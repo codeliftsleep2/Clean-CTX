@@ -1,0 +1,27 @@
+[package]
+name = "clean-ctx"
+version = "0.1.0"
+edition = "2024"
+description = "Enterprise Token Waste Reducer & Context Compiler - Local-first AST compression engine for LLM token optimization"
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "s"
+codegen-units = 1
+
+[dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
+tree-sitter = "0.20"
+tree-sitter-c-sharp = "0.20"
+tree-sitter-typescript = "0.20"
+
+# high-speed, zero-copy JSON stream parsing
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# High-speed cryptographic hashing
+sha2 = "0.10"
+
+# High-speed local token estimation (Closer to standard LLM tokenizers)
+tiktoken-rs = "0.11"
