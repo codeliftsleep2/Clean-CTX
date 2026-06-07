@@ -23,6 +23,30 @@ use crate::compression::CapEntry;
 use crate::compression::Fidelity;
 use crate::dictionary::PathDictionary;
 
+/// Output of [`build_output_lines`]. F-04 (FAANG audit): previously
+/// the orchestrator counted classes/methods/imports by
+/// `let class_count: usize = 0;` and bound it to `_`, then passed
+/// `0, 0, 0` to `format_final_output`. The header always lied.
+/// The struct now carries the real counts and a `Vec<String>` of
+/// import lines (kept in case downstream code needs them).
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct BuildOutputResult {
+    /// The compacted body lines, in document order, with the import
+    /// block prepended.
+    pub output_lines: Vec<String>,
+    /// The compacted import lines (without the fidelity-specific
+    /// join). Kept for symmetry with the legacy return type.
+    pub imports: Vec<String>,
+    /// Number of `class.root` captures that emitted a class entry.
+    pub class_count: usize,
+    /// Number of `method.root` captures that emitted a method line.
+    pub method_count: usize,
+    /// Number of `import.root` captures that produced a non-empty
+    /// import line.
+    pub import_count: usize,
+}
+
 /// Reads a target source file and compiles it down into a highly compacted,
 /// keyword-stripped structural signature stream with configurable fidelity.
 pub fn compress_file(
@@ -39,7 +63,7 @@ pub fn compress_file(
     let path_alias = dict.get_or_create_alias(absolute_path.clone());
 
     // Include fidelity in the cache key so different fidelity levels don't share cached results
-    let cache_key = format!("{}::{:?}", absolute_path, fidelity);
+    let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
     let is_modified = cache.update_and_verify(cache_key, current_hash);
     if !is_modified {
         let cached_notice = format!(
@@ -48,9 +72,18 @@ pub fn compress_file(
         );
         let meta = calculate_savings(&source_code, &cached_notice);
 
+        // F-04: also surface the Structures line on a cache hit so
+        // the header is consistent with the miss path. We can't
+        // know the real counts without re-parsing, so we report
+        // "cached" for each — the LLM client knows the previous
+        // output and can match by `path_alias`.
+        let ratio_report = format!(
+            "// Structures: cached, cached, cached | {}/{} tokens",
+            meta.raw_tokens, meta.compressed_tokens
+        );
         return Ok(format!(
-            "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n{}",
-            meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, cached_notice
+            "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
+            meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, ratio_report, cached_notice
         ));
     }
 
@@ -58,29 +91,40 @@ pub fn compress_file(
     let (language, query_string) = language_for_extension(extension)
         .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
 
-    // Run the SHARED capture pipeline
+    // Run the SHARED capture pipeline. F-08: pass the real `fidelity`
+    // through so the per-capture closures use it (instead of always
+    // Low).
     let all_captures: Vec<CapEntry> = run_capture_pipeline(
         language,
         query_string,
         &source_code,
-        |capture_name, raw, _low| {
+        fidelity,
+        |capture_name, raw, f| {
             if capture_name == "class.root" {
                 Some(extract_class_name(raw))
             } else if capture_name == "method.root" {
-                Some(extract_method_sig(raw, fidelity))
+                Some(extract_method_sig(raw, f))
             } else if capture_name == "field.root" {
-                Some(extract_field(raw, fidelity))
+                Some(extract_field(raw, f))
             } else {
-                Some(compact_expression(raw, fidelity))
+                Some(compact_expression(raw, f))
             }
         },
     )?;
 
-    let (output_lines, _imports) = build_output_lines(&all_captures, &source_code, fidelity);
-    let body_content = assemble_body(&output_lines, fidelity);
+    // F-04: `build_output_lines` now returns real counts.
+    let built = build_output_lines(&all_captures, &source_code, fidelity);
+    let body_content = assemble_body(&built.output_lines, fidelity);
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
     let compacted_body = format_compacted_body(&display_body, &sym_footer, &path_alias, fidelity);
-    let final_output = format_final_output(&source_code, &compacted_body, fidelity, 0, 0, 0);
+    let final_output = format_final_output(
+        &source_code,
+        &compacted_body,
+        fidelity,
+        built.class_count,
+        built.method_count,
+        built.import_count,
+    );
     Ok(final_output)
 }
 
@@ -88,31 +132,40 @@ pub fn compress_file(
 // Shared pipeline helpers
 // ---------------------------------------------------------------------------
 
-/// Walk the captures in document order and build the output lines + the
-/// imports list. Shared between the streaming and non-streaming variants.
+/// Walk the captures in document order and build the output lines +
+/// the per-fidelity counts. Shared between the streaming and
+/// non-streaming variants.
+///
+/// F-04: the return type is now `BuildOutputResult` (with the real
+/// counts) instead of a `(Vec<String>, Vec<String>)` tuple.
 pub fn build_output_lines(
     all_captures: &[CapEntry],
     source_code: &str,
     fidelity: Fidelity,
-) -> (Vec<String>, Vec<String>) {
+) -> BuildOutputResult {
     let mut output_lines: Vec<String> = Vec::new();
     let mut fields: Vec<String> = Vec::new();
     let mut markers: Vec<String> = Vec::new();
     let mut imports: Vec<String> = Vec::new();
-    let import_count: usize = 0;
-    let class_count: usize = 0;
-    let _ = (import_count, class_count);
+    let mut class_count: usize = 0;
+    let mut method_count: usize = 0;
+    let mut import_count: usize = 0;
 
     for cap in all_captures {
         match cap.name.as_str() {
             "import.root" => {
-                imports.push(compact_import(&cap.text, fidelity));
+                let compact = compact_import(&cap.text, fidelity);
+                if !compact.is_empty() {
+                    imports.push(compact);
+                    import_count += 1;
+                }
             }
             "class.root" => {
                 if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium) {
                     output_lines.push(String::new());
                 }
                 output_lines.push(format_class_entry(&cap.text, &fields, fidelity));
+                class_count += 1;
                 fields.clear();
                 markers.clear();
             }
@@ -134,6 +187,7 @@ pub fn build_output_lines(
                         output_lines.push(sig.clone());
                     }
                 }
+                method_count += 1;
                 markers.clear();
             }
             "field.root" => {
@@ -176,7 +230,13 @@ pub fn build_output_lines(
         };
         output.insert(0, import_block);
     }
-    (output, imports)
+    BuildOutputResult {
+        output_lines: output,
+        imports,
+        class_count,
+        method_count,
+        import_count,
+    }
 }
 
 /// Join the body lines using the per-fidelity separator.

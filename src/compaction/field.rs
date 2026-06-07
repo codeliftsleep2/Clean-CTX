@@ -2,8 +2,8 @@
 //
 // Field/property compaction across fidelity levels.
 
+use crate::compaction::modifiers::{strip_modifiers, MODIFIERS_FIELD};
 use crate::compression::Fidelity;
-use crate::compaction::modifiers::MODIFIERS_FIELD;
 
 /// Extract a compact field/property signature.
 ///
@@ -22,20 +22,8 @@ pub fn extract_field(text: &str, fidelity: Fidelity) -> String {
 /// Medium-fidelity field: "name:type"
 fn compact_field_medium(text: &str) -> String {
     let line = text.lines().next().unwrap_or(text).trim();
-    // Reuse the shared modifier list — `MODIFIERS_FIELD` is the single
-    // source of truth (Phase 2 consolidation). The helper
-    // `strip_modifiers` is local to this module and not exported.
-    let mut s = line.to_string();
-    loop {
-        let mut stripped = false;
-        for m in MODIFIERS_FIELD {
-            if let Some(rest) = s.strip_prefix(m) {
-                s = rest.trim().to_string();
-                stripped = true;
-            }
-        }
-        if !stripped { break; }
-    }
+    // F-16: use the shared `strip_modifiers` helper.
+    let s = strip_modifiers(line, MODIFIERS_FIELD);
     // Drop initialiser (everything from `=` onwards) and trailing `;`
     let s = s.split('=').next().unwrap_or(&s).trim();
     let s = s.trim_end_matches(';').trim();

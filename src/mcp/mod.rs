@@ -9,13 +9,17 @@
 //   - tools      : tool definitions and tools/call dispatch
 //   - prompts    : prompt definitions and content
 //   - workspace  : workspace-level operations (compress_workspace_dir, collect_source_files)
+//   - state      : per-session state shared by all tool handlers (F-05)
 
 mod handlers;
 pub(crate) mod prompts;
 mod router;
 mod server;
+pub(crate) mod state;
 pub(crate) mod tools;
 pub(crate) mod workspace;
+
+pub use state::McpState;
 
 /// Run the MCP server. This is the entry point called from `main()`.
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {

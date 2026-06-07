@@ -16,23 +16,61 @@ pub struct Decompressor {
     builtin_opcodes: BTreeMap<&'static str, &'static str>,
 }
 
+/// F-06 (FAANG audit): a word boundary for opcode expansion is "the
+/// adjacent char is not a Unicode alphanumeric or `_`". The previous
+/// implementation used `is_ascii_alphanumeric`, which silently
+/// treated every non-ASCII character as a boundary — meaning a
+/// token like `α1` (Greek alpha, ASCII '1') would expand correctly
+/// but `αétat` (Greek alpha + Latin é + t + a + t) would not.
+pub(crate) fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
 /// Replace all occurrences of `pattern` in `text` at word boundaries.
-/// Word boundary = adjacent char is not alphanumeric.
-fn word_boundary_replace(text: &str, pattern: &str, replacement: &str) -> String {
-    let mut result = String::new();
+///
+/// F-06: the previous byte-based ASCII check has been replaced with
+/// a char-based Unicode check. The new algorithm is:
+///   1. Find the next occurrence of `pattern` in the remainder of
+///      `text`. Record its absolute byte offset.
+///   2. If neither the preceding char nor the following char is a
+///      "word char" (per `is_word_char` above), replace the match
+///      with `replacement` and resume after it.
+///   3. Otherwise advance by one char and re-scan.
+///
+/// Because `pattern` is expected to be short (an opcode like
+/// `"$ctor"`) the inner `find` is cheap; the outer loop is
+/// `O(len(text) + num_replacements)`.
+pub(crate) fn word_boundary_replace(text: &str, pattern: &str, replacement: &str) -> String {
+    let mut result = String::with_capacity(text.len());
     let mut start = 0;
+
     while let Some(pos) = text[start..].find(pattern) {
-        let abs_pos = start + pos;
-        let before_ok = abs_pos == 0 || !text.as_bytes()[abs_pos - 1].is_ascii_alphanumeric();
-        let after_pos = abs_pos + pattern.len();
-        let after_ok = after_pos >= text.len() || !text.as_bytes()[after_pos].is_ascii_alphanumeric();
+        let abs = start + pos;
+        // The char immediately before the match, if any.
+        let before_ok = text[..abs]
+            .chars()
+            .next_back()
+            .is_none_or(|c| !is_word_char(c));
+        // The char immediately after the match, if any.
+        let after_ok = text[abs + pattern.len()..]
+            .chars()
+            .next()
+            .is_none_or(|c| !is_word_char(c));
 
         if before_ok && after_ok {
-            result.push_str(&text[start..abs_pos]);
+            result.push_str(&text[start..abs]);
             result.push_str(replacement);
-            start = after_pos;
+            start = abs + pattern.len();
         } else {
-            start = abs_pos + 1;
+            // Advance one Unicode char (not one byte) so we don't
+            // infinite-loop on a multi-byte character.
+            let next_char_boundary = text[start..]
+                .char_indices()
+                .nth(1)
+                .map(|(i, _)| start + i)
+                .unwrap_or(text.len());
+            result.push_str(&text[start..next_char_boundary]);
+            start = next_char_boundary;
         }
     }
     result.push_str(&text[start..]);
@@ -162,4 +200,4 @@ impl Decompressor {
 
 #[cfg(test)]
 #[path = "../tests/decompression/decompressor.rs"]
-mod tests;
+mod integration_tests;

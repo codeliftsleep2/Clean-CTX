@@ -41,25 +41,16 @@ pub struct CapEntry {
     pub start_byte: usize,
 }
 
-/// Run the shared capture pipeline.
-///
-/// - `language`        : tree-sitter language to use (TypeScript or C#)
-/// - `query_string`    : the query that defines the captures we want
-/// - `source`          : the raw source code
-/// - `process`         : closure that, given `(capture_name, raw_text)`,
-///   returns the text the caller wants stored in the resulting
-///   `CapEntry.text`. Returning `None` from `process` drops the capture
-///   entirely (the caller does not see it in the returned vector).
-///
-/// The closure is `FnMut` so the caller can accumulate state across
-/// captures (rare in practice; the production callers all return a
-/// `String` directly). Captures are returned sorted by `start_byte`
-/// ascending so the caller can walk them in document order without
-/// re-sorting.
+// F-08 (FAANG audit): the closure previously received a hard-coded
+// `Fidelity::Low` regardless of what the caller asked for. That meant
+// `compress_code_context` with `fidelity: "high"` still produced
+// Low-fidelity method/field signatures. The function now takes a
+// real `Fidelity` argument and threads it through to `process`.
 pub fn run_capture_pipeline<F>(
     language: Language,
     query_string: &str,
     source: &str,
+    fidelity: Fidelity,
     mut process: F,
 ) -> Result<Vec<CapEntry>, Box<dyn std::error::Error>>
 where
@@ -80,7 +71,7 @@ where
             let capture_name = query.capture_names()[capture.index as usize].to_string();
             if let Ok(text_slice) = capture.node.utf8_text(source_bytes) {
                 let raw = text_slice.to_string();
-                if let Some(processed) = process(&capture_name, &raw, Fidelity::Low) {
+                if let Some(processed) = process(&capture_name, &raw, fidelity) {
                     all_captures.push(CapEntry {
                         name: capture_name,
                         text: processed,
