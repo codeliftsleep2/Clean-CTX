@@ -4,7 +4,7 @@
 
 use std::collections::BTreeMap;
 
-use super::snapshot::{CapturedClass, CapturedMethod};
+use super::snapshot::CapturedClass;
 
 /// Group a vector of items by a derived key, preserving the relative order
 /// of items within each group.
@@ -61,7 +61,3 @@ pub(crate) fn summarize_class(cls: &CapturedClass) -> String {
     }
 }
 
-// Bring CapturedMethod into scope to keep the import set explicit even
-// though it isn't directly referenced yet. (Removed once tests land here.)
-#[allow(dead_code)]
-fn _typecheck(_: CapturedMethod) {}

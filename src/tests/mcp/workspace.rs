@@ -1,9 +1,10 @@
 use super::*;
 use crate::config::CleanCtxConfig;
 use std::fs;
+use std::path::Path;
 use tempfile::TempDir;
 
-fn create_ts_file(dir: &std::path::PathBuf, name: &str, content: &str) {
+fn create_ts_file(dir: &Path, name: &str, content: &str) {
     let path = dir.join(name);
     let mut f = fs::File::create(&path).unwrap();
     std::io::Write::write(&mut f, content.as_bytes()).unwrap();
@@ -16,12 +17,12 @@ fn compress_workspace_dir_respects_exclude_patterns() {
     let dir = TempDir::new().unwrap();
     let dir_path = dir.path().to_path_buf();
     create_ts_file(
-        &dir_path,
+        dir.path(),
         "keep.ts",
         "export class A { foo(): void {} }\n",
     );
     create_ts_file(
-        &dir_path,
+        dir.path(),
         "skip-me.ts",
         "export class B { bar(): void {} }\n",
     );
@@ -69,7 +70,7 @@ fn workspace_emits_alias_cross_reference() {
     let dir = TempDir::new().unwrap();
     let dir_path = dir.path().to_path_buf();
     create_ts_file(
-        &dir_path,
+        dir.path(),
         "alpha.ts",
         "export class Alpha { run(): void {} }\n",
     );
@@ -106,7 +107,7 @@ fn workspace_shares_aliases_with_per_file_tool() {
     let dir = TempDir::new().unwrap();
     let dir_path = dir.path().to_path_buf();
     create_ts_file(
-        &dir_path,
+        dir.path(),
         "shared.ts",
         "export class Shared { hello(): string { return ''; } }\n",
     );
@@ -173,7 +174,7 @@ fn collect_source_files_survives_symlink_loop() {
     let sub = dir_path.join("sub");
     fs::create_dir(&sub).unwrap();
     create_ts_file(
-        &sub.to_path_buf(),
+        &sub,
         "good.ts",
         "export class Good {}\n",
     );
@@ -215,7 +216,7 @@ fn collect_source_files_respects_max_depth() {
         fs::create_dir(&current).unwrap();
     }
     // Put a .ts file at the deepest level.
-    create_ts_file(&current.to_path_buf(), "deep.ts", "export class Deep {}\n");
+    create_ts_file(&current, "deep.ts", "export class Deep {}\n");
 
     let mut entries = Vec::new();
     collect_source_files(dir.path().to_str().unwrap(), &mut entries);

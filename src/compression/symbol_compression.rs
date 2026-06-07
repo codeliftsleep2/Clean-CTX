@@ -6,6 +6,7 @@
 // skip this pass because structural markers already keep density high.
 
 use crate::compression::Fidelity;
+use crate::dictionary::symbol::tokenize_for_symbols;
 use crate::dictionary::SymbolDictionary;
 
 /// Apply the symbol-dictionary opcode pass (Low fidelity only). Higher
@@ -17,10 +18,7 @@ pub fn apply_symbol_compression(body_content: &str, fidelity: Fidelity) -> (Stri
     }
     let mut sym_dict = SymbolDictionary::new();
     for token in body_content.split_whitespace() {
-        let clean = token.trim_matches(|c: char| {
-            c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}'
-                || c == '<' || c == '>' || c == ':' || c == ';' || c == ',' || c == '.'
-        });
+        let clean = tokenize_for_symbols(token);
         if !clean.is_empty() {
             sym_dict.register(clean);
         }

@@ -1,0 +1,30 @@
+# cargo-deny configuration
+
+[advisories]
+# Path to advisory database
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# If 1 or more advisories are present, fail the build
+vulnerability = "deny"
+# If 1 or more unmaintained crates are present, fail the build
+unmaintained = "deny"
+# If 1 or more notice advisories are present, warn
+notice = "warn"
+
+[licenses]
+# Deny unknown licenses
+unlicensed = "deny"
+# Allow these licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+]
+
+[bans]
+# Ban unsafe code (currently zero unsafe blocks in the codebase)
+deny = []
+skip = []
+
+[sources]
+# Only allow crates from crates.io by default
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

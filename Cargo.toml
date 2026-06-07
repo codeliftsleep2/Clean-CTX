@@ -2,7 +2,17 @@
 name = "clean-ctx"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+license = "Proprietary"
 description = "Enterprise Token Waste Reducer & Context Compiler - Local-first AST compression engine for LLM token optimization"
+
+[lib]
+name = "clean_ctx"
+path = "src/lib.rs"
+
+[[bin]]
+name = "clean-ctx"
+path = "src/main.rs"
 
 [profile.release]
 strip = true
@@ -12,9 +22,12 @@ codegen-units = 1
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
-tree-sitter = "0.20"
-tree-sitter-c-sharp = "0.20"
-tree-sitter-typescript = "0.20"
+# SAFETY: tree-sitter 0.20.x is pinned in lockstep with the language crates.
+tree-sitter = "=0.20.10"
+# SAFETY: Must match tree-sitter 0.20.x ABI.
+tree-sitter-c-sharp = "=0.20.0"
+# SAFETY: Must match tree-sitter 0.20.x ABI.
+tree-sitter-typescript = "=0.20.5"
 
 # high-speed, zero-copy JSON stream parsing
 serde = { version = "1.0", features = ["derive"] }
