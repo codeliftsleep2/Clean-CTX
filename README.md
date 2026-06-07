@@ -58,10 +58,10 @@ A local-first, air-gapped context optimization engine that eliminates token wast
 Automatically maps repeated tokens to ultra-short opcodes:
 
 ```
-$c = class          $s = string          $b = boolean
+$c = class           $s = string          $b = boolean
 $ctor = constructor  $P = Promise         $a = async
-$r = return         $t = throw           $E = Error
-$T = true           $F = false           $e = export
+$r = return          $t = throw           $E = Error
+$T = true            $F = false           $e = export
 ```
 
 Custom opcodes (`$1`, `$2`, etc.) are auto-assigned for tokens appearing 2+ times in a session.
