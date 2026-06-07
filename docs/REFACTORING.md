@@ -26,11 +26,11 @@ This plan decomposes the project into **eight cohesive modules**, each with a si
 
 ## 🔍 Audit Findings
 
-### File Sizes (current state — after Phase 3)
+### File Sizes (current state — after Phase 4)
 
 | File | Lines | Status | Primary Issue |
 |------|------:|--------|---------------|
-| `src/main.rs` | **421** | 🟡 P1 | Bootstrap + routing + tool defs + prompts + dispatch (Phase 4 target) |
+| `src/main.rs` | **7** | ✅ | Phase 4: 3-line bootstrap (was 421) |
 | `src/compression/markers.rs` | 71 | ✅ | OK |
 | `src/compression/opcodes.rs` | 117 | ✅ | OK |
 | `src/compression/fidelity.rs` | 42 | ✅ | OK |
@@ -52,9 +52,11 @@ This plan decomposes the project into **eight cohesive modules**, each with a si
 | `src/dictionary/` (2 files) | ~80–200 each | ✅ | Phase 1: split from dictionary.rs |
 | `src/decompression/` (4 files) | ~30–120 each | ✅ | Phase 1: split from decompressor.rs |
 | `src/diff/` (6 files) | ~30–300 each | ✅ | Phase 1: split from diff.rs |
-| **New files this phase** | **~460 total** | ✅ | 4 new modules added to `src/compression/` |
-| **Largest file** | **421 (main.rs)** | 🟡 | Phase 4 target |
-| **Files > 350 lines** | **1** | 🟡 | Only `main.rs` remains (Phase 4 target) |
+| `src/mcp/` (7 files) | ~23–170 each | ✅ | Phase 4: split from main.rs |
+| **New files this phase** | **~460 total (Phase 3)** | ✅ | 4 new modules added to `src/compression/` |
+| **New files this phase** | **~545 total (Phase 4)** | ✅ | 7 new modules added to `src/mcp/` |
+| **Largest file** | **170 (tools.rs)** | ✅ | All files < 350 lines |
+| **Files > 350 lines** | **0** | ✅ | Target met |
 
 ### SOLID / SoC Violations Per File
 
@@ -243,20 +245,29 @@ The work is split into **five phases**. Each phase ends with a green `cargo buil
 ### ✅ Phase 4 — MCP Server Rewrite
 **Goal:** Decompose `main.rs` into a 3-line bootstrap that calls a focused server module.
 
-- [ ] Create `src/mcp/mod.rs` exposing `run() -> Result<(), Box<dyn Error>>`.
-- [ ] Create `src/mcp/server.rs` containing the stdin/stdout read loop and the call to `router::dispatch`.
-- [ ] Create `src/mcp/router.rs` containing the top-level `match req.method` dispatcher.
-- [ ] Create `src/mcp/handlers.rs` containing `initialize`, `tools/list`, `prompts/list`, `prompts/get` handlers.
-- [ ] Create `src/mcp/tools.rs` with the 4 tool definitions as data + a `dispatch_tools_call` function.
-- [ ] Create `src/mcp/prompts.rs` with the `cleanctx-notation` prompt content (extracted from the giant `concat!` string).
-- [ ] Create `src/mcp/workspace.rs` with `compress_workspace_dir` and `collect_source_files`.
-- [ ] Replace `src/main.rs` with:
+- [x] Create `src/mcp/mod.rs` exposing `run() -> Result<(), Box<dyn Error>>`.
+- [x] Create `src/mcp/server.rs` containing the stdin/stdout read loop and the call to `router::dispatch`.
+- [x] Create `src/mcp/router.rs` containing the top-level `match req.method` dispatcher.
+- [x] Create `src/mcp/handlers.rs` containing `initialize`, `tools/list`, `prompts/list`, `prompts/get` handlers.
+- [x] Create `src/mcp/tools.rs` with the 4 tool definitions as data + a `dispatch_tools_call` function.
+- [x] Create `src/mcp/prompts.rs` with the `cleanctx-notation` prompt content (extracted from the giant `concat!` string).
+- [x] Create `src/mcp/workspace.rs` with `compress_workspace_dir` and `collect_source_files`.
+- [x] Replace `src/main.rs` with:
   ```rust
   fn main() -> Result<(), Box<dyn std::error::Error>> {
       clean_ctx::mcp::run()
   }
   ```
-- [ ] **Validation:** `cargo build` and `cargo test` both green. The 421-line `main.rs` is now 3 lines.
+- [x] **Validation:** `cargo build` and `cargo test` both green. The 421-line `main.rs` is now 3 lines.
+
+**Phase 4 result (2026-06-07):**
+- `cargo build` — ✅ green (3 pre-existing dead-code warnings only)
+- `cargo test` — ✅ 51/51 tests pass (unchanged from Phase 3)
+- `src/main.rs` dropped from 421 to 7 lines (bootstrap only)
+- 7 new files created in `src/mcp/`: `mod.rs`, `server.rs`, `router.rs`, `handlers.rs`, `tools.rs`, `prompts.rs`, `workspace.rs`
+- Largest file in the codebase is now `tools.rs` at 170 lines — well under the 350-line target
+- No file in the codebase exceeds 350 lines (headline target met)
+- Awaiting go-ahead to begin Phase 5.
 
 ### ✅ Phase 5 — Polish
 **Goal:** Clean up dead code, consolidate documentation, add missing tests.
@@ -323,7 +334,7 @@ These are rough estimates assuming no surprises:
 | Phase 1: Pure splits | 1–2 hours | Low (mechanical) | ✅ Complete |
 | Phase 2: Eliminate duplication | 2–3 hours | Medium (semantic checks) | ✅ Complete |
 | Phase 3: Compressor rewrite | 2–3 hours | Medium (refactor public API) | ✅ ~30 min |
-| Phase 4: MCP server rewrite | 1–2 hours | Low (mechanical) | ⏳ Pending |
+| Phase 4: MCP server rewrite | 1–2 hours | Low (mechanical) | ✅ ~15 min |
 | Phase 5: Polish | 1 hour | Low (cleanup) | ⏳ Pending |
 | **Total** | **7–11 hours** | | |
 
@@ -346,5 +357,5 @@ These are rough estimates assuming no surprises:
 | 2026-06-06 | Phase 1 | ✅ | Pure file splits complete; cargo build green; 14/14 tests pass |
 | 2026-06-07 | Phase 2 | ✅ | All 5 DRY violations eliminated; cargo build green; 46/46 tests pass |
 | 2026-06-07 | Phase 3 | ✅ | Compressor decomposed into 4 focused modules; 17-line re-export shim; cargo build green; 51/51 tests pass |
-| _TBD_ | Phase 4 | ⏳ | MCP server rewrite |
+| 2026-06-07 | Phase 4 | ✅ | MCP server decomposed into 7 focused modules; 7-line bootstrap; cargo build green; 51/51 tests pass |
 | _TBD_ | Phase 5 | ⏳ | Polish |

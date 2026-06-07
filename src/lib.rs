@@ -24,6 +24,7 @@
 pub mod cache;
 pub mod compressor;
 pub mod config;
+pub mod mcp;
 pub mod protocol;
 pub mod queries;
 pub mod analytics;
