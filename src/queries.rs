@@ -5,7 +5,7 @@
 //   import_statement, import_declaration
 // C# AST node types: class_declaration, method_declaration, 
 //   interface_declaration, field_declaration, throw_statement,
-//   for_statement, foreach_statement, if_statement, while_statement,
+//   for_statement, if_statement, while_statement,
 //   return_statement, using_directive
 
 pub const TS_QUERY: &str = r#"
@@ -27,7 +27,6 @@ pub const CS_QUERY: &str = r#"
     (field_declaration) @field.root
     (throw_statement) @throw.root
     (for_statement) @for.root
-    (foreach_statement) @for.root
     (if_statement) @if.root
     (while_statement) @while.root
     (return_statement) @return.root

@@ -3,8 +3,16 @@
 // Maps frequently repeated tokens to ultra-short opcodes (e.g., $1, $2).
 // This is the "extended lookup dictionary graph" — a learnable symbol table
 // that compresses repeated tokens into tiny references.
+//
+// Phase 2: the built-in primitive opcodes are loaded from the shared
+// `crate::compression::opcodes::PRIMITIVE_OPCODES` table so the
+// dictionary and the decompressor both read from the same single source
+// of truth (previously the 32 entries were duplicated inline here and
+// in `decompression/opcodes.rs`).
 
 use std::collections::BTreeMap;
+
+use crate::compression::opcodes::{is_primitive_opcode, PRIMITIVE_OPCODES};
 
 /// Opcode symbol type
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -30,7 +38,6 @@ pub struct SymbolDictionary {
 
 impl SymbolDictionary {
     pub fn new() -> Self {
-        // Pre-populate with very common token "primitives" that appear frequently
         let mut dict = Self {
             forward: BTreeMap::new(),
             reverse: BTreeMap::new(),
@@ -38,41 +45,11 @@ impl SymbolDictionary {
             frequency: BTreeMap::new(),
         };
 
-        // Built-in primitives: one-char opcodes for ultra-common tokens
-        dict.insert_primitive("export", "$e");
-        dict.insert_primitive("class", "$c");
-        dict.insert_primitive("async", "$a");
-        dict.insert_primitive("Promise", "$P");
-        dict.insert_primitive("boolean", "$b");
-        dict.insert_primitive("string", "$s");
-        dict.insert_primitive("number", "$n");
-        dict.insert_primitive("void", "$v");
-        dict.insert_primitive("true", "$T");
-        dict.insert_primitive("false", "$F");
-        dict.insert_primitive("public", "$pu");
-        dict.insert_primitive("private", "$pv");
-        dict.insert_primitive("protected", "$pd");
-        dict.insert_primitive("static", "$st");
-        dict.insert_primitive("new", "$nw");
-        dict.insert_primitive("return", "$r");
-        dict.insert_primitive("throw", "$t");
-        dict.insert_primitive("Error", "$E");
-        dict.insert_primitive("const", "$k");
-        dict.insert_primitive("let", "$l");
-        dict.insert_primitive("if", "$i");
-        dict.insert_primitive("for", "$fr");
-        dict.insert_primitive("while", "$w");
-        dict.insert_primitive("this", "$h");
-        dict.insert_primitive("extends", "$x");
-        dict.insert_primitive("implements", "$m");
-        dict.insert_primitive("import", "$im");
-        dict.insert_primitive("from", "$fm");
-        dict.insert_primitive("interface", "$if");
-        dict.insert_primitive("type", "$ty");
-        dict.insert_primitive("function", "$fn");
-        dict.insert_primitive("constructor", "$ctor");
-        dict.insert_primitive("undefined", "$ud");
-        dict.insert_primitive("null", "$nl");
+        // Built-in primitives: load from the SHARED opcode table so the
+        // dictionary and the decompressor can never drift apart.
+        for (opcode, token) in PRIMITIVE_OPCODES {
+            dict.insert_primitive(token, opcode);
+        }
 
         dict
     }
@@ -159,10 +136,7 @@ impl SymbolDictionary {
         if self.reverse.len() <= 32 {
             // Only show opcodes that aren't built-in primitives (IDs >= 1 after primitives)
             let custom: Vec<_> = self.reverse.iter()
-                .filter(|(opcode, _)| {
-                    // Filter out the built-in primitives by checking if opcode matches $[a-z]+ pattern
-                    !Self::is_primitive_opcode(opcode)
-                })
+                .filter(|(opcode, _)| !is_primitive_opcode(opcode))
                 .collect();
 
             if custom.is_empty() {
@@ -178,16 +152,11 @@ impl SymbolDictionary {
             String::new()
         }
     }
+}
 
-    fn is_primitive_opcode(opcode: &str) -> bool {
-        // Primitives are $ followed by 1-3 lowercase letters, or $im, $fm, $if, $ty, $fn, $ctor
-        let primitives = [
-            "$e", "$c", "$a", "$P", "$b", "$s", "$n", "$v", "$T", "$F",
-            "$pu", "$pv", "$pd", "$st", "$nw", "$r", "$t", "$E", "$k", "$l",
-            "$i", "$fr", "$w", "$h", "$x", "$m", "$im", "$fm", "$if", "$ty",
-            "$fn", "$ctor", "$ud", "$nl",
-        ];
-        primitives.contains(&opcode)
+impl Default for SymbolDictionary {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -220,5 +189,13 @@ mod tests {
         // `CustomType` gets auto-registered on its second occurrence.
         let encoded = sd.encode("async function CustomType");
         assert_eq!(encoded, "$a $fn $1");
+    }
+
+    #[test]
+    fn default_impl_works() {
+        // Phase 2: ensures the new `Default` impl wires up the same
+        // primitive opcodes as `new()` does.
+        let sd = SymbolDictionary::default();
+        assert_eq!(sd.get_opcode("async"), Some("$a"));
     }
 }

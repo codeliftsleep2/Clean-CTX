@@ -2,7 +2,7 @@
 //
 // Generic expression-level compaction and raw-text fallback.
 
-use crate::compressor::Fidelity;
+use crate::compression::Fidelity;
 
 /// Compact an arbitrary expression (used for captures that aren't class,
 /// method, field, or import nodes — e.g. throw expressions, return values).

@@ -2,7 +2,7 @@
 //
 // Import declaration compaction and symbol-name extraction.
 
-use crate::compressor::Fidelity;
+use crate::compression::Fidelity;
 
 /// Compact an import declaration.
 ///

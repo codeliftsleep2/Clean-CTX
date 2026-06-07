@@ -2,7 +2,7 @@
 //
 // Class-level extraction and formatting helpers.
 
-use crate::compressor::Fidelity;
+use crate::compression::Fidelity;
 
 /// Extract just the class name (and optional base/interface list) from the
 /// raw text of a class declaration node.

@@ -2,13 +2,21 @@
 //
 // Snapshot construction: parse a source string with tree-sitter, walk the
 // captures, and assemble a `CapturedStructure`.
-
-use tree_sitter::{Language, Parser as TSParser, Query, QueryCursor};
+//
+// Phase 2: the tree-sitter capture walk, the language heuristic, and the
+// marker construction logic now live in `crate::compression::*`. This
+// file is reduced to:
+//   1. Choosing the language (with a content-based fallback)
+//   2. Driving the SHARED capture pipeline
+//   3. Assembling the `CapturedStructure` from the resulting `CapEntry`s
 
 use crate::compaction::{
     compact_expression, compact_import, extract_class_name, extract_field, extract_method_sig,
 };
-use crate::compressor::Fidelity;
+use crate::compression::capture_pipeline::run_capture_pipeline;
+use crate::compression::language::detect_language;
+use crate::compression::markers::build_marker;
+use crate::compression::Fidelity;
 use crate::queries;
 
 use super::snapshot::{CapturedClass, CapturedMethod, CapturedStructure};
@@ -20,21 +28,16 @@ pub fn build_snapshot(
     source: &str,
     fidelity: Fidelity,
 ) -> Result<CapturedStructure, Box<dyn std::error::Error>> {
-    let (language, query_string): (Language, &str) = detect_language(source);
+    let (language, query_string) = detect_language(source);
     // Try the chosen language first; if it yields no captures (e.g. wrong
     // file content for the heuristic), fall back to the other parser.
     match try_build_with(language, query_string, source, fidelity) {
         Ok(snap) if !snap.classes.is_empty() || !snap.imports.is_empty() => Ok(snap),
         _ => {
-            let other_lang = if query_string == queries::TS_QUERY {
-                tree_sitter_c_sharp::language()
+            let (other_lang, other_query) = if query_string == queries::TS_QUERY {
+                (tree_sitter_c_sharp::language(), queries::CS_QUERY)
             } else {
-                tree_sitter_typescript::language_typescript()
-            };
-            let other_query = if query_string == queries::TS_QUERY {
-                queries::CS_QUERY
-            } else {
-                queries::TS_QUERY
+                (tree_sitter_typescript::language_typescript(), queries::TS_QUERY)
             };
             try_build_with(other_lang, other_query, source, fidelity)
         }
@@ -42,52 +45,32 @@ pub fn build_snapshot(
 }
 
 fn try_build_with(
-    language: Language,
+    language: tree_sitter::Language,
     query_string: &str,
     source: &str,
     fidelity: Fidelity,
 ) -> Result<CapturedStructure, Box<dyn std::error::Error>> {
-    let mut parser = TSParser::new();
-    parser.set_language(language)?;
-    let tree = parser.parse(source, None).ok_or("AST Generation Error")?;
-    let source_bytes = source.as_bytes();
-
-    let query = Query::new(language, query_string)?;
-    let mut cursor = QueryCursor::new();
-    let matches = cursor.matches(&query, tree.root_node(), source_bytes);
-
-    #[derive(Debug)]
-    struct Cap {
-        name: String,
-        text: String,
-        start_byte: usize,
-    }
-    let mut all_captures: Vec<Cap> = Vec::new();
-    for mat in matches {
-        for capture in mat.captures {
-            let capture_name = query.capture_names()[capture.index as usize].to_string();
-            if let Ok(text_slice) = capture.node.utf8_text(source_bytes) {
-                let raw = text_slice.to_string();
-                let processed = if capture_name == "class.root" {
-                    extract_class_name(&raw)
-                } else if capture_name == "method.root" {
-                    extract_method_sig(&raw, fidelity)
-                } else if capture_name == "field.root" {
-                    extract_field(&raw, fidelity)
-                } else if capture_name == "import.root" {
-                    compact_import(&raw, fidelity)
-                } else {
-                    compact_expression(&raw, fidelity)
-                };
-                all_captures.push(Cap {
-                    name: capture_name,
-                    text: processed,
-                    start_byte: capture.node.start_byte(),
-                });
+    // Run the SHARED capture pipeline. The closure maps each
+    // (capture_name, raw_text) pair to the normalised text the diff
+    // path wants stored in the resulting CapEntry.
+    let all_captures = run_capture_pipeline(
+        language,
+        query_string,
+        source,
+        |capture_name, raw, _low| {
+            if capture_name == "class.root" {
+                Some(extract_class_name(raw))
+            } else if capture_name == "method.root" {
+                Some(extract_method_sig(raw, fidelity))
+            } else if capture_name == "field.root" {
+                Some(extract_field(raw, fidelity))
+            } else if capture_name == "import.root" {
+                Some(compact_import(raw, fidelity))
+            } else {
+                Some(compact_expression(raw, fidelity))
             }
-        }
-    }
-    all_captures.sort_by(|a, b| a.start_byte.cmp(&b.start_byte));
+        },
+    )?;
 
     let mut classes: Vec<CapturedClass> = Vec::new();
     let mut imports: Vec<String> = Vec::new();
@@ -134,16 +117,11 @@ fn try_build_with(
                 if fidelity == Fidelity::Low {
                     continue;
                 }
-                let marker = match cap.name.as_str() {
-                    "throw.root" => format!("⊕!{}", cap.text),
-                    "for.root" => "⊕loop".to_string(),
-                    "if.root" => "⊕guard".to_string(),
-                    "while.root" => "⊕loop".to_string(),
-                    "return.root" => format!("⊕⇒{}", cap.text),
-                    _ => continue,
-                };
-                if pending_markers.last().map(|m| m != &marker).unwrap_or(true) {
-                    pending_markers.push(marker);
+                // Delegate marker construction to the SHARED module.
+                if let Some(marker) = build_marker(&cap.name, &cap.text) {
+                    if pending_markers.last().map(|m| m != &marker).unwrap_or(true) {
+                        pending_markers.push(marker);
+                    }
                 }
             }
         }
@@ -164,14 +142,43 @@ fn try_build_with(
     })
 }
 
-fn detect_language(source: &str) -> (Language, &'static str) {
-    let looks_csharp = source.contains("namespace ")
-        || source.contains("using System")
-        || source.contains("public class ")
-        || source.contains("private void ");
-    if looks_csharp {
-        (tree_sitter_c_sharp::language(), queries::CS_QUERY)
-    } else {
-        (tree_sitter_typescript::language_typescript(), queries::TS_QUERY)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_snapshot_parses_a_simple_class() {
+        let src = r#"
+            export class Foo {
+                public greet(name: string): string { return "hi " + name; }
+            }
+        "#;
+        let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot");
+        assert!(!snap.classes.is_empty(), "expected at least one class");
+        let foo = &snap.classes[0];
+        assert_eq!(foo.name, "Foo");
+    }
+
+    #[test]
+    fn build_snapshot_handles_empty_source() {
+        let snap = build_snapshot("", Fidelity::Low).expect("build_snapshot");
+        assert!(snap.classes.is_empty());
+        assert!(snap.imports.is_empty());
+    }
+
+    #[test]
+    fn build_snapshot_falls_back_to_other_language() {
+        // C# content where the TS-first heuristic would fail to find
+        // anything; the fallback should still produce a snapshot.
+        let src = r#"
+            namespace MyApp {
+                public class Greeter {
+                    public string Greet(string name) { return "hi " + name; }
+                }
+            }
+        "#;
+        let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot");
+        // Either the C# path or the TS fallback must produce classes.
+        assert!(!snap.classes.is_empty() || !snap.imports.is_empty());
     }
 }

@@ -3,7 +3,7 @@
 // Render a `Vec<DiffAction>` into the canonical compact change-set format
 // used by the diff tool, and provide a one-line summary helper.
 
-use crate::compressor::Fidelity;
+use crate::compression::Fidelity;
 
 use super::action::{DiffAction, DiffKind, DiffTarget};
 
