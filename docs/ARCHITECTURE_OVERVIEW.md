@@ -9,32 +9,32 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  MCP stdio Interface (JSON-RPC 2.0)                    │
+│  MCP stdio Interface (JSON-RPC 2.0)                     │
 │                                                         │
-│  ┌───────────────┐  ┌──────────────┐  ┌─────────────┐  │
-│  │ compress_     │  │ decompress_  │  │ compress_   │  │
-│  │ code_context  │  │ code_context │  │ workspace   │  │
-│  └───────┬───────┘  └──────┬───────┘  └──────┬──────┘  │
-│          │                  │                  │         │
-│          │           ┌─────▼─────┐  ┌─────────▼──────┐  │
+│  ┌───────────────┐  ┌──────────────┐  ┌─────────────┐   │
+│  │ compress_     │  │ decompress_  │  │ compress_   │   │
+│  │ code_context  │  │ code_context │  │ workspace   │   │
+│  └───────┬───────┘  └──────┬───────┘  └──────┬──────┘   │
+│          │                 │                 │          │
+│          │           ┌─────▼─────┐  ┌────────▼───────┐  │
 │          │           │  diff_    │  │  Tree-sitter   │  │
 │          │           │  code_    │  │  AST + baseline│  │
 │          │           │  context  │  │  snapshots     │  │
 │          │           └─────┬─────┘  └─────────┬──────┘  │
-│  ┌───────▼──────────────────▼──────────────────▼──────┐ │
+│  ┌───────▼─────────────────▼──────────────────▼───────┐ │
 │  │              Compressor Engine                     │ │
 │  │  AST Extraction → Fidelity Filter → Opcode Encode  │ │
 │  └───────┬────────────────────────────────────────────┘ │
 │          │                                              │
-│  ┌───────▼──────────┐  ┌─────────────────────────────┐ │
-│  │ SymbolDictionary │  │ Decompressor                │ │
-│  │ PathDictionary   │  │ Opcode → Readable expansion │ │
-│  └───────┬──────────┘  └─────────────────────────────┘ │
+│  ┌───────▼──────────┐  ┌─────────────────────────────┐  │
+│  │ SymbolDictionary │  │ Decompressor                │  │
+│  │ PathDictionary   │  │ Opcode → Readable expansion │  │
+│  └───────┬──────────┘  └─────────────────────────────┘  │
 │          │                                              │
-│  ┌───────▼──────────┐  ┌─────────────────────────────┐ │
-│  │ Tree-sitter AST  │  │ LocalStateCache             │ │
-│  │ Parser (TS + C#) │  │ Hash + baseline snapshots   │ │
-│  └──────────────────┘  └─────────────────────────────┘ │
+│  ┌───────▼──────────┐  ┌─────────────────────────────┐  │
+│  │ Tree-sitter AST  │  │ LocalStateCache             │  │
+│  │ Parser (TS + C#) │  │ Hash + baseline snapshots   │  │
+│  └──────────────────┘  └─────────────────────────────┘  │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
 │  │ TokenAnalytics (cl100k tiktoken estimator)       │   │
@@ -51,11 +51,12 @@
 ## Compression Pipeline Stages
 
 ```
-Source Code
-    │
-    ▼
+     Source Code
+          │
+          ▼
 ┌─────────────────────┐
-│ Tree-sitter AST Parse│  Extract class, method, field, control flow nodes
+│     Tree-sitter     |
+|     AST Parse       │  Extract class, method, field, control flow nodes
 └─────────┬───────────┘
           │
           ▼
