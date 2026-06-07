@@ -3,8 +3,8 @@ name = "clean-ctx"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
-license = "Proprietary"
-description = "Enterprise Token Waste Reducer & Context Compiler - Local-first AST compression engine for LLM token optimization"
+license = "CC0-1.0"
+description = "Token Waste Reducer & Context Compiler - Local-first AST compression engine for LLM token optimization"
 
 [lib]
 name = "clean_ctx"

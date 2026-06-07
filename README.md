@@ -1,6 +1,6 @@
-# Clean-CTX — Enterprise Token Waste Reducer & Context Compiler
+# Clean-CTX — Token Waste Reducer & Context Compiler
 
-A local-first, air-gapped context optimization engine that eliminates token waste in LLM interactions while maintaining zero network footprint. Built in Rust for enterprise environments with restrictive firewalls and DLP systems.
+A local-first, air-gapped context optimization engine that eliminates token waste in LLM interactions while maintaining zero network footprint. Built in Rust for restrictive firewall and DLP environments.
 
 > **🚀 New in 0.1.0:** Streaming compression, AST-level diff with baseline caching, workspace-wide path aliasing, `.clean-ctx.json` project configuration, and 3 fidelity levels.
 
@@ -77,7 +77,7 @@ Long file paths are compressed to short aliases:
   α2 = C:\project\src\core\auth\security\TokenVerifier.tsx
 ```
 
-### Enterprise Security
+### Security
 
 - **Zero network transport** — stdio-only via MCP, no HTTP/WS/RPC servers
 - **No external runtimes** — single statically linked binary
@@ -358,8 +358,13 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 | Document | Audience | Content |
 |----------|----------|---------|
 | [`README.md`](README.md) | **Users** | Installation, configuration, usage, opcode reference |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contributors | Overview, process, quick links to detailed docs |
 | [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md) | Architects | System design, module structure, pipeline stages, design decisions |
 | [`docs/DEVELOPER_DOCUMENTATION.md`](docs/DEVELOPER_DOCUMENTATION.md) | Contributors | Building, testing, adding languages/tools/opcodes, code quality gates |
+| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Users | Common issues, error codes, diagnostic commands |
+| [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Architects | Benchmarks, caching, memory profile, optimization checklist |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | Administrators | Compliance checklist, hardening, SBOM, air-gap deployment |
+| [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | All | Version history with all additions, fixes, and deferrals |
 | [`docs/FAANG_AUDIT.md`](docs/FAANG_AUDIT.md) | Auditors | Complete audit findings and remediation status |
 | [`docs/REFACTORING.md`](docs/REFACTORING.md) | Developers | SOLID refactoring plan and execution history |
 
@@ -367,4 +372,4 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 
 ## License
 
-CC0-1.0 license
+[CC0-1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) — Dedicated to the public domain.

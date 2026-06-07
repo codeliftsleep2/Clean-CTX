@@ -158,7 +158,7 @@ src/
 
 ### Why stdio-only (no HTTP)?
 
-Clean-CTX is designed for **air-gapped enterprise environments** where DLP (Data Loss Prevention) systems block all network traffic. By communicating exclusively over stdin/stdout via the Model Context Protocol (MCP), the binary:
+Clean-CTX is designed for **air-gapped environments** where DLP (Data Loss Prevention) systems block all network traffic. By communicating exclusively over stdin/stdout via the Model Context Protocol (MCP), the binary:
 - Has zero network footprint
 - Requires no ports, no HTTP server, no TLS configuration
 - Works behind the most restrictive firewalls out of the box
