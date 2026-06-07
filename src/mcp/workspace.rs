@@ -9,11 +9,32 @@
 // the `compress_code_context` tool, the cache survives between
 // calls, and `is_excluded` filters out files the user has
 // configured to skip.
+//
+// F-09/F-13: the workspace result is now a structured
+// [`WorkspaceResult`] instead of a bare `String`, and per-file
+// alias cross-references are emitted in the manifest.
 
 use std::path::PathBuf;
 use crate::compressor::compress_file;
 use crate::compression::Fidelity;
 use crate::mcp::McpState;
+
+/// Structured result of a workspace compression pass.
+///
+/// F-13 (FAANG audit): errors used to be inlined as `// ERROR`
+/// comments inside the manifest string. They are now surfaced as
+/// a separate `errors` field so MCP clients can programmatically
+/// inspect failures without parsing comments.
+#[derive(Debug, Clone)]
+pub struct WorkspaceResult {
+    /// The full manifest string with per-file compressed output,
+    /// exclusion report, and path-alias footer.
+    pub manifest: String,
+    /// Per-file errors encountered during compression.
+    pub errors: Vec<(String, String)>,
+    /// Files skipped due to config exclusion patterns.
+    pub excluded: Vec<String>,
+}
 
 /// Scan a directory for .ts/.cs files and compress each one.
 ///
@@ -22,6 +43,10 @@ use crate::mcp::McpState;
 /// consulted per entry. Per-file errors are collected into a
 /// structured `errors` field instead of being inlined as
 /// `// ERROR` comments.
+///
+/// F-09: per-file alias cross-references (`// α1 = /path/to/file.ts`)
+/// are emitted in the manifest so LLM clients can correlate the
+/// per-file block with the global path map.
 ///
 /// Borrow-checker note: the function destructures `state` to split
 /// the dict and cache into two independent `&mut` references. The
@@ -32,7 +57,7 @@ pub(crate) fn compress_workspace_dir(
     dir_path: &str,
     fidelity: Fidelity,
     state: &mut McpState,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<WorkspaceResult, Box<dyn std::error::Error>> {
     let mut manifest = String::new();
     manifest.push_str("// Clean-CTX Workspace Manifest\n");
     manifest.push_str(&format!("// Directory: {}\n", dir_path));
@@ -76,7 +101,17 @@ pub(crate) fn compress_workspace_dir(
     for entry in &kept {
         match compress_file(PathBuf::from(entry), dict, cache, fidelity) {
             Ok(compressed) => {
-                manifest.push_str(&format!("// ===== FILE: {} =====\n", entry));
+                // F-09: emit the per-file alias cross-reference so
+                // LLM clients can correlate the block with the
+                // path map footer.
+                let absolute = std::fs::canonicalize(entry)
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_else(|_| entry.clone());
+                let alias = dict.get_or_create_alias(absolute);
+                manifest.push_str(&format!(
+                    "// ===== FILE: {} =====\n// α alias: {}\n",
+                    entry, alias
+                ));
                 manifest.push_str(&compressed);
                 manifest.push('\n');
             }
@@ -104,7 +139,11 @@ pub(crate) fn compress_workspace_dir(
     // Append the global path map.
     manifest.push_str(&dict.format_footer());
 
-    Ok(manifest)
+    Ok(WorkspaceResult {
+        manifest,
+        errors,
+        excluded,
+    })
 }
 
 /// Recursively collect .ts and .cs files from a directory.

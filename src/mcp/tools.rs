@@ -210,11 +210,24 @@ pub(crate) fn dispatch_tools_call(
             };
 
             match workspace::compress_workspace_dir(dir_path, fidelity, state) {
-                Ok(manifest) => {
+                Ok(result) => {
+                    // F-13: the WorkspaceResult carries the manifest
+                    // plus structured errors/excluded lists. We send
+                    // the manifest as the primary text content; the
+                    // errors are surfaced as a separate JSON field so
+                    // MCP clients can inspect them programmatically.
                     send_response(&serde_json::json!({
                         "jsonrpc": "2.0",
                         "id": id,
-                        "result": { "content": [{ "type": "text", "text": manifest }] }
+                        "result": {
+                            "content": [{ "type": "text", "text": result.manifest }],
+                            "_meta": {
+                                "errors": result.errors.into_iter().map(|(p, e)| {
+                                    serde_json::json!({ "path": p, "error": e })
+                                }).collect::<Vec<_>>(),
+                                "excluded": result.excluded,
+                            }
+                        }
                     }));
                 }
                 Err(e) => {
