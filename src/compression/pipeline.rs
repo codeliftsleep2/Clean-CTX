@@ -1,0 +1,214 @@
+// src/compression/pipeline.rs
+//
+// Non-streaming compression orchestrator (`compress_file`). It owns the
+// shared helper functions `build_output_lines` and `assemble_body` that
+// were historically private to `compressor.rs`. These are `pub(crate)` so
+// the streaming variant can also call them.
+
+use std::fs;
+use std::path::PathBuf;
+
+use crate::analytics::calculate_savings;
+use crate::cache::LocalStateCache;
+use crate::compaction::{
+    compact_expression, compact_import, extract_class_name, extract_field,
+    extract_method_sig, format_class_entry, simple_compact,
+};
+use crate::compression::capture_pipeline::run_capture_pipeline;
+use crate::compression::language::language_for_extension;
+use crate::compression::markers::build_marker;
+use crate::compression::report::{format_compacted_body, format_final_output};
+use crate::compression::symbol_compression::apply_symbol_compression;
+use crate::compression::CapEntry;
+use crate::compression::Fidelity;
+use crate::dictionary::PathDictionary;
+
+/// Reads a target source file and compiles it down into a highly compacted,
+/// keyword-stripped structural signature stream with configurable fidelity.
+pub fn compress_file(
+    file: PathBuf,
+    dict: &mut PathDictionary,
+    cache: &mut LocalStateCache,
+    fidelity: Fidelity,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let source_code = fs::read_to_string(&file)?;
+    let source_bytes = source_code.as_bytes();
+
+    let current_hash = cache.compute_hash(source_bytes);
+    let absolute_path = fs::canonicalize(&file)?.to_string_lossy().into_owned();
+    let path_alias = dict.get_or_create_alias(absolute_path.clone());
+
+    // Include fidelity in the cache key so different fidelity levels don't share cached results
+    let cache_key = format!("{}::{:?}", absolute_path, fidelity);
+    let is_modified = cache.update_and_verify(cache_key, current_hash);
+    if !is_modified {
+        let cached_notice = format!(
+            "// [CACHE_HIT] {} unchanged. Use historic memory.\n",
+            path_alias
+        );
+        let meta = calculate_savings(&source_code, &cached_notice);
+
+        return Ok(format!(
+            "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n{}",
+            meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, cached_notice
+        ));
+    }
+
+    let extension = file.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+    let (language, query_string) = language_for_extension(extension)
+        .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
+
+    // Run the SHARED capture pipeline
+    let all_captures: Vec<CapEntry> = run_capture_pipeline(
+        language,
+        query_string,
+        &source_code,
+        |capture_name, raw, _low| {
+            if capture_name == "class.root" {
+                Some(extract_class_name(raw))
+            } else if capture_name == "method.root" {
+                Some(extract_method_sig(raw, fidelity))
+            } else if capture_name == "field.root" {
+                Some(extract_field(raw, fidelity))
+            } else {
+                Some(compact_expression(raw, fidelity))
+            }
+        },
+    )?;
+
+    let (output_lines, _imports) = build_output_lines(&all_captures, &source_code, fidelity);
+    let body_content = assemble_body(&output_lines, fidelity);
+    let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
+    let compacted_body = format_compacted_body(&display_body, &sym_footer, &path_alias, fidelity);
+    let final_output = format_final_output(&source_code, &compacted_body, fidelity, 0, 0, 0);
+    Ok(final_output)
+}
+
+// ---------------------------------------------------------------------------
+// Shared pipeline helpers
+// ---------------------------------------------------------------------------
+
+/// Walk the captures in document order and build the output lines + the
+/// imports list. Shared between the streaming and non-streaming variants.
+pub fn build_output_lines(
+    all_captures: &[CapEntry],
+    source_code: &str,
+    fidelity: Fidelity,
+) -> (Vec<String>, Vec<String>) {
+    let mut output_lines: Vec<String> = Vec::new();
+    let mut fields: Vec<String> = Vec::new();
+    let mut markers: Vec<String> = Vec::new();
+    let mut imports: Vec<String> = Vec::new();
+    let import_count: usize = 0;
+    let class_count: usize = 0;
+    let _ = (import_count, class_count);
+
+    for cap in all_captures {
+        match cap.name.as_str() {
+            "import.root" => {
+                imports.push(compact_import(&cap.text, fidelity));
+            }
+            "class.root" => {
+                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium) {
+                    output_lines.push(String::new());
+                }
+                output_lines.push(format_class_entry(&cap.text, &fields, fidelity));
+                fields.clear();
+                markers.clear();
+            }
+            "method.root" => {
+                let sig = &cap.text;
+                if !markers.is_empty() {
+                    let marker_str = markers.join(" ");
+                    if fidelity == Fidelity::High {
+                        output_lines.push(format!("  {} {{ {} }}", sig, marker_str));
+                    } else if fidelity == Fidelity::Medium {
+                        output_lines.push(format!("{} {}", sig, marker_str));
+                    } else {
+                        output_lines.push(sig.clone());
+                    }
+                } else {
+                    if fidelity == Fidelity::High {
+                        output_lines.push(format!("  {}", sig));
+                    } else {
+                        output_lines.push(sig.clone());
+                    }
+                }
+                markers.clear();
+            }
+            "field.root" => {
+                if !cap.text.is_empty() {
+                    fields.push(cap.text.clone());
+                }
+            }
+            _ => {
+                if fidelity == Fidelity::Low {
+                    continue;
+                }
+                if let Some(marker) = build_marker(&cap.name, &cap.text) {
+                    if markers.last().map(|m| m != &marker).unwrap_or(true) {
+                        markers.push(marker);
+                    }
+                }
+            }
+        }
+    }
+
+    // Orphaned fields with no class context
+    if !fields.is_empty() && output_lines.is_empty() && fidelity != Fidelity::Low {
+        output_lines.push(format!("⊕fields {{ {} }}", fields.join("; ")));
+    }
+
+    // Raw fallback when nothing was captured
+    if output_lines.is_empty() {
+        if let Some(first_line) = source_code.lines().next() {
+            let trimmed = first_line.trim().to_string();
+            if !trimmed.is_empty() {
+                output_lines.push(simple_compact(&trimmed, fidelity));
+            }
+        }
+    }
+
+    // Prepend imports
+    let mut output = output_lines;
+    if !imports.is_empty() {
+        let import_block = match fidelity {
+            Fidelity::Low => imports.join("; "),
+            _ => imports.join("\n"),
+        };
+        output.insert(0, import_block);
+    }
+    (output, imports)
+}
+
+/// Join the body lines using the per-fidelity separator.
+pub fn assemble_body(output_lines: &[String], fidelity: Fidelity) -> String {
+    match fidelity {
+        Fidelity::Low => output_lines.join(";"),
+        Fidelity::Medium => output_lines.join("\n"),
+        Fidelity::High => output_lines.join("\n"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assemble_body_uses_semicolon_at_low() {
+        let lines = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(assemble_body(&lines, Fidelity::Low), "a;b");
+    }
+
+    #[test]
+    fn assemble_body_uses_newline_at_medium() {
+        let lines = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(assemble_body(&lines, Fidelity::Medium), "a\nb");
+    }
+
+    #[test]
+    fn assemble_body_uses_newline_at_high() {
+        let lines = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(assemble_body(&lines, Fidelity::High), "a\nb");
+    }
+}

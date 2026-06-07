@@ -1,11 +1,10 @@
 // src/compression/mod.rs
 //
-// Shared building blocks for the compression pipeline. Before Phase 2 these
-// concepts were duplicated across `compressor.rs`, `diff/builder.rs`,
-// `dictionary/symbol.rs`, `decompression/*`, and `compaction/*`. After Phase 2
-// they live here as the single source of truth.
+// Shared building blocks for the compression pipeline, plus the two
+// orchestrators (`compress_file` and `compress_file_streaming`).
 //
-// Module split:
+// # Phase 2 foundations (shared single-source modules)
+//
 //   - `fidelity`          : the `Fidelity` enum + `from_str` parser
 //   - `language`          : centralized language detection (extension + heuristic)
 //   - `opcodes`           : SHARED primitive opcode table (consumed by symbol
@@ -15,18 +14,24 @@
 //   - `capture_pipeline`  : SHARED tree-sitter capture-walk that yields a
 //                           sorted `Vec<CapEntry>` from a parsed tree
 //
-// The orchestrators (`compress_file`, `compress_file_streaming`,
-// `build_snapshot`) call into these modules rather than reimplementing them.
+// # Phase 3 orchestrators (extracted from the 601-line `compressor.rs`)
+//
+//   - `symbol_compression`: Low-fidelity opcode pass
+//   - `report`            : Final optimisation-report formatting
+//   - `pipeline`          : Non-streaming `compress_file` + shared helpers
+//   - `streaming`         : Streaming variant with progress callbacks
 
 pub(crate) mod capture_pipeline;
 pub(crate) mod markers;
 pub(crate) mod opcodes;
+pub(crate) mod pipeline;
+pub(crate) mod report;
+pub(crate) mod streaming;
+pub(crate) mod symbol_compression;
 pub mod language;
 pub mod fidelity;
 
-// Re-export shared types for downstream callers. These were previously
-// defined inside `compressor.rs` and `diff/builder.rs`; they now live in
-// the `compression` namespace so both modules can depend on them.
+// Re-export shared types for downstream callers.
 //
 // `Fidelity` is `pub` (not `pub(crate)`) because the historical
 // `crate::compressor::Fidelity` import path needs to remain public, and
@@ -34,5 +39,10 @@ pub mod fidelity;
 pub(crate) use capture_pipeline::CapEntry;
 pub use fidelity::Fidelity;
 pub use language::{detect_language, language_for_extension, looks_like_csharp};
-pub(crate) use markers::{build_marker, expand_markers_in_line};
-pub(crate) use opcodes::{builtin_opcode_map, is_primitive_opcode, PRIMITIVE_OPCODES};
+// These are re-exported for convenience but the main consumers
+// (`pipeline.rs`, `streaming.rs`, consumers of `dictionary/`) import
+// directly from the submodules.
+
+// Re-export the orchestrator entry points and the progress type.
+pub use pipeline::compress_file;
+pub use streaming::{compress_file_streaming, CompressionProgress};
