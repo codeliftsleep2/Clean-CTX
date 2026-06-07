@@ -150,7 +150,7 @@ First call stores the current state as baseline. Subsequent calls return only th
 
 ---
 
-## Token Savings Results
+## Token Savings Results (Very Limited Testing)
 
 ### Small File: sample_service.ts (193 raw tokens)
 
