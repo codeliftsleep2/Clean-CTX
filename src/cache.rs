@@ -26,6 +26,12 @@ pub struct LocalStateCache {
     baseline_snapshots: BTreeMap<String, CapturedStructure>,
 }
 
+impl Default for LocalStateCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LocalStateCache {
     pub fn new() -> Self {
         Self {
@@ -45,11 +51,10 @@ impl LocalStateCache {
     /// modified file, `false` if the content is byte-for-byte identical to
     /// the last seen version.
     pub fn update_and_verify(&mut self, absolute_path: String, current_hash: String) -> bool {
-        if let Some(existing_hash) = self.registry.get(&absolute_path) {
-            if *existing_hash == current_hash {
+        if let Some(existing_hash) = self.registry.get(&absolute_path)
+            && *existing_hash == current_hash {
                 return false;
             }
-        }
         self.registry.insert(absolute_path, current_hash);
         true
     }

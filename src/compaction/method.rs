@@ -37,7 +37,7 @@ fn compact_method_low(sig: &str) -> String {
 
     // s is now "name(params...): ReturnType" or "name<T>(params): ReturnType"
     // Extract name (up to first `(` or `<`)
-    let name = s.split(|c: char| c == '(' || c == '<').next().unwrap_or(&s);
+    let name = s.split(['(', '<']).next().unwrap_or(&s);
 
     // Extract param block
     let params = extract_param_names(&s);

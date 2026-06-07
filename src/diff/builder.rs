@@ -91,7 +91,7 @@ fn try_build_with(
                         last.fields = std::mem::take(&mut pending_fields);
                     }
                 } else if !pending_fields.is_empty() {
-                    orphan_fields.extend(pending_fields.drain(..));
+                    orphan_fields.append(&mut pending_fields);
                 }
                 classes.push(CapturedClass {
                     name: cap.text.clone(),
@@ -118,11 +118,10 @@ fn try_build_with(
                     continue;
                 }
                 // Delegate marker construction to the SHARED module.
-                if let Some(marker) = build_marker(&cap.name, &cap.text) {
-                    if pending_markers.last().map(|m| m != &marker).unwrap_or(true) {
+                if let Some(marker) = build_marker(&cap.name, &cap.text)
+                    && pending_markers.last().map(|m| m != &marker).unwrap_or(true) {
                         pending_markers.push(marker);
                     }
-                }
             }
         }
     }

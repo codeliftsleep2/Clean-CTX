@@ -38,7 +38,7 @@ pub fn format_diff(actions: &[DiffAction], fidelity: Fidelity) -> String {
                 out.push_str(&format!("= {} (unchanged)\n", action.label));
             } else {
                 out.push_str(
-                    &format!(
+                    format!(
                         "{} {} {}\n",
                         action.kind.symbol(),
                         action.label,

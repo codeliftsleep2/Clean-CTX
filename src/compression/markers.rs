@@ -54,6 +54,9 @@ pub fn build_marker(capture_name: &str, text: &str) -> Option<String> {
 
 /// Expand a single marker token. Returns the expanded text, or `None` if the
 /// input is not a recognised marker (caller should pass through unchanged).
+///
+/// Only used in test code; production callers use `expand_markers_in_line`.
+#[allow(dead_code)]
 pub fn expand_marker(token: &str) -> Option<&'static str> {
     match token {
         "⊕guard" | "⊕loop" => Some(""),

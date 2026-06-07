@@ -16,7 +16,8 @@ pub fn calculate_savings(raw_text: &str, compressed_text: &str) -> TokenMetadata
     let compressed_tokens = bpe.encode_with_special_tokens(compressed_text).len();
 
     let savings_percentage = if raw_tokens > 0 {
-        ((raw_tokens - compressed_tokens) as f64 / raw_tokens as f64) * 100.0
+        let saved = raw_tokens.saturating_sub(compressed_tokens);
+        (saved as f64 / raw_tokens as f64) * 100.0
     } else {
         0.0
     };

@@ -41,7 +41,7 @@ pub(crate) fn method_key(sig: &str) -> String {
 
 pub(crate) fn field_key(field: &str) -> String {
     let end = field
-        .find(|c: char| c == ':' || c == '?' || c == '=' || c == ';')
+        .find([':', '?', '=', ';'])
         .unwrap_or(field.len());
     field[..end].trim().to_string()
 }
