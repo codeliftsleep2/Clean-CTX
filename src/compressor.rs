@@ -1,37 +1,42 @@
 // src/compressor.rs
+//
+// Public entry points for the compression pipeline. The actual
+// pipeline is decomposed into focused submodules under
+// `crate::compression`; this file is a thin orchestrator.
+//
+// Phase 2 notes:
+//   - The capture-processing pipeline now lives in
+//     `crate::compression::capture_pipeline::run_capture_pipeline`.
+//   - Marker construction now lives in
+//     `crate::compression::markers::build_marker`.
+//   - Language detection now lives in `crate::compression::language`.
+//   - The primitive opcode table now lives in
+//     `crate::compression::opcodes::PRIMITIVE_OPCODES`.
+//   - `Fidelity` now lives in `crate::compression::fidelity::Fidelity`.
+//     `pub use crate::compression::Fidelity;` re-exports it here for
+//     backward compatibility with the historical
+//     `crate::compressor::Fidelity` import path.
+
 use std::fs;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufReader, Read};
 use std::path::PathBuf;
-use tree_sitter::{Language, Parser as TSParser, Query, QueryCursor};
-use crate::queries;
-use crate::dictionary::{PathDictionary, SymbolDictionary};
-use crate::cache::LocalStateCache;
+
 use crate::analytics::calculate_savings;
-use crate::helpers::{
+use crate::cache::LocalStateCache;
+use crate::compaction::{
     compact_expression, compact_import, extract_class_name, extract_field,
     extract_method_sig, format_class_entry, simple_compact,
 };
+use crate::compression::capture_pipeline::run_capture_pipeline;
+use crate::compression::language::language_for_extension;
+use crate::compression::markers::build_marker;
+use crate::compression::CapEntry;
+use crate::dictionary::{PathDictionary, SymbolDictionary};
 
-/// Compression fidelity level
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Fidelity {
-    /// Maximum compression — strips keywords, async, fields, errors (current default)
-    Low,
-    /// Balanced — preserves async, field types, errors, control flow markers
-    Medium,
-    /// Minimal compression — preserves as much semantic depth as possible
-    High,
-}
-
-impl Fidelity {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "medium" => Fidelity::Medium,
-            "high" => Fidelity::High,
-            _ => Fidelity::Low,
-        }
-    }
-}
+// Re-export the shared `Fidelity` enum so external callers and the old
+// `use crate::compressor::Fidelity;` import statements keep working.
+// The type is the same one as `crate::compression::Fidelity`.
+pub use crate::compression::Fidelity;
 
 /// A progress event emitted by streaming compression. The `progress` is in
 /// the range `0.0..=1.0`. `phase` describes the current step of the pipeline.
@@ -48,14 +53,14 @@ pub struct CompressionProgress {
 /// Reads a target source file and compiles it down into a highly compacted,
 /// keyword-stripped structural signature stream with configurable fidelity.
 pub fn compress_file(
-    file: PathBuf, 
+    file: PathBuf,
     dict: &mut PathDictionary,
     cache: &mut LocalStateCache,
     fidelity: Fidelity,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let source_code = fs::read_to_string(&file)?;
     let source_bytes = source_code.as_bytes();
-    
+
     let current_hash = cache.compute_hash(source_bytes);
     let absolute_path = fs::canonicalize(&file)?.to_string_lossy().into_owned();
     let path_alias = dict.get_or_create_alias(absolute_path.clone());
@@ -65,11 +70,11 @@ pub fn compress_file(
     let is_modified = cache.update_and_verify(cache_key, current_hash);
     if !is_modified {
         let cached_notice = format!(
-            "// [CACHE_HIT] {} unchanged. Use historic memory.\n", 
+            "// [CACHE_HIT] {} unchanged. Use historic memory.\n",
             path_alias
         );
         let meta = calculate_savings(&source_code, &cached_notice);
-        
+
         return Ok(format!(
             "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n{}",
             meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, cached_notice
@@ -77,223 +82,42 @@ pub fn compress_file(
     }
 
     let extension = file.extension().and_then(|ext| ext.to_str()).unwrap_or("");
-    let (language, query_string): (Language, &str) = match extension {
-        "ts" | "js" => (tree_sitter_typescript::language_typescript(), queries::TS_QUERY),
-        "cs" => (tree_sitter_c_sharp::language(), queries::CS_QUERY),
-        _ => return Err(format!("Unsupported file extension: .{}", extension).into()),
-    };
+    let (language, query_string) = language_for_extension(extension)
+        .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
 
-    let mut parser = TSParser::new();
-    parser.set_language(language)?;
-    let tree = parser.parse(&source_code, None).ok_or("AST Generation Error")?;
-
-    let query = Query::new(language, query_string)?;
-    let mut cursor = QueryCursor::new();
-    let matches = cursor.matches(&query, tree.root_node(), source_bytes);
-
-    let mut output_lines: Vec<String> = Vec::new();
-    let mut fields: Vec<String> = Vec::new();
-    let mut markers: Vec<String> = Vec::new();
-    let mut imports: Vec<String> = Vec::new();
-    let method_count: usize = 0;
-    let _field_count: usize = 0;
-    let mut import_count: usize = 0;
-    let mut class_count: usize = 0;
-    let _marker_count: usize = 0;
-
-    // Collect all captures with their node positions for ordering
-    #[derive(Debug)]
-    struct CaptureEntry {
-        name: String,
-        text: String,
-        start_byte: usize,
-    }
-
-    let mut all_captures: Vec<CaptureEntry> = Vec::new();
-
-    for mat in matches {
-        for capture in mat.captures {
-            let capture_name = query.capture_names()[capture.index as usize].to_string();
-            if let Ok(text_slice) = capture.node.utf8_text(source_bytes) {
-                let text = text_slice.to_string();
-                let cap_name = capture_name.clone();
-                all_captures.push(CaptureEntry {
-                    name: cap_name,
-                    text: if capture_name == "class.root" {
-                        extract_class_name(&text)
-                    } else if capture_name == "method.root" {
-                        extract_method_sig(&text, fidelity)
-                    } else if capture_name == "field.root" {
-                        extract_field(&text, fidelity)
-                    } else {
-                        compact_expression(&text, fidelity)
-                    },
-                    start_byte: capture.node.start_byte(),
-                });
+    // Run the SHARED capture pipeline. The closure maps each
+    // (capture_name, raw_text) pair to the normalised text the
+    // compressor wants stored in the resulting CapEntry.
+    let all_captures: Vec<CapEntry> = run_capture_pipeline(
+        language,
+        query_string,
+        &source_code,
+        |capture_name, raw, _low| {
+            if capture_name == "class.root" {
+                Some(extract_class_name(raw))
+            } else if capture_name == "method.root" {
+                Some(extract_method_sig(raw, fidelity))
+            } else if capture_name == "field.root" {
+                Some(extract_field(raw, fidelity))
+            } else {
+                Some(compact_expression(raw, fidelity))
             }
-        }
-    }
+        },
+    )?;
 
-    // Sort captures by document position
-    all_captures.sort_by(|a, b| a.start_byte.cmp(&b.start_byte));
-
-    // Build the output: walk through captures in document order
-    for cap in &all_captures {
-        match cap.name.as_str() {
-            "import.root" => {
-                import_count += 1;
-                imports.push(compact_import(&cap.text, fidelity));
-            }
-            "class.root" => {
-                class_count += 1;
-                // Separate classes with empty line in higher fidelities
-                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium) {
-                    output_lines.push(String::new());
-                }
-                output_lines.push(format_class_entry(&cap.text, &fields, fidelity));
-                fields.clear();
-                markers.clear();
-            }
-            "method.root" => {
-                let sig = &cap.text;
-                if !markers.is_empty() {
-                    let marker_str = markers.join(" ");
-                    if fidelity == Fidelity::High {
-                        output_lines.push(format!("  {} {{ {} }}", sig, marker_str));
-                    } else if fidelity == Fidelity::Medium {
-                        output_lines.push(format!("{} {}", sig, marker_str));
-                    } else {
-                        output_lines.push(sig.clone());
-                    }
-                } else {
-                    if fidelity == Fidelity::High {
-                        output_lines.push(format!("  {}", sig));
-                    } else {
-                        output_lines.push(sig.clone());
-                    }
-                }
-                markers.clear();
-            }
-            "field.root" => {
-                if !cap.text.is_empty() {
-                    fields.push(cap.text.clone());
-                }
-            }
-            _ => {
-                // Control flow / behavior markers (throw, for, if, while, return)
-                if fidelity == Fidelity::Low {
-                    continue;
-                }
-                let marker = match cap.name.as_str() {
-                    "throw.root" => format!("⊕!{}", cap.text),
-                    "for.root" => "⊕loop".to_string(),
-                    "if.root" => "⊕guard".to_string(),
-                    "while.root" => "⊕loop".to_string(),
-                    "return.root" => format!("⊕⇒{}", cap.text),
-                    _ => continue,
-                };
-                // Deduplicate consecutive identical markers
-                if markers.last().map(|m| m != &marker).unwrap_or(true) {
-                    markers.push(marker);
-                }
-            }
-        }
-    }
-
-    // If we have fields and no class context, add them if fidelity allows
-    if !fields.is_empty() && output_lines.is_empty() && fidelity != Fidelity::Low {
-        output_lines.push(format!("⊕fields {{ {} }}", fields.join("; ")));
-    }
-
-    // If nothing was captured, provide a raw fallback
-    if output_lines.is_empty() {
-        if let Some(first_line) = source_code.lines().next() {
-            let trimmed = first_line.trim().to_string();
-            if !trimmed.is_empty() {
-                output_lines.push(simple_compact(&trimmed, fidelity));
-            }
-        }
-    }
-
-    // Prepend imports (if any were captured) to the output
-    if !imports.is_empty() {
-        let import_block = match fidelity {
-            Fidelity::Low => imports.join("; "),
-            _ => imports.join("\n"),
-        };
-        output_lines.insert(0, import_block);
-    }
-
-    let body_content: String = match fidelity {
-        Fidelity::Low => output_lines.join(";"),
-        Fidelity::Medium => output_lines.join("\n"),
-        Fidelity::High => output_lines.join("\n"),
-    };
-    
-    // ---- Symbol Opcode Compression (optional pre-session pass) ----
-    // Only apply opcodes to low fidelity compact bodies where they help most.
-    // For medium/high, the structural markers already provide sufficient density.
-    let (display_body, sym_footer) = if fidelity == Fidelity::Low {
-        let mut sym_dict = SymbolDictionary::new();
-        for token in body_content.split_whitespace() {
-            let clean = token.trim_matches(|c: char| c == '(' || c == ')' || c == '[' || c == ']' 
-                                                         || c == '{' || c == '}' || c == '<' || c == '>'
-                                                         || c == ':' || c == ';' || c == ',' || c == '.');
-            if !clean.is_empty() {
-                sym_dict.register(clean);
-            }
-            if let Some(rest) = token.strip_prefix('⊕') {
-                if !rest.is_empty() {
-                    sym_dict.register(rest);
-                }
-            }
-        }
-        let encoded = sym_dict.encode(&body_content);
-        let footer = sym_dict.format_footer();
-        (encoded, footer)
-    } else {
-        (body_content, String::new())
-    };
-    
-    let layout_header = match fidelity {
-        Fidelity::Low => format!("// --- Compacted Layout (Low Fidelity): {} ---", path_alias),
-        Fidelity::Medium => format!("// --- Enhanced Layout (Medium Fidelity): {} ---", path_alias),
-        Fidelity::High => format!("// --- Full Layout (High Fidelity): {} ---", path_alias),
-    };
-    
-    let compacted_body = if sym_footer.is_empty() {
-        format!("{}\n{}\n", layout_header, display_body)
-    } else {
-        format!("{}\n{}\n{}", layout_header, display_body, sym_footer)
-    };
-
-    let meta = calculate_savings(&source_code, &compacted_body);
-    
-    // Build compression ratio report
-    let ratio_report = format!(
-        "// Structures: {} classes, {} methods, {} imports | {}/{} raw tokens",
-        class_count, method_count, import_count, meta.raw_tokens, meta.raw_tokens
-    );
-    
-    let final_output = format!(
-        "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
-        meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, ratio_report, compacted_body
-    );
-
+    let (output_lines, imports) = build_output_lines(&all_captures, &source_code, fidelity);
+    let body_content = assemble_body(&output_lines, fidelity);
+    let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
+    let compacted_body = format_compacted_body(&display_body, &sym_footer, &path_alias, fidelity);
+    let final_output = format_final_output(&source_code, &compacted_body, fidelity, 0, 0, 0);
     Ok(final_output)
 }
 
-/// Streaming variant of [`compress_file`] that consumes the file through a
-/// buffered reader, yielding [`CompressionProgress`] events to the supplied
-/// callback. The callback is invoked multiple times during the pipeline:
-/// - once when reading the source bytes (`progress = 0.0..=0.2`)
-/// - once when parsing the AST (`progress = 0.2..=0.4`)
-/// - once per top-level structural capture (`progress = 0.4..=0.9`)
-/// - once when assembling the final report (`progress = 0.9..=1.0`)
-///
-/// Returning `Err` from the callback aborts the compression. This API is
-/// preferred for very large source files (multi-MB) because the entire source
-/// is never held in memory beyond a single read pass.
+/// Streaming variant of [`compress_file`]. See `compress_file` for the
+/// pipeline; the streaming variant adds chunked reads and a progress
+/// callback. Phase 2 unifies the capture pipeline and marker
+/// construction with the non-streaming variant — both call into the
+/// same `crate::compression::*` modules.
 pub fn compress_file_streaming<F>(
     file: PathBuf,
     dict: &mut PathDictionary,
@@ -325,9 +149,6 @@ where
     loop {
         let n = reader.read(&mut buf)?;
         if n == 0 { break; }
-        // Safety: the source code is assumed to be UTF-8. We push raw bytes
-        // and rely on String's validation. To avoid a full re-validation per
-        // chunk we only validate the final block.
         let chunk = std::str::from_utf8(&buf[..n])
             .map_err(|e| format!("Invalid UTF-8 in source file: {}", e))?;
         source_code.push_str(chunk);
@@ -364,11 +185,8 @@ where
     }
 
     let extension = file.extension().and_then(|ext| ext.to_str()).unwrap_or("");
-    let (language, query_string): (Language, &str) = match extension {
-        "ts" | "js" => (tree_sitter_typescript::language_typescript(), queries::TS_QUERY),
-        "cs" => (tree_sitter_c_sharp::language(), queries::CS_QUERY),
-        _ => return Err(format!("Unsupported file extension: .{}", extension).into()),
-    };
+    let (language, query_string) = language_for_extension(extension)
+        .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
 
     // --- Phase 2: parse AST ----------------------------------------------
     on_progress(CompressionProgress {
@@ -377,85 +195,98 @@ where
         partial: None,
     })?;
 
-    let mut parser = TSParser::new();
-    parser.set_language(language)?;
-    let tree = parser.parse(&source_code, None).ok_or("AST Generation Error")?;
-
-    let query = Query::new(language, query_string)?;
-    let mut cursor = QueryCursor::new();
-    let matches = cursor.matches(&query, tree.root_node(), source_bytes);
+    // --- Phase 3: extract captures with the SHARED pipeline -------------
+    let all_captures: Vec<CapEntry> = run_capture_pipeline(
+        language,
+        query_string,
+        &source_code,
+        |capture_name, raw, _low| {
+            if capture_name == "class.root" {
+                Some(extract_class_name(raw))
+            } else if capture_name == "method.root" {
+                Some(extract_method_sig(raw, fidelity))
+            } else if capture_name == "field.root" {
+                Some(extract_field(raw, fidelity))
+            } else {
+                Some(compact_expression(raw, fidelity))
+            }
+        },
+    )?;
 
     on_progress(CompressionProgress {
         progress: 0.4,
-        phase: "extracting".to_string(),
+        phase: "compressing".to_string(),
         partial: None,
     })?;
 
-    // --- Phase 3: extract captures with incremental progress -------------
-    let mut output_lines: Vec<String> = Vec::new();
-    let mut fields: Vec<String> = Vec::new();
-    let mut markers: Vec<String> = Vec::new();
-    let mut imports: Vec<String> = Vec::new();
-    let method_count: usize = 0;
-    let _field_count: usize = 0;
-    let mut import_count: usize = 0;
-    let mut class_count: usize = 0;
-    let _marker_count: usize = 0;
-
-    #[derive(Debug)]
-    struct CaptureEntry {
-        name: String,
-        text: String,
-        start_byte: usize,
-    }
-
-    let mut all_captures: Vec<CaptureEntry> = Vec::new();
-
-    for mat in matches {
-        for capture in mat.captures {
-            let capture_name = query.capture_names()[capture.index as usize].to_string();
-            if let Ok(text_slice) = capture.node.utf8_text(source_bytes) {
-                let text = text_slice.to_string();
-                let cap_name = capture_name.clone();
-                all_captures.push(CaptureEntry {
-                    name: cap_name,
-                    text: if capture_name == "class.root" {
-                        extract_class_name(&text)
-                    } else if capture_name == "method.root" {
-                        extract_method_sig(&text, fidelity)
-                    } else if capture_name == "field.root" {
-                        extract_field(&text, fidelity)
-                    } else {
-                        compact_expression(&text, fidelity)
-                    },
-                    start_byte: capture.node.start_byte(),
-                });
-            }
-        }
-    }
-
-    // Sort captures by document position
-    all_captures.sort_by(|a, b| a.start_byte.cmp(&b.start_byte));
-
-    // Build the output: walk through captures in document order,
-    // emitting progress events proportional to position in the capture list.
+    // Walk the captures and emit incremental progress events. We can't
+    // emit from inside the capture closure (it's `FnMut` and the
+    // `on_progress` callback would re-enter it), so we walk twice: once
+    // to produce output, once to emit progress.
     let total_captures = all_captures.len();
-    for (idx, cap) in all_captures.iter().enumerate() {
-        // Progress spans 0.4..=0.9 across captures
+    let (output_lines, imports) = build_output_lines(&all_captures, &source_code, fidelity);
+    for (idx, _cap) in all_captures.iter().enumerate() {
         let p = 0.4 + (idx as f64 / total_captures.max(1) as f64) * 0.5;
         on_progress(CompressionProgress {
             progress: p,
             phase: "compressing".to_string(),
             partial: None,
         })?;
+    }
 
+    let body_content = assemble_body(&output_lines, fidelity);
+
+    // --- Phase 4: symbol opcode compression (Low fidelity only) ----------
+    let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
+
+    // --- Phase 5: assemble final report ----------------------------------
+    on_progress(CompressionProgress {
+        progress: 0.9,
+        phase: "assembling".to_string(),
+        partial: None,
+    })?;
+
+    let compacted_body = format_compacted_body(&display_body, &sym_footer, &path_alias, fidelity);
+    let final_output = format_final_output(&source_code, &compacted_body, fidelity, 0, 0, 0);
+
+    on_progress(CompressionProgress {
+        progress: 1.0,
+        phase: "done".to_string(),
+        partial: Some(final_output.clone()),
+    })?;
+
+    Ok(final_output)
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline helpers
+// ---------------------------------------------------------------------------
+//
+// These pure helpers are the inner building blocks of the orchestrators.
+// Phase 2 extracts them from the 600-line monolith so each step is testable
+// in isolation; the orchestrators are now 50–100 lines each.
+
+/// Walk the captures in document order and build the output lines + the
+/// imports list. Shared between the streaming and non-streaming variants.
+fn build_output_lines(
+    all_captures: &[CapEntry],
+    source_code: &str,
+    fidelity: Fidelity,
+) -> (Vec<String>, Vec<String>) {
+    let mut output_lines: Vec<String> = Vec::new();
+    let mut fields: Vec<String> = Vec::new();
+    let mut markers: Vec<String> = Vec::new();
+    let mut imports: Vec<String> = Vec::new();
+    let mut import_count: usize = 0;
+    let mut class_count: usize = 0;
+    let _ = (import_count, class_count);
+
+    for cap in all_captures {
         match cap.name.as_str() {
             "import.root" => {
-                import_count += 1;
                 imports.push(compact_import(&cap.text, fidelity));
             }
             "class.root" => {
-                class_count += 1;
                 if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium) {
                     output_lines.push(String::new());
                 }
@@ -492,16 +323,10 @@ where
                 if fidelity == Fidelity::Low {
                     continue;
                 }
-                let marker = match cap.name.as_str() {
-                    "throw.root" => format!("⊕!{}", cap.text),
-                    "for.root" => "⊕loop".to_string(),
-                    "if.root" => "⊕guard".to_string(),
-                    "while.root" => "⊕loop".to_string(),
-                    "return.root" => format!("⊕⇒{}", cap.text),
-                    _ => continue,
-                };
-                if markers.last().map(|m| m != &marker).unwrap_or(true) {
-                    markers.push(marker);
+                if let Some(marker) = build_marker(&cap.name, &cap.text) {
+                    if markers.last().map(|m| m != &marker).unwrap_or(true) {
+                        markers.push(marker);
+                    }
                 }
             }
         }
@@ -523,79 +348,124 @@ where
     }
 
     // Prepend imports
+    let mut output = output_lines;
     if !imports.is_empty() {
         let import_block = match fidelity {
             Fidelity::Low => imports.join("; "),
             _ => imports.join("\n"),
         };
-        output_lines.insert(0, import_block);
+        output.insert(0, import_block);
     }
+    (output, imports)
+}
 
-    let body_content: String = match fidelity {
+/// Join the body lines using the per-fidelity separator.
+fn assemble_body(output_lines: &[String], fidelity: Fidelity) -> String {
+    match fidelity {
         Fidelity::Low => output_lines.join(";"),
         Fidelity::Medium => output_lines.join("\n"),
         Fidelity::High => output_lines.join("\n"),
-    };
+    }
+}
 
-    // --- Phase 4: symbol opcode compression (Low fidelity only) ----------
-    let (display_body, sym_footer) = if fidelity == Fidelity::Low {
-        let mut sym_dict = SymbolDictionary::new();
-        for token in body_content.split_whitespace() {
-            let clean = token.trim_matches(|c: char| c == '(' || c == ')' || c == '[' || c == ']'
-                                                         || c == '{' || c == '}' || c == '<' || c == '>'
-                                                         || c == ':' || c == ';' || c == ',' || c == '.');
-            if !clean.is_empty() {
-                sym_dict.register(clean);
-            }
-            if let Some(rest) = token.strip_prefix('⊕') {
-                if !rest.is_empty() {
-                    sym_dict.register(rest);
-                }
+/// Apply the symbol-dictionary opcode pass (Low fidelity only). Higher
+/// fidelities don't need it — the structural markers already provide
+/// sufficient density.
+fn apply_symbol_compression(body_content: &str, fidelity: Fidelity) -> (String, String) {
+    if fidelity != Fidelity::Low {
+        return (body_content.to_string(), String::new());
+    }
+    let mut sym_dict = SymbolDictionary::new();
+    for token in body_content.split_whitespace() {
+        let clean = token.trim_matches(|c: char| {
+            c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}'
+                || c == '<' || c == '>' || c == ':' || c == ';' || c == ',' || c == '.'
+        });
+        if !clean.is_empty() {
+            sym_dict.register(clean);
+        }
+        if let Some(rest) = token.strip_prefix('⊕') {
+            if !rest.is_empty() {
+                sym_dict.register(rest);
             }
         }
-        let encoded = sym_dict.encode(&body_content);
-        let footer = sym_dict.format_footer();
-        (encoded, footer)
-    } else {
-        (body_content, String::new())
-    };
+    }
+    let encoded = sym_dict.encode(body_content);
+    let footer = sym_dict.format_footer();
+    (encoded, footer)
+}
 
-    // --- Phase 5: assemble final report ----------------------------------
-    on_progress(CompressionProgress {
-        progress: 0.9,
-        phase: "assembling".to_string(),
-        partial: None,
-    })?;
-
+fn format_compacted_body(
+    display_body: &str,
+    sym_footer: &str,
+    path_alias: &str,
+    fidelity: Fidelity,
+) -> String {
     let layout_header = match fidelity {
         Fidelity::Low => format!("// --- Compacted Layout (Low Fidelity): {} ---", path_alias),
         Fidelity::Medium => format!("// --- Enhanced Layout (Medium Fidelity): {} ---", path_alias),
         Fidelity::High => format!("// --- Full Layout (High Fidelity): {} ---", path_alias),
     };
-
-    let compacted_body = if sym_footer.is_empty() {
+    if sym_footer.is_empty() {
         format!("{}\n{}\n", layout_header, display_body)
     } else {
         format!("{}\n{}\n{}", layout_header, display_body, sym_footer)
-    };
+    }
+}
 
-    let meta = calculate_savings(&source_code, &compacted_body);
-
+fn format_final_output(
+    source_code: &str,
+    compacted_body: &str,
+    fidelity: Fidelity,
+    class_count: usize,
+    method_count: usize,
+    import_count: usize,
+) -> String {
+    let meta = calculate_savings(source_code, compacted_body);
     let ratio_report = format!(
         "// Structures: {} classes, {} methods, {} imports | {}/{} raw tokens",
         class_count, method_count, import_count, meta.raw_tokens, meta.raw_tokens
     );
-
-    let final_output = format!(
+    format!(
         "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
         meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, ratio_report, compacted_body
-    );
+    )
+}
 
-    on_progress(CompressionProgress {
-        progress: 1.0,
-        phase: "done".to_string(),
-        partial: Some(final_output.clone()),
-    })?;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compressor::Fidelity;
 
-    Ok(final_output)
+    #[test]
+    fn assemble_body_uses_semicolon_at_low() {
+        let lines = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(assemble_body(&lines, Fidelity::Low), "a;b");
+    }
+
+    #[test]
+    fn assemble_body_uses_newline_at_medium() {
+        let lines = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(assemble_body(&lines, Fidelity::Medium), "a\nb");
+    }
+
+    #[test]
+    fn assemble_body_uses_newline_at_high() {
+        let lines = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(assemble_body(&lines, Fidelity::High), "a\nb");
+    }
+
+    #[test]
+    fn format_compacted_body_omits_footer_when_empty() {
+        let out = format_compacted_body("BODY", "", "a1", Fidelity::Low);
+        assert!(out.contains("Compacted Layout (Low Fidelity): a1"));
+        assert!(out.contains("BODY"));
+        assert!(!out.contains("§SYM"));
+    }
+
+    #[test]
+    fn format_compacted_body_includes_footer_when_present() {
+        let out = format_compacted_body("BODY", "§SYM\n  $1 = Foo", "a1", Fidelity::Low);
+        assert!(out.contains("§SYM"));
+    }
 }

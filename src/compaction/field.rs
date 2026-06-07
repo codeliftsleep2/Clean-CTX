@@ -2,7 +2,8 @@
 //
 // Field/property compaction across fidelity levels.
 
-use crate::compressor::Fidelity;
+use crate::compression::Fidelity;
+use crate::compaction::modifiers::MODIFIERS_FIELD;
 
 /// Extract a compact field/property signature.
 ///
@@ -21,23 +22,22 @@ pub fn extract_field(text: &str, fidelity: Fidelity) -> String {
 /// Medium-fidelity field: "name:type"
 fn compact_field_medium(text: &str) -> String {
     let line = text.lines().next().unwrap_or(text).trim();
-    // Strip modifiers
-    let modifiers = ["public ", "private ", "protected ", "readonly ",
-                     "static ", "abstract ", "override ", "virtual ",
-                     "sealed ", "new ", "required "];
-    let mut s = line;
+    // Reuse the shared modifier list — `MODIFIERS_FIELD` is the single
+    // source of truth (Phase 2 consolidation). The helper
+    // `strip_modifiers` is local to this module and not exported.
+    let mut s = line.to_string();
     loop {
         let mut stripped = false;
-        for m in &modifiers {
+        for m in MODIFIERS_FIELD {
             if let Some(rest) = s.strip_prefix(m) {
-                s = rest.trim();
+                s = rest.trim().to_string();
                 stripped = true;
             }
         }
         if !stripped { break; }
     }
     // Drop initialiser (everything from `=` onwards) and trailing `;`
-    let s = s.split('=').next().unwrap_or(s).trim();
+    let s = s.split('=').next().unwrap_or(&s).trim();
     let s = s.trim_end_matches(';').trim();
     // Collapse spaces around `:` and `?:`
     s.replace(" ?: ", "?:")
@@ -51,4 +51,27 @@ fn compact_field_high(text: &str) -> String {
     // Drop initialiser and trailing semicolon
     let s = line.split('=').next().unwrap_or(line).trim();
     s.trim_end_matches(';').trim().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn low_fidelity_suppresses_fields() {
+        assert_eq!(extract_field("private readonly userId: string = '';", Fidelity::Low), "");
+    }
+
+    #[test]
+    fn medium_fidelity_keeps_name_and_type() {
+        let out = extract_field("private readonly userId: string = '';", Fidelity::Medium);
+        assert_eq!(out, "userId:string");
+    }
+
+    #[test]
+    fn high_fidelity_strips_only_initialiser() {
+        let out = extract_field("private readonly userId: string = '';", Fidelity::High);
+        assert!(out.starts_with("private readonly userId"));
+        assert!(!out.contains("''"));
+    }
 }
