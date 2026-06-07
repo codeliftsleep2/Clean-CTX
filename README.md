@@ -367,4 +367,4 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 
 ## License
 
-Internal use — Enterprise Token Reduction Engine.
+CC0-1.0 license
