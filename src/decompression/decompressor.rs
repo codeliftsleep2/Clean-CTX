@@ -39,6 +39,12 @@ fn word_boundary_replace(text: &str, pattern: &str, replacement: &str) -> String
     result
 }
 
+impl Default for Decompressor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Decompressor {
     pub fn new() -> Self {
         Self {
@@ -55,20 +61,17 @@ impl Decompressor {
             let trimmed = line.trim();
             if (trimmed.starts_with('α') || trimmed.starts_with('β') || trimmed.starts_with('γ'))
                 && trimmed.contains(" = ")
-            {
-                if let Some(eq_pos) = trimmed.find(" = ") {
+                && let Some(eq_pos) = trimmed.find(" = ") {
                     let alias = trimmed[..eq_pos].trim().to_string();
                     let path = trimmed[eq_pos + 3..].trim().to_string();
                     self.path_aliases.insert(alias, path);
                 }
-            }
-            if trimmed.starts_with('$') && trimmed.contains(" = ") {
-                if let Some(eq_pos) = trimmed.find(" = ") {
+            if trimmed.starts_with('$') && trimmed.contains(" = ")
+                && let Some(eq_pos) = trimmed.find(" = ") {
                     let opcode = trimmed[..eq_pos].trim().to_string();
                     let token = trimmed[eq_pos + 3..].trim().to_string();
                     self.custom_symbols.insert(opcode, token);
                 }
-            }
         }
     }
 
@@ -107,7 +110,7 @@ impl Decompressor {
             for (&opcode, &token) in &self.builtin_opcodes {
                 all_opcodes.push((opcode, token));
             }
-            all_opcodes.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+            all_opcodes.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
 
             for (opcode, token) in &all_opcodes {
                 expanded = word_boundary_replace(&expanded, opcode, token);

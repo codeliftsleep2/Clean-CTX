@@ -76,7 +76,7 @@ pub(crate) fn dispatch_tools_call(
         "compress_code_context" => {
             let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
             let fidelity_str = params["arguments"]["fidelity"].as_str().unwrap_or("low");
-            let fidelity = Fidelity::from_str(fidelity_str);
+            let fidelity = Fidelity::parse(fidelity_str);
 
             match compress_file(PathBuf::from(file_path_str), structural_dict, session_cache, fidelity) {
                 Ok(mut compressed_text) => {
@@ -112,7 +112,7 @@ pub(crate) fn dispatch_tools_call(
         "compress_workspace" => {
             let dir_path = params["arguments"]["directoryPath"].as_str().unwrap_or(".");
             let fidelity_str = params["arguments"]["fidelity"].as_str().unwrap_or("low");
-            let fidelity = Fidelity::from_str(fidelity_str);
+            let fidelity = Fidelity::parse(fidelity_str);
 
             match crate::mcp::workspace::compress_workspace_dir(dir_path, fidelity) {
                 Ok(manifest) => {
@@ -134,7 +134,7 @@ pub(crate) fn dispatch_tools_call(
         "diff_code_context" => {
             let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
             let fidelity_str = params["arguments"]["fidelity"].as_str().unwrap_or("low");
-            let fidelity = Fidelity::from_str(fidelity_str);
+            let fidelity = Fidelity::parse(fidelity_str);
 
             match diff_code_context_handler(
                 PathBuf::from(file_path_str),

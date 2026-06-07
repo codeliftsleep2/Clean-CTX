@@ -16,7 +16,7 @@ pub enum Fidelity {
 }
 
 impl Fidelity {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "medium" => Fidelity::Medium,
             "high" => Fidelity::High,

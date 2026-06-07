@@ -49,7 +49,7 @@ pub(crate) fn dispatch(
             }
         }
         "tools/call" => {
-            if let (Some(ref id), Some(ref params)) = (req.id.as_ref(), req.params.as_ref()) {
+            if let (Some(id), Some(params)) = (req.id.as_ref(), req.params.as_ref()) {
                 let tool_name = params["name"].as_str().unwrap_or("");
                 tools::dispatch_tools_call(id, tool_name, params, structural_dict, session_cache);
             }

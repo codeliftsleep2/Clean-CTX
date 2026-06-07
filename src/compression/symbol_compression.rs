@@ -24,11 +24,10 @@ pub fn apply_symbol_compression(body_content: &str, fidelity: Fidelity) -> (Stri
         if !clean.is_empty() {
             sym_dict.register(clean);
         }
-        if let Some(rest) = token.strip_prefix('⊕') {
-            if !rest.is_empty() {
+        if let Some(rest) = token.strip_prefix('⊕')
+            && !rest.is_empty() {
                 sym_dict.register(rest);
             }
-        }
     }
     let encoded = sym_dict.encode(body_content);
     let footer = sym_dict.format_footer();

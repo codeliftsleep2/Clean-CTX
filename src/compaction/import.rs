@@ -22,11 +22,11 @@ pub fn compact_import(text: &str, fidelity: Fidelity) -> String {
         }
         Fidelity::Medium => {
             // Collapse spaces inside braces, keep path
-            let line = line
+            
+            line
                 .replace("{ ", "{")
                 .replace(" }", "}")
-                .replace(", ", ",");
-            line
+                .replace(", ", ",")
         }
         Fidelity::High => line.to_string(),
     }
@@ -41,8 +41,8 @@ pub fn compact_import(text: &str, fidelity: Fidelity) -> String {
 ///   import '...'                     → ""  (side-effect import)
 pub fn extract_import_names(line: &str) -> String {
     // Named imports: { A, B }
-    if let (Some(open), Some(close)) = (line.find('{'), line.find('}')) {
-        if open < close {
+    if let (Some(open), Some(close)) = (line.find('{'), line.find('}'))
+        && open < close {
             return line[open + 1..close]
                 .split(',')
                 .map(|s| {
@@ -57,7 +57,6 @@ pub fn extract_import_names(line: &str) -> String {
                 .collect::<Vec<_>>()
                 .join(",");
         }
-    }
 
     // Namespace import: import * as NS from '...'
     if let Some(as_pos) = line.find("* as ") {

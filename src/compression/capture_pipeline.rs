@@ -47,10 +47,9 @@ pub struct CapEntry {
 /// - `query_string`    : the query that defines the captures we want
 /// - `source`          : the raw source code
 /// - `process`         : closure that, given `(capture_name, raw_text)`,
-///                       returns the text the caller wants stored in the
-///                       resulting `CapEntry.text`. Returning `None` from
-///                       `process` drops the capture entirely (the
-///                       caller does not see it in the returned vector).
+///   returns the text the caller wants stored in the resulting
+///   `CapEntry.text`. Returning `None` from `process` drops the capture
+///   entirely (the caller does not see it in the returned vector).
 ///
 /// The closure is `FnMut` so the caller can accumulate state across
 /// captures (rare in practice; the production callers all return a
@@ -95,7 +94,7 @@ where
     // Sort captures by document position so the caller can walk them
     // in source order. This is the same `Vec::sort_by` both original
     // call sites performed.
-    all_captures.sort_by(|a, b| a.start_byte.cmp(&b.start_byte));
+    all_captures.sort_by_key(|a| a.start_byte);
     Ok(all_captures)
 }
 

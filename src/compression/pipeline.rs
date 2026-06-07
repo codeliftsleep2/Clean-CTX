@@ -145,11 +145,10 @@ pub fn build_output_lines(
                 if fidelity == Fidelity::Low {
                     continue;
                 }
-                if let Some(marker) = build_marker(&cap.name, &cap.text) {
-                    if markers.last().map(|m| m != &marker).unwrap_or(true) {
+                if let Some(marker) = build_marker(&cap.name, &cap.text)
+                    && markers.last().map(|m| m != &marker).unwrap_or(true) {
                         markers.push(marker);
                     }
-                }
             }
         }
     }
@@ -160,14 +159,13 @@ pub fn build_output_lines(
     }
 
     // Raw fallback when nothing was captured
-    if output_lines.is_empty() {
-        if let Some(first_line) = source_code.lines().next() {
+    if output_lines.is_empty()
+        && let Some(first_line) = source_code.lines().next() {
             let trimmed = first_line.trim().to_string();
             if !trimmed.is_empty() {
                 output_lines.push(simple_compact(&trimmed, fidelity));
             }
         }
-    }
 
     // Prepend imports
     let mut output = output_lines;
@@ -193,6 +191,16 @@ pub fn assemble_body(output_lines: &[String], fidelity: Fidelity) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    fn create_ts_file(dir: &TempDir, name: &str, content: &str) -> PathBuf {
+        let path = dir.path().join(name);
+        let mut f = std::fs::File::create(&path).unwrap();
+        write!(f, "{}", content).unwrap();
+        path
+    }
 
     #[test]
     fn assemble_body_uses_semicolon_at_low() {
@@ -210,5 +218,71 @@ mod tests {
     fn assemble_body_uses_newline_at_high() {
         let lines = vec!["a".to_string(), "b".to_string()];
         assert_eq!(assemble_body(&lines, Fidelity::High), "a\nb");
+    }
+
+    #[test]
+    fn compress_file_cache_hit_returns_notice() {
+        let dir = TempDir::new().unwrap();
+        let path = create_ts_file(&dir, "test.ts", "export class Foo {}\n");
+
+        let mut dict = crate::dictionary::PathDictionary::new();
+        let mut cache = LocalStateCache::new();
+        let fidelity = Fidelity::Low;
+
+        // First call: file is new, so it should be processed and NOT hit cache.
+        let result1 = compress_file(path.clone(), &mut dict, &mut cache, fidelity);
+        assert!(result1.is_ok(), "compress_file (miss) should succeed, got: {:?}", result1);
+
+        // Second call with the same file content: should hit the cache.
+        let result2 = compress_file(path.clone(), &mut dict, &mut cache, fidelity);
+        assert!(result2.is_ok(), "compress_file (hit) should succeed");
+        let output2 = result2.unwrap();
+
+        // The cache-hit path returns a shorter output containing "[CACHE_HIT]".
+        assert!(
+            output2.contains("[CACHE_HIT]"),
+            "expected CACHE_HIT notice, got: {}",
+            output2
+        );
+
+        // Modify the file content -> cache miss again.
+        create_ts_file(&dir, "test.ts", "export class Bar {}");
+        let result3 = compress_file(path, &mut dict, &mut cache, fidelity);
+        assert!(result3.is_ok(), "compress_file (modified) should succeed");
+        let output3 = result3.unwrap();
+        assert!(
+            !output3.contains("[CACHE_HIT]"),
+            "modified file should NOT hit cache, got: {}",
+            output3
+        );
+
+        // Output should no longer be a cache hit notice
+        assert!(
+            output3.contains("Compacted Layout"),
+            "expected a full compacted output after modification, got: {}",
+            output3
+        );
+    }
+
+    #[test]
+    fn compress_file_cache_hit_vs_miss_output_differ() {
+        let dir = TempDir::new().unwrap();
+        let path = create_ts_file(&dir, "test.ts", "class A { foo():void {} }\n");
+
+        let mut dict = crate::dictionary::PathDictionary::new();
+        let mut cache = LocalStateCache::new();
+        let fidelity = Fidelity::Medium;
+
+        let result1 = compress_file(path.clone(), &mut dict, &mut cache, fidelity);
+        assert!(result1.is_ok(), "compress_file (first call) should succeed");
+
+        let result2 = compress_file(path.clone(), &mut dict, &mut cache, fidelity);
+        assert!(result2.is_ok());
+        let second = result2.unwrap();
+
+        assert!(
+            second.contains("[CACHE_HIT]"),
+            "Second call with same content should hit cache"
+        );
     }
 }

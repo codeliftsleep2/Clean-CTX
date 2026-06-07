@@ -11,6 +11,8 @@
 //
 // Each "header" prefix and each "§" line is fully skipped.
 
+/// Only used in test code; the production decompressor uses `is_section_start`.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineKind {
     /// A blank line.
@@ -27,6 +29,9 @@ pub enum LineKind {
 }
 
 /// Classify a single line of the compressed output.
+///
+/// Only used in test code; the production decompressor uses `is_section_start`.
+#[allow(dead_code)]
 pub fn classify(line: &str) -> LineKind {
     let trimmed = line.trim();
     if trimmed.is_empty() {

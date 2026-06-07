@@ -8,6 +8,12 @@ pub struct PathDictionary {
     mappings: BTreeMap<String, String>,
 }
 
+impl Default for PathDictionary {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PathDictionary {
     pub fn new() -> Self {
         Self { mappings: BTreeMap::new() }
