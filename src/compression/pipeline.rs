@@ -64,13 +64,33 @@ pub fn compress_file(
 
     // Include fidelity in the cache key so different fidelity levels don't share cached results
     let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
-    let is_modified = cache.update_and_verify(cache_key, current_hash);
+    let is_modified = cache.update_and_verify(&cache_key, &current_hash);
     if !is_modified {
         let cached_notice = format!(
             "// [CACHE_HIT] {} unchanged. Use historic memory.\n",
             path_alias
         );
-        let meta = calculate_savings(&source_code, &cached_notice);
+
+        // F-14: use the cached raw-token count to skip the BPE encode.
+        // If the count is not in the cache (e.g. an older session), fall
+        // through to a fresh `calculate_savings` call.
+        let meta = if let Some(raw_tokens) = cache.get_raw_token_count(&current_hash) {
+            let bpe = crate::analytics::bpe();
+            let compressed_tokens = bpe.encode_with_special_tokens(&cached_notice).len();
+            let savings_percentage = if raw_tokens > 0 {
+                let saved = raw_tokens.saturating_sub(compressed_tokens);
+                (saved as f64 / raw_tokens as f64) * 100.0
+            } else {
+                0.0
+            };
+            crate::analytics::TokenMetadata {
+                raw_tokens,
+                compressed_tokens,
+                savings_percentage,
+            }
+        } else {
+            calculate_savings(&source_code, &cached_notice)
+        };
 
         // F-04: also surface the Structures line on a cache hit so
         // the header is consistent with the miss path. We can't
@@ -117,6 +137,13 @@ pub fn compress_file(
     let body_content = assemble_body(&built.output_lines, fidelity);
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
     let compacted_body = format_compacted_body(&display_body, &sym_footer, &path_alias, fidelity);
+    // F-14: store the raw-token count for this content hash so the
+    // cache-hit path can skip the BPE encode on subsequent calls.
+    let raw_tokens = crate::analytics::bpe()
+        .encode_with_special_tokens(&source_code)
+        .len();
+    cache.store_raw_token_count(&current_hash, raw_tokens);
+
     let final_output = format_final_output(
         &source_code,
         &compacted_body,

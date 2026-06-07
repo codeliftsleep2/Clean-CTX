@@ -24,6 +24,11 @@ pub struct LocalStateCache {
     /// Maps cache key ("{path}::{fidelity}") to the last `CapturedStructure`
     /// for that file. Used by `diff_code_context` to compute AST deltas.
     baseline_snapshots: BTreeMap<String, CapturedStructure>,
+    /// F-14: Maps content hash → raw-token count so that cache-hit paths
+    /// can skip the expensive BPE encode. Keyed by the hash (not the
+    /// file path) because the same content in two locations yields the
+    /// same raw-token count.
+    raw_token_counts: BTreeMap<String, usize>,
 }
 
 impl Default for LocalStateCache {
@@ -37,6 +42,7 @@ impl LocalStateCache {
         Self {
             registry: BTreeMap::new(),
             baseline_snapshots: BTreeMap::new(),
+            raw_token_counts: BTreeMap::new(),
         }
     }
 
@@ -50,12 +56,12 @@ impl LocalStateCache {
     /// Checks if a file has changed. Returns `true` if it is a brand-new or
     /// modified file, `false` if the content is byte-for-byte identical to
     /// the last seen version.
-    pub fn update_and_verify(&mut self, absolute_path: String, current_hash: String) -> bool {
-        if let Some(existing_hash) = self.registry.get(&absolute_path)
+    pub fn update_and_verify(&mut self, absolute_path: &str, current_hash: &str) -> bool {
+        if let Some(existing_hash) = self.registry.get(absolute_path)
             && *existing_hash == current_hash {
                 return false;
             }
-        self.registry.insert(absolute_path, current_hash);
+        self.registry.insert(absolute_path.to_string(), current_hash.to_string());
         true
     }
 
@@ -76,11 +82,24 @@ impl LocalStateCache {
         self.baseline_snapshots.remove(key);
     }
 
-    /// Clear both registries. Useful for tests and for clients that want
+    /// F-14: Store the raw-token count for a content hash so the cache-hit
+    /// path can skip the BPE encode.
+    pub fn store_raw_token_count(&mut self, content_hash: &str, count: usize) {
+        self.raw_token_counts.insert(content_hash.to_string(), count);
+    }
+
+    /// F-14: Retrieve a previously-stored raw-token count for the given
+    /// content hash. Returns `None` if the hash has never been seen.
+    pub fn get_raw_token_count(&self, content_hash: &str) -> Option<usize> {
+        self.raw_token_counts.get(content_hash).copied()
+    }
+
+    /// Clear all registries. Useful for tests and for clients that want
     /// to reset session state.
     pub fn clear(&mut self) {
         self.registry.clear();
         self.baseline_snapshots.clear();
+        self.raw_token_counts.clear();
     }
 }
 
