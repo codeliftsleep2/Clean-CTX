@@ -1,0 +1,326 @@
+# Refactoring Plan: RustContextLayerAI
+
+> **Status:** Approved for execution
+> **Created:** 2026-06-06
+> **Goal:** Decompose the six largest source files into focused, single-responsibility modules following SOLID principles, eliminate cross-file duplication, and preserve a stable public API.
+
+---
+
+## 📊 Executive Summary
+
+Six files in `src/` have grown past the point of comfortable maintenance. The largest (`diff.rs` at 913 lines and `compressor.rs` at 601 lines) violate the Single Responsibility Principle badly — each is a "god module" that mixes data models, parsing, transformation, and formatting. Compounding the problem, the same logic (capture processing, opcode tables, marker construction) is duplicated across files.
+
+This plan decomposes the project into **eight cohesive modules**, each with a single clear responsibility, and consolidates the duplicated logic into shared abstractions. The work is structured into **five phases** that can be executed and reviewed independently, with `cargo build` and `cargo test` as the gate between each phase.
+
+### Headline Targets
+
+| Metric | Before | After (Target) |
+|--------|-------:|---------------:|
+| Largest file (lines) | 913 (`diff.rs`) | < 350 |
+| Files > 400 lines | 4 | 0 |
+| Cross-file duplications | 5 major | 0 |
+| `cargo build` green | ✅ | ✅ after every phase |
+| `cargo test` green | ✅ | ✅ after every phase |
+
+---
+
+## 🔍 Audit Findings
+
+### File Sizes (current state)
+
+| File | Lines | Status | Primary Issue |
+|------|------:|--------|---------------|
+| `src/diff.rs` | **913** | 🔴 P0 | God module: models + capture + diff + format + tests |
+| `src/compressor.rs` | **601** | 🔴 P0 | ~70% duplication between streaming/non-streaming; one function does 8 things |
+| `src/helpers.rs` | **423** | 🟡 P1 | 4 unrelated concerns (class / method / field / import) |
+| `src/main.rs` | **421** | 🟡 P1 | Bootstrap + routing + tool defs + prompts + dispatch |
+| `src/dictionary.rs` | **249** | 🟢 P2 | Two unrelated structs + duplicated opcode table |
+| `src/decompressor.rs` | **205** | 🟢 P2 | Duplicated opcode table; mixed parsing/expansion |
+| `src/config.rs` | 134 | ✅ | OK |
+| `src/cache.rs` | 110 | ✅ | OK |
+| `src/queries.rs` | 35 | ✅ | OK |
+| `src/analytics.rs` | 29 | ✅ | OK |
+| `src/protocol.rs` | 19 | ✅ | OK |
+| `src/lib.rs` | 10 | ✅ | OK |
+
+### SOLID / SoC Violations Per File
+
+#### `src/diff.rs` (913 lines) — P0
+- **SRP violation** — single file owns: data structures, tree-sitter capture extraction, language detection, diff algorithm, output formatting, helpers, *and* tests.
+- **Massive duplication** with `compressor.rs`: the `try_build_with` capture pipeline (lines 118–239) is a near-clone of the capture pipeline in `compressor.rs` (lines 86–201).
+- **Dead code**: `had_child_changes` and `last_kind` are written but never read.
+
+#### `src/compressor.rs` (601 lines) — P0
+- **`compress_file` does 8 things**: file I/O, hashing, cache lookup, tree-sitter setup, query execution, capture walking, output assembly, symbol compression, and report formatting.
+- **Streaming vs non-streaming duplication**: `compress_file_streaming` is ~70% copy-paste of `compress_file` with progress callbacks added. They will drift.
+- **No unit tests** for the public functions.
+
+#### `src/helpers.rs` (423 lines) — P1
+- **Mixed responsibilities**: class, method, field, expression, and import extraction all share one file. The shared concept ("extraction at a given fidelity") is invisible in the module structure.
+- **Modifier arrays duplicated 3 times** for method-low, method-medium, and field-medium.
+
+#### `src/main.rs` (421 lines) — P1
+- **Mixed concerns**: server bootstrap, JSON-RPC routing, tool definitions (4 tools inline as `json!` macros), prompt definitions (one ~50-line string), tool dispatch, and two helper functions (`diff_code_context`, `compress_workspace_dir`, `collect_source_files`).
+- **Tool/prompt data is structural** but lives inline in `match` arms.
+
+#### `src/dictionary.rs` (249 lines) — P2
+- Two unrelated structs (`PathDictionary` and `SymbolDictionary`) share one file. Their only relationship is "they're both called dictionaries."
+- The 32-entry primitive opcode table is **duplicated** in `decompressor.rs`.
+
+#### `src/decompressor.rs` (205 lines) — P2
+- **Opcode table duplicated** with `dictionary.rs` (DRY violation).
+- Marker expansion (`⊕guard` → empty, `⊕⇒` → `→`, etc.) is hardcoded separately from the corresponding marker construction in `compressor.rs` and `diff.rs`.
+
+---
+
+## 🚨 Cross-cutting DRY Violations
+
+These are the highest-value targets because they appear in multiple files and any change must currently be made in all of them:
+
+| # | What | Duplicated In | Consolidation Target |
+|---|------|---------------|---------------------|
+| 1 | Capture processing pipeline (tree-sitter setup, capture walk, marker building) | `compressor.rs` (L86–201), `diff.rs::try_build_with` (L118–239) | `src/compression/capture_pipeline.rs` |
+| 2 | Primitive opcode table (32 entries) | `dictionary.rs::SymbolDictionary::new`, `decompressor.rs::Decompressor::new` | `src/compression/opcodes.rs` (single source of truth) |
+| 3 | Modifier lists (`public`, `private`, …) | `helpers.rs::compact_method_low`, `helpers.rs::compact_method_medium`, `helpers.rs::compact_field_medium` | `src/compaction/modifiers.rs` |
+| 4 | Marker construction (`⊕guard`, `⊕loop`, `⊕⇒`, `⊕!`) | `compressor.rs` (L182–199, L491–506), `diff.rs::try_build_with` (L207–222) | `src/compression/markers.rs` |
+| 5 | Language detection | `compressor.rs` (extension-based) vs `diff.rs` (heuristic-based) — *inconsistent* | `src/compression/language.rs` |
+
+---
+
+## 🏗️ Proposed New Structure
+
+```
+src/
+├── lib.rs                       # Re-exports for backward compat
+├── main.rs                      # Just calls mcp::run() (3 lines)
+├── config.rs                    # unchanged
+├── cache.rs                     # unchanged
+├── queries.rs                   # unchanged (data only)
+├── analytics.rs                 # unchanged
+│
+├── compression/                 # ⬅ from compressor.rs
+│   ├── mod.rs                   # Public API: compress_file, CompressionProgress
+│   ├── fidelity.rs              # Fidelity enum + strategy dispatch
+│   ├── language.rs              # Centralized language detection (extension + heuristic)
+│   ├── capture_pipeline.rs      # Shared tree-sitter extract+walk
+│   ├── markers.rs               # Shared marker construction (⊕guard, ⊕loop, ⊕⇒, ⊕!)
+│   ├── opcodes.rs               # SHARED primitive opcode table
+│   ├── symbol_compression.rs    # Low-fidelity opcode pass
+│   ├── report.rs                # Final optimization report formatting
+│   ├── pipeline.rs              # Non-streaming orchestrator (compress_file)
+│   └── streaming.rs             # Streaming orchestrator (compress_file_streaming)
+│
+├── diff/                        # ⬅ from diff.rs
+│   ├── mod.rs                   # Public API: build_snapshot, diff_snapshots, format_diff
+│   ├── snapshot.rs              # CapturedStructure, CapturedClass, CapturedMethod
+│   ├── action.rs                # DiffAction, DiffKind, DiffTarget + symbol()
+│   ├── builder.rs               # build_snapshot + try_build_with
+│   ├── differ.rs                # diff_snapshots + diff_class
+│   ├── formatter.rs             # format_diff + diff_summary
+│   └── keys.rs                  # method_key, field_key, group_by_key, summarize_class
+│
+├── compaction/                  # ⬅ from helpers.rs
+│   ├── mod.rs
+│   ├── modifiers.rs             # SHARED modifier lists
+│   ├── class.rs                 # extract_class_name, format_class_entry
+│   ├── method.rs                # extract_method_sig + helpers
+│   ├── field.rs                 # extract_field + helpers
+│   ├── import.rs                # compact_import, extract_import_names
+│   └── expression.rs            # compact_expression, simple_compact
+│
+├── decompression/               # ⬅ from decompressor.rs
+│   ├── mod.rs
+│   ├── decompressor.rs          # Decompressor struct
+│   ├── opcodes.rs               # Re-exports shared opcodes
+│   ├── markers.rs               # SHARED marker expansion
+│   └── walker.rs                # Line-by-line section walker
+│
+├── dictionary/                  # ⬅ from dictionary.rs
+│   ├── mod.rs
+│   ├── path.rs                  # PathDictionary
+│   └── symbol.rs                # SymbolDictionary
+│
+└── mcp/                         # ⬅ from main.rs
+    ├── mod.rs                   # run() entry point
+    ├── server.rs                # Stdin/stdout loop
+    ├── router.rs                # JSON-RPC method dispatch
+    ├── handlers.rs              # initialize, tools/list, prompts/list
+    ├── tools.rs                 # Tool definitions + dispatch
+    ├── prompts.rs               # Prompt content
+    └── workspace.rs             # compress_workspace_dir + collect_source_files
+```
+
+### Solid Principles Applied
+
+| Principle | Before | After |
+|-----------|--------|-------|
+| **SRP** | `compressor.rs::compress_file` does 8 things | Orchestrator (`pipeline.rs`) calls 5 single-purpose modules |
+| **OCP** | Adding a new fidelity level requires editing `match` blocks in 4 files | `Fidelity` strategies own their own behavior |
+| **LSP** | `compress_file` and `compress_file_streaming` have different signatures despite the same intent | Both implement the same `CompressionPipeline` trait |
+| **ISP** | `helpers.rs` exposes 11 functions; callers depend on all | Each `compaction/*.rs` exposes only its own concern |
+| **DIP** | `diff.rs` reaches into `helpers.rs` and `queries.rs` directly | `diff/` depends on `compaction` and `capture_pipeline` abstractions |
+
+---
+
+## ⚙️ Phases
+
+The work is split into **five phases**. Each phase ends with a green `cargo build` and `cargo test` run. Phases 1–2 are pure refactors (no behavior change). Phases 3–4 are the high-value consolidations. Phase 5 is polish.
+
+### ✅ Phase 1 — Pure File Splits (no behavior change)
+**Goal:** Move code into new files without changing semantics. Backward-compatible via `lib.rs` re-exports.
+
+- [ ] Create `src/compaction/` with `mod.rs` + 5 sibling files (`modifiers`, `class`, `method`, `field`, `import`, `expression`).
+- [ ] Move `helpers.rs` content into the appropriate `compaction/*.rs` file. **Keep tests in place** for now.
+- [ ] Replace `src/helpers.rs` with `pub use crate::compaction::*;` (re-export).
+- [ ] Create `src/dictionary/{mod.rs, path.rs, symbol.rs}` and move accordingly.
+- [ ] Create `src/decompression/{mod.rs, decompressor.rs, opcodes.rs, markers.rs, walker.rs}` and move accordingly.
+- [ ] Create `src/diff/{mod.rs, snapshot.rs, action.rs, builder.rs, differ.rs, formatter.rs, keys.rs}` and move accordingly.
+- [ ] Update `src/lib.rs` to re-export the new module paths.
+- [ ] **Validation:** `cargo build` and `cargo test` both green. No file in the codebase is now larger than 350 lines except `compressor.rs` and `main.rs`.
+
+### ✅ Phase 2 — Eliminate Duplication
+**Goal:** Consolidate the five cross-cutting DRY violations into shared modules.
+
+- [ ] Extract `src/compression/opcodes.rs` containing the 32-entry primitive opcode table.
+- [ ] Refactor `dictionary::SymbolDictionary::new` to *load from* `opcodes.rs` rather than embed the table.
+- [ ] Refactor `decompression::Decompressor::new` to *load from* `opcodes.rs`.
+- [ ] Extract `src/compaction/modifiers.rs` exposing `MODIFIERS_LOW`, `MODIFIERS_MEDIUM`, `MODIFIERS_FIELD` arrays.
+- [ ] Refactor `compaction::method` and `compaction::field` to import shared modifier arrays.
+- [ ] Extract `src/compression/markers.rs` exposing `build_marker(capture_name, text) -> Option<String>`.
+- [ ] Refactor `compressor.rs` and `diff/builder.rs` to call `markers::build_marker`.
+- [ ] Extract `src/compression/capture_pipeline.rs` exposing `run_capture_pipeline(language, query_string, source, fidelity) -> Vec<CapEntry>`.
+- [ ] Refactor `compressor.rs` and `diff/builder.rs` to call the shared pipeline.
+- [ ] Extract `src/compression/language.rs` exposing `detect_language(source: &str) -> (Language, &'static str)` with a single heuristic.
+- [ ] Refactor both callers to use `detect_language`.
+- [ ] **Validation:** `cargo build` and `cargo test` both green. The five duplications are now single-source.
+
+### ✅ Phase 3 — Compressor Rewrite (highest impact)
+**Goal:** Decompose `compressor.rs` into a 10-line orchestrator that calls 5 pipeline stages.
+
+- [ ] Create `src/compression/mod.rs` with public re-exports of `compress_file`, `compress_file_streaming`, `CompressionProgress`, `Fidelity`.
+- [ ] Create `src/compression/fidelity.rs` with the `Fidelity` enum and `Fidelity::from_str`.
+- [ ] Create `src/compression/symbol_compression.rs` for the Low-fidelity opcode pass.
+- [ ] Create `src/compression/report.rs` for the final optimization report formatting.
+- [ ] Create `src/compression/pipeline.rs` containing `compress_file` as an orchestrator:
+  ```rust
+  pub fn compress_file(...) -> Result<String, Box<dyn Error>> {
+      let source = read_source(...)?;
+      check_cache(&source, ...)?;
+      let captures = capture_pipeline::run(...)?;
+      let body = build_body(captures, fidelity)?;
+      let (body, footer) = symbol_compression::apply(body, fidelity)?;
+      Ok(report::format(...))
+  }
+  ```
+- [ ] Create `src/compression/streaming.rs` containing `compress_file_streaming` as a thin wrapper that injects progress callbacks.
+- [ ] Update `src/compressor.rs` to be a re-export shim: `pub use crate::compression::*;`
+- [ ] **Validation:** `cargo build` and `cargo test` both green. The 601-line `compressor.rs` is now < 5 lines.
+
+### ✅ Phase 4 — MCP Server Rewrite
+**Goal:** Decompose `main.rs` into a 3-line bootstrap that calls a focused server module.
+
+- [ ] Create `src/mcp/mod.rs` exposing `run() -> Result<(), Box<dyn Error>>`.
+- [ ] Create `src/mcp/server.rs` containing the stdin/stdout read loop and the call to `router::dispatch`.
+- [ ] Create `src/mcp/router.rs` containing the top-level `match req.method` dispatcher.
+- [ ] Create `src/mcp/handlers.rs` containing `initialize`, `tools/list`, `prompts/list`, `prompts/get` handlers.
+- [ ] Create `src/mcp/tools.rs` with the 4 tool definitions as data + a `dispatch_tools_call` function.
+- [ ] Create `src/mcp/prompts.rs` with the `cleanctx-notation` prompt content (extracted from the giant `concat!` string).
+- [ ] Create `src/mcp/workspace.rs` with `compress_workspace_dir` and `collect_source_files`.
+- [ ] Replace `src/main.rs` with:
+  ```rust
+  fn main() -> Result<(), Box<dyn std::error::Error>> {
+      clean_ctx::mcp::run()
+  }
+  ```
+- [ ] **Validation:** `cargo build` and `cargo test` both green. The 421-line `main.rs` is now 3 lines.
+
+### ✅ Phase 5 — Polish
+**Goal:** Clean up dead code, consolidate documentation, add missing tests.
+
+- [ ] Remove dead code: `had_child_changes` (line 302) and `last_kind` (line 615) in `diff.rs`.
+- [ ] Consolidate doc comments at the module level for each new module.
+- [ ] Add unit tests for `compress_file` cache-hit path.
+- [ ] Add unit tests for `compress_file_streaming` callback contract.
+- [ ] Add unit tests for `markers::build_marker` covering all capture names.
+- [ ] Add unit tests for `opcodes` table completeness.
+- [ ] Add a top-level architecture diagram to `README.md`.
+- [ ] **Validation:** `cargo test --all-features` green. `cargo clippy` clean.
+
+---
+
+## 🎯 Decisions & Assumptions
+
+These are the defaults. Override any of them before Phase 1 begins.
+
+1. **Public API stability: Hybrid.**
+   - `lib.rs` re-exports the old module paths (`pub mod helpers; pub mod diff;` etc.) **and** the new module paths (`pub mod compaction; pub mod compression;` etc.).
+   - Internal callers (`main.rs`, tests) are updated to use the new paths.
+   - External consumers of the library see no breaking change.
+
+2. **Phasing: Phase 1 first, then check in.**
+   - After each phase, run `cargo build` and `cargo test`. Report results.
+   - Wait for explicit go-ahead before starting the next phase.
+   - This keeps each phase reviewable in isolation and minimizes risk.
+
+3. **Tests: Co-located with code.**
+   - Each split module has its own `#[cfg(test)] mod tests` block, right next to the code it tests.
+   - Tests that exercise multiple modules (e.g., `end_to_end_diff_on_real_typescript` in `diff.rs`) move to whichever file owns the primary subject under test.
+   - New tests added in Phase 5 go into the module they exercise.
+
+4. **Edition 2024 idioms.**
+   - Use `mod.rs` for module roots (compatible with edition 2024).
+   - Prefer `pub(crate)` over `pub` for items that don't need to escape the crate boundary.
+
+5. **No new public API surface.**
+   - All new modules are `pub(crate)` by default.
+   - Only the public-API re-exports at `lib.rs` are public.
+
+---
+
+## ✅ Validation Criteria
+
+Every phase must pass all of these before being declared complete:
+
+- [ ] `cargo build` — no warnings (treating warnings as errors is recommended: `RUSTFLAGS="-D warnings"`)
+- [ ] `cargo test` — all existing tests still pass
+- [ ] `cargo clippy --all-targets -- -D warnings` — no new lints
+- [ ] `wc -l src/*.rs src/**/*.rs` — no file larger than 350 lines (except `lib.rs` re-export shims and `main.rs` bootstrap, which should be tiny)
+- [ ] `grep -r "fn compact_method_low" src/` — exactly one definition (was duplicated in helpers.rs and used in compressor.rs via the duplication)
+- [ ] `grep -r "builtin.insert" src/` — exactly one location (was in `dictionary.rs` and `decompressor.rs`)
+
+---
+
+## 📅 Estimated Effort
+
+These are rough estimates assuming no surprises:
+
+| Phase | Estimated Time | Risk |
+|-------|---------------:|------|
+| Phase 1: Pure splits | 1–2 hours | Low (mechanical) |
+| Phase 2: Eliminate duplication | 2–3 hours | Medium (semantic checks) |
+| Phase 3: Compressor rewrite | 2–3 hours | Medium (refactor public API) |
+| Phase 4: MCP server rewrite | 1–2 hours | Low (mechanical) |
+| Phase 5: Polish | 1 hour | Low (cleanup) |
+| **Total** | **7–11 hours** | |
+
+---
+
+## 📚 References
+
+- [Single Responsibility Principle (Robert C. Martin)](https://blog.cleancoder.com/uncle-bob/2014/05/08/SingleReponsibilityPrinciple.html)
+- [Rust API Guidelines: Organization](https://rust-lang.github.io/api-guidelines/organization.html)
+- [Rust Book: Modules](https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html)
+- [Edition 2024 module changes](https://doc.rust-lang.org/edition-guide/rust-2024/index.html)
+
+---
+
+## 📝 Change Log
+
+| Date | Phase | Status | Notes |
+|------|-------|--------|-------|
+| 2026-06-06 | Plan created | ✅ | Initial plan authored |
+| _TBD_ | Phase 1 | ⏳ | Pure file splits |
+| _TBD_ | Phase 2 | ⏳ | Eliminate duplication |
+| _TBD_ | Phase 3 | ⏳ | Compressor rewrite |
+| _TBD_ | Phase 4 | ⏳ | MCP server rewrite |
+| _TBD_ | Phase 5 | ⏳ | Polish |
