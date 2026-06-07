@@ -52,22 +52,24 @@ fn try_build_with(
 ) -> Result<CapturedStructure, Box<dyn std::error::Error>> {
     // Run the SHARED capture pipeline. The closure maps each
     // (capture_name, raw_text) pair to the normalised text the diff
-    // path wants stored in the resulting CapEntry.
+    // path wants stored in the resulting CapEntry. F-08: pass the
+    // real `fidelity` through so the per-capture closures honour it.
     let all_captures = run_capture_pipeline(
         language,
         query_string,
         source,
-        |capture_name, raw, _low| {
+        fidelity,
+        |capture_name, raw, f| {
             if capture_name == "class.root" {
                 Some(extract_class_name(raw))
             } else if capture_name == "method.root" {
-                Some(extract_method_sig(raw, fidelity))
+                Some(extract_method_sig(raw, f))
             } else if capture_name == "field.root" {
-                Some(extract_field(raw, fidelity))
+                Some(extract_field(raw, f))
             } else if capture_name == "import.root" {
-                Some(compact_import(raw, fidelity))
+                Some(compact_import(raw, f))
             } else {
-                Some(compact_expression(raw, fidelity))
+                Some(compact_expression(raw, f))
             }
         },
     )?;

@@ -87,7 +87,7 @@ where
     let current_hash = cache.compute_hash(source_bytes);
 
     // --- Cache short-circuit (consistent with non-streaming variant) ------
-    let cache_key = format!("{}::{:?}", absolute_path, fidelity);
+    let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
     let is_modified = cache.update_and_verify(cache_key, current_hash);
     if !is_modified {
         let cached_notice = format!(
@@ -100,9 +100,15 @@ where
             phase: "cache-hit".to_string(),
             partial: Some(cached_notice.clone()),
         })?;
+        // F-04: same `cached, cached, cached` placeholder as the
+        // non-streaming path so LLM clients see a consistent header.
+        let ratio_report = format!(
+            "// Structures: cached, cached, cached | {}/{} tokens",
+            meta.raw_tokens, meta.compressed_tokens
+        );
         return Ok(format!(
-            "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n{}",
-            meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, cached_notice
+            "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
+            meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, ratio_report, cached_notice
         ));
     }
 
@@ -118,19 +124,22 @@ where
     })?;
 
     // --- Phase 3: extract captures with the SHARED pipeline -------------
+    // F-08: pass the real `fidelity` through so the per-capture
+    // closures use it (instead of always Low).
     let all_captures: Vec<CapEntry> = run_capture_pipeline(
         language,
         query_string,
         &source_code,
-        |capture_name, raw, _low| {
+        fidelity,
+        |capture_name, raw, f| {
             if capture_name == "class.root" {
                 Some(extract_class_name(raw))
             } else if capture_name == "method.root" {
-                Some(extract_method_sig(raw, fidelity))
+                Some(extract_method_sig(raw, f))
             } else if capture_name == "field.root" {
-                Some(extract_field(raw, fidelity))
+                Some(extract_field(raw, f))
             } else {
-                Some(compact_expression(raw, fidelity))
+                Some(compact_expression(raw, f))
             }
         },
     )?;
@@ -141,9 +150,11 @@ where
         partial: None,
     })?;
 
-    // Walk the captures and emit incremental progress events
+    // Walk the captures and emit incremental progress events.
+    // F-04: `build_output_lines` now returns `BuildOutputResult` with
+    // real counts; we destructure only what we need here.
     let total_captures = all_captures.len();
-    let (output_lines, _imports) = build_output_lines(&all_captures, &source_code, fidelity);
+    let built = build_output_lines(&all_captures, &source_code, fidelity);
     for idx in 0..total_captures {
         let p = 0.4 + (idx as f64 / total_captures.max(1) as f64) * 0.5;
         on_progress(CompressionProgress {
@@ -153,7 +164,7 @@ where
         })?;
     }
 
-    let body_content = assemble_body(&output_lines, fidelity);
+    let body_content = assemble_body(&built.output_lines, fidelity);
 
     // --- Phase 4: symbol opcode compression (Low fidelity only) ----------
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
@@ -166,7 +177,15 @@ where
     })?;
 
     let compacted_body = format_compacted_body(&display_body, &sym_footer, &path_alias, fidelity);
-    let final_output = format_final_output(&source_code, &compacted_body, fidelity, 0, 0, 0);
+    // F-04: pass real counts from `built`.
+    let final_output = format_final_output(
+        &source_code,
+        &compacted_body,
+        fidelity,
+        built.class_count,
+        built.method_count,
+        built.import_count,
+    );
 
     on_progress(CompressionProgress {
         progress: 1.0,

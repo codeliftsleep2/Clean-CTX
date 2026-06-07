@@ -2,6 +2,7 @@
 //
 // Class-level extraction and formatting helpers.
 
+use crate::compaction::modifiers::{strip_modifiers, MODIFIERS_CLASS};
 use crate::compression::Fidelity;
 
 /// Extract just the class name (and optional base/interface list) from the
@@ -11,6 +12,7 @@ use crate::compression::Fidelity;
 ///   "export class FooService extends BaseService implements IFoo { ... }"
 ///   "class Bar { ... }"
 ///   "abstract class Baz<T> { ... }"
+///   "public static abstract class Quux { ... }"   <-- F-07 regression
 ///
 /// Output examples (Low):   "FooService"
 /// Output examples (Medium): "FooService:BaseService"
@@ -21,14 +23,15 @@ pub fn extract_class_name(text: &str) -> String {
     let decl = decl.split('{').next().unwrap_or(decl).trim();
 
     // Strip leading modifiers: export, default, abstract, public, sealed, …
-    let keywords = ["export default ", "export ", "abstract ", "sealed ",
-                    "public ", "private ", "protected ", "static "];
-    let mut rest = decl;
-    for kw in &keywords {
-        rest = rest.strip_prefix(kw).unwrap_or(rest);
-    }
+    //
+    // F-07: the previous implementation walked the modifier list once
+    // and returned the first match, which broke for inputs like
+    // "public static abstract class Foo" (it stripped "public " and
+    // then returned, leaving "static abstract class Foo" behind).
+    // The shared `strip_modifiers` helper loops until stable.
+    let rest = strip_modifiers(decl, MODIFIERS_CLASS);
     // Strip "class " keyword
-    let rest = rest.strip_prefix("class ").unwrap_or(rest).trim();
+    let rest = rest.strip_prefix("class ").unwrap_or(&rest).trim();
 
     // Split on whitespace: first token is "Name<T>" or "Name"
     let name_token = rest.split_whitespace().next().unwrap_or(rest);
@@ -114,3 +117,7 @@ fn extract_base_types(decl: &str, keyword: &str) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .collect()
 }
+
+#[cfg(test)]
+#[path = "../tests/compaction/class.rs"]
+mod tests;

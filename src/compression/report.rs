@@ -29,6 +29,13 @@ pub fn format_compacted_body(
 }
 
 /// Build the complete final output string: savings report + compacted body.
+///
+/// F-04 (FAANG audit): the previous implementation hard-coded
+/// `0, 0, 0` for class/method/import counts and emitted
+/// `"{raw}/{raw} raw tokens"` (the denominator was wrong, the
+/// numerator and denominator were the same value). The signature
+/// now takes the real counts from the orchestrator, and the
+/// denominator uses `compressed_tokens`.
 pub fn format_final_output(
     source_code: &str,
     compacted_body: &str,
@@ -39,8 +46,12 @@ pub fn format_final_output(
 ) -> String {
     let meta = calculate_savings(source_code, compacted_body);
     let ratio_report = format!(
-        "// Structures: {} classes, {} methods, {} imports | {}/{} raw tokens",
-        class_count, method_count, import_count, meta.raw_tokens, meta.raw_tokens
+        "// Structures: {} classes, {} methods, {} imports | {}/{} tokens",
+        class_count,
+        method_count,
+        import_count,
+        meta.raw_tokens,
+        meta.compressed_tokens,
     );
     format!(
         "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
