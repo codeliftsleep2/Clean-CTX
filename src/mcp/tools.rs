@@ -292,6 +292,11 @@ pub(crate) fn dispatch_tools_call(
 
 /// Compute an AST-level diff between the file's in-session baseline and
 /// its current on-disk state.
+///
+/// F-21 (FAANG audit): before calling the expensive `build_snapshot`,
+/// the handler hashes the source and checks if a baseline exists *and*
+/// the hash matches. On match, it returns a "no changes" message
+/// without re-parsing the file with tree-sitter.
 fn diff_code_context_handler(
     file: PathBuf,
     cache: &mut crate::cache::LocalStateCache,
@@ -304,12 +309,32 @@ fn diff_code_context_handler(
     let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
 
     let source = std::fs::read_to_string(&file)?;
+
+    // F-21: hash the source content and check if the baseline is
+    // still valid before paying for the expensive tree-sitter parse.
+    let source_hash = cache.compute_hash(source.as_bytes());
+    if let Some(stored_hash) = cache.get_baseline_hash(&cache_key)
+        && stored_hash == source_hash
+        && let Some(baseline_snap) = cache.get_baseline(&cache_key).cloned()
+    {
+        // Content is byte-identical to the stored baseline — no
+        // structural changes possible.
+        let class_count = baseline_snap.classes.len();
+        return Ok(format!(
+            "// --- AST Diff ---\n// No changes since last snapshot ({} classes).\n// Hash: {}",
+            class_count, &source_hash[..12],
+        ));
+    }
+
     let current = build_snapshot(&source, fidelity)?;
 
     let baseline = cache.get_baseline(&cache_key).cloned();
     let body = match baseline {
         None => {
             let class_count = current.classes.len();
+            // F-21: store the hash BEFORE `store_baseline` takes
+            // ownership of `cache_key`.
+            cache.store_baseline_hash(&cache_key, &source_hash);
             cache.store_baseline(cache_key, current);
             format!(
                 "// --- AST Diff ---\n// No baseline snapshot for this file yet.\n// Current state stored as baseline ({} classes).\n// Call diff_code_context again after the file changes to see the delta.",
@@ -324,6 +349,7 @@ fn diff_code_context_handler(
                 absolute_path, added, removed, modified, unchanged
             );
             let body = format_diff(&actions, fidelity);
+            cache.store_baseline_hash(&cache_key, &source_hash);
             cache.store_baseline(cache_key, current);
             format!("{}{}", header, body)
         }

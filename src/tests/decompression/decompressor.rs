@@ -95,3 +95,34 @@ fn handles_empty_replacement() {
     // "$ctor" with empty replacement should still respect boundaries.
     assert_eq!(word_boundary_replace("a $ctor b", "$ctor", ""), "a  b");
 }
+
+// ---------- F-15: precomputed sorted opcode list ----------
+
+#[test]
+fn parse_builds_sorted_opcodes_longest_first() {
+    // After `parse()`, the sorted_opcodes vec should contain both
+    // builtin and custom opcodes, sorted longest-first so that a
+    // 5-char opcode is tried before a 2-char one.
+    let input = "// header\n$foo = bar\n§PATHMAP\n  α1 = /tmp/x.ts";
+    let mut d = Decompressor::new();
+    d.parse(input);
+    // The sorted_opcodes list must be non-empty (contains builtins).
+    assert!(!d.sorted_opcodes.is_empty());
+    // The first entry should be the longest opcode.
+    for w in d.sorted_opcodes.windows(2) {
+        assert!(w[0].0.len() >= w[1].0.len(),
+            "sorted_opcodes must be longest-first: {:?} before {:?}",
+            w[0].0, w[1].0);
+    }
+}
+
+#[test]
+fn decompress_with_precomputed_opcodes_matches_expected() {
+    // A compressed block using a builtin opcode ($c = class) should
+    // decompress correctly via the precomputed path.
+    let input = "// --- Compacted Layout (Low Fidelity): α1 ---\n$c Foo;$a bar\n\n§PATHMAP\n  α1 = /tmp/Foo.ts";
+    let mut d = Decompressor::new();
+    let result = d.quick_decompress(input);
+    assert!(result.contains("class Foo"), "Expected 'class Foo' in: {}", result);
+    assert!(result.contains("async bar"), "Expected 'async bar' in: {}", result);
+}

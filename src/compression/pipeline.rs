@@ -9,6 +9,13 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::analytics::calculate_savings;
+
+/// F-18 (FAANG audit): maximum file size in bytes that `compress_file`
+/// will read into memory. Files larger than this return a clean error
+/// instead of risking an OOM. The streaming variant
+/// (`compress_file_streaming`) can be used as a fallback for larger
+/// files.
+const MAX_FILE_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
 use crate::cache::LocalStateCache;
 use crate::compaction::{
     compact_expression, compact_import, extract_class_name, extract_field,
@@ -49,12 +56,27 @@ pub struct BuildOutputResult {
 
 /// Reads a target source file and compiles it down into a highly compacted,
 /// keyword-stripped structural signature stream with configurable fidelity.
+///
+/// F-18: returns a [`CompressionError::FileTooLarge`] if the file exceeds
+/// [`MAX_FILE_BYTES`]. Use [`compress_file_streaming`](crate::compression::streaming::compress_file_streaming)
+/// for larger files.
 pub fn compress_file(
     file: PathBuf,
     dict: &mut PathDictionary,
     cache: &mut LocalStateCache,
     fidelity: Fidelity,
 ) -> Result<String, Box<dyn std::error::Error>> {
+    // F-18: guard against reading an unbounded file into memory.
+    let meta = fs::metadata(&file)?;
+    if meta.len() > MAX_FILE_BYTES {
+        return Err(format!(
+            "File too large ({} bytes; max {} bytes). \
+             Use compress_workspace or the streaming variant for large files.",
+            meta.len(),
+            MAX_FILE_BYTES,
+        )
+        .into());
+    }
     let source_code = fs::read_to_string(&file)?;
     let source_bytes = source_code.as_bytes();
 
