@@ -16,7 +16,7 @@
 use std::path::PathBuf;
 use serde_json::Value;
 use crate::compressor::{compress_file, Fidelity};
-use crate::decompressor::Decompressor;
+use crate::decompression::Decompressor;
 use crate::diff::{build_snapshot, diff_snapshots, format_diff, diff_summary};
 use crate::mcp::McpState;
 use crate::mcp::workspace;

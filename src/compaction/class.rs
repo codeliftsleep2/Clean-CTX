@@ -38,6 +38,10 @@ pub fn extract_class_name(text: &str) -> String {
     // Strip generic parameters for Low fidelity
     let bare_name = name_token.split('<').next().unwrap_or(name_token);
 
+    // F-38: strip characters that would be ambiguous in the output format
+    // (`{`, `}`, `:` are structural delimiters in the compact notation).
+    let bare_name = bare_name.trim_end_matches(['{', '}', ':']);
+
     // Collect extends / implements if present
     let extends = extract_base_types(rest, "extends");
     let implements = extract_base_types(rest, "implements");

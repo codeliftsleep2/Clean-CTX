@@ -3,6 +3,8 @@
 // Render a `Vec<DiffAction>` into the canonical compact change-set format
 // used by the diff tool, and provide a one-line summary helper.
 
+use std::fmt::Write;
+
 use crate::compression::Fidelity;
 
 use super::action::{DiffAction, DiffKind, DiffTarget};
@@ -17,16 +19,11 @@ pub fn format_diff(actions: &[DiffAction], fidelity: Fidelity) -> String {
 
     for action in actions {
         // Break the "method X / field Y" indentation under the right class.
-        match action.target {
-            DiffTarget::Method | DiffTarget::Field => {
-                if let Some(cls) = &current_class {
-                    if !out.ends_with('\n') {
-                        out.push('\n');
-                    }
-                    let _ = cls; // keep current_class alive
-                }
-            }
-            _ => {}
+        if matches!(action.target, DiffTarget::Method | DiffTarget::Field)
+            && current_class.is_some()
+            && !out.ends_with('\n')
+        {
+            out.push('\n');
         }
 
         if action.target == DiffTarget::Class {
@@ -35,17 +32,9 @@ pub fn format_diff(actions: &[DiffAction], fidelity: Fidelity) -> String {
                 out.push('\n');
             }
             if matches!(action.kind, DiffKind::Unchanged) {
-                out.push_str(&format!("= {} (unchanged)\n", action.label));
+                let _ = writeln!(out, "= {} (unchanged)", action.label);
             } else {
-                out.push_str(
-                    format!(
-                        "{} {} {}\n",
-                        action.kind.symbol(),
-                        action.label,
-                        action.detail,
-                    )
-                    .trim_end(),
-                );
+                let _ = write!(out, "{} {} {}", action.kind.symbol(), action.label, action.detail);
                 out.push('\n');
             }
             current_class = Some(action.label.clone());
@@ -53,36 +42,16 @@ pub fn format_diff(actions: &[DiffAction], fidelity: Fidelity) -> String {
             let indent = if fidelity == Fidelity::Low { "" } else { "  " };
             match action.kind {
                 DiffKind::Modified => {
-                    out.push_str(&format!(
-                        "{}{} {} ~ {}\n",
-                        indent,
-                        action.kind.symbol(),
-                        action.label,
-                        action.detail
-                    ));
+                    let _ = writeln!(out, "{}{} {} ~ {}", indent, action.kind.symbol(), action.label, action.detail);
                     if !action.previous_detail.is_empty() {
-                        out.push_str(&format!(
-                            "{}    was: {}\n",
-                            indent, action.previous_detail
-                        ));
+                        let _ = writeln!(out, "{}    was: {}", indent, action.previous_detail);
                     }
                 }
                 DiffKind::Unchanged => {
-                    out.push_str(&format!(
-                        "{}{} {}\n",
-                        indent,
-                        action.kind.symbol(),
-                        action.detail
-                    ));
+                    let _ = writeln!(out, "{}{} {}", indent, action.kind.symbol(), action.detail);
                 }
                 _ => {
-                    out.push_str(&format!(
-                        "{}{} {} {}\n",
-                        indent,
-                        action.kind.symbol(),
-                        action.label,
-                        action.detail
-                    ));
+                    let _ = writeln!(out, "{}{} {} {}", indent, action.kind.symbol(), action.label, action.detail);
                 }
             }
         }

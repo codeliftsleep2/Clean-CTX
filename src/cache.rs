@@ -8,31 +8,29 @@
 //      `diff_code_context` tool can produce AST-level deltas without
 //      re-reading historical source.
 //
-// The baseline registry uses a `BTreeMap` so the implementation is
-// deterministic and free of unsafe code; persistence across restarts is
-// not currently required (the MCP server is session-scoped), but the API
-// is shaped so that a future JSON snapshot could be dropped in here.
+// F-40: uses `HashMap` (not `BTreeMap`) because no caller iterates the
+// registry or baseline in sorted order; `HashMap` is faster for lookups.
 
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use crate::diff::CapturedStructure;
 
 pub struct LocalStateCache {
     /// Maps absolute file paths to their last calculated content hashes.
-    registry: BTreeMap<String, String>,
+    registry: HashMap<String, String>,
     /// Maps cache key ("{path}::{fidelity}") to the last `CapturedStructure`
     /// for that file. Used by `diff_code_context` to compute AST deltas.
-    baseline_snapshots: BTreeMap<String, CapturedStructure>,
+    baseline_snapshots: HashMap<String, CapturedStructure>,
     /// F-21 (FAANG audit): maps cache key ("{path}::{fidelity}") to the
     /// content hash at the time the baseline was stored. Used by
     /// `diff_code_context` to skip re-parsing when the file hasn't changed.
-    baseline_hashes: BTreeMap<String, String>,
+    baseline_hashes: HashMap<String, String>,
     /// F-14: Maps content hash → raw-token count so that cache-hit paths
     /// can skip the expensive BPE encode. Keyed by the hash (not the
     /// file path) because the same content in two locations yields the
     /// same raw-token count.
-    raw_token_counts: BTreeMap<String, usize>,
+    raw_token_counts: HashMap<String, usize>,
 }
 
 impl Default for LocalStateCache {
@@ -44,10 +42,10 @@ impl Default for LocalStateCache {
 impl LocalStateCache {
     pub fn new() -> Self {
         Self {
-            registry: BTreeMap::new(),
-            baseline_snapshots: BTreeMap::new(),
-            baseline_hashes: BTreeMap::new(),
-            raw_token_counts: BTreeMap::new(),
+            registry: HashMap::new(),
+            baseline_snapshots: HashMap::new(),
+            baseline_hashes: HashMap::new(),
+            raw_token_counts: HashMap::new(),
         }
     }
 
@@ -66,6 +64,7 @@ impl LocalStateCache {
             && *existing_hash == current_hash {
                 return false;
             }
+        // F-41: only insert if the hash actually changed.
         self.registry.insert(absolute_path.to_string(), current_hash.to_string());
         true
     }

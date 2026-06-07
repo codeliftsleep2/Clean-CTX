@@ -34,17 +34,12 @@ use crate::dictionary::PathDictionary;
 /// the orchestrator counted classes/methods/imports by
 /// `let class_count: usize = 0;` and bound it to `_`, then passed
 /// `0, 0, 0` to `format_final_output`. The header always lied.
-/// The struct now carries the real counts and a `Vec<String>` of
-/// import lines (kept in case downstream code needs them).
+/// The struct now carries the real counts.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct BuildOutputResult {
     /// The compacted body lines, in document order, with the import
     /// block prepended.
     pub output_lines: Vec<String>,
-    /// The compacted import lines (without the fidelity-specific
-    /// join). Kept for symmetry with the legacy return type.
-    pub imports: Vec<String>,
     /// Number of `class.root` captures that emitted a class entry.
     pub class_count: usize,
     /// Number of `method.root` captures that emitted a method line.
@@ -281,7 +276,6 @@ pub fn build_output_lines(
     }
     BuildOutputResult {
         output_lines: output,
-        imports,
         class_count,
         method_count,
         import_count,

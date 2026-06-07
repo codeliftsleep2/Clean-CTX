@@ -2,7 +2,9 @@
 //
 // DiffAction / DiffKind / DiffTarget — the value types emitted by the diff.
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiffAction {
     /// "+" added, "-" removed, "~" modified, "=" unchanged.
     pub kind: DiffKind,
@@ -16,7 +18,8 @@ pub struct DiffAction {
     pub previous_detail: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Serialized as `"+", "-", "~", "="`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiffKind {
     Added,
     Removed,
@@ -24,7 +27,8 @@ pub enum DiffKind {
     Unchanged,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Serialized as `"class", "method", "field", "import"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiffTarget {
     Class,
     Method,

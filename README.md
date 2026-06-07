@@ -111,7 +111,7 @@ src/
 ├── protocol.rs          # JSON-RPC message handling
 ├── config.rs            # Project-level .clean-ctx.json configuration
 └── test_files/
-    ├── sample_Service.ts   # Small test file (32 lines)
+    ├── sample_service.ts   # Small test file (32 lines)
     └── LargeService.ts     # Large test file (~400 lines)
 ```
 

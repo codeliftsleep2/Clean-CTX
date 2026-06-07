@@ -24,8 +24,10 @@ fn resolve_fidelity_uses_extension_override() {
 
 #[test]
 fn resolve_fidelity_falls_back_to_default() {
-    let mut config = CleanCtxConfig::default();
-    config.default_fidelity = "medium".to_string();
+    let config = CleanCtxConfig {
+        default_fidelity: "medium".to_string(),
+        ..Default::default()
+    };
     assert_eq!(
         resolve_fidelity(None, Some("cs"), &config),
         Fidelity::Medium
@@ -58,7 +60,7 @@ fn diff_code_context_unchanged_file_skips_reparse() {
     let path = dir.path().join("sample.ts");
     {
         let mut f = std::fs::File::create(&path).unwrap();
-        write!(f, "export class Foo {{ bar(): void {{}} }}\n").unwrap();
+        writeln!(f, "export class Foo {{ bar(): void {{}} }}").unwrap();
     }
 
     let mut cache = crate::cache::LocalStateCache::new();
@@ -99,7 +101,7 @@ fn diff_code_context_changed_file_produces_diff() {
     let path = dir.path().join("change.ts");
     {
         let mut f = std::fs::File::create(&path).unwrap();
-        write!(f, "export class Alpha {{ run(): void {{}} }}\n").unwrap();
+        writeln!(f, "export class Alpha {{ run(): void {{}} }}").unwrap();
     }
 
     let mut cache = crate::cache::LocalStateCache::new();
@@ -115,9 +117,9 @@ fn diff_code_context_changed_file_produces_diff() {
     // Modify the file.
     {
         let mut f = std::fs::File::create(&path).unwrap();
-        write!(
+        writeln!(
             f,
-            "export class Alpha {{ run(): void {{}} }}\nexport class Beta {{ go(): string {{ return ''; }} }}\n"
+            "export class Alpha {{ run(): void {{}} }}\nexport class Beta {{ go(): string {{ return ''; }} }}"
         )
         .unwrap();
     }

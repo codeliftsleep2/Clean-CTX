@@ -10,9 +10,21 @@
 // of truth (previously the 32 entries were duplicated inline here and
 // in `decompression/opcodes.rs`).
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use crate::compression::opcodes::{is_primitive_opcode, PRIMITIVE_OPCODES};
+
+/// Trim a token string to the canonical form used for symbol registration
+/// and lookup. Strips surrounding punctuation that is part of the syntax
+/// rather than the token itself.
+///
+/// F-37: centralises the trim logic that was previously duplicated in
+/// `SymbolDictionary::register` and `apply_symbol_compression`.
+pub fn tokenize_for_symbols(s: &str) -> &str {
+    s.trim_matches(|c: char| {
+        matches!(c, '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>' | ':' | ';' | ',' | '.')
+    })
+}
 
 /// Opcode symbol type
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -27,22 +39,22 @@ pub enum SymbolKind {
 
 pub struct SymbolDictionary {
     /// token -> opcode (e.g. "async" -> "$1")
-    forward: BTreeMap<String, String>,
+    forward: HashMap<String, String>,
     /// opcode -> token (e.g. "$1" -> "async")
-    reverse: BTreeMap<String, String>,
+    reverse: HashMap<String, String>,
     /// Running counter for new opcodes
     next_id: usize,
     /// Frequency tracking — tokens seen multiple times get opcodes
-    frequency: BTreeMap<String, usize>,
+    frequency: HashMap<String, usize>,
 }
 
 impl SymbolDictionary {
     pub fn new() -> Self {
         let mut dict = Self {
-            forward: BTreeMap::new(),
-            reverse: BTreeMap::new(),
+            forward: HashMap::new(),
+            reverse: HashMap::new(),
             next_id: 1,
-            frequency: BTreeMap::new(),
+            frequency: HashMap::new(),
         };
 
         // Built-in primitives: load from the SHARED opcode table so the
@@ -60,7 +72,7 @@ impl SymbolDictionary {
     }
 
     /// Load custom type aliases from config into the dictionary
-    pub fn load_custom_aliases(&mut self, aliases: &std::collections::BTreeMap<String, String>) {
+    pub fn load_custom_aliases(&mut self, aliases: &std::collections::HashMap<String, String>) {
         for (opcode, token) in aliases {
             // Only insert if the token doesn't already have an opcode
             if !self.forward.contains_key(token) {
@@ -70,10 +82,10 @@ impl SymbolDictionary {
         }
     }
 
-    /// Register a token — if seen >= 2 times, assign it an opcode
+    /// Register a token — if seen >= 2 times, assign it an opcode.
+    /// F-37: uses `tokenize_for_symbols` for consistent trimming.
     pub fn register(&mut self, token: &str) {
-        // Skip whitespace-only and empty tokens
-        let token = token.trim();
+        let token = tokenize_for_symbols(token);
         if token.is_empty() || token.len() <= 1 {
             return;
         }
