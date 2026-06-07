@@ -88,3 +88,33 @@ fn compress_file_cache_hit_vs_miss_output_differ() {
         "Second call with same content should hit cache"
     );
 }
+
+// ---------- F-18: file size guard ----------
+
+#[test]
+fn compress_file_rejects_file_larger_than_max() {
+    // Create a .ts file that exceeds the 10 MB limit.
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("huge.ts");
+    {
+        let mut f = std::fs::File::create(&path).unwrap();
+        // Write just over 10 MB of content (valid UTF-8).
+        let chunk = "export class X {}\n";
+        let repetitions = (10 * 1024 * 1024 / chunk.len()) + 2;
+        for _ in 0..repetitions {
+            f.write_all(chunk.as_bytes()).unwrap();
+        }
+    }
+
+    let mut dict = crate::dictionary::PathDictionary::new();
+    let mut cache = LocalStateCache::new();
+
+    let result = compress_file(path, &mut dict, &mut cache, Fidelity::Low);
+    assert!(result.is_err(), "should reject oversized file");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("File too large"),
+        "error should mention 'File too large', got: {}",
+        err_msg
+    );
+}

@@ -24,6 +24,10 @@ pub struct LocalStateCache {
     /// Maps cache key ("{path}::{fidelity}") to the last `CapturedStructure`
     /// for that file. Used by `diff_code_context` to compute AST deltas.
     baseline_snapshots: BTreeMap<String, CapturedStructure>,
+    /// F-21 (FAANG audit): maps cache key ("{path}::{fidelity}") to the
+    /// content hash at the time the baseline was stored. Used by
+    /// `diff_code_context` to skip re-parsing when the file hasn't changed.
+    baseline_hashes: BTreeMap<String, String>,
     /// F-14: Maps content hash → raw-token count so that cache-hit paths
     /// can skip the expensive BPE encode. Keyed by the hash (not the
     /// file path) because the same content in two locations yields the
@@ -42,6 +46,7 @@ impl LocalStateCache {
         Self {
             registry: BTreeMap::new(),
             baseline_snapshots: BTreeMap::new(),
+            baseline_hashes: BTreeMap::new(),
             raw_token_counts: BTreeMap::new(),
         }
     }
@@ -71,6 +76,17 @@ impl LocalStateCache {
         self.baseline_snapshots.insert(key, snapshot);
     }
 
+    /// F-21: Persist the content hash alongside the baseline so
+    /// `diff_code_context` can short-circuit when the file hasn't changed.
+    pub fn store_baseline_hash(&mut self, key: &str, hash: &str) {
+        self.baseline_hashes.insert(key.to_string(), hash.to_string());
+    }
+
+    /// F-21: Retrieve the stored content hash for a baseline.
+    pub fn get_baseline_hash(&self, key: &str) -> Option<&str> {
+        self.baseline_hashes.get(key).map(|s| s.as_str())
+    }
+
     /// Retrieve a previously-stored baseline snapshot, if any.
     pub fn get_baseline(&self, key: &str) -> Option<&CapturedStructure> {
         self.baseline_snapshots.get(key)
@@ -80,6 +96,7 @@ impl LocalStateCache {
     /// or invalidate stale state after a manual overwrite).
     pub fn invalidate_baseline(&mut self, key: &str) {
         self.baseline_snapshots.remove(key);
+        self.baseline_hashes.remove(key);
     }
 
     /// F-14: Store the raw-token count for a content hash so the cache-hit
@@ -99,6 +116,7 @@ impl LocalStateCache {
     pub fn clear(&mut self) {
         self.registry.clear();
         self.baseline_snapshots.clear();
+        self.baseline_hashes.clear();
         self.raw_token_counts.clear();
     }
 }

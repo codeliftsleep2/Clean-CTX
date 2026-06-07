@@ -14,6 +14,11 @@ pub struct Decompressor {
     custom_symbols: BTreeMap<String, String>,
     path_aliases: BTreeMap<String, String>,
     builtin_opcodes: BTreeMap<&'static str, &'static str>,
+    /// F-15 (FAANG audit): precomputed sorted opcode list, rebuilt in
+    /// `parse()`. Previously the sort happened inside the per-line loop
+    /// of `decompress()`, turning an O(L × N log N) pass into O(L × N)
+    /// where L = line count and N = opcode count.
+    sorted_opcodes: Vec<(String, String)>,
 }
 
 /// F-06 (FAANG audit): a word boundary for opcode expansion is "the
@@ -89,6 +94,7 @@ impl Decompressor {
             custom_symbols: BTreeMap::new(),
             path_aliases: BTreeMap::new(),
             builtin_opcodes: builtin_opcode_map(),
+            sorted_opcodes: Vec::new(),
         }
     }
 
@@ -111,6 +117,23 @@ impl Decompressor {
                     self.custom_symbols.insert(opcode, token);
                 }
         }
+        // F-15: rebuild the sorted opcode list once so `decompress()`
+        // does not have to sort per line.
+        self.rebuild_sorted_opcodes();
+    }
+
+    /// Rebuild `sorted_opcodes` from the current `custom_symbols` +
+    /// `builtin_opcodes`. Called at the end of [`parse()`].
+    fn rebuild_sorted_opcodes(&mut self) {
+        self.sorted_opcodes.clear();
+        for (opcode, token) in &self.custom_symbols {
+            self.sorted_opcodes.push((opcode.clone(), token.clone()));
+        }
+        for (&opcode, &token) in &self.builtin_opcodes {
+            self.sorted_opcodes.push((opcode.to_string(), token.to_string()));
+        }
+        // Longest opcode first so partial matches don't shadow longer ones.
+        self.sorted_opcodes.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
     }
 
     pub fn decompress(&self, compressed: &str) -> String {
@@ -140,17 +163,9 @@ impl Decompressor {
                 expanded = expanded.replace(alias.as_str(), path.as_str());
             }
 
-            // Build sorted opcode list (longest first) and expand
-            let mut all_opcodes: Vec<(&str, &str)> = Vec::new();
-            for (opcode, token) in &self.custom_symbols {
-                all_opcodes.push((opcode.as_str(), token.as_str()));
-            }
-            for (&opcode, &token) in &self.builtin_opcodes {
-                all_opcodes.push((opcode, token));
-            }
-            all_opcodes.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
-
-            for (opcode, token) in &all_opcodes {
+            // F-15: iterate the precomputed sorted opcode list
+            // (built once in `parse()` / `rebuild_sorted_opcodes()`).
+            for (opcode, token) in &self.sorted_opcodes {
                 expanded = word_boundary_replace(&expanded, opcode, token);
             }
 

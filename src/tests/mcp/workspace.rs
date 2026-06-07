@@ -158,3 +158,72 @@ fn workspace_shares_aliases_with_per_file_tool() {
         workspace_alias_line
     );
 }
+
+// ---------- F-17: symlink-loop protection ----------
+
+/// F-17: a symlink loop (`loop -> ../loop`) must not cause infinite
+/// recursion or an OOM. The workspace walk should detect the cycle
+/// via canonical-path tracking and terminate quickly.
+#[test]
+fn collect_source_files_survives_symlink_loop() {
+    let dir = TempDir::new().unwrap();
+    let dir_path = dir.path();
+
+    // Create a subdirectory with a real .ts file.
+    let sub = dir_path.join("sub");
+    fs::create_dir(&sub).unwrap();
+    create_ts_file(
+        &sub.to_path_buf(),
+        "good.ts",
+        "export class Good {}\n",
+    );
+
+    // Create a symlink loop: loop_dir -> dir_path/sub/loop_dir
+    // (which we're about to create).
+    let loop_dir = sub.join("loop_dir");
+    fs::create_dir(&loop_dir).unwrap();
+    // loop_dir/loop points back to loop_dir itself (symlink loop).
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&loop_dir, loop_dir.join("loop")).unwrap();
+    // On Windows, use the `junction` or skip if unsupported.
+    #[cfg(not(unix))]
+    {
+        // Symlink creation requires elevated privileges on Windows;
+        // just verify the non-symlink path works.
+    }
+
+    let mut entries = Vec::new();
+    collect_source_files(dir_path.to_str().unwrap(), &mut entries);
+
+    // The good.ts file should still be found.
+    assert!(
+        entries.iter().any(|e| e.contains("good.ts")),
+        "good.ts should be found despite symlink loop, got: {:?}",
+        entries
+    );
+}
+
+/// F-17: `collect_source_files` respects the max depth limit.
+#[test]
+fn collect_source_files_respects_max_depth() {
+    let dir = TempDir::new().unwrap();
+    let mut current = dir.path().to_path_buf();
+
+    // Create a deeply nested directory structure (deeper than MAX_WALK_DEPTH).
+    for i in 0..40 {
+        current = current.join(format!("d{}", i));
+        fs::create_dir(&current).unwrap();
+    }
+    // Put a .ts file at the deepest level.
+    create_ts_file(&current.to_path_buf(), "deep.ts", "export class Deep {}\n");
+
+    let mut entries = Vec::new();
+    collect_source_files(dir.path().to_str().unwrap(), &mut entries);
+
+    // The deep file should NOT be found because it exceeds max depth.
+    assert!(
+        !entries.iter().any(|e| e.contains("deep.ts")),
+        "deep.ts should NOT be found (exceeds max depth), got: {:?}",
+        entries
+    );
+}

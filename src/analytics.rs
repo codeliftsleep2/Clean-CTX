@@ -9,6 +9,13 @@
 // now cached in a process-global `OnceLock` so it loads exactly once and
 // a load failure surfaces as a recoverable `BpeInitError` at startup time
 // rather than a mid-request panic.
+//
+// F-22 (FAANG audit): tiktoken-rs 0.11 embeds the cl100k BPE merge data
+// directly in the binary via `include_bytes!`, so there is no filesystem
+// dependency. The binary works correctly on read-only filesystems
+// (e.g. Docker `--read-only`) and in sandboxed environments. The
+// `bpe_or_init()` call at server startup serves as a defence-in-depth
+// check that the embedded data is intact.
 
 use std::fmt;
 use std::sync::OnceLock;
