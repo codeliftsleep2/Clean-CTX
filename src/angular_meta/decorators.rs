@@ -19,6 +19,7 @@
 // The string walker is O(L) where L is the length of the class
 // capture, which is bounded by the class body length.
 
+use crate::angular_meta::graph::ClassKind;
 use crate::angular_meta::markers::{
     build_component_line, build_directive_line, build_injects_line, build_input_line,
     build_model_line, build_module_line, build_output_line, build_pipe_line, build_service_line,
@@ -794,6 +795,71 @@ fn unquote(s: &str) -> &str {
         }
     }
     s
+}
+
+/// Extract graph-compatible metadata from the class capture for the
+/// cross-file dependency graph (Phase 3, Tier 3).
+///
+/// Returns `(class_name, kind, selector, injects, pipe_name)` for
+/// the class, suitable for pushing into a `GraphCollector`.
+#[allow(clippy::type_complexity)]
+pub fn extract_graph_entries(raw_class: &str) -> Option<(String, ClassKind, Option<String>, Vec<String>, Option<String>)> {
+    let head_end = find_class_head_end(raw_class);
+    let head = &raw_class[..head_end];
+
+    let class_name = extract_class_name(raw_class);
+    let decorators = collect_decorators(head);
+
+    let mut injects: Vec<String> = Vec::new();
+    let mut kind: Option<ClassKind> = None;
+    let mut selector: Option<String> = None;
+    let mut pipe_name: Option<String> = None;
+
+    for dec in &decorators {
+        match dec.kind {
+            DecoratorKind::Component => {
+                kind = Some(ClassKind::Component);
+                let fields = parse_object_literal(&dec.arg);
+                selector = fields.selector;
+            }
+            DecoratorKind::Injectable => {
+                kind = Some(ClassKind::Service);
+            }
+            DecoratorKind::NgModule => {
+                kind = Some(ClassKind::Module);
+            }
+            DecoratorKind::Directive => {
+                kind = Some(ClassKind::Directive);
+                let fields = parse_object_literal(&dec.arg);
+                selector = fields.selector;
+            }
+            DecoratorKind::Pipe => {
+                kind = Some(ClassKind::Pipe);
+                let (name, _) = parse_pipe_fields(&dec.arg);
+                pipe_name = name;
+            }
+            _ => {}
+        }
+    }
+
+    // Extract constructor DI types.
+    if let Some(types) = extract_constructor_injects(raw_class) {
+        injects = types;
+    }
+
+    // Also check for signal-based inject() calls.
+    if let Some(class_body_start) = find_class_body_open(raw_class) {
+        let body = &raw_class[class_body_start..];
+        let body_end = find_matching_brace(body, 0);
+        let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
+        for sf in collect_signal_fields(body_inner) {
+            if let SignalKind::Inject = sf.kind {
+                injects.push(sf.name.clone());
+            }
+        }
+    }
+
+    kind.map(|k| (class_name, k, selector, injects, pipe_name))
 }
 
 fn split_top_level_commas(s: &str) -> Vec<String> {

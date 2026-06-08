@@ -17,6 +17,7 @@
 // arguments; the dict and cache stay single-threaded (the MCP server
 // is single-threaded by design) and the config is shared immutably.
 
+use crate::angular_meta::graph_state::AngularGraphHandle;
 use crate::cache::LocalStateCache;
 use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
@@ -33,6 +34,10 @@ pub struct McpState {
     /// Treated as immutable for the session — the operator must
     /// restart the server to pick up edits.
     pub config: CleanCtxConfig,
+    /// Angular cross-file dependency graph (Phase 3, Tier 3).
+    /// Built once per `compress_workspace` call; `None` when no
+    /// workspace has been compressed yet.
+    pub angular_graph: AngularGraphHandle,
 }
 
 impl McpState {
@@ -43,6 +48,7 @@ impl McpState {
             dict: PathDictionary::new(),
             cache: LocalStateCache::new(),
             config,
+            angular_graph: AngularGraphHandle::new(),
         }
     }
 

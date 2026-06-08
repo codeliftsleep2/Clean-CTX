@@ -24,7 +24,7 @@ These items address the most common user requests and unlock adoption on larger 
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **R-22** | Angular Meta-Layer | Framework-annotation layer for Angular files. Phase 1 ✅ (Tier 1: decorator extraction). Phase 2 ✅ (file-triplet bundling). Phase 2.5 ✅ (modern Angular 17–21 syntax: `@if`/`@for`/`@switch`/`@defer`/`@let` detection + `Φmodel:` marker). Phase 3 📋 (cross-file DI graph). | 4.5 days | 🟡 Medium |
+| **R-22** | Angular Meta-Layer | Framework-annotation layer for Angular files. Phase 1 ✅ (Tier 1: decorator extraction). Phase 2 ✅ (file-triplet bundling). Phase 2.5 ✅ (modern Angular 17–21 syntax: `@if`/`@for`/`@switch`/`@defer`/`@let` detection + `Φmodel:` marker). Phase 3 ✅ (cross-file DI + selector graph). | 6.5 days | 🟡 Medium |
 | **R-19** | Pluggable tokenizers | Today the binary hard-codes cl100k via `tiktoken-rs`. Add a `Tokenizer` trait with `o200k_base` (GPT-4o), Claude, and Llama-3 implementations selectable via tool argument or config. | 2 days | 🔴 High |
 | **F-20** | Rayon parallelization for `compress_workspace` | Per-thread tree-sitter `Parser` pool, shared `DashMap` for the path dictionary, `par_iter().try_for_each`. Expected ~4× speedup on 16-core boxes. | 3-5 days | 🔴 High |
 | **F-19** | Streaming workspace walk | Replace `collect_source_files` collect-then-sort pattern with a `walkdir` streaming visitor. Required before F-20. | 1 day | 🟡 Medium |

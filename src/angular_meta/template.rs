@@ -431,10 +431,8 @@ fn extract_modern_syntax_from_text(text: &str, shape: &mut TemplateShape) {
     }
     // Detect bare @defer (no trigger) — only if no trigger was found in
     // this text node.
-    if contains_at_keyword(text, "defer") && !contains_at_keyword(text, "deferred") {
-        if !had_triggers {
-            shape.defer_blocks.push("default".to_string());
-        }
+    if contains_at_keyword(text, "defer") && !contains_at_keyword(text, "deferred") && !had_triggers {
+        shape.defer_blocks.push("default".to_string());
     }
 
     // @placeholder, @loading, @error (defer sub-blocks)

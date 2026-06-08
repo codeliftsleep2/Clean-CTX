@@ -132,7 +132,7 @@ src/
 │   ├── import.rs                 # compact_import, extract_import_names
 │   └── expression.rs             # compact_expression, simple_compact
 │
-├── angular_meta/                 # Angular Meta-Layer (Phase 1 + 2)
+├── angular_meta/                 # Angular Meta-Layer (Phase 1 + 2 + 3)
 │   ├── mod.rs                    # MetaBlock struct, run_meta_layer entry point
 │   ├── detect.rs                 # Angular detection heuristic + sibling detection
 │   ├── decorators.rs             # @Component / @Injectable / @NgModule / etc. extractor
@@ -140,7 +140,9 @@ src/
 │   ├── bundler.rs                # File-triplet resolver (*.component.ts → .html + .scss)
 │   ├── template.rs               # tree-sitter-html Angular-syntax template extractor
 │   ├── style.rs                  # CSS/SCSS class selector + variable extractor
-│   └── footer.rs                 # §ΦMAP workspace footer formatter
+│   ├── footer.rs                 # §ΦMAP workspace footer formatter
+│   ├── graph.rs                  # AngularGraph — cross-file DI + selector graph (Phase 3)
+│   └── graph_state.rs            # AngularGraphHandle — McpState integration wrapper
 │
 ├── decompression/                # Opcode → readable expansion
 │   ├── mod.rs
@@ -200,7 +202,7 @@ The `LocalStateCache` serves double duty:
 
 ---
 
-## Angular Meta-Layer (Phase 1 + 2)
+## Angular Meta-Layer (Phase 1 + 2 + 3)
 
 The Meta-Layer is **purely additive** — it never modifies the existing TS compaction output. It only appends a `Φ` block below the existing compacted class. Non-Angular files pay zero overhead.
 
@@ -260,13 +262,59 @@ The Meta-Layer is **purely additive** — it never modifies the existing TS comp
 └─────────────────────┘
 ```
 
-**Modules:** `src/angular_meta/` — `mod.rs`, `detect.rs`, `decorators.rs`, `markers.rs`, `bundler.rs`, `template.rs`, `style.rs`, `footer.rs`
+### Phase 3 — Cross-File Dependency Graph (workspace mode only)
 
-**Marker vocabulary:** `Φcmp:`, `Φdir:`, `Φpipe:`, `Φsvc:`, `Φmod:`, `Φin:`, `Φout:`, `Φinjects:`, `Φtpl:`, `Φsty:`, `ΦBUNDLE`, `ΦMAP`
+```  
+     compress_workspace (post-bundling)
+          │
+          ▼
+┌──────────────────────────┐
+│ GraphCollector (per-file)│  Reads raw .ts → decorators::extract_graph_entries
+│                          │  Collects (class_name, file_alias, kind, selector, injects)
+└─────────┬────────────────┘
+          │
+          ▼
+┌──────────────────────┐
+│ AngularGraph Builder │  register_class → resolve_all() builds injected_by reverse edges
+└─────────┬────────────┘
+          │
+     ┌────┴──────────────┐
+     ▼                   ▼
+┌──────────────┐  ┌──────────────┐
+│ DI Resolution│  │ Selector     │  resolve_inject_type → `UserService@α12`
+│              │  │ Linkage      │  resolve_selector  → `UserCardComponent@α9`
+└──────┬───────┘  └──────┬───────┘
+       │                 │
+       └──────┬──────────┘
+              ▼
+┌──────────────────────────┐
+│ Φgraph: + §ΦGRAPH Footer │  // Φgraph:UserCardComponent → injects=[UserService@α2] ← injected-by=[] 
+│                          │  §ΦGRAPH
+│                          │    cmp UserCardComponent@α1
+│                          │      Φcmp:injects=[UserService@α2]
+│                          │      selector="app-user-card"
+└──────────────────────────┘
+```
+
+**New module:** `src/angular_meta/graph.rs` — `AngularGraph`, `AngularGraphHandle`, `GraphCollector`, `ClassKind`
+
+**Added to McpState:** `angular_graph: AngularGraphHandle` — built once per `compress_workspace` call
+
+**Additional Φ markers:** `Φgraph:<ClassName> → injects=[…] ← injected-by=[…]`, `§ΦGRAPH` footer section
+
+**Resolution rules:**
+- Constructor `private` / `protected` params resolve to `Type@αN` where the type is a registered `@Injectable` class
+- Custom-element tags (`<app-foo>`) resolve to the `@Component({selector: 'app-foo'})` class via `resolve_selector`
+- Unknown types get a `?` suffix (e.g., `HttpClient?`) — no spurious errors
+- Transitive dependencies are tracked (if A injects B which injects C, all edges are recorded)
+
+**Modules:** `src/angular_meta/` — `mod.rs`, `detect.rs`, `decorators.rs`, `markers.rs`, `bundler.rs`, `template.rs`, `style.rs`, `footer.rs`, `graph.rs`, `graph_state.rs`
+
+**Marker vocabulary:** `Φcmp:`, `Φdir:`, `Φpipe:`, `Φsvc:`, `Φmod:`, `Φin:`, `Φout:`, `Φinjects:`, `Φtpl:`, `Φsty:`, `ΦBUNDLE`, `ΦMAP`, `Φgraph:`, `§ΦGRAPH`
 
 **Config:** `meta_layers.angular.enabled` in `.clean-ctx.json` (default: on)
 
-**New dependency:** `tree-sitter-html = "=0.20.0"` (ABI-matched with tree-sitter 0.20.x)
+**Dependencies:** `tree-sitter-html = "=0.20.0"` (unchanged from Phase 2)
 
 ---
 
@@ -319,7 +367,6 @@ This codebase underwent a comprehensive FAANG-level audit (41 findings across 5 
 
 **Key results:**
 - `cargo clippy --all-targets -- -D warnings`: 0 warnings
-- `cargo test`: 229/229 passing (includes 107 Angular Meta-Layer tests across Phase 1 + 2)
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks

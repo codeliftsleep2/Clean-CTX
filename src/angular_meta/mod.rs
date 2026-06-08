@@ -27,6 +27,8 @@ pub mod bundler;
 pub mod template;
 pub mod style;
 pub mod footer;
+pub mod graph;
+pub mod graph_state;
 
 use crate::compression::Fidelity;
 
