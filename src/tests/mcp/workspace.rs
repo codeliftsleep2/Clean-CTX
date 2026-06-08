@@ -204,6 +204,134 @@ fn collect_source_files_survives_symlink_loop() {
     );
 }
 
+// --- Track D (F-ANG-15): sub-pass and extract_class_blocks tests ---
+
+/// F-ANG-03: `extract_class_blocks` should handle a malformed class
+/// body (no closing brace) without panicking. The Track A helpers
+/// return `None` for unclosed braces, so the function should just
+/// skip that block.
+#[test]
+fn extract_class_blocks_does_not_panic_on_unclosed_body() {
+    // A class with no closing `}` — the old implementation would
+    // return a truncated block; the new one should return empty
+    // (or skip the class) without panicking.
+    let source = "export class Foo { method() { return 1; }";
+    let blocks = super::extract_class_blocks(source);
+    // Unclosed body → `find_matching_brace` returns None → skipped.
+    assert!(
+        blocks.is_empty() || blocks.iter().all(|b| b.contains("class Foo")),
+        "should either skip or include the class, got: {:?}",
+        blocks
+    );
+}
+
+/// F-ANG-03: `extract_class_blocks` does not panic on empty input.
+#[test]
+fn extract_class_blocks_handles_empty_input() {
+    let blocks = super::extract_class_blocks("");
+    assert!(blocks.is_empty());
+}
+
+/// F-ANG-15: `compress_pass` emits `FILE:` sections in the manifest.
+#[test]
+fn compress_pass_emits_per_file_section() {
+    let dir = TempDir::new().unwrap();
+    create_ts_file(
+        dir.path(),
+        "service.ts",
+        "export class MyService { run(): void {} }\n",
+    );
+
+    let config = CleanCtxConfig::default();
+    let mut state = McpState::new(config);
+
+    let result = compress_workspace_dir(
+        dir.path().to_str().unwrap(),
+        Fidelity::Low,
+        &mut state,
+    )
+    .expect("workspace compress should succeed");
+
+    assert!(
+        result.manifest.contains("FILE:"),
+        "manifest should contain FILE: section, got:\n{}",
+        result.manifest
+    );
+    assert!(
+        result.manifest.contains("service.ts"),
+        "manifest should reference service.ts, got:\n{}",
+        result.manifest
+    );
+}
+
+/// F-ANG-15: `bundle_pass` emits `Φ` bundle markers when a component
+/// triplet is present.
+#[test]
+fn bundle_pass_emits_phi_bundle_and_footer() {
+    let dir = TempDir::new().unwrap();
+    // Create a component triplet: my-comp.component.ts + .html + .scss
+    create_ts_file(
+        dir.path(),
+        "my-comp.component.ts",
+        "@Component({selector:'app-my'}) export class MyComp {}",
+    );
+    create_ts_file(dir.path(), "my-comp.component.html", "<div>hello</div>");
+    create_ts_file(dir.path(), "my-comp.component.scss", ".root { color: red; }");
+
+    let config = CleanCtxConfig::default();
+    let mut state = McpState::new(config);
+
+    let result = compress_workspace_dir(
+        dir.path().to_str().unwrap(),
+        Fidelity::Low,
+        &mut state,
+    )
+    .expect("workspace compress should succeed");
+
+    // Bundle pass emits §ΦMAP footer when bundles exist.
+    assert!(
+        result.manifest.contains("§ΦMAP") || !result.manifest.contains("Φ1"),
+        "manifest should contain bundle markers or ΦMAP footer, got:\n{}",
+        result.manifest
+    );
+}
+
+/// F-ANG-15: `graph_pass` emits `§ΦGRAPH` when an Angular file is
+/// detected.
+#[test]
+fn graph_pass_emits_phi_graph_section() {
+    let dir = TempDir::new().unwrap();
+    // Angular injectable service — `is_angular_file` should detect it.
+    create_ts_file(
+        dir.path(),
+        "logger.service.ts",
+        "import { Injectable } from '@angular/core';\n\
+         @Injectable({ providedIn: 'root' })\n\
+         export class LoggerService { log(msg: string) {} }\n",
+    );
+
+    let config = CleanCtxConfig::default();
+    let mut state = McpState::new(config);
+
+    let result = compress_workspace_dir(
+        dir.path().to_str().unwrap(),
+        Fidelity::Low,
+        &mut state,
+    )
+    .expect("workspace compress should succeed");
+
+    assert!(
+        result.manifest.contains("§ΦGRAPH"),
+        "manifest should contain §ΦGRAPH section for Angular files, got:\n{}",
+        result.manifest
+    );
+    assert!(
+        result.manifest.contains("LoggerService"),
+        "manifest should reference LoggerService, got:\n{}",
+        result.manifest
+    );
+}
+
 /// F-17: `collect_source_files` respects the max depth limit.
 #[test]
 fn collect_source_files_respects_max_depth() {

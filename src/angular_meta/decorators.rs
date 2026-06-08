@@ -388,8 +388,9 @@ fn consume_call_expression(text: &str, open_paren: usize) -> Option<(usize, Stri
             b')' => {
                 depth -= 1;
                 if depth == 0 {
-                    let arg = text[open_paren + 1..i].to_string();
-                    return Some((i - open_paren + 1, arg));
+                    let end = i + 1;
+                    let arg = text[open_paren + 1..end - 1].to_string();
+                    return Some((end - open_paren, arg));
                 }
             }
             b'"' | b'\'' => {
