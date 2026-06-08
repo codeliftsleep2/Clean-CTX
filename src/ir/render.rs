@@ -157,6 +157,16 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
 }
 
 /// Convert IR flags back to ⊕ markers for backward-compatible display.
+///
+/// F-35: `ASYNC` is rendered as `$a` (legacy text opcode) rather than a
+/// ⊕ marker. This is intentional for backward compatibility with the
+/// legacy pipeline. The spec says ASYNC is a keyword preserved, but the
+/// render function produces byte-identical output to the legacy pipeline
+/// for `IF/LOOP/RET/THROW`. `ASYNC` is the exception — it uses `$a`.
+///
+/// F-36: Unknown flags are rendered as `⊕{other}`. This is a silent
+/// acceptance of arbitrary strings. A future improvement could log a
+/// warning or return `?` for unknown flags.
 fn flags_to_markers(flags: &[&str]) -> Vec<String> {
     flags
         .iter()

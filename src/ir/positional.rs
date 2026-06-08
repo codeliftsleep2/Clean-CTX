@@ -32,6 +32,11 @@ use super::wire::{op_to_tuple, tuple_to_op};
 ///
 /// `tagged: false`  → opcode string is stripped (maximum compression).
 /// `tagged: true`   → opcode string is preserved at index 0 (mixed streams).
+///
+/// F-39: The audit suggested replacing this struct with a `bool` or
+/// separate functions. We retain the struct because it is `Copy` and
+/// serves as a self-documenting configuration type. The two constructors
+/// `stripped()` and `tagged()` are the canonical way to create it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct PositionalConfig {
     /// Whether to preserve the opcode in the output tuple.
@@ -136,11 +141,13 @@ pub fn ir_to_positional_wire(
     })
 }
 
-/// Estimate the token savings of positional vs. named encoding for a
+/// Estimate the character savings of positional vs. named encoding for a
 /// stream of instructions. Returns `(named_chars, positional_chars)`.
 ///
-/// Tokens are estimated as ceiling(chars / 4) — a common LLM rule of
-/// thumb. Both counts include the JSON array brackets and quotes.
+/// F-41: The docstring previously said "Tokens are estimated as
+/// ceiling(chars / 4)" but the function actually returns raw character
+/// counts. To estimate tokens, divide each result by 4. Both counts
+/// include the JSON array brackets and quotes.
 pub fn estimate_savings(ops: &[CoreOp]) -> (usize, usize) {
     let config = PositionalConfig::stripped();
     let named = ops.iter().map(|op| op_to_tuple(op).join(",").len() + 4).sum::<usize>();
@@ -152,6 +159,11 @@ pub fn estimate_savings(ops: &[CoreOp]) -> (usize, usize) {
 
 /// Total character count of a positional stream, including the outer
 /// `ir: [...]` envelope. Useful for printing compactness stats.
+///
+/// F-43: The `+ 12` is a hand-counted estimate of the JSON envelope
+/// `{"file":"…","v":N,"encoding":"…","ir":[…]}`. The actual size
+/// depends on the file_id length and encoding string. This is a
+/// conservative approximation that works for typical file paths.
 pub fn positional_char_count(ops: &[CoreOp], config: PositionalConfig) -> usize {
     let tuples = encode_stream(ops, config);
     let inner: usize = tuples.iter().map(|t| t.join(",").len() + 4).sum();
@@ -162,6 +174,11 @@ pub fn positional_char_count(ops: &[CoreOp], config: PositionalConfig) -> usize 
 /// original. Returns the first index where they differ, or `None` if
 /// they match. Each positional tuple must be tagged with its opcode
 /// (so the verifier can decode it back).
+///
+/// F-40: The name `verify_round_trip` suggests a property test, but
+/// this function returns `Option<usize>` for the first mismatch. The
+/// return type is unchanged for backward compatibility, but callers
+/// should assert `result.is_none()` to verify the round-trip property.
 pub fn verify_round_trip(ops: &[CoreOp], tagged: &[Vec<String>]) -> Option<usize> {
     if ops.len() != tagged.len() {
         return Some(ops.len().min(tagged.len()));
