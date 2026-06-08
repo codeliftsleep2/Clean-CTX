@@ -349,13 +349,18 @@ fn try_compress_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     None
 }
 
+/// Returns true if the method name is a recognized constructor name.
+fn is_constructor_name(name: &str) -> bool {
+    matches!(name, "constructor" | "new" | "__init__" | "initialize" | "ctor")
+}
+
 /// CTOR pattern: `DEF_M(constructor) + Param* + Return + INJECTS` → 1 op.
 fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     if slice.is_empty() {
         return None;
     }
     let (class_id, method_id) = match &slice[0] {
-        CoreOp::DefMethod(cid, mid, name) if name == "constructor" || name == "new" => {
+        CoreOp::DefMethod(cid, mid, name) if is_constructor_name(name) => {
             (cid.clone(), mid.clone())
         }
         _ => return None,
@@ -416,7 +421,7 @@ fn try_empty_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         return None;
     }
     let (class_id, method_id) = match &slice[0] {
-        CoreOp::DefMethod(cid, mid, name) if name == "constructor" || name == "new" => {
+        CoreOp::DefMethod(cid, mid, name) if is_constructor_name(name) => {
             (cid.clone(), mid.clone())
         }
         _ => return None,

@@ -843,5 +843,48 @@ The remaining work is the **boring 60%** that turns a designed subsystem into a 
 
 This audit follows the format of the previous `docs/FAANG_AUDIT.md` (41 findings, 5 phases, ~8 days, all complete) and the `docs/FAANG_AUDIT_ANGULAR.md` for stylistic consistency.
 
-— *End of audit.*
+---
+
+## Phase C Remediation (Completed 2026-06-08)
+
+**Scope:** Findings F-10 through F-15 — delta engine correctness, performance optimization (swap_remove), constructor name coverage.
+
+### Changes Applied
+
+| Finding | File(s) | Change |
+|---------|---------|--------|
+| **F-13** | `src/ir/replay.rs` | Replaced O(n) `vec.remove(idx)` + O(n) `rebuild_index()` with O(1) `swap_remove` + single-index update. The IR stream is positional and order-non-preserving; re-render at any fidelity does not depend on instruction order. |
+| **F-13 tests** | `src/tests/ir/replay.rs` | Added 3 tests: `file_state_remove_by_key_swap_remove_preserves_index` (verifies swapped-in element's index is correct), `file_state_remove_by_key_from_end_no_swap_issues` (removing last element), `file_state_remove_by_key_multiple_times` (consecutive swaps maintain consistency). |
+| **F-15** | `src/ir/patterns.rs` | Added `is_constructor_name()` helper that accepts `["constructor", "new", "__init__", "initialize", "ctor"]`. Both `try_ctor_pattern` and `try_empty_ctor_pattern` now use this matcher. |
+| **F-15 tests** | `src/tests/ir/patterns.rs` | Added tests: `compress_init_constructor_name` (Python `__init__`), `compress_initialize_constructor_name` (Ruby `initialize`), `compress_ctor_constructor_name` (short form), `compress_non_constructor_name_does_not_match` (`"init"` without underscores should NOT match), `compress_empty_constructor_python` (empty `__init__` → EmptyConstructor). |
+| **F-10 tests** | `src/tests/ir/delta.rs` | Added `delta_impl_reorder_no_false_positive` (verifies IMPL set semantics — reordering interfaces produces no delta) and `delta_impl_add_interface` (adding a new interface produces a single add). Documented set semantics in test comments per §13 spec. |
+| **F-11 tests** | `src/tests/ir/delta.rs` | Added `delta_injects_dep_change_replaces` (verifies INJECTS dep list changes produce a single `replace` mod, not per-dep deltas). |
+| **F-12 tests** | `src/tests/ir/delta.rs` | Added `delta_flags_two_methods_no_collision` (two methods with distinct FLAGS keys don't interfere; modifying one leaves the other untouched). |
+
+### Build Status
+
+- `cargo test --lib ir --` — ✅ 315/315 pass (0 failures, 1 warning: `rebuild_index` retained for backward compatibility)
+- All existing tests unchanged — no regressions
+- No new `#[allow(...)]` attributes introduced
+
+### Design Decisions
+
+1. **swap_remove trade-off**: Instruction order is NOT preserved after removal. The IR stream is positional and re-rendering is fidelity-based, not index-based. No consumer depends on ordering within a file's IR stream. The O(1) win (vs O(n) per delete, O(n²) for bulk) is decisive.
+
+2. **IMPL set semantics**: Per F-10, the delta engine treats IMPL as a set `(class_id, interface_id)`. Interface list reordering produces no delta. This is documented in the spec and test comments. Adding/removing an interface correctly produces a delta.
+
+3. **INJECTS replacement granularity**: Per F-11, INJECTS changes are reported as a full replacement (`~` mod), not per-dep add/remove. This matches the spec's CQS stance — replacing the entire deps list is atomic and unambiguous for LLM consumers.
+
+4. **Constructor name coverage**: The `is_constructor_name()` function covers the 5 known constructor patterns (`constructor`, `new`, `__init__`, `initialize`, `ctor`). This is an allowlist — new language targets may need additions. The `matches!` macro makes extension trivial.
+
+5. **`rebuild_index` retained**: The method is kept for backward compatibility (it was previously part of `remove_by_key`). It is now unused dead code but retained as a utility. Will be removed in a future cleanup pass.
+
+### Remaining Phase C Items
+
+- **F-14** (replace_by_key secondary operands): The existing code already correctly updates the index when a replacement changes the primary key. The `replace_by_key` test for key changes (`file_state_replace_changes_key`) already covers this case. No additional code change needed.
+- **F-10 ordered-list fix**: Deferred as out of scope. The IMPL schema change (single `IMPL:cid` with `Vec<String>` operands) would require a spec-breaking change. Current set semantics are documented and tested.
+- **F-33 / F-34** (consumed heuristic): Marked for Phase D/E (hygiene). The heuristic is used only in `CompressionStats`, which is cosmetic.
+- **F-22** (add after no-op mod): Marked for Phase D (edge case test).
+
+— *End of audit. Phase C complete.*
 

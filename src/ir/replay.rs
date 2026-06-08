@@ -92,13 +92,25 @@ impl FileState {
     /// identifies it (e.g., `["DEF_M", "C1", "M1"]`). Returns true if
     /// the instruction was found and removed, false otherwise.
     ///
-    /// After removal, the index is rebuilt since all subsequent indices shift.
+    /// Uses `swap_remove` (O(1)) and updates the swapped element's index.
+    /// Instruction order is NOT preserved — the last instruction moves to
+    /// the removed position. The IR stream is positional and a re-render
+    /// at any fidelity does not depend on order.
     pub fn remove_by_key(&mut self, key_tuple: &[String]) -> bool {
         let key = primary_key_from_tuple(key_tuple);
         if let Some(idx) = self.index.remove(&key) {
-            self.instructions.remove(idx);
-            // Rebuild index after removal (indices shifted for all items after idx)
-            self.rebuild_index();
+            // Use swap_remove (O(1)) — removes the instruction by swapping
+            // it with the last element, then popping.
+            self.instructions.swap_remove(idx);
+            
+            // If the removed element was not the last one, update the index
+            // for the element that was swapped into position `idx`.
+            if idx < self.instructions.len() {
+                let swapped = &self.instructions[idx];
+                let swapped_key = primary_key_from_tuple(swapped);
+                self.index.insert(swapped_key, idx);
+            }
+            
             true
         } else {
             false
