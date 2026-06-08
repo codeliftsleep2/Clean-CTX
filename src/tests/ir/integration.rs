@@ -95,8 +95,8 @@ fn delta_computer_with_state() {
     assert!(delta.is_some(), "There should be a delta");
 
     let delta = delta.unwrap();
-    assert_eq!(delta.from_version, 1);
-    assert_eq!(delta.to_version, 2);
+    assert_eq!(delta.from, 1);
+    assert_eq!(delta.to, 2);
 
     // The new method should be in adds
     let has_new_method = delta

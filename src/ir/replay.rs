@@ -141,27 +141,25 @@ impl FileState {
     /// Append a new instruction to the end of the instruction stream.
     ///
     /// Automatically computes the primary key and updates the index.
-    pub fn append(&mut self, instruction: Vec<String>) {
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(DeltaError::DuplicateSymbol)` if an instruction with
+    /// the same primary key already exists in this file state (F-23).
+    pub fn append(&mut self, instruction: Vec<String>) -> Result<(), DeltaError> {
         let key = primary_key_from_tuple(&instruction);
+        if self.index.contains_key(&key) {
+            return Err(DeltaError::DuplicateSymbol(key));
+        }
         self.index.insert(key, self.instructions.len());
         self.instructions.push(instruction);
+        Ok(())
     }
 
     /// Check if this state contains an instruction with the given key tuple.
     pub fn contains_key(&self, key_tuple: &[String]) -> bool {
         let key = primary_key_from_tuple(key_tuple);
         self.index.contains_key(&key)
-    }
-
-    /// Rebuild the index from scratch.
-    ///
-    /// Called after removal operations that shift instruction indices.
-    fn rebuild_index(&mut self) {
-        self.index.clear();
-        for (i, insn) in self.instructions.iter().enumerate() {
-            let key = primary_key_from_tuple(insn);
-            self.index.insert(key, i);
-        }
     }
 }
 
@@ -214,7 +212,7 @@ impl ContextState {
     /// # Errors
     ///
     /// Returns `DeltaError::UnknownFile` if the file is not tracked.
-    /// Returns `DeltaError::VersionMismatch` if the delta's `from_version`
+    /// Returns `DeltaError::VersionMismatch` if the delta's `from`
     /// doesn't match the file's current version.
     /// Returns `DeltaError::SymbolNotFound` if a deletion or modification
     /// references a key that doesn't exist.
@@ -227,10 +225,10 @@ impl ContextState {
             .ok_or_else(|| DeltaError::UnknownFile(delta.file.clone()))?;
 
         // Validate version chain
-        if file.version != delta.from_version {
+        if file.version != delta.from {
             return Err(DeltaError::VersionMismatch {
                 expected: file.version,
-                got: delta.from_version,
+                got: delta.from,
             });
         }
 
@@ -255,18 +253,14 @@ impl ContextState {
 
         // Phase 3: Additions
         for add in &delta.ops.adds {
-            let key = primary_key_from_tuple(add);
-            if file.index.contains_key(&key) {
-                return Err(DeltaError::DuplicateSymbol(key));
-            }
-            file.append(add.clone());
+            file.append(add.clone())?;
         }
 
         // Update version tracking
-        file.version = delta.to_version;
-        self.version = self.version.max(delta.to_version);
+        file.version = delta.to;
+        self.version = self.version.max(delta.to);
 
-        Ok(delta.to_version)
+        Ok(delta.to)
     }
 
     /// Render human-readable output from current state for a given file.

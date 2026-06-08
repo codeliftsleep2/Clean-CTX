@@ -116,7 +116,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                             }
                         }
                     },
-                    "currentVersion": { "type": "integer", "description": "The current version of the file state (must match delta.from_version)." }
+                    "currentVersion": { "type": "integer", "description": "The current version of the file state (must match delta.from)." }
                 },
                 "required": ["delta", "currentVersion"]
             }
@@ -487,11 +487,11 @@ fn handle_delta_code_context(
                     "jsonrpc": "2.0",
                     "id": id,
                     "result": {
-                        "content": [{ "type": "text", "text": format!("IR delta: v{} → v{}", delta.from_version, delta.to_version) }],
+                        "content": [{ "type": "text", "text": format!("IR delta: v{} → v{}", delta.from, delta.to) }],
                         "delta": delta,
                         "file": file_alias,
-                        "from": delta.from_version,
-                        "to": delta.to_version,
+                        "from": delta.from,
+                        "to": delta.to,
                         "ops": delta.ops
                     }
                 })
@@ -553,7 +553,7 @@ fn handle_apply_delta(
     };
 
     // Validate version chain
-    if delta.from_version != current_version {
+    if delta.from != current_version {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -561,7 +561,7 @@ fn handle_apply_delta(
                 "code": -32602,
                 "message": format!(
                     "Version mismatch: state is v{}, delta expects v{}",
-                    current_version, delta.from_version
+                    current_version, delta.from
                 )
             }
         }));

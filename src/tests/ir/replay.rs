@@ -6,7 +6,7 @@
 // Tests cover:
 //   - FileState construction, operations (append, remove, replace, contains)
 //   - ContextState: load_ir, apply deltas (add, remove, modify)
-//   - Version chain validation (file.version matched against from_version)
+//   - Version chain validation (file.version matched against from)
 //   - Error cases: unknown file, version mismatch, symbol not found
 //   - Sequential deltas: v1→v2→v3 applied in series
 //   - Render: render_pretty after state application
@@ -54,11 +54,11 @@ fn multi_class_ir(file_id: &str, version: u64) -> CompiledIR {
 }
 
 /// Create a delta for adding a method to C1.
-fn add_method_delta(from_version: u64, to_version: u64) -> IRDelta {
+fn add_method_delta(from: u64, to: u64) -> IRDelta {
     IRDelta {
         file: "a1".to_string(),
-        from_version,
-        to_version,
+        from,
+        to,
         ops: DeltaOps {
             adds: vec![
                 vec!["DEF_M".into(), "C1".into(), "M2".into(), "newMethod".into()],
@@ -72,11 +72,11 @@ fn add_method_delta(from_version: u64, to_version: u64) -> IRDelta {
 }
 
 /// Create a delta for removing method M1.
-fn remove_method_delta(from_version: u64, to_version: u64) -> IRDelta {
+fn remove_method_delta(from: u64, to: u64) -> IRDelta {
     IRDelta {
         file: "a1".to_string(),
-        from_version,
-        to_version,
+        from,
+        to,
         ops: DeltaOps {
             adds: vec![],
             mods: vec![],
@@ -91,11 +91,11 @@ fn remove_method_delta(from_version: u64, to_version: u64) -> IRDelta {
 }
 
 /// Create a delta for renaming method M1.
-fn modify_method_delta(from_version: u64, to_version: u64) -> IRDelta {
+fn modify_method_delta(from: u64, to: u64) -> IRDelta {
     IRDelta {
         file: "a1".to_string(),
-        from_version,
-        to_version,
+        from,
+        to,
         ops: DeltaOps {
             adds: vec![],
             mods: vec![ModOp {
@@ -144,7 +144,8 @@ fn file_state_append() {
     let ir = baseline_ir("a1", 1);
     let mut fs = FileState::from_compiled(&ir);
 
-    fs.append(vec!["DEF_F".into(), "C1".into(), "F1".into(), "items".into()]);
+    fs.append(vec!["DEF_F".into(), "C1".into(), "F1".into(), "items".into()])
+        .expect("append should succeed");
 
     assert_eq!(fs.instructions.len(), 7);
     assert!(fs.index.contains_key("DEF_F:C1:F1"));
@@ -478,8 +479,8 @@ fn context_state_apply_combined_delta() {
     // Combined: add, remove, modify in one delta
     let delta = IRDelta {
         file: "a1".to_string(),
-        from_version: 1,
-        to_version: 2,
+        from: 1,
+        to: 2,
         ops: DeltaOps {
             adds: vec![
                 vec!["DEF_F".into(), "C1".into(), "F1".into(), "newField".into()],
@@ -509,8 +510,8 @@ fn context_state_apply_unknown_file() {
 
     let delta = IRDelta {
         file: "nonexistent".to_string(),
-        from_version: 0,
-        to_version: 1,
+        from: 0,
+        to: 1,
         ops: DeltaOps::default(),
     };
 
@@ -530,8 +531,8 @@ fn context_state_apply_version_mismatch() {
     // Delta targeting version 0 when file is at version 1
     let delta = IRDelta {
         file: "a1".to_string(),
-        from_version: 0,
-        to_version: 2,
+        from: 0,
+        to: 2,
         ops: DeltaOps::default(),
     };
 
@@ -539,7 +540,7 @@ fn context_state_apply_version_mismatch() {
     match result {
         Err(DeltaError::VersionMismatch { expected, got }) => {
             assert_eq!(expected, 1, "expected current version is 1");
-            assert_eq!(got, 0, "got from_version 0");
+            assert_eq!(got, 0, "got from 0");
         }
         other => panic!("expected VersionMismatch error, got: {:?}", other),
     }
@@ -554,8 +555,8 @@ fn context_state_apply_symbol_not_found_on_remove() {
     // Try to remove an instruction that doesn't exist
     let delta = IRDelta {
         file: "a1".to_string(),
-        from_version: 1,
-        to_version: 2,
+        from: 1,
+        to: 2,
         ops: DeltaOps {
             adds: vec![],
             mods: vec![],
@@ -583,8 +584,8 @@ fn context_state_apply_symbol_not_found_on_modify() {
     // Try to modify an instruction that doesn't exist
     let delta = IRDelta {
         file: "a1".to_string(),
-        from_version: 1,
-        to_version: 2,
+        from: 1,
+        to: 2,
         ops: DeltaOps {
             adds: vec![],
             mods: vec![ModOp {
@@ -613,8 +614,8 @@ fn context_state_apply_duplicate_symbol() {
     // Try to add an instruction with a key that already exists
     let delta = IRDelta {
         file: "a1".to_string(),
-        from_version: 1,
-        to_version: 2,
+        from: 1,
+        to: 2,
         ops: DeltaOps {
             adds: vec![
                 vec!["DEF_M".into(), "C1".into(), "M1".into(), "duplicate".into()],
@@ -661,8 +662,8 @@ fn context_state_sequential_deltas() {
     // v3 → v4: remove M2
     let delta_3_4 = IRDelta {
         file: "a1".to_string(),
-        from_version: 3,
-        to_version: 4,
+        from: 3,
+        to: 4,
         ops: DeltaOps {
             adds: vec![],
             mods: vec![],
@@ -781,8 +782,8 @@ fn context_state_empty_ir() {
     // Apply an empty delta (adds nothing)
     let delta = IRDelta {
         file: "empty".to_string(),
-        from_version: 1,
-        to_version: 2,
+        from: 1,
+        to: 2,
         ops: DeltaOps::default(),
     };
 
@@ -946,4 +947,67 @@ fn full_replay_cycle() {
     // Render at low fidelity should show updated content
     let rendered = cs.render_pretty("main.ts", Fidelity::Low).unwrap();
     assert!(rendered.contains("refactored"), "rendered output should have new method name");
+}
+
+// ── F-22: Add After No-Op Mod ───────────────────────────────────
+//
+// Edge case: a mod that produces the same instruction as before is a no-op
+// (the DeltaComputer won't emit it). If the delta contains such a mod and
+// an unrelated add, the add should still succeed. The spec says "Apply order:
+// deletions → modifications → additions" — there's no spec on no-op mods,
+// so we test that the add still works.
+
+#[test]
+fn context_state_apply_no_op_mod_then_add() {
+    let ir = baseline_ir("a1", 1);
+    let mut cs = ContextState::new();
+    cs.load_ir(ir);
+
+    // Manually construct a delta with a mod that is a no-op
+    // (replace equals the original key) plus a real add.
+    let delta = IRDelta {
+        file: "a1".to_string(),
+        from: 1,
+        to: 2,
+        ops: DeltaOps {
+            adds: vec![
+                // Real add
+                vec!["DEF_F".into(), "C1".into(), "F1".into(), "newField".into()],
+            ],
+            mods: vec![
+                // No-op mod: replace equals the existing instruction
+                ModOp {
+                    key: vec!["DEF_M".into(), "C1".into(), "M1".into()],
+                    replace: vec!["DEF_M".into(), "C1".into(), "M1".into(), "processData".into()],
+                },
+            ],
+            dels: vec![],
+        },
+    };
+
+    let result = cs.apply(delta);
+    assert!(result.is_ok(), "no-op mod + add should apply successfully: {:?}", result);
+    assert_eq!(cs.file_version("a1").unwrap(), 2);
+    assert!(cs.get_ir("a1").unwrap().iter().any(|t| t[0] == "DEF_F" && t[2] == "F1"));
+}
+
+// ── F-23: FileState append returns Err for duplicates ────────────
+
+#[test]
+fn file_state_append_duplicate_key_returns_err_f23() {
+    let ir = baseline_ir("a1", 1);
+    let mut fs = FileState::from_compiled(&ir);
+
+    // Try to append an instruction that already exists (same key as DEF_C C1)
+    let result = fs.append(vec!["DEF_C".into(), "C1".into(), "Duplicate".into()]);
+    assert!(result.is_err(), "duplicate append should return Err");
+    match result {
+        Err(DeltaError::DuplicateSymbol(key)) => {
+            assert!(key.contains("C1"), "error should mention C1");
+        }
+        other => panic!("expected DuplicateSymbol error, got: {:?}", other),
+    }
+
+    // Length should be unchanged
+    assert_eq!(fs.instructions.len(), 6, "failed append should not change state");
 }

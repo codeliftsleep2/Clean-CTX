@@ -120,7 +120,8 @@ impl GlobalSymbolTable {
     ///
     /// If an entry with the same alias already exists, it will be overwritten
     /// (for delta replay scenarios). The reverse index and file membership
-    /// are updated accordingly.
+    /// are updated accordingly. When overwriting, `version_last` is bumped
+    /// to the current version via `touch()` (F-24).
     pub fn register(
         &mut self,
         alias: String,
@@ -150,7 +151,11 @@ impl GlobalSymbolTable {
         self.file_members
             .entry(file_id.to_string())
             .or_default()
-            .push(alias);
+            .push(alias.clone());
+
+        // F-24: Bump version_last after overwrite so `get_changed_since`
+        // correctly reports the re-registered symbol as changed.
+        self.touch(&alias);
     }
 
     /// Unregister a symbol (for delta deletions).

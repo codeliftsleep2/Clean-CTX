@@ -50,8 +50,8 @@ fn delta_add_method() {
     let delta = computer.compute(&baseline, &current).expect("delta should be Some");
 
     assert_eq!(delta.file, "a1");
-    assert_eq!(delta.from_version, 1);
-    assert_eq!(delta.to_version, 2);
+    assert_eq!(delta.from, 1);
+    assert_eq!(delta.to, 2);
     assert!(!delta.ops.adds.is_empty(), "should have additions");
     assert!(delta.ops.mods.is_empty(), "should have no modifications");
     assert!(delta.ops.dels.is_empty(), "should have no deletions");
@@ -282,20 +282,20 @@ fn delta_version_chain() {
 
     // v1 → v2: adds only
     let delta_1_2 = computer.compute(&v1, &v2).expect("v1→v2 delta");
-    assert_eq!(delta_1_2.from_version, 1);
-    assert_eq!(delta_1_2.to_version, 2);
+    assert_eq!(delta_1_2.from, 1);
+    assert_eq!(delta_1_2.to, 2);
     assert_eq!(delta_1_2.ops.adds.len(), 2, "v1→v2: 2 adds");
 
     // v2 → v3: modification only
     let delta_2_3 = computer.compute(&v2, &v3).expect("v2→v3 delta");
-    assert_eq!(delta_2_3.from_version, 2);
-    assert_eq!(delta_2_3.to_version, 3);
+    assert_eq!(delta_2_3.from, 2);
+    assert_eq!(delta_2_3.to, 3);
     assert_eq!(delta_2_3.ops.mods.len(), 1, "v2→v3: 1 mod");
 
     // v1 → v3: both adds and mods
     let delta_1_3 = computer.compute(&v1, &v3).expect("v1→v3 delta");
-    assert_eq!(delta_1_3.from_version, 1);
-    assert_eq!(delta_1_3.to_version, 3);
+    assert_eq!(delta_1_3.from, 1);
+    assert_eq!(delta_1_3.to, 3);
     assert!(!delta_1_3.ops.adds.is_empty(), "v1→v3: has adds");
     assert!(!delta_1_3.ops.mods.is_empty(), "v1→v3: has mods");
 }
@@ -430,8 +430,8 @@ fn delta_json_serialization_round_trip() {
     let restored: IRDelta = serde_json::from_value(json).expect("deserialize");
 
     assert_eq!(restored.file, delta.file);
-    assert_eq!(restored.from_version, delta.from_version);
-    assert_eq!(restored.to_version, delta.to_version);
+    assert_eq!(restored.from, delta.from);
+    assert_eq!(restored.to, delta.to);
     assert_eq!(restored.ops.adds.len(), delta.ops.adds.len());
     assert_eq!(restored.ops.mods.len(), delta.ops.mods.len());
     assert_eq!(restored.ops.dels.len(), delta.ops.dels.len());

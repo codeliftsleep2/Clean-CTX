@@ -16,6 +16,35 @@ use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
 use serde_json::{json, Value};
 
+/// Errors during wire format decoding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DecodeError {
+    /// Missing required field
+    MissingField(String),
+    /// Invalid field type (expected a different JSON type)
+    InvalidFieldType(String),
+    /// Unknown opcode in instruction tuple
+    UnknownOpcode(String),
+    /// Malformed tuple (wrong arity for the opcode)
+    MalformedTuple(String),
+    /// Input was not a valid JSON object/array
+    InvalidInput(String),
+}
+
+impl std::fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DecodeError::MissingField(name) => write!(f, "missing field: {}", name),
+            DecodeError::InvalidFieldType(name) => write!(f, "invalid field type: {}", name),
+            DecodeError::UnknownOpcode(op) => write!(f, "unknown opcode: {}", op),
+            DecodeError::MalformedTuple(msg) => write!(f, "malformed tuple: {}", msg),
+            DecodeError::InvalidInput(msg) => write!(f, "invalid input: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for DecodeError {}
+
 /// Serialize a single CoreOp to its positional tuple representation.
 pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
     match op {
@@ -224,24 +253,60 @@ pub fn ir_to_wire(ir: &CompiledIR) -> Value {
 }
 
 /// Deserialize a CompiledIR from the wire format.
-pub fn wire_to_ir(value: &Value) -> Option<CompiledIR> {
-    let file_id = value.get("file")?.as_str()?.to_string();
-    let version = value.get("v")?.as_u64()?;
-    let ir_array = value.get("ir")?.as_array()?;
+///
+/// # Errors
+///
+/// Returns `Err(DecodeError)` if:
+/// - Required fields (`file`, `v`, `ir`) are missing
+/// - A tuple cannot be decoded (unknown opcode or malformed arity)
+///
+/// This ensures no input corruption is silently swallowed (F-19).
+pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
+    let file_id = value
+        .get("file")
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .ok_or_else(|| DecodeError::MissingField("file".into()))?;
+    let version = value
+        .get("v")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| DecodeError::MissingField("v".into()))?;
+    let ir_array = value
+        .get("ir")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| DecodeError::MissingField("ir".into()))?;
 
     let mut instructions = Vec::new();
-    for tuple_val in ir_array {
+    for (i, tuple_val) in ir_array.iter().enumerate() {
         let tuple: Vec<String> = tuple_val
-            .as_array()?
+            .as_array()
+            .ok_or_else(|| {
+                DecodeError::InvalidFieldType(format!("ir[{}]: expected array", i))
+            })?
             .iter()
-            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-            .collect();
-        if let Some(op) = tuple_to_op(&tuple) {
-            instructions.push(op);
-        }
+            .map(|v| {
+                v.as_str()
+                    .map(|s| s.to_string())
+                    .ok_or_else(|| {
+                        DecodeError::InvalidFieldType(format!("ir[{}]: expected string element", i))
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let op = tuple_to_op(&tuple).ok_or_else(|| {
+            if tuple.is_empty() {
+                DecodeError::MalformedTuple(format!("ir[{}]: empty tuple", i))
+            } else {
+                DecodeError::UnknownOpcode(format!(
+                    "ir[{}]: unknown opcode '{}'",
+                    i,
+                    tuple[0]
+                ))
+            }
+        })?;
+        instructions.push(op);
     }
 
-    Some(CompiledIR {
+    Ok(CompiledIR {
         file_id,
         instructions,
         version,
