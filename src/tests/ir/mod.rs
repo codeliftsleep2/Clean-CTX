@@ -7,3 +7,8 @@
 // Phase G integration tests are loaded here as a submodule.
 #[path = "integration.rs"]
 mod integration;
+
+// Phase A (FAANG remediation F-01–F-03) integration tests:
+// Verifies that the full 4-layer pipeline is wired through IRCompiler.
+#[path = "layers_integration.rs"]
+mod layers_integration;

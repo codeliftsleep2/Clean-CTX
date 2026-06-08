@@ -587,13 +587,20 @@ fn handle_apply_delta(
 // ── Helpers ────────────────────────────────────────────────────────
 
 /// Compile a file to IR, detecting language and running the full
-/// compilation pipeline.
+/// 4-layer compilation pipeline.
+///
+/// Phase A (FAANG remediation): The compiler now instantiates the
+/// appropriate language layers (TypeScriptLayer, CSharpLayer) and
+/// meta layers (AngularMetaLayer) based on the detected language.
 fn compile_file_ir(
     file_path: &str,
     fidelity: Fidelity,
     state: &mut McpState,
 ) -> Result<crate::ir::compiler::CompiledIR, Box<dyn std::error::Error>> {
     use crate::ir::compiler::IRCompiler;
+    use crate::ir::layers::typescript::TypeScriptLayer;
+    use crate::ir::layers::csharp::CSharpLayer;
+    use crate::ir::layers::angular::AngularMetaLayer;
     use crate::compression::language::language_for_extension;
 
     let source = std::fs::read_to_string(file_path)?;
@@ -611,6 +618,26 @@ fn compile_file_ir(
     let path_alias = state.dict.get_or_create_alias(absolute_path);
 
     let mut compiler = IRCompiler::new();
+
+    // Add language-specific layers (Layer 2)
+    match extension {
+        "ts" | "js" => {
+            compiler.add_language_layer(Box::new(TypeScriptLayer::new()));
+        }
+        "cs" => {
+            compiler.add_language_layer(Box::new(CSharpLayer::new()));
+        }
+        _ => {}
+    }
+
+    // Add Angular meta layer (Layer 3) for TypeScript files
+    if extension == "ts" || extension == "js" {
+        compiler.add_meta_layer(Box::new(AngularMetaLayer::new()));
+    }
+
+    // F-03: Pattern recognizers can be added here when wired in
+    // For now, pattern recognizers are opt-in (no default ones added)
+
     let compiled = compiler.compile(
         &source,
         &path_alias,
