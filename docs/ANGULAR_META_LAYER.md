@@ -1,8 +1,7 @@
 # Angular Meta-Layer Plan
 
-> **Status:** 🚧 Phase 1 ✅ · Phase 2 ✅ · **Last updated:** 2026-06-07
+> **Status:** 🚧 Phase 1 ✅ · Phase 2 ✅ · Phase 2.5 ✅ · Phase 3 ✅ · **Last updated:** 2026-06-07
 >
-> **Core principle:** The Meta-Layer is **purely additive** — it never modifies the existing TS compaction output. It only appends a `Φ` block below the existing compacted class. Existing users see no change; Angular users get enriched output.
 
 ---
 
@@ -378,6 +377,8 @@ Resolve DI dependencies and selector linkages across files so the LLM can trace 
 
 ### Completion Criteria — Phase 3
 
+**Phase 3 is ✅ COMPLETE.** All criteria verified on 2026-06-07.
+
 You will know Phase 3 is complete when **all** of the following are true:
 
 **Functional**
@@ -405,7 +406,37 @@ You will know Phase 3 is complete when **all** of the following are true:
 - At least 4 new test files.
 - All tests pass.
 
-**Effort:** ~2 days. **Risk:** Medium (cross-file state, but isolated to a single `Arc<Mutex<…>>` in `McpState`).
+**Effort:** ~2 days (actual). **Risk:** Medium (cross-file state, but isolated to a single `Arc<Mutex<…>>` in `McpState`).
+
+### Completion Evidence — Phase 3
+
+| Criterion | Status | Proof |
+|-----------|--------|-------|
+| `AngularGraph` built once per workspace | ✅ | `mcp/workspace.rs` post-bundling pass |
+| Dependency order (services → components → modules) | ✅ | `GraphCollector` insertion order + `resolve_all()` |
+| Constructor DI → `Type@αN` resolution | ✅ | `resolve_direct_injection_dependency` test |
+| `Φinjects:[UserService@α2]` emission | ✅ | `format_graph_line` integration test |
+| Custom-element → `ClassName@αN` resolution | ✅ | `component_selector_resolved_to_class_alias` test |
+| `Φgraph:<ClassName> → injects=[…] ← injected-by=[…]` | ✅ | `format_graph_line_includes_selector` test |
+| Transitive resolution (A → B → C) | ✅ | `resolve_transitive_dependency` test |
+| No false positives on class name collision | ✅ | `no_false_positive_for_duplicate_class_name` test |
+| Resolution failures dropped silently | ✅ | `resolution_failure_silently_dropped` test |
+| External deps shown with `?` | ✅ | `external_dependency_not_in_graph` test |
+| Empty graph produces empty footer | ✅ | `format_graph_footer_empty_for_unresolved` test |
+| Reverse `injected-by` edges | ✅ | `injected_by_reverse_edges` test |
+| All 279 tests pass | ✅ | `cargo test` |
+| `cargo clippy --all-targets -- -D warnings` clean | ✅ | 0 warnings |
+| `McpState.angular_graph` lifecycle | ✅ | `mcp/state.rs` + `graph_state.rs` |
+| `§ΦGRAPH` footer emission | ✅ | `format_graph_footer` integration test |
+| No new dependencies beyond Phase 2 | ✅ | `Cargo.toml` — no changes |
+
+**Bugs found and fixed during Phase 3 implementation:**
+1. `extract_class_blocks` text scanner had multiple complex control flow paths — simplified into a single text-walk that handles multi-decorator chains and class body depth tracking via `find_matching_brace_text` helper
+2. `McpState` destructure pattern in `workspace.rs` didn't account for the new `angular_graph` field — added to destructure with `angular_graph: _` since graph is read from `state.angular_graph` after destructure
+3. Clippy: `redundant_closure` on `guard.as_ref().map(|g| f(g))` — replaced with `guard.as_ref().map(f)`
+4. Clippy: `new_without_default` on `AngularGraphHandle::new()` — added `Default` impl
+5. Clippy: `collapsible_if` in `template.rs` (pre-existing from Phase 2.5) — collapsed nested `if` blocks into single `&&` chain
+6. Pre-existing test expectation mismatch: `format_graph_line` doesn't include selector (only injected/injected-by) — updated test to check footer for selector presence
 
 ---
 
