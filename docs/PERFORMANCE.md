@@ -117,6 +117,7 @@ The cl100k BPE engine (via `tiktoken-rs`) is loaded once at server startup via `
 | BPE engine (cl100k) | ~4 MB (shared, loaded once) |
 | Tree-sitter parser (TS) | ~1.5 MB per instance |
 | Tree-sitter parser (C#) | ~1.5 MB per instance |
+| Tree-sitter parser (HTML) | ~1.5 MB per instance (Phase 2) |
 | Typical compressed output (100 KB file) | ~2-5 KB |
 | `PathDictionary` (1,000 entries) | ~150 KB |
 | `SymbolDictionary` (100 entries) | ~8 KB |
@@ -158,3 +159,27 @@ cargo test workspace_shares_aliases_with_per_file_tool
 |-------|-------------|-------------|
 | F-19 | Streaming workspace walk (replace collect-then-sort) | Future release |
 | F-20 | Rayon parallelization for `compress_workspace` | Future release (blocked by tree-sitter `!Send`) |
+
+---
+
+## Angular Meta-Layer Bundling (Phase 2)
+
+The Phase 2 bundling pass adds **zero overhead** to non-Angular workspaces. Angular workspaces pay a small cost only during `compress_workspace`:
+
+| Operation | Time (estimated) | Notes |
+|-----------|-----------------|-------|
+| Triplet resolution | ~0.01 ms per component | Filesystem `is_file()` check |
+| Template shape extraction | ~0.1 ms per template | tree-sitter-html parse + walk |
+| Style shape extraction | ~0.05 ms per stylesheet | Byte-level scanner |
+| `§ΦMAP` footer formatting | ~0.01 ms | BTreeMap iteration |
+
+**Token savings example:** A workspace with 5 Angular components (each with `.html` + `.scss`) would have raw HTML/SCSS files totaling ~10,000 tokens. The bundled output replaces this with 5 one-line shape summaries (~50 tokens) — a **~99.5% reduction** for the template/style content.
+
+### Bundle output format
+
+```text
+// ===== Φ1: user-card.component =====
+// files: α1, α2, α3
+// Φtpl:div,h2,p,button,app-avatar [ngIf] [ngFor] [(ngModel)] {{}}x4 (click)
+// Φsty:.card,.card-text,.btn-primary $primary-color,$card-padding @include
+```

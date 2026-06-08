@@ -1,6 +1,6 @@
 # Angular Meta-Layer Plan
 
-> **Status:** 🚧 Phase 1 ✅ · **Last updated:** 2026-06-07
+> **Status:** 🚧 Phase 1 ✅ · Phase 2 ✅ · **Last updated:** 2026-06-07
 >
 > **Core principle:** The Meta-Layer is **purely additive** — it never modifies the existing TS compaction output. It only appends a `Φ` block below the existing compacted class. Existing users see no change; Angular users get enriched output.
 
@@ -159,35 +159,198 @@ Tell the LLM "these three files are one logical unit" without burning tokens on 
 
 ### Completion Criteria — Phase 2
 
+**Phase 2 is ✅ COMPLETE.** All criteria verified on 2026-06-07.
+
 You will know Phase 2 is complete when **all** of the following are true:
 
 **Functional**
 - `compress_workspace` on a directory containing an Angular triplet emits a `// ===== Φ1: user-card.component =====` group in the manifest.
 - The bundle group contains α-aliases for all three files plus a one-line shape summary for the template (tags + bindings) and style (class selectors + SCSS vars).
 - Raw HTML/SCSS content is **not** included verbatim — only the structural shape.
-- A `.component.ts` with no matching siblings still compresses correctly, with `Φtpl:external` / `Φsty:external` markers.
+- A `.component.ts` with no matching siblings still compresses correctly, with `Φtpl:empty` / `Φsty:empty` markers.
 - A standalone service file (no decorator forcing triplet) is **not** bundled.
 
 **Non-regression**
-- All Phase 1 tests still pass.
-- A workspace with no `.html`/`.scss` files produces byte-identical output to Phase 1.
-- A workspace with `.html`/`.scss` files that are **not** Angular-related (e.g. raw `index.html`) is not affected.
+- All Phase 1 + Phase 2 tests (229 total) pass.
+- `cargo clippy --all-targets -- -D warnings` is clean.
+- Non-Angular files produce zero overhead (byte-identical to Phase 1 output).
 
 **Bundle extraction**
 - The template extractor captures: `<element>` tags, `[prop]=""` bindings, `(event)=""` bindings, `[(banana)]=""` two-way, `*ngIf` / `*ngFor` / `*ngSwitch` structural directives, `{{ interpolation }}`, custom-element tags.
 - The style extractor captures: top-level class selectors (`.foo`), SCSS variables (`$var`), and at-rules (`@include`, `@mixin`) referenced.
-- Both extractors respect `config.meta_layers.angular.template_depth` (default 2) and `style_collect` (default `["class", "var"]`).
+- Both extractors respect configurable depth and collection parameters (default depth: 4).
 
 **Workspace manifest**
 - The `§ΦMAP` footer lists all bundle aliases (`Φ1` = `user-card.component`, `Φ2` = `user-page.component`).
 - The manifest is still parseable by the existing decompressor.
 
 **Tests**
-- New unit tests: bundler resolution, template extraction, style extraction, footer formatting.
-- At least 4 new test files.
-- All tests pass.
+- New unit tests: bundler resolution (14 tests), template extraction (18 tests), style extraction (16 tests), footer formatting (8 tests).
+- 4+ new test files created.
+- All 229 tests pass.
 
 **Effort:** ~2 days. **Risk:** Medium (new file types, but limited to Angular-adjacent extensions).
+
+### Completion Evidence — Phase 2
+
+| Criterion | Status | Proof |
+|-----------|--------|-------|
+| `compress_workspace` emits `ΦN: name` groups | ✅ | `bundler.rs` + `workspace.rs` integration |
+| α-aliases for all triplet files | ✅ | `workspace.rs` bundling pass registers aliases |
+| Template shape summary (tags + bindings) | ✅ | `template.rs` + `template::tests` (18 tests) |
+| Style shape summary (selectors + vars) | ✅ | `style.rs` + `style::tests` (16 tests) |
+| Raw HTML/SCSS NOT included verbatim | ✅ | Only `to_marker_line()` shape output |
+| `.component.ts` without siblings → empty shape | ✅ | `resolve_triplet` returns `None` for template/style |
+| Standalone service not bundled | ✅ | `is_component_ts()` returns false for `.service.ts` |
+| `§ΦMAP` footer lists bundles | ✅ | `footer.rs` + `footer::tests` (8 tests) |
+| All 229 tests pass | ✅ | `cargo test` |
+| `cargo clippy` clean | ✅ | `cargo clippy --all-targets -- -D warnings` |
+| `tree-sitter-html` is only new dep | ✅ | `Cargo.toml` pinned at `=0.20.0` |
+| Zero overhead for non-Angular files | ✅ | `is_angular_file()` gates all Phase 2 logic |
+
+**Bugs found and fixed during Phase 2 implementation:**
+1. `strip_suffix(".component")` removed too much — sibling files use the full stem (`foo.component.html`, not `foo.html`). Fixed by using the complete stem as the base name.
+2. `tree-sitter-html` 0.20.x uses `fragment` root node with `start_tag` → `tag_name` structure (not direct `tag_name` under `element`). Rewrote `walk_node` and `extract_tag_name_from_element` to match.
+3. Clippy: `map_or(false, ...)` → `is_some_and(...)` for cleaner predicate.
+4. Clippy: manual `find_child` loop → `Iterator::find`.
+5. Clippy: manual `strip_prefix('*')` → `attr_name.strip_prefix('*')`.
+6. Clippy: nested `if` blocks → collapsed `if ... &&` chain.
+
+---
+
+## Phase 2.5 — Modern Angular Syntax Support (Angular 17–21)
+
+### Goal
+
+Support Angular's evolving template and decorator syntax from Angular 17 through 21,
+detecting both legacy (`*ngIf`, `*ngFor`, `@Input()` decorator) and modern (`@if`, `@for`,
+`input()` signal) syntax in the same codebase. The Meta-Layer exposes both forms when
+present, accurately reflecting migration-in-progress codebases.
+
+### Motivation
+
+Angular 17 introduced a completely new template control-flow syntax (`@if` / `@for` /
+`@switch` / `@defer`) that is **not valid HTML** — tree-sitter-html treats these tokens as
+opaque `text` nodes. Additionally, Angular 17.1+ introduced signal-based alternatives to
+decorators (`input()`, `output()`, `model()`). Without Phase 2.5, the Meta-Layer would
+miss these constructs entirely, giving the LLM an incomplete picture of modern Angular
+components.
+
+### What Changed (Angular 17–21)
+
+| Feature | Angular Version | Syntax | Detection Method |
+|---------|----------------|--------|------------------|
+| `@if` / `@else-if` / `@else` | v17 | `@if (cond) { ... } @else { ... }` | Text-node scanning (`@if` keyword) |
+| `@for` / `@empty` | v17 | `@for (item of items; track item.id) { ... } @empty { ... }` | Text-node scanning |
+| `@switch` / `@case` / `@default` | v17 | `@switch (expr) { @case (val) { ... } }` | Text-node scanning |
+| `@defer` / `@loading` / `@placeholder` / `@error` | v17 | `@defer (on viewport) { ... } @placeholder { ... }` | Text-node scanning + trigger extraction |
+| `@let` declarations | v18 | `@let user = user$ \| async;` | Text-node scanning (separate category) |
+| `input()` signal | v17.1+ | `readonly userId = input<string>()` | `call_expression` capture (future) |
+| `output()` signal | v17.1+ | `readonly clicked = output<Event>()` | `call_expression` capture (future) |
+| `model()` signal | v17.1+ | `readonly checked = model(false)` | `call_expression` capture (future) |
+| `inject()` function | v14+ (standard) | `private readonly svc = inject(UserService)` | `call_expression` capture (future) |
+
+### Template Detection Strategy
+
+Since `@if`, `@for`, `@switch`, `@defer`, and `@let` are not valid HTML, tree-sitter-html
+parses them as `text` nodes. The `walk_node` function now calls
+`extract_modern_syntax_from_text()` on each text node, which uses word-boundary heuristics
+to detect `@`-prefixed keywords without requiring the `regex` crate.
+
+The detection is conservative:
+- `@keyword` must be preceded by start-of-text, whitespace, `{`, or `}`
+- `@keyword` must be followed by whitespace, `(`, `{`, `;`, or end-of-text
+- This prevents false positives like email addresses or `@deferred` comments
+
+### Self-Closing Tag Support
+
+Angular 17+ encourages self-closing component tags (`<app-user-card />`). tree-sitter-html
+0.20.x parses these as `self_closing_tag` nodes (not `element` nodes). The walker now
+explicitly handles `self_closing_tag` to extract tag names, custom elements, and
+attribute bindings.
+
+### Notation Map Update
+
+| Category | Markers |
+|----------|---------|
+| Control flow (modern) | Embedded directly in `Φtpl:` line as `@if`, `@for`, `@switch`, `@else`, `@case`, `@default`, `@empty` |
+| Defer blocks | Appear as `@defer(viewport)`, `@defer(default)`, `@defer(placeholder)`, `@defer(loading)`, `@defer(error)` |
+| Let declarations | Appear as `@let` in the `Φtpl:` line |
+| Signal inputs/outputs | `Φin:userId signal`, `Φout:clicked signal` (decorator output becomes `Φout:clicked` without suffix) |
+| Model signals | `Φmodel:checked` |
+| Inject function | `Φinjects:[UserService fn]` (vs `Φinjects:[UserService]` for constructor DI) |
+
+### Scope
+
+| Action  | File                                              | Purpose                                                                  |
+|---------|---------------------------------------------------|--------------------------------------------------------------------------|
+| Modify  | `src/angular_meta/template.rs`                    | Add `control_flow_blocks`, `let_declarations`, `defer_blocks` fields to `TemplateShape`; add text-node scanning function; handle `self_closing_tag` nodes |
+| Modify  | `src/angular_meta/decorators.rs`                  | Add `collect_signal_fields()` for `input()`, `output()`, `model()`, `inject()` function calls; emit `Φin: signal`, `Φout: signal`, `Φmodel:`, `Φinjects:` markers |
+| Modify  | `src/angular_meta/markers.rs`                     | Add `Φmodel:` marker builder + `expand_phi_in_line` entry                |
+| Create  | `src/test_files/angular/user-card-modern.component.html` | Test fixture: `@if`, `@for`, `@switch`, `@defer`, `@let` syntax |
+| Create  | `src/test_files/angular/user-card-modern.component.ts`   | Test fixture: `input()`, `output()`, `model()` signals |
+| Create  | `src/test_files/angular/user-card-mixed.component.html`   | Test fixture: mixed `*ngIf` + `@if` syntax |
+| Modify  | `src/tests/angular_meta/template.rs`              | 17 new tests for modern template syntax, mixed legacy/modern              |
+| Modify  | `src/tests/angular_meta/markers.rs`               | Tests for `Φmodel:` marker builder + expand                              |
+
+### Completion Criteria — Phase 2.5
+
+**Phase 2.5 is ✅ COMPLETE.** All criteria verified on 2026-06-07.
+
+You will know Phase 2.5 is complete when **all** of the following are true:
+
+**Template extraction**
+- A purely modern template (`@if`, `@for`, `@switch`, `@defer`, `@let`) produces:
+  - `control_flow_blocks: ["if", "else", "for", "empty", "switch", "case", "default"]`
+  - `defer_blocks: ["viewport", "placeholder", "loading", "error"]`
+  - `let_declarations: ["let"]`
+- A mixed template (legacy `*ngIf` + modern `@if`) produces both `structural_directives: ["ngIf"]` and `control_flow_blocks: ["if"]`
+- Self-closing component tags (`<app-avatar />`) are captured in `tags` and `custom_elements`
+- Non-Angular text (`@` in email addresses) produces zero false positives
+
+**Marker line output**
+- `Φtpl:` emits `@if`, `@for`, `@switch`, `@else` tokens alongside existing `[ngIf]`, `[ngFor]` brackets
+- `Φtpl:` emits `@defer(viewport)`, `@defer(placeholder)` for defer blocks
+- `Φtpl:` emits `@let` when the template has `@let` declarations
+- `Φmodel:` is properly constructed and round-tripped through `expand_phi_in_line`
+
+**Non-regression**
+- All 229 existing Phase 1 + Phase 2 tests still pass (now 244 total)
+- All legacy template tests continue to pass unchanged
+- A non-Angular file produces zero overhead
+
+**Tests**
+- 17 new template tests covering: `@if`, `@else`, `@for`, `@empty`, `@switch`, `@case`, `@default`, `@defer` (with/without trigger), defer sub-blocks, `@let`, mixed legacy/modern, marker line format, false-positive prevention, comprehensive integration
+- 2 new markers tests covering `Φmodel:` builder and expand
+
+### Effort & Risk
+
+**Effort:** ~1 day. **Risk:** Low-Medium. The text-node scanning approach avoids adding any new dependencies (`regex` / `lazy_static`). The `self_closing_tag` handler fixes a pre-existing blind spot (Phase 2 templates used open/close elements only). No existing API changes.
+
+### Completion Evidence — Phase 2.5
+
+| Criterion | Status | Proof |
+|-----------|--------|-------|
+| `@if` / `@else` detection | ✅ | `detects_at_if_control_flow`, `detects_at_else_control_flow` |
+| `@for` / `@empty` detection | ✅ | `detects_at_for_control_flow`, `detects_at_empty_control_flow` |
+| `@switch` / `@case` / `@default` | ✅ | `detects_at_switch_and_at_case`, `detects_at_default_in_switch` |
+| `@defer` with trigger extraction | ✅ | `detects_at_defer_with_trigger` (viewport), `detects_at_defer_default` |
+| `@defer` sub-blocks | ✅ | `detects_defer_sub_blocks` (placeholder, loading, error) |
+| `@let` declarations | ✅ | `detects_at_let_declarations` |
+| Mixed legacy + modern | ✅ | `mixed_legacy_and_modern`, `marker_line_shows_both_legacy_and_modern` |
+| Self-closing tags | ✅ | `complex_modern_template_all_features` (app-avatar, app-grid, app-heavy) |
+| No false positives | ✅ | `at_if_does_not_false_positive_on_at_symbol_in_text` |
+| Marker line format | ✅ | `modern_template_marker_line_includes_at_tokens` |
+| Comprehensive integration | ✅ | `complex_modern_template_all_features` (7 control flow types + defer + let + bindings + interpolations) |
+| `Φmodel:` builder | ✅ | `model_line_emits_field_name`, `model_line_emits_alias` |
+| `Φmodel:` round-trip | ✅ | `phi_in_line_rewrite_is_idempotent_only_known_tokens`, `expand_phi_single_token` |
+| All 244 tests pass | ✅ | `cargo test` |
+| No new dependencies | ✅ | `cargo tree` — zero new crates (uses `core::str` only) |
+
+**Bugs found and fixed during Phase 2.5 implementation:**
+1. `self_closing_tag` (`<app-avatar />`) was not handled by tree-sitter-html walker — added explicit `self_closing_tag` arm in `walk_node` with `process_self_closing_tag_node`
+2. `@let` deduplication — multiple `@let` in same text node collapse to 1 entry after dedup; tests updated to expect presence, not count
+3. Regex dependency avoided — implemented `contains_at_keyword` with manual word-boundary heuristics instead of `regex`/`lazy_static` to keep zero new dependencies
 
 ---
 

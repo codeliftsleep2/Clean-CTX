@@ -14,19 +14,20 @@
 //
 // # Marker vocabulary
 //
-// | Marker   | Expansion (Phase 1)                          |
-// |----------|----------------------------------------------|
-// | Φcmp:    | @Component                                   |
-// | Φdir:    | @Directive                                   |
-// | Φpipe:   | @Pipe                                        |
-// | Φsvc:    | @Injectable                                  |
-// | Φmod:    | @NgModule                                    |
-// | Φin:     | @Input                                       |
-// | Φout:    | @Output                                      |
-// | Φinjects:| constructor injection (private/protected)   |
-// | Φgraph:  | cross-file dependency graph (Phase 3 only)   |
-// | ΦBUNDLE  | file-triplet bundle (Phase 2 only)           |
-// | ΦMAP     | workspace meta-map footer (Phase 2 only)     |
+// | Marker    | Expansion (Phase 1)                          |
+// |-----------|----------------------------------------------|
+// | Φcmp:     | @Component                                   |
+// | Φdir:     | @Directive                                   |
+// | Φpipe:    | @Pipe                                        |
+// | Φsvc:     | @Injectable                                  |
+// | Φmod:     | @NgModule                                    |
+// | Φin:      | @Input  (or `input()` signal with ` signal` suffix) |
+// | Φout:     | @Output (or `output()` signal with ` signal` suffix) |
+// | Φmodel:   | model() signal (two-way binding signal)      |
+// | Φinjects: | constructor injection (private/protected)   |
+// | Φgraph:   | cross-file dependency graph (Phase 3 only)   |
+// | ΦBUNDLE   | file-triplet bundle (Phase 2 only)           |
+// | ΦMAP      | workspace meta-map footer (Phase 2 only)     |
 //
 // # Why a single-character prefix?
 //
@@ -132,6 +133,19 @@ pub fn build_output_line(field_name: &str, alias: Option<&str>) -> String {
     }
 }
 
+/// Build a `Φmodel:<fieldName> [alias=…]` marker line for a `model()`
+/// signal field (Angular 17.1+). Models are two-way binding signals
+/// that bridge input/output behavior.
+///
+/// The alias parameter refers to the public-facing binding name, which
+/// may differ from the field name if the signal was created with one.
+pub fn build_model_line(field_name: &str, alias: Option<&str>) -> String {
+    match alias {
+        Some(a) => format!("Φmodel:{} alias={}", field_name, a),
+        None => format!("Φmodel:{}", field_name),
+    }
+}
+
 /// Build a `Φinjects:[<Type>,…]` marker line for constructor
 /// parameters with `private` / `protected` access modifiers. The
 /// Phase 1 implementation emits class names only (no `α` aliases yet
@@ -174,6 +188,7 @@ pub fn expand_phi_in_line(line: &str) -> String {
         ("Φpipe:", "@Pipe "),
         ("Φsvc:", "@Injectable "),
         ("Φmod:", "@NgModule "),
+        ("Φmodel:", "@Model "),
         ("Φinjects:", "@Inject "),
         ("Φgraph:", "@Graph "),
         ("Φin:", "@Input "),
@@ -202,6 +217,7 @@ pub fn expand_phi(token: &str) -> Option<&'static str> {
         "Φmod" => Some("@NgModule"),
         "Φin" => Some("@Input"),
         "Φout" => Some("@Output"),
+        "Φmodel" => Some("@Model"),
         "Φinjects" => Some("@Inject"),
         "Φgraph" => Some("@Graph"),
         "ΦBUNDLE" => Some("@Bundle"),

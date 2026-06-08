@@ -1,0 +1,25 @@
+// src/test_files/angular/user-card.component.scss
+// Test fixture: SCSS with class selectors and variables.
+
+$primary-color: #1976d2;
+$card-padding: 16px;
+
+.card {
+  border: 1px solid #ccc;
+  padding: $card-padding;
+  border-radius: 4px;
+}
+
+.card-text {
+  color: $primary-color;
+  font-size: 14px;
+}
+
+.btn-primary {
+  background-color: $primary-color;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+
+  @include flex-center;
+}

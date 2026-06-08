@@ -1,0 +1,7 @@
+<div class="page">
+  <h1>{{ pageTitle }}</h1>
+  <app-user-card *ngFor="let user of users"
+    [userId]="user.id"
+    (userDeleted)="onUserDeleted($event)">
+  </app-user-card>
+</div>

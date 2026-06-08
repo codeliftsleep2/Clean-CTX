@@ -132,11 +132,15 @@ src/
 │   ├── import.rs                 # compact_import, extract_import_names
 │   └── expression.rs             # compact_expression, simple_compact
 │
-├── angular_meta/                 # Angular Meta-Layer (Phase 1: Tier 1)
+├── angular_meta/                 # Angular Meta-Layer (Phase 1 + 2)
 │   ├── mod.rs                    # MetaBlock struct, run_meta_layer entry point
-│   ├── detect.rs                 # Angular detection heuristic
+│   ├── detect.rs                 # Angular detection heuristic + sibling detection
 │   ├── decorators.rs             # @Component / @Injectable / @NgModule / etc. extractor
-│   └── markers.rs                # Φ marker construction & expansion
+│   ├── markers.rs                # Φ marker construction & expansion
+│   ├── bundler.rs                # File-triplet resolver (*.component.ts → .html + .scss)
+│   ├── template.rs               # tree-sitter-html Angular-syntax template extractor
+│   ├── style.rs                  # CSS/SCSS class selector + variable extractor
+│   └── footer.rs                 # §ΦMAP workspace footer formatter
 │
 ├── decompression/                # Opcode → readable expansion
 │   ├── mod.rs
@@ -196,9 +200,11 @@ The `LocalStateCache` serves double duty:
 
 ---
 
-## Angular Meta-Layer (Phase 1)
+## Angular Meta-Layer (Phase 1 + 2)
 
 The Meta-Layer is **purely additive** — it never modifies the existing TS compaction output. It only appends a `Φ` block below the existing compacted class. Non-Angular files pay zero overhead.
+
+### Phase 1 — Decorator Extraction (single-file mode)
 
 ```
      Source Code
@@ -225,11 +231,42 @@ The Meta-Layer is **purely additive** — it never modifies the existing TS comp
 └─────────────────────┘
 ```
 
-**Module:** `src/angular_meta/` — `mod.rs`, `detect.rs`, `decorators.rs`, `markers.rs`
+### Phase 2 — File-Triplet Bundling (workspace mode only)
 
-**Marker vocabulary:** `Φcmp:`, `Φdir:`, `Φpipe:`, `Φsvc:`, `Φmod:`, `Φin:`, `Φout:`, `Φinjects:`
+```
+     compress_workspace
+          │
+          ▼
+┌─────────────────────┐
+│ Compress .ts/.js/.cs│  Standard Phase 1 + compression pipeline
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ Triplet Resolver    │  *.component.ts → .html + .scss siblings (bundler.rs)
+└─────────┬───────────┘
+          │
+     ┌────┴────┐
+     ▼         ▼
+┌──────────┐ ┌──────────┐
+│ Template │ │  Style   │  tree-sitter-html parse  Byte-level scan
+│ Extract  │ │ Extract  │  (tags, bindings, etc.)  (selectors, vars)
+└────┬─────┘ └────┬─────┘
+     │            │
+     ▼            ▼
+┌─────────────────────┐
+│ ΦBUNDLE Groups      │  // ===== Φ1: user-card.component =====
+│ + §ΦMAP Footer      │  Φtpl:...  Φsty:...
+└─────────────────────┘
+```
+
+**Modules:** `src/angular_meta/` — `mod.rs`, `detect.rs`, `decorators.rs`, `markers.rs`, `bundler.rs`, `template.rs`, `style.rs`, `footer.rs`
+
+**Marker vocabulary:** `Φcmp:`, `Φdir:`, `Φpipe:`, `Φsvc:`, `Φmod:`, `Φin:`, `Φout:`, `Φinjects:`, `Φtpl:`, `Φsty:`, `ΦBUNDLE`, `ΦMAP`
 
 **Config:** `meta_layers.angular.enabled` in `.clean-ctx.json` (default: on)
+
+**New dependency:** `tree-sitter-html = "=0.20.0"` (ABI-matched with tree-sitter 0.20.x)
 
 ---
 
@@ -282,7 +319,7 @@ This codebase underwent a comprehensive FAANG-level audit (41 findings across 5 
 
 **Key results:**
 - `cargo clippy --all-targets -- -D warnings`: 0 warnings
-- `cargo test`: 172/172 passing (includes 50 Angular Meta-Layer tests)
+- `cargo test`: 229/229 passing (includes 107 Angular Meta-Layer tests across Phase 1 + 2)
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks
