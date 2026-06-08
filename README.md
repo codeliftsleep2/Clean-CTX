@@ -2,7 +2,7 @@
 
 A local-first, air-gapped context optimization engine that eliminates token waste in LLM interactions while maintaining zero network footprint. Built in Rust for restrictive firewall and DLP environments.
 
-> **🚀 New in 0.1.0:** Streaming compression, AST-level diff with baseline caching, workspace-wide path aliasing, `.clean-ctx.json` project configuration, and 3 fidelity levels.
+> **🚀 New in 0.1.0:** Streaming compression, AST-level diff with baseline caching, workspace-wide path aliasing, `.clean-ctx.json` project configuration, 3 fidelity levels, and **Angular Meta-Layer** (framework-annotation markers, file-triplet bundling, cross-file dependency graph).
 
 ---
 
@@ -76,6 +76,18 @@ Long file paths are compressed to short aliases:
   α1 = C:\project\src\core\auth\security\Provider.tsx
   α2 = C:\project\src\core\auth\security\TokenVerifier.tsx
 ```
+
+### Angular Meta-Layer
+
+For Angular projects, Clean-CTX automatically detects framework decorators and enriches the compressed output with structured metadata — without modifying existing behavior for non-Angular files.
+
+| Tier | What It Does | When It Runs |
+|------|-------------|--------------|
+| **Tier 1 — Decorators** | Extracts `@Component`, `@Injectable`, `@NgModule`, `@Directive`, `@Pipe`, `@Input`, `@Output` and emits `Φ` markers | Single-file and workspace mode |
+| **Tier 2 — File-Triplet Bundling** | Resolves `*.component.ts` → `.html` + `.scss` siblings; extracts template shape (tags, bindings, control flow) and style shape (selectors, variables) | Workspace mode only |
+| **Tier 3 — Cross-File Graph** | Builds a DI injection graph (`UserService@α12`) and selector linkage (`<app-user-card>` → `UserCardComponent@α9`) across all files | Workspace mode only |
+
+**Non-Angular files pay zero overhead** — no markers, no extra parsing, no newlines.
 
 ### Security
 
@@ -233,6 +245,26 @@ The tool delivers **78–97% token waste reduction** in real-world conditions. �
 | `⊕!` | Throws error |
 | `⊕export` | Module export |
 
+### Angular Meta-Layer Markers (Φ)
+
+| Marker | Meaning |
+|--------|---------|
+| `Φcmp:` | `@Component` — class name + selector, template URL, style URLs |
+| `Φsvc:` | `@Injectable` — class name + `providedIn` scope |
+| `Φmod:` | `@NgModule` — class name + declarations, imports, exports |
+| `Φdir:` | `@Directive` — class name + selector |
+| `Φpipe:` | `@Pipe` — class name + pipe name |
+| `Φin:` | `@Input` — field name + optional alias |
+| `Φout:` | `@Output` — field name + optional alias |
+| `Φmodel:` | `model()` signal — field name + optional alias (Angular 17.1+) |
+| `Φinjects:` | Constructor/DI injection — resolved types with file aliases |
+| `Φtpl:` | Template shape — tags, bindings, control flow blocks |
+| `Φsty:` | Style shape — class selectors, SCSS/CSS variables |
+| `ΦBUNDLE` | File-triplet bundle group (workspace manifest) |
+| `ΦMAP` | Workspace bundle alias map footer |
+| `Φgraph:` | Cross-file dependency graph edge |
+| `§ΦGRAPH` | Workspace dependency graph footer section |
+
 ---
 
 ## IDE Configuration
@@ -320,6 +352,7 @@ File: `settings.json` (Zed settings)
 The `cleanctx-notation` prompt provides system-level instructions to the AI explaining how to read and write Clean-CTX compressed notation. When loaded, the AI learns:
 - How to interpret all opcodes (`$c`, `$ctor`, `$s`, etc.)
 - How to interpret behavior markers (`⊕guard`, `⊕loop`, `⊕!throw`, `⊕⇒`)
+- How to interpret Angular Meta-Layer markers (`Φcmp:`, `Φsvc:`, `Φin:`, `Φgraph:`, etc.)
 - To respond in compressed form when appropriate
 - To never output raw opcode tables or metadata sections
 
@@ -355,6 +388,8 @@ See [`docs/DEVELOPER_DOCUMENTATION.md`](docs/DEVELOPER_DOCUMENTATION.md) for the
 | TypeScript | `.ts`, `.js` | ✅ Full support |
 | C# | `.cs` | ✅ Full support |
 
+Angular framework detection (decorators, templates, styles) is automatic for TypeScript files containing `@Component`, `@Injectable`, `@NgModule`, `@Directive`, or `@Pipe` decorators.
+
 See [`docs/DEVELOPER_DOCUMENTATION.md`](docs/DEVELOPER_DOCUMENTATION.md) for instructions on adding new languages.
 
 ---
@@ -379,10 +414,11 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — 0 warnings |
-| Tests | ✅ 121/121 passing |
+| Tests | ✅ 279+ passing |
 | Audit | ✅ FAANG-level audit — all 41 findings resolved |
 | Largest file | ~170 lines (down from 913) |
 | Unsafe code | 0 blocks |
+| Meta-Layer | ✅ Phases 1–3 complete (decorators, bundling, graph) |
 
 ---
 

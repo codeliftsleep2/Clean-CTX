@@ -14,9 +14,11 @@
 5. [Adding a New Language](#adding-a-new-language)
 6. [Adding a New Tool](#adding-a-new-tool)
 7. [Adding a New Opcode](#adding-a-new-opcode)
-8. [Configuration System](#configuration-system)
-9. [Testing Conventions](#testing-conventions)
-10. [Code Quality Gates](#code-quality-gates)
+8. [Adding a New Φ Marker](#adding-a-new--marker)
+9. [Angular Meta-Layer Architecture](#angular-meta-layer-architecture)
+10. [Configuration System](#configuration-system)
+11. [Testing Conventions](#testing-conventions)
+12. [Code Quality Gates](#code-quality-gates)
 
 ---
 
@@ -117,6 +119,17 @@ src/
 │   ├── pipeline.rs         # Non-streaming orchestrator
 │   └── streaming.rs        # Streaming orchestrator
 │
+├── angular_meta/           # Angular Meta-Layer (Phases 1–3)
+│   ├── mod.rs              # MetaBlock struct, run_meta_layer entry point
+│   ├── detect.rs           # Angular detection heuristic
+│   ├── decorators.rs       # @Component/@Injectable/@NgModule/etc. extractor
+│   ├── markers.rs          # Φ marker construction & expansion
+│   ├── bundler.rs          # File-triplet resolver (*.component.ts → .html + .scss)
+│   ├── template.rs         # tree-sitter-html Angular-syntax template extractor
+│   ├── style.rs            # CSS/SCSS class selector + variable extractor
+│   ├── footer.rs           # §ΦMAP workspace footer formatter
+│   ├── graph.rs            # AngularGraph — cross-file DI + selector graph
+│   └── graph_state.rs      # AngularGraphHandle — McpState integration
 ├── diff/                   # AST-level diff engine
 ├── compaction/             # AST node compaction
 ├── decompression/          # Opcode → readable output
@@ -133,6 +146,7 @@ src/
 - **No unsafe code** — the entire codebase is safe Rust
 - **No network dependencies** — stdio-only MCP transport
 - **HashMap over BTreeMap** — no caller iterates in sorted order; HashMap is faster
+- **Meta-Layer is purely additive** — non-Angular files produce byte-identical output with zero overhead
 
 ---
 
@@ -334,6 +348,182 @@ fn table_has_35_entries() {
     assert_eq!(PRIMITIVE_OPCODES.len(), 35);
 }
 ```
+
+---
+
+## Adding a New Φ Marker
+
+The Angular Meta-Layer uses `Φ`-prefixed markers (Φcmp, Φsvc, Φin, etc.) to encode framework annotations. The marker vocabulary is centrally defined in `src/angular_meta/markers.rs`.
+
+### Step 1: Add a variant to `PhiLineKind`
+
+The `PhiLineKind` enum is the **single source of truth** for the marker vocabulary:
+
+```rust
+// In src/angular_meta/markers.rs
+pub enum PhiLineKind {
+    Component,   // Φcmp:
+    Service,     // Φsvc:
+    // ...existing variants...
+    MyNewMarker, // NEW
+}
+```
+
+### Step 2: Add marker_prefix and expansion arms
+
+```rust
+impl PhiLineKind {
+    pub fn marker_prefix(self) -> &'static str {
+        match self {
+            // ...existing arms...
+            Self::MyNewMarker => "Φnew:",
+        }
+    }
+
+    pub fn expansion(self) -> &'static str {
+        match self {
+            // ...existing arms...
+            Self::MyNewMarker => "@MyNew",
+        }
+    }
+}
+```
+
+### Step 3: Add to `all_in_expand_order`
+
+Place the new variant at the correct position (longer prefixes before shorter ones):
+
+```rust
+pub fn all_in_expand_order() -> &'static [PhiLineKind] {
+    &[
+        // ...existing entries...
+        Self::MyNewMarker, // insert at correct length position
+    ]
+}
+```
+
+### Step 4: Add to `from_token` and `token`
+
+```rust
+pub fn from_token(token: &str) -> Option<PhiLineKind> {
+    match token {
+        // ...existing arms...
+        "Φnew" => Some(Self::MyNewMarker),
+        _ => None,
+    }
+}
+
+pub fn token(self) -> &'static str {
+    match self {
+        // ...existing arms...
+        Self::MyNewMarker => "Φnew",
+    }
+}
+```
+
+### Step 5: Add a builder struct (if the marker has data)
+
+```rust
+pub struct MyNewLine<'a> {
+    pub field_name: &'a str,
+}
+
+impl PhiLine for MyNewLine<'_> {
+    fn kind(&self) -> PhiLineKind { PhiLineKind::MyNewMarker }
+    fn render(&self) -> String { format!("Φnew:{}", self.field_name) }
+}
+
+pub fn build_my_new_line(field_name: &str) -> String {
+    MyNewLine { field_name }.render()
+}
+```
+
+### Step 6: Add extraction logic
+
+Wire the new marker into `decorators.rs` (for class-level markers) or the appropriate extractor. Add tests in `src/tests/angular_meta/`.
+
+**Key invariant:** The `expand_phi_in_line` function in the decompressor is **generic** over `PhiLineKind` — it needs no manual updates when you add a new marker. Only the enum and its arms need updating.
+
+---
+
+## Angular Meta-Layer Architecture
+
+The Meta-Layer is a three-tier system that enriches compressed output with Angular framework context. It is **purely additive** — it never modifies existing TS compaction output.
+
+### Module Overview
+
+| Module | Tier | Purpose |
+|--------|------|---------|
+| `detect.rs` | 0 | Heuristic: is this file Angular? |
+| `decorators.rs` | 1 | Extract `@Component`/`@Injectable`/etc. from class captures |
+| `markers.rs` | 1 | Φ marker construction, rendering, and expansion |
+| `bundler.rs` | 2 | Resolve `*.component.ts` → `.html` + `.scss` file triplets |
+| `template.rs` | 2 | tree-sitter-html Angular-syntax template shape extraction |
+| `style.rs` | 2 | CSS/SCSS class selector and variable extraction |
+| `footer.rs` | 2 | `§ΦMAP` workspace footer formatting |
+| `graph.rs` | 3 | Cross-file DI injection + selector linkage graph |
+| `graph_state.rs` | 3 | `McpState` integration wrapper |
+
+### Detection Strategy (`detect.rs`)
+
+A file is "Angular" if it meets either condition:
+1. Contains a **strong** decorator signal: `@Component(`, `@Injectable(`, `@NgModule(`, `@Directive(`, `@Pipe(`, etc.
+2. Imports from `@angular/core` AND has at least one `@Input`/`@Output` (weak signal paired with import).
+
+Plain `@Input`/`@Output` alone (no strong signal, no `@angular/core` import) returns `false` — these decorators are also used by MobX/Vue.
+
+### Extraction Strategy (`decorators.rs`)
+
+The extractor walks raw text of `class.root` tree-sitter captures (no AST re-parse):
+1. Find the text before `class <Name>` keyword (the "head")
+2. Collect all `@...(...)` decorator calls from the head
+3. Classify each decorator and emit the corresponding Φ marker line
+4. Optionally scan the class body for field-level `@Input`/`@Output` and signal-based APIs
+
+### Fidelity Control (F-ANG-23)
+
+The `fidelity` parameter controls Meta-Layer verbosity:
+
+| Fidelity | Class-level | Field-level | DI/Signals |
+|----------|------------|-------------|------------|
+| Low | Φcmp, Φsvc, Φmod, Φdir, Φpipe | — | — |
+| Medium | All above | Φin, Φout | — |
+| High | All above | Φin, Φout | Φinjects, Φmodel, input()/output() signals |
+
+### Template Extraction (`template.rs`)
+
+Uses `tree-sitter-html` to parse Angular templates and extract structural shape:
+- **Tags** and **custom elements** (tags containing a hyphen)
+- **Property bindings** (`[prop]="expr"`) and **event bindings** (`(event)="handler"`)
+- **Two-way bindings** (`[(ngModel)]="value"`)
+- **Structural directives** (`*ngIf`, `*ngFor`)
+- **Modern control flow** (`@if`, `@for`, `@switch`) — detected via text-node word-boundary scanning since these are not valid HTML
+- **Defer blocks** with trigger extraction (`@defer (on viewport)`)
+- **`@let` declarations** (Angular 18+)
+- **Self-closing tags** (`<app-avatar />`)
+
+Raw HTML content is **never** included — only the structural summary.
+
+### Cross-File Graph (`graph.rs`)
+
+Built once per `compress_workspace` call using the typestate pattern:
+
+1. **Collection phase** — each file's `extract_graph_entries` produces `(class_name, file_alias, kind, selector, injects, pipe_name)` tuples
+2. **Registration** — `AngularGraphBuilder::register_class` adds entries to the mutable builder
+3. **Resolution** — `builder.build()` consumes the builder, builds `injected_by` reverse edges, and returns the immutable `AngularGraph`
+4. **Querying** — `resolve_inject_type("UserService")` → `"UserService@α12"`, `resolve_selector("app-user-card")` → `"UserCardComponent@α9"`
+
+The graph is purely in-memory and discarded after the workspace manifest is emitted.
+
+### Adding a New Framework Meta-Layer
+
+The Meta-Layer pattern is designed to be extensible to other frameworks (React, Vue, Svelte). To add a new framework:
+
+1. Create `src/<framework>_meta/` with the same module structure
+2. Implement detection (`is_<framework>_file`)
+3. Define a marker vocabulary in `markers.rs`
+4. Implement extraction in `decorators.rs` (or equivalent)
+5. The `Φ` prefix is Angular-specific; use a different Greek letter for new frameworks (e.g., `Ψ` for React, `Ω` for Vue)
 
 ---
 
