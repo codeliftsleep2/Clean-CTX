@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0 (Proposed)
 **Last updated:** 2026-06-08
-**Status:** � Phase A Complete - Phase B Complete
+**Status:** � Phase A Complete - Phase B Complete - Phase C Complete
 
 > **Living document.** This spec defines the evolution from text-based compression to a structured intermediate representation (IR) with delta-based state transport. It serves as the implementation guideline for the Compiler IR subsystem.
 
@@ -707,6 +707,8 @@ impl GlobalSymbolTable {
 
 ## 6. Phase C: Delta Transport
 
+**Status: ✅ Complete** — implemented 2026-06-08
+
 ### Goal
 
 Instruction-level diffing between two `CompiledIR` states, producing a structured delta envelope for transport.
@@ -716,7 +718,7 @@ Instruction-level diffing between two `CompiledIR` states, producing a structure
 | File | Description |
 |------|-------------|
 | `src/ir/delta.rs` | `IRDelta`, `DeltaOps`, `ModOp`, `DeltaComputer` |
-| Tests for delta engine | Add/modify/remove detection, version validation |
+| `src/tests/ir/delta.rs` | 26 tests: add/modify/remove detection, version chain, JSON round-trip, edge cases |
 
 ### Delta Wire Format
 
@@ -870,19 +872,19 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
 
 ### Completion Criteria
 
-- [ ] `IRDelta` struct with `DeltaOps` (adds, mods, dels) defined and serializable
-- [ ] `ModOp` struct with key/replace fields
-- [ ] `DeltaComputer::compute()` correctly identifies additions, removals, modifications
-- [ ] `primary_key()` generates unique keys for every instruction type
-- [ ] `key_tuple()` extracts the match key for modifications
-- [ ] Delta is `None` when IRs are identical (no unnecessary deltas)
-- [ ] Version chain: `from_version` = baseline.version, `to_version` = current.version
-- [ ] Unit tests: add a method → delta has 1 add op
-- [ ] Unit tests: remove a method → delta has 1 del op (and its SIG/RET)
-- [ ] Unit tests: modify a method signature → delta has 1 mod op
-- [ ] Unit tests: unchanged IR → delta is None
-- [ ] JSON serialization produces correct `+`/`~`/`-` keys
-- [ ] `cargo clippy --all-targets -- -D warnings` passes
+- [x] `IRDelta` struct with `DeltaOps` (adds, mods, dels) defined and serializable
+- [x] `ModOp` struct with key/replace fields
+- [x] `DeltaComputer::compute()` correctly identifies additions, removals, modifications
+- [x] `primary_key()` generates unique keys for every instruction type
+- [x] `key_tuple()` extracts the match key for modifications
+- [x] Delta is `None` when IRs are identical (no unnecessary deltas)
+- [x] Version chain: `from_version` = baseline.version, `to_version` = current.version
+- [x] Unit tests: add a method → delta has 1 add op
+- [x] Unit tests: remove a method → delta has 1 del op (and its SIG/RET)
+- [x] Unit tests: modify a method signature → delta has 1 mod op
+- [x] Unit tests: unchanged IR → delta is None
+- [x] JSON serialization produces correct `+`/`~`/`-` keys
+- [x] `cargo clippy --all-targets -- -D warnings` passes
 
 ---
 

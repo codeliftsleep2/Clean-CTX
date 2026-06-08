@@ -10,12 +10,14 @@
 //
 // Phase A: IR Core — instruction types, compiler, render, wire format.
 // Phase B: Global Symbol Table — cross-stage symbol registry.
+// Phase C: Delta Transport — instruction-level diff engine.
 
 pub mod opcodes;
 pub mod compiler;
 pub mod render;
 pub mod wire;
 pub mod symbol_table;
+pub mod delta;
 
 // Re-export public types for downstream consumers.
 pub use opcodes::CoreOp;
@@ -23,6 +25,7 @@ pub use compiler::{CompiledIR, IRCompiler};
 pub use render::ir_to_text;
 pub use wire::{ir_to_wire, op_to_tuple};
 pub use symbol_table::{GlobalSymbolTable, SymbolEntry, SymbolKind};
+pub use delta::{IRDelta, DeltaOps, ModOp, DeltaComputer, primary_key_from_tuple, key_tuple_from_tuple};
 
 #[cfg(test)]
 #[path = "../tests/ir/mod.rs"]
