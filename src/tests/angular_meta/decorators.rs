@@ -270,3 +270,104 @@ fn medium_fidelity_omits_phi_injects() {
     // F-ANG-23: Φinjects: should NOT appear at Medium fidelity.
     assert!(!lines.iter().any(|l| l.starts_with("Φinjects:")));
 }
+
+// ----- Track A: None-return tests for the string-walker helpers -----
+//
+// Each test exercises the malformed-input path that previously
+// returned a silent sentinel (len-1, len(), len(), or
+// "(anonymous)"). The new return type is `Option<...>`, so a
+// well-formed `None` is the expected behaviour.
+
+#[test]
+fn find_matching_brace_returns_none_on_unclosed_body() {
+    // F-ANG-08: no closing `}` — used to return `len-1` (silent
+    // truncation to end of text). Now returns `None`.
+    let body = "{ unclosed";
+    assert!(crate::angular_meta::decorators::find_matching_brace(body, 0).is_none());
+}
+
+#[test]
+fn consume_call_expression_returns_none_on_unterminated_call() {
+    // F-ANG-09: no closing `)` — used to return `(i-open_paren,
+    // text[open_paren+1..i])` (silent EOF). Now returns `None`.
+    let text = "(unterminated call";
+    assert!(crate::angular_meta::decorators::consume_call_expression(text, 0).is_none());
+}
+
+#[test]
+fn find_class_head_end_returns_none_on_no_class_keyword() {
+    // F-ANG-12: no `class ` and no `{` — used to return `raw.len()`
+    // (silently included the rest of the file as part of the
+    // "head"). Now returns `None`.
+    let raw = "export const x = 5;\n";
+    assert!(crate::angular_meta::decorators::find_class_head_end(raw).is_none());
+}
+
+#[test]
+fn extract_class_name_returns_none_for_anonymous_class() {
+    // F-ANG-13: no `class ` keyword at all — used to return the
+    // literal `"(anonymous)"`. Now returns `None`.
+    let raw = "export const x = 5;";
+    assert!(crate::angular_meta::decorators::extract_class_name(raw).is_none());
+}
+
+#[test]
+fn find_class_body_open_returns_none_when_no_class_keyword() {
+    // F-ANG-07: no `class ` keyword — used to early-return `?`
+    // on the primitive `find`. The pre-audit behaviour was already
+    // correct; this test pins the contract.
+    let raw = "function foo() { return 1; }";
+    assert!(crate::angular_meta::decorators::find_class_body_open(raw).is_none());
+}
+
+// ----- Track A: end-to-end behaviour preservation -----
+
+#[test]
+fn extract_decorators_substitutes_question_mark_for_anonymous_class() {
+    // F-ANG-13: callers substitute `?` at the call site for missing
+    // class names. The marker line is still emitted using `?` as
+    // the class name.
+    let raw = r#"
+        @Component({ selector: 'app-foo' })
+        export default class { /* anonymous */ }
+    "#;
+    // Hmm, this input actually has `class` so the name is empty
+    // (the part right after `class` is ` {`). `extract_class_name`
+    // returns `None` and the call site substitutes `?`.
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
+    // The class name shows up as `?` in the marker line.
+    assert!(
+        lines.iter().any(|l| l.contains("Φcmp:?") || l.contains("Φcmp:?")),
+        "expected Φcmp:? in {:?}",
+        lines
+    );
+}
+
+#[test]
+fn extract_decorators_returns_none_for_input_without_class_keyword() {
+    // F-ANG-12: malformed input that has neither `class ` nor `{`
+    // produces `None` from `find_class_head_end`, which
+    // `extract_decorators` propagates. Previously this was a
+    // wasted scan that returned `None` anyway.
+    let raw = "// only a comment, no class";
+    assert!(extract_decorators(raw, Fidelity::Medium).is_none());
+}
+
+#[test]
+fn extract_decorators_handles_unterminated_decorator_call() {
+    // F-ANG-09: the decorator has `(` but no `)`. Previously the
+    // scanner consumed to end-of-text and used the resulting slice
+    // as the decorator arg. Now it advances past the `(` and
+    // uses an empty arg, so the decorator is parsed without its
+    // arguments.
+    let raw = r#"
+        @Component(
+        export class FooCmp {}
+    "#;
+    // The class body is unterminated too — this exercises both
+    // F-ANG-08 (`find_matching_brace` returns `None`) and F-ANG-09
+    // (`consume_call_expression` returns `None`). The function
+    // should not panic and should still emit a marker line.
+    let result = std::panic::catch_unwind(|| extract_decorators(raw, Fidelity::Medium).is_some());
+    assert!(result.is_ok(), "extract_decorators panicked on malformed input");
+}

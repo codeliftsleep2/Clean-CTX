@@ -43,11 +43,19 @@ use crate::compression::Fidelity;
 ///   `Φinjects:` (the class summary already shows the class).
 /// - `High`   → emit everything including `Φinjects:` and the
 ///   modern `input()`/`output()`/`model()`/`inject()` signal lines.
+// F-ANG-12: use `?` since the enclosing function returns `Option`
+// (clippy::question_mark prefers `?` over `let-else` when both
+// apply). The pre-audit behaviour was to slice to `raw.len()` and
+// scan the whole string, which always yielded zero decorators
+// and returned `None` anyway, just wasted work.
+// F-ANG-13: substitute `?` for missing class names at the call site
+// (the audit notes the call site already did this implicitly via
+// the `"(anonymous)"` literal).
 pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Vec<String>> {
-    let head_end = find_class_head_end(raw_class);
+    let head_end = find_class_head_end(raw_class)?;
     let head = &raw_class[..head_end];
 
-    let class_name = extract_class_name(raw_class);
+    let class_name = extract_class_name(raw_class).unwrap_or_else(|| "?".to_string());
     let decorators = collect_decorators(head);
 
     let mut lines: Vec<String> = Vec::new();
@@ -100,21 +108,24 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Vec<Str
     // Field-level markers: scan the class body for
     // `@Input(...)` / `@Output(...)` decorators attached to
     // individual field declarations.
-    if fidelity != Fidelity::Low {
-        if let Some(class_body_start) = find_class_body_open(raw_class) {
-            let body = &raw_class[class_body_start..];
-            let body_end = find_matching_brace(body, 0);
-            let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-            for (kind, alias, field_name) in collect_field_decorators(body_inner) {
-                match kind {
-                    DecoratorKind::Input => {
-                        input_output_lines.push(build_input_line(&field_name, alias.as_deref()));
-                    }
-                    DecoratorKind::Output => {
-                        input_output_lines.push(build_output_line(&field_name, alias.as_deref()));
-                    }
-                    _ => {}
+    // F-ANG-08: skip the body scan if no matching `}` is found.
+    // (clippy::collapsible_if: the `if` conditions are combined
+    // with `&&` so the nested block is unnecessary.)
+    if fidelity != Fidelity::Low
+        && let Some(class_body_start) = find_class_body_open(raw_class)
+        && let Some(body_end) = find_matching_brace(&raw_class[class_body_start..], 0)
+    {
+        let body = &raw_class[class_body_start..];
+        let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
+        for (kind, alias, field_name) in collect_field_decorators(body_inner) {
+            match kind {
+                DecoratorKind::Input => {
+                    input_output_lines.push(build_input_line(&field_name, alias.as_deref()));
                 }
+                DecoratorKind::Output => {
+                    input_output_lines.push(build_output_line(&field_name, alias.as_deref()));
+                }
+                _ => {}
             }
         }
     }
@@ -139,34 +150,35 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Vec<Str
     // Detect `input()`, `output()`, `model()`, and `inject()` function
     // calls in the class body (Angular 17.1+ signal API). High
     // fidelity only (F-ANG-23) — these are the most verbose lines.
+    // F-ANG-08: skip the body scan if no matching `}` is found.
     let mut inject_fn_types: Vec<String> = Vec::new();
-    if fidelity == Fidelity::High {
-        if let Some(class_body_start) = find_class_body_open(raw_class) {
-            let body = &raw_class[class_body_start..];
-            let body_end = find_matching_brace(body, 0);
-            let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-            for sf in collect_signal_fields(body_inner) {
-                match sf.kind {
-                    SignalKind::Input => {
-                        let mut line = build_input_line(&sf.name, sf.alias.as_deref());
-                        if !line.ends_with(" signal") {
-                            line.push_str(" signal");
-                        }
-                        input_output_lines.push(line);
+    if fidelity == Fidelity::High
+        && let Some(class_body_start) = find_class_body_open(raw_class)
+        && let Some(body_end) = find_matching_brace(&raw_class[class_body_start..], 0)
+    {
+        let body = &raw_class[class_body_start..];
+        let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
+        for sf in collect_signal_fields(body_inner) {
+            match sf.kind {
+                SignalKind::Input => {
+                    let mut line = build_input_line(&sf.name, sf.alias.as_deref());
+                    if !line.ends_with(" signal") {
+                        line.push_str(" signal");
                     }
-                    SignalKind::Output => {
-                        let mut line = build_output_line(&sf.name, sf.alias.as_deref());
-                        if !line.ends_with(" signal") {
-                            line.push_str(" signal");
-                        }
-                        input_output_lines.push(line);
+                    input_output_lines.push(line);
+                }
+                SignalKind::Output => {
+                    let mut line = build_output_line(&sf.name, sf.alias.as_deref());
+                    if !line.ends_with(" signal") {
+                        line.push_str(" signal");
                     }
-                    SignalKind::Model => {
-                        lines.push(build_model_line(&sf.name, sf.alias.as_deref()));
-                    }
-                    SignalKind::Inject => {
-                        inject_fn_types.push(sf.name.clone());
-                    }
+                    input_output_lines.push(line);
+                }
+                SignalKind::Model => {
+                    lines.push(build_model_line(&sf.name, sf.alias.as_deref()));
+                }
+                SignalKind::Inject => {
+                    inject_fn_types.push(sf.name.clone());
                 }
             }
         }
@@ -282,7 +294,10 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                     _ => unreachable!(),
                 };
 
-                let (_, arg) = consume_call_expression(body, open_paren);
+                // F-ANG-09: if the call is unterminated, treat as no alias.
+                let arg = consume_call_expression(body, open_paren)
+                    .map(|(_, arg)| arg)
+                    .unwrap_or_default();
                 let alias = parse_first_string_arg(&arg);
 
                 // Walk backwards from `=` to find the field name.
@@ -335,10 +350,17 @@ fn collect_decorators(head: &str) -> Vec<Decorator> {
             i += 1;
         }
         let mut arg = String::new();
+        // F-ANG-09: if the decorator call is unterminated, advance
+        // past the `(` to avoid an infinite loop and use an empty
+        // arg. The audit's deferred fix note says callers tolerate
+        // the fallback gracefully.
         if i < len && bytes[i] == b'(' {
-            let (consumed, arg_str) = consume_call_expression(head, i);
-            i += consumed;
-            arg = arg_str;
+            if let Some((consumed, arg_str)) = consume_call_expression(head, i) {
+                i += consumed;
+                arg = arg_str;
+            } else {
+                i += 1;
+            }
         }
         let kind = classify_decorator(name);
         decorators.push(Decorator {
@@ -351,7 +373,10 @@ fn collect_decorators(head: &str) -> Vec<Decorator> {
     decorators
 }
 
-fn consume_call_expression(text: &str, open_paren: usize) -> (usize, String) {
+// F-ANG-09: returns `None` if the call expression is unterminated
+// (was returning `i-open_paren` and slicing to end of text — silent
+// EOF behaviour).
+fn consume_call_expression(text: &str, open_paren: usize) -> Option<(usize, String)> {
     let bytes = text.as_bytes();
     let mut depth: i32 = 0;
     let mut i = open_paren;
@@ -364,7 +389,7 @@ fn consume_call_expression(text: &str, open_paren: usize) -> (usize, String) {
                 depth -= 1;
                 if depth == 0 {
                     let arg = text[open_paren + 1..i].to_string();
-                    return (i - open_paren + 1, arg);
+                    return Some((i - open_paren + 1, arg));
                 }
             }
             b'"' | b'\'' => {
@@ -392,14 +417,14 @@ fn consume_call_expression(text: &str, open_paren: usize) -> (usize, String) {
         }
         i += 1;
     }
-    (i.saturating_sub(open_paren), text[open_paren + 1..i].to_string())
+    None
 }
 
-/// Find the byte offset of the `}` that matches the `{` at
-/// `open_brace` in `text`, tracking nested braces, strings, and
-/// template literals. Returns `text.len() - 1` if no match is
-/// found (so the caller can safely slice up to the end).
-fn find_matching_brace(text: &str, open_brace: usize) -> usize {
+// F-ANG-08: returns `None` if no matching `}` is found (was
+// `text.len().saturating_sub(1)` — silent truncation).
+// `pub(crate)` so Track D's `extract_class_blocks` rewrite can use it
+// (see `docs/FAANG_AUDIT_ANGULAR_DEFERRED_PLAN.md`).
+pub(crate) fn find_matching_brace(text: &str, open_brace: usize) -> Option<usize> {
     let bytes = text.as_bytes();
     let mut depth: i32 = 0;
     let mut i = open_brace;
@@ -410,7 +435,7 @@ fn find_matching_brace(text: &str, open_brace: usize) -> usize {
             b'}' => {
                 depth -= 1;
                 if depth == 0 {
-                    return i;
+                    return Some(i);
                 }
             }
             b'"' | b'\'' => {
@@ -438,7 +463,7 @@ fn find_matching_brace(text: &str, open_brace: usize) -> usize {
         }
         i += 1;
     }
-    len.saturating_sub(1)
+    None
 }
 
 fn classify_decorator(name: &str) -> DecoratorKind {
@@ -454,21 +479,33 @@ fn classify_decorator(name: &str) -> DecoratorKind {
     }
 }
 
-fn find_class_head_end(raw: &str) -> usize {
+// F-ANG-12: returns `None` if neither `class ` nor `{` is found (was
+// `raw.len()` — silently included the rest of the file as part of
+// the "head").
+fn find_class_head_end(raw: &str) -> Option<usize> {
     if let Some(pos) = raw.find("class ") {
-        return pos;
+        return Some(pos);
     }
     if let Some(pos) = raw.find('{') {
-        return pos;
+        return Some(pos);
     }
-    raw.len()
+    None
 }
 
 /// Find the byte offset of the `{` that opens the class body, not
 /// any `{` inside a decorator object literal. Scans from the
 /// `class` keyword forward, tracking brace depth so that
 /// `@Component({...})` braces are skipped.
-fn find_class_body_open(raw: &str) -> Option<usize> {
+///
+// F-ANG-07: the function still uses `?` rather than `let-else`
+// (clippy::question_mark prefers `?` when the enclosing function
+// returns `Option` — both produce identical control flow but `?`
+// is the canonical idiom). The previous audit deferred this as
+// cosmetic; the new behaviour is byte-identical to the pre-audit
+// version. Promoting to `pub(crate)` is the substantive change so
+// Track D's `extract_class_blocks` rewrite can use it
+// (see `docs/FAANG_AUDIT_ANGULAR_DEFERRED_PLAN.md`).
+pub(crate) fn find_class_body_open(raw: &str) -> Option<usize> {
     let class_pos = raw.find("class ")?;
     let search_start = class_pos + 6;
     let bytes = raw.as_bytes();
@@ -515,7 +552,12 @@ fn find_class_body_open(raw: &str) -> Option<usize> {
     None
 }
 
-fn extract_class_name(raw: &str) -> String {
+// F-ANG-13: returns `None` when no class name can be found (was
+// `"(anonymous)"` literal — callers had to know to substitute `?`
+// for unknown names). Callers in `extract_decorators` and
+// `extract_graph_entries` now do the `?` substitution at the
+// call site, which the audit notes they did anyway.
+fn extract_class_name(raw: &str) -> Option<String> {
     if let Some(class_pos) = raw.find("class ") {
         let after = &raw[class_pos + 6..];
         let trimmed = after.trim_start();
@@ -524,10 +566,10 @@ fn extract_class_name(raw: &str) -> String {
             .unwrap_or(trimmed.len());
         let name = trimmed[..end].trim();
         if !name.is_empty() {
-            return name.to_string();
+            return Some(name.to_string());
         }
     }
-    "(anonymous)".to_string()
+    None
 }
 
 fn parse_object_literal(arg: &str) -> ComponentFields {
@@ -695,7 +737,11 @@ fn extract_constructor_injects(raw_class: &str) -> Option<Vec<String>> {
     }
 
     let open = ctor_paren?;
-    let (_, params) = consume_call_expression(raw_class, open);
+    // F-ANG-09: an unterminated constructor has no params (no
+    // injects to extract). Fall back to an empty param list.
+    let params = consume_call_expression(raw_class, open)
+        .map(|(_, p)| p)
+        .unwrap_or_default();
 
     let mut types: Vec<String> = Vec::new();
     for param in split_top_level_commas(&params) {
@@ -767,10 +813,15 @@ fn collect_field_decorators(body: &str) -> Vec<(DecoratorKind, Option<String>, S
             i += 1;
         }
         let mut arg = String::new();
+        // F-ANG-09: same pattern as `collect_decorators` — advance
+        // past `(` on unterminated call, use empty arg.
         if i < len && bytes[i] == b'(' {
-            let (consumed, arg_str) = consume_call_expression(body, i);
-            i += consumed;
-            arg = arg_str;
+            if let Some((consumed, arg_str)) = consume_call_expression(body, i) {
+                i += consumed;
+                arg = arg_str;
+            } else {
+                i += 1;
+            }
         }
         let kind = match name {
             "Input" => Some(DecoratorKind::Input),
@@ -825,12 +876,16 @@ fn unquote(s: &str) -> &str {
 ///
 /// Returns `(class_name, kind, selector, injects, pipe_name)` for
 /// the class, suitable for pushing into a `GraphCollector`.
+// F-ANG-12: use `?` since the enclosing function returns `Option`.
+// F-ANG-13: substitute `?` for missing class names at the call site.
+// (Same as `extract_decorators`; the `let-else` → `?` swap is
+// required by clippy::question_mark when both apply.)
 #[allow(clippy::type_complexity)]
 pub fn extract_graph_entries(raw_class: &str) -> Option<(String, ClassKind, Option<String>, Vec<String>, Option<String>)> {
-    let head_end = find_class_head_end(raw_class);
+    let head_end = find_class_head_end(raw_class)?;
     let head = &raw_class[..head_end];
 
-    let class_name = extract_class_name(raw_class);
+    let class_name = extract_class_name(raw_class).unwrap_or_else(|| "?".to_string());
     let decorators = collect_decorators(head);
 
     let mut injects: Vec<String> = Vec::new();
@@ -871,9 +926,11 @@ pub fn extract_graph_entries(raw_class: &str) -> Option<(String, ClassKind, Opti
     }
 
     // Also check for signal-based inject() calls.
-    if let Some(class_body_start) = find_class_body_open(raw_class) {
+    // F-ANG-08: skip the body scan if no matching `}` is found.
+    if let Some(class_body_start) = find_class_body_open(raw_class)
+        && let Some(body_end) = find_matching_brace(&raw_class[class_body_start..], 0)
+    {
         let body = &raw_class[class_body_start..];
-        let body_end = find_matching_brace(body, 0);
         let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
         for sf in collect_signal_fields(body_inner) {
             if let SignalKind::Inject = sf.kind {
