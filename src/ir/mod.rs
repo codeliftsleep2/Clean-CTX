@@ -20,6 +20,7 @@ pub mod wire;
 pub mod symbol_table;
 pub mod delta;
 pub mod replay;
+pub mod layers;
 
 // Re-export public types for downstream consumers.
 pub use opcodes::CoreOp;

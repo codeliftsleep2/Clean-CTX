@@ -60,6 +60,7 @@ pub struct SymbolEntry {
 /// Tracks all symbols across all files, with version-based change tracking.
 /// Provides efficient lookup by alias, original name, file membership, and
 /// version range.
+#[derive(Debug, Clone)]
 pub struct GlobalSymbolTable {
     /// Monotonically increasing version counter
     version: u64,
