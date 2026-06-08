@@ -1,8 +1,8 @@
 # Clean-CTX — Compiler IR: Structured State Protocol
 
 **Version:** 0.1.0 (Proposed)
-**Last updated:** 2026-06-08
-**Status:** Phase A Complete - Phase B Complete - Phase C Complete - Phase D Complete - Phase E Complete - Phase F Complete
+**Last updated:** 2026-06-08 (Phase G marked complete)
+**Status:** Phase A Complete - Phase B Complete - Phase C Complete - Phase D Complete - Phase E Complete - Phase F Complete - Phase G Complete
 
 > **Living document.** This spec defines the evolution from text-based compression to a structured intermediate representation (IR) with delta-based state transport. It serves as the implementation guideline for the Compiler IR subsystem.
 
@@ -73,7 +73,7 @@ Every compression is a full re-parse. The diff system computes deltas between st
 │  Layer 4: Application Patterns + Positional Encoding    │
 │  Pattern recognition, key stripping, positional tuples  │
 │                                                         │
-│  ["DEF_C","C1"] ["DEF_M","C1","M1"] ["SIG","M1","P1",  │
+│  ["DEF_C","C1"] ["DEF_M","C1","M1"] ["SIG","M1","P1",   │
 │   "$s","payload"]                                       │
 ├─────────────────────────────────────────────────────────┤
 │  Layer 3: Meta-Layer (Framework-Specific)               │
@@ -90,7 +90,7 @@ Every compression is a full re-parse. The diff system computes deltas between st
 │  Universal instruction set — every language compiles    │
 │  down to these operations                               │
 │                                                         │
-│  DEF_C, DEF_M, DEF_F, SIG, RET, FLAGS, EXT, IMP, IMP   │
+│  DEF_C, DEF_M, DEF_F, SIG, RET, FLAGS, EXT, IMP, IMP    │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -1426,15 +1426,44 @@ Wire the IR system into the MCP tool interface, maintaining backward compatibili
 }
 ```
 
+**Status: ✅ Complete** — implemented 2026-06-08
+
 ### Completion Criteria
 
-- [ ] `compress_code_context` tool output includes `ir` field alongside `pretty`
-- [ ] `delta_code_context` tool computes and returns `IRDelta` envelope
-- [ ] `apply_delta` tool applies delta and returns updated state
-- [ ] Backward compatibility: existing `compress_code_context` `pretty` field is byte-identical to current output
-- [ ] MCP tool schemas updated for new tools
-- [ ] Integration test: compress → edit → delta → apply → render matches expected
-- [ ] `cargo clippy --all-targets -- -D warnings` passes
+- [x] `compress_code_context` tool output includes `ir` field alongside `pretty`
+- [x] `delta_code_context` tool computes and returns `IRDelta` envelope
+- [x] `apply_delta` tool applies delta and returns updated state
+- [x] Backward compatibility: existing `compress_code_context` `pretty` field is byte-identical to current output
+- [x] MCP tool schemas updated for new tools
+- [x] Integration test: compress → edit → delta → apply → render matches expected
+- [x] `cargo clippy --all-targets -- -D warnings` passes
+
+### Implementation Summary
+
+**Files modified:**
+
+| File | Change |
+|------|--------|
+| `src/mcp/tools.rs` | Added `delta_code_context` and `apply_delta` tool definitions + handlers; upgraded `compress_code_context` to also emit `ir` field; added `compile_file_ir()` helper. Refactored into per-tool handler functions. |
+| `src/mcp/state.rs` | Added `ir_context: ContextState` field to `McpState` for in-session IR delta tracking. |
+| `src/ir/layers/angular.rs` | Fixed pre-existing clippy warnings (`needless_borrow`). |
+| `src/ir/layers/patterns.rs` | Fixed pre-existing clippy warnings (`collapsible_match`, `needless_range_loop`). |
+| `src/tests/ir/layers/patterns.rs` | Fixed pre-existing dead-code warning. |
+
+**Files added:**
+
+| File | Purpose |
+|------|---------|
+| `src/tests/ir/integration.rs` | Phase G end-to-end tests: full pipeline, state replay, wire format, delta computer with state. |
+| `src/tests/ir/mod.rs` | Test module wiring for the new integration tests. |
+
+**Key design decisions:**
+
+1. **`McpState.ir_context`** — The new `ContextState` is held inside the existing per-session `McpState` (alongside `dict`, `cache`, `config`) so handlers can mutate it via `&mut McpState` — no signature changes to the existing dispatch chain.
+2. **Backward compatibility** — The upgraded `compress_code_context` keeps the original `compress_file()` text output and *adds* `ir`, `pretty`, `v`, and `file` fields. Old clients that only read `content` see byte-identical text.
+3. **`delta_code_context` first call** — When no baseline IR exists, the handler compiles the current IR and stores it as the baseline. Subsequent calls compute the `IRDelta` envelope using the existing `DeltaComputer`.
+4. **`apply_delta` validation** — The handler does a pre-flight version check against `currentVersion` to fail fast on stale deltas, then delegates to `ContextState::apply()` for the actual mutation.
+5. **`compile_file_ir` helper** — Detects the language from the file extension, looks up the tree-sitter query via `language_for_extension`, runs the existing `IRCompiler::compile`, and returns a `CompiledIR` ready to load or diff.
 
 ---
 

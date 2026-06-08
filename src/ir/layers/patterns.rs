@@ -94,12 +94,10 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
 
     // First instruction must be DefMethod with "constructor" or class name
     let (_, method_id, _name) = match &slice[0] {
-        CoreOp::DefMethod(cid, mid, name) => {
-            if name == "constructor" || name == "new" {
-                (cid, mid, name)
-            } else {
-                return None;
-            }
+        CoreOp::DefMethod(cid, mid, name)
+            if name == "constructor" || name == "new" =>
+        {
+            (cid, mid, name)
         }
         _ => return None,
     };
@@ -129,18 +127,19 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
     let mut has_observable_return = false;
     let mut has_async_flag = false;
 
-    for i in 1..slice.len().min(6) {
-        match &slice[i] {
+    for op in slice.iter().skip(1).take(5) {
+        match op {
             CoreOp::Return(_, ty) => {
                 if ty == "$P" || ty.contains("Promise") || ty.contains("Observable") {
                     has_observable_return = true;
                 }
             }
-            CoreOp::Flags(tid, flags) => {
-                if tid == &method_id && flags.contains(&"ASYNC".to_string()) {
-                    has_async_flag = true;
-                }
+            CoreOp::Flags(tid, flags)
+                if *tid == method_id && flags.contains(&"ASYNC".to_string()) =>
+            {
+                has_async_flag = true;
             }
+            CoreOp::Flags(..) => {}
             _ => {}
         }
     }

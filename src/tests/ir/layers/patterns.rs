@@ -23,10 +23,6 @@ fn make_flags(tid: &str, flags: Vec<&str>) -> CoreOp {
     CoreOp::Flags(tid.into(), flags.iter().map(|s| s.to_string()).collect())
 }
 
-fn make_injects(cid: &str, deps: Vec<&str>) -> CoreOp {
-    CoreOp::Injects(cid.into(), deps.iter().map(|s| s.to_string()).collect())
-}
-
 // ── Constructor Pattern Tests ─────────────────────────
 
 #[test]

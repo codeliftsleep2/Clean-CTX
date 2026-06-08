@@ -21,6 +21,7 @@ use crate::angular_meta::graph_state::AngularGraphHandle;
 use crate::cache::LocalStateCache;
 use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
+use crate::ir::replay::ContextState;
 
 /// Per-session state shared by all MCP tool handlers.
 pub struct McpState {
@@ -38,6 +39,10 @@ pub struct McpState {
     /// Built once per `compress_workspace` call; `None` when no
     /// workspace has been compressed yet.
     pub angular_graph: AngularGraphHandle,
+    /// Compiler IR context state — tracks all files and their IR state.
+    /// Enables delta-based state transport: load full IR on first
+    /// compress, then apply deltas on subsequent edits.
+    pub ir_context: ContextState,
 }
 
 impl McpState {
@@ -49,6 +54,7 @@ impl McpState {
             cache: LocalStateCache::new(),
             config,
             angular_graph: AngularGraphHandle::new(),
+            ir_context: ContextState::new(),
         }
     }
 
@@ -60,5 +66,10 @@ impl McpState {
     /// Borrow the cache mutably.
     pub fn cache_mut(&mut self) -> &mut LocalStateCache {
         &mut self.cache
+    }
+
+    /// Borrow the IR context mutably.
+    pub fn ir_context_mut(&mut self) -> &mut ContextState {
+        &mut self.ir_context
     }
 }
