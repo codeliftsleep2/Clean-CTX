@@ -10,10 +10,24 @@
 // The output is a single-line shape summary suitable for a `Φtpl:`
 // marker in the workspace manifest.
 
+use std::sync::OnceLock;
 use tree_sitter::{Language, Parser};
 
 /// Default maximum nesting depth for tag extraction.
 const DEFAULT_DEPTH: usize = 4;
+
+/// Cached tree-sitter `Language` (F-ANG-18). `tree_sitter_html::language()`
+/// is a pure function that returns a `static` pointer, but caching the
+/// result in a `OnceLock` lets us:
+/// 1. Avoid the function call overhead per `extract_template_shape`.
+/// 2. Make the call site look like a `static LANG: Language`.
+///
+/// We keep a fresh `Parser` per call (parsers hold mutable state and
+/// are not `Sync`), but the `Language` is immutable and thread-safe.
+fn html_language() -> &'static Language {
+    static LANG: OnceLock<Language> = OnceLock::new();
+    LANG.get_or_init(tree_sitter_html::language)
+}
 
 /// Structural shape of an Angular template, suitable for a one-line
 /// summary in the workspace manifest.
@@ -131,9 +145,8 @@ pub fn extract_template_shape_with_depth(html: &str, depth: usize) -> TemplateSh
         return shape;
     }
 
-    let language = tree_sitter_html_language();
     let mut parser = Parser::new();
-    parser.set_language(language).ok();
+    parser.set_language(*html_language()).ok();
     let tree = match parser.parse(html.as_bytes(), None) {
         Some(t) => t,
         None => return shape,
@@ -507,11 +520,6 @@ fn extract_attributes(
 
         capture_attribute(&attr_name, shape);
     }
-}
-
-/// Get the tree-sitter Language for HTML.
-fn tree_sitter_html_language() -> Language {
-    tree_sitter_html::language()
 }
 
 #[cfg(test)]

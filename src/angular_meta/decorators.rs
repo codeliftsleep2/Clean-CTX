@@ -25,6 +25,7 @@ use crate::angular_meta::markers::{
     build_model_line, build_module_line, build_output_line, build_pipe_line, build_service_line,
     ComponentFields,
 };
+use crate::compression::Fidelity;
 
 /// Extract every Angular decorator on the given class capture and
 /// emit the corresponding `Φ` marker lines. Returns `None` if no
@@ -32,7 +33,17 @@ use crate::angular_meta::markers::{
 ///
 /// `raw_class` is the text of a `class_declaration` capture as
 /// produced by the TS capture pipeline.
-pub fn extract_decorators(raw_class: &str) -> Option<Vec<String>> {
+///
+/// `fidelity` (F-ANG-23) controls the verbosity of the output:
+/// - `Low`    → only class-level summaries (`@Component`,
+///   `@Injectable`, `@Directive`, `@Pipe`, `@NgModule`). No
+///   field-level `@Input` / `@Output`, no `Φinjects:`, no
+///   signal-based lines.
+/// - `Medium` → add field-level `@Input` / `@Output` markers; skip
+///   `Φinjects:` (the class summary already shows the class).
+/// - `High`   → emit everything including `Φinjects:` and the
+///   modern `input()`/`output()`/`model()`/`inject()` signal lines.
+pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Vec<String>> {
     let head_end = find_class_head_end(raw_class);
     let head = &raw_class[..head_end];
 
@@ -71,12 +82,16 @@ pub fn extract_decorators(raw_class: &str) -> Option<Vec<String>> {
                 pipe_emit = Some(build_pipe_line(&class_name, name.as_deref()));
             }
             DecoratorKind::Input => {
-                let alias = parse_first_string_arg(&dec.arg);
-                input_output_lines.push(build_input_line("?", alias.as_deref()));
+                if fidelity != Fidelity::Low {
+                    let alias = parse_first_string_arg(&dec.arg);
+                    input_output_lines.push(build_input_line("?", alias.as_deref()));
+                }
             }
             DecoratorKind::Output => {
-                let alias = parse_first_string_arg(&dec.arg);
-                input_output_lines.push(build_output_line("?", alias.as_deref()));
+                if fidelity != Fidelity::Low {
+                    let alias = parse_first_string_arg(&dec.arg);
+                    input_output_lines.push(build_output_line("?", alias.as_deref()));
+                }
             }
             DecoratorKind::Other => {}
         }
@@ -85,19 +100,21 @@ pub fn extract_decorators(raw_class: &str) -> Option<Vec<String>> {
     // Field-level markers: scan the class body for
     // `@Input(...)` / `@Output(...)` decorators attached to
     // individual field declarations.
-    if let Some(class_body_start) = find_class_body_open(raw_class) {
-        let body = &raw_class[class_body_start..];
-        let body_end = find_matching_brace(body, 0);
-        let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-        for (kind, alias, field_name) in collect_field_decorators(body_inner) {
-            match kind {
-                DecoratorKind::Input => {
-                    input_output_lines.push(build_input_line(&field_name, alias.as_deref()));
+    if fidelity != Fidelity::Low {
+        if let Some(class_body_start) = find_class_body_open(raw_class) {
+            let body = &raw_class[class_body_start..];
+            let body_end = find_matching_brace(body, 0);
+            let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
+            for (kind, alias, field_name) in collect_field_decorators(body_inner) {
+                match kind {
+                    DecoratorKind::Input => {
+                        input_output_lines.push(build_input_line(&field_name, alias.as_deref()));
+                    }
+                    DecoratorKind::Output => {
+                        input_output_lines.push(build_output_line(&field_name, alias.as_deref()));
+                    }
+                    _ => {}
                 }
-                DecoratorKind::Output => {
-                    input_output_lines.push(build_output_line(&field_name, alias.as_deref()));
-                }
-                _ => {}
             }
         }
     }
@@ -120,33 +137,36 @@ pub fn extract_decorators(raw_class: &str) -> Option<Vec<String>> {
 
     // --- Phase 2.5b: Signal-based function calls ---
     // Detect `input()`, `output()`, `model()`, and `inject()` function
-    // calls in the class body (Angular 17.1+ signal API).
+    // calls in the class body (Angular 17.1+ signal API). High
+    // fidelity only (F-ANG-23) — these are the most verbose lines.
     let mut inject_fn_types: Vec<String> = Vec::new();
-    if let Some(class_body_start) = find_class_body_open(raw_class) {
-        let body = &raw_class[class_body_start..];
-        let body_end = find_matching_brace(body, 0);
-        let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-        for sf in collect_signal_fields(body_inner) {
-            match sf.kind {
-                SignalKind::Input => {
-                    let mut line = build_input_line(&sf.name, sf.alias.as_deref());
-                    if !line.ends_with(" signal") {
-                        line.push_str(" signal");
+    if fidelity == Fidelity::High {
+        if let Some(class_body_start) = find_class_body_open(raw_class) {
+            let body = &raw_class[class_body_start..];
+            let body_end = find_matching_brace(body, 0);
+            let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
+            for sf in collect_signal_fields(body_inner) {
+                match sf.kind {
+                    SignalKind::Input => {
+                        let mut line = build_input_line(&sf.name, sf.alias.as_deref());
+                        if !line.ends_with(" signal") {
+                            line.push_str(" signal");
+                        }
+                        input_output_lines.push(line);
                     }
-                    input_output_lines.push(line);
-                }
-                SignalKind::Output => {
-                    let mut line = build_output_line(&sf.name, sf.alias.as_deref());
-                    if !line.ends_with(" signal") {
-                        line.push_str(" signal");
+                    SignalKind::Output => {
+                        let mut line = build_output_line(&sf.name, sf.alias.as_deref());
+                        if !line.ends_with(" signal") {
+                            line.push_str(" signal");
+                        }
+                        input_output_lines.push(line);
                     }
-                    input_output_lines.push(line);
-                }
-                SignalKind::Model => {
-                    lines.push(build_model_line(&sf.name, sf.alias.as_deref()));
-                }
-                SignalKind::Inject => {
-                    inject_fn_types.push(sf.name.clone());
+                    SignalKind::Model => {
+                        lines.push(build_model_line(&sf.name, sf.alias.as_deref()));
+                    }
+                    SignalKind::Inject => {
+                        inject_fn_types.push(sf.name.clone());
+                    }
                 }
             }
         }
@@ -162,7 +182,10 @@ pub fn extract_decorators(raw_class: &str) -> Option<Vec<String>> {
 
     lines.extend(input_output_lines);
 
-    if let Some(types) = extract_constructor_injects(raw_class)
+    // Φinjects: is high-fidelity only (F-ANG-23). Medium already
+    // shows the class summary line which carries the type.
+    if fidelity == Fidelity::High
+        && let Some(types) = extract_constructor_injects(raw_class)
         && !types.is_empty()
     {
         lines.push(build_injects_line(&types));

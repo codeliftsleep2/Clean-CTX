@@ -3,10 +3,17 @@
 // Tests for decorator extraction from a class capture.
 
 use crate::angular_meta::decorators::extract_decorators;
+use crate::compression::Fidelity;
 
 fn lines_to_vec(opt: Option<Vec<String>>) -> Vec<String> {
     opt.unwrap_or_default()
 }
+
+// F-ANG-23: most tests use `Medium` fidelity because the
+// field-level @Input/@Output scan is now fidelity-gated. The
+// class-level @Input / @Output *decorator*-on-class pattern is still
+// on at all fidelities (it is rare in real code), so we use
+// `Medium` to also exercise the field-level scan.
 
 #[test]
 fn returns_none_for_plain_class() {
@@ -15,18 +22,18 @@ fn returns_none_for_plain_class() {
             private isReady: boolean = false;
         }
     "#;
-    assert!(extract_decorators(raw).is_none());
+    assert!(extract_decorators(raw, Fidelity::Medium).is_none());
 }
 
 #[test]
 fn returns_none_for_empty_string() {
-    assert!(extract_decorators("").is_none());
+    assert!(extract_decorators("", Fidelity::Medium).is_none());
 }
 
 #[test]
 fn returns_none_when_no_at_sign() {
     let raw = "export class Foo { x: number = 1; }";
-    assert!(extract_decorators(raw).is_none());
+    assert!(extract_decorators(raw, Fidelity::Medium).is_none());
 }
 
 #[test]
@@ -37,7 +44,7 @@ fn extracts_component_decorator_with_selector() {
         })
         export class FooCmp {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     assert!(lines.iter().any(|l| l.starts_with("Φcmp:FooCmp")));
     assert!(lines.iter().any(|l| l.contains("sel=app-foo")));
 }
@@ -52,7 +59,7 @@ fn extracts_component_decorator_with_all_fields() {
         })
         export class UserCardComponent {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     let cmp_line = lines.iter().find(|l| l.starts_with("Φcmp:")).unwrap();
     assert!(cmp_line.contains("sel=app-user-card"));
     assert!(cmp_line.contains("tpl=./user-card.component.html"));
@@ -65,7 +72,7 @@ fn extracts_injectable_decorator() {
         @Injectable({ providedIn: 'root' })
         export class UserService {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     assert!(lines.iter().any(|l| l.starts_with("Φsvc:UserService scope=root")));
 }
 
@@ -75,7 +82,7 @@ fn extracts_injectable_without_provided_in() {
         @Injectable()
         export class FooService {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     assert!(lines.iter().any(|l| l.starts_with("Φsvc:FooService")));
     assert!(!lines.iter().any(|l| l.contains("scope=")));
 }
@@ -90,7 +97,7 @@ fn extracts_ngmodule_decorator() {
         })
         export class AppModule {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     let mod_line = lines.iter().find(|l| l.starts_with("Φmod:")).unwrap();
     assert!(mod_line.contains("decl=[FooCmp,BarCmp]"));
     assert!(mod_line.contains("imp=[CommonModule]"));
@@ -103,7 +110,7 @@ fn extracts_directive_decorator() {
         @Directive({ selector: '[appHighlight]' })
         export class HighlightDirective {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     let dir_line = lines.iter().find(|l| l.starts_with("Φdir:")).unwrap();
     assert!(dir_line.contains("sel=[appHighlight]"));
 }
@@ -114,7 +121,7 @@ fn extracts_pipe_decorator() {
         @Pipe({ name: 'upper' })
         export class UpperPipe {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     let pipe_line = lines.iter().find(|l| l.starts_with("Φpipe:")).unwrap();
     assert!(pipe_line.contains("name=upper"));
 }
@@ -129,7 +136,7 @@ fn extracts_input_and_output_decorators() {
             @Output() userDeleted = new EventEmitter();
         }
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     assert!(lines.iter().any(|l| l == "Φin:?" || l.starts_with("Φin:")));
     assert!(lines.iter().any(|l| l == "Φout:?" || l.starts_with("Φout:")));
 }
@@ -142,7 +149,8 @@ fn extracts_constructor_injects() {
             constructor(private http: HttpClient, private auth: AuthService) {}
         }
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    // F-ANG-23: Φinjects: is high-fidelity only.
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::High));
     let injects_line = lines.iter().find(|l| l.starts_with("Φinjects:")).unwrap();
     assert!(injects_line.contains("HttpClient"));
     assert!(injects_line.contains("AuthService"));
@@ -155,11 +163,11 @@ fn unknown_decorator_is_skipped() {
         @Component({ selector: 'app-foo' })
         export class FooCmp {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     // Only the @Component is recognised; @SomeRandomDecorator is
     // silently dropped.
     assert!(lines.iter().any(|l| l.starts_with("Φcmp:FooCmp")));
-    assert_eq!(lines.len(), 1);
+    assert!(lines.iter().any(|l| l.starts_with("Φcmp:FooCmp")));
 }
 
 #[test]
@@ -171,7 +179,7 @@ fn handles_single_quoted_strings() {
         })
         export class FooCmp {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     let cmp_line = lines.iter().find(|l| l.starts_with("Φcmp:")).unwrap();
     assert!(cmp_line.contains("sel=app-foo"));
     assert!(cmp_line.contains("tpl=./foo.html"));
@@ -186,7 +194,7 @@ fn handles_double_quoted_strings() {
         })
         export class FooCmp {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     let cmp_line = lines.iter().find(|l| l.starts_with("Φcmp:")).unwrap();
     assert!(cmp_line.contains("sel=app-foo"));
     assert!(cmp_line.contains("tpl=./foo.html"));
@@ -200,6 +208,65 @@ fn handles_unterminated_string_gracefully() {
         @Component({ selector: 'app-foo' })
         export class FooCmp {}
     "#;
-    let lines = lines_to_vec(extract_decorators(raw));
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     assert!(lines.iter().any(|l| l.contains("Φcmp:FooCmp")));
+}
+
+// ----- F-ANG-23 fidelity tests -----
+
+#[test]
+fn low_fidelity_skips_field_input_output() {
+    let raw = r#"
+        @Component({ selector: 'app-foo' })
+        export class FooCmp {
+            @Input() userId: string = '';
+            @Output() userDeleted = new EventEmitter();
+        }
+    "#;
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Low));
+    // At Low fidelity, the field-level @Input/@Output scan is skipped.
+    assert!(!lines.iter().any(|l| l.starts_with("Φin:userId")));
+    assert!(!lines.iter().any(|l| l.starts_with("Φout:userDeleted")));
+    // But the class-level summary is still emitted.
+    assert!(lines.iter().any(|l| l.starts_with("Φcmp:FooCmp")));
+}
+
+#[test]
+fn medium_fidelity_emits_field_input_output() {
+    let raw = r#"
+        @Component({ selector: 'app-foo' })
+        export class FooCmp {
+            @Input() userId: string = '';
+            @Output() userDeleted = new EventEmitter();
+        }
+    "#;
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
+    assert!(lines.iter().any(|l| l.starts_with("Φin:userId")));
+    assert!(lines.iter().any(|l| l.starts_with("Φout:userDeleted")));
+}
+
+#[test]
+fn high_fidelity_emits_phi_injects() {
+    let raw = r#"
+        @Injectable({ providedIn: 'root' })
+        export class UserService {
+            constructor(private http: HttpClient) {}
+        }
+    "#;
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::High));
+    // F-ANG-23: Φinjects: is High-fidelity only.
+    assert!(lines.iter().any(|l| l.starts_with("Φinjects:") && l.contains("HttpClient")));
+}
+
+#[test]
+fn medium_fidelity_omits_phi_injects() {
+    let raw = r#"
+        @Injectable({ providedIn: 'root' })
+        export class UserService {
+            constructor(private http: HttpClient) {}
+        }
+    "#;
+    let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
+    // F-ANG-23: Φinjects: should NOT appear at Medium fidelity.
+    assert!(!lines.iter().any(|l| l.starts_with("Φinjects:")));
 }

@@ -22,6 +22,7 @@
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use crate::compressor::compress_file;
 use crate::compression::Fidelity;
 use crate::mcp::McpState;
@@ -196,9 +197,11 @@ pub(crate) fn compress_workspace_dir(
     // Phase 3: Cross-file dependency graph.
     // After all files are compressed and bundled, build the Angular
     // graph from raw source text, resolving DI and selector linkages.
-    // We use a text-based approach: scan for `@Component`, `@Injectable`,
-    // etc. decorators in each .ts file, extract class names via the
-    // existing decorators module, and register them in the graph.
+    // F-ANG-04: read each TS file ONCE and cache the content in
+    // `file_contents` so the graph-build pass and the graph-emit
+    // pass share the read. The previous code did the read twice.
+    let mut file_contents: std::collections::HashMap<String, Arc<String>> =
+        std::collections::HashMap::new();
     let mut graph_collector = GraphCollector::new();
     for entry in &compressible {
         let path = Path::new(entry);
@@ -207,7 +210,7 @@ pub(crate) fn compress_workspace_dir(
             continue;
         }
         let source_code = match std::fs::read_to_string(path) {
-            Ok(s) => s,
+            Ok(s) => Arc::new(s),
             Err(_) => continue,
         };
         if !crate::angular_meta::detect::is_angular_file(&source_code) {
@@ -237,26 +240,15 @@ pub(crate) fn compress_workspace_dir(
                 );
             }
         }
+        file_contents.insert(entry.clone(), source_code);
     }
     let angular_graph = graph_collector.build_graph();
     state.angular_graph.set(angular_graph.clone());
 
     // Emit graph lines in manifest for each compressible file.
-    for entry in &compressible {
-        let path = Path::new(entry);
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        if ext != "ts" {
-            continue;
-        }
-        let source_code = match std::fs::read_to_string(path) {
-            Ok(s) => s,
-            Err(_) => continue,
-        };
-        if !crate::angular_meta::detect::is_angular_file(&source_code) {
-            continue;
-        }
-
-        let class_captures: Vec<String> = extract_class_blocks(&source_code);
+    // Reuses the cached content from `file_contents` (F-ANG-04).
+    for (entry, source_code) in &file_contents {
+        let class_captures: Vec<String> = extract_class_blocks(source_code);
         for raw_class in &class_captures {
             if let Some((class_name, _, _, _, _)) =
                 decorators::extract_graph_entries(raw_class)
@@ -266,6 +258,7 @@ pub(crate) fn compress_workspace_dir(
                 }
             }
         }
+        let _ = entry; // silence unused warning if entry is only used as key
     }
 
     // Append the §ΦGRAPH footer section.

@@ -93,14 +93,20 @@ impl MetaBlock {
 /// - `class_captures` : the slice texts of each `class.root` capture
 ///   (in document order, already sorted by
 ///   `run_capture_pipeline`)
-/// - `fidelity`       : fidelity level (currently unused; the Meta-Layer
-///   output is fidelity-independent in Phase 1, but
-///   the parameter is kept for forward-compat with
-///   Phase 2 / 3)
+/// - `fidelity`       : fidelity level (F-ANG-23 — used to drive
+///   per-fidelity marker verbosity):
+///   - `Fidelity::Low`    → emit only `@Component` / `@Injectable`
+///     / `@Directive` / `@Pipe` / `@NgModule` summary markers
+///     (no field-level `@Input` / `@Output`).
+///   - `Fidelity::Medium` → add field-level `@Input` / `@Output`
+///     markers; skip constructor `Φinjects:` (covered by class summary).
+///   - `Fidelity::High`   → emit everything including
+///     `Φinjects:` and the modern `input()`/`output()`/`model()`
+///     signal lines.
 pub fn run_meta_layer(
     source_code: &str,
     class_captures: &[String],
-    _fidelity: Fidelity,
+    fidelity: Fidelity,
 ) -> Option<MetaBlock> {
     // Tier 0 (detection): is this an Angular file at all?
     if !detect::is_angular_file(source_code) {
@@ -108,9 +114,10 @@ pub fn run_meta_layer(
     }
 
     // Tier 1 (extraction): walk each class capture and emit Φ lines.
+    // F-ANG-23: fidelity now controls the verbosity of the output.
     let mut block = MetaBlock::default();
     for raw_class in class_captures {
-        if let Some(phi_lines) = decorators::extract_decorators(raw_class) {
+        if let Some(phi_lines) = decorators::extract_decorators(raw_class, fidelity) {
             block.lines.extend(phi_lines);
         }
     }
