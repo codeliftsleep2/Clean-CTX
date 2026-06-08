@@ -414,7 +414,7 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — 0 warnings |
-| Tests | ✅ 279+ passing |
+| Tests | ✅ 301+ passing |
 | Audit | ✅ FAANG-level audit — all 41 findings resolved |
 | Largest file | ~170 lines (down from 913) |
 | Unsafe code | 0 blocks |
