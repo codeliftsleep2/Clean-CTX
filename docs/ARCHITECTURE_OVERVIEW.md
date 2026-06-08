@@ -132,11 +132,17 @@ src/
 │   ├── import.rs                 # compact_import, extract_import_names
 │   └── expression.rs             # compact_expression, simple_compact
 │
+├── angular_meta/                 # Angular Meta-Layer (Phase 1: Tier 1)
+│   ├── mod.rs                    # MetaBlock struct, run_meta_layer entry point
+│   ├── detect.rs                 # Angular detection heuristic
+│   ├── decorators.rs             # @Component / @Injectable / @NgModule / etc. extractor
+│   └── markers.rs                # Φ marker construction & expansion
+│
 ├── decompression/                # Opcode → readable expansion
 │   ├── mod.rs
 │   ├── decompressor.rs           # Decompressor struct (F-15: precomputed opcodes)
 │   ├── opcodes.rs                # Re-exports shared opcode table
-│   ├── markers.rs                # Shared marker expansion
+│   ├── markers.rs                # Shared marker expansion + Φ marker re-export
 │   └── walker.rs                 # Line-by-line section walker
 │
 ├── dictionary/                   # Symbol and path registries
@@ -190,6 +196,43 @@ The `LocalStateCache` serves double duty:
 
 ---
 
+## Angular Meta-Layer (Phase 1)
+
+The Meta-Layer is **purely additive** — it never modifies the existing TS compaction output. It only appends a `Φ` block below the existing compacted class. Non-Angular files pay zero overhead.
+
+```
+     Source Code
+          │
+          ▼
+┌─────────────────────┐
+│   Angular Detect    │  is_angular_file() — strong + weak decorator signals
+└─────────┬───────────┘
+          │ (Angular file)
+          ▼
+┌─────────────────────┐
+│ Decorator Extract   │  @Component, @Injectable, @NgModule, @Directive, @Pipe
+│ + Field I/O Scan    │  @Input, @Output fields + constructor injection
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ Φ Marker Emit       │  Φcmp:, Φsvc:, Φmod:, Φdir:, Φpipe:, Φin:, Φout:, Φinjects:
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ Append to body      │  // --- Φ Angular Meta --- block after compacted class
+└─────────────────────┘
+```
+
+**Module:** `src/angular_meta/` — `mod.rs`, `detect.rs`, `decorators.rs`, `markers.rs`
+
+**Marker vocabulary:** `Φcmp:`, `Φdir:`, `Φpipe:`, `Φsvc:`, `Φmod:`, `Φin:`, `Φout:`, `Φinjects:`
+
+**Config:** `meta_layers.angular.enabled` in `.clean-ctx.json` (default: on)
+
+---
+
 ## Measured Compression Performance
 
 All numbers below were produced by the `compress_code_context` tool on the two in-repo TypeScript fixtures, using the **cl100k BPE** estimator (`tiktoken-rs`). "Raw tokens" is the encoded length of the source file as-is; "Retained tokens" is the encoded length of the compressed output (including the report header, the `§PATHMAP` footer, and all behavior markers).
@@ -239,7 +282,7 @@ This codebase underwent a comprehensive FAANG-level audit (41 findings across 5 
 
 **Key results:**
 - `cargo clippy --all-targets -- -D warnings`: 0 warnings
-- `cargo test`: 121/121 passing
+- `cargo test`: 172/172 passing (includes 50 Angular Meta-Layer tests)
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks

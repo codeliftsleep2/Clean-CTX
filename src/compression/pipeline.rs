@@ -29,6 +29,7 @@ use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
 use crate::dictionary::PathDictionary;
+use crate::angular_meta::run_meta_layer;
 
 /// Output of [`build_output_lines`]. F-04 (FAANG audit): previously
 /// the orchestrator counted classes/methods/imports by
@@ -47,6 +48,8 @@ pub struct BuildOutputResult {
     /// Number of `import.root` captures that produced a non-empty
     /// import line.
     pub import_count: usize,
+    /// Angular Meta-Layer block (Phase 1: Tier 1 decorator extraction).
+    pub meta_block: Option<crate::angular_meta::MetaBlock>,
 }
 
 /// Reads a target source file and compiles it down into a highly compacted,
@@ -151,7 +154,12 @@ pub fn compress_file(
 
     // F-04: `build_output_lines` now returns real counts.
     let built = build_output_lines(&all_captures, &source_code, fidelity);
-    let body_content = assemble_body(&built.output_lines, fidelity);
+    let mut body_content = assemble_body(&built.output_lines, fidelity);
+    // Angular Meta-Layer (Phase 1): inject the Φ block into the body
+    // BEFORE symbol compression so the `Φ` markers stay untouched.
+    if let Some(block) = &built.meta_block {
+        body_content.push_str(&block.render());
+    }
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
     let compacted_body = format_compacted_body(&display_body, &sym_footer, &path_alias, fidelity);
     // F-14: store the raw-token count for this content hash so the
@@ -194,6 +202,7 @@ pub fn build_output_lines(
     let mut class_count: usize = 0;
     let mut method_count: usize = 0;
     let mut import_count: usize = 0;
+    let mut class_captures: Vec<String> = Vec::new();
 
     for cap in all_captures {
         match cap.name.as_str() {
@@ -209,6 +218,7 @@ pub fn build_output_lines(
                     output_lines.push(String::new());
                 }
                 output_lines.push(format_class_entry(&cap.text, &fields, fidelity));
+                class_captures.push(cap.text.clone());
                 class_count += 1;
                 fields.clear();
                 markers.clear();
@@ -274,11 +284,17 @@ pub fn build_output_lines(
         };
         output.insert(0, import_block);
     }
+    let meta_block = run_meta_layer(
+        source_code,
+        &class_captures,
+        fidelity,
+    );
     BuildOutputResult {
         output_lines: output,
         class_count,
         method_count,
         import_count,
+        meta_block,
     }
 }
 
@@ -294,3 +310,5 @@ pub fn assemble_body(output_lines: &[String], fidelity: Fidelity) -> String {
 #[cfg(test)]
 #[path = "../tests/compression/pipeline.rs"]
 mod tests;
+
+

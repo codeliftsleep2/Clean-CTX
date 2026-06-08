@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use super::markers::expand_markers_in_line;
+use super::markers::{expand_markers_in_line, expand_phi_in_line};
 use super::opcodes::builtin_opcode_map;
 use super::walker::is_section_start;
 
@@ -169,8 +169,13 @@ impl Decompressor {
                 expanded = word_boundary_replace(&expanded, opcode, token);
             }
 
-            // Expand markers to human-readable comments
+            // Expand behavior markers (⊕…) to human-readable comments.
             expanded = expand_markers_in_line(&expanded);
+            // Phase 1 (Angular Meta-Layer): expand framework meta
+            // markers (Φcmp: → @Component, Φsvc: → @Injectable, etc.)
+            // alongside the behavior markers so the decompressed output
+            // is fully human-readable.
+            expanded = expand_phi_in_line(&expanded);
 
             let cleaned = expanded.trim().to_string();
             if !cleaned.is_empty() {
@@ -216,3 +221,5 @@ impl Decompressor {
 #[cfg(test)]
 #[path = "../tests/decompression/decompressor.rs"]
 mod integration_tests;
+
+

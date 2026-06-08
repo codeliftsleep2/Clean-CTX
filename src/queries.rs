@@ -18,6 +18,16 @@ pub const TS_QUERY: &str = r#"
     (while_statement) @while.root
     (return_statement) @return.root
     (import_statement) @import.root
+    ; --- Angular Meta-Layer Phase 1 forward-compat captures ---
+    ; These captures expose decorator/object AST nodes for downstream
+    ; consumers. In Phase 1 the string-based Tier 1 extractor does
+    ; not need them, but they are available via the standard capture
+    ; pipeline. The default per-capture closure runs them through
+    ; `compact_expression`, which is a safe no-op for these nodes.
+    ; NOTE: `decorator_call_expression` is NOT a valid
+    ; tree-sitter-typescript node type and must not be added here.
+    (decorator) @decorator.root
+    (object) @object.root
 "#;
 
 pub const CS_QUERY: &str = r#"
