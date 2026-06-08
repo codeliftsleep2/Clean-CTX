@@ -218,6 +218,58 @@ fn compress_constructor_with_injects_no_params() {
 }
 
 #[test]
+fn compress_init_constructor_name() {
+    let ops = vec![
+        defmethod("C1", "M1", "__init__"),
+        param("M1", "P1", "$s", "x"),
+        ret("M1", "$v"),
+    ];
+    let rec = CompressingPatternRecognizer::new();
+    let (pats, _) = rec.compress(&ops);
+    assert_eq!(pats.len(), 1);
+    assert!(matches!(&pats[0], PatternOp::Constructor { .. }));
+}
+
+#[test]
+fn compress_initialize_constructor_name() {
+    let ops = vec![
+        defmethod("C1", "M1", "initialize"),
+        param("M1", "P1", "$s", "x"),
+        ret("M1", "$v"),
+    ];
+    let rec = CompressingPatternRecognizer::new();
+    let (pats, _) = rec.compress(&ops);
+    assert_eq!(pats.len(), 1);
+    assert!(matches!(&pats[0], PatternOp::Constructor { .. }));
+}
+
+#[test]
+fn compress_ctor_constructor_name() {
+    let ops = vec![
+        defmethod("C1", "M1", "ctor"),
+        param("M1", "P1", "$s", "x"),
+        ret("M1", "$v"),
+    ];
+    let rec = CompressingPatternRecognizer::new();
+    let (pats, _) = rec.compress(&ops);
+    assert_eq!(pats.len(), 1);
+    assert!(matches!(&pats[0], PatternOp::Constructor { .. }));
+}
+
+#[test]
+fn compress_non_constructor_name_does_not_match() {
+    // A method named "init" (without leading underscores) should NOT match
+    let ops = vec![
+        defmethod("C1", "M1", "init"),
+        param("M1", "P1", "$s", "x"),
+        ret("M1", "$v"),
+    ];
+    let rec = CompressingPatternRecognizer::new();
+    let (pats, _) = rec.compress(&ops);
+    assert!(pats.is_empty(), "init without underscores should not match as constructor");
+}
+
+#[test]
 fn compress_new_constructor_name() {
     let ops = vec![
         defmethod("C1", "M1", "new"),
@@ -231,6 +283,19 @@ fn compress_new_constructor_name() {
 }
 
 // ── Empty CTOR ────────────────────────────────────────────────
+
+#[test]
+fn compress_empty_constructor_python() {
+    // Empty constructor with __init__ name
+    let ops = vec![
+        defmethod("C1", "M1", "__init__"),
+        ret("M1", "$v"),
+    ];
+    let rec = CompressingPatternRecognizer::new();
+    let (pats, _) = rec.compress(&ops);
+    assert_eq!(pats.len(), 1);
+    assert!(matches!(&pats[0], PatternOp::EmptyConstructor { .. }));
+}
 
 #[test]
 fn compress_empty_constructor() {

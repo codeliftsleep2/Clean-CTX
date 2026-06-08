@@ -13,7 +13,7 @@
 //   - Edge cases: empty IRs, duplicate detection, multi-file state
 
 use crate::ir::compiler::CompiledIR;
-use crate::ir::delta::{DeltaComputer, IRDelta, DeltaOps, ModOp};
+use crate::ir::delta::{DeltaComputer, IRDelta, DeltaOps, ModOp, primary_key_from_tuple};
 use crate::ir::opcodes::CoreOp;
 use crate::ir::replay::{ContextState, DeltaError, FileState};
 use crate::compression::Fidelity;
@@ -166,6 +166,95 @@ fn file_state_remove_by_key() {
     // Verify remaining instructions are still correct
     assert_eq!(fs.instructions[0], vec!["DEF_C", "C1", "SampleService"]);
     assert_eq!(fs.instructions[4], vec!["FLAGS", "M1", "IF", "LOOP"]);
+}
+
+#[test]
+fn file_state_remove_by_key_swap_remove_preserves_index() {
+    // F-13: swap_remove optimization must correctly update the index
+    // for the element that was swapped into the removed position.
+    let ir = baseline_ir("a1", 1);
+    let mut fs = FileState::from_compiled(&ir);
+
+    // Remove the second instruction (DefMethod at index 1)
+    // swap_remove will move the last instruction (Import) into index 1
+    let removed = fs.remove_by_key(&["DEF_M".into(), "C1".into(), "M1".into()]);
+    assert!(removed, "remove should succeed");
+
+    assert_eq!(fs.instructions.len(), 5, "should have 5 remaining instructions");
+
+    // The index entry for Import (which was swapped into index 1) should be correct
+    assert!(fs.index.contains_key("IMP:IM1"), "IMP:IM1 should still be in index");
+    let imp_idx = fs.index.get("IMP:IM1").unwrap();
+    assert_eq!(*imp_idx, 1, "Import should now be at index 1 (swapped from last position)");
+
+    // All remaining keys should be present and point to valid indices
+    assert!(fs.index.contains_key("DEF_C:C1"));
+    assert!(fs.index.contains_key("SIG:M1:P1"));
+    assert!(fs.index.contains_key("RET:M1"));
+    assert!(fs.index.contains_key("FLAGS:M1"));
+
+    // Verify instruction at index 1 is now the Import
+    assert_eq!(fs.instructions[1], vec!["IMP", "IM1", "rxjs", "map"]);
+
+    // Verify no duplicate keys in the index
+    let mut seen_instructions = std::collections::HashSet::new();
+    for (key, &idx) in &fs.index {
+        assert!(idx < fs.instructions.len(), "index {} out of bounds for key {}", idx, key);
+        let insn = &fs.instructions[idx];
+        let computed_key = primary_key_from_tuple(insn);
+        assert_eq!(key, &computed_key, "index points to wrong instruction for key {}", key);
+        assert!(seen_instructions.insert(idx), "duplicate index {} in map", idx);
+    }
+}
+
+#[test]
+fn file_state_remove_by_key_from_end_no_swap_issues() {
+    // F-13: Removing the last element should not cause any swap issues
+    let ir = baseline_ir("a1", 1);
+    let mut fs = FileState::from_compiled(&ir);
+
+    // Remove the last instruction (Import at index 5)
+    let removed = fs.remove_by_key(&["IMP".into(), "IM1".into()]);
+    assert!(removed, "remove should succeed");
+
+    assert_eq!(fs.instructions.len(), 5);
+
+    // Since we removed the last element, no swap occurred
+    // Index should still be consistent
+    assert!(!fs.index.contains_key("IMP:IM1"));
+    assert!(fs.index.contains_key("DEF_C:C1"));
+    assert!(fs.index.contains_key("DEF_M:C1:M1"));
+
+    // Verify last instruction is now FLAGS (was at index 4)
+    assert_eq!(fs.instructions[4], vec!["FLAGS", "M1", "IF", "LOOP"]);
+
+    // FLAGS index should now point to index 4
+    assert_eq!(*fs.index.get("FLAGS:M1").unwrap(), 4);
+}
+
+#[test]
+fn file_state_remove_by_key_multiple_times() {
+    // F-13: Multiple consecutive swap_removes should maintain a consistent index
+    let ir = baseline_ir("a1", 1);
+    let mut fs = FileState::from_compiled(&ir);
+
+    // Remove Import (last, no swap effect)
+    assert!(fs.remove_by_key(&["IMP".into(), "IM1".into()]));
+
+    // Remove DEF_M (will swap with FLAGS)
+    assert!(fs.remove_by_key(&["DEF_M".into(), "C1".into(), "M1".into()]));
+
+    assert_eq!(fs.instructions.len(), 4);
+
+    // Verify index consistency after multiple removes
+    let mut seen_keys = std::collections::HashSet::new();
+    for (key, &idx) in &fs.index {
+        assert!(idx < fs.instructions.len(), "idx {} out of bounds", idx);
+        let computed = primary_key_from_tuple(&fs.instructions[idx]);
+        assert_eq!(key, &computed, "key mismatch for idx {}", idx);
+        assert!(seen_keys.insert(key.clone()), "duplicate key {}", key);
+    }
+    assert_eq!(seen_keys.len(), 4);
 }
 
 #[test]

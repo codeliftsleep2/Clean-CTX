@@ -579,6 +579,153 @@ fn delta_field_type_modified() {
     assert_eq!(delta.ops.mods[0].replace, vec!["FIELD_T", "F1", "$s"]);
 }
 
+// ── F-10: IMPL Reordering (Set Semantics) ───────────────────────
+//
+// IMPL keys use set semantics: `class_id:interface_id`. If the interface list is
+// reordered across edits (e.g., implements A,B → implements B,A), the same three
+// IMPL keys are produced and the delta shows no change. This is semantically correct
+// for set semantics — the visible interface list is the same set — but the spec
+// documents this behavior in §13. Tests confirm no false-positive deltas on reorder.
+
+#[test]
+fn delta_impl_reorder_no_false_positive() {
+    // Baseline: class C1 implements A, B
+    let baseline = CompiledIR {
+        file_id: "a1".into(),
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Service".into()),
+            CoreOp::Implements("C1".into(), "A".into()),
+            CoreOp::Implements("C1".into(), "B".into()),
+        ],
+        version: 1,
+    };
+
+    // Current: class C1 implements B, A (reordered)
+    let current = CompiledIR {
+        file_id: "a1".into(),
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Service".into()),
+            CoreOp::Implements("C1".into(), "B".into()),
+            CoreOp::Implements("C1".into(), "A".into()),
+        ],
+        version: 2,
+    };
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current);
+
+    // Set semantics: same interface set, no delta
+    assert!(delta.is_none(), "IMPL reorder should produce no delta (set semantics)");
+}
+
+#[test]
+fn delta_impl_add_interface() {
+    let baseline = CompiledIR {
+        file_id: "a1".into(),
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Service".into()),
+            CoreOp::Implements("C1".into(), "A".into()),
+        ],
+        version: 1,
+    };
+
+    let current = CompiledIR {
+        file_id: "a1".into(),
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Service".into()),
+            CoreOp::Implements("C1".into(), "A".into()),
+            CoreOp::Implements("C1".into(), "B".into()),
+        ],
+        version: 2,
+    };
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    assert_eq!(delta.ops.adds.len(), 1);
+    assert_eq!(delta.ops.adds[0], vec!["IMPL", "C1", "B"]);
+}
+
+// ── F-12: FLAGS Collision Prevention ─────────────────────────────
+//
+// FLAGS key uses `target_id` only. Two methods in the same class can each have
+// one FLAGS op with unique target_id (M1, M2), so keys do NOT collide across methods.
+// However, if the compiler emits two FLAGS ops for the same target (e.g., one from
+// control flow and one from a pattern recognizer), the BTreeMap index will overwrite.
+// The fix is to ensure the compiler merges FLAGS for the same target — tested at
+// the compiler level in compiler.rs tests. At the delta level, we test that two
+// distinct methods with distinct FLAGS keys are handled correctly.
+
+#[test]
+fn delta_flags_two_methods_no_collision() {
+    let baseline = CompiledIR {
+        file_id: "a1".into(),
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Service".into()),
+            CoreOp::DefMethod("C1".into(), "M1".into(), "doA".into()),
+            CoreOp::Flags("M1".into(), vec!["IF".into()]),
+            CoreOp::DefMethod("C1".into(), "M2".into(), "doB".into()),
+            CoreOp::Flags("M2".into(), vec!["LOOP".into()]),
+        ],
+        version: 1,
+    };
+
+    // Modify M1's flags
+    let mut current = baseline.clone();
+    current.version = 2;
+    for op in &mut current.instructions {
+        if let CoreOp::Flags(tid, flags) = op {
+            if tid == "M1" {
+                flags.push("THROW".to_string());
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    assert_eq!(delta.ops.mods.len(), 1);
+    assert_eq!(delta.ops.mods[0].key, vec!["FLAGS", "M1"]);
+    assert!(delta.ops.mods[0].replace.contains(&"THROW".to_string()));
+    // M2's flags should be untouched
+    assert!(delta.ops.adds.is_empty());
+    assert!(delta.ops.dels.is_empty());
+}
+
+// ── F-11: INJECTS Dep Changes (replace behavior) ────────────────
+//
+// INJECTS key is `class_id` only — the entire deps list is replaced on change.
+// There is no per-dep add/remove granularity. This is a documented deviation.
+
+#[test]
+fn delta_injects_dep_change_replaces() {
+    let baseline = CompiledIR {
+        file_id: "a1".into(),
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Service".into()),
+            CoreOp::Injects("C1".into(), vec!["S1".into(), "S2".into()]),
+        ],
+        version: 1,
+    };
+
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Change deps: remove S1, add S3
+    for op in &mut current.instructions {
+        if let CoreOp::Injects(cid, deps) = op {
+            if cid == "C1" {
+                *deps = vec!["S2".into(), "S3".into()];
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    assert_eq!(delta.ops.mods.len(), 1);
+    assert_eq!(delta.ops.mods[0].key, vec!["INJECTS", "C1"]);
+    assert_eq!(delta.ops.mods[0].replace, vec!["INJECTS", "C1", "S2", "S3"]);
+    assert!(delta.ops.adds.is_empty());
+    assert!(delta.ops.dels.is_empty());
+}
+
 // ── Primary Key Helpers ─────────────────────────────────────────
 
 #[test]
