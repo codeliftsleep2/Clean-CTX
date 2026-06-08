@@ -40,7 +40,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts or .cs file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%). Default: 'low'." }
+                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%). Default: 'low'." },
+                    "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." }
                 },
                 "required": ["filePath"]
             }
@@ -184,7 +185,8 @@ pub(crate) fn dispatch_tools_call(
 ) {
     match tool_name {
         "compress_code_context" => {
-            handle_compress_code_context(id, params, state);
+            let encoding = params["arguments"]["encoding"].as_str().unwrap_or("named");
+            handle_compress_code_context(id, params, state, encoding);
         }
         "decompress_code_context" => {
             let compressed_text = params["arguments"]["compressedText"].as_str().unwrap_or("");
@@ -257,10 +259,20 @@ pub(crate) fn dispatch_tools_call(
 // ── Handler: compress_code_context (upgraded, backward compatible) ──
 
 /// Handle `compress_code_context` — includes `ir` field alongside `pretty`.
+///
+/// Supports an optional `encoding` parameter:
+///   - `"named"` (default): standard tuple format with opcode strings
+///   - `"positional"`: stripped opcode format (30%+ savings per the spec)
+///   - `"tagged"`: positional with opcode preserved for mixed streams
+///
+/// F-08 (FAANG audit): the positional encoding was previously unreachable
+/// from the MCP surface. This change wires `ir_to_positional_wire` into
+/// the production path.
 fn handle_compress_code_context(
     id: &Value,
     params: &Value,
     state: &mut McpState,
+    encoding: &str,
 ) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let fidelity = match parse_fidelity_arg(id, params) {
@@ -308,12 +320,30 @@ fn handle_compress_code_context(
                 // Store the full IR in context state for delta tracking
                 state.ir_context.load_ir(ir.clone());
 
+                // F-08: Determine the IR wire format based on the encoding parameter.
+                // Positional encoding strips opcode strings for ~30% size reduction.
+                let ir_value = match encoding {
+                    "positional" => {
+                        let config = crate::ir::positional::PositionalConfig::stripped();
+                        crate::ir::positional::ir_to_positional_wire(
+                            &ir.file_id, ir.version, &ir.instructions, config,
+                        )
+                    }
+                    "tagged" => {
+                        let config = crate::ir::positional::PositionalConfig::tagged();
+                        crate::ir::positional::ir_to_positional_wire(
+                            &ir.file_id, ir.version, &ir.instructions, config,
+                        )
+                    }
+                    _ => ir_to_wire(&ir),
+                };
+
                 serde_json::json!({
                     "jsonrpc": "2.0",
                     "id": id,
                     "result": {
                         "content": [{ "type": "text", "text": compressed_text }],
-                        "ir": ir_to_wire(&ir),
+                        "ir": ir_value,
                         "pretty": compressed_text,
                         "v": ir.version,
                         "file": ir.file_id
@@ -635,8 +665,14 @@ fn compile_file_ir(
         compiler.add_meta_layer(Box::new(AngularMetaLayer::new()));
     }
 
-    // F-03: Pattern recognizers can be added here when wired in
-    // For now, pattern recognizers are opt-in (no default ones added)
+    // F-07 (FAANG audit): Wire the additive CodePatternRecognizer into
+    // the compile path. This is the Layer 4 additive recognizer that
+    // emits CTOR/OBSERVABLE/GETTER/SETTER flags alongside the original
+    // instructions. The recognizer is always-on because it adds context
+    // without removing any instructions (zero regression).
+    compiler.add_pattern_recognizer(Box::new(
+        crate::ir::layers::patterns::CodePatternRecognizer::new(),
+    ));
 
     let compiled = compiler.compile(
         &source,
