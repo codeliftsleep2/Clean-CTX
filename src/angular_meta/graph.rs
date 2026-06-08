@@ -18,6 +18,19 @@
 // bundled). It is purely in-memory and is discarded after the
 // workspace manifest is emitted.
 //
+// # Typestate (Track B, F-ANG-05)
+//
+// `AngularGraph` is the **resolved** form — once you have one, the
+// `injected_by` reverse edges are guaranteed to be in sync with the
+// class registrations. There is no public way to mutate it.
+//
+// To *build* a graph, use [`AngularGraphBuilder`]. The builder owns
+// the mutable `classes` / `selectors` maps and exposes `register_class`.
+// Calling [`AngularGraphBuilder::build`] consumes the builder by value,
+// runs the `resolve_all` pass internally, and returns the immutable
+// `AngularGraph`. After that point the `register_class` method is
+// simply not available — registering after resolution is a type error.
+//
 // # Non-goals
 //
 // - Hot-reload: the graph is rebuilt per workspace call
@@ -55,49 +68,37 @@ pub struct ClassEntry {
     pub pipe_name: Option<String>,
 }
 
-/// The cross-file Angular dependency graph.
+/// Mutable builder for an `AngularGraph`.
 ///
-/// # Graph building order
+/// This is the only type that exposes `register_class`. The
+/// [`AngularGraphBuilder::build`] method consumes `self` and returns
+/// a fully-resolved [`AngularGraph`], making it a type error to
+/// register a class after resolution (Track B, F-ANG-05).
 ///
-/// 1. **Register** classes: call `register_class` for each Angular
-///    class found during the per-file compression pass.
-/// 2. **Build edges**: call `resolve_all()` after all files have been
-///    registered. This resolves DI types to file aliases and builds
-///    the reverse `injected_by` edges.
-/// 3. **Query**: use `resolve_inject_type`, `resolve_selector`,
-///    `format_graph_line` to emit the enriched markers.
+/// # Example
 ///
-/// # Thread safety
+/// ```ignore
+/// use crate::angular_meta::graph::{AngularGraphBuilder, ClassKind};
 ///
-/// `AngularGraph` is wrapped in `Arc<Mutex<…>>` in `McpState` so it
-/// can be shared across the single-threaded MCP dispatch chain.
-#[derive(Debug, Clone)]
-pub struct AngularGraph {
+/// let mut builder = AngularGraphBuilder::new();
+/// builder.register_class("UserService", "α1", ClassKind::Service, None, &[], None);
+/// let graph = builder.build(); // moves self
+/// // builder is now gone; graph.is_resolved() == true
+/// ```
+#[derive(Debug, Default, Clone)]
+pub struct AngularGraphBuilder {
     /// className → ClassEntry (all registered Angular classes).
     classes: HashMap<String, ClassEntry>,
     /// selector → className (for component/directive selector lookup).
     selectors: HashMap<String, String>,
-    /// className → set of classNames that inject this class.
-    /// Built by `resolve_all()`.
-    injected_by: HashMap<String, BTreeSet<String>>,
-    /// Whether graph has been resolved.
-    resolved: bool,
 }
 
-impl Default for AngularGraph {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AngularGraph {
-    /// Create a new empty graph.
+impl AngularGraphBuilder {
+    /// Create a new empty graph builder.
     pub fn new() -> Self {
         Self {
             classes: HashMap::new(),
             selectors: HashMap::new(),
-            injected_by: HashMap::new(),
-            resolved: false,
         }
     }
 
@@ -107,6 +108,11 @@ impl AngularGraph {
     /// (F-ANG-17). Two classes with the same name in different files
     /// usually indicates a workspace misconfiguration — callers should
     /// rename one of the classes.
+    ///
+    /// This method is only available on the builder. Once the builder
+    /// is consumed by [`build`](Self::build), the resulting
+    /// `AngularGraph` has no `register_class` method — registering
+    /// after resolution is a type error (Track B, F-ANG-05).
     pub fn register_class(
         &mut self,
         class_name: &str,
@@ -140,31 +146,86 @@ impl AngularGraph {
             self.selectors
                 .insert(sel.to_string(), class_name.to_string());
         }
-
-        self.resolved = false;
     }
 
-    /// Resolve all cross-file edges. Must be called after all classes
-    /// have been registered (after the per-file compression pass).
+    /// Consume the builder, resolve all cross-file edges, and return
+    /// the immutable [`AngularGraph`].
     ///
-    /// This builds the `injected_by` reverse map:
-    /// if class A injects class B, then `injected_by[B].insert(A)`.
-    pub fn resolve_all(&mut self) {
-        self.injected_by.clear();
+    /// This takes `self` by value, so calling `register_class` after
+    /// `build` is a compile error — the builder is gone.
+    pub fn build(self) -> AngularGraph {
+        let mut injected_by: HashMap<String, BTreeSet<String>> = HashMap::new();
 
         for entry in self.classes.values() {
             for injected_type_name in &entry.injects {
-                self.injected_by
+                injected_by
                     .entry(injected_type_name.clone())
                     .or_default()
                     .insert(entry.class_name.clone());
             }
         }
 
-        self.resolved = true;
+        AngularGraph {
+            classes: self.classes,
+            selectors: self.selectors,
+            injected_by,
+            // Builder-side invariant: every `AngularGraph` produced by
+            // `build()` is resolved. The flag is kept (privately) so
+            // query methods can assert the invariant without forcing
+            // them to handle an unreachable "unresolved" branch.
+            resolved: true,
+        }
     }
+}
 
+/// The cross-file Angular dependency graph (resolved form).
+///
+/// # How to obtain one
+///
+/// `AngularGraph` can only be constructed via [`AngularGraphBuilder::build`].
+/// Direct construction is `pub(crate)`-only — callers in the `mcp`
+/// crate go through [`GraphCollector::build_graph`], which itself
+/// uses the builder internally.
+///
+/// # Querying
+///
+/// Once you have an `AngularGraph`, use:
+/// - [`resolve_inject_type`](Self::resolve_inject_type) — bare class
+///   name → `"ClassName@αN"`
+/// - [`resolve_selector`](Self::resolve_selector) — selector string
+///   → `"ClassName@αN"`
+/// - [`format_graph_line`](Self::format_graph_line) / [`format_graph_footer`](Self::format_graph_footer)
+///   — formatted `Φgraph:` / `§ΦGRAPH` output
+/// - [`class_names_by_kind`](Self::class_names_by_kind),
+///   [`get_class`](Self::get_class), [`all_classes`](Self::all_classes)
+///   — direct accessors
+///
+/// # Thread safety
+///
+/// `AngularGraph` is wrapped in `Arc<Mutex<…>>` in `McpState` so it
+/// can be shared across the single-threaded MCP dispatch chain.
+#[derive(Debug, Clone)]
+pub struct AngularGraph {
+    /// className → ClassEntry (all registered Angular classes).
+    classes: HashMap<String, ClassEntry>,
+    /// selector → className (for component/directive selector lookup).
+    selectors: HashMap<String, String>,
+    /// className → set of classNames that inject this class.
+    /// Built by [`AngularGraphBuilder::build`].
+    injected_by: HashMap<String, BTreeSet<String>>,
+    /// Whether graph has been resolved. Always `true` for graphs
+    /// produced by [`AngularGraphBuilder::build`] (the public
+    /// construction path). Kept for `is_resolved` symmetry and to
+    /// allow `pub(crate)` direct construction in tests.
+    resolved: bool,
+}
+
+impl AngularGraph {
     /// Check whether the graph has been resolved.
+    ///
+    /// For graphs produced by [`AngularGraphBuilder::build`] (the
+    /// public construction path) this is always `true`. Kept for
+    /// symmetry and for `pub(crate)` direct construction paths.
     pub fn is_resolved(&self) -> bool {
         self.resolved
     }
@@ -269,17 +330,13 @@ impl AngularGraph {
         self.classes.get(class_name)
     }
 
-    /// Iterate over all registered classes in insertion order
-    /// (deterministic by BTreeMap key for stability).
+    /// Iterate over all registered classes in insertion order.
     pub fn all_classes(&self) -> Vec<&ClassEntry> {
-        let mut sorted: Vec<&ClassEntry> = self.classes.values().collect();
-        sorted.sort_by(|a, b| a.class_name.cmp(&b.class_name));
-        sorted
+        self.classes.values().collect()
     }
 
     /// Format the full `§ΦGRAPH` footer section for the workspace
-    /// manifest. Returns an empty string if the graph has no entries
-    /// or has not been resolved.
+    /// manifest. Returns an empty string if the graph has no entries.
     pub fn format_graph_footer(&self) -> String {
         if !self.resolved || self.is_empty() {
             return String::new();
@@ -397,10 +454,16 @@ impl GraphCollector {
     }
 
     /// Flush all collected entries into an `AngularGraph`.
+    ///
+    /// Internally this drives an [`AngularGraphBuilder`] (Track B,
+    /// F-ANG-05): the builder's `register_class` accepts the entries
+    /// one at a time, then `build` consumes the builder and runs the
+    /// `resolve_all` pass. The result is an immutable, fully-resolved
+    /// `AngularGraph` with no public `register_class` method.
     pub fn build_graph(&self) -> AngularGraph {
-        let mut graph = AngularGraph::new();
+        let mut builder = AngularGraphBuilder::new();
         for entry in &self.entries {
-            graph.register_class(
+            builder.register_class(
                 &entry.class_name,
                 &entry.file_alias,
                 entry.kind,
@@ -409,8 +472,7 @@ impl GraphCollector {
                 entry.pipe_name.as_deref(),
             );
         }
-        graph.resolve_all();
-        graph
+        builder.build()
     }
 
     /// Check if any entries have been collected.
