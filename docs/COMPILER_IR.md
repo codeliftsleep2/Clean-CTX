@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0 (Proposed)
 **Last updated:** 2026-06-08
-**Status:** Phase A Complete - Phase B Complete - Phase C Complete - Phase D Complete
+**Status:** Phase A Complete - Phase B Complete - Phase C Complete - Phase D Complete - Phase E Complete
 
 > **Living document.** This spec defines the evolution from text-based compression to a structured intermediate representation (IR) with delta-based state transport. It serves as the implementation guideline for the Compiler IR subsystem.
 
@@ -992,6 +992,8 @@ impl ContextState {
 
 ## 8. Phase E: IR / Pretty Separation
 
+**Status: ✅ Complete** — implemented 2026-06-08
+
 ### Goal
 
 Two completely independent render paths from the same canonical IR. The IR is the source of truth; pretty output is derived.
@@ -1136,16 +1138,16 @@ The `ir_to_text()` function can produce **byte-identical output** to the current
 
 ### Completion Criteria
 
-- [ ] `ir_to_text()` renders IR to human-readable text at all 3 fidelity levels
-- [ ] Low fidelity: compact output with opcodes and ⊕ markers
-- [ ] Medium fidelity: full signatures with keywords
-- [ ] High fidelity: indented with behavior markers in braces
-- [ ] `flags_to_markers()` converts IR flags back to ⊕ notation
-- [ ] Import rendering at all fidelity levels
-- [ ] Class/method/field rendering at all fidelity levels
-- [ ] Round-trip test: compile sample → render → matches expected output format
-- [ ] Fidelity comparison: same IR at Low vs Medium vs High shows progressive detail
-- [ ] `cargo clippy --all-targets -- -D warnings` passes
+- [x] `ir_to_text()` renders IR to human-readable text at all 3 fidelity levels
+- [x] Low fidelity: compact output with opcodes and ⊕ markers
+- [x] Medium fidelity: full signatures with keywords
+- [x] High fidelity: indented with behavior markers in braces
+- [x] `flags_to_markers()` converts IR flags back to ⊕ notation
+- [x] Import rendering at all fidelity levels
+- [x] Class/method/field rendering at all fidelity levels
+- [x] Round-trip test: compile sample → render → matches expected output format
+- [x] Fidelity comparison: same IR at Low vs Medium vs High shows progressive detail
+- [x] `cargo clippy --all-targets -- -D warnings` passes
 
 ---
 
