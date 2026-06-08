@@ -82,44 +82,6 @@ pub fn is_angular_file(source: &str) -> bool {
     false
 }
 
-/// Check if a file is an Angular-adjacent sibling (template or style)
-/// that belongs to a known Angular component triplet. This is used
-/// by the workspace bundling pass to identify `.html` / `.scss` files
-/// that should be read for shape extraction rather than compressed.
-#[allow(dead_code)] // Used by Phase 2 workspace bundling; will be wired in later.
-///
-/// The heuristic: the file must be in the same directory as a
-/// `.component.ts` file and have a matching base name. This is a
-/// lightweight check — the full triplet resolution happens in
-/// `bundler::resolve_triplet`.
-pub fn is_angular_sibling(file_path: &std::path::Path) -> bool {
-    use std::path::PathBuf;
-
-    let ext = file_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("");
-
-    let is_angular_ext = matches!(ext, "html" | "scss" | "css" | "sass" | "less");
-    if !is_angular_ext {
-        return false;
-    }
-
-    // Check if a sibling *.component.ts exists.
-    let parent = match file_path.parent() {
-        Some(p) => p,
-        None => return false,
-    };
-
-    let stem = match file_path.file_stem().and_then(|s| s.to_str()) {
-        Some(s) => s,
-        None => return false,
-    };
-
-    let component_candidate: PathBuf = parent.join(format!("{}.component.ts", stem));
-    component_candidate.is_file()
-}
-
 #[cfg(test)]
 #[path = "../tests/angular_meta/detect.rs"]
 mod tests;

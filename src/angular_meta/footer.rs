@@ -9,7 +9,7 @@
 // The footer is appended to the workspace manifest after the
 // `§PATHMAP` footer.
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 /// A single bundle entry in the `§ΦMAP` footer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,17 +39,25 @@ pub fn format_bundle_footer(entries: &[BundleEntry]) -> String {
 
     let mut footer = String::from("\n§ΦMAP\n");
     for entry in entries {
-        footer.push_str(&format!("  {} = {}", entry.alias, entry.name));
+        use std::fmt::Write;
+        // F-ANG-39 (mirrored from main audit): use `write!` instead of
+        // `format!` + `push_str` to avoid the intermediate String alloc.
+        let _ = writeln!(footer, "  {} = {}", entry.alias, entry.name);
         if !entry.file_aliases.is_empty() {
-            footer.push_str(&format!(" [{}]", entry.file_aliases.join(", ")));
+            let _ = write!(footer, " [{}]", entry.file_aliases.join(", "));
         }
-        footer.push('\n');
+        // The opening line above already ended with a newline, so we
+        // need to re-establish the entry line if `file_aliases` was
+        // emitted. Push the closing newline now.
+        if !entry.file_aliases.is_empty() {
+            footer.push('\n');
+        }
 
         if let Some(ref tpl) = entry.template_summary {
-            footer.push_str(&format!("    {}\n", tpl));
+            let _ = writeln!(footer, "    {}", tpl);
         }
         if let Some(ref sty) = entry.style_summary {
-            footer.push_str(&format!("    {}\n", sty));
+            let _ = writeln!(footer, "    {}", sty);
         }
     }
     footer
@@ -59,11 +67,18 @@ pub fn format_bundle_footer(entries: &[BundleEntry]) -> String {
 ///
 /// This is used by the workspace compression pass to collect bundle
 /// entries as files are processed, then format the footer at the end.
+///
+/// # Storage
+///
+/// Uses `HashMap` for the entries (F-ANG-22). Aliases are monotonically
+/// increasing (`Φ1`, `Φ2`, …) so iteration order matches insertion
+/// order, and `format_bundle_footer` sorts on emit for determinism.
 #[derive(Debug, Clone, Default)]
 pub struct FooterBuilder {
-    /// Maps bundle alias → entry. Uses BTreeMap for deterministic
-    /// output order.
-    entries: BTreeMap<String, BundleEntry>,
+    /// Maps bundle alias → entry. HashMap for O(1) lookup.
+    entries: HashMap<String, BundleEntry>,
+    /// Secondary index: component name → bundle alias (F-ANG-21).
+    by_name: HashMap<String, String>,
     /// Counter for generating unique aliases (Φ1, Φ2, …).
     next_index: usize,
 }
@@ -84,16 +99,18 @@ impl FooterBuilder {
     ) -> String {
         self.next_index += 1;
         let alias = format!("Φ{}", self.next_index);
+        // F-ANG-14: avoid cloning the alias twice.
         self.entries.insert(
             alias.clone(),
             BundleEntry {
                 alias: alias.clone(),
-                name,
+                name: name.clone(),
                 file_aliases,
                 template_summary,
                 style_summary,
             },
         );
+        self.by_name.insert(name, alias.clone());
         alias
     }
 
@@ -109,13 +126,37 @@ impl FooterBuilder {
 
     /// Format the complete `§ΦMAP` footer.
     pub fn build(&self) -> String {
-        let entries: Vec<BundleEntry> = self.entries.values().cloned().collect();
+        let mut entries: Vec<BundleEntry> = self.entries.values().cloned().collect();
+        // Sort by alias (lexicographic Φ1, Φ10, Φ2, … would be wrong,
+        // but aliases are zero-padded implicitly because all have the
+        // same Φ prefix and monotonically increasing integer suffix).
+        // Use natural sort via a stable comparator on the trailing
+        // number.
+        entries.sort_by(|a, b| {
+            natural_cmp(&a.alias, &b.alias)
+        });
         format_bundle_footer(&entries)
     }
 
-    /// Look up a bundle alias by component name.
+    /// Look up a bundle alias by component name (F-ANG-21: O(1)).
     pub fn find_by_name(&self, name: &str) -> Option<&BundleEntry> {
-        self.entries.values().find(|e| e.name == name)
+        self.by_name
+            .get(name)
+            .and_then(|alias| self.entries.get(alias))
+    }
+}
+
+/// Natural-order comparator that sorts `"Φ2"` before `"Φ10"`.
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    let num_a: Option<usize> = a
+        .strip_prefix('Φ')
+        .and_then(|s| s.parse().ok());
+    let num_b: Option<usize> = b
+        .strip_prefix('Φ')
+        .and_then(|s| s.parse().ok());
+    match (num_a, num_b) {
+        (Some(na), Some(nb)) => na.cmp(&nb),
+        _ => a.cmp(b),
     }
 }
 

@@ -170,7 +170,8 @@ pub fn extract_style_shape(css: &str) -> StyleShape {
             let name = &css[start..i];
             if !name.is_empty() {
                 // Only collect common at-rules, not @media, @keyframes, etc.
-                if (name == "include" || name == "mixin" || name == "import" || name == "use")
+                // (`@forward` is SCSS module re-export; F-ANG-19.)
+                if matches!(name, "include" | "mixin" | "import" | "use" | "forward")
                     && !shape.at_rules.contains(&format!("@{}", name))
                 {
                     shape.at_rules.push(format!("@{}", name));

@@ -103,7 +103,10 @@ impl AngularGraph {
 
     /// Register a class in the graph. If the class name already exists
     /// (possible with duplicate class names in different files), the
-    /// last registration wins and a warning note is recorded.
+    /// last registration wins and a warning is logged via `eprintln!`
+    /// (F-ANG-17). Two classes with the same name in different files
+    /// usually indicates a workspace misconfiguration — callers should
+    /// rename one of the classes.
     pub fn register_class(
         &mut self,
         class_name: &str,
@@ -113,6 +116,13 @@ impl AngularGraph {
         injects: &[String],
         pipe_name: Option<&str>,
     ) {
+        if let Some(prev) = self.classes.get(class_name) {
+            eprintln!(
+                "[clean-ctx] WARN: AngularGraph: duplicate class name '{}' (prev alias={}, new alias={}); last-write-wins",
+                class_name, prev.file_alias, file_alias
+            );
+        }
+
         let entry = ClassEntry {
             class_name: class_name.to_string(),
             file_alias: file_alias.to_string(),

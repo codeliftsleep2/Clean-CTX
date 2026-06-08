@@ -35,7 +35,9 @@ fn meta_layer_emits_phi_block_for_component() {
         }
     "#;
     let class_captures = vec![src.to_string()];
-    let result = run_meta_layer(src, &class_captures, Fidelity::Low);
+    // F-ANG-23: use Medium fidelity so field-level @Input/@Output
+    // markers are emitted.
+    let result = run_meta_layer(src, &class_captures, Fidelity::Medium);
     let block = result.expect("Angular component should produce a MetaBlock");
     let rendered = block.render();
     assert!(rendered.contains("// --- Φ Angular Meta ---"));
@@ -53,7 +55,8 @@ fn meta_layer_emits_phi_block_for_service() {
         }
     "#;
     let class_captures = vec![src.to_string()];
-    let result = run_meta_layer(src, &class_captures, Fidelity::Low);
+    // F-ANG-23: Φinjects: is High-fidelity only.
+    let result = run_meta_layer(src, &class_captures, Fidelity::High);
     let block = result.expect("Angular service should produce a MetaBlock");
     let rendered = block.render();
     assert!(rendered.contains("Φsvc:UserService"));
