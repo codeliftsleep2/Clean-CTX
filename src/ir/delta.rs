@@ -31,11 +31,9 @@ pub struct IRDelta {
     /// Target file (path alias)
     pub file: String,
     /// Baseline version this delta applies to
-    #[serde(rename = "from")]
-    pub from_version: u64,
+    pub from: u64,
     /// Version after applying this delta
-    #[serde(rename = "to")]
-    pub to_version: u64,
+    pub to: u64,
     /// Operations grouped by type
     pub ops: DeltaOps,
 }
@@ -119,8 +117,8 @@ impl DeltaComputer {
 
         Some(IRDelta {
             file: current.file_id.clone(),
-            from_version: baseline.version,
-            to_version: current.version,
+            from: baseline.version,
+            to: current.version,
             ops,
         })
     }
@@ -228,7 +226,17 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         "INJECTS" => format!("INJECTS:{}", tuple.get(1).unwrap_or(&String::new())),
         "IMP" => format!("IMP:{}", tuple.get(1).unwrap_or(&String::new())),
         "TYPE" => format!("TYPE:{}", tuple.get(1).unwrap_or(&String::new())),
-        _ => tuple.join(":"),
+        _ => {
+            // F-16: Unknown opcode — fallback produces a key from the full tuple.
+            // This is intentionally conservative: the content-derived key is
+            // a stable primary key (coincidentally), but callers should ensure
+            // all known opcodes are covered above. This branch should only be
+            // reached if a new CoreOp variant is added without updating this match.
+            if cfg!(debug_assertions) {
+                eprintln!("[warn] primary_key_from_tuple: unknown opcode '{}'", tuple[0]);
+            }
+            tuple.join(":")
+        }
     }
 }
 
@@ -269,7 +277,16 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
         "INJECTS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "IMP" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "TYPE" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
-        _ => tuple.to_vec(),
+        _ => {
+            // F-17: Unknown opcode — fallback returns the full instruction body.
+            // This is correct by accident (matching by full body is equivalent
+            // to matching by the entire instruction), but it conflates "match key"
+            // with "instruction body". See F-16 for the same pattern.
+            if cfg!(debug_assertions) {
+                eprintln!("[warn] key_tuple_from_tuple: unknown opcode '{}'", tuple[0]);
+            }
+            tuple.to_vec()
+        }
     }
 }
 

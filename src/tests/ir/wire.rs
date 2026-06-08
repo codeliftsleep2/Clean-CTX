@@ -1,6 +1,6 @@
 use crate::ir::compiler::CompiledIR;
 use crate::ir::opcodes::CoreOp;
-use crate::ir::wire::{op_to_tuple, tuple_to_op, ir_to_wire, wire_to_ir};
+use crate::ir::wire::{op_to_tuple, tuple_to_op, ir_to_wire, wire_to_ir, DecodeError};
 
 #[test]
 fn op_to_tuple_def_class() {
@@ -284,25 +284,27 @@ fn wire_to_ir_empty_instructions() {
 }
 
 #[test]
-fn wire_to_ir_missing_file_returns_none() {
+fn wire_to_ir_missing_file_returns_err() {
     let wire = serde_json::json!({
         "v": 1,
         "ir": []
     });
-    assert!(wire_to_ir(&wire).is_none());
+    let err = wire_to_ir(&wire).expect_err("should return error for missing file");
+    assert!(matches!(err, DecodeError::MissingField(_)));
 }
 
 #[test]
-fn wire_to_ir_missing_version_returns_none() {
+fn wire_to_ir_missing_version_returns_err() {
     let wire = serde_json::json!({
         "file": "f",
         "ir": []
     });
-    assert!(wire_to_ir(&wire).is_none());
+    let err = wire_to_ir(&wire).expect_err("should return error for missing version");
+    assert!(matches!(err, DecodeError::MissingField(_)));
 }
 
 #[test]
-fn wire_to_ir_unknown_opcode_skipped() {
+fn wire_to_ir_unknown_opcode_returns_err() {
     let wire = serde_json::json!({
         "file": "f",
         "v": 1,
@@ -312,7 +314,29 @@ fn wire_to_ir_unknown_opcode_skipped() {
             ["DEF_M", "C1", "M1", "bar"]
         ]
     });
-    let restored = wire_to_ir(&wire).expect("should deserialize");
-    // Unknown opcode should be skipped, only 2 instructions
-    assert_eq!(restored.instructions.len(), 2);
+    // Unknown opcode should return an error (F-19: no silent swallowing)
+    let err = wire_to_ir(&wire).expect_err("should return error for unknown opcode");
+    assert!(matches!(err, DecodeError::UnknownOpcode(_)));
+}
+
+#[test]
+fn wire_to_ir_malformed_tuple_returns_err() {
+    // Tuple with a known opcode but insufficient operands is silently dropped
+    // by tuple_to_op returning None. The decoder then reports it as an
+    // unknown opcode (because tuple_to_op cannot tell us "too short" vs
+    // "unknown").
+    let wire = serde_json::json!({
+        "file": "f",
+        "v": 1,
+        "ir": [
+            ["DEF_C"] // too short for DEF_C (needs 3 elements)
+        ]
+    });
+    let err = wire_to_ir(&wire).expect_err("should return error for malformed tuple");
+    // Either MalformedTuple (if the decoder can tell it's a known opcode)
+    // or UnknownOpcode (if the decoder treats the short tuple as unknown).
+    assert!(
+        matches!(err, DecodeError::MalformedTuple(_) | DecodeError::UnknownOpcode(_)),
+        "expected MalformedTuple or UnknownOpcode, got: {:?}", err
+    );
 }
