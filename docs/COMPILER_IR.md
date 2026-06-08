@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0 (Proposed)
 **Last updated:** 2026-06-08
-**Status:** � Phase A Complete - Phase B Complete - Phase C Complete
+**Status:** Phase A Complete - Phase B Complete - Phase C Complete - Phase D Complete
 
 > **Living document.** This spec defines the evolution from text-based compression to a structured intermediate representation (IR) with delta-based state transport. It serves as the implementation guideline for the Compiler IR subsystem.
 
@@ -890,6 +890,8 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
 
 ## 7. Phase D: State Replay
 
+**Status: ✅ Complete** — implemented 2026-06-08
+
 ### Goal
 
 Client-side state machine that applies delta ops to reconstruct IR state, with version-based catch-up support.
@@ -899,7 +901,7 @@ Client-side state machine that applies delta ops to reconstruct IR state, with v
 | File | Description |
 |------|-------------|
 | `src/ir/replay.rs` | `ContextState`, `FileState`, `DeltaError` |
-| Tests for replay | Apply, version validation, catch-up, error cases |
+| `src/tests/ir/replay.rs` | 39 tests: FileState ops, ContextState apply, version validation, error cases, sequential deltas, render, multi-file, full replay cycle |
 
 ### State Machine Design
 
@@ -907,14 +909,15 @@ Client-side state machine that applies delta ops to reconstruct IR state, with v
 // src/ir/replay.rs
 
 use std::collections::HashMap;
-use super::delta::{IRDelta, DeltaOps, ModOp};
-use super::opcodes::{CoreOp, op_to_tuple};
+use super::delta::IRDelta;
 use super::compiler::CompiledIR;
 use super::render::ir_to_text;
+use super::wire::op_to_tuple;
+use super::delta::{primary_key_from_tuple, key_tuple_from_tuple};
 use crate::compression::Fidelity;
 
 /// Errors during delta application
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeltaError {
     UnknownFile(String),
     VersionMismatch { expected: u64, got: u64 },
@@ -923,209 +926,67 @@ pub enum DeltaError {
 }
 
 /// Per-file IR state with indexed instruction stream.
+#[derive(Debug, Clone)]
 pub struct FileState {
-    /// Ordered instruction stream
+    /// Ordered instruction stream (each instruction is a positional tuple)
     pub instructions: Vec<Vec<String>>,
-    
     /// Index: primary_key → instruction index in `instructions`
     pub index: HashMap<String, usize>,
-    
     /// Version when this file was last modified
     pub version: u64,
 }
 
 impl FileState {
-    pub fn new(version: u64) -> Self {
-        Self {
-            instructions: Vec::new(),
-            index: HashMap::new(),
-            version,
-        }
-    }
-    
-    /// Build from a CompiledIR
-    pub fn from_compiled(ir: &CompiledIR) -> Self {
-        let mut state = Self::new(ir.version);
-        for op in &ir.instructions {
-            let tuple = op_to_tuple(op);
-            let key = primary_key_from_tuple(&tuple);
-            state.index.insert(key, state.instructions.len());
-            state.instructions.push(tuple);
-        }
-        state
-    }
-    
-    /// Remove an instruction by primary key
-    pub fn remove_by_key(&mut self, key_tuple: &[String]) -> bool {
-        let key = key_string_from_tuple(key_tuple);
-        if let Some(idx) = self.index.remove(&key) {
-            self.instructions.remove(idx);
-            // Rebuild index after removal (indices shifted)
-            self.rebuild_index();
-            true
-        } else {
-            false
-        }
-    }
-    
-    /// Replace an instruction by key
-    pub fn replace_by_key(&mut self, key_tuple: &[String], replacement: &[String]) -> bool {
-        let key = key_string_from_tuple(key_tuple);
-        if let Some(&idx) = self.index.get(&key) {
-            self.instructions[idx] = replacement.to_vec();
-            // Update index if the key changed
-            let new_key = primary_key_from_tuple(replacement);
-            if key != new_key {
-                self.index.remove(&key);
-                self.index.insert(new_key, idx);
-            }
-            true
-        } else {
-            false
-        }
-    }
-    
-    /// Append a new instruction
-    pub fn append(&mut self, instruction: Vec<String>) {
-        let key = primary_key_from_tuple(&instruction);
-        self.index.insert(key, self.instructions.len());
-        self.instructions.push(instruction);
-    }
-    
-    /// Rebuild the index from scratch
-    fn rebuild_index(&mut self) {
-        self.index.clear();
-        for (i, insn) in self.instructions.iter().enumerate() {
-            let key = primary_key_from_tuple(insn);
-            self.index.insert(key, i);
-        }
-    }
+    pub fn new(version: u64) -> Self { ... }
+    pub fn from_compiled(ir: &CompiledIR) -> Self { ... }
+    pub fn remove_by_key(&mut self, key_tuple: &[String]) -> bool { ... }
+    pub fn replace_by_key(&mut self, key_tuple: &[String], replacement: &[String]) -> bool { ... }
+    pub fn append(&mut self, instruction: Vec<String>) { ... }
+    pub fn contains_key(&self, key_tuple: &[String]) -> bool { ... }
+    fn rebuild_index(&mut self) { ... }
 }
 
-/// Top-level context state — tracks all files and the global symbol table.
+/// Top-level context state — tracks all files and their IR states.
+#[derive(Debug, Clone)]
 pub struct ContextState {
-    /// Per-file IR state
     files: HashMap<String, FileState>,
-    
-    /// Current version (monotonic)
     version: u64,
 }
 
 impl ContextState {
-    pub fn new() -> Self {
-        Self {
-            files: HashMap::new(),
-            version: 0,
-        }
-    }
-    
-    /// Load a full IR (first compression or catch-up)
-    pub fn load_ir(&mut self, ir: CompiledIR) {
-        let file_id = ir.file_id.clone();
-        let version = ir.version;
-        self.files.insert(file_id, FileState::from_compiled(&ir));
-        self.version = self.version.max(version);
-    }
-    
-    /// Apply a delta to update state.
-    /// Returns Ok(new_version) or Err(DeltaError).
-    pub fn apply(&mut self, delta: IRDelta) -> Result<u64, DeltaError> {
-        let file = self.files.get_mut(&delta.file)
-            .ok_or_else(|| DeltaError::UnknownFile(delta.file.clone()))?;
-        
-        // Validate version chain
-        if file.version != delta.from_version {
-            return Err(DeltaError::VersionMismatch {
-                expected: file.version,
-                got: delta.from_version,
-            });
-        }
-        
-        // Phase 1: Deletions (process first)
-        for del in &delta.ops.dels {
-            file.remove_by_key(del);
-        }
-        
-        // Phase 2: Modifications
-        for mod_op in &delta.ops.mods {
-            file.replace_by_key(&mod_op.key, &mod_op.replace);
-        }
-        
-        // Phase 3: Additions
-        for add in &delta.ops.adds {
-            file.append(add.clone());
-        }
-        
-        // Update version
-        file.version = delta.to_version;
-        self.version = self.version.max(delta.to_version);
-        
-        Ok(delta.to_version)
-    }
-    
-    /// Render human-readable output from current state
-    pub fn render_pretty(&self, file_id: &str, fidelity: Fidelity) -> Option<String> {
-        let file = self.files.get(file_id)?;
-        Some(ir_to_text(&file.instructions, fidelity))
-    }
-    
-    /// Get the raw IR for a file
-    pub fn get_ir(&self, file_id: &str) -> Option<&Vec<Vec<String>>> {
-        self.files.get(file_id).map(|f| &f.instructions)
-    }
-    
-    /// Get current version
-    pub fn version(&self) -> u64 {
-        self.version
-    }
-}
-
-// Helper functions
-fn primary_key_from_tuple(tuple: &[String]) -> String {
-    if tuple.is_empty() {
-        return String::new();
-    }
-    match tuple[0].as_str() {
-        "DEF_C" => format!("DEF_C:{}", tuple.get(1).unwrap_or(&String::new())),
-        "DEF_M" => format!("DEF_M:{}:{}", 
-            tuple.get(1).unwrap_or(&String::new()),
-            tuple.get(2).unwrap_or(&String::new())),
-        "DEF_F" => format!("DEF_F:{}:{}", 
-            tuple.get(1).unwrap_or(&String::new()),
-            tuple.get(2).unwrap_or(&String::new())),
-        "SIG" => format!("SIG:{}:{}", 
-            tuple.get(1).unwrap_or(&String::new()),
-            tuple.get(2).unwrap_or(&String::new())),
-        "RET" => format!("RET:{}", tuple.get(1).unwrap_or(&String::new())),
-        "FLAGS" => format!("FLAGS:{}", tuple.get(1).unwrap_or(&String::new())),
-        _ => tuple.join(":"),
-    }
-}
-
-fn key_string_from_tuple(key_tuple: &[String]) -> String {
-    primary_key_from_tuple(key_tuple)
+    pub fn new() -> Self { ... }
+    pub fn load_ir(&mut self, ir: CompiledIR) { ... }
+    pub fn apply(&mut self, delta: IRDelta) -> Result<u64, DeltaError> { ... }
+    pub fn render_pretty(&self, file_id: &str, fidelity: Fidelity) -> Option<String> { ... }
+    pub fn get_ir(&self, file_id: &str) -> Option<&Vec<Vec<String>>> { ... }
+    pub fn version(&self) -> u64 { ... }
+    pub fn has_file(&self, file_id: &str) -> bool { ... }
+    pub fn file_version(&self, file_id: &str) -> Option<u64> { ... }
+    pub fn instruction_count(&self, file_id: &str) -> Option<usize> { ... }
+    pub fn remove_file(&mut self, file_id: &str) -> bool { ... }
+    pub fn file_ids(&self) -> Vec<String> { ... }
 }
 ```
 
 ### Completion Criteria
 
-- [ ] `FileState` with instructions, index, and version tracking
-- [ ] `ContextState` with per-file management
-- [ ] `apply()` validates version chain before applying
-- [ ] Apply order: deletions → modifications → additions
-- [ ] `remove_by_key()` correctly removes and rebuilds index
-- [ ] `replace_by_key()` correctly replaces and updates index
-- [ ] `append()` adds instruction and updates index
-- [ ] `render_pretty()` delegates to `ir_to_text()`
-- [ ] `load_ir()` bootstraps state from full CompiledIR
-- [ ] Error cases: unknown file, version mismatch, missing symbol
-- [ ] Unit tests: apply add delta → new instruction present
-- [ ] Unit tests: apply remove delta → instruction absent
-- [ ] Unit tests: apply modify delta → instruction updated
-- [ ] Unit tests: version mismatch → DeltaError::VersionMismatch
-- [ ] Unit tests: unknown file → DeltaError::UnknownFile
-- [ ] Unit tests: sequential deltas (v1→v2→v3) apply correctly
-- [ ] `cargo clippy --all-targets -- -D warnings` passes
+- [x] `FileState` with instructions, index, and version tracking
+- [x] `ContextState` with per-file management
+- [x] `apply()` validates version chain before applying
+- [x] Apply order: deletions → modifications → additions
+- [x] `remove_by_key()` correctly removes and rebuilds index
+- [x] `replace_by_key()` correctly replaces and updates index
+- [x] `append()` adds instruction and updates index
+- [x] `render_pretty()` delegates to `ir_to_text()`
+- [x] `load_ir()` bootstraps state from full CompiledIR
+- [x] Error cases: unknown file, version mismatch, missing symbol
+- [x] Unit tests: apply add delta → new instruction present
+- [x] Unit tests: apply remove delta → instruction absent
+- [x] Unit tests: apply modify delta → instruction updated
+- [x] Unit tests: version mismatch → DeltaError::VersionMismatch
+- [x] Unit tests: unknown file → DeltaError::UnknownFile
+- [x] Unit tests: sequential deltas (v1→v2→v3) apply correctly
+- [x] `cargo clippy --all-targets -- -D warnings` passes
 
 ---
 
