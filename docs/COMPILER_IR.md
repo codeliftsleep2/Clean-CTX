@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0 (Proposed)
 **Last updated:** 2026-06-08
-**Status:** � Phase A Complete — Implementation In Progress
+**Status:** � Phase A Complete - Phase B Complete
 
 > **Living document.** This spec defines the evolution from text-based compression to a structured intermediate representation (IR) with delta-based state transport. It serves as the implementation guideline for the Compiler IR subsystem.
 
@@ -692,16 +692,16 @@ impl GlobalSymbolTable {
 
 ### Completion Criteria
 
-- [ ] `GlobalSymbolTable` struct implemented with all methods
-- [ ] `SymbolEntry` and `SymbolKind` defined
-- [ ] `next_alias()` generates correct prefixed aliases (C1, M1, F1, etc.)
-- [ ] `register()` / `unregister()` / `touch()` maintain all indexes
-- [ ] `get()` / `get_by_original()` / `get_file_symbols()` / `get_changed_since()` work correctly
-- [ ] Version bumping works (each `bump_version()` increments monotonically)
-- [ ] Unit tests: register 10 symbols across 3 files → verify lookup by alias, original, and file
-- [ ] Unit tests: unregister removes from all indexes
-- [ ] Unit tests: `get_changed_since()` returns correct subset
-- [ ] `cargo clippy --all-targets -- -D warnings` passes
+- [x] `GlobalSymbolTable` struct implemented with all methods
+- [x] `SymbolEntry` and `SymbolKind` defined
+- [x] `next_alias()` generates correct prefixed aliases (C1, M1, F1, etc.)
+- [x] `register()` / `unregister()` / `touch()` maintain all indexes
+- [x] `get()` / `get_by_original()` / `get_file_symbols()` / `get_changed_since()` work correctly
+- [x] Version bumping works (each `bump_version()` increments monotonically)
+- [x] Unit tests: register 10 symbols across 3 files → verify lookup by alias, original, and file
+- [x] Unit tests: unregister removes from all indexes
+- [x] Unit tests: `get_changed_since()` returns correct subset
+- [x] `cargo clippy --all-targets -- -D warnings` passes
 
 ---
 
