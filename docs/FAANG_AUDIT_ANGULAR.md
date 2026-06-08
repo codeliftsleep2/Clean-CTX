@@ -45,7 +45,7 @@ Each finding has a stable ID (`F-ANG-NN`). **Status reflects the post-audit stat
 | F-ANG-02 | 🟠 | Orphan `///` doc comment in `detect.rs` | 1 | ✅ Fixed — removed with the dead function |
 | F-ANG-03 | 🟠 | `extract_class_blocks` is a brittle duplicated state machine | 1 | ✅ Fixed (partial) — file content is now cached; full refactor deferred to F-ANG-15 |
 | F-ANG-04 | 🟠 | `compress_workspace_dir` re-reads every TS file | 1 | ✅ Fixed — single-pass read, content cached in `Arc<String>` per-call |
-| F-ANG-05 | 🔴 | `AngularGraph::resolved: bool` has no typestate | 1 | ⏳ Deferred — would touch `GraphCollector` API; documented as follow-up |
+| F-ANG-05 | 🔴 | `AngularGraph::resolved: bool` has no typestate | 1 | ✅ Fixed — split into `AngularGraphBuilder` (mutable) + `AngularGraph` (resolved); `build(self)` consumes builder; `register_class` not available on resolved graph (Track B) |
 | F-ANG-06 | 🟡 | `Φ` marker grammar is scattered `format!` strings | 1 | ⏳ Deferred — non-blocking; existing 9 builders are well-tested |
 | F-ANG-07 | 🟠 | `find_class_body_open` `else if let` chain on a primitive | 2 | ⏳ Deferred — cosmetic; existing tests pass |
 | F-ANG-08 | 🟠 | `find_matching_brace` returns `len-1` on no-match (silently) | 2 | ⏳ Deferred — `saturating_sub(1)` is documented; no panic |
@@ -470,7 +470,7 @@ The 283 tests cover the core mechanics, workspace operations, graph build/resolv
 | Area | Coverage | Status | Suggestion |
 |------|----------|--------|------------|
 | `mcp::workspace::compress_workspace_dir` (re-read) | **0 tests** | ⏳ Deferred | Add `READ_COUNT` AtomicUsize test |
-| `angular_meta::graph::AngularGraph` typestate | **0 tests** | ⏳ Deferred | Add `builder_consumes_self` test |
+| `angular_meta::graph::AngularGraph` typestate | **2 tests** | ✅ Fixed via `AngularGraphBuilder` (Track B) | `builder_consumes_self` + `resolved_flag_always_true_for_builder_output` |
 | `angular_meta::template::extract_template_shape` (deferred) | **2 tests** | ✅ Cached via OnceLock | — |
 | `angular_meta::footer::FooterBuilder::find_by_name` | **1 test** | ✅ O(1) verified | — |
 | `angular_meta::style::extract_style_shape` (forward) | **0 tests** | ⏳ Pending | Add `extracts_at_forward` test |

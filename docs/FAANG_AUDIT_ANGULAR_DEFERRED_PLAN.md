@@ -5,7 +5,7 @@
 **Deferred findings:** 11 (F-ANG-05, 06, 07, 08, 09, 11, 12, 13, 15, 16, 20)
 **This plan:** 9 of 11 fixed across 4 tracks; 2 punted with rationale
 
-**Status (updated 2026-06-07):** Track A ✅ **complete**. 5 of 11 deferred findings resolved (F-ANG-07, 08, 09, 12, 13). 291/291 tests pass, 0 clippy warnings. Remaining: Track B (F-ANG-05), Track C (F-ANG-06), Track D (F-ANG-15, F-ANG-03, F-ANG-20). Punted: F-ANG-11, F-ANG-16.
+**Status (updated 2026-06-08):** Track A ✅ **complete** (2026-06-07). Track B ✅ **complete** (2026-06-08). 6 of 11 deferred findings resolved (F-ANG-05, 07, 08, 09, 12, 13). 293/293 tests pass, 0 clippy warnings. Remaining: Track C (F-ANG-06), Track D (F-ANG-15, F-ANG-03, F-ANG-20). Punted: F-ANG-11, F-ANG-16.
 
 ---
 
@@ -16,10 +16,10 @@ The 11 deferred findings cluster into 4 natural refactor groups. Tracks are orde
 | Track | Findings | Effort | Risk | Status |
 |-------|----------|--------|------|--------|
 | **A** | Honest types for string walkers (F-ANG-07/08/09/12/13) | 0.5 d | Low | ✅ **Complete (2026-06-07)** — 5 findings fixed, 8 new tests, 291/291 pass |
-| **B** | `AngularGraph` typestate (F-ANG-05) | 0.5 d | Medium | 🔵 Independent of A |
+| **B** | `AngularGraph` typestate (F-ANG-05) | 0.5 d | Medium | ✅ **Complete (2026-06-08)** — F-ANG-05 fixed, 2 new tests, 293/293 pass |
 | **C** | `Φ` marker grammar centralisation (F-ANG-06) | 1.0 d | Low | 🔵 Independent of A/B |
 | **D** | God-function split (F-ANG-15) + `extract_class_blocks` rewrite (F-ANG-03) + insertion-order iteration (F-ANG-20) | 1.5 d | Medium | 🔵 Depends on A |
-| **Total** | **9 findings fixed** | **3.5 d** | — | 5/9 done |
+| **Total** | **9 findings fixed** | **3.5 d** | — | 6/9 done |
 | — | F-ANG-11 (deferred: syscall is cheap) | — | — | ⏭ Skip |
 | — | F-ANG-16 (deferred: rayon + tree-sitter `Send`) | — | — | ⏭ Follow-up PR |
 
@@ -308,13 +308,13 @@ This ordering puts the smallest, most independent refactor (Track A) first, leav
 | Track | Gate | Verification command | Status |
 |-------|------|----------------------|--------|
 | A | cargo test lib >= 168 pass; 0 clippy warnings | cargo test --lib && cargo clippy --all-targets -- -D warnings | 291/291 pass, 0 warnings |
-| B | AngularGraph typestate split; register_class no longer compiles | cargo test --lib && cargo doc --no-deps | Pending |
+| B | AngularGraph typestate split; register_class no longer compiles | cargo test --lib && cargo doc --no-deps | ✅ 293/293 pass, 0 warnings |
 | C | PhiLine trait; 1-step marker adds | cargo test --lib | Pending |
 | D | compress_workspace_dir <= 30 lines; extract_class_blocks <= 20 lines | cargo test --lib && wc -l src/mcp/workspace.rs | Pending |
 
 Final state after all 4 tracks: 9 of 11 deferred findings fixed (82%), 283 -> >=290 tests pass, 0 clippy warnings, 2 findings deferred with documented rationale.
 
-Actual state at 2026-06-07 (after Track A): 5 of 11 deferred findings fixed (45%); 291/291 tests pass (8 new), 0 clippy warnings; 2 findings deferred with documented rationale.
+Actual state at 2026-06-08 (after Track A + B): 6 of 11 deferred findings fixed (55%); 293/293 tests pass (2 new), 0 clippy warnings; 2 findings deferred with documented rationale.
 
 ---
 
@@ -329,5 +329,5 @@ The plan respects the existing audit methodology (risk-reduction-per-engineering
 
 **Track A landed cleanly on 2026-06-07** with all 5 of its targeted findings resolved, 8 new tests, 0 clippy warnings, and find_class_body_open / find_matching_brace promoted to pub(crate) so Track D's extract_class_blocks rewrite can proceed as planned.
 
-- Plan authored 2026-06-07. Source: docs/FAANG_AUDIT_ANGULAR.md. Track A completion recorded 2026-06-07.
+- Plan authored 2026-06-07. Source: docs/FAANG_AUDIT_ANGULAR.md. Track A completion recorded 2026-06-07. Track B completion recorded 2026-06-08.
 

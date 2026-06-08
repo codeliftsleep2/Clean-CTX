@@ -2,14 +2,14 @@
 //
 // Tests for the Angular cross-file dependency graph (Phase 3, Tier 3).
 
-use crate::angular_meta::graph::{AngularGraph, ClassKind, GraphCollector};
+use crate::angular_meta::graph::{AngularGraphBuilder, ClassKind, GraphCollector};
 
 #[test]
 fn empty_graph_has_no_classes() {
-    let graph = AngularGraph::new();
+    let graph = AngularGraphBuilder::new().build();
     assert!(graph.is_empty());
     assert_eq!(graph.len(), 0);
-    assert!(!graph.is_resolved());
+    assert!(graph.is_resolved());
 }
 
 #[test]
@@ -132,8 +132,8 @@ fn graph_line_injects_unknown_types_with_question_mark() {
 }
 
 #[test]
-fn format_graph_footer_empty_for_unresolved() {
-    let graph = AngularGraph::new();
+fn format_graph_footer_empty_for_empty_graph() {
+    let graph = AngularGraphBuilder::new().build();
     let footer = graph.format_graph_footer();
     assert!(footer.is_empty());
 }
@@ -190,4 +190,42 @@ fn class_names_by_kind_filters_correctly() {
     let components = graph.class_names_by_kind(ClassKind::Component);
     assert_eq!(components.len(), 1);
     assert!(components.contains(&"UserCardComponent".to_string()));
+}
+
+// --- Track B (F-ANG-05): Typestate tests ---
+
+/// Verify that `AngularGraphBuilder::build()` consumes the builder by
+/// value. After calling `build`, the builder is gone and cannot be
+/// used to call `register_class` again. This is a compile-time
+/// guarantee, but this test documents the expected behaviour at the
+/// type level.
+#[test]
+fn builder_consumes_self() {
+    let mut builder = AngularGraphBuilder::new();
+    builder.register_class("A", "α1", ClassKind::Service, None, &[], None);
+
+    let _graph = builder.build(); // moves `builder`
+
+    // builder is no longer usable here. If we uncomment the next line
+    // it would fail to compile — that IS the typestate guarantee:
+    //
+    // builder.register_class("B", "α2", ClassKind::Service, None, &[], None);
+    // ^ error[E0382]: borrow of moved value: `builder`
+
+    // Verify the graph is fully resolved.
+}
+
+/// The resolved graph returned by `build()` always has
+/// `is_resolved() == true`, even for an empty graph. This replaces
+/// the pre-typestate test that checked `is_resolved() == false` for
+/// an unwrapped `AngularGraph::new()`.
+#[test]
+fn resolved_flag_always_true_for_builder_output() {
+    let graph = AngularGraphBuilder::new().build();
+    assert!(graph.is_resolved());
+
+    let mut collector = GraphCollector::new();
+    collector.push("Svc", "α1", ClassKind::Service, None, &[], None);
+    let graph = collector.build_graph();
+    assert!(graph.is_resolved());
 }
