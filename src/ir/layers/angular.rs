@@ -90,14 +90,14 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                 class_name.to_string(),
             ));
 
-            if let Some(sel) = parse_meta_value(&metadata, "sel") {
+            if let Some(sel) = parse_meta_value(metadata, "sel") {
                 ops.push(CoreOp::TypeAlias(
                     format!("NG_SEL_{}", class_name),
                     sel.to_string(),
                 ));
             }
 
-            if let Some(injects_str) = parse_meta_value(&metadata, "injects") {
+            if let Some(injects_str) = parse_meta_value(metadata, "injects") {
                 let deps: Vec<String> =
                     injects_str.split(',').map(|s| s.trim().to_string()).collect();
                 if !deps.is_empty() {
@@ -126,7 +126,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             ));
 
             for kind in &["decl", "imp", "exp"] {
-                if let Some(values) = parse_meta_value(&metadata, kind) {
+                if let Some(values) = parse_meta_value(metadata, kind) {
                     let items: String = values
                         .trim_start_matches('[')
                         .trim_end_matches(']')
@@ -150,7 +150,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                 class_name.to_string(),
             ));
 
-            if let Some(sel) = parse_meta_value(&metadata, "sel") {
+            if let Some(sel) = parse_meta_value(metadata, "sel") {
                 ops.push(CoreOp::TypeAlias(
                     format!("NG_SEL_{}", class_name),
                     sel.to_string(),
@@ -169,7 +169,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                 class_name.to_string(),
             ));
 
-            if let Some(pname) = parse_meta_value(&metadata, "name") {
+            if let Some(pname) = parse_meta_value(metadata, "name") {
                 ops.push(CoreOp::TypeAlias(
                     format!("NG_PIPE_NAME_{}", class_name),
                     pname.to_string(),
