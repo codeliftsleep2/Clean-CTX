@@ -41,6 +41,11 @@
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
+│  │ Angular Meta-Layer (Φ markers + graph)           │   │
+│  │   detect → decorators → markers → bundler → graph│   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐   │
 │  │ MCP Prompts (cleanctx-notation system guide)     │   │
 │  └──────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
@@ -200,11 +205,33 @@ The `LocalStateCache` serves double duty:
 1. **Content-hash registry** — avoids re-compressing identical files in the same session
 2. **Baseline snapshot registry** — enables `diff_code_context` to produce AST-level deltas instead of full re-compressions on subsequent calls
 
+### Why string-based Meta-Layer extraction?
+
+The Meta-Layer walks raw text of existing `class.root` tree-sitter captures rather than building a new tree-sitter query or re-parsing the AST. This design choice:
+- Keeps the dependency footprint minimal (only `tree-sitter-html` for template parsing)
+- Avoids duplication with the core compression pipeline's capture logic
+- Runs at O(L) where L is the class body length — negligible compared to the parse step
+- Makes the Meta-Layer a self-contained additive pass that can be independently tested
+
+### Why word-boundary heuristics for modern Angular syntax?
+
+Angular 17+ template control-flow (`@if`, `@for`, `@switch`, `@defer`) is not valid HTML, so tree-sitter-html parses these tokens as opaque `text` nodes. The extractor uses word-boundary heuristics instead of regex to detect `@`-prefixed keywords, avoiding the `regex` crate dependency entirely. This keeps the binary size small and the attack surface minimal.
+
 ---
 
 ## Angular Meta-Layer (Phase 1 + 2 + 3)
 
-The Meta-Layer is **purely additive** — it never modifies the existing TS compaction output. It only appends a `Φ` block below the existing compacted class. Non-Angular files pay zero overhead.
+The Meta-Layer is **purely additive** — it never modifies the existing TS compaction output. It only appends a `Φ` block below the existing compacted class. Non-Angular files pay zero overhead (byte-identical output).
+
+### Fidelity-Aware Output (F-ANG-23)
+
+The Meta-Layer respects the compression fidelity level:
+
+| Fidelity | Meta-Layer Output |
+|----------|-------------------|
+| **Low** | Class-level summaries only: `Φcmp:`, `Φsvc:`, `Φdir:`, `Φpipe:`, `Φmod:`. No field-level `@Input`/`@Output`, no `Φinjects:`. |
+| **Medium** | Adds field-level `Φin:` / `Φout:` markers. Skips `Φinjects:` (class summary already shows the class). |
+| **High** | Full output: adds `Φinjects:` with constructor DI types, `Φmodel:` for signal-based APIs, and `input()`/`output()` signal lines. |
 
 ### Phase 1 — Decorator Extraction (single-file mode)
 
@@ -262,6 +289,23 @@ The Meta-Layer is **purely additive** — it never modifies the existing TS comp
 └─────────────────────┘
 ```
 
+### Phase 2.5 — Modern Angular Syntax (Angular 17–21)
+
+Supports Angular's evolving template and decorator syntax:
+
+| Feature | Syntax | Detection |
+|---------|--------|-----------|
+| Control flow | `@if`, `@for`, `@switch`, `@else`, `@case`, `@empty` | Text-node word-boundary scanning |
+| Defer blocks | `@defer (on viewport)`, `@placeholder`, `@loading`, `@error` | Text-node scanning with trigger extraction |
+| `@let` declarations | `@let user = expr` | Text-node scanning |
+| Signal inputs | `readonly x = input<T>()` | Class body scan (High fidelity) |
+| Signal outputs | `readonly x = output<T>()` | Class body scan (High fidelity) |
+| Model signals | `readonly x = model(false)` | Class body scan (High fidelity) |
+| Signal inject | `private x = inject(Service)` | Class body scan (High fidelity) |
+| Self-closing tags | `<app-avatar />` | tree-sitter `self_closing_tag` node |
+
+These are embedded in the `Φtpl:` marker line (`@if`, `@for`) or emit their own `Φ` markers (`Φmodel:`, `Φin:...signal`).
+
 ### Phase 3 — Cross-File Dependency Graph (workspace mode only)
 
 ```  
@@ -296,11 +340,16 @@ The Meta-Layer is **purely additive** — it never modifies the existing TS comp
 └──────────────────────────┘
 ```
 
-**New module:** `src/angular_meta/graph.rs` — `AngularGraph`, `AngularGraphHandle`, `GraphCollector`, `ClassKind`
+**Modules:** `src/angular_meta/` — `mod.rs`, `detect.rs`, `decorators.rs`, `markers.rs`, `bundler.rs`, `template.rs`, `style.rs`, `footer.rs`, `graph.rs`, `graph_state.rs`
 
 **Added to McpState:** `angular_graph: AngularGraphHandle` — built once per `compress_workspace` call
 
-**Additional Φ markers:** `Φgraph:<ClassName> → injects=[…] ← injected-by=[…]`, `§ΦGRAPH` footer section
+**Marker vocabulary:** `Φcmp:`, `Φdir:`, `Φpipe:`, `Φsvc:`, `Φmod:`, `Φin:`, `Φout:`, `Φmodel:`, `Φinjects:`, `Φtpl:`, `Φsty:`, `ΦBUNDLE`, `ΦMAP`, `Φgraph:`, `§ΦGRAPH`
+
+**Key design decisions:**
+- **String-based extraction (no AST re-parse)** — the Meta-Layer walks raw text of existing `class.root` captures rather than building a new tree-sitter query. This keeps the dependency footprint minimal (only `tree-sitter-html` for templates) and avoids duplication with the core compression pipeline.
+- **Typestate pattern (F-ANG-05)** — `AngularGraph` can only be created via `AngularGraphBuilder::build()`, making it a compile-time error to register classes after resolution.
+- **Text-node scanning for modern syntax** — `@if`/`@for`/`@switch` are not valid HTML, so tree-sitter-html parses them as opaque `text` nodes. The extractor uses word-boundary heuristics instead of regex to avoid adding dependencies.
 
 **Resolution rules:**
 - Constructor `private` / `protected` params resolve to `Type@αN` where the type is a registered `@Injectable` class
@@ -308,13 +357,9 @@ The Meta-Layer is **purely additive** — it never modifies the existing TS comp
 - Unknown types get a `?` suffix (e.g., `HttpClient?`) — no spurious errors
 - Transitive dependencies are tracked (if A injects B which injects C, all edges are recorded)
 
-**Modules:** `src/angular_meta/` — `mod.rs`, `detect.rs`, `decorators.rs`, `markers.rs`, `bundler.rs`, `template.rs`, `style.rs`, `footer.rs`, `graph.rs`, `graph_state.rs`
-
-**Marker vocabulary:** `Φcmp:`, `Φdir:`, `Φpipe:`, `Φsvc:`, `Φmod:`, `Φin:`, `Φout:`, `Φinjects:`, `Φtpl:`, `Φsty:`, `ΦBUNDLE`, `ΦMAP`, `Φgraph:`, `§ΦGRAPH`
-
 **Config:** `meta_layers.angular.enabled` in `.clean-ctx.json` (default: on)
 
-**Dependencies:** `tree-sitter-html = "=0.20.0"` (unchanged from Phase 2)
+**Dependencies:** `tree-sitter-html = "=0.20.0"` (Phase 2+)
 
 ---
 

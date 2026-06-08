@@ -46,6 +46,17 @@ Clean-CTX is designed for **air-gapped environments** with restrictive firewall 
 | Data in transit | ✅ N/A | Data never leaves the process boundary |
 | Memory safety | ✅ Safe Rust | All memory operations are bounds-checked at compile time |
 
+### Angular Meta-Layer
+
+| Requirement | Status | Detail |
+|-------------|--------|--------|
+| No code mutation | ✅ Purely additive | Meta-Layer never modifies TS compaction output; only appends Φ blocks |
+| Zero overhead for non-Angular | ✅ Byte-identical | Non-Angular files produce identical output to builds without Meta-Layer |
+| No file system access | ✅ In-memory only | Graph, bundler, and footer state are ephemeral; discarded after workspace emit |
+| No external data leakage | ✅ No network | Graph resolution stays in-process; no external lookups |
+| tree-sitter-html sandboxed | ✅ Parse-only | Template parser receives raw HTML and returns structural shape; no eval, no code execution |
+| Detection heuristic safe | ✅ String scanning | Angular detection uses `source.contains()` — no regex, no complex parsing |
+
 ---
 
 ## Binary Verification
@@ -179,6 +190,11 @@ This project has no external vulnerability reporting process yet. For security i
 | No logging to disk | Prevents sensitive source code from appearing in log files (errors go to stderr only) |
 | Config is cached at startup | Prevents TOCTOU (time-of-check-time-of-use) attacks on `.clean-ctx.json` |
 | BPE data embedded in binary | Prevents man-in-the-middle attacks on BPE model data at startup |
+| Meta-Layer is purely additive | Non-Angular files produce byte-identical output; no risk of silent data corruption |
+| AngularGraph is in-memory only | Cross-file dependency graph is discarded after each workspace call; no persistence, no disk writes |
+| No regex in Meta-Layer | Detection and template extraction use string scanning and word-boundary heuristics; avoids ReDoS-class vulnerabilities |
+| tree-sitter-html parse-only | Template parser receives HTML and returns structural metadata; no code execution, no network calls |
+| Fidelity controls Meta-Layer depth | Low fidelity emits minimal markers; reduces attack surface by limiting the amount of framework metadata exposed |
 
 ---
 
@@ -199,6 +215,7 @@ cargo bom --output-path docs/sbom.spdx.json
 | `tree-sitter` | 0.20.10 | MIT | AST parsing framework |
 | `tree-sitter-typescript` | 0.20.5 | MIT | TypeScript grammar |
 | `tree-sitter-c-sharp` | 0.20.0 | MIT | C# grammar |
+| `tree-sitter-html` | 0.20.0 | MIT | HTML grammar (Angular template parsing) |
 | `tiktoken-rs` | 0.11 | MIT | cl100k BPE token counting |
 | `serde` | 1.0 | MIT/Apache-2.0 | JSON serialization |
 | `serde_json` | 1.0 | MIT/Apache-2.0 | JSON parsing |
@@ -206,6 +223,14 @@ cargo bom --output-path docs/sbom.spdx.json
 | `clap` | 4.6.1 | MIT/Apache-2.0 | CLI argument parsing |
 
 All dependencies are MIT or Apache-2.0 licensed. Zero GPL or AGPL dependencies.
+
+### Meta-Layer Dependency Notes
+
+The `tree-sitter-html` crate (added in Phase 2) is the only dependency introduced by the Meta-Layer. It is:
+- **Parse-only** — receives HTML content and returns a syntax tree; no file I/O, no network calls
+- **Memory-safe** — written in safe Rust with the same tree-sitter runtime used by the TypeScript and C# grammars
+- **Pinned version** — `=0.20.0` in `Cargo.toml` prevents automatic upgrades that could introduce behavioral changes
+- **Audit-friendly** — `cargo audit` covers it alongside all other dependencies
 
 ---
 
