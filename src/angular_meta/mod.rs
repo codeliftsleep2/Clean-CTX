@@ -1,6 +1,6 @@
 // src/angular_meta/mod.rs
 //
-// Angular Meta-Layer — Tier 1 (Decorator Extraction).
+// Angular Meta-Layer — Tier 1 (Decorators) + Tier 2 (File-Triplet Bundling).
 //
 // The Meta-Layer is **purely additive**: it never modifies the existing
 // TS compaction output. It only appends a `Φ` block below the existing
@@ -8,23 +8,25 @@
 // enriched output with `@Component` / `@Injectable` / `@Input` /
 // `@Output` context.
 //
-// # Phase 1 scope
-//
-// Only Tier 1 (decorators) is implemented. Tier 2 (file-triplet
-// bundling) and Tier 3 (cross-file graph) are deferred to subsequent
-// phases per `docs/ANGULAR_META_LAYER.md`.
-//
 // # Module structure
 //
 // - `detect`     : Angular detection heuristic
 // - `decorators` : `@Component` / `@Injectable` / `@NgModule` /
 //                  `@Directive` / `@Pipe` / `@Input` / `@Output` extractor
 // - `markers`    : `Φ` marker construction & expansion
+// - `bundler`    : file-triplet resolver (*.component.ts → .html + .scss)
+// - `template`   : tree-sitter-html Angular-syntax template extractor
+// - `style`      : CSS/SCSS class + var extractor
+// - `footer`     : `§ΦMAP` workspace footer formatter
 // - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
 
 pub(crate) mod decorators;
 pub(crate) mod detect;
 pub(crate) mod markers;
+pub mod bundler;
+pub mod template;
+pub mod style;
+pub mod footer;
 
 use crate::compression::Fidelity;
 

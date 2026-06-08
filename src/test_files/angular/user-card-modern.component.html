@@ -1,0 +1,44 @@
+@if (isLoggedIn) {
+  <app-avatar [user]="user" (avatarClick)="onAvatarClicked()" />
+  <div class="user-info">
+    <p>{{ user.name }} - {{ user.email }}</p>
+  </div>
+} @else {
+  <button (click)="login()">Log in</button>
+}
+
+@for (item of items; track item.id) {
+  <div class="list-item">
+    <span>{{ item.label }}</span>
+    <span [style.color]="item.color">{{ item.value }}</span>
+  </div>
+} @empty {
+  <p>No items found.</p>
+}
+
+@switch (viewMode) {
+  @case ('grid') {
+    <app-grid-view [data]="items" />
+  }
+  @case ('list') {
+    <app-list-view [data]="items" />
+  }
+  @default {
+    <p>Select a view mode</p>
+  }
+}
+
+@defer (on viewport) {
+  <app-heavy-component [config]="heavyConfig" />
+} @placeholder {
+  <div class="placeholder">Loading heavy component...</div>
+} @loading {
+  <app-spinner />
+}
+
+@defer (on idle) {
+  <app-analytics-widget />
+}
+
+@let greeting = 'Hello ' + userName;
+@let user = user$ | async;

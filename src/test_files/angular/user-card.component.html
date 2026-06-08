@@ -1,0 +1,13 @@
+<!-- src/test_files/angular/user-card.component.html
+     Test fixture: Angular template with common syntax patterns. -->
+<div class="card" *ngIf="isVisible">
+  <h2>{{ userName }}</h2>
+  <p class="card-text">{{ userId }}</p>
+  <app-avatar [userId]="userId" (avatarClick)="onAvatarClicked()"></app-avatar>
+  <button [(ngModel)]="editMode" (click)="toggleEdit()">
+    {{ editMode ? 'Save' : 'Edit' }}
+  </button>
+  <div *ngFor="let item of items">
+    <span [style.color]="item.color">{{ item.name }}</span>
+  </div>
+</div>

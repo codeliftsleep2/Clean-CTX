@@ -1,0 +1,20 @@
+<div class="page-header">
+  <h1>{{ title }}</h1>
+  <button *ngIf="showAdd" (click)="onAdd()">Add</button>
+</div>
+
+@if (items.length > 0) {
+  <div *ngFor="let item of items; trackBy: trackFn" class="card">
+    <app-avatar [userId]="item.userId" (avatarClick)="onAvatarClicked(item)"></app-avatar>
+    <span>{{ item.name }}</span>
+    <span *ngIf="item.isActive" class="badge">Active</span>
+  </div>
+
+  <div class="footer">
+    @if (items.length > 10) {
+      <button (click)="loadMore()">Load more</button>
+    }
+  </div>
+} @else {
+  <p class="empty-state">No items available.</p>
+}

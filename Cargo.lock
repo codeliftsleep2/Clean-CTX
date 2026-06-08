@@ -178,6 +178,7 @@ dependencies = [
  "tiktoken-rs",
  "tree-sitter",
  "tree-sitter-c-sharp",
+ "tree-sitter-html",
  "tree-sitter-typescript",
 ]
 
@@ -579,6 +580,16 @@ name = "tree-sitter-c-sharp"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9ab3dc608f34924fa9e10533a95f62dbc14b6de0ddd7107722eba66fe19ae31"
+dependencies = [
+ "cc",
+ "tree-sitter",
+]
+
+[[package]]
+name = "tree-sitter-html"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "017822b6bd42843c4bd67fabb834f61ce23254e866282dd93871350fd6b7fa1d"
 dependencies = [
  "cc",
  "tree-sitter",

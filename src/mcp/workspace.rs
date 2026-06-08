@@ -13,51 +13,41 @@
 // F-09/F-13: the workspace result is now a structured
 // [`WorkspaceResult`] instead of a bare `String`, and per-file
 // alias cross-references are emitted in the manifest.
+//
+// Phase 2: Angular file-triplet bundling. After all compressible
+// files have been compressed, a post-compression bundling pass
+// resolves file triplets (*.component.ts → .html + .scss),
+// extracts template/style shape summaries, and emits ΦBUNDLE
+// groups with a §ΦMAP footer.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use crate::compressor::compress_file;
 use crate::compression::Fidelity;
 use crate::mcp::McpState;
+use crate::angular_meta::bundler;
+use crate::angular_meta::footer::FooterBuilder;
+use crate::angular_meta::template;
+use crate::angular_meta::style;
 
-/// F-17 (FAANG audit): maximum directory recursion depth for workspace
-/// traversal. Prevents stack overflow on pathological directory trees.
+/// F-17: maximum directory recursion depth.
 const MAX_WALK_DEPTH: usize = 32;
 
+/// File extensions eligible for direct compression.
+const COMPRESSIBLE_EXTENSIONS: &[&str] = &["ts", "js", "cs"];
+
+/// Angular-adjacent file extensions for shape extraction (not compressed).
+const ANGULAR_EXTENSIONS: &[&str] = &["html", "scss", "css", "sass", "less"];
+
 /// Structured result of a workspace compression pass.
-///
-/// F-13 (FAANG audit): errors used to be inlined as `// ERROR`
-/// comments inside the manifest string. They are now surfaced as
-/// a separate `errors` field so MCP clients can programmatically
-/// inspect failures without parsing comments.
 #[derive(Debug, Clone)]
 pub struct WorkspaceResult {
-    /// The full manifest string with per-file compressed output,
-    /// exclusion report, and path-alias footer.
     pub manifest: String,
-    /// Per-file errors encountered during compression.
     pub errors: Vec<(String, String)>,
-    /// Files skipped due to config exclusion patterns.
     pub excluded: Vec<String>,
 }
 
-/// Scan a directory for .ts/.cs files and compress each one.
-///
-/// F-05: the per-file compressions now share the path dictionary
-/// and cache in `state`, and the config's `exclude_patterns` are
-/// consulted per entry. Per-file errors are collected into a
-/// structured `errors` field instead of being inlined as
-/// `// ERROR` comments.
-///
-/// F-09: per-file alias cross-references (`// α1 = /path/to/file.ts`)
-/// are emitted in the manifest so LLM clients can correlate the
-/// per-file block with the global path map.
-///
-/// Borrow-checker note: the function destructures `state` to split
-/// the dict and cache into two independent `&mut` references. The
-/// `.dict_mut()` / `.cache_mut()` accessor pattern would not
-/// compile here because Rust treats the two `state.field_mut()`
-/// calls as overlapping mutable borrows of the same struct.
+/// Scan a directory, compress source files, and bundle Angular triplets.
 pub(crate) fn compress_workspace_dir(
     dir_path: &str,
     fidelity: Fidelity,
@@ -78,12 +68,8 @@ pub(crate) fn compress_workspace_dir(
     let mut excluded: Vec<String> = Vec::new();
     let mut errors: Vec<(String, String)> = Vec::new();
 
-    // Collect all .ts and .cs files recursively.
     collect_source_files(dir_path, &mut entries);
 
-    // Apply the user's exclude patterns up front so the manifest
-    // can report the skip count and the per-file exclusions are
-    // not silently absorbed into "ERROR ..." comments.
     let kept: Vec<String> = entries
         .into_iter()
         .filter(|p| {
@@ -96,19 +82,27 @@ pub(crate) fn compress_workspace_dir(
         })
         .collect();
 
-    // Destructure to split-borrow dict and cache out of `state`
-    // so we can call `compress_file` with both. (Rust's borrow
-    // checker treats two `state.field_mut()` calls in the same
-    // expression as overlapping mutable borrows; destructuring
-    // gives us two independent `&mut` references.)
+    // Separate compressible from Angular-adjacent files.
+    let mut compressible: Vec<String> = Vec::new();
+    let mut angular_files: Vec<String> = Vec::new();
+    for entry in &kept {
+        let ext = Path::new(entry)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
+        if COMPRESSIBLE_EXTENSIONS.contains(&ext) {
+            compressible.push(entry.clone());
+        } else if ANGULAR_EXTENSIONS.contains(&ext) {
+            angular_files.push(entry.clone());
+        }
+    }
+
     let McpState { dict, cache, config: _ } = state;
 
-    for entry in &kept {
+    // Compress compressible files (ts/js/cs).
+    for entry in &compressible {
         match compress_file(PathBuf::from(entry), dict, cache, fidelity) {
             Ok(compressed) => {
-                // F-09: emit the per-file alias cross-reference so
-                // LLM clients can correlate the block with the
-                // path map footer.
                 let absolute = std::fs::canonicalize(entry)
                     .map(|p| p.to_string_lossy().into_owned())
                     .unwrap_or_else(|_| entry.clone());
@@ -127,6 +121,84 @@ pub(crate) fn compress_workspace_dir(
         }
     }
 
+    // Phase 2: Bundling pass.
+    let mut footer_builder = FooterBuilder::new();
+    let mut bundle_count = 0usize;
+
+    for entry in &compressible {
+        let path = Path::new(entry);
+        if !bundler::is_component_ts(path) {
+            continue;
+        }
+
+        let Some(triplet) = bundler::resolve_triplet(path) else {
+            continue;
+        };
+
+        let component_abs = std::fs::canonicalize(entry)
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| entry.clone());
+        let component_alias = dict.get_or_create_alias(component_abs);
+
+        let mut file_aliases = vec![component_alias];
+        let mut tpl_summary = None;
+        let mut sty_summary = None;
+
+        if let Some(ref tpl_path) = triplet.template {
+            if let Ok(tpl_abs) = std::fs::canonicalize(tpl_path) {
+                let a = dict.get_or_create_alias(tpl_abs.to_string_lossy().into_owned());
+                file_aliases.push(a);
+            }
+            if let Ok(content) = std::fs::read_to_string(tpl_path) {
+                let shape = template::extract_template_shape(&content);
+                tpl_summary = Some(shape.to_marker_line());
+            }
+        }
+
+        if let Some(ref sty_path) = triplet.style {
+            if let Ok(sty_abs) = std::fs::canonicalize(sty_path) {
+                let a = dict.get_or_create_alias(sty_abs.to_string_lossy().into_owned());
+                file_aliases.push(a);
+            }
+            if let Ok(content) = std::fs::read_to_string(sty_path) {
+                let shape = style::extract_style_shape(&content);
+                sty_summary = Some(shape.to_marker_line());
+            }
+        }
+
+        let _bundle_alias = dict.get_or_create_bundle_alias(triplet_name(path));
+
+        bundle_count += 1;
+        manifest.push_str(&format!(
+            "// ===== Φ{}: {} =====\n",
+            bundle_count,
+            triplet_name(path),
+        ));
+        manifest.push_str(&format!("// files: {}\n", file_aliases.join(", ")));
+        if let Some(ref t) = tpl_summary {
+            manifest.push_str(&format!("// {}\n", t));
+        }
+        if let Some(ref s) = sty_summary {
+            manifest.push_str(&format!("// {}\n", s));
+        }
+        manifest.push('\n');
+
+        footer_builder.register_bundle(
+            triplet_name(path),
+            file_aliases,
+            tpl_summary,
+            sty_summary,
+        );
+    }
+
+    // Register Angular-adjacent files not part of a bundle as α-aliases.
+    for entry in &angular_files {
+        let abs = std::fs::canonicalize(entry)
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| entry.clone());
+        dict.get_or_create_alias(abs);
+    }
+
     if !excluded.is_empty() {
         manifest.push_str(&format!("// EXCLUDED ({} files):\n", excluded.len()));
         for path in &excluded {
@@ -141,8 +213,8 @@ pub(crate) fn compress_workspace_dir(
         }
     }
 
-    // Append the global path map.
     manifest.push_str(&dict.format_footer());
+    manifest.push_str(&footer_builder.build());
 
     Ok(WorkspaceResult {
         manifest,
@@ -151,11 +223,7 @@ pub(crate) fn compress_workspace_dir(
     })
 }
 
-/// Recursively collect .ts and .cs files from a directory.
-///
-/// F-17 (FAANG audit): tracks visited canonical paths to detect
-/// symlink loops, and enforces a maximum recursion depth to prevent
-/// stack overflow on pathological directory trees.
+/// Recursively collect source files from a directory.
 pub(crate) fn collect_source_files(dir: &str, entries: &mut Vec<String>) {
     let mut visited = HashSet::new();
     collect_source_files_inner(dir, entries, &mut visited, 0);
@@ -173,13 +241,12 @@ fn collect_source_files_inner(
 
     let dir_path = Path::new(dir);
 
-    // F-17: canonicalize the directory and check for loops.
     let canonical = match std::fs::canonicalize(dir_path) {
         Ok(p) => p,
-        Err(_) => return, // inaccessible directory, skip silently
+        Err(_) => return,
     };
     if !visited.insert(canonical) {
-        return; // symlink loop detected
+        return;
     }
 
     if let Ok(read_dir) = std::fs::read_dir(dir_path) {
@@ -187,7 +254,6 @@ fn collect_source_files_inner(
             let path = entry.path();
             let name = path.file_name().unwrap_or_default().to_string_lossy();
 
-            // Skip hidden dirs, node_modules, target, etc.
             if name.starts_with('.')
                 || name == "node_modules"
                 || name == "target"
@@ -197,8 +263,6 @@ fn collect_source_files_inner(
             }
 
             if path.is_dir() {
-                // F-17: canonicalize the child dir; if it's a symlink
-                // that points to an already-visited location, skip it.
                 if let Ok(child_canonical) = std::fs::canonicalize(&path)
                     && visited.contains(&child_canonical)
                 {
@@ -212,12 +276,22 @@ fn collect_source_files_inner(
                 );
             } else if path.is_file() {
                 let ext = path.extension().unwrap_or_default().to_string_lossy();
-                if ext == "ts" || ext == "js" || ext == "cs" {
+                if COMPRESSIBLE_EXTENSIONS.contains(&ext.as_ref())
+                    || ANGULAR_EXTENSIONS.contains(&ext.as_ref())
+                {
                     entries.push(path.to_string_lossy().into_owned());
                 }
             }
         }
     }
+}
+
+/// Extract the triplet name from a component path.
+fn triplet_name(path: &Path) -> String {
+    path.file_stem()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 #[cfg(test)]

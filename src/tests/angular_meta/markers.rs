@@ -4,8 +4,8 @@
 
 use crate::angular_meta::markers::{
     build_component_line, build_directive_line, build_injects_line, build_input_line,
-    build_module_line, build_output_line, build_pipe_line, build_service_line, expand_phi,
-    expand_phi_in_line, ComponentFields,
+    build_model_line, build_module_line, build_output_line, build_pipe_line, build_service_line,
+    expand_phi, expand_phi_in_line, ComponentFields,
 };
 
 #[test]
@@ -95,6 +95,18 @@ fn output_line_emits_alias() {
 }
 
 #[test]
+fn model_line_emits_field_name() {
+    let line = build_model_line("checked", None);
+    assert_eq!(line, "Φmodel:checked");
+}
+
+#[test]
+fn model_line_emits_alias() {
+    let line = build_model_line("checked", Some("isChecked"));
+    assert_eq!(line, "Φmodel:checked alias=isChecked");
+}
+
+#[test]
 fn injects_line_joins_types() {
     let line = build_injects_line(&["UserService".to_string(), "HttpClient".to_string()]);
     assert_eq!(line, "Φinjects:[UserService,HttpClient]");
@@ -135,16 +147,17 @@ fn expand_phi_single_token() {
     assert_eq!(expand_phi("Φsvc"), Some("@Injectable"));
     assert_eq!(expand_phi("Φin"), Some("@Input"));
     assert_eq!(expand_phi("Φout"), Some("@Output"));
+    assert_eq!(expand_phi("Φmodel"), Some("@Model"));
     assert_eq!(expand_phi("Φunknown"), None);
 }
 
 #[test]
 fn phi_in_line_rewrite_is_idempotent_only_known_tokens() {
     // Multiple known tokens in one line.
-    let line = "Φcmp:Foo sel=a;Φin:bar;Φout:baz";
+    let line = "Φcmp:Foo sel=a;Φin:bar;Φout:baz;Φmodel:checked";
     let expanded = expand_phi_in_line(line);
     assert_eq!(
         expanded,
-        "@Component Foo sel=a;@Input bar;@Output baz"
+        "@Component Foo sel=a;@Input bar;@Output baz;@Model checked"
     );
 }

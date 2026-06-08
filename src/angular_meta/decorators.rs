@@ -1,9 +1,11 @@
 // src/angular_meta/decorators.rs
 //
-// Angular decorator extraction — Tier 1 of the Meta-Layer.
+// Angular decorator extraction — Tier 1 + 2.5b of the Meta-Layer.
 //
 // Given the raw text of a `class_declaration` capture, extract every
 // Angular decorator and emit one `Φ` marker line per class.
+// Also detects signal-based function calls (`input()`, `output()`,
+// `model()`, `inject()`) in the class body (Phase 2.5b).
 //
 // # Strategy
 //
@@ -19,12 +21,13 @@
 
 use crate::angular_meta::markers::{
     build_component_line, build_directive_line, build_injects_line, build_input_line,
-    build_module_line, build_output_line, build_pipe_line, build_service_line, ComponentFields,
+    build_model_line, build_module_line, build_output_line, build_pipe_line, build_service_line,
+    ComponentFields,
 };
 
 /// Extract every Angular decorator on the given class capture and
 /// emit the corresponding `Φ` marker lines. Returns `None` if no
-/// Angular decorator is present.
+/// Angular decorator or signal-based API is present.
 ///
 /// `raw_class` is the text of a `class_declaration` capture as
 /// produced by the TS capture pipeline.
@@ -32,15 +35,8 @@ pub fn extract_decorators(raw_class: &str) -> Option<Vec<String>> {
     let head_end = find_class_head_end(raw_class);
     let head = &raw_class[..head_end];
 
-    if !head.contains('@') {
-        return None;
-    }
-
     let class_name = extract_class_name(raw_class);
     let decorators = collect_decorators(head);
-    if decorators.is_empty() {
-        return None;
-    }
 
     let mut lines: Vec<String> = Vec::new();
     let mut input_output_lines: Vec<String> = Vec::new();
@@ -88,11 +84,6 @@ pub fn extract_decorators(raw_class: &str) -> Option<Vec<String>> {
     // Field-level markers: scan the class body for
     // `@Input(...)` / `@Output(...)` decorators attached to
     // individual field declarations.
-    //
-    // We must find the class body's `{`, not the first `{` in the
-    // raw capture (which may be inside `@Component({...})`).
-    // Walk past nested braces (decorator object literals) to
-    // locate the `class` keyword, then take the next `{`.
     if let Some(class_body_start) = find_class_body_open(raw_class) {
         let body = &raw_class[class_body_start..];
         let body_end = find_matching_brace(body, 0);
@@ -125,6 +116,49 @@ pub fn extract_decorators(raw_class: &str) -> Option<Vec<String>> {
     if let Some(line) = pipe_emit {
         lines.push(line);
     }
+
+    // --- Phase 2.5b: Signal-based function calls ---
+    // Detect `input()`, `output()`, `model()`, and `inject()` function
+    // calls in the class body (Angular 17.1+ signal API).
+    let mut inject_fn_types: Vec<String> = Vec::new();
+    if let Some(class_body_start) = find_class_body_open(raw_class) {
+        let body = &raw_class[class_body_start..];
+        let body_end = find_matching_brace(body, 0);
+        let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
+        for sf in collect_signal_fields(body_inner) {
+            match sf.kind {
+                SignalKind::Input => {
+                    let mut line = build_input_line(&sf.name, sf.alias.as_deref());
+                    if !line.ends_with(" signal") {
+                        line.push_str(" signal");
+                    }
+                    input_output_lines.push(line);
+                }
+                SignalKind::Output => {
+                    let mut line = build_output_line(&sf.name, sf.alias.as_deref());
+                    if !line.ends_with(" signal") {
+                        line.push_str(" signal");
+                    }
+                    input_output_lines.push(line);
+                }
+                SignalKind::Model => {
+                    lines.push(build_model_line(&sf.name, sf.alias.as_deref()));
+                }
+                SignalKind::Inject => {
+                    inject_fn_types.push(sf.name.clone());
+                }
+            }
+        }
+    }
+
+    // Emit inject() function calls.
+    if !inject_fn_types.is_empty() {
+        let mut sorted = inject_fn_types.clone();
+        sorted.sort();
+        sorted.dedup();
+        lines.push(build_injects_line(&sorted));
+    }
+
     lines.extend(input_output_lines);
 
     if let Some(types) = extract_constructor_injects(raw_class)
@@ -157,6 +191,95 @@ enum DecoratorKind {
     Input,
     Output,
     Other,
+}
+
+// --- Phase 2.5b: Signal-based function calls ---
+
+/// Kind of signal-based Angular API function call detected in
+/// the class body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SignalKind {
+    Input,
+    Output,
+    Model,
+    Inject,
+}
+
+/// A detected signal-function call with its field name and optional alias.
+#[derive(Debug, Clone)]
+struct SignalField {
+    kind: SignalKind,
+    name: String,
+    alias: Option<String>,
+}
+
+/// Scan the class body for signal-based Angular function calls:
+/// `input()`, `output()`, `model()`, `inject()`.
+///
+/// These are `= funcName(...)` assignments at the field level. We scan
+/// for the pattern: `fieldName = funcName(...)`.
+fn collect_signal_fields(body: &str) -> Vec<SignalField> {
+    let mut out: Vec<SignalField> = Vec::new();
+    let bytes = body.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+
+    while i < len {
+        if bytes[i] == b'=' {
+            let after_eq = i + 1;
+            let mut scan = after_eq;
+            while scan < len && (bytes[scan] == b' ' || bytes[scan] == b'\t') {
+                scan += 1;
+            }
+            if scan < len {
+                let (func_name, open_paren) =
+                    if scan + 5 < len && &body[scan..scan + 6] == "input(" {
+                        ("input", scan + 5)
+                    } else if scan + 5 < len && &body[scan..scan + 6] == "model(" {
+                        ("model", scan + 5)
+                    } else if scan + 6 < len && &body[scan..scan + 7] == "output(" {
+                        ("output", scan + 6)
+                    } else if scan + 5 < len
+                        && &body[scan..scan + 6] == "inject"
+                        && scan + 6 < len
+                        && bytes[scan + 6] == b'('
+                    {
+                        ("inject", scan + 6)
+                    } else {
+                        i += 1;
+                        continue;
+                    };
+
+                let kind = match func_name {
+                    "input" => SignalKind::Input,
+                    "output" => SignalKind::Output,
+                    "model" => SignalKind::Model,
+                    "inject" => SignalKind::Inject,
+                    _ => unreachable!(),
+                };
+
+                let (_, arg) = consume_call_expression(body, open_paren);
+                let alias = parse_first_string_arg(&arg);
+
+                // Walk backwards from `=` to find the field name.
+                let name_end = if i > 0 { i } else { 0 };
+                let mut name_start = name_end;
+                while name_start > 0 {
+                    if is_word_byte(bytes[name_start - 1]) {
+                        name_start -= 1;
+                    } else {
+                        break;
+                    }
+                }
+                let name = body[name_start..name_end].trim().to_string();
+                let name = if name.is_empty() { "?".to_string() } else { name };
+
+                out.push(SignalField { kind, name, alias });
+            }
+        }
+        i += 1;
+    }
+    out
 }
 
 fn collect_decorators(head: &str) -> Vec<Decorator> {
@@ -333,8 +456,6 @@ fn find_class_body_open(raw: &str) -> Option<usize> {
         match bytes[i] {
             b'{' => {
                 if depth == 0 {
-                    // First `{` at depth 0 after `class` is the
-                    // class body opening.
                     return Some(i);
                 }
                 depth += 1;
@@ -390,7 +511,6 @@ fn parse_object_literal(arg: &str) -> ComponentFields {
     if trimmed.is_empty() {
         return ComponentFields::default();
     }
-    // Strip outer braces if present.
     if trimmed.starts_with('{') && trimmed.ends_with('}') {
         trimmed = trimmed[1..trimmed.len() - 1].trim().to_string();
     }
@@ -593,9 +713,7 @@ fn is_word_byte(c: u8) -> bool {
 
 /// Walk the class body and collect all `@Input(...)` /
 /// `@Output(...)` decorator occurrences, pairing each decorator
-/// with the field declaration line that follows it. Returns a
-/// list of `(kind, alias, field_name)` tuples — one per
-/// `@Input` / `@Output` decorator found.
+/// with the field declaration line that follows it.
 fn collect_field_decorators(body: &str) -> Vec<(DecoratorKind, Option<String>, String)> {
     let mut out: Vec<(DecoratorKind, Option<String>, String)> = Vec::new();
     let bytes = body.as_bytes();
@@ -636,14 +754,10 @@ fn collect_field_decorators(body: &str) -> Vec<(DecoratorKind, Option<String>, S
             _ => None,
         };
         if let Some(k) = kind {
-            // Read forward to the next field name. Scan up to a
-            // newline or `{`. The field name is the first
-            // identifier.
             while i < len && (bytes[i] == b' ' || bytes[i] == b'\t') {
                 i += 1;
             }
             let field_start = i;
-            // Stop at the first newline or `{` or `=` or `;`.
             while i < len {
                 let c = bytes[i];
                 if c == b'\n' || c == b'{' || c == b'=' || c == b';' || c == b':' {
@@ -652,7 +766,6 @@ fn collect_field_decorators(body: &str) -> Vec<(DecoratorKind, Option<String>, S
                 i += 1;
             }
             let field_segment = body[field_start..i].trim();
-            // The field name is the first token in the segment.
             let field_name = field_segment
                 .split_whitespace()
                 .next()
