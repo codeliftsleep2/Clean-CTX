@@ -48,10 +48,13 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                     Fidelity::High => "  ",
                     _ => "",
                 };
+                // In low fidelity, append () and ; as a compact representation.
+                // In medium/high, we start the param list and SIG/RET will
+                // fill in the parameters and close with return type.
                 if fidelity == Fidelity::Low {
                     output.push_str(&format!("{}();", name));
                 } else {
-                    output.push_str(&format!("{}{}()", indent, name));
+                    output.push_str(&format!("{}{}(", indent, name));
                 }
             }
             "SIG" => {
