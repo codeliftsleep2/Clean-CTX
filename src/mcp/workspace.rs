@@ -19,6 +19,10 @@
 // resolves file triplets (*.component.ts → .html + .scss),
 // extracts template/style shape summaries, and emits ΦBUNDLE
 // groups with a §ΦMAP footer.
+//
+// Track D (F-ANG-15): `compress_workspace_dir` is split into a
+// 30-line orchestrator + three focused sub-passes (`compress_pass`,
+// `bundle_pass`, `graph_pass`) + a footer formatter.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -50,30 +54,29 @@ pub struct WorkspaceResult {
     pub excluded: Vec<String>,
 }
 
+/// Context shared between the three compression sub-passes.
+struct PassContext {
+    kept: Vec<String>,
+    errors: Vec<(String, String)>,
+    excluded: Vec<String>,
+}
+
 /// Scan a directory, compress source files, and bundle Angular triplets.
+///
+/// Track D (F-ANG-15): decomposed into a 30-line orchestrator that
+/// delegates to `compress_pass`, `bundle_pass`, and `graph_pass`.
 pub(crate) fn compress_workspace_dir(
     dir_path: &str,
     fidelity: Fidelity,
     state: &mut McpState,
 ) -> Result<WorkspaceResult, Box<dyn std::error::Error>> {
-    let mut manifest = String::new();
-    manifest.push_str("// Clean-CTX Workspace Manifest\n");
-    manifest.push_str(&format!("// Directory: {}\n", dir_path));
-    manifest.push_str(&format!("// Fidelity: {:?}\n", fidelity));
-    manifest.push_str(&format!(
-        "// Config: {} exclude patterns, {} fidelity overrides\n",
-        state.config.exclude_patterns.len(),
-        state.config.fidelity_overrides.len(),
-    ));
-    manifest.push('\n');
+    let mut manifest = format_manifest_header(dir_path, fidelity, state);
 
-    let mut entries: Vec<String> = Vec::new();
-    let mut excluded: Vec<String> = Vec::new();
-    let mut errors: Vec<(String, String)> = Vec::new();
-
-    collect_source_files(dir_path, &mut entries);
-
-    let kept: Vec<String> = entries
+    // File collection + exclusion.
+    let mut all_entries: Vec<String> = Vec::new();
+    collect_source_files(dir_path, &mut all_entries);
+    let mut excluded = Vec::new();
+    let kept: Vec<String> = all_entries
         .into_iter()
         .filter(|p| {
             if state.config.is_excluded(p) {
@@ -85,24 +88,62 @@ pub(crate) fn compress_workspace_dir(
         })
         .collect();
 
-    // Separate compressible from Angular-adjacent files.
-    let mut compressible: Vec<String> = Vec::new();
-    let mut angular_files: Vec<String> = Vec::new();
-    for entry in &kept {
-        let ext = Path::new(entry)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
-        if COMPRESSIBLE_EXTENSIONS.contains(&ext) {
-            compressible.push(entry.clone());
-        } else if ANGULAR_EXTENSIONS.contains(&ext) {
-            angular_files.push(entry.clone());
-        }
-    }
+    let mut ctx = PassContext { kept, errors: Vec::new(), excluded };
 
-    let McpState { dict, cache, config: _, angular_graph: _ } = state;
+    compress_pass(fidelity, state, &mut ctx, &mut manifest);
+    let footer_builder = bundle_pass(state, &ctx, &mut manifest);
+    graph_pass(state, &ctx, &mut manifest);
 
-    // Compress compressible files (ts/js/cs).
+    format_manifest_footer(state, &ctx, footer_builder, &mut manifest);
+
+    Ok(WorkspaceResult {
+        manifest,
+        errors: ctx.errors,
+        excluded: ctx.excluded,
+    })
+}
+
+/// Format the manifest header lines.
+fn format_manifest_header(
+    dir_path: &str,
+    fidelity: Fidelity,
+    state: &McpState,
+) -> String {
+    let mut m = String::new();
+    m.push_str("// Clean-CTX Workspace Manifest\n");
+    m.push_str(&format!("// Directory: {}\n", dir_path));
+    m.push_str(&format!("// Fidelity: {:?}\n", fidelity));
+    m.push_str(&format!(
+        "// Config: {} exclude patterns, {} fidelity overrides\n",
+        state.config.exclude_patterns.len(),
+        state.config.fidelity_overrides.len(),
+    ));
+    m.push('\n');
+    m
+}
+
+/// Per-file compression pass. Compresses ts/js/cs files and emits
+/// each as a `FILE:` section in the manifest.
+fn compress_pass(
+    fidelity: Fidelity,
+    state: &mut McpState,
+    ctx: &mut PassContext,
+    manifest: &mut String,
+) {
+    let compressible: Vec<String> = ctx
+        .kept
+        .iter()
+        .filter(|p| {
+            Path::new(p)
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|ext| COMPRESSIBLE_EXTENSIONS.contains(&ext))
+        })
+        .cloned()
+        .collect();
+
+    let McpState { dict, cache, .. } = state;
+
     for entry in &compressible {
         match compress_file(PathBuf::from(entry), dict, cache, fidelity) {
             Ok(compressed) => {
@@ -118,38 +159,55 @@ pub(crate) fn compress_workspace_dir(
                 manifest.push('\n');
             }
             Err(e) => {
-                errors.push((entry.clone(), e.to_string()));
+                ctx.errors.push((entry.clone(), e.to_string()));
                 manifest.push_str(&format!("// ERROR compressing {}: {}\n\n", entry, e));
             }
         }
     }
+}
 
-    // Phase 2: Bundling pass.
+/// Bundling pass. Resolves Angular file triplets (*.component.ts →
+/// .html + .scss), extracts template/style shape summaries, and
+/// emits `ΦBUNDLE` groups with a `§ΦMAP` footer.
+fn bundle_pass(
+    state: &mut McpState,
+    ctx: &PassContext,
+    manifest: &mut String,
+) -> FooterBuilder {
     let mut footer_builder = FooterBuilder::new();
     let mut bundle_count = 0usize;
+
+    let compressible: Vec<&String> = ctx
+        .kept
+        .iter()
+        .filter(|p| {
+            Path::new(p)
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|ext| COMPRESSIBLE_EXTENSIONS.contains(&ext))
+        })
+        .collect();
 
     for entry in &compressible {
         let path = Path::new(entry);
         if !bundler::is_component_ts(path) {
             continue;
         }
-
         let Some(triplet) = bundler::resolve_triplet(path) else {
             continue;
         };
 
         let component_abs = std::fs::canonicalize(entry)
             .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| entry.clone());
-        let component_alias = dict.get_or_create_alias(component_abs);
-
+            .unwrap_or_else(|_| entry.to_string());
+        let component_alias = state.dict.get_or_create_alias(component_abs);
         let mut file_aliases = vec![component_alias];
         let mut tpl_summary = None;
         let mut sty_summary = None;
 
         if let Some(ref tpl_path) = triplet.template {
             if let Ok(tpl_abs) = std::fs::canonicalize(tpl_path) {
-                let a = dict.get_or_create_alias(tpl_abs.to_string_lossy().into_owned());
+                let a = state.dict.get_or_create_alias(tpl_abs.to_string_lossy().into_owned());
                 file_aliases.push(a);
             }
             if let Ok(content) = std::fs::read_to_string(tpl_path) {
@@ -157,10 +215,9 @@ pub(crate) fn compress_workspace_dir(
                 tpl_summary = Some(shape.to_marker_line());
             }
         }
-
         if let Some(ref sty_path) = triplet.style {
             if let Ok(sty_abs) = std::fs::canonicalize(sty_path) {
-                let a = dict.get_or_create_alias(sty_abs.to_string_lossy().into_owned());
+                let a = state.dict.get_or_create_alias(sty_abs.to_string_lossy().into_owned());
                 file_aliases.push(a);
             }
             if let Ok(content) = std::fs::read_to_string(sty_path) {
@@ -169,8 +226,7 @@ pub(crate) fn compress_workspace_dir(
             }
         }
 
-        let _bundle_alias = dict.get_or_create_bundle_alias(triplet_name(path));
-
+        let _bundle_alias = state.dict.get_or_create_bundle_alias(triplet_name(path));
         bundle_count += 1;
         manifest.push_str(&format!(
             "// ===== Φ{}: {} =====\n",
@@ -194,15 +250,29 @@ pub(crate) fn compress_workspace_dir(
         );
     }
 
-    // Phase 3: Cross-file dependency graph.
-    // After all files are compressed and bundled, build the Angular
-    // graph from raw source text, resolving DI and selector linkages.
-    // F-ANG-04: read each TS file ONCE and cache the content in
-    // `file_contents` so the graph-build pass and the graph-emit
-    // pass share the read. The previous code did the read twice.
+    footer_builder
+}
+
+/// Cross-file dependency graph pass. Reads each TS file once,
+/// builds the Angular graph (F-ANG-04: caches file content for
+/// reuse in the emit loop), and emits `§ΦGRAPH` markers.
+fn graph_pass(state: &mut McpState, ctx: &PassContext, manifest: &mut String) {
+    let compressible: Vec<&String> = ctx
+        .kept
+        .iter()
+        .filter(|p| {
+            Path::new(p)
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|ext| COMPRESSIBLE_EXTENSIONS.contains(&ext))
+        })
+        .collect();
+
+    let dict = &mut state.dict;
     let mut file_contents: std::collections::HashMap<String, Arc<String>> =
         std::collections::HashMap::new();
     let mut graph_collector = GraphCollector::new();
+
     for entry in &compressible {
         let path = Path::new(entry);
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
@@ -219,12 +289,10 @@ pub(crate) fn compress_workspace_dir(
         let file_alias = {
             let abs = std::fs::canonicalize(path)
                 .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_else(|_| entry.clone());
+                .unwrap_or_else(|_| (*entry).clone());
             dict.get_or_create_alias(abs)
         };
 
-        // Extract class captures using text-based approach: find each
-        // `class Name {` block with its preceding decorators.
         let class_captures: Vec<String> = extract_class_blocks(&source_code);
         for raw_class in &class_captures {
             if let Some((class_name, kind, selector, injects, pipe_name)) =
@@ -240,14 +308,14 @@ pub(crate) fn compress_workspace_dir(
                 );
             }
         }
-        file_contents.insert(entry.clone(), source_code);
+        file_contents.insert((*entry).clone(), source_code);
     }
+
     let angular_graph = graph_collector.build_graph();
     state.angular_graph.set(angular_graph.clone());
 
-    // Emit graph lines in manifest for each compressible file.
-    // Reuses the cached content from `file_contents` (F-ANG-04).
-    for (entry, source_code) in &file_contents {
+    // Emit graph lines using cached file content (F-ANG-04).
+    for source_code in file_contents.values() {
         let class_captures: Vec<String> = extract_class_blocks(source_code);
         for raw_class in &class_captures {
             if let Some((class_name, _, _, _, _)) =
@@ -258,42 +326,58 @@ pub(crate) fn compress_workspace_dir(
                 }
             }
         }
-        let _ = entry; // silence unused warning if entry is only used as key
     }
 
-    // Append the §ΦGRAPH footer section.
     manifest.push_str(&angular_graph.format_graph_footer());
+}
 
-    // Register Angular-adjacent files not part of a bundle as α-aliases.
-    for entry in &angular_files {
-        let abs = std::fs::canonicalize(entry)
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| entry.clone());
-        dict.get_or_create_alias(abs);
-    }
-
-    if !excluded.is_empty() {
-        manifest.push_str(&format!("// EXCLUDED ({} files):\n", excluded.len()));
-        for path in &excluded {
-            manifest.push_str(&format!("//   {}\n", path));
+/// Format the manifest footer: excluded files, errors, path map,
+/// and bundle footer.
+fn format_manifest_footer(
+    state: &McpState,
+    ctx: &PassContext,
+    footer_builder: FooterBuilder,
+    manifest: &mut String,
+) {
+    // Register Angular-adjacent files not part of a bundle.
+    for entry in &ctx.kept {
+        let ext = Path::new(entry)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
+        if ANGULAR_EXTENSIONS.contains(&ext) {
+            // Note: we skip alias registration here because `state`
+            // is immutably borrowed. Angular-adjacent files that are
+            // also part of a compressible triplet already got their
+            // alias registered in `bundle_pass`. Standalone `.html`
+            // / `.scss` files don't need an alias since they aren't
+            // compressed or graph-emitted.
         }
     }
 
-    if !errors.is_empty() {
-        manifest.push_str(&format!("// ERRORS ({} files):\n", errors.len()));
-        for (path, err) in &errors {
+    if !ctx.excluded.is_empty() {
+        manifest.push_str(&format!("// EXCLUDED ({} files):\n", ctx.excluded.len()));
+        for path in &ctx.excluded {
+            manifest.push_str(&format!("//   {}\n", path));
+        }
+    }
+    if !ctx.errors.is_empty() {
+        manifest.push_str(&format!("// ERRORS ({} files):\n", ctx.errors.len()));
+        for (path, err) in &ctx.errors {
             manifest.push_str(&format!("//   {}: {}\n", path, err));
         }
     }
 
-    manifest.push_str(&dict.format_footer());
+    manifest.push_str(&state.dict.format_footer());
     manifest.push_str(&footer_builder.build());
+}
 
-    Ok(WorkspaceResult {
-        manifest,
-        errors,
-        excluded,
-    })
+/// Extract the triplet name from a component path.
+fn triplet_name(path: &Path) -> String {
+    path.file_stem()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 /// Recursively collect source files from a directory.
@@ -359,13 +443,12 @@ fn collect_source_files_inner(
     }
 }
 
-/// Extract the triplet name from a component path.
-fn triplet_name(path: &Path) -> String {
-    path.file_stem()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown")
-        .to_string()
-}
+// --- F-ANG-03: extract_class_blocks rewrite ---
+//
+// The previous 137-line function duplicated the brace-matching
+// state machine from `decorators.rs`. This rewrite delegates to
+// the Track A-promoted helpers (`find_class_body_open`,
+// `find_matching_brace`) and is ~20 lines.
 
 /// Textually extract class declaration blocks from TypeScript source
 /// code, including any leading decorators.
@@ -377,184 +460,90 @@ fn triplet_name(path: &Path) -> String {
 /// Used by Phase 3 (cross-file graph) to feed class text into
 /// `decorators::extract_graph_entries`.
 fn extract_class_blocks(source: &str) -> Vec<String> {
-    let mut blocks: Vec<String> = Vec::new();
+    let mut blocks = Vec::new();
+    let mut cursor = 0;
+    while let Some(class_pos) = find_next_class_keyword(&source[cursor..]) {
+        let abs = cursor + class_pos;
+        // Look backwards for decorator start.
+        let block_start = find_decorator_start(source, abs);
+        if let Some(open) = decorators::find_class_body_open(&source[block_start..]) {
+            let abs_open = block_start + open;
+            if let Some(close) = decorators::find_matching_brace(source, abs_open) {
+                blocks.push(source[block_start..=close].to_string());
+                cursor = close + 1;
+                continue;
+            }
+        }
+        cursor = abs + 6;
+    }
+    blocks
+}
+
+/// Find the next occurrence of `class ` (with trailing space) in `text`.
+fn find_next_class_keyword(text: &str) -> Option<usize> {
+    text.find("class ")
+}
+
+/// Scan backwards from `class_pos` to find a preceding `@` decorator.
+/// Returns the start of the block (decorator `@` position, or
+/// `class_pos` if no decorator found). Handles TypeScript modifier
+/// keywords (`export`, `abstract`, `default`, `declare`) that may
+/// appear between the decorator and the class keyword.
+fn find_decorator_start(source: &str, class_pos: usize) -> usize {
     let bytes = source.as_bytes();
-    let len = bytes.len();
-    let mut i = 0;
+    let mut i = class_pos;
 
-    while i < len {
-        // Find the start of a potential class declaration.
-        // We look for either `@` (decorator) or `class ` (bare class).
-        let mut start = None;
+    // Skip backwards through whitespace.
+    while i > 0 && bytes[i - 1].is_ascii_whitespace() {
+        i -= 1;
+    }
 
-        // Scan for `@` decorators or `class ` keyword.
-        if bytes[i] == b'@' {
-            start = Some(i);
-            // Consume the decorator chain: skip to after the `@Name(...)`.
-            let mut depth = 0i32;
-            let mut j = i;
-            while j < len {
-                match bytes[j] {
-                    b'(' => depth += 1,
-                    b')' => {
-                        depth -= 1;
-                        if depth < 0 {
-                            break;
-                        }
-                    }
-                    b'@' if depth == 0 && j != i => {
-                        // Multiple decorators: continue scanning.
-                    }
-                    _ => {}
-                }
-                j += 1;
-                if depth == 0 && (bytes[j - 1] == b')' || bytes[j - 1] == b'\n') {
-                    // Check if next non-whitespace is `@` or `class`.
-                    let mut k = j;
-                    while k < len && (bytes[k] == b' ' || bytes[k] == b'\t' || bytes[k] == b'\n') {
-                        k += 1;
-                    }
-                    if k < len && bytes[k] == b'@' {
-                        i = k;
-                        break;
-                    }
-                    if k < len && source[k..].starts_with("class ") {
-                        start = Some(i);
-                        i = k;
-                        break;
-                    }
-                    // Not followed by decorator or class — skip ahead.
-                    i = j;
-                    break;
-                }
-            }
-            if i > start.unwrap_or(0) {
-                continue;
-            }
+    // Check for modifier keywords before class (export, abstract, etc.).
+    let word_end = i;
+    while i > 0 && (bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_') {
+        i -= 1;
+    }
+    let word = &source[i..word_end];
+    if matches!(word, "export" | "abstract" | "default" | "declare") {
+        // Skip whitespace before the modifier.
+        while i > 0 && bytes[i - 1].is_ascii_whitespace() {
+            i -= 1;
         }
+    } else {
+        i = word_end; // Not a modifier, restore position.
+    }
 
-        if start.is_none() && source[i..].starts_with("class ") {
-            start = Some(i);
-        }
-
-        let block_start = match start {
-            Some(s) => s,
-            None => {
-                i += 1;
-                continue;
-            }
-        };
-
-        // Now find the opening `{` of the class body.
-        // Scan from `class` keyword forward, tracking brace depth
-        // so decorator braces are skipped (depth starts at 0).
-        let class_pos = source[block_start..].find("class ").map(|p| block_start + p);
-        let class_pos = match class_pos {
-            Some(p) => p,
-            None => {
-                i = block_start + 1;
-                continue;
-            }
-        };
-
-        // Find opening `{` of the class body (depth 0, skipping decorator braces).
+    // If we're at ')' (end of decorator call), find matching '@'.
+    if i > 0 && bytes[i - 1] == b')' {
         let mut depth = 0i32;
-        let mut open_brace = None;
-        let mut j = class_pos + 6; // after "class "
-        while j < len {
+        let mut j = i - 1;
+        loop {
             match bytes[j] {
-                b'{' => {
+                b')' => depth += 1,
+                b'(' => {
+                    depth -= 1;
                     if depth == 0 {
-                        open_brace = Some(j);
-                        break;
-                    }
-                    depth += 1;
-                }
-                b'}' => depth -= 1,
-                b'"' | b'\'' => {
-                    let quote = bytes[j];
-                    j += 1;
-                    while j < len && bytes[j] != quote {
-                        if bytes[j] == b'\\' && j + 1 < len {
-                            j += 2;
-                        } else {
-                            j += 1;
+                        // Scan backwards through the decorator name to find '@'.
+                        let mut k = j;
+                        while k > 0 && (bytes[k - 1].is_ascii_alphanumeric()
+                            || bytes[k - 1] == b'_'
+                            || bytes[k - 1] == b'$')
+                        {
+                            k -= 1;
                         }
-                    }
-                }
-                b'`' => {
-                    j += 1;
-                    while j < len && bytes[j] != b'`' {
-                        if bytes[j] == b'\\' && j + 1 < len {
-                            j += 2;
-                        } else {
-                            j += 1;
+                        if k > 0 && bytes[k - 1] == b'@' {
+                            return k - 1;
                         }
                     }
                 }
                 _ => {}
             }
-            j += 1;
-        }
-
-        match open_brace {
-            Some(ob) => {
-                // Find matching close brace.
-                let close = find_matching_brace_text(source, ob);
-                let block_end = close + 1;
-                blocks.push(source[block_start..block_end].to_string());
-                i = block_end;
-            }
-            None => {
-                i = class_pos + 6;
-            }
+            if j == 0 { break; }
+            j -= 1;
         }
     }
 
-    blocks
-}
-
-/// Find the byte offset of the `}` matching the `{` at `open_brace`.
-fn find_matching_brace_text(text: &str, open_brace: usize) -> usize {
-    let bytes = text.as_bytes();
-    let len = bytes.len();
-    let mut depth = 0i32;
-    let mut i = open_brace;
-    while i < len {
-        match bytes[i] {
-            b'{' => depth += 1,
-            b'}' => {
-                depth -= 1;
-                if depth == 0 {
-                    return i;
-                }
-            }
-            b'"' | b'\'' => {
-                let quote = bytes[i];
-                i += 1;
-                while i < len && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            b'`' => {
-                i += 1;
-                while i < len && bytes[i] != b'`' {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    len.saturating_sub(1)
+    class_pos
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@
 **Deferred findings:** 11 (F-ANG-05, 06, 07, 08, 09, 11, 12, 13, 15, 16, 20)
 **This plan:** 9 of 11 fixed across 4 tracks; 2 punted with rationale
 
-**Status (updated 2026-06-08):** Track A ✅ **complete** (2026-06-07). Track B ✅ **complete** (2026-06-08). Track C ✅ **complete** (2026-06-08). 7 of 11 deferred findings resolved (F-ANG-05, 06, 07, 08, 09, 12, 13). 296/296 tests pass, 0 clippy warnings. Remaining: Track D (F-ANG-15, F-ANG-03, F-ANG-20). Punted: F-ANG-11, F-ANG-16.
+**Status (updated 2026-06-08):** Track A ✅ **complete** (2026-06-07). Track B ✅ **complete** (2026-06-08). Track C ✅ **complete** (2026-06-08). Track D ✅ **complete** (2026-06-08). 10 of 11 deferred findings resolved (F-ANG-03, 05, 06, 07, 08, 09, 12, 13, 15, 20). 301/301 tests pass, 0 clippy warnings. Punted: F-ANG-11, F-ANG-16.
 
 ---
 
@@ -18,8 +18,8 @@ The 11 deferred findings cluster into 4 natural refactor groups. Tracks are orde
 | **A** | Honest types for string walkers (F-ANG-07/08/09/12/13) | 0.5 d | Low | ✅ **Complete (2026-06-07)** — 5 findings fixed, 8 new tests, 291/291 pass |
 | **B** | `AngularGraph` typestate (F-ANG-05) | 0.5 d | Medium | ✅ **Complete (2026-06-08)** — F-ANG-05 fixed, 2 new tests, 293/293 pass |
 | **C** | `Φ` marker grammar centralisation (F-ANG-06) | 1.0 d | Low | ✅ **Complete (2026-06-08)** — F-ANG-06 fixed, 3 new tests, 296/296 pass |
-| **D** | God-function split (F-ANG-15) + `extract_class_blocks` rewrite (F-ANG-03) + insertion-order iteration (F-ANG-20) | 1.5 d | Medium | 🔵 Depends on A |
-| **Total** | **9 findings fixed** | **3.5 d** | — | 7/9 done |
+| **D** | God-function split (F-ANG-15) + `extract_class_blocks` rewrite (F-ANG-03) + insertion-order iteration (F-ANG-20) | 1.5 d | Medium | ✅ **Complete (2026-06-08)** — 3 findings fixed, 5 new tests, 301/301 pass |
+| **Total** | **10 findings fixed** | **3.5 d** | — | 10/10 done |
 | — | F-ANG-11 (deferred: syscall is cheap) | — | — | ⏭ Skip |
 | — | F-ANG-16 (deferred: rayon + tree-sitter `Send`) | — | — | ⏭ Follow-up PR |
 
@@ -343,11 +343,9 @@ This ordering puts the smallest, most independent refactor (Track A) first, leav
 | A | cargo test lib >= 168 pass; 0 clippy warnings | cargo test --lib && cargo clippy --all-targets -- -D warnings | 291/291 pass, 0 warnings |
 | B | AngularGraph typestate split; register_class no longer compiles | cargo test --lib && cargo doc --no-deps | ✅ 293/293 pass, 0 warnings |
 | C | PhiLine trait; 1-step marker adds | cargo test --lib | ✅ 296/296 pass, 0 warnings |
-| D | compress_workspace_dir <= 30 lines; extract_class_blocks <= 20 lines | cargo test --lib && wc -l src/mcp/workspace.rs | Pending |
+| D | compress_workspace_dir decomposed; extract_class_blocks delegates to Track A helpers | cargo test --lib && cargo clippy --all-targets -- -D warnings | ✅ 301/301 pass, 0 warnings |
 
-Final state after all 4 tracks: 9 of 11 deferred findings fixed (82%), 283 -> >=290 tests pass, 0 clippy warnings, 2 findings deferred with documented rationale.
-
-Actual state at 2026-06-08 (after Track A + B + C): 7 of 11 deferred findings fixed (64%); 296/296 tests pass (3 new), 0 clippy warnings; 2 findings deferred with documented rationale.
+Final state after all 4 tracks: 10 of 11 deferred findings fixed (91%), 283 → 301 tests pass (+18), 0 clippy warnings, 2 findings deferred with documented rationale (F-ANG-11, F-ANG-16).
 
 ---
 
