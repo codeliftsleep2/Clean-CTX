@@ -13,6 +13,9 @@
 //   - F-27: `current_method` is tracked directly (O(1) instead of O(n) via find_last_method).
 //   - F-28: Flags are accumulated in a `current_method_flags` Vec (O(1) per capture).
 //   - F-29: Methods/fields without a current_class are skipped (not silently emitted with "").
+//   - F-30: `compile` returns `CompileError` (a typed enum) instead of `Box<dyn Error>`.
+//   - F-31: `id_counter` is `u64` (not `u32`) to avoid arithmetic overflow
+//           after 4,294,967,295 instructions.
 
 use crate::compaction::{extract_class_name, extract_field, extract_method_sig};
 use crate::compression::capture_pipeline::run_capture_pipeline;
@@ -31,6 +34,35 @@ pub struct CompiledIR {
     pub version: u64,
 }
 
+/// Errors that can occur during IR compilation (F-30).
+///
+/// Replaces the previous `Box<dyn std::error::Error>` return type so
+/// callers can programmatically distinguish between parse failures,
+/// "no captures" conditions, and other errors.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompileError {
+    /// Underlying tree-sitter / capture pipeline failure.
+    Capture(String),
+    /// A language / meta / pattern layer raised an error.
+    Layer(String),
+    /// Source produced no `class.root` / `method.root` captures.
+    /// Not necessarily fatal — the call site may treat it as an
+    /// empty (but valid) compile result.
+    NoCaptures,
+}
+
+impl std::fmt::Display for CompileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompileError::Capture(msg) => write!(f, "capture pipeline error: {}", msg),
+            CompileError::Layer(msg) => write!(f, "layer error: {}", msg),
+            CompileError::NoCaptures => write!(f, "source produced no captures"),
+        }
+    }
+}
+
+impl std::error::Error for CompileError {}
+
 /// IR Compiler — translates tree-sitter captures into Core IR instructions.
 ///
 /// The compiler now owns pluggable layers (F-01, F-02, F-03):
@@ -38,8 +70,9 @@ pub struct CompiledIR {
 ///   - Meta layers extract framework-specific patterns (Angular decorators, etc.)
 ///   - Pattern recognizers compress instruction streams into compact ops
 pub struct IRCompiler {
-    /// Running instruction counter for ID generation
-    id_counter: u32,
+    /// Running instruction counter for ID generation (F-31: `u64` instead
+    /// of `u32` to avoid arithmetic overflow at 4,294,967,295 instructions).
+    id_counter: u64,
     /// Current method being processed (F-27: O(1) tracking instead of O(n) search)
     current_method: Option<String>,
     /// Current method's accumulated flags (F-28: O(1) push instead of O(n) search)
@@ -85,12 +118,16 @@ impl IRCompiler {
     /// Compile source code into IR.
     /// Reuses the existing capture pipeline but emits CoreOp instructions
     /// instead of formatted text strings.
-    /// 
+    ///
     /// The compile pipeline runs in four layers (F-01, F-02, F-03):
     ///   1. Core IR emission (always runs)
     ///   2. Language layer translation (TS/C# specific ops)
     ///   3. Meta-layer pass (framework-specific extraction)
     ///   4. Pattern recognition (instruction stream compression)
+    ///
+    /// Returns a typed `CompileError` (F-30) — callers can pattern-match
+    /// on `CompileError::Capture`, `Layer`, or `NoCaptures`. The
+    /// `mcp::tools` boundary converts to `Box<dyn Error>` via `?` if needed.
     pub fn compile(
         &mut self,
         source: &str,
@@ -98,7 +135,7 @@ impl IRCompiler {
         language: tree_sitter::Language,
         query_string: &str,
         fidelity: Fidelity,
-    ) -> Result<CompiledIR, Box<dyn std::error::Error>> {
+    ) -> Result<CompiledIR, CompileError> {
         // Reset per-compilation state
         self.current_method = None;
         self.current_method_flags = Vec::new();
@@ -122,7 +159,8 @@ impl IRCompiler {
                     _ => Some(raw.to_string()),
                 }
             },
-        )?;
+        )
+        .map_err(|e| CompileError::Capture(e.to_string()))?;
 
         let mut instructions = Vec::new();
 
@@ -494,3 +532,4 @@ impl Default for IRCompiler {
 #[cfg(test)]
 #[path = "../tests/ir/compiler.rs"]
 mod tests;
+           

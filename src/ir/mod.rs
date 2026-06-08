@@ -30,7 +30,7 @@ pub mod patterns;
 
 // Re-export public types for downstream consumers.
 pub use opcodes::CoreOp;
-pub use compiler::{CompiledIR, IRCompiler};
+pub use compiler::{CompiledIR, CompileError, IRCompiler};
 pub use render::ir_to_text;
 pub use wire::{ir_to_wire, op_to_tuple};
 pub use symbol_table::{GlobalSymbolTable, SymbolEntry, SymbolKind};

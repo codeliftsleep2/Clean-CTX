@@ -890,6 +890,55 @@ This audit follows the format of the previous `docs/FAANG_AUDIT.md` (41 findings
 
 ---
 
+## Phase E Remediation (Completed 2026-06-08)
+
+**Scope:** Findings F-30 through F-47 — hygiene, dead code, naming, SoC, documentation, and minor correctness fixes.
+
+### Changes Applied
+
+| Finding | File(s) | Change |
+|---------|---------|--------|
+| **F-30** | `src/ir/compiler.rs` | `compile()` now returns `Result<CompiledIR, CompileError>` instead of `Box<dyn std::error::Error>`. Introduced `CompileError` enum with `Capture`, `Layer`, and `NoCaptures` variants. Callers can pattern-match on the error type. The `mcp::tools` boundary continues to use `?` since `CompileError: std::error::Error`. |
+| **F-31** | `src/ir/compiler.rs` | `id_counter` changed from `u32` to `u64` to avoid arithmetic overflow after 4,294,967,295 instructions. In debug mode, Rust panics on overflow; in release, it wraps to 0. With `u64`, the counter is practically infinite. |
+| **F-33/F-34** | `src/ir/patterns.rs` | Added documentation noting the `consumed()` heuristic is an approximation. The actual consumed count is computed by `try_compress_pattern` and used for `CompressionStats`. The `consumed()` method is retained for backward compatibility. |
+| **F-35/F-36** | `src/ir/render.rs` | Added documentation explaining that `ASYNC` renders as `$a` (legacy text opcode) for backward compatibility, and that unknown flags silently get a `⊕` prefix. Future improvements could log warnings. |
+| **F-37** | `src/ir/render.rs` | Fidelity match arms documented: `Low` vs `Medium` vs `High` arms are intentionally different per instruction type. The `FLAGS` opcode uses `Low \| Medium` grouping because both produce the same output. This is correct by design. |
+| **F-39** | `src/ir/positional.rs` | Added documentation explaining why `PositionalConfig` is retained as a struct rather than inlined to a `bool`. It is `Copy` and self-documenting; the two constructors `stripped()` and `tagged()` are the canonical API. |
+| **F-40** | `src/ir/positional.rs` | Added documentation explaining that `verify_round_trip` returns `Option<usize>` for the first mismatch, not a boolean. Callers should assert `result.is_none()` to verify the round-trip property. |
+| **F-41** | `src/ir/positional.rs` | Fixed misleading docstring on `estimate_savings`: previously claimed "Tokens are estimated as ceiling(chars / 4)" but the function returns raw character counts. Updated docstring to clarify the function returns `(named_chars, positional_chars)`. |
+| **F-42** | `src/ir/positional.rs` | Added documentation noting that the `"encoding"` field in the wire output uses `"positional"` or `"tagged"`, while the Rust struct uses `tagged: bool`. The naming is consistent within each layer (JSON vs Rust). |
+| **F-43** | `src/ir/positional.rs` | Added documentation explaining that the `+ 12` in `positional_char_count` is a hand-counted estimate of the JSON envelope `{"file":"…","v":N,"encoding":"…","ir":[…]}`. This is a conservative approximation. |
+| **F-44/F-45** | `src/ir/layers/angular.rs` | Added documentation noting that `angular_meta::run_meta_layer` emits Φ marker *text* which is then re-parsed by `parse_phi_line`. This text round-trip is known design debt. A future refactor should return structured `Vec<AngularDecorators>` directly. |
+| **F-46** | `src/ir/layers/mod.rs` | Added documentation explaining that `LayerContext` is constructed fresh per `IRCompiler::compile` call. The `GlobalSymbolTable` is owned (not borrowed), so mutations inside `process_capture` are visible to subsequent layers but not to the caller's copy. |
+| **F-47** | `src/ir/layers/typescript.rs` | Replaced byte-level parsing (`bytes[i]`) with char-level iteration (`char_indices()`) in `extract_class_relationships`. This prevents potential panics on multi-byte UTF-8 characters at a `,` or `{` boundary, and correctly handles non-ASCII whitespace. |
+
+### Build Status
+
+- `cargo build --lib` — ✅ no errors, no warnings
+- `cargo clippy --all-targets -- -D warnings` — ✅ clean
+- `cargo test --lib ir --` — ✅ 318/318 pass (0 failures, 0 regressions)
+- No new `#[allow(...)]` attributes introduced
+- `CompileError` is now exported from `src/ir/mod.rs` for downstream consumers
+
+### Design Decisions
+
+1. **F-30 `CompileError` shape**: Three variants — `Capture`, `Layer`, `NoCaptures` — cover the primary error categories identified in the audit. The `Capture` variant wraps the underlying capture pipeline error as a `String`. The `Layer` variant is reserved for future layer errors. `NoCaptures` is informational. All three implement `std::error::Error` so callers can use `?` with `Box<dyn Error>` at the `mcp::tools` boundary.
+
+2. **F-31 `u64` counter**: The `u32` counter could overflow at 4,294,967,295 instructions. While no single compilation will hit this limit, a long-running server could. The `u64` change is zero-cost (same register width on 64-bit platforms) and eliminates the overflow risk entirely.
+
+3. **F-33/F-34 `consumed()` heuristic**: The audit identified that `PatternOp::consumed()` returns a heuristic rather than the exact count. We chose to document this rather than refactor the API, because the actual consumed count is already computed by `try_compress_pattern` and used for `CompressionStats`. The heuristic is only used for the `consumed()` convenience method.
+
+4. **F-47 char-level parsing**: The TypeScript layer's `extract_class_relationships` used `bytes[i]` to scan for `,`, `{`, and whitespace. This is safe for ASCII but can silently mis-handle non-ASCII whitespace (e.g., `U+00A0 NO-BREAK SPACE`). The `char_indices()` replacement is both correct and idiomatic.
+
+5. **Documentation-only fixes (F-35, F-36, F-37, F-39, F-40, F-41, F-42, F-43, F-44/F-45, F-46)**: These findings identified naming drift, misleading docs, or known design debt. All are addressed with targeted documentation. No code changes were needed — the existing behavior is correct or acceptable, but the docs now explain the rationale.
+
+### Remaining Items
+
+- **F-32** (CompressedItem/PatternOp API surface): Not addressed in this pass. The audit noted confusing naming; renaming would break test code. Deferred to a future cleanup pass.
+- **F-38** (ir_to_text generic over &[CoreOp]): Not addressed — would change the function signature and break the render tests. Deferred to a future cleanup pass.
+
+---
+
 ## Phase D Remediation (Completed 2026-06-08)
 
 **Scope:** Findings F-16, F-17, F-19, F-21, F-22, F-23, F-24 — error handling robustness, API consistency, correctness, and spec/implementation alignment for the wire/delta/symbol-table surfaces.

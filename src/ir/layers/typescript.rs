@@ -36,15 +36,15 @@ impl TypeScriptLayer {
         if let Some(ext_pos) = class_head.find("extends") {
             let after_ext = class_head[ext_pos + 7..].trim_start();
             // Find the end of the extended class (next keyword or boundary)
+            // F-47: use char-level iteration instead of byte-level to handle
+            // multi-byte UTF-8 correctly (non-ASCII whitespace, identifiers).
             let mut end_pos = 0;
-            let bytes = after_ext.as_bytes();
-            let mut i = 0;
-            while i < after_ext.len() {
-                if bytes[i] == b',' || bytes[i] == b'{' {
+            for (i, ch) in after_ext.char_indices() {
+                if ch == ',' || ch == '{' {
                     end_pos = i;
                     break;
                 }
-                if bytes[i].is_ascii_whitespace() {
+                if ch.is_whitespace() {
                     // Check if next word is "implements"
                     let rest = after_ext[i..].trim_start();
                     if rest.starts_with("implements") {
@@ -52,7 +52,6 @@ impl TypeScriptLayer {
                         break;
                     }
                 }
-                i += 1;
             }
             if end_pos > 0 {
                 base = Some(after_ext[..end_pos].trim().to_string());

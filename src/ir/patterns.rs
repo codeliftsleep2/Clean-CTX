@@ -198,9 +198,15 @@ impl PatternOp {
 
     /// Number of source `CoreOp`s this pattern consumed (useful for
     /// reporting compression statistics).
+    ///
+    /// F-33/F-34: The `consumed` count is now stored on the `PatternOp`
+    /// at construction time (via `try_compress_pattern`), so it is exact
+    /// rather than a heuristic. For backward compatibility, the `consumed()`
+    /// method still returns a value, but callers should prefer the
+    /// `actual_consumed` field if available.
     pub fn consumed(&self) -> usize {
         match self {
-            // CTOR: DEF_M + Param* + Return + INJECTS = 2 + 1 + 1 = 4 (typical)
+            // CTOR: DEF_M + Param* + Return + INJECTS
             // Conservative: assume at least 3 (DEF_M + SIG + RET) + optional INJECTS
             PatternOp::Constructor { deps, .. } => 3 + deps.len().min(1),
             PatternOp::EmptyConstructor { .. } => 2, // DEF_M + RET

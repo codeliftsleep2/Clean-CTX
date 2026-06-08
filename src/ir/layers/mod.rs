@@ -21,6 +21,14 @@ pub mod patterns;
 
 /// Context passed to layer processing functions.
 /// Provides current class/method context and symbol table access.
+///
+/// F-46: `LayerContext` is constructed fresh per `IRCompiler::compile`
+/// call. The `GlobalSymbolTable` is owned (not borrowed), so mutations
+/// inside `process_capture` are visible to subsequent layers but not
+/// to the caller's copy. This is intentional for the current single-shot
+/// compile path. A future enhancement could propagate a `&mut
+/// GlobalSymbolTable` from `McpState` through to the compiler for
+/// cross-compile symbol registration.
 #[derive(Debug, Clone)]
 pub struct LayerContext {
     /// Current class ID (set when processing a class capture)

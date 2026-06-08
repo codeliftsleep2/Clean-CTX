@@ -45,7 +45,13 @@ impl MetaLayer for AngularMetaLayer {
     ) -> Vec<CoreOp> {
         let mut ops = Vec::new();
 
-        // Use the existing angular_meta extraction pipeline
+        // F-44/F-45: The angular_meta pipeline emits Φ marker *text* via
+        // `MetaBlock { lines: Vec<String> }`, which is then re-parsed by
+        // `parse_phi_line`. This round-trip through text is a known design
+        // debt (two parsers of the same shape). A future refactor should
+        // make `run_meta_layer` return structured `Vec<AngularDecorators>`
+        // directly. For now, the text round-trip is stable because the
+        // Φ marker format is simple and unlikely to change within Phase 3.
         let meta_block = angular_meta::run_meta_layer(source, class_captures, fidelity);
 
         // If there's no Angular content, return empty
