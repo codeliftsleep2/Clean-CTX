@@ -42,6 +42,44 @@ pub struct CleanCtxConfig {
     /// Whether to enable workspace-wide type detection
     #[serde(default = "default_true")]
     pub workspace_type_detection: bool,
+
+    /// Per-framework Meta-Layer configuration (Phase 1: Angular only).
+    ///
+    /// Each entry configures one framework meta-layer. The key is
+    /// the framework name (e.g. `"angular"`); the value is the
+    /// per-framework config struct. A missing entry means the
+    /// framework meta-layer is on (default behaviour — see the
+    /// framework-specific config for the opt-out flag).
+    ///
+    /// Example `.clean-ctx.json`:
+    /// ```json
+    /// { "meta_layers": { "angular": { "enabled": false } } }
+    /// ```
+    #[serde(default)]
+    pub meta_layers: BTreeMap<String, MetaLayerConfig>,
+}
+
+/// Per-framework Meta-Layer configuration.
+///
+/// Phase 1 ships only the `angular` variant. Future phases will add
+/// `react`, `vue`, `svelte` variants following the same pattern. Each
+/// framework gets its own struct (or, when the schema converges
+/// further, a shared `MetaLayerConfig` with framework-specific
+/// extension fields).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetaLayerConfig {
+    /// Master switch for this framework's meta-layer. Defaults to
+    /// `true` (the meta-layer runs whenever the framework is
+    /// detected). Set to `false` in `.clean-ctx.json` to opt out
+    /// of the meta-layer entirely (zero overhead).
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for MetaLayerConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 fn default_fidelity() -> String {
@@ -62,6 +100,7 @@ impl Default for CleanCtxConfig {
             default_fidelity: default_fidelity(),
             diff_compression: default_true(),
             workspace_type_detection: default_true(),
+            meta_layers: BTreeMap::new(),
         }
     }
 }

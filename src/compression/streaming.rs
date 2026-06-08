@@ -183,7 +183,12 @@ where
         })?;
     }
 
-    let body_content = assemble_body(&built.output_lines, fidelity);
+    let mut body_content = assemble_body(&built.output_lines, fidelity);
+    // Angular Meta-Layer (Phase 1): inject the Φ block into the body
+    // BEFORE symbol compression so the `Φ` markers stay untouched.
+    if let Some(block) = &built.meta_block {
+        body_content.push_str(&block.render());
+    }
 
     // --- Phase 4: symbol opcode compression (Low fidelity only) ----------
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);

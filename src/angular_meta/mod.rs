@@ -1,0 +1,125 @@
+// src/angular_meta/mod.rs
+//
+// Angular Meta-Layer — Tier 1 (Decorator Extraction).
+//
+// The Meta-Layer is **purely additive**: it never modifies the existing
+// TS compaction output. It only appends a `Φ` block below the existing
+// compacted class. Existing users see no change; Angular users get
+// enriched output with `@Component` / `@Injectable` / `@Input` /
+// `@Output` context.
+//
+// # Phase 1 scope
+//
+// Only Tier 1 (decorators) is implemented. Tier 2 (file-triplet
+// bundling) and Tier 3 (cross-file graph) are deferred to subsequent
+// phases per `docs/ANGULAR_META_LAYER.md`.
+//
+// # Module structure
+//
+// - `detect`     : Angular detection heuristic
+// - `decorators` : `@Component` / `@Injectable` / `@NgModule` /
+//                  `@Directive` / `@Pipe` / `@Input` / `@Output` extractor
+// - `markers`    : `Φ` marker construction & expansion
+// - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
+
+pub(crate) mod decorators;
+pub(crate) mod detect;
+pub(crate) mod markers;
+
+use crate::compression::Fidelity;
+
+/// The Meta-Layer output for a single `.ts` file.
+///
+/// `None` means "not an Angular file" — the caller should not emit any
+/// Φ block at all (zero overhead, byte-identical to non-Angular
+/// output).
+///
+/// `Some(block)` means "Angular file" — the caller should append the
+/// Φ block lines below the existing compacted class entry.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MetaBlock {
+    /// One `Φ` line per Angular-bearing class, in document order.
+    /// Each line is the fully-formatted marker line (e.g. `Φcmp:Foo sel=...`).
+    /// Already newline-separated; caller is responsible for the
+    /// surrounding `// --- Φ Angular Meta ---` header.
+    pub lines: Vec<String>,
+}
+
+impl MetaBlock {
+    /// Returns `true` if there are no Φ lines to emit (i.e. the
+    /// caller should skip the entire `// --- Φ Angular Meta ---` block).
+    pub fn is_empty(&self) -> bool {
+        self.lines.is_empty()
+    }
+
+    /// Render the full Φ block, including the header. Returns an
+    /// empty string when the block is empty (so callers can `+=`
+    /// blindly).
+    pub fn render(&self) -> String {
+        if self.is_empty() {
+            return String::new();
+        }
+        let mut s = String::new();
+        s.push_str("// --- Φ Angular Meta ---\n");
+        for line in &self.lines {
+            s.push_str(line);
+            s.push('\n');
+        }
+        s
+    }
+}
+
+/// Run the Tier-1 Meta-Layer pass on a single `.ts` file's raw source
+/// text. Returns `None` when the file is not an Angular file (no
+/// `@Component` / `@Injectable` / etc. decorators present), and
+/// `Some(MetaBlock)` when at least one class carries a recognised
+/// Angular decorator.
+///
+/// The function is deliberately **string-based** for Phase 1 — it
+/// does not re-parse the AST. The TS capture pipeline has already
+/// given us `class.root` captures; we walk the raw text of each
+/// class capture looking for decorators that immediately precede
+/// it. This is the same strategy used by `compaction/import.rs` and
+/// is sufficient for the Tier 1 deliverable (no new dependencies,
+/// no new file types, no AST changes).
+///
+/// # Arguments
+///
+/// - `source_code`    : the full source text of the file being compressed
+/// - `class_captures` : the slice texts of each `class.root` capture
+///   (in document order, already sorted by
+///   `run_capture_pipeline`)
+/// - `fidelity`       : fidelity level (currently unused; the Meta-Layer
+///   output is fidelity-independent in Phase 1, but
+///   the parameter is kept for forward-compat with
+///   Phase 2 / 3)
+pub fn run_meta_layer(
+    source_code: &str,
+    class_captures: &[String],
+    _fidelity: Fidelity,
+) -> Option<MetaBlock> {
+    // Tier 0 (detection): is this an Angular file at all?
+    if !detect::is_angular_file(source_code) {
+        return None;
+    }
+
+    // Tier 1 (extraction): walk each class capture and emit Φ lines.
+    let mut block = MetaBlock::default();
+    for raw_class in class_captures {
+        if let Some(phi_lines) = decorators::extract_decorators(raw_class) {
+            block.lines.extend(phi_lines);
+        }
+    }
+
+    if block.is_empty() {
+        // Angular file but no Angular decorators on any class. Be
+        // conservative — do not emit a Φ block header.
+        return None;
+    }
+
+    Some(block)
+}
+
+#[cfg(test)]
+#[path = "../tests/angular_meta/mod.rs"]
+mod tests;
