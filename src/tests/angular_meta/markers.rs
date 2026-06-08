@@ -5,7 +5,8 @@
 use crate::angular_meta::markers::{
     build_component_line, build_directive_line, build_injects_line, build_input_line,
     build_model_line, build_module_line, build_output_line, build_pipe_line, build_service_line,
-    expand_phi, expand_phi_in_line, ComponentFields,
+    expand_phi, expand_phi_in_line, ComponentFields, InjectsLine, InputLine, ModelLine, ModuleLine,
+    OutputLine, PhiLine, PhiLineKind, PipeLine, ServiceLine,
 };
 
 #[test]
@@ -160,4 +161,195 @@ fn phi_in_line_rewrite_is_idempotent_only_known_tokens() {
         expanded,
         "@Component Foo sel=a;@Input bar;@Output baz;@Model checked"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Track C — PhiLineKind / PhiLine structural tests (F-ANG-06)
+// ---------------------------------------------------------------------------
+
+/// Every `PhiLineKind` variant must have a unique `marker_prefix` and
+/// `expansion`. This catches copy-paste errors where two variants map
+/// to the same token or expansion string.
+#[test]
+fn phi_line_kind_uniqueness() {
+    let all_kinds = PhiLineKind::all_in_expand_order();
+    assert_eq!(all_kinds.len(), 14, "expected 14 PhiLineKind variants");
+
+    // Check that marker_prefix is unique across all variants.
+    let mut prefixes = std::collections::HashSet::new();
+    for &kind in all_kinds {
+        let prefix = kind.marker_prefix();
+        assert!(
+            prefixes.insert(prefix),
+            "duplicate marker_prefix {:?} for kind {:?}",
+            prefix,
+            kind
+        );
+    }
+
+    // Check that expansion is unique across all variants.
+    let mut expansions = std::collections::HashSet::new();
+    for &kind in all_kinds {
+        let expansion = kind.expansion();
+        assert!(
+            expansions.insert(expansion),
+            "duplicate expansion {:?} for kind {:?}",
+            expansion,
+            kind
+        );
+    }
+}
+
+/// The expansion table is a bijection: every marker prefix maps to
+/// exactly one expansion, and every expansion maps back to exactly one
+/// prefix. This is the same invariant that the old hand-maintained
+/// `expand_phi` match table enforced.
+#[test]
+fn phi_vocab_is_bijective() {
+    // Forward: each kind → unique expansion.
+    let mut exp_to_kind = std::collections::HashMap::new();
+    for &kind in PhiLineKind::all_in_expand_order() {
+        let exp = kind.expansion();
+        if let Some(&prev) = exp_to_kind.get(exp) {
+            panic!(
+                "expansion {:?} maps to both {:?} and {:?}",
+                exp, prev, kind
+            );
+        }
+        exp_to_kind.insert(exp, kind);
+    }
+
+    // Reverse: each expansion → unique kind.
+    let mut prefix_to_kind = std::collections::HashMap::new();
+    for &kind in PhiLineKind::all_in_expand_order() {
+        let prefix = kind.marker_prefix();
+        if let Some(&prev) = prefix_to_kind.get(prefix) {
+            panic!(
+                "prefix {:?} maps to both {:?} and {:?}",
+                prefix, prev, kind
+            );
+        }
+        prefix_to_kind.insert(prefix, kind);
+    }
+}
+
+/// For each builder-backed `PhiLine` impl, verify that the rendered
+/// output starts with the correct `Φ…:` prefix and that
+/// `expand_phi_in_line` reverses the prefix to the expected expansion.
+/// This is the round-trip invariant: `render()` → `expand_phi_in_line`.
+#[test]
+fn phi_line_round_trip() {
+    // --- Component (with fields) ---
+    let fields = ComponentFields {
+        selector: Some("app-test".to_string()),
+        ..Default::default()
+    };
+    let line = crate::angular_meta::markers::ComponentLine {
+        class_name: "MyCmp",
+        fields: &fields,
+    };
+    assert_eq!(line.kind(), PhiLineKind::Component);
+    let rendered = line.render();
+    assert!(rendered.starts_with("Φcmp:"));
+    let expanded = expand_phi_in_line(&rendered);
+    assert!(expanded.starts_with("@Component MyCmp"));
+
+    // --- Component (no fields) ---
+    let fields = ComponentFields::default();
+    let line = crate::angular_meta::markers::ComponentLine {
+        class_name: "Bare",
+        fields: &fields,
+    };
+    let rendered = line.render();
+    assert_eq!(rendered, "Φcmp:Bare");
+    let expanded = expand_phi_in_line(&rendered);
+    assert!(expanded.starts_with("@Component Bare"));
+
+    // --- Service ---
+    let line = ServiceLine {
+        class_name: "Svc",
+        provided_in: Some("root"),
+    };
+    assert_eq!(line.kind(), PhiLineKind::Service);
+    let rendered = line.render();
+    assert!(rendered.starts_with("Φsvc:"));
+    let expanded = expand_phi_in_line(&rendered);
+    assert!(expanded.starts_with("@Injectable Svc"));
+
+    // --- Module ---
+    let decl = vec!["CmpA".to_string()];
+    let line = ModuleLine {
+        class_name: "Mod",
+        decl: &decl,
+        imp: &[],
+        exp: &[],
+    };
+    assert_eq!(line.kind(), PhiLineKind::Module);
+    let rendered = line.render();
+    assert!(rendered.starts_with("Φmod:"));
+    let expanded = expand_phi_in_line(&rendered);
+    assert!(expanded.starts_with("@NgModule Mod"));
+
+    // --- Directive ---
+    let line = crate::angular_meta::markers::DirectiveLine {
+        class_name: "Dir",
+        selector: Some("[appDir]"),
+    };
+    let rendered = line.render();
+    assert!(rendered.starts_with("Φdir:"));
+    let expanded = expand_phi_in_line(&rendered);
+    assert!(expanded.starts_with("@Directive Dir"));
+
+    // --- Pipe ---
+    let line = PipeLine {
+        class_name: "Pip",
+        name: Some("myPipe"),
+    };
+    assert_eq!(line.kind(), PhiLineKind::Pipe);
+    let rendered = line.render();
+    assert!(rendered.starts_with("Φpipe:"));
+    let expanded = expand_phi_in_line(&rendered);
+    assert!(expanded.starts_with("@Pipe Pip"));
+
+    // --- Input ---
+    let line = InputLine {
+        field_name: "value",
+        alias: Some("val"),
+    };
+    assert_eq!(line.kind(), PhiLineKind::Input);
+    let rendered = line.render();
+    assert!(rendered.starts_with("Φin:"));
+    let expanded = expand_phi_in_line(&rendered);
+    assert!(expanded.starts_with("@Input value"));
+
+    // --- Output ---
+    let line = OutputLine {
+        field_name: "changed",
+        alias: None,
+    };
+    assert_eq!(line.kind(), PhiLineKind::Output);
+    let rendered = line.render();
+    assert!(rendered.starts_with("Φout:"));
+    let expanded = expand_phi_in_line(&rendered);
+    assert!(expanded.starts_with("@Output changed"));
+
+    // --- Model ---
+    let line = ModelLine {
+        field_name: "checked",
+        alias: Some("isOn"),
+    };
+    assert_eq!(line.kind(), PhiLineKind::Model);
+    let rendered = line.render();
+    assert!(rendered.starts_with("Φmodel:"));
+    let expanded = expand_phi_in_line(&rendered);
+    assert!(expanded.starts_with("@Model checked"));
+
+    // --- Injects ---
+    let types = vec!["HttpClient".to_string(), "Router".to_string()];
+    let line = InjectsLine { types: &types };
+    assert_eq!(line.kind(), PhiLineKind::Injects);
+    let rendered = line.render();
+    assert!(rendered.starts_with("Φinjects:"));
+    let expanded = expand_phi_in_line(&rendered);
+    assert!(expanded.starts_with("@Inject [HttpClient,Router]"));
 }
