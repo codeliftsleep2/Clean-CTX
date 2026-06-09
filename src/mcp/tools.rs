@@ -537,7 +537,6 @@ fn handle_apply_delta(
     state: &mut McpState,
 ) {
     let delta_val = &params["arguments"]["delta"];
-    let current_version = params["arguments"]["currentVersion"].as_u64().unwrap_or(0);
 
     // Parse the delta from the JSON params
     let delta: IRDelta = match serde_json::from_value(delta_val.clone()) {
@@ -552,27 +551,20 @@ fn handle_apply_delta(
         }
     };
 
-    // Validate version chain
-    if delta.from != current_version {
-        send_response(&serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "error": {
-                "code": -32602,
-                "message": format!(
-                    "Version mismatch: state is v{}, delta expects v{}",
-                    current_version, delta.from
-                )
-            }
-        }));
-        return;
-    }
+    // NF-03 + NF-10: Extract the file ID before the delta is consumed by apply().
+    let delta_file_id = delta.file.clone();
 
-    // Apply the delta
+    // Apply the delta.
+    // NF-04: Removed redundant version check — ContextState::apply is the
+    // single source of truth for version validation. The previous manual
+    // check produced -32602 while apply produces -32603 for the same
+    // condition. The 'currentVersion' parameter is still accepted for
+    // backward compatibility but is no longer validated here.
     match state.ir_context.apply(delta) {
         Ok(new_version) => {
-            let file_id = state.ir_context.file_ids().last().cloned().unwrap_or_default();
-            let pretty = state.ir_context.render_pretty(&file_id, Fidelity::Low);
+            // NF-03 + NF-10: Use delta's file ID instead of file_ids().last()
+            // file_ids() returns HashMap keys — non-deterministic in multi-file sessions.
+            let pretty = state.ir_context.render_pretty(&delta_file_id, Fidelity::Low);
 
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0",
@@ -622,6 +614,17 @@ fn handle_apply_delta(
 /// Phase A (FAANG remediation): The compiler now instantiates the
 /// appropriate language layers (TypeScriptLayer, CSharpLayer) and
 /// meta layers (AngularMetaLayer) based on the detected language.
+///
+/// NF-02 fix: The version is set based on the previous version in the
+/// context state, ensuring a monotonic version chain across successive
+/// `delta_code_context` calls. If the file was previously tracked at
+/// version N, the new compiled IR gets version N+1. If untracked,
+/// version starts at 1.
+///
+/// NF-01 fix: The consumptive `CompressingPatternRecognizer` is wired
+/// into the compile path *after* the additive `CodePatternRecognizer`,
+/// so flags are emitted first, then patterns are consumed for wire-size
+/// reduction. This enables the Phase H 30% compression on edits.
 fn compile_file_ir(
     file_path: &str,
     fidelity: Fidelity,
@@ -646,6 +649,9 @@ fn compile_file_ir(
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|_| file_path.to_string());
     let path_alias = state.dict.get_or_create_alias(absolute_path);
+
+    // NF-02: Determine the next version based on the previous context state
+    let prev_version = state.ir_context.file_version(&path_alias).unwrap_or(0);
 
     let mut compiler = IRCompiler::new();
 
@@ -674,13 +680,27 @@ fn compile_file_ir(
         crate::ir::layers::patterns::CodePatternRecognizer::new(),
     ));
 
-    let compiled = compiler.compile(
+    // NF-01: Wire the consumptive CompressingPatternRecognizer *after*
+    // the additive recognizer. This enables the Phase H 30% compression
+    // on edits by consuming recognised patterns into single PAT ops.
+    // The additive recognizer's flags (CTOR/OBSERVABLE/GETTER/SETTER)
+    // are emitted first, then the consumptive recognizer collapses them
+    // where possible. This ordering ensures maximum compression.
+    compiler.add_pattern_recognizer(Box::new(
+        crate::ir::patterns::CompressingPatternRecognizer::new(),
+    ));
+
+    let mut compiled = compiler.compile(
         &source,
         &path_alias,
         language,
         query_string,
         fidelity,
     )?;
+
+    // NF-02: Override the version with the next monotonic value.
+    // The compiler always sets version=1; we fix it here.
+    compiled.version = prev_version.saturating_add(1);
 
     Ok(compiled)
 }

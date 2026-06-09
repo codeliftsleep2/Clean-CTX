@@ -163,6 +163,10 @@ fn primary_key(op: &CoreOp) -> String {
         CoreOp::Injects(cid, _) => format!("INJECTS:{}", cid),
         CoreOp::Import(alias, _, _) => format!("IMP:{}", alias),
         CoreOp::TypeAlias(alias, _) => format!("TYPE:{}", alias),
+        CoreOp::Pattern(name, args) => {
+            // Use pattern name as primary key — args may vary across compilations
+            format!("PAT:{}:{}", name, args.first().map(|s| s.as_str()).unwrap_or("?"))
+        }
     }
 }
 
@@ -184,6 +188,13 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
         CoreOp::Injects(cid, _) => vec!["INJECTS".into(), cid.clone()],
         CoreOp::Import(alias, _, _) => vec!["IMP".into(), alias.clone()],
         CoreOp::TypeAlias(alias, _) => vec!["TYPE".into(), alias.clone()],
+        CoreOp::Pattern(name, args) => {
+            let mut v = vec!["PAT".into(), name.clone()];
+            if let Some(first_arg) = args.first() {
+                v.push(first_arg.clone());
+            }
+            v
+        }
     }
 }
 

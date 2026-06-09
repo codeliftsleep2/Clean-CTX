@@ -29,6 +29,8 @@ pub enum DeltaError {
     SymbolNotFound(String),
     /// Attempted to add a symbol that already exists
     DuplicateSymbol(String),
+    /// Delta to version is not greater than from version (non-monotonic)
+    NonMonotonicVersion { from: u64, to: u64 },
 }
 
 impl std::fmt::Display for DeltaError {
@@ -40,6 +42,9 @@ impl std::fmt::Display for DeltaError {
             }
             DeltaError::SymbolNotFound(sym) => write!(f, "symbol not found: {}", sym),
             DeltaError::DuplicateSymbol(sym) => write!(f, "duplicate symbol: {}", sym),
+            DeltaError::NonMonotonicVersion { from, to } => {
+                write!(f, "non-monotonic version: delta from {} to {} must be strictly increasing", from, to)
+            }
         }
     }
 }
@@ -229,6 +234,15 @@ impl ContextState {
             return Err(DeltaError::VersionMismatch {
                 expected: file.version,
                 got: delta.from,
+            });
+        }
+
+        // NF-09: Validate monotonic version — to must be strictly greater than from.
+        // This prevents delta replay from rolling backwards or staying the same.
+        if delta.to <= delta.from {
+            return Err(DeltaError::NonMonotonicVersion {
+                from: delta.from,
+                to: delta.to,
             });
         }
 

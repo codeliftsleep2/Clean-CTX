@@ -22,6 +22,7 @@ use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::Fidelity;
 use super::layers::{LanguageLayer, LayerContext, MetaLayer, PatternRecognizer};
 use super::opcodes::*;
+use super::symbol_table::SymbolKind;
 
 /// The compiled IR for a single file.
 #[derive(Debug, Clone)]
@@ -177,6 +178,16 @@ impl IRCompiler {
                     self.current_class = Some(class_id.clone());
                     layer_context.current_class = Some(class_id.clone());
                     layer_context.current_class_name = Some(cap.text.clone());
+
+                    // NF-05: Register the class alias in the symbol table so
+                    // language layers (TypeScript, C#) can resolve aliases for
+                    // EXT/IMPL ops via `symbol_table.alias_for(&base_id)`.
+                    layer_context.symbol_table_mut().register(
+                        class_id.clone(),
+                        cap.text.clone(),
+                        SymbolKind::Class,
+                        file_id,
+                    );
 
                     // Invoke language layers for class captures.
                     // Pass raw_text so layers can parse extends/implements

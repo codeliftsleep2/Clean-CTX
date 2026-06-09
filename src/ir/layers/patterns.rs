@@ -10,6 +10,7 @@
 //   - Override pattern (DEF_M + FLAGS(OVERRIDE))
 
 use crate::ir::opcodes::CoreOp;
+use crate::ir::patterns::is_constructor_name;
 use super::PatternRecognizer;
 
 /// Pattern recognizer (Layer 4).
@@ -92,10 +93,13 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
         return None;
     }
 
-    // First instruction must be DefMethod with "constructor" or class name
+    // First instruction must be DefMethod with a recognized constructor name.
+    // NF-08: Uses `is_constructor_name` from `patterns.rs` for consistency with
+    // the consumptive recognizer, matching all 5 constructor variants:
+    // "constructor", "new", "__init__", "initialize", "ctor"
     let (_, method_id, _name) = match &slice[0] {
         CoreOp::DefMethod(cid, mid, name)
-            if name == "constructor" || name == "new" =>
+            if is_constructor_name(name) =>
         {
             (cid, mid, name)
         }

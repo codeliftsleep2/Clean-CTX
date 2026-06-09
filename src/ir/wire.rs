@@ -103,6 +103,11 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             ]
         }
         CoreOp::TypeAlias(alias, original) => vec!["TYPE".into(), alias.clone(), original.clone()],
+        CoreOp::Pattern(name, args) => {
+            let mut v = vec!["PAT".into(), name.clone()];
+            v.extend(args.iter().cloned());
+            v
+        }
     }
 }
 
@@ -237,17 +242,33 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
                 None
             }
         }
+        "PAT" => {
+            if tuple.len() >= 3 {
+                Some(CoreOp::Pattern(
+                    tuple[1].clone(),
+                    tuple[2..].to_vec(),
+                ))
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }
 
 /// Serialize a CompiledIR to the wire format.
+///
+/// NF-07: Now emits `"encoding": "named"` for consistency with the
+/// positional and tagged wire formats. Previously the `encoding` field
+/// was absent, making it impossible for readers to distinguish the
+/// three formats without knowing the ingestion path.
 pub fn ir_to_wire(ir: &CompiledIR) -> Value {
     let tuples: Vec<Vec<String>> = ir.instructions.iter().map(op_to_tuple).collect();
 
     json!({
         "file": ir.file_id,
         "v": ir.version,
+        "encoding": "named",
         "ir": tuples
     })
 }

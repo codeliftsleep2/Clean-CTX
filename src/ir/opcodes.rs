@@ -62,6 +62,12 @@ pub enum CoreOp {
     // ── Type Aliases (runtime-assigned) ─────────────────
     /// ["TYPE", alias, original_type]
     TypeAlias(String, String),
+
+    // ── Compressed Patterns (Phase H consumptive) ───────
+    /// ["PAT", pattern_name, class_id, method_id, ...metadata]
+    /// Consumptive pattern op that replaces N source instructions
+    /// with a single compact op. Produced by `CompressingPatternRecognizer`.
+    Pattern(String, Vec<String>),
 }
 
 impl fmt::Display for CoreOp {
@@ -83,6 +89,9 @@ impl fmt::Display for CoreOp {
                 write!(f, "IMP {} {} {}", alias, module, named)
             }
             CoreOp::TypeAlias(alias, original) => write!(f, "TYPE {} {}", alias, original),
+            CoreOp::Pattern(name, args) => {
+                write!(f, "PAT {} {}", name, args.join(" "))
+            }
         }
     }
 }
@@ -151,6 +160,7 @@ pub fn arity(opcode: &str) -> Option<i32> {
         "INJECTS" => Some(-1),  // class_id, deps...
         "IMP" => Some(4),       // alias, module, named
         "TYPE" => Some(3),      // alias, original
+        "PAT" => Some(-1),      // pattern_name, args...
         _ => None,
     }
 }
@@ -172,6 +182,7 @@ pub fn opcode_name(op: &CoreOp) -> &'static str {
         CoreOp::Injects(..) => "INJECTS",
         CoreOp::Import(..) => "IMP",
         CoreOp::TypeAlias(..) => "TYPE",
+        CoreOp::Pattern(..) => "PAT",
     }
 }
 

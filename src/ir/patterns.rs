@@ -22,6 +22,7 @@
 // A pattern that doesn't match falls through unchanged (zero regression).
 
 use super::opcodes::CoreOp;
+use super::layers::PatternRecognizer;
 
 /// A compressed pattern op.
 ///
@@ -299,6 +300,34 @@ impl CompressingPatternRecognizer {
     }
 }
 
+/// NF-06: Implement the `PatternRecognizer` trait for `CompressingPatternRecognizer`.
+///
+/// This bridges the consumptive pattern recognizer into the production compile
+/// path (Layer 4). The `recognize` method calls `compress_merged` and maps
+/// each `MergeItem` to a `CoreOp`:
+///   - `Passthrough` ops are forwarded as-is.
+///   - `Pattern` ops are encoded as `CoreOp::Pattern(name, args)` where name
+///     is the pattern's canonical name (e.g., "CTOR") and args contains the
+///     tuple payload exluding the "PAT" prefix.
+///
+/// This replaces the additive `CodePatternRecognizer`'s flag-based approach
+/// with actual consumptive compression: N source instructions become 1 PAT op.
+impl PatternRecognizer for CompressingPatternRecognizer {
+    fn recognize(&self, instructions: &[CoreOp]) -> Vec<CoreOp> {
+        let merged = self.compress_merged(instructions);
+        merged.into_iter().map(|item| match item {
+            MergeItem::Passthrough(op) => op,
+            MergeItem::Pattern(pat) => {
+                let tuple = pat.to_tuple();
+                // tuple[0] is "PAT", tuple[1] is pattern name, rest are args
+                let name = tuple.get(1).cloned().unwrap_or_default();
+                let args = tuple.into_iter().skip(2).collect();
+                CoreOp::Pattern(name, args)
+            }
+        }).collect()
+    }
+}
+
 /// Statistics from a `compress()` run.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompressionStats {
@@ -364,7 +393,11 @@ fn try_compress_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
 }
 
 /// Returns true if the method name is a recognized constructor name.
-fn is_constructor_name(name: &str) -> bool {
+///
+/// NF-08: Made `pub` so the additive `CodePatternRecognizer` in
+/// `layers/patterns.rs` can also use it, ensuring both recognizers
+/// match the same set of constructor names.
+pub fn is_constructor_name(name: &str) -> bool {
     matches!(name, "constructor" | "new" | "__init__" | "initialize" | "ctor")
 }
 
