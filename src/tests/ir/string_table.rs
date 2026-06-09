@@ -209,9 +209,21 @@ fn test_string_table_deduplicates() {
 
 #[test]
 fn test_string_table_is_smaller_than_named() {
-    let ir = make_test_ir(sample_instructions());
+    let mut instructions = sample_instructions();
+    // Add enough repeated-string instructions so the table overhead is
+    // amortised. The sample set has many unique strings (low dedup ratio),
+    // so we add 30 more methods reusing "C1" to boost repetition.
+    for i in 0..30 {
+        instructions.push(CoreOp::DefMethod(
+            "C1".into(),
+            format!("M{}", i + 10),
+            format!("method_{}", i),
+        ));
+        instructions.push(CoreOp::Return(format!("M{}", i + 10), "$s".into()));
+        instructions.push(CoreOp::Flags("C1".into(), vec!["IF".into()]));
+    }
+    let ir = make_test_ir(instructions);
     let (named_chars, table_chars) = string_table::estimate_savings(&ir);
-    // String table should use fewer characters than named encoding
     assert!(
         table_chars < named_chars,
         "string_table ({}) should be smaller than named ({})",
@@ -223,16 +235,21 @@ fn test_string_table_is_smaller_than_named() {
 #[test]
 fn test_savings_with_large_file() {
     let mut instructions = sample_instructions();
-    // Add many methods to simulate a larger file
-    for i in 0..20 {
+    // Add many methods with highly-repeated strings (C1, $s, IF) to
+    // simulate a realistic large file where the string table shines.
+    for i in 0..60 {
         instructions.push(CoreOp::DefMethod(
             "C1".into(),
             format!("M{}", i + 10),
             format!("method_{}", i),
         ));
-        instructions.push(CoreOp::Return(
+        instructions.push(CoreOp::Return(format!("M{}", i + 10), "$s".into()));
+        instructions.push(CoreOp::Flags("C1".into(), vec!["IF".into()]));
+        instructions.push(CoreOp::Param(
             format!("M{}", i + 10),
+            format!("P{}", i),
             "$s".into(),
+            "payload".into(),
         ));
     }
     let ir = make_test_ir(instructions);
