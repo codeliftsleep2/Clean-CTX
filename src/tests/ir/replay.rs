@@ -98,10 +98,10 @@ fn modify_method_delta(from: u64, to: u64) -> IRDelta {
         to,
         ops: DeltaOps {
             adds: vec![],
-            mods: vec![ModOp {
-                key: vec!["DEF_M".into(), "C1".into(), "M1".into()],
-                replace: vec!["DEF_M".into(), "C1".into(), "M1".into(), "renamedMethod".into()],
-            }],
+            mods: vec![ModOp::new_replace(
+                vec!["DEF_M".into(), "C1".into(), "M1".into()],
+                vec!["DEF_M".into(), "C1".into(), "M1".into(), "renamedMethod".into()],
+            )],
             dels: vec![],
         },
     }
@@ -485,10 +485,10 @@ fn context_state_apply_combined_delta() {
             adds: vec![
                 vec!["DEF_F".into(), "C1".into(), "F1".into(), "newField".into()],
             ],
-            mods: vec![ModOp {
-                key: vec!["DEF_M".into(), "C1".into(), "M1".into()],
-                replace: vec!["DEF_M".into(), "C1".into(), "M1".into(), "modifiedMethod".into()],
-            }],
+            mods: vec![ModOp::new_replace(
+                vec!["DEF_M".into(), "C1".into(), "M1".into()],
+                vec!["DEF_M".into(), "C1".into(), "M1".into(), "modifiedMethod".into()],
+            )],
             dels: vec![
                 vec!["IMP".into(), "IM1".into(), "rxjs".into(), "map".into()],
             ],
@@ -588,10 +588,10 @@ fn context_state_apply_symbol_not_found_on_modify() {
         to: 2,
         ops: DeltaOps {
             adds: vec![],
-            mods: vec![ModOp {
-                key: vec!["DEF_M".into(), "C1".into(), "M99".into()],
-                replace: vec!["DEF_M".into(), "C1".into(), "M99".into(), "ghost".into()],
-            }],
+            mods: vec![ModOp::new_replace(
+                vec!["DEF_M".into(), "C1".into(), "M99".into()],
+                vec!["DEF_M".into(), "C1".into(), "M99".into(), "ghost".into()],
+            )],
             dels: vec![],
         },
     };
@@ -976,10 +976,10 @@ fn context_state_apply_no_op_mod_then_add() {
             ],
             mods: vec![
                 // No-op mod: replace equals the existing instruction
-                ModOp {
-                    key: vec!["DEF_M".into(), "C1".into(), "M1".into()],
-                    replace: vec!["DEF_M".into(), "C1".into(), "M1".into(), "processData".into()],
-                },
+                ModOp::new_replace(
+                    vec!["DEF_M".into(), "C1".into(), "M1".into()],
+                    vec!["DEF_M".into(), "C1".into(), "M1".into(), "processData".into()],
+                ),
             ],
             dels: vec![],
         },

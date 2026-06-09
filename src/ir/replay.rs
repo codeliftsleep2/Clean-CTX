@@ -257,11 +257,32 @@ impl ContextState {
             }
         }
 
-        // Phase 2: Modifications
+        // Phase 2: Modifications — supports both full replacement and field-patch formats
         for mod_op in &delta.ops.mods {
-            if !file.replace_by_key(&mod_op.key, &mod_op.replace) {
+            if let Some(replacement) = &mod_op.replace {
+                // Full replacement format
+                if !file.replace_by_key(&mod_op.key, replacement) {
+                    let key = primary_key_from_tuple(&mod_op.key);
+                    return Err(DeltaError::SymbolNotFound(key));
+                }
+            } else if let Some(patches) = &mod_op.patches {
+                // Field-patch format (Idea #3) — apply patches to the existing instruction
                 let key = primary_key_from_tuple(&mod_op.key);
-                return Err(DeltaError::SymbolNotFound(key));
+                let idx = *file.index.get(&key).ok_or_else(|| {
+                    DeltaError::SymbolNotFound(key.clone())
+                })?;
+                let instruction = &mut file.instructions[idx];
+                for patch in patches {
+                    if patch.field_index < instruction.len() {
+                        instruction[patch.field_index] = patch.new_value.clone();
+                    }
+                }
+                // Re-index if the key changed (e.g., a rename patch)
+                let new_key = primary_key_from_tuple(instruction);
+                if key != new_key {
+                    file.index.remove(&key);
+                    file.index.insert(new_key, idx);
+                }
             }
         }
 
