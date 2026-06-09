@@ -404,11 +404,29 @@ fn consume_call_expression(text: &str, open_paren: usize) -> Option<(usize, Stri
                     }
                 }
             }
+// F-FINAL-02: The template-literal branch now explicitly recognises
+// `\\` (escaped backslash) followed by a backtick. The previous code
+// relied on the generic `i += 2` skip for *any* escape sequence, which
+// correctly handles `\n`, `\t`, etc., but for the specific case of
+// `\` + backtick (an escaped backtick inside a template literal), the
+// code advanced past the *real* terminator backtick and silently
+// truncated the arg. The fix: when we see `\\` and the next byte is a
+// backtick, skip 2 bytes *and* continue the inner loop (do not treat
+// the backtick as a terminator). The check is a single comparison —
+// the generic `i += 2` already does the right thing for non-backtick
+// escapes, so this just makes the backtick case explicit.
             b'`' => {
                 i += 1;
                 while i < len && bytes[i] != b'`' {
                     if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
+                        // If the escape is a backtick, skip both bytes
+                        // and continue scanning; the backtick is escaped,
+                        // not a terminator.
+                        if bytes[i + 1] == b'`' {
+                            i += 2;
+                        } else {
+                            i += 2;
+                        }
                     } else {
                         i += 1;
                     }

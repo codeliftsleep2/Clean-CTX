@@ -340,3 +340,113 @@ fn wire_to_ir_malformed_tuple_returns_err() {
         "expected MalformedTuple or UnknownOpcode, got: {:?}", err
     );
 }
+
+// ─── F-FINAL-07: Round-trip stability tests ──────────────────────
+//
+// The audit flagged that the IR wire format has *individual* encode
+// and decode tests but no end-to-end "ir → wire → ir" round-trip
+// assertion. A round-trip test that does NOT use `verify_round_trip`
+// (which is tagged with its own caveat) is the only way to catch
+// drift between the encoder, the JSON envelope, and the decoder.
+//
+// The tests below cover:
+//   1. A small hand-built CompiledIR (5 ops).
+//   2. An empty CompiledIR (boundary).
+//   3. A mixed-type CompiledIR with every CoreOp variant represented.
+//   4. A version-stability test (re-encode and check the byte count
+//      is deterministic — guards against HashMap iteration leakage).
+
+/// F-FINAL-07: Round-trip a small hand-built CompiledIR through
+/// `ir_to_wire` and back. Asserts the result is byte-identical to
+/// the input.
+#[test]
+fn round_trip_small_ir_is_stable() {
+    let ir = CompiledIR {
+        file_id: "test.ts".to_string(),
+        version: 7,
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Foo".into()),
+            CoreOp::DefMethod("C1".into(), "M1".into(), "bar".into()),
+            CoreOp::Param("M1".into(), "P1".into(), "$s".into(), "name".into()),
+            CoreOp::Return("M1".into(), "$v".into()),
+            CoreOp::Flags("M1".into(), vec!["IF".into()]),
+        ],
+    };
+    let wire = ir_to_wire(&ir);
+    let decoded = wire_to_ir(&wire).expect("round-trip should succeed");
+    assert_eq!(decoded.file_id, ir.file_id);
+    assert_eq!(decoded.version, ir.version);
+    assert_eq!(decoded.instructions.len(), ir.instructions.len());
+    for (a, b) in decoded.instructions.iter().zip(ir.instructions.iter()) {
+        assert_eq!(a, b, "instruction round-trip mismatch");
+    }
+}
+
+/// F-FINAL-07: An empty CompiledIR (no instructions) must round-trip
+/// without error. This catches decoder-side "empty tuple" panic paths.
+#[test]
+fn round_trip_empty_ir_is_stable() {
+    let ir = CompiledIR {
+        file_id: "empty.ts".to_string(),
+        version: 0,
+        instructions: vec![],
+    };
+    let wire = ir_to_wire(&ir);
+    let decoded = wire_to_ir(&wire).expect("empty IR should round-trip");
+    assert_eq!(decoded.file_id, "empty.ts");
+    assert_eq!(decoded.version, 0);
+    assert!(decoded.instructions.is_empty());
+}
+
+/// F-FINAL-07: A mixed-type IR with every CoreOp variant represented
+/// must round-trip correctly. This is the strongest stability check
+/// — if any single variant fails to encode/decode symmetrically,
+/// the assertion will fail.
+#[test]
+fn round_trip_all_variants_is_stable() {
+    let ir = CompiledIR {
+        file_id: "all.ts".to_string(),
+        version: 1,
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Foo".into()),
+            CoreOp::DefMethod("C1".into(), "M1".into(), "ctor".into()),
+            CoreOp::DefField("C1".into(), "F1".into(), "x".into()),
+            CoreOp::DefInterface("I1".into(), "IFoo".into()),
+            CoreOp::Param("M1".into(), "P1".into(), "$s".into(), "name".into()),
+            CoreOp::Return("M1".into(), "$v".into()),
+            CoreOp::FieldType("F1".into(), "$n".into()),
+            CoreOp::Flags("M1".into(), vec!["IF".into(), "LOOP".into()]),
+            CoreOp::ClassFlags("C1".into(), vec!["EXPORT".into()]),
+            CoreOp::Extends("C1".into(), "C2".into()),
+            CoreOp::Implements("C1".into(), "I1".into()),
+            CoreOp::Injects("C1".into(), vec!["S1".into(), "S2".into()]),
+            CoreOp::Import("IM1".into(), "fs".into(), "readFile".into()),
+            CoreOp::TypeAlias("T1".into(), "string".into()),
+            CoreOp::Pattern("CTOR".into(), vec!["C1".into(), "M1".into(), "S1".into()]),
+        ],
+    };
+    let wire = ir_to_wire(&ir);
+    let decoded = wire_to_ir(&wire).expect("all-variants round-trip should succeed");
+    assert_eq!(decoded.instructions.len(), ir.instructions.len());
+    for (i, (a, b)) in decoded.instructions.iter().zip(ir.instructions.iter()).enumerate() {
+        assert_eq!(a, b, "mismatch at instruction {}", i);
+    }
+}
+
+/// F-FINAL-07: Re-encoding the same CompiledIR must produce
+/// byte-identical JSON. This guards against HashMap iteration
+/// ordering leaking into the wire format.
+#[test]
+fn ir_to_wire_is_deterministic() {
+    let ir = CompiledIR {
+        file_id: "determinism.ts".to_string(),
+        version: 3,
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Foo".into()),
+            CoreOp::DefMethod("C1".into(), "M1".into(), "bar".into()),
+        ],
+    };
+    let wire1 = serde_json::to_string(&ir_to_wire(&ir)).unwrap();
+    let wire2 = serde_json::to_string(&ir_to_wire(&ir)).unwrap();
+    assert_eq!(wire1, wire2, "ir_to_wire must be deterministic");
+}

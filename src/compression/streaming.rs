@@ -53,7 +53,12 @@ where
 {
     let metadata = fs::metadata(&file)?;
     let total_bytes = metadata.len() as usize;
-    let absolute_path = fs::canonicalize(&file)?.to_string_lossy().into_owned();
+    // F-FINAL-05: Use the raw path as the alias key (not the
+    // canonicalized path) for consistency with the non-streaming
+    // variant and `bundle_pass` / `graph_pass`. On Windows, `canonicalize`
+    // returns UNC paths that would produce a different alias from the
+    // raw-path aliases used everywhere else.
+    let absolute_path = file.to_string_lossy().into_owned();
     let path_alias = dict.get_or_create_alias(absolute_path.clone());
 
     // --- Phase 1: streaming read with progress reporting -----------------

@@ -55,14 +55,26 @@ const ANGULAR_EXTENSIONS: &[&str] = &["html", "scss", "css", "sass", "less"];
 pub struct WorkspaceResult {
     pub manifest: String,
     pub errors: Vec<(String, String)>,
-    pub excluded: Vec<String>,
+    /// F-FINAL-04: Each entry is `(file_path, matching_patterns)` so
+    /// callers can surface *why* a file was excluded.
+    pub excluded: Vec<(String, Vec<String>)>,
+    /// F-FINAL-06: Non-fatal warnings emitted by sub-passes (e.g.
+    /// duplicate Angular class name). Surfaced via the JSON-RPC
+    /// `_warnings` field so MCP clients can see them.
+    pub warnings: Vec<String>,
 }
 
 /// Context shared between the three compression sub-passes.
 struct PassContext {
     kept: Vec<String>,
     errors: Vec<(String, String)>,
-    excluded: Vec<String>,
+    /// F-FINAL-04: `(file_path, matching_patterns)` per excluded file.
+    excluded: Vec<(String, Vec<String>)>,
+    /// F-FINAL-06: Non-fatal warnings collected by the sub-passes
+    /// (e.g. duplicate Angular class name in the graph pass). The
+    /// orchestrator drains these into `state.warnings` at the end
+    /// of the pass so the JSON-RPC response surfaces them.
+    warnings: Vec<String>,
 }
 
 /// Scan a directory, compress source files, and bundle Angular triplets.
@@ -79,12 +91,12 @@ pub(crate) fn compress_workspace_dir(
     // File collection + exclusion.
     let mut all_entries: Vec<String> = Vec::new();
     collect_source_files(dir_path, &mut all_entries);
-    let mut excluded = Vec::new();
+    let mut excluded: Vec<(String, Vec<String>)> = Vec::new();
     let kept: Vec<String> = all_entries
         .into_iter()
         .filter(|p| {
-            if state.config.is_excluded(p) {
-                excluded.push(p.clone());
+            if let Some(patterns) = state.config.matching_exclude_patterns(p) {
+                excluded.push((p.clone(), patterns));
                 false
             } else {
                 true
@@ -92,18 +104,33 @@ pub(crate) fn compress_workspace_dir(
         })
         .collect();
 
-    let mut ctx = PassContext { kept, errors: Vec::new(), excluded };
+    let mut ctx = PassContext {
+        kept,
+        errors: Vec::new(),
+        excluded,
+        warnings: Vec::new(),
+    };
 
     compress_pass(fidelity, state, &mut ctx, &mut manifest);
     let footer_builder = bundle_pass(state, &ctx, &mut manifest);
-    graph_pass(state, &ctx, &mut manifest);
+    graph_pass(state, &mut ctx, &mut manifest);
 
     format_manifest_footer(state, &ctx, footer_builder, &mut manifest);
+
+    // F-FINAL-06: Merge the per-pass warnings collected in
+    // `ctx.warnings` into the session-level buffer so the
+    // `_warnings` field in the JSON-RPC response surfaces them. We
+    // also drain `state.warnings` (in case any sub-system pushed
+    // there directly) to ensure all sources of warnings are
+    // captured in the result.
+    let mut warnings = ctx.warnings;
+    warnings.extend(state.drain_warnings());
 
     Ok(WorkspaceResult {
         manifest,
         errors: ctx.errors,
         excluded: ctx.excluded,
+        warnings,
     })
 }
 
@@ -218,7 +245,9 @@ fn bundle_pass(
         if let Some(ref tpl_path) = triplet.template {
             let a = state.dict.get_or_create_alias(tpl_path.to_string_lossy().to_string());
             file_aliases.push(a);
-            if let Ok(content) = std::fs::read_to_string(tpl_path) {
+            // F-FINAL-01: Use the shared source cache so files already
+            // read in compress_pass / graph_pass are not re-read here.
+            if let Ok(content) = state.read_source(&tpl_path.to_string_lossy()) {
                 let shape = template::extract_template_shape(&content);
                 tpl_summary = Some(shape.to_marker_line());
             }
@@ -226,7 +255,8 @@ fn bundle_pass(
         if let Some(ref sty_path) = triplet.style {
             let a = state.dict.get_or_create_alias(sty_path.to_string_lossy().to_string());
             file_aliases.push(a);
-            if let Ok(content) = std::fs::read_to_string(sty_path) {
+            // F-FINAL-01: Same shared-cache fix as the template branch.
+            if let Ok(content) = state.read_source(&sty_path.to_string_lossy()) {
                 let shape = style::extract_style_shape(&content);
                 sty_summary = Some(shape.to_marker_line());
             }
@@ -262,7 +292,12 @@ fn bundle_pass(
 /// Cross-file dependency graph pass. Reads each TS file once,
 /// builds the Angular graph (F-ANG-04: caches file content for
 /// reuse in the emit loop), and emits `§ΦGRAPH` markers.
-fn graph_pass(state: &mut McpState, ctx: &PassContext, manifest: &mut String) {
+///
+/// F-FINAL-06: `graph_pass` now takes `&mut PassContext` so it can
+/// push non-fatal warnings (currently: duplicate Angular class
+/// names from `AngularGraphBuilder`) into `ctx.warnings` for the
+/// orchestrator to merge into the JSON-RPC response.
+fn graph_pass(state: &mut McpState, ctx: &mut PassContext, manifest: &mut String) {
     let compressible: Vec<&String> = ctx
         .kept
         .iter()
@@ -314,7 +349,14 @@ fn graph_pass(state: &mut McpState, ctx: &PassContext, manifest: &mut String) {
         file_contents.insert((*entry).clone(), source_code);
     }
 
-    let angular_graph = graph_collector.build_graph();
+    let mut angular_graph = graph_collector.build_graph();
+
+    // F-FINAL-06: Drain the graph's warnings (currently: duplicate
+    // class names) into the pass-level warning buffer so the
+    // orchestrator can surface them via the JSON-RPC `_warnings`
+    // field. This replaces the previous `eprintln!` in the builder.
+    ctx.warnings.extend(angular_graph.take_warnings());
+
     state.angular_graph.set(angular_graph.clone());
 
     // Emit graph lines using cached file content (F-ANG-04).
@@ -360,8 +402,14 @@ fn format_manifest_footer(
 
     if !ctx.excluded.is_empty() {
         manifest.push_str(&format!("// EXCLUDED ({} files):\n", ctx.excluded.len()));
-        for path in &ctx.excluded {
-            manifest.push_str(&format!("//   {}\n", path));
+        for (path, patterns) in &ctx.excluded {
+            // F-FINAL-04: surface *which* pattern(s) excluded this file
+            // so the user can debug a misconfigured exclude list.
+            manifest.push_str(&format!(
+                "//   {} [matched: {}]\n",
+                path,
+                patterns.join(", "),
+            ));
         }
     }
     if !ctx.errors.is_empty() {
