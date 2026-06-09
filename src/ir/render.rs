@@ -151,6 +151,12 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                 let original = insn.get(2).map(|s| s.as_str()).unwrap_or("?");
                 output.push_str(&format!("$ty {}={}", alias, original));
             }
+            "PAT" => {
+                let pat_name = insn.get(1).map(|s| s.as_str()).unwrap_or("?");
+                let class_id = insn.get(2).map(|s| s.as_str()).unwrap_or("?");
+                let method_id = insn.get(3).map(|s| s.as_str()).unwrap_or("?");
+                output.push_str(&format!(" // {{{}}} {}:{}", pat_name, class_id, method_id));
+            }
             "FLAGS_C" => {
                 let flags: Vec<&str> = insn[2..].iter().map(|s| s.as_str()).collect();
                 for flag in &flags {

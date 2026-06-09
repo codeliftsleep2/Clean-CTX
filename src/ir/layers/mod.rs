@@ -59,6 +59,16 @@ impl LayerContext {
             source: source.to_string(),
         }
     }
+
+    /// Get a mutable reference to the symbol table.
+    /// Allows the compiler and layers to register/resolve class aliases.
+    ///
+    /// NF-05: Exposed so `IRCompiler::compile` can register class aliases
+    /// after emitting `DefClass`, enabling language layers (TypeScript, C#)
+    /// to find the alias of extended/implemented interfaces via `alias_for`.
+    pub fn symbol_table_mut(&mut self) -> &mut GlobalSymbolTable {
+        &mut self.symbol_table
+    }
 }
 
 /// Language-specific IR layer (Layer 2).
