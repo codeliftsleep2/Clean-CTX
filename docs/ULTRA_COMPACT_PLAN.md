@@ -1,9 +1,9 @@
 # Clean-CTX — Ultra-Compact IR & Ultra-Compressed Text: Plan
 
-**Version:** 0.4.0 (Phase II: Ideas #4 + #1 Complete)
+**Version:** 0.5.0 (Phase III: Ideas #8 + #7 Complete)
 **Created:** 2026-06-09
 **Updated:** 2026-06-09
-**Status:** Phase II Complete — Phase III Next
+**Status:** Phase III Partial — Ideas #8 + #7 Complete, #9 + #10 Next
 
 > **Living document.** This plan defines the next evolution of both the Compiler IR and text compression subsystems, targeting maximum token savings without any loss of correctness. Every proposal preserves 100% information fidelity — the AI receives identical semantic information through a more compact encoding.
 
@@ -630,12 +630,14 @@ Every proposal in this plan preserves **100% information fidelity**:
 8. [x] Run full test suite — verify 0 regressions (`cargo check` clean, all 23 binary wire tests pass)
 
 ### Phase III: Ultra-Compressed Text (Week 5-6)
-9. [ ] Implement progressive header elision (Idea #8)
-   - [ ] `src/compression/report.rs` — format_compact_header()
-   - [ ] `src/tests/compression/` — header format tests
-10. [ ] Implement structural deduplication (Idea #7)
-    - [ ] `src/compression/pipeline.rs` — scope-default detection
-    - [ ] `src/tests/compression/` — scope default tests
+9. [x] Implement progressive header elision (Idea #8)
+   - [x] `src/compression/report.rs` — format_compact_header(), parse_compact_header(), format_compact_cache_hit()
+   - [x] `src/compression/pipeline.rs` — compact cache-hit path for Low fidelity
+   - [x] `src/compression/streaming.rs` — compact cache-hit path for Low fidelity
+   - [x] `src/tests/compression/report.rs` — 18 tests (4 original + 14 new)
+10. [x] Implement structural deduplication (Idea #7)
+    - [x] `src/compression/scope_defaults.rs` — apply_scope_defaults() with class-level dedup
+    - [x] `src/tests/compression/scope_defaults.rs` — 10 tests
 11. [ ] Implement cross-file symbol deduplication (Idea #9)
     - [ ] `src/compression/workspace.rs` — global symbol table
     - [ ] `src/tests/compression/workspace.rs` — workspace tests

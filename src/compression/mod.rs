@@ -26,6 +26,7 @@ pub(crate) mod markers;
 pub(crate) mod opcodes;
 pub(crate) mod pipeline;
 pub(crate) mod report;
+pub(crate) mod scope_defaults;
 pub(crate) mod streaming;
 pub(crate) mod symbol_compression;
 pub mod language;
