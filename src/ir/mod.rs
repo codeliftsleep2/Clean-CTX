@@ -27,6 +27,7 @@ pub mod replay;
 pub mod layers;
 pub mod positional;
 pub mod patterns;
+pub mod string_table;
 
 // Re-export public types for downstream consumers.
 pub use opcodes::CoreOp;
@@ -34,7 +35,11 @@ pub use compiler::{CompiledIR, CompileError, IRCompiler};
 pub use render::{ir_to_text, ir_to_text_ops};
 pub use wire::{ir_to_wire, op_to_tuple};
 pub use symbol_table::{GlobalSymbolTable, SymbolEntry, SymbolKind};
-pub use delta::{IRDelta, DeltaOps, ModOp, DeltaComputer, primary_key_from_tuple, key_tuple_from_tuple};
+pub use delta::{
+    IRDelta, DeltaOps, ModOp, FieldPatch, DeltaComputer,
+    compute_field_patches, primary_key_from_tuple, key_tuple_from_tuple,
+    CompactDelta, CompactOps, compact_encode, compact_decode,
+};
 pub use replay::{ContextState, FileState, DeltaError};
 pub use positional::{
     PositionalConfig, encode_op, decode_op, encode_stream, ir_to_positional_wire,
@@ -42,6 +47,9 @@ pub use positional::{
 };
 pub use patterns::{
     PatternOp, CompressingPatternRecognizer, CompressionStats, MergeItem,
+};
+pub use string_table::{
+    StringTable, ir_to_string_table_wire, estimate_savings as string_table_savings,
 };
 
 #[cfg(test)]

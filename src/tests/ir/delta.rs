@@ -169,7 +169,10 @@ fn delta_modify_method_name() {
     // Verify the modification
     let mod_op = &delta.ops.mods[0];
     assert_eq!(mod_op.key, vec!["DEF_M", "C1", "M1"]);
-    assert_eq!(mod_op.replace, vec!["DEF_M", "C1", "M1", "renamedMethod"]);
+    assert_eq!(mod_op.replace, Some(vec![
+        "DEF_M".to_string(), "C1".to_string(),
+        "M1".to_string(), "renamedMethod".to_string(),
+    ]));
 }
 
 #[test]
@@ -193,7 +196,7 @@ fn delta_modify_return_type() {
     assert_eq!(delta.ops.mods.len(), 1, "should have 1 modification");
     let mod_op = &delta.ops.mods[0];
     assert_eq!(mod_op.key, vec!["RET", "M1"]);
-    assert_eq!(mod_op.replace, vec!["RET", "M1", "$s"]);
+    assert_eq!(mod_op.replace, Some(vec!["RET".to_string(), "M1".to_string(), "$s".to_string()]));
 }
 
 #[test]
@@ -217,7 +220,10 @@ fn delta_modify_param_type() {
 
     assert_eq!(delta.ops.mods.len(), 1, "should have 1 modification");
     assert_eq!(delta.ops.mods[0].key, vec!["SIG", "M1", "P1"]);
-    assert_eq!(delta.ops.mods[0].replace, vec!["SIG", "M1", "P1", "$n", "count"]);
+    assert_eq!(delta.ops.mods[0].replace, Some(vec![
+        "SIG".to_string(), "M1".to_string(), "P1".to_string(),
+        "$n".to_string(), "count".to_string(),
+    ]));
 }
 
 #[test]
@@ -240,7 +246,10 @@ fn delta_modify_flags() {
 
     assert_eq!(delta.ops.mods.len(), 1, "should have 1 modification");
     assert_eq!(delta.ops.mods[0].key, vec!["FLAGS", "M1"]);
-    assert_eq!(delta.ops.mods[0].replace, vec!["FLAGS", "M1", "IF", "LOOP", "THROW"]);
+    assert_eq!(delta.ops.mods[0].replace, Some(vec![
+        "FLAGS".to_string(), "M1".to_string(),
+        "IF".to_string(), "LOOP".to_string(), "THROW".to_string(),
+    ]));
 }
 
 // ── No Change Detection ─────────────────────────────────────────
@@ -576,7 +585,9 @@ fn delta_field_type_modified() {
     let delta = computer.compute(&baseline, &current).expect("delta should be Some");
 
     assert_eq!(delta.ops.mods.len(), 1);
-    assert_eq!(delta.ops.mods[0].replace, vec!["FIELD_T", "F1", "$s"]);
+    assert_eq!(delta.ops.mods[0].replace, Some(vec![
+        "FIELD_T".to_string(), "F1".to_string(), "$s".to_string(),
+    ]));
 }
 
 // ── F-10: IMPL Reordering (Set Semantics) ───────────────────────
@@ -684,7 +695,7 @@ fn delta_flags_two_methods_no_collision() {
     let delta = computer.compute(&baseline, &current).expect("delta should be Some");
     assert_eq!(delta.ops.mods.len(), 1);
     assert_eq!(delta.ops.mods[0].key, vec!["FLAGS", "M1"]);
-    assert!(delta.ops.mods[0].replace.contains(&"THROW".to_string()));
+    assert!(delta.ops.mods[0].replace.as_ref().unwrap().contains(&"THROW".to_string()));
     // M2's flags should be untouched
     assert!(delta.ops.adds.is_empty());
     assert!(delta.ops.dels.is_empty());
@@ -721,7 +732,10 @@ fn delta_injects_dep_change_replaces() {
     let delta = computer.compute(&baseline, &current).expect("delta should be Some");
     assert_eq!(delta.ops.mods.len(), 1);
     assert_eq!(delta.ops.mods[0].key, vec!["INJECTS", "C1"]);
-    assert_eq!(delta.ops.mods[0].replace, vec!["INJECTS", "C1", "S2", "S3"]);
+    assert_eq!(delta.ops.mods[0].replace, Some(vec![
+        "INJECTS".to_string(), "C1".to_string(),
+        "S2".to_string(), "S3".to_string(),
+    ]));
     assert!(delta.ops.adds.is_empty());
     assert!(delta.ops.dels.is_empty());
 }

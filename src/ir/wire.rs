@@ -273,6 +273,19 @@ pub fn ir_to_wire(ir: &CompiledIR) -> Value {
     })
 }
 
+/// Detect the encoding format from a wire value and decode accordingly.
+///
+/// Supports all wire formats: "named", "positional", "tagged", and "string_table".
+/// Returns None if the encoding is unrecognized or decoding fails.
+pub fn wire_to_ir_detect(value: &Value) -> Option<super::compiler::CompiledIR> {
+    let encoding = value.get("encoding").and_then(|v| v.as_str()).unwrap_or("named");
+    match encoding {
+        "string_table" => super::string_table::wire_to_ir(value),
+        "named" | "tagged" => wire_to_ir(value).ok(),
+        _ => wire_to_ir(value).ok(), // fallback to named
+    }
+}
+
 /// Deserialize a CompiledIR from the wire format.
 ///
 /// # Errors

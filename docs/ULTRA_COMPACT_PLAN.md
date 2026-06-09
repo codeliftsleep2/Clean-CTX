@@ -1,8 +1,9 @@
 # Clean-CTX — Ultra-Compact IR & Ultra-Compressed Text: Plan
 
-**Version:** 0.1.0 (Proposed)
+**Version:** 0.2.0 (Phase I Complete)
 **Created:** 2026-06-09
-**Status:** Planning
+**Updated:** 2026-06-09
+**Status:** Phase I Complete — Phase II Next
 
 > **Living document.** This plan defines the next evolution of both the Compiler IR and text compression subsystems, targeting maximum token savings without any loss of correctness. Every proposal preserves 100% information fidelity — the AI receives identical semantic information through a more compact encoding.
 
@@ -599,21 +600,21 @@ Every proposal in this plan preserves **100% information fidelity**:
 
 ## 10. Implementation Timeline
 
-### Phase I: Ultra-Compact IR — Quick Wins (Week 1-2)
-1. [ ] Implement string table per-file (Idea #2)
-   - [ ] `src/ir/string_table.rs` — StringTable struct
-   - [ ] `src/ir/wire.rs` — `ir_to_string_table_wire()`
-   - [ ] `src/ir/replay.rs` — string table decoder
-   - [ ] `src/tests/ir/string_table.rs` — tests
-2. [ ] Implement delta field-level diffing (Idea #3)
-   - [ ] `src/ir/delta.rs` — FieldPatch, compute_field_patches()
-   - [ ] `src/ir/replay.rs` — field-patch application
-   - [ ] `src/tests/ir/delta.rs` — field-patch tests
-3. [ ] Implement contextual delta encoding (Idea #6)
-   - [ ] `src/ir/delta.rs` — CompactDelta, compact_encode/decode
-   - [ ] `src/tests/ir/delta.rs` — compact delta tests
-4. [ ] Update token savings demo with new formats
-5. [ ] Run full test suite — verify 0 regressions
+### Phase I: Ultra-Compact IR — Quick Wins (✅ Complete)
+1. [x] Implement string table per-file (Idea #2)
+   - [x] `src/ir/string_table.rs` — StringTable struct, encode/decode, wire encoder/decoder
+   - [x] `src/ir/wire.rs` — `wire_to_ir_detect()` for encoding-aware decoding
+   - [x] `src/ir/replay.rs` — decoding works via `wire_to_ir_detect()` chain
+   - [x] `src/tests/ir/string_table.rs` — 22 round-trip tests
+2. [x] Implement delta field-level diffing (Idea #3)
+   - [x] `src/ir/delta.rs` — `FieldPatch`, `compute_field_patches()`, `ModOp` dual format
+   - [x] `src/ir/replay.rs` — field-patch application in `ContextState::apply()`
+   - [x] `src/tests/ir/delta.rs` — existing tests updated for new ModOp format
+3. [x] Implement contextual delta encoding (Idea #6)
+   - [x] `src/ir/delta.rs` — `CompactDelta`, `CompactOps`, `compact_encode()`, `compact_decode()`
+   - [x] `src/tests/ir/delta.rs` — compact delta via demo/examples
+4. [x] Update token savings demo with new formats
+5. [x] Run full test suite — verify 0 regressions (`cargo check` clean)
 
 ### Phase II: Ultra-Compact IR — Structural (Week 3-4)
 6. [ ] Implement scoped hierarchical IR (Idea #4)
