@@ -25,6 +25,7 @@ use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::language::language_for_extension;
 use crate::compression::markers::build_marker;
 use crate::compression::report::{format_compacted_body, format_final_output};
+use crate::compression::micro_opcodes::apply_micro_opcodes;
 use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
@@ -194,6 +195,10 @@ pub fn compress_file(
     if let Some(block) = &built.meta_block {
         body_content.push_str(&block.render());
     }
+    // Phase III (Idea #11 — Micro-Opcode Table for Text):
+    // Apply micro-opcodes (§C, §P) before symbol compression so the
+    // §-prefixed codes are included in the symbol dictionary analysis.
+    body_content = apply_micro_opcodes(&body_content, fidelity);
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
     let compacted_body = format_compacted_body(&display_body, &sym_footer, &path_alias, fidelity);
     // F-14: store the raw-token count for this content hash so the
@@ -444,6 +449,9 @@ pub fn compress_source(
     if let Some(block) = &built.meta_block {
         body_content.push_str(&block.render());
     }
+    // Phase III (Idea #11 — Micro-Opcode Table for Text):
+    // Apply micro-opcodes (§C, §P) for workspace-level compression too.
+    body_content = apply_micro_opcodes(&body_content, fidelity);
     // NOTE: Symbol compression is NOT applied here — it will be applied
     // by the workspace-level global symbol table instead.
     let compacted_body = crate::compression::report::format_compacted_body(

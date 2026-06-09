@@ -23,6 +23,7 @@
 
 pub(crate) mod capture_pipeline;
 pub(crate) mod markers;
+pub(crate) mod micro_opcodes;
 pub(crate) mod opcodes;
 pub(crate) mod pipeline;
 pub(crate) mod report;
