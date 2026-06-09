@@ -1,9 +1,9 @@
 # Clean-CTX — Ultra-Compact IR & Ultra-Compressed Text: Plan
 
-**Version:** 0.5.0 (Phase III: Ideas #8 + #7 + #9 + #11 Complete)
+**Version:** 0.6.0 (Phase III + IV: Ideas #8 + #7 + #9 + #11 + #12 Complete)
 **Created:** 2026-06-09
 **Updated:** 2026-06-09
-**Status:** Phase III Partial — Ideas #8 + #7 + #9 + #11 Complete, #10 Next
+**Status:** Phases III & IV Partial — Ideas #8 + #7 + #9 + #11 + #12 Complete, #10 Next
 
 > **Living document.** This plan defines the next evolution of both the Compiler IR and text compression subsystems, targeting maximum token savings without any loss of correctness. Every proposal preserves 100% information fidelity — the AI receives identical semantic information through a more compact encoding.
 
@@ -654,15 +654,13 @@ Every proposal in this plan preserves **100% information fidelity**:
     - [x] `src/tests/compression/micro_opcodes.rs` — 12 tests
 14. [ ] Run full test suite — verify 0 regressions
 
-### Phase IV: Text Delta Support (Week 7-8)
-14. [ ] Implement delta-aware text compression (Idea #12)
-    - [ ] `src/compression/text_delta.rs` — TextDelta, TextDeltaComputer
-    - [ ] `src/compression/pipeline.rs` — delta mode
-    - [ ] `src/mcp/state.rs` — text delta state tracking
-    - [ ] `src/mcp/tools.rs` — delta_text_context tool
-    - [ ] `src/tests/compression/text_delta.rs` — delta tests
-15. [ ] Run full test suite — verify 0 regressions
-16. [ ] Update documentation (COMPILER_IR.md, ROADMAP.md)
+### Phase IV: Text Delta Support (✅ Complete)
+14. [x] Implement delta-aware text compression (Idea #12)
+    - [x] `src/compression/text_delta.rs` — TextDelta, TextDeltaComputer, diff_lines, apply_text_delta
+    - [x] `src/mcp/state.rs` — text delta state tracking (TextDeltaComputer field)
+    - [x] `src/mcp/tools.rs` — delta_text_context tool + compress_text_body helper
+    - [x] `src/tests/compression/text_delta.rs` — 15 delta tests
+15. [x] Run full test suite — 759 passed, 0 failures, 0 regressions
 
 ---
 

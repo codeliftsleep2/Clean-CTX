@@ -23,6 +23,7 @@ use crate::angular_meta::graph_state::AngularGraphHandle;
 use crate::cache::LocalStateCache;
 use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
+use crate::compression::text_delta::TextDeltaComputer;
 use crate::ir::replay::ContextState;
 
 /// Per-session state shared by all MCP tool handlers.
@@ -45,6 +46,10 @@ pub struct McpState {
     /// Enables delta-based state transport: load full IR on first
     /// compress, then apply deltas on subsequent edits.
     pub ir_context: ContextState,
+    /// Phase IV (Idea #12): Text-level delta compressor.
+    /// Stores compressed body snapshots per file and computes
+    /// line-level deltas for delta-based text transport.
+    pub text_delta: TextDeltaComputer,
     /// F-FULL-01/F-FULL-05: Shared file-content cache keyed by raw path.
     /// All I/O paths check this cache first, populating it on first read.
     /// Subsequent reads (from IR compiler, bundle_pass, graph_pass) are
@@ -67,6 +72,7 @@ impl McpState {
             config,
             angular_graph: AngularGraphHandle::new(),
             ir_context: ContextState::new(),
+            text_delta: TextDeltaComputer::new(),
             source_cache: HashMap::new(),
             // F-FINAL-06: empty warning buffer at session start.
             warnings: Vec::new(),
@@ -100,6 +106,11 @@ impl McpState {
     /// Borrow the IR context mutably.
     pub fn ir_context_mut(&mut self) -> &mut ContextState {
         &mut self.ir_context
+    }
+
+    /// Borrow the text delta computer mutably.
+    pub fn text_delta_mut(&mut self) -> &mut TextDeltaComputer {
+        &mut self.text_delta
     }
 
     /// F-FULL-01/F-FULL-05: Read file content, using the shared source cache.

@@ -30,6 +30,7 @@ pub(crate) mod report;
 pub(crate) mod scope_defaults;
 pub(crate) mod streaming;
 pub(crate) mod symbol_compression;
+pub(crate) mod text_delta;
 pub(crate) mod workspace_symbols;
 pub mod language;
 pub mod fidelity;
