@@ -383,7 +383,10 @@ impl IRCompiler {
         raw_sig: &str,
     ) {
         // Parse the method signature: "name(params):return_type"
-        let (name, params_str, return_type) = parse_method_sig(raw_sig);
+        let sig = parse_method_sig(raw_sig);
+        let name = sig.name;
+        let params_str = sig.params_str;
+        let return_type = sig.return_type;
 
         // Emit DefMethod
         instructions.push(CoreOp::DefMethod(
@@ -473,11 +476,31 @@ impl IRCompiler {
     }
 }
 
-/// Parse a method signature string into (name, params_str, return_type).
+/// Parsed method signature — the result of parsing the string returned
+/// by `compaction::extract_method_sig`.
+///
+/// F-26: This struct formalizes the output shape that `parse_method_sig`
+/// returns, making the two-field `(name, params_str, return_type)` tuple
+/// self-documenting. The upstream `extract_method_sig` (in `compaction/*`)
+/// returns a string of the form `name(params):return_type`, and this
+/// function re-parses that string into a structured form. This is an
+/// acknowledged duplication — a future refactor could have
+/// `extract_method_sig` return this struct directly.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MethodSig {
+    /// Method name (e.g., "processComplexData")
+    pub name: String,
+    /// Raw parameter list string (e.g., "payload:$s[],payload2:$n")
+    pub params_str: String,
+    /// Return type opcode (e.g., "$b", "$v")
+    pub return_type: String,
+}
+
+/// Parse a method signature string into a `MethodSig`.
 ///
 /// Input: "processComplexData(payload:$s[],payload2:$n):$b"
-/// Output: ("processComplexData", "payload:$s[],payload2:$n", "$b")
-fn parse_method_sig(sig: &str) -> (String, String, String) {
+/// Output: MethodSig { name: "processComplexData", params_str: "payload:$s[],payload2:$n", return_type: "$b" }
+fn parse_method_sig(sig: &str) -> MethodSig {
     let sig = sig.trim();
 
     // Find the return type separator "):"
@@ -520,7 +543,11 @@ fn parse_method_sig(sig: &str) -> (String, String, String) {
         (sig.to_string(), String::new(), TYPE_VOID.to_string())
     };
 
-    (name, params_str, if return_type.is_empty() { TYPE_VOID.to_string() } else { return_type })
+    MethodSig {
+        name,
+        params_str,
+        return_type: if return_type.is_empty() { TYPE_VOID.to_string() } else { return_type },
+    }
 }
 
 impl Default for IRCompiler {

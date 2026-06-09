@@ -10,6 +10,18 @@
 // `compress_code_context` tool, enabling backward compatibility.
 
 use crate::compression::Fidelity;
+use super::opcodes::CoreOp;
+use super::wire::op_to_tuple;
+
+/// Render IR instructions (as canonical `CoreOp`s) to human-readable text.
+///
+/// F-38: Convenience overload that accepts `&[CoreOp]` directly, avoiding
+/// the need for callers to serialize to tuples first. Internally converts
+/// to tuples and delegates to the positional-tuple version.
+pub fn ir_to_text_ops(instructions: &[CoreOp], fidelity: Fidelity) -> String {
+    let tuples: Vec<Vec<String>> = instructions.iter().map(op_to_tuple).collect();
+    ir_to_text(&tuples, fidelity)
+}
 
 /// Render IR instructions (as positional tuples) to human-readable text.
 /// Fidelity controls what information is included, not the compilation.
