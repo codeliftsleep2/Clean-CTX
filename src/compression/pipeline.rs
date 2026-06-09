@@ -332,6 +332,142 @@ pub fn build_output_lines(
     }
 }
 
+/// Compress source code from a string (not from a file path).
+///
+/// This is used by workspace-level compression where the source code
+/// has already been read. The `apply_symbol_compression` step is
+/// skipped when a global symbol table will be used instead.
+pub fn compress_source(
+    source_code: &str,
+    absolute_path: &str,
+    dict: &mut PathDictionary,
+    cache: &mut LocalStateCache,
+    fidelity: Fidelity,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let source_bytes = source_code.as_bytes();
+    let current_hash = cache.compute_hash(source_bytes);
+    let path_alias = dict.get_or_create_alias(absolute_path.to_string());
+
+    let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
+    let is_modified = cache.update_and_verify(&cache_key, &current_hash);
+    if !is_modified {
+        if fidelity == Fidelity::Low {
+            let meta = if let Some(raw_tokens) = cache.get_raw_token_count(&current_hash) {
+                let bpe = crate::analytics::bpe();
+                let cached_notice = format!(
+                    "// [CACHE_HIT] {} unchanged. Use historic memory.\n",
+                    path_alias
+                );
+                let compressed_tokens = bpe.encode_with_special_tokens(&cached_notice).len();
+                let savings_percentage = if raw_tokens > 0 {
+                    let saved = raw_tokens.saturating_sub(compressed_tokens);
+                    (saved as f64 / raw_tokens as f64) * 100.0
+                } else {
+                    0.0
+                };
+                crate::analytics::TokenMetadata {
+                    raw_tokens,
+                    compressed_tokens,
+                    savings_percentage,
+                }
+            } else {
+                crate::analytics::calculate_savings(source_code, "// [CACHE_HIT]")
+            };
+            return Ok(crate::compression::report::format_compact_cache_hit(
+                meta.raw_tokens,
+                meta.compressed_tokens,
+                meta.savings_percentage,
+                &path_alias,
+            ));
+        }
+
+        let cached_notice = format!(
+            "// [CACHE_HIT] {} unchanged. Use historic memory.\n",
+            path_alias
+        );
+        let meta = if let Some(raw_tokens) = cache.get_raw_token_count(&current_hash) {
+            let bpe = crate::analytics::bpe();
+            let compressed_tokens = bpe.encode_with_special_tokens(&cached_notice).len();
+            let savings_percentage = if raw_tokens > 0 {
+                let saved = raw_tokens.saturating_sub(compressed_tokens);
+                (saved as f64 / raw_tokens as f64) * 100.0
+            } else {
+                0.0
+            };
+            crate::analytics::TokenMetadata {
+                raw_tokens,
+                compressed_tokens,
+                savings_percentage,
+            }
+        } else {
+            crate::analytics::calculate_savings(source_code, &cached_notice)
+        };
+
+        let ratio_report = format!(
+            "// Structures: cached, cached, cached | {}/{} tokens",
+            meta.raw_tokens, meta.compressed_tokens
+        );
+        return Ok(format!(
+            "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
+            meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, ratio_report, cached_notice
+        ));
+    }
+
+    // Determine file extension from path
+    let extension = std::path::Path::new(absolute_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("");
+    let (language, query_string) = crate::compression::language::language_for_extension(extension)
+        .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
+
+    let all_captures: Vec<CapEntry> = run_capture_pipeline(
+        language,
+        query_string,
+        source_code,
+        fidelity,
+        |capture_name, raw, f| {
+            if capture_name == "class.root" {
+                Some(crate::compaction::extract_class_name(raw))
+            } else if capture_name == "method.root" {
+                Some(crate::compaction::extract_method_sig(raw, f))
+            } else if capture_name == "field.root" {
+                Some(crate::compaction::extract_field(raw, f))
+            } else {
+                Some(crate::compaction::compact_expression(raw, f))
+            }
+        },
+    )?;
+
+    let built = build_output_lines(&all_captures, source_code, fidelity);
+    let mut body_content = assemble_body(&built.output_lines, fidelity);
+    if let Some(block) = &built.meta_block {
+        body_content.push_str(&block.render());
+    }
+    // NOTE: Symbol compression is NOT applied here — it will be applied
+    // by the workspace-level global symbol table instead.
+    let compacted_body = crate::compression::report::format_compacted_body(
+        &body_content,
+        "",
+        &path_alias,
+        fidelity,
+    );
+    let raw_tokens = crate::analytics::bpe()
+        .encode_with_special_tokens(source_code)
+        .len();
+    cache.store_raw_token_count(&current_hash, raw_tokens);
+
+    let final_output = crate::compression::report::format_final_output(
+        source_code,
+        &compacted_body,
+        fidelity,
+        built.class_count,
+        built.method_count,
+        built.import_count,
+    );
+    Ok(final_output)
+}
+
 /// Join the body lines using the per-fidelity separator.
 pub fn assemble_body(output_lines: &[String], fidelity: Fidelity) -> String {
     match fidelity {
