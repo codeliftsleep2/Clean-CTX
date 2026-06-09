@@ -1,9 +1,9 @@
 # Clean-CTX — Ultra-Compact IR & Ultra-Compressed Text: Plan
 
-**Version:** 0.3.0 (Phase II: Idea #4 Complete)
+**Version:** 0.4.0 (Phase II: Ideas #4 + #1 Complete)
 **Created:** 2026-06-09
 **Updated:** 2026-06-09
-**Status:** Phase II: Idea #4 Complete — Idea #1 (Binary Wire) Next
+**Status:** Phase II Complete — Phase III Next
 
 > **Living document.** This plan defines the next evolution of both the Compiler IR and text compression subsystems, targeting maximum token savings without any loss of correctness. Every proposal preserves 100% information fidelity — the AI receives identical semantic information through a more compact encoding.
 
@@ -616,17 +616,18 @@ Every proposal in this plan preserves **100% information fidelity**:
 4. [x] Update token savings demo with new formats
 5. [x] Run full test suite — verify 0 regressions (`cargo check` clean)
 
-### Phase II: Ultra-Compact IR — Structural (Week 3-4)
+### Phase II: Ultra-Compact IR — Structural (✅ Complete)
 6. [x] Implement scoped hierarchical IR (Idea #4)
    - [x] `src/ir/hierarchical.rs` — tree structs + converters
    - [x] `src/ir/mod.rs` — register module + re-exports
    - [x] `src/ir/wire.rs` — "hierarchical" in wire_to_ir_detect
    - [x] `src/tests/ir/hierarchical.rs` — 23 round-trip tests
-7. [ ] Implement binary wire format (Idea #1)
-   - [ ] `src/ir/binary_wire.rs` — binary encoder/decoder
-   - [ ] `src/ir/wire.rs` — encoding detection
-   - [ ] `src/tests/ir/binary_wire.rs` — round-trip tests
-8. [ ] Run full test suite — verify 0 regressions
+7. [x] Implement binary wire format (Idea #1)
+   - [x] `src/ir/binary_wire.rs` — binary encoder/decoder + base64 JSON wrapper
+   - [x] `src/ir/wire.rs` — "binary" in wire_to_ir_detect
+   - [x] `src/ir/mod.rs` — register module + re-exports
+   - [x] `src/tests/ir/binary_wire.rs` — 23 round-trip tests
+8. [x] Run full test suite — verify 0 regressions (`cargo check` clean, all 23 binary wire tests pass)
 
 ### Phase III: Ultra-Compressed Text (Week 5-6)
 9. [ ] Implement progressive header elision (Idea #8)
