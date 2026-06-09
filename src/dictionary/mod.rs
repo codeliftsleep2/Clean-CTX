@@ -5,8 +5,12 @@
 //   - `path`   : maps absolute file paths to short aliases (α1, α2, …)
 //   - `symbol` : maps frequently repeated tokens to ultra-short opcodes
 
+pub(crate) mod huffman;
 pub(crate) mod path;
 pub(crate) mod symbol;
+pub(crate) mod workspace;
 
+pub use huffman::HuffmanSymbolDictionary;
 pub use path::PathDictionary;
 pub use symbol::{SymbolDictionary, SymbolKind};
+pub use workspace::GlobalSymbolTable;

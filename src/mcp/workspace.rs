@@ -29,6 +29,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use crate::compressor::compress_file;
 use crate::compression::Fidelity;
+use crate::compression::pipeline::compress_source;
+use crate::compression::workspace_symbols::build_global_symbol_table;
 use crate::mcp::McpState;
 use crate::angular_meta::bundler;
 use crate::angular_meta::decorators;
@@ -81,6 +83,9 @@ struct PassContext {
 ///
 /// Track D (F-ANG-15): decomposed into a 30-line orchestrator that
 /// delegates to `compress_pass`, `bundle_pass`, and `graph_pass`.
+///
+/// Phase III (Idea #9): At Low fidelity, uses a two-pass approach
+/// with global symbol deduplication for 15-30% additional savings.
 pub(crate) fn compress_workspace_dir(
     dir_path: &str,
     fidelity: Fidelity,
@@ -111,7 +116,17 @@ pub(crate) fn compress_workspace_dir(
         warnings: Vec::new(),
     };
 
-    compress_pass(fidelity, state, &mut ctx, &mut manifest);
+    // Phase III (Idea #9): At Low fidelity, use the two-pass approach
+    // with global symbol deduplication. This builds a workspace-level
+    // frequency table across all files, assigns globally-optimised
+    // opcodes, and emits a shared §GSYM dictionary instead of per-file
+    // symbol footers.
+    if fidelity == Fidelity::Low {
+        compress_pass_with_global_symbols(fidelity, state, &mut ctx, &mut manifest);
+    } else {
+        compress_pass(fidelity, state, &mut ctx, &mut manifest);
+    }
+
     let footer_builder = bundle_pass(state, &ctx, &mut manifest);
     graph_pass(state, &mut ctx, &mut manifest);
 
@@ -203,6 +218,180 @@ fn compress_pass(
             }
         }
     }
+}
+
+/// Two-pass compression with global symbol deduplication (Phase III, Idea #9).
+///
+/// Pass 1: Compress each file without symbol compression, collect bodies.
+/// Pass 2: Build global symbol table, re-encode each file with shared
+///         dictionary, emit global §GSYM dictionary in manifest header.
+fn compress_pass_with_global_symbols(
+    fidelity: Fidelity,
+    state: &mut McpState,
+    ctx: &mut PassContext,
+    manifest: &mut String,
+) {
+    let compressible: Vec<String> = ctx
+        .kept
+        .iter()
+        .filter(|p| {
+            Path::new(p)
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|ext| COMPRESSIBLE_EXTENSIONS.contains(&ext))
+        })
+        .cloned()
+        .collect();
+
+    // Pass 1: Compress all files and collect the output.
+    // We use `compress_source` (which skips per-file symbol compression)
+    // so we can later apply the global symbol dictionary instead.
+    struct CompressedEntry {
+        path: String,
+        alias: String,
+        compressed: String,
+        /// The body portion (after header, before footer) for global encoding.
+        body: String,
+    }
+
+    let mut entries: Vec<CompressedEntry> = Vec::new();
+
+    {
+        let McpState { dict, cache, .. } = state;
+
+        for entry in &compressible {
+            // Read the source code.
+            let source_code = match std::fs::read_to_string(entry) {
+                Ok(s) => s,
+                Err(e) => {
+                    ctx.errors.push((entry.clone(), e.to_string()));
+                    manifest.push_str(&format!(
+                        "// ERROR reading {}: {}\n\n",
+                        entry, e
+                    ));
+                    continue;
+                }
+            };
+
+            // Compress without per-file symbol compression.
+            match compress_source(&source_code, entry, dict, cache, fidelity) {
+                Ok(compressed) => {
+                    let alias = dict.get_or_create_alias(entry.clone());
+                    // Extract the body from the compressed output.
+                    // The compressed output has the report header + body.
+                    // We need the body for global symbol encoding.
+                    let body = extract_body_from_compressed(&compressed);
+                    entries.push(CompressedEntry {
+                        path: entry.clone(),
+                        alias,
+                        compressed,
+                        body,
+                    });
+                }
+                Err(e) => {
+                    ctx.errors.push((entry.clone(), e.to_string()));
+                    manifest.push_str(&format!(
+                        "// ERROR compressing {}: {}\n\n",
+                        entry, e
+                    ));
+                }
+            }
+        }
+    }
+
+    if entries.is_empty() {
+        return;
+    }
+
+    // Pass 2: Build global symbol table from all file bodies.
+    let body_pairs: Vec<(String, String)> = entries
+        .iter()
+        .map(|e| (e.path.clone(), e.body.clone()))
+        .collect();
+    let mut global_table = build_global_symbol_table(&body_pairs);
+
+    // Emit the global dictionary in the manifest.
+    let global_footer = global_table.format_global_footer();
+    if !global_footer.is_empty() {
+        manifest.push_str(&global_footer);
+        manifest.push('\n');
+    }
+
+    // Re-encode each file with the global dictionary.
+    for entry in &entries {
+        manifest.push_str(&format!(
+            "// ===== FILE: {} =====\n// α alias: {}\n",
+            entry.path, entry.alias
+        ));
+
+        if entry.body.is_empty() {
+            // No body to encode — emit the original compressed output.
+            manifest.push_str(&entry.compressed);
+        } else {
+            // Encode the body with global symbols.
+            global_table.begin_file();
+            let encoded_body = global_table.encode_body(&entry.body);
+            let file_refs = global_table.format_file_refs();
+
+            // Reconstruct the output: header + encoded body + global refs.
+            // We use the original compressed output's header (everything
+            // before the body starts) and append the encoded body.
+            let header = extract_header_from_compressed(&entry.compressed);
+            manifest.push_str(&header);
+            manifest.push_str(&encoded_body);
+            if !file_refs.is_empty() {
+                manifest.push_str(&file_refs);
+            }
+        }
+        manifest.push('\n');
+    }
+}
+
+/// Extract the body portion from a compressed output string.
+///
+/// The compressed output from `compress_source` has the format:
+/// ```text
+/// // --- Token Optimization Report ---
+/// // Raw Tokens: X | ...
+/// // Fidelity: Low
+/// // Structures: ...
+/// // α1
+/// <body>
+/// ```
+///
+/// This function returns everything after the header (after the `// αN` line).
+fn extract_body_from_compressed(compressed: &str) -> String {
+    let mut lines = compressed.lines();
+    let mut header_ended = false;
+    let mut body = String::new();
+
+    while let Some(line) = lines.next() {
+        if header_ended {
+            if !body.is_empty() {
+                body.push('\n');
+            }
+            body.push_str(line);
+        } else if line.starts_with("// α") || line.starts_with("// [CACHE_HIT]") {
+            header_ended = true;
+        }
+    }
+
+    body
+}
+
+/// Extract the header portion from a compressed output string.
+///
+/// Returns everything up to and including the `// αN` line.
+fn extract_header_from_compressed(compressed: &str) -> String {
+    let mut header = String::new();
+    for line in compressed.lines() {
+        header.push_str(line);
+        header.push('\n');
+        if line.starts_with("// α") || line.starts_with("// [CACHE_HIT]") {
+            break;
+        }
+    }
+    header
 }
 
 /// Bundling pass. Resolves Angular file triplets (*.component.ts →
