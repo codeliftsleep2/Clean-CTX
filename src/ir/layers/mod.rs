@@ -33,8 +33,14 @@ pub mod patterns;
 pub struct LayerContext {
     /// Current class ID (set when processing a class capture)
     pub current_class: Option<String>,
-    /// Current class original name (set when processing a class capture)
+    /// Current class original name (set when processing a class capture).
+    /// May include `extends`/`implements` suffixes from raw_text.
+    /// F-FULL-14: Previously was the extracted bare name; now stores the
+    /// raw class head so language layers see the full declaration.
     pub current_class_name: Option<String>,
+    /// F-FULL-14: Bare class name (modifiers stripped, no extends/implements).
+    /// Used by the Angular meta layer's phi-line parsing which splits on `:`.
+    pub current_class_bare_name: Option<String>,
     /// Current method ID (set when processing a method capture)
     pub current_method: Option<String>,
     /// Current method original name (set when processing a method capture)
@@ -52,6 +58,7 @@ impl LayerContext {
         Self {
             current_class: None,
             current_class_name: None,
+            current_class_bare_name: None,
             current_method: None,
             current_method_name: None,
             symbol_table: GlobalSymbolTable::new(),

@@ -177,7 +177,14 @@ impl IRCompiler {
                     ));
                     self.current_class = Some(class_id.clone());
                     layer_context.current_class = Some(class_id.clone());
-                    layer_context.current_class_name = Some(cap.text.clone());
+                    // F-FULL-14: Use cap.raw_text for current_class_name so the
+                    // class name includes any `extends`/`implements` suffixes
+                    // that language layers may need. Previously used cap.text
+                    // which is the *extracted* name (modifiers stripped).
+                    // For the Angular layer's phi-line parsing, store the
+                    // bare class name too (derived from cap.text).
+                    layer_context.current_class_name = Some(cap.raw_text.clone());
+                    layer_context.current_class_bare_name = Some(cap.text.clone());
 
                     // NF-05: Register the class alias in the symbol table so
                     // language layers (TypeScript, C#) can resolve aliases for
@@ -352,6 +359,13 @@ impl IRCompiler {
             // Replace instructions with recognized output
             instructions = pattern_ops;
         }
+
+        // ── F-FULL-08: Forward-declaration alias resolution ────────────
+        // Post-process the IR stream to resolve Extends/Implements ops
+        // whose target is a raw class name (no alias ID prefix like "C1").
+        // This handles forward references where class B extends class A
+        // but A is defined later in the file.
+        resolve_forward_aliases(&mut instructions);
 
         Ok(CompiledIR {
             file_id: file_id.to_string(),
@@ -564,6 +578,49 @@ fn parse_method_sig(sig: &str) -> MethodSig {
 impl Default for IRCompiler {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// F-FULL-08: Post-process the IR stream to resolve forward-declared class
+/// aliases. When class B extends class A, but A is defined later in the file,
+/// the TypeScript layer emits `Extends("C2", "A")` where "A" is a raw class
+/// name (not an alias ID). This function builds a mapping from class name →
+/// alias ID from the `DefClass` ops in the stream, then rewrites any
+/// `Extends`/`Implements` ops that reference a raw class name.
+fn resolve_forward_aliases(instructions: &mut Vec<CoreOp>) {
+    // First pass: build the class-name → alias-id mapping from DefClass ops.
+    let mut name_to_alias: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for op in instructions.iter() {
+        if let CoreOp::DefClass(alias_id, name) = op {
+            // name is the extracted class name like "FooService" (no modifiers).
+            // Store the mapping so we can resolve Extends("C1", "Foo") → Extends("C1", "C2").
+            if !name_to_alias.contains_key(name) {
+                name_to_alias.insert(name.clone(), alias_id.clone());
+            }
+        }
+    }
+
+    // Second pass: rewrite Extends/Implements ops that reference raw class names.
+    for op in instructions.iter_mut() {
+        match op {
+            CoreOp::Extends(_, target) => {
+                // If target looks like a raw class name (not an alias ID starting with "C"),
+                // try to resolve it to the alias ID.
+                if !target.starts_with('C') {
+                    if let Some(alias) = name_to_alias.get(target.as_str()) {
+                        *target = alias.clone();
+                    }
+                }
+            }
+            CoreOp::Implements(_, target) => {
+                if !target.starts_with('C') {
+                    if let Some(alias) = name_to_alias.get(target.as_str()) {
+                        *target = alias.clone();
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }
 

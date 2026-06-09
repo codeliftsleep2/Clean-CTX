@@ -191,6 +191,26 @@ pub(crate) fn dispatch_tools_call(
         "decompress_code_context" => {
             let compressed_text = params["arguments"]["compressedText"].as_str().unwrap_or("");
 
+            // F-FULL-11: Validate compressedText length before processing.
+            // The MCP server's line limit caps the request to ~16 MB, but
+            // a string within that bound can still be large enough to cause
+            // memory pressure. Return a clean error for oversized input.
+            const MAX_DECOMPRESS_BYTES: usize = 4 * 1024 * 1024; // 4 MB
+            if compressed_text.len() > MAX_DECOMPRESS_BYTES {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": {
+                        "code": -32603,
+                        "message": format!(
+                            "compressedText too large: {} bytes (max {}).",
+                            compressed_text.len(), MAX_DECOMPRESS_BYTES
+                        )
+                    }
+                }));
+                return;
+            }
+
             let mut decompressor = Decompressor::new();
             let decompressed = decompressor.quick_decompress(compressed_text);
 
@@ -645,10 +665,10 @@ fn compile_file_ir(
     let (language, query_string) = language_for_extension(extension)
         .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
 
-    let absolute_path = std::fs::canonicalize(&path_buf)
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| file_path.to_string());
-    let path_alias = state.dict.get_or_create_alias(absolute_path);
+    // F-FULL-10: Use raw path for alias key for deterministic results.
+    // Canonicalize is still performed for the `α alias: <path>` footer
+    // display, but the alias key itself uses the raw path.
+    let path_alias = state.dict.get_or_create_alias(file_path.to_string());
 
     // NF-02: Determine the next version based on the previous context state
     let prev_version = state.ir_context.file_version(&path_alias).unwrap_or(0);

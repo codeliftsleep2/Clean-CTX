@@ -17,6 +17,8 @@
 // arguments; the dict and cache stay single-threaded (the MCP server
 // is single-threaded by design) and the config is shared immutably.
 
+use std::collections::HashMap;
+use std::sync::Arc;
 use crate::angular_meta::graph_state::AngularGraphHandle;
 use crate::cache::LocalStateCache;
 use crate::config::CleanCtxConfig;
@@ -43,6 +45,11 @@ pub struct McpState {
     /// Enables delta-based state transport: load full IR on first
     /// compress, then apply deltas on subsequent edits.
     pub ir_context: ContextState,
+    /// F-FULL-01/F-FULL-05: Shared file-content cache keyed by raw path.
+    /// All I/O paths check this cache first, populating it on first read.
+    /// Subsequent reads (from IR compiler, bundle_pass, graph_pass) are
+    /// O(1) lookups. Files are stored as `Arc<String>` to avoid clones.
+    pub source_cache: HashMap<String, Arc<String>>,
 }
 
 impl McpState {
@@ -55,6 +62,7 @@ impl McpState {
             config,
             angular_graph: AngularGraphHandle::new(),
             ir_context: ContextState::new(),
+            source_cache: HashMap::new(),
         }
     }
 
@@ -71,5 +79,22 @@ impl McpState {
     /// Borrow the IR context mutably.
     pub fn ir_context_mut(&mut self) -> &mut ContextState {
         &mut self.ir_context
+    }
+
+    /// F-FULL-01/F-FULL-05: Read file content, using the shared source cache.
+    /// Returns `Arc<String>` so the cache can be shared across passes
+    /// without cloning the underlying string data.
+    pub fn read_source(&mut self, path: &str) -> Result<Arc<String>, std::io::Error> {
+        use std::path::Path;
+        let cache_key = Path::new(path)
+            .canonicalize()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| path.to_string());
+        if let Some(cached) = self.source_cache.get(&cache_key) {
+            return Ok(Arc::clone(cached));
+        }
+        let content = Arc::new(std::fs::read_to_string(path)?);
+        self.source_cache.insert(cache_key, Arc::clone(&content));
+        Ok(content)
     }
 }

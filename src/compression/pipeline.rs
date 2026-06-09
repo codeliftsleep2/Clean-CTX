@@ -79,7 +79,9 @@ pub fn compress_file(
     let source_bytes = source_code.as_bytes();
 
     let current_hash = cache.compute_hash(source_bytes);
-    let absolute_path = fs::canonicalize(&file)?.to_string_lossy().into_owned();
+    // F-FULL-10: Use the raw path as the alias key for deterministic results
+    // across workspace passes and per-file tools.
+    let absolute_path = file.to_string_lossy().to_string();
     let path_alias = dict.get_or_create_alias(absolute_path.clone());
 
     // Include fidelity in the cache key so different fidelity levels don't share cached results

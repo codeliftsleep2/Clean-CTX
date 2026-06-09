@@ -48,9 +48,15 @@ pub fn detect_language(source: &str) -> (Language, &'static str) {
 /// Map a file extension to a `(Language, query)` pair, or `None` if the
 /// extension is not supported. Used by `compress_file` / streaming variant,
 /// which must reject unsupported file types with a hard error.
+///
+/// F-FULL-16: `.js` files are rejected with a clear error because the
+/// TypeScript grammar does not match all JavaScript constructs (e.g.,
+/// CommonJS `require()` calls are not captured, `function` keyword
+/// definitions are not recognised). Use `.ts` for full support, or open
+/// an issue requesting JavaScript grammar integration.
 pub fn language_for_extension(extension: &str) -> Option<(Language, &'static str)> {
     match extension {
-        "ts" | "js" => Some((tree_sitter_typescript::language_typescript(), queries::TS_QUERY)),
+        "ts" => Some((tree_sitter_typescript::language_typescript(), queries::TS_QUERY)),
         "cs" => Some((tree_sitter_c_sharp::language(), queries::CS_QUERY)),
         _ => None,
     }

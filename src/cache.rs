@@ -12,9 +12,13 @@
 // registry or baseline in sorted order; `HashMap` is faster for lookups.
 
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use crate::diff::CapturedStructure;
+
+/// Maximum number of entries in `raw_token_counts` before LRU eviction.
+/// F-FULL-17: Prevents unbounded memory growth in long-running sessions.
+const MAX_RAW_TOKEN_COUNT_ENTRIES: usize = 10_000;
 
 pub struct LocalStateCache {
     /// Maps absolute file paths to their last calculated content hashes.
@@ -30,7 +34,10 @@ pub struct LocalStateCache {
     /// can skip the expensive BPE encode. Keyed by the hash (not the
     /// file path) because the same content in two locations yields the
     /// same raw-token count.
+    /// F-FULL-17: LRU-evicting cache bounded by MAX_RAW_TOKEN_COUNT_ENTRIES.
     raw_token_counts: HashMap<String, usize>,
+    /// LRU eviction order for `raw_token_counts`. Newest at the back.
+    raw_token_order: VecDeque<String>,
 }
 
 impl Default for LocalStateCache {
@@ -46,6 +53,7 @@ impl LocalStateCache {
             baseline_snapshots: HashMap::new(),
             baseline_hashes: HashMap::new(),
             raw_token_counts: HashMap::new(),
+            raw_token_order: VecDeque::new(),
         }
     }
 
@@ -100,8 +108,21 @@ impl LocalStateCache {
 
     /// F-14: Store the raw-token count for a content hash so the cache-hit
     /// path can skip the BPE encode.
+    /// F-FULL-17: LRU-evicting cache bounded by MAX_RAW_TOKEN_COUNT_ENTRIES.
     pub fn store_raw_token_count(&mut self, content_hash: &str, count: usize) {
+        // If already present, move to back (most recently used).
+        if self.raw_token_counts.contains_key(content_hash) {
+            if let Some(pos) = self.raw_token_order.iter().position(|k| k == content_hash) {
+                self.raw_token_order.remove(pos);
+            }
+        } else if self.raw_token_counts.len() >= MAX_RAW_TOKEN_COUNT_ENTRIES {
+            // Evict the oldest (front of the queue).
+            if let Some(oldest) = self.raw_token_order.pop_front() {
+                self.raw_token_counts.remove(&oldest);
+            }
+        }
         self.raw_token_counts.insert(content_hash.to_string(), count);
+        self.raw_token_order.push_back(content_hash.to_string());
     }
 
     /// F-14: Retrieve a previously-stored raw-token count for the given
@@ -117,6 +138,7 @@ impl LocalStateCache {
         self.baseline_snapshots.clear();
         self.baseline_hashes.clear();
         self.raw_token_counts.clear();
+        self.raw_token_order.clear();
     }
 }
 

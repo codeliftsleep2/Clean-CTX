@@ -44,7 +44,7 @@
 | `FAANG_AUDIT_ANGULAR.md` | 2026-06-07 | 23 | 🟡 20/23 fixed, 3 deferred |
 | **FAANG_AUDIT_FULL.md (this)** | 2026-06-08 | **18** | ⏳ This report |
 
-**Net finding count after this audit:** 18 open (1 critical, 5 major, 8 minor, 4 hygiene).
+**Net finding count after this audit:** 18 open (1 critical, 5 major, 8 minor, 4 hygiene). **F-FULL-12 invalidated on re-read** — `src/diff/differ.rs:194` and `:268` already set `previous_detail: b.sig.clone()` / `b.clone()` in the modified method/field arms. Effective open: **17**.
 
 ### Findings Index (this audit)
 
