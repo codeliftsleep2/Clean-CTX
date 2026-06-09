@@ -28,6 +28,7 @@ pub mod layers;
 pub mod positional;
 pub mod patterns;
 pub mod string_table;
+pub mod hierarchical;
 
 // Re-export public types for downstream consumers.
 pub use opcodes::CoreOp;
@@ -50,6 +51,12 @@ pub use patterns::{
 };
 pub use string_table::{
     StringTable, ir_to_string_table_wire, estimate_savings as string_table_savings,
+};
+pub use hierarchical::{
+    HierarchicalIR, ClassNode, MethodNode, FieldNode, PatternEntry,
+    ir_to_hierarchical, hierarchical_to_ir,
+    ir_to_hierarchical_wire, wire_to_ir as hierarchical_wire_to_ir,
+    estimate_savings as hierarchical_savings,
 };
 
 #[cfg(test)]

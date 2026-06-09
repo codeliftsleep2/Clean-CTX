@@ -1,9 +1,9 @@
 # Clean-CTX — Ultra-Compact IR & Ultra-Compressed Text: Plan
 
-**Version:** 0.2.0 (Phase I Complete)
+**Version:** 0.3.0 (Phase II: Idea #4 Complete)
 **Created:** 2026-06-09
 **Updated:** 2026-06-09
-**Status:** Phase I Complete — Phase II Next
+**Status:** Phase II: Idea #4 Complete — Idea #1 (Binary Wire) Next
 
 > **Living document.** This plan defines the next evolution of both the Compiler IR and text compression subsystems, targeting maximum token savings without any loss of correctness. Every proposal preserves 100% information fidelity — the AI receives identical semantic information through a more compact encoding.
 
@@ -617,11 +617,11 @@ Every proposal in this plan preserves **100% information fidelity**:
 5. [x] Run full test suite — verify 0 regressions (`cargo check` clean)
 
 ### Phase II: Ultra-Compact IR — Structural (Week 3-4)
-6. [ ] Implement scoped hierarchical IR (Idea #4)
-   - [ ] `src/ir/hierarchical.rs` — tree structs + converters
-   - [ ] `src/ir/wire.rs` — hierarchical wire encoder
-   - [ ] `src/ir/replay.rs` — hierarchical wire decoder
-   - [ ] `src/tests/ir/hierarchical.rs` — round-trip tests
+6. [x] Implement scoped hierarchical IR (Idea #4)
+   - [x] `src/ir/hierarchical.rs` — tree structs + converters
+   - [x] `src/ir/mod.rs` — register module + re-exports
+   - [x] `src/ir/wire.rs` — "hierarchical" in wire_to_ir_detect
+   - [x] `src/tests/ir/hierarchical.rs` — 23 round-trip tests
 7. [ ] Implement binary wire format (Idea #1)
    - [ ] `src/ir/binary_wire.rs` — binary encoder/decoder
    - [ ] `src/ir/wire.rs` — encoding detection
