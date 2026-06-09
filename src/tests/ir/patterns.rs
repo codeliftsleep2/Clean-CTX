@@ -4,7 +4,7 @@
 
 use crate::ir::opcodes::CoreOp;
 use crate::ir::patterns::{
-    PatternOp, CompressingPatternRecognizer, CompressedItem,
+    PatternOp, CompressingPatternRecognizer, MergeItem,
 };
 
 fn defclass(id: &str, name: &str) -> CoreOp {
@@ -512,9 +512,9 @@ fn compress_merged_preserves_passthroughs() {
     let rec = CompressingPatternRecognizer::new();
     let merged = rec.compress_merged(&ops);
     let has_class = merged.iter().any(|i|
-        matches!(i, CompressedItem::Passthrough(CoreOp::DefClass(_, _))));
+        matches!(i, MergeItem::Passthrough(CoreOp::DefClass(_, _))));
     let has_ctor = merged.iter().any(|i|
-        matches!(i, CompressedItem::Pattern(PatternOp::Constructor { .. })));
+        matches!(i, MergeItem::Pattern(PatternOp::Constructor { .. })));
     assert!(has_class, "DEF_C should pass through");
     assert!(has_ctor, "constructor should compress to Pattern");
 }
@@ -528,7 +528,7 @@ fn compress_merged_no_patterns_means_all_passthrough() {
     ];
     let rec = CompressingPatternRecognizer::new();
     let merged = rec.compress_merged(&ops);
-    assert!(merged.iter().all(|i| matches!(i, CompressedItem::Passthrough(_))));
+    assert!(merged.iter().all(|i| matches!(i, MergeItem::Passthrough(_))));
     assert_eq!(merged.len(), 3);
 }
 

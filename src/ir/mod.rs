@@ -31,7 +31,7 @@ pub mod patterns;
 // Re-export public types for downstream consumers.
 pub use opcodes::CoreOp;
 pub use compiler::{CompiledIR, CompileError, IRCompiler};
-pub use render::ir_to_text;
+pub use render::{ir_to_text, ir_to_text_ops};
 pub use wire::{ir_to_wire, op_to_tuple};
 pub use symbol_table::{GlobalSymbolTable, SymbolEntry, SymbolKind};
 pub use delta::{IRDelta, DeltaOps, ModOp, DeltaComputer, primary_key_from_tuple, key_tuple_from_tuple};
@@ -41,7 +41,7 @@ pub use positional::{
     estimate_savings, positional_char_count, verify_round_trip,
 };
 pub use patterns::{
-    PatternOp, CompressingPatternRecognizer, CompressionStats, CompressedItem,
+    PatternOp, CompressingPatternRecognizer, CompressionStats, MergeItem,
 };
 
 #[cfg(test)]

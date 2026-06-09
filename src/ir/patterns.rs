@@ -275,19 +275,22 @@ impl CompressingPatternRecognizer {
     /// instructions are preserved in their original position relative to
     /// any preceding/following pattern ops.
     ///
-    /// Returns a `Vec<CompressedItem>` which is either a passthrough
+    /// Returns a `Vec<MergeItem>` which is either a passthrough
     /// `CoreOp` or a recognised `PatternOp`. The caller can decide how
     /// to serialise the merged stream.
-    pub fn compress_merged(&self, instructions: &[CoreOp]) -> Vec<CompressedItem> {
-        let mut output: Vec<CompressedItem> = Vec::new();
+    ///
+    /// F-32: Renamed from `CompressedItem` to `MergeItem` to clarify
+    /// that this is a merge-result enum, not a compressed instruction.
+    pub fn compress_merged(&self, instructions: &[CoreOp]) -> Vec<MergeItem> {
+        let mut output: Vec<MergeItem> = Vec::new();
         let mut i = 0;
 
         while i < instructions.len() {
             if let Some((pat, consumed)) = try_compress_pattern(&instructions[i..]) {
-                output.push(CompressedItem::Pattern(pat));
+                output.push(MergeItem::Pattern(pat));
                 i += consumed;
             } else {
-                output.push(CompressedItem::Passthrough(instructions[i].clone()));
+                output.push(MergeItem::Passthrough(instructions[i].clone()));
                 i += 1;
             }
         }
@@ -310,10 +313,15 @@ pub struct CompressionStats {
 /// Result of a `compress_merged()` call: a heterogeneous stream of
 /// pass-through CoreOps and recognised PatternOps.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum CompressedItem {
+/// F-32: Renamed from `CompressedItem` to `MergeItem` to clarify that
+/// this enum represents the result of merging patterns into the instruction
+/// stream — either a passthrough (unchanged instruction) or a compressed
+/// pattern op. The name `CompressedItem` was confusing because `PatternOp`
+/// is also "compressed" but lives at a different abstraction level.
+pub enum MergeItem {
     /// An instruction that no pattern matched.
     Passthrough(CoreOp),
-    /// A compressed pattern.
+    /// A recognised pattern that replaces one or more instructions.
     Pattern(PatternOp),
 }
 
