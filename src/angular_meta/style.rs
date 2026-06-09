@@ -20,6 +20,8 @@ pub struct StyleShape {
     pub variables: Vec<String>,
     /// At-rules referenced (e.g. `@include`, `@mixin`).
     pub at_rules: Vec<String>,
+    /// F-FULL-13: marker for parser failure on corrupt input.
+    pub parse_failed: bool,
 }
 
 impl StyleShape {
@@ -51,6 +53,10 @@ impl StyleShape {
             parts.push(format!("@{}", rules.join(",")));
         }
 
+        // F-FULL-13: distinguish parser failure from empty style
+        if self.parse_failed {
+            return "Φsty:PARSE_ERROR".to_string();
+        }
         if parts.is_empty() {
             "Φsty:empty".to_string()
         } else {

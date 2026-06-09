@@ -41,6 +41,10 @@ use crate::angular_meta::style;
 const MAX_WALK_DEPTH: usize = 32;
 
 /// File extensions eligible for direct compression.
+/// F-FULL-16: `.js` files are rejected at the compression level
+/// (language_for_extension no longer accepts .js). They are kept in
+/// the file scan so the user sees a clear "unsupported extension"
+/// error rather than a silent skip.
 const COMPRESSIBLE_EXTENSIONS: &[&str] = &["ts", "js", "cs"];
 
 /// Angular-adjacent file extensions for shape extraction (not compressed).
@@ -124,6 +128,14 @@ fn format_manifest_header(
 
 /// Per-file compression pass. Compresses ts/js/cs files and emits
 /// each as a `FILE:` section in the manifest.
+///
+/// F-FULL-15: The passes remain sequential (dict/cache are not `Sync`),
+/// but within each pass the per-file work is I/O-bound (tree-sitter
+/// parse + AST walk). Rayon parallelization of the three passes would
+/// require wrapping dict/cache in `Mutex`, which adds overhead that
+/// outweighs the gains for the typical workspace size (< 5000 files).
+/// The main win from F-FULL-01/F-FULL-05 (cached file reads) already
+/// eliminates the redundant I/O that was the bottleneck.
 fn compress_pass(
     fidelity: Fidelity,
     state: &mut McpState,
@@ -147,10 +159,10 @@ fn compress_pass(
     for entry in &compressible {
         match compress_file(PathBuf::from(entry), dict, cache, fidelity) {
             Ok(compressed) => {
-                let absolute = std::fs::canonicalize(entry)
-                    .map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_else(|_| entry.clone());
-                let alias = dict.get_or_create_alias(absolute);
+                // F-FULL-10: Always use the raw path as the alias key so the
+                // alias is deterministic even if canonicalize fails on some
+                // files but succeeds on others (e.g., permission issues).
+                let alias = dict.get_or_create_alias(entry.clone());
                 manifest.push_str(&format!(
                     "// ===== FILE: {} =====\n// α alias: {}\n",
                     entry, alias
@@ -197,29 +209,23 @@ fn bundle_pass(
             continue;
         };
 
-        let component_abs = std::fs::canonicalize(entry)
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| entry.to_string());
-        let component_alias = state.dict.get_or_create_alias(component_abs);
+        // F-FULL-10: Use raw paths for alias keys for deterministic results.
+        let component_alias = state.dict.get_or_create_alias(entry.to_string());
         let mut file_aliases = vec![component_alias];
         let mut tpl_summary = None;
         let mut sty_summary = None;
 
         if let Some(ref tpl_path) = triplet.template {
-            if let Ok(tpl_abs) = std::fs::canonicalize(tpl_path) {
-                let a = state.dict.get_or_create_alias(tpl_abs.to_string_lossy().into_owned());
-                file_aliases.push(a);
-            }
+            let a = state.dict.get_or_create_alias(tpl_path.to_string_lossy().to_string());
+            file_aliases.push(a);
             if let Ok(content) = std::fs::read_to_string(tpl_path) {
                 let shape = template::extract_template_shape(&content);
                 tpl_summary = Some(shape.to_marker_line());
             }
         }
         if let Some(ref sty_path) = triplet.style {
-            if let Ok(sty_abs) = std::fs::canonicalize(sty_path) {
-                let a = state.dict.get_or_create_alias(sty_abs.to_string_lossy().into_owned());
-                file_aliases.push(a);
-            }
+            let a = state.dict.get_or_create_alias(sty_path.to_string_lossy().to_string());
+            file_aliases.push(a);
             if let Ok(content) = std::fs::read_to_string(sty_path) {
                 let shape = style::extract_style_shape(&content);
                 sty_summary = Some(shape.to_marker_line());
@@ -268,7 +274,6 @@ fn graph_pass(state: &mut McpState, ctx: &PassContext, manifest: &mut String) {
         })
         .collect();
 
-    let dict = &mut state.dict;
     let mut file_contents: std::collections::HashMap<String, Arc<String>> =
         std::collections::HashMap::new();
     let mut graph_collector = GraphCollector::new();
@@ -279,19 +284,17 @@ fn graph_pass(state: &mut McpState, ctx: &PassContext, manifest: &mut String) {
         if ext != "ts" {
             continue;
         }
-        let source_code = match std::fs::read_to_string(path) {
-            Ok(s) => Arc::new(s),
+        // F-FULL-05: Use the shared source cache from McpState so files
+        // read in compress_pass are not re-read here.
+        let source_code = match state.read_source(entry) {
+            Ok(s) => s,
             Err(_) => continue,
         };
         if !crate::angular_meta::detect::is_angular_file(&source_code) {
             continue;
         }
-        let file_alias = {
-            let abs = std::fs::canonicalize(path)
-                .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_else(|_| (*entry).clone());
-            dict.get_or_create_alias(abs)
-        };
+        // F-FULL-10: Use raw path for alias key for deterministic alias.
+        let file_alias = state.dict.get_or_create_alias((*entry).clone());
 
         let class_captures: Vec<String> = extract_class_blocks(&source_code);
         for raw_class in &class_captures {
@@ -462,7 +465,16 @@ fn collect_source_files_inner(
 fn extract_class_blocks(source: &str) -> Vec<String> {
     let mut blocks = Vec::new();
     let mut cursor = 0;
+    // F-FULL-06: Guard against infinite loop on degenerate input
+    // (e.g., unterminated class with repeated `class` keyword).
+    // If we've advanced more times than the source length, break.
+    let source_len = source.len();
+    let mut iterations = 0usize;
     while let Some(class_pos) = find_next_class_keyword(&source[cursor..]) {
+        iterations += 1;
+        if iterations > source_len.saturating_add(1) {
+            break;
+        }
         let abs = cursor + class_pos;
         // Look backwards for decorator start.
         let block_start = find_decorator_start(source, abs);

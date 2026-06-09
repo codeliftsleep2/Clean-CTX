@@ -401,7 +401,13 @@ pub fn is_constructor_name(name: &str) -> bool {
     matches!(name, "constructor" | "new" | "__init__" | "initialize" | "ctor")
 }
 
-/// CTOR pattern: `DEF_M(constructor) + Param* + Return + INJECTS` → 1 op.
+/// CTOR pattern: `DEF_M(constructor) [+ Flags(Mid, ["CTOR"])] + Param* + Return + INJECTS` → 1 op.
+///
+/// F-FULL-03/F-FULL-09: The consumptive recognizer is aware of the additive
+/// `CodePatternRecognizer`'s CTOR `Flags` op that may immediately precede
+/// the `DefMethod`. If present, it consumes the `Flags` op as part of the
+/// matched span, preventing orphan `Flags(M1, ["CTOR"])` ops from remaining
+/// in the stream after the `DefMethod` has been consumed.
 fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     if slice.is_empty() {
         return None;
@@ -419,6 +425,17 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     let mut saw_return = false;
     let mut saw_injects = false;
     let mut deps: Vec<String> = Vec::new();
+
+    // F-FULL-03/F-FULL-09: Consume any trailing CTOR Flags op that the
+    // additive CodePatternRecognizer emitted before the method body.
+    // This prevents orphan Flags(M1, ["CTOR"]) ops in the final stream.
+    if idx < slice.len() {
+        if let CoreOp::Flags(mid, flags) = &slice[idx] {
+            if mid == &method_id && flags.contains(&"CTOR".to_string()) {
+                idx += 1;
+            }
+        }
+    }
 
     while idx < slice.len() {
         match &slice[idx] {

@@ -57,6 +57,8 @@ pub struct TemplateShape {
     /// `@defer` block triggers (Angular 17+): e.g. `on viewport`,
     /// `on idle`, `on interaction`, `on immediate`.
     pub defer_blocks: Vec<String>,
+    /// F-FULL-13: marker for parser failure on corrupt input.
+    pub parse_failed: bool,
 }
 
 impl TemplateShape {
@@ -66,6 +68,11 @@ impl TemplateShape {
     /// Φtpl:div,app-user-card @if @for [ngIf] [(ngModel)] {{count}} (click) [style.color]
     /// ```
     pub fn to_marker_line(&self) -> String {
+        // F-FULL-13: distinguish parser failure from empty template
+        if self.parse_failed {
+            return "Φtpl:PARSE_ERROR".to_string();
+        }
+
         let mut parts: Vec<String> = Vec::new();
 
         // Tags (join with commas, limit to 8 for readability).
@@ -149,7 +156,11 @@ pub fn extract_template_shape_with_depth(html: &str, depth: usize) -> TemplateSh
     parser.set_language(*html_language()).ok();
     let tree = match parser.parse(html.as_bytes(), None) {
         Some(t) => t,
-        None => return shape,
+        None => {
+            // F-FULL-13: surface parser failure to the caller
+            shape.parse_failed = true;
+            return shape;
+        }
     };
 
     let root = tree.root_node();
