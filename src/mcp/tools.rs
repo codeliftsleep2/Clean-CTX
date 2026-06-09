@@ -234,6 +234,14 @@ pub(crate) fn dispatch_tools_call(
                     // the manifest as the primary text content; the
                     // errors are surfaced as a separate JSON field so
                     // MCP clients can inspect them programmatically.
+                    //
+                    // F-FINAL-04: `excluded` is now `Vec<(String, Vec<String>)>`
+                    // — `(path, matching_patterns)` — so MCP clients can
+                    // debug a misconfigured exclude list.
+                    //
+                    // F-FINAL-06: `warnings` is the per-session warning
+                    // buffer (duplicate class names, etc.) so MCP
+                    // clients can surface non-fatal anomalies.
                     send_response(&serde_json::json!({
                         "jsonrpc": "2.0",
                         "id": id,
@@ -243,7 +251,13 @@ pub(crate) fn dispatch_tools_call(
                                 "errors": result.errors.into_iter().map(|(p, e)| {
                                     serde_json::json!({ "path": p, "error": e })
                                 }).collect::<Vec<_>>(),
-                                "excluded": result.excluded,
+                                "excluded": result.excluded.into_iter().map(|(p, patterns)| {
+                                    serde_json::json!({
+                                        "path": p,
+                                        "matched_patterns": patterns,
+                                    })
+                                }).collect::<Vec<_>>(),
+                                "warnings": result.warnings,
                             }
                         }
                     }));

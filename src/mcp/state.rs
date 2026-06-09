@@ -50,6 +50,11 @@ pub struct McpState {
     /// Subsequent reads (from IR compiler, bundle_pass, graph_pass) are
     /// O(1) lookups. Files are stored as `Arc<String>` to avoid clones.
     pub source_cache: HashMap<String, Arc<String>>,
+    /// F-FINAL-06: Accumulated warnings surfaced via the JSON-RPC
+    /// `_warnings` field. Sub-systems that previously used `eprintln!`
+    /// (e.g. duplicate class name in the Angular graph) now push
+    /// here. Drained by tool handlers before each response.
+    pub warnings: Vec<String>,
 }
 
 impl McpState {
@@ -63,7 +68,23 @@ impl McpState {
             angular_graph: AngularGraphHandle::new(),
             ir_context: ContextState::new(),
             source_cache: HashMap::new(),
+            // F-FINAL-06: empty warning buffer at session start.
+            warnings: Vec::new(),
         }
+    }
+
+    /// F-FINAL-06: Push a warning into the session buffer. The next
+    /// `tools/call` response will surface it in the `_warnings` field
+    /// and then clear the buffer. The single-threaded MCP dispatch
+    /// chain guarantees no concurrent access.
+    pub fn push_warning(&mut self, msg: impl Into<String>) {
+        self.warnings.push(msg.into());
+    }
+
+    /// F-FINAL-06: Drain all accumulated warnings. Returns a `Vec`
+    /// that the caller embeds in the response's `_warnings` field.
+    pub fn drain_warnings(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.warnings)
     }
 
     /// Borrow the path dictionary mutably.
