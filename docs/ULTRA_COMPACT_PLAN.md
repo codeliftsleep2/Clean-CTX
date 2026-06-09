@@ -1,9 +1,9 @@
 # Clean-CTX — Ultra-Compact IR & Ultra-Compressed Text: Plan
 
-**Version:** 0.5.0 (Phase III: Ideas #8 + #7 Complete)
+**Version:** 0.5.0 (Phase III: Ideas #8 + #7 + #9 + #11 Complete)
 **Created:** 2026-06-09
 **Updated:** 2026-06-09
-**Status:** Phase III Partial — Ideas #8 + #7 Complete, #9 + #10 Next
+**Status:** Phase III Partial — Ideas #8 + #7 + #9 + #11 Complete, #10 Next
 
 > **Living document.** This plan defines the next evolution of both the Compiler IR and text compression subsystems, targeting maximum token savings without any loss of correctness. Every proposal preserves 100% information fidelity — the AI receives identical semantic information through a more compact encoding.
 
@@ -638,13 +638,21 @@ Every proposal in this plan preserves **100% information fidelity**:
 10. [x] Implement structural deduplication (Idea #7)
     - [x] `src/compression/scope_defaults.rs` — apply_scope_defaults() with class-level dedup
     - [x] `src/tests/compression/scope_defaults.rs` — 10 tests
-11. [ ] Implement cross-file symbol deduplication (Idea #9)
-    - [ ] `src/compression/workspace.rs` — global symbol table
-    - [ ] `src/tests/compression/workspace.rs` — workspace tests
+11. [x] Implement cross-file symbol deduplication (Idea #9)
+    - [x] `src/dictionary/workspace.rs` — GlobalSymbolTable with global frequency table
+    - [x] `src/compression/workspace_symbols.rs` — build_global_symbol_table, encode_with_global_symbols
+    - [x] `src/mcp/workspace.rs` — two-pass workspace compression at Low fidelity
+    - [x] `src/tests/dictionary/workspace.rs` — 13 tests
+    - [x] `src/tests/compression/workspace_symbols.rs` — 6 tests
 12. [ ] Implement Huffman-coded symbols (Idea #10)
     - [ ] `src/dictionary/symbol.rs` — HuffmanSymbolDictionary
     - [ ] `src/tests/dictionary/` — Huffman tests
-13. [ ] Run full test suite — verify 0 regressions
+13. [x] Implement micro-opcodes (Idea #11)
+    - [x] `src/compression/micro_opcodes.rs` — apply_micro_opcodes, expand_micro_opcodes, §C/§P
+    - [x] `src/compression/pipeline.rs` — micro-opcodes in compress_file and compress_source
+    - [x] `src/compression/streaming.rs` — micro-opcodes in streaming pipeline
+    - [x] `src/tests/compression/micro_opcodes.rs` — 12 tests
+14. [ ] Run full test suite — verify 0 regressions
 
 ### Phase IV: Text Delta Support (Week 7-8)
 14. [ ] Implement delta-aware text compression (Idea #12)
@@ -672,10 +680,10 @@ Every proposal in this plan preserves **100% information fidelity**:
 | 8 | Progressive Header Elision | Text | ~25 tok | Very High | None | III |
 | 9 | Cross-File Symbols | Text | 15-30% | Medium | None | III |
 | 10 | Huffman-Coded Symbols | Text | 10-20% | High | None | III |
-| 11 | Micro-Opcodes | Text | 15-25% | Medium | None | Deferred |
+| 11 | Micro-Opcodes | Text | 15-25% | Medium | None | III |
 | 12 | Delta Text Compression | Text | 70-90% | High | Medium | IV |
 
-**Deferred:** Ideas #5 (RLE Delta Batching) and #11 (Micro-Opcodes) are lower priority and can be added in a future phase if needed.
+**Deferred:** Idea #5 (RLE Delta Batching) is lower priority and can be added in a future phase if needed.
 
 ---
 

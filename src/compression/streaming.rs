@@ -19,6 +19,7 @@ use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::language::language_for_extension;
 use crate::compression::pipeline::{assemble_body, build_output_lines};
 use crate::compression::report::{format_compacted_body, format_final_output};
+use crate::compression::micro_opcodes::apply_micro_opcodes;
 use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
@@ -232,6 +233,10 @@ where
     if let Some(block) = &built.meta_block {
         body_content.push_str(&block.render());
     }
+
+    // Phase III (Idea #11 — Micro-Opcode Table for Text):
+    // Apply micro-opcodes before symbol compression.
+    body_content = apply_micro_opcodes(&body_content, fidelity);
 
     // --- Phase 4: symbol opcode compression (Low fidelity only) ----------
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
