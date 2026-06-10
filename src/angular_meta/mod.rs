@@ -117,8 +117,21 @@ pub fn run_meta_layer(
     // F-ANG-23: fidelity now controls the verbosity of the output.
     let mut block = MetaBlock::default();
     for raw_class in class_captures {
-        if let Some(phi_lines) = decorators::extract_decorators(raw_class, fidelity) {
-            block.lines.extend(phi_lines);
+        if let Some(result) = decorators::extract_decorators(raw_class, fidelity) {
+            block.lines.extend(result.lines);
+            // Tier 2.5: run tree-sitter-html on inline templates.
+            // Only for components with `template:` (not `templateUrl:`)
+            // since external .html files are handled by the workspace
+            // bundle pass.
+            if let Some(tpl) = &result.inline_template {
+                if !tpl.trim().is_empty() {
+                    let shape = template::extract_template_shape(tpl);
+                    let tpl_line = shape.to_marker_line();
+                    if tpl_line != "Φtpl:empty" {
+                        block.lines.push(tpl_line);
+                    }
+                }
+            }
         }
     }
 

@@ -603,6 +603,34 @@ cargo test -- --ignored             # Integration tests (tagged with #[ignore])
 
 ---
 
+## Running Examples
+
+The `examples/` directory contains demonstration programs.
+
+### Token Savings Demo (`token_savings_demo`)
+
+Shows single-pass compression savings across named IR, string-table IR, and compact delta formats:
+
+```bash
+cargo run --example token_savings_demo
+```
+
+### 50-Edit Simulation (`fifty_edit_simulation`)
+
+Simulates a realistic developer editing session on a ~440-line Angular service (`UserManagementService.ts`). Applies 50 sequential edits across 5 categories (small changes, method-level, structural, cross-method, refactors) and measures token costs across three pipelines:
+
+- **Raw**: Uncompressed BPE token count of full source at each step
+- **Clean-CTX full recompression**: Compress at each step via `compress_file`
+- **Clean-CTX + delta transport**: Compress once, then send only text-level deltas
+
+```bash
+cargo run --example fifty_edit_simulation
+```
+
+Output includes a per-edit table (50 rows × 8 columns), final summary with per-pipeline totals and savings percentages, breakdown by edit category, and key insight callouts (break-even point, best/worst case delta savings). See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for the full results.
+
+---
+
 ## Code Quality Gates
 
 Every pull request must pass these checks:

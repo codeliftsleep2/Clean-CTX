@@ -57,6 +57,8 @@ pub struct TemplateShape {
     /// `@defer` block triggers (Angular 17+): e.g. `on viewport`,
     /// `on idle`, `on interaction`, `on immediate`.
     pub defer_blocks: Vec<String>,
+    /// F-FULL-13: marker for parser failure on corrupt input.
+    pub parse_failed: bool,
 }
 
 impl TemplateShape {
@@ -66,6 +68,11 @@ impl TemplateShape {
     /// Φtpl:div,app-user-card @if @for [ngIf] [(ngModel)] {{count}} (click) [style.color]
     /// ```
     pub fn to_marker_line(&self) -> String {
+        // F-FULL-13: distinguish parser failure from empty template
+        if self.parse_failed {
+            return "Φtpl:PARSE_ERROR".to_string();
+        }
+
         let mut parts: Vec<String> = Vec::new();
 
         // Tags (join with commas, limit to 8 for readability).
@@ -149,7 +156,11 @@ pub fn extract_template_shape_with_depth(html: &str, depth: usize) -> TemplateSh
     parser.set_language(*html_language()).ok();
     let tree = match parser.parse(html.as_bytes(), None) {
         Some(t) => t,
-        None => return shape,
+        None => {
+            // F-FULL-13: surface parser failure to the caller
+            shape.parse_failed = true;
+            return shape;
+        }
     };
 
     let root = tree.root_node();
@@ -248,6 +259,11 @@ fn walk_node(
 }
 
 /// Process an `element` node (has start_tag, children, end_tag).
+///
+/// tree-sitter-html 0.20.x represents XHTML self-closing elements
+/// (`<app-heavy />`) as an `element` wrapping a `self_closing_tag`
+/// child, rather than having a `start_tag` child. We must check for
+/// both structures.
 fn process_element_node(
     node: tree_sitter::Node,
     source: &str,
@@ -255,6 +271,14 @@ fn process_element_node(
     current_depth: usize,
     shape: &mut TemplateShape,
 ) {
+    // Check if this element wraps a self_closing_tag (XHTML-style `<tag />`).
+    // In that case, extract tag name and attributes from the self_closing_tag child.
+    if let Some(self_closing) = find_child(node, "self_closing_tag") {
+        process_self_closing_tag_node(self_closing, source, shape);
+        // No further children to recurse into for XHTML self-closing elements.
+        return;
+    }
+
     // Extract tag name from the start_tag child.
     if let Some(tag_name) = extract_tag_name_from_element(node, source) {
         shape.tags.push(tag_name.clone());

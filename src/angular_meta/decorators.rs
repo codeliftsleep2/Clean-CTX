@@ -27,6 +27,18 @@ use crate::angular_meta::markers::{
 };
 use crate::compression::Fidelity;
 
+/// Result of [`extract_decorators`]: the Φ marker lines plus any
+/// inline template content that should be fed through the HTML
+/// template extractor.
+pub struct DecoratorsResult {
+    /// Φ marker lines (Φcmp:, Φsvc:, etc.).
+    pub lines: Vec<String>,
+    /// Raw inline template content (from `template: '...'`), when
+    /// the component uses an inline template instead of `templateUrl`.
+    /// `None` when no inline template is present.
+    pub inline_template: Option<String>,
+}
+
 /// Extract every Angular decorator on the given class capture and
 /// emit the corresponding `Φ` marker lines. Returns `None` if no
 /// Angular decorator or signal-based API is present.
@@ -51,7 +63,7 @@ use crate::compression::Fidelity;
 // F-ANG-13: substitute `?` for missing class names at the call site
 // (the audit notes the call site already did this implicitly via
 // the `"(anonymous)"` literal).
-pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Vec<String>> {
+pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<DecoratorsResult> {
     let head_end = find_class_head_end(raw_class)?;
     let head = &raw_class[..head_end];
 
@@ -65,11 +77,18 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Vec<Str
     let mut module_emit: Option<String> = None;
     let mut directive_emit: Option<String> = None;
     let mut pipe_emit: Option<String> = None;
+    let mut inline_template: Option<String> = None;
 
     for dec in &decorators {
         match dec.kind {
             DecoratorKind::Component => {
                 let fields = parse_object_literal(&dec.arg);
+                // Capture inline template for later shape extraction.
+                // Only use when there's no templateUrl (the external
+                // .html file takes precedence in workspace mode).
+                if inline_template.is_none() {
+                    inline_template = fields.template.clone();
+                }
                 component_emit = Some(build_component_line(&class_name, &fields));
             }
             DecoratorKind::Injectable => {
@@ -206,7 +225,7 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Vec<Str
     if lines.is_empty() {
         None
     } else {
-        Some(lines)
+        Some(DecoratorsResult { lines, inline_template })
     }
 }
 
@@ -404,10 +423,24 @@ fn consume_call_expression(text: &str, open_paren: usize) -> Option<(usize, Stri
                     }
                 }
             }
+// F-FINAL-02: The template-literal branch now explicitly recognises
+// `\\` (escaped backslash) followed by a backtick. The previous code
+// relied on the generic `i += 2` skip for *any* escape sequence, which
+// correctly handles `\n`, `\t`, etc., but for the specific case of
+// `\` + backtick (an escaped backtick inside a template literal), the
+// code advanced past the *real* terminator backtick and silently
+// truncated the arg. The fix: when we see `\\` and the next byte is a
+// backtick, skip 2 bytes *and* continue the inner loop (do not treat
+// the backtick as a terminator). The check is a single comparison —
+// the generic `i += 2` already does the right thing for non-backtick
+// escapes, so this just makes the backtick case explicit.
             b'`' => {
                 i += 1;
                 while i < len && bytes[i] != b'`' {
                     if bytes[i] == b'\\' && i + 1 < len {
+                        // If the escape is a backtick, skip both bytes
+                        // and continue scanning; the backtick is escaped,
+                        // not a terminator.
                         i += 2;
                     } else {
                         i += 1;

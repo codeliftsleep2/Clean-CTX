@@ -56,9 +56,18 @@ fn compress_workspace_dir_respects_exclude_patterns() {
         manifest
     );
     // F-13: the structured errors/excluded fields should be populated.
+    // F-FINAL-04: `excluded` is now `Vec<(String, Vec<String>)>` so we
+    // match against `p.0` (the path) and `p.1` (the matched patterns).
     assert!(
-        result.excluded.iter().any(|p| p.contains("skip-me")),
-        "excluded vec should contain the skipped file"
+        result.excluded.iter().any(|p| p.0.contains("skip-me")),
+        "excluded vec should contain the skipped file path"
+    );
+    assert!(
+        result
+            .excluded
+            .iter()
+            .any(|p| p.0.contains("skip-me") && p.1.contains(&"skip-me*".to_string())),
+        "excluded vec should record the matching pattern"
     );
 }
 

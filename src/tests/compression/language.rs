@@ -26,8 +26,10 @@ fn detect_language_returns_correct_tuple() {
 
 #[test]
 fn language_for_extension_handles_known_extensions() {
+    // F-FULL-16: .js is no longer supported (TypeScript grammar doesn't
+    // match all JS constructs). Only .ts and .cs are accepted.
     assert!(language_for_extension("ts").is_some());
-    assert!(language_for_extension("js").is_some());
+    assert!(language_for_extension("js").is_none());
     assert!(language_for_extension("cs").is_some());
     assert!(language_for_extension("py").is_none());
     assert!(language_for_extension("").is_none());

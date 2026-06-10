@@ -37,6 +37,11 @@ pub struct CapEntry {
     /// `method.root` it might be the compacted signature; for control
     /// flow it might be the marker string.
     pub text: String,
+    /// Raw (unprocessed) text of the captured node in the source.
+    /// Used by the IR compiler's language layers which need the full
+    /// original text (e.g., class head with extends/implements) to
+    /// extract relationships.
+    pub raw_text: String,
     /// Byte offset of the start of the captured node in the source.
     pub start_byte: usize,
 }
@@ -75,6 +80,7 @@ where
                     all_captures.push(CapEntry {
                         name: capture_name,
                         text: processed,
+                        raw_text: raw,
                         start_byte: capture.node.start_byte(),
                     });
                 }

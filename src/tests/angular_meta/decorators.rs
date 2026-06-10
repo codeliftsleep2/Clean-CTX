@@ -5,8 +5,8 @@
 use crate::angular_meta::decorators::extract_decorators;
 use crate::compression::Fidelity;
 
-fn lines_to_vec(opt: Option<Vec<String>>) -> Vec<String> {
-    opt.unwrap_or_default()
+fn lines_to_vec(opt: Option<crate::angular_meta::decorators::DecoratorsResult>) -> Vec<String> {
+    opt.map(|r| r.lines).unwrap_or_default()
 }
 
 // F-ANG-23: most tests use `Medium` fidelity because the
