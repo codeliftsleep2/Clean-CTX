@@ -86,8 +86,8 @@ fn encode_with_global_symbols_multiple_files() {
     assert!(refs2.contains("§GSYM"));
 
     // File 1 uses all 3 symbols, file 2 uses only 2
-    let ids1: Vec<&str> = refs1.trim().split(' ').last().unwrap().split(',').collect();
-    let ids2: Vec<&str> = refs2.trim().split(' ').last().unwrap().split(',').collect();
+    let ids1: Vec<&str> = refs1.trim().split(' ').next_back().unwrap().split(',').collect();
+    let ids2: Vec<&str> = refs2.trim().split(' ').next_back().unwrap().split(',').collect();
     assert!(ids1.len() > ids2.len());
 }
 

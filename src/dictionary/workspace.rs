@@ -141,8 +141,7 @@ impl GlobalSymbolTable {
         ];
 
         let mut code_idx = 0;
-        let mut index = 0usize;
-        for (token, _count) in &freq_vec {
+        for (index, (token, _count)) in freq_vec.iter().enumerate() {
             // Skip codes already used by primitive opcodes.
             while code_idx < HUFFMAN_CODES.len()
                 && self.reverse.contains_key(HUFFMAN_CODES[code_idx])
@@ -158,7 +157,6 @@ impl GlobalSymbolTable {
             self.opcode_to_index.insert(code.to_string(), index);
             self.custom_opcodes.push(code.to_string());
             code_idx += 1;
-            index += 1;
         }
 
         self.built = true;

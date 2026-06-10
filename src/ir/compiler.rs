@@ -587,7 +587,7 @@ impl Default for IRCompiler {
 /// name (not an alias ID). This function builds a mapping from class name →
 /// alias ID from the `DefClass` ops in the stream, then rewrites any
 /// `Extends`/`Implements` ops that reference a raw class name.
-fn resolve_forward_aliases(instructions: &mut Vec<CoreOp>) {
+fn resolve_forward_aliases(instructions: &mut [CoreOp]) {
     // First pass: build the class-name → alias-id mapping from DefClass ops.
     let mut name_to_alias: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     for op in instructions.iter() {
@@ -612,13 +612,12 @@ fn resolve_forward_aliases(instructions: &mut Vec<CoreOp>) {
                     }
                 }
             }
-            CoreOp::Implements(_, target) => {
-                if !target.starts_with('C') {
+            CoreOp::Implements(_, target)
+                if !target.starts_with('C') => {
                     if let Some(alias) = name_to_alias.get(target.as_str()) {
                         *target = alias.clone();
                     }
                 }
-            }
             _ => {}
         }
     }

@@ -441,11 +441,7 @@ fn consume_call_expression(text: &str, open_paren: usize) -> Option<(usize, Stri
                         // If the escape is a backtick, skip both bytes
                         // and continue scanning; the backtick is escaped,
                         // not a terminator.
-                        if bytes[i + 1] == b'`' {
-                            i += 2;
-                        } else {
-                            i += 2;
-                        }
+                        i += 2;
                     } else {
                         i += 1;
                     }
