@@ -27,6 +27,7 @@ use crate::compression::text_delta::TextDeltaComputer;
 use crate::ir::replay::ContextState;
 use crate::mcp::context_store::InMemoryContextStore;
 use crate::mcp::session_stats::SessionStats;
+use crate::mcp::sqlite_store::SqliteStore;
 
 /// Per-session state shared by all MCP tool handlers.
 pub struct McpState {
@@ -67,12 +68,33 @@ pub struct McpState {
     pub session_stats: SessionStats,
     /// In-memory context store for persistence-ready baselines.
     pub context_store: InMemoryContextStore,
+    /// Optional SQLite persistence store for cross-session survival.
+    /// Initialized from `config.persistence` — `None` if disabled or
+    /// if DB open fails.
+    pub persistence_store: Option<SqliteStore>,
 }
 
 impl McpState {
     /// Create a fresh state object with the given config and empty
     /// registries.
     pub fn new(config: CleanCtxConfig) -> Self {
+        // Initialize SQLite persistence store if enabled in config
+        let persistence_store = if config.persistence.enabled {
+            let db_path = std::path::Path::new(&config.persistence.db_path);
+            match SqliteStore::open(db_path) {
+                Ok(store) => {
+                    eprintln!("[clean-ctx] Persistence enabled: {}", db_path.display());
+                    Some(store)
+                }
+                Err(e) => {
+                    eprintln!("[clean-ctx] WARNING: Failed to open persistence DB: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Self {
             dict: PathDictionary::new(),
             cache: LocalStateCache::new(),
@@ -85,6 +107,7 @@ impl McpState {
             warnings: Vec::new(),
             session_stats: SessionStats::new(),
             context_store: InMemoryContextStore::new(),
+            persistence_store,
         }
     }
 

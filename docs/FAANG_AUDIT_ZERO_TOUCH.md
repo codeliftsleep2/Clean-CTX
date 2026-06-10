@@ -56,3 +56,71 @@
 **Problem**: The `if f != Fidelity::Low || explicit_fidelity.is_some()` check is always true at this point (priority 1 would have caught an explicit fidelity), making the second `return f` dead code.
 
 **Fix**: Simplify to `return f` directly.
+
+---
+
+## ✅ PASS: SQLite Persistence Layer (Phase 5 Addition)
+
+**Date**: 2026-06-10
+**Scope**: Cross-session persistence for compression contexts via SQLite
+
+### Components Added
+
+| File | Description |
+|------|-------------|
+| `src/mcp/sqlite_store.rs` | `SqliteStore` — full `ContextStore` trait impl backed by SQLite (WAL mode) |
+| `src/tests/mcp/sqlite_store.rs` | 13 integration tests (all passing) |
+| `src/mcp/mod.rs` | Lazy DB init from `CLEANCTX_PERSISTENCE_DB` env var |
+| `src/mcp/state.rs` | `persistence_store: Option<SqliteStore>` on `McpState` |
+
+### Schema (v1)
+
+- **`contexts`** — baselines (content-hash PK, IR BLOB, fidelity, pretty text)
+- **`deltas`** — sequential delta payloads (FK → contexts, auto-increment edit_sequence)
+- **`symbols`** — symbol table entries (FK → contexts, phi markers)
+- **`sessions`** — workspace session tracking
+- **`_schema_version`** — migration version tracking
+
+### New MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `save_context` | Explicit manual checkpoint to DB |
+| `list_sessions` | Show tracked sessions/files |
+| `replay_history` | Replay deltas from DB up to target sequence |
+| `purge_old_deltas` | Trim old delta history by age |
+
+### Hot-Path Hooks
+
+Persistence hooks fire automatically in:
+- `provide_code_context` → `FullCompress` path (baseline save)
+- `provide_code_context` → `DeltaTransport` path (baseline + delta save)
+- `restore_context` → DB clear on file reset
+
+### Test Coverage
+
+```
+test_sqlite_store_open_and_migrate ... ok
+test_sqlite_save_and_load_round_trip ... ok
+test_sqlite_save_with_ir_blob ... ok
+test_sqlite_has_context ... ok
+test_sqlite_clear_file ... ok
+test_sqlite_delta_append_and_count ... ok
+test_sqlite_deterministic_id_from_hash ... ok
+test_sqlite_load_context_with_deltas ... ok
+test_sqlite_load_nonexistent_returns_none ... ok
+test_sqlite_purge_old_deltas ... ok
+test_sqlite_delta_count_for_file ... ok
+test_sqlite_rebuild_stats ... ok
+test_sqlite_multiple_files_independent ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored
+```
+
+### Design Decisions
+
+- **Non-fatal persistence**: All DB writes are fire-and-forget with `eprintln!` warnings — compression never fails due to DB issues.
+- **Content-hash deterministic IDs**: `ctx-{sha256_hex}` ensures idempotent saves (same content → same ID → UPSERT).
+- **No Mutex**: MCP server is single-threaded (stdin/stdout loop), so no concurrent access protection needed.
+- **Lazy initialization**: DB only opens if `CLEANCTX_PERSISTENCE_DB` env var is set — zero overhead for users who don't need persistence.
+- **`binary_wire::encode/decode`**: IR is serialized/deserialized as BLOBs; `file_id` and `version` are restored from DB columns on load (Gap 2 from plan).

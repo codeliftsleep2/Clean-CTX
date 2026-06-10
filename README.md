@@ -2,7 +2,7 @@
 
 A local-first, air-gapped context optimization engine that eliminates token waste in LLM interactions while maintaining zero network footprint. Built in Rust for restrictive firewall and DLP environments.
 
-> **🚀 Version 0.1.6** — Angular HTML parsing fully fixed (XHTML self-closing tag support + inline template shape extraction), IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, and 766 tests all passing.
+> **🚀 Version 0.1.6** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular HTML parsing (XHTML self-closing + inline template), IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, and 798 tests all passing.
 
 ---
 
@@ -38,11 +38,28 @@ Add to your MCP settings (see [IDE Configuration](#ide-configuration) below for 
 }
 ```
 
-Restart your editor. The tools `compress_code_context`, `decompress_code_context`, `compress_workspace`, and `diff_code_context` will be available.
+Restart your editor. The tools `provide_code_context`, `compress_code_context`, `decompress_code_context`, `compress_workspace`, `diff_code_context`, `delta_code_context`, `delta_text_context`, `context_stats`, `context_history`, and `restore_context` will be available.
 
 ---
 
 ## Key Features
+
+### Zero-Touch Workflow
+
+The **recommended entry point** is `provide_code_context` — a single tool that automatically handles compression, delta transport, Angular detection, and fidelity selection:
+
+| Tool | Purpose |
+|------|---------|
+| `provide_code_context` | **Single entry point** — auto-detects file type, selects optimal fidelity, uses delta transport on subsequent calls |
+| `restore_context` | Force full re-compression, clearing all baselines and DB entries |
+| `context_history` | View compression history and delta savings for tracked files |
+| `context_stats` | Dashboard: token savings, compression stats, session metrics |
+
+The workflow automatically:
+- Runs a **heuristics engine** to select the best fidelity and strategy based on file characteristics
+- Detects **Angular files** and enables the Meta-Layer with Φ markers
+- Uses **delta transport** on subsequent calls for minimal token usage
+- Records **session stats** for monitoring compression efficiency
 
 ### Three-Fidelity Compression
 
@@ -52,7 +69,7 @@ Restart your editor. The tools `compress_code_context`, `decompress_code_context
 | **Medium** | Preserves async, exports, behavior markers | ~61-84% | Understanding code behavior |
 | **High** | Preserves full keywords + indentation | ~61-83% | Code review / documentation |
 
-### Six MCP Tools
+### Core Tools
 
 | Tool | Purpose |
 |------|---------|
@@ -62,6 +79,22 @@ Restart your editor. The tools `compress_code_context`, `decompress_code_context
 | `diff_code_context` | Source file → AST-level change-set (`+` / `-` / `~` / `=`) |
 | `delta_code_context` | IR-level delta compression — instruction-level deltas between compiled IR states |
 | `delta_text_context` | Text-level delta compression — line-level deltas between compressed body snapshots |
+
+### Persistence Layer (Optional)
+
+Optionally, Clean-CTX can persist compression contexts across sessions using SQLite:
+
+| Tool | Purpose |
+|------|---------|
+| `save_context` | Manual checkpoint to DB |
+| `list_sessions` | Show tracked files/sessions |
+| `replay_history` | Replay deltas from DB (crash recovery) |
+| `purge_old_deltas` | Trim old delta history |
+
+Enable by setting the `CLEANCTX_PERSISTENCE_DB` environment variable:
+```bash
+set CLEANCTX_PERSISTENCE_DB=C:\Users\you\.clean-ctx\contexts.db
+```
 
 ### Smart Caching
 
@@ -101,6 +134,19 @@ For Angular projects, Clean-CTX automatically detects framework decorators and e
 ---
 
 ## Usage Examples
+
+### Quick context (recommended)
+
+```json
+{
+  "name": "provide_code_context",
+  "arguments": {
+    "filePath": "/path/to/MyService.ts"
+  }
+}
+```
+
+First call performs full compression; subsequent calls automatically use delta transport.
 
 ### Compress a file (Low fidelity)
 
@@ -160,6 +206,15 @@ First call stores the current state as baseline. Subsequent calls return only th
   ~ method process(id:string):boolean
         was: process(id:number):boolean
   = method healthCheck():string (unchanged)
+```
+
+### View compression dashboard
+
+```json
+{
+  "name": "context_stats",
+  "arguments": {}
+}
 ```
 
 ---
@@ -461,11 +516,13 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — 0 warnings |
-| Tests | ✅ 766 passing |
+| Tests | ✅ 798 passing |
 | Audit | ✅ FAANG-level audit — all 41 findings resolved |
 | Largest file | ~170 lines (down from 913) |
 | Unsafe code | 0 blocks |
 | Meta-Layer | ✅ Phases 1–3 complete (decorators, bundling, graph) |
+| Workflow | ✅ Zero-touch workflow with heuristics engine |
+| Persistence | ✅ SQLite cross-session persistence (optional) |
 
 ---
 

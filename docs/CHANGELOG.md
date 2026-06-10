@@ -6,7 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [0.1.6] — 2026-06-09
+## [0.1.6] — 2026-06-10
+
+### Added
+
+#### Zero-Touch Workflow
+- `src/mcp/heuristics.rs` — New heuristics engine that automatically selects optimal fidelity and compression strategy based on file characteristics, explicit intent, and existing baselines
+- `src/mcp/session_stats.rs` — Session statistics tracking with per-file metrics (raw/compressed tokens, savings %, delta count, strategy, Angular detection) and dashboard rendering (text + JSON formats)
+- `src/mcp/tools.rs` — Four new zero-touch workflow tools:
+  - `provide_code_context` — Single entry point that orchestrates heuristics, compression/delta, Angular detection, and stats recording
+  - `restore_context` — Force full re-compression, clearing all baselines and DB entries
+  - `context_history` — View compression history and delta savings for tracked files
+  - `context_stats` — Dashboard showing token savings, compression stats, and session metrics
+- `src/mcp/prompts.rs` — New `dashboard` MCP prompt for system-level dashboard instructions
+
+#### SQLite Persistence Layer
+- `src/mcp/sqlite_store.rs` — Full `ContextStore` trait implementation backed by SQLite with WAL mode, schema versioning, and content-hash deterministic IDs
+- `src/mcp/context_store.rs` — `ContextStore` trait abstraction with `InMemoryContextStore` (session-scoped) and `SqliteStore` (cross-session) implementations
+- `src/mcp/mod.rs` — Lazy DB initialization from `CLEANCTX_PERSISTENCE_DB` environment variable
+- `src/mcp/state.rs` — `persistence_store: Option<SqliteStore>` field on `McpState`
+- `src/mcp/tools.rs` — Four new persistence tools:
+  - `save_context` — Explicit manual checkpoint to DB
+  - `list_sessions` — Show tracked sessions/files
+  - `replay_history` — Replay deltas from DB up to target sequence (crash recovery)
+  - `purge_old_deltas` — Trim old delta history by age
+- Schema v1: `contexts` (baselines + IR BLOBs), `deltas` (sequential payloads), `symbols` (symbol table entries), `sessions` (workspace tracking), `_schema_version` (migration tracking)
+- Persistence hooks in `provide_code_context` (FullCompress + DeltaTransport paths) and `restore_context` (DB clear)
+- Non-fatal persistence: all DB writes are fire-and-forget with `eprintln!` warnings — compression never fails due to DB issues
+
+#### FAANG Audit — Zero-Touch Workflow
+- `docs/FAANG_AUDIT_ZERO_TOUCH.md` — Complete audit of zero-touch workflow and persistence layer with 4 issues found and fixed
 
 ### Fixed
 
@@ -22,7 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 7 new tests: 6 XHTML self-closing template tests (`extracts_self_closing_xhtml_component`, `extracts_self_closing_xhtml_in_container`, `extracts_self_closing_in_control_flow`, `extracts_void_element_with_bindings`, `extracts_multiple_self_closing_at_root`, `marker_line_includes_self_closing_components`) + 1 inline template integration test (`meta_layer_extracts_inline_template_shape`)
 
 ### Test count
-- 766/766 tests pass (7 new from XHTML fix + inline template extraction)
+- 798/798 tests pass (13 new from SQLite persistence tests + XHTML fix + inline template extraction)
 - 0 clippy warnings
 
 ---
@@ -252,7 +281,7 @@ This project follows [Semantic Versioning](https://semver.org/). Major version z
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 0.1.6 | 2026-06-09 | XHTML self-closing tag fix + inline template shape extraction — 766 tests, 0 clippy warnings |
+| 0.1.6 | 2026-06-10 | Zero-touch workflow + SQLite persistence + XHTML fix + inline template — 798 tests, 0 clippy warnings |
 | 0.1.5 | 2026-06-08 | FAANG Audit Compiler IR Phase E (F-30 through F-47) — 318 tests, 0 clippy warnings |
 | 0.1.4 | 2026-06-08 | Tracks C+D: Phi marker centralisation + god-function split — 301 tests, 0 clippy warnings |
 | 0.1.3 | 2026-06-08 | Track B: `AngularGraphBuilder` typestate split — 293 tests, 0 clippy warnings |

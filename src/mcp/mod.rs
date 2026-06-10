@@ -18,6 +18,7 @@ pub(crate) mod prompts;
 mod router;
 mod server;
 pub(crate) mod session_stats;
+pub(crate) mod sqlite_store;
 pub(crate) mod state;
 pub(crate) mod tools;
 pub(crate) mod workspace;

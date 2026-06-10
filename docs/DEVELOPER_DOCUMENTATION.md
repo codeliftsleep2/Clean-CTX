@@ -1,7 +1,7 @@
 # Clean-CTX — Developer Documentation
 
-**Version:** 0.1.0
-**Last updated:** 2026-06-07
+**Version:** 0.1.6
+**Last updated:** 2026-06-10
 
 ---
 
@@ -11,14 +11,16 @@
 2. [Project Overview](#project-overview)
 3. [Building & Testing](#building--testing)
 4. [Codebase Organization](#codebase-organization)
-5. [Adding a New Language](#adding-a-new-language)
-6. [Adding a New Tool](#adding-a-new-tool)
-7. [Adding a New Opcode](#adding-a-new-opcode)
-8. [Adding a New Φ Marker](#adding-a-new--marker)
-9. [Angular Meta-Layer Architecture](#angular-meta-layer-architecture)
-10. [Configuration System](#configuration-system)
-11. [Testing Conventions](#testing-conventions)
-12. [Code Quality Gates](#code-quality-gates)
+5. [Zero-Touch Workflow](#zero-touch-workflow)
+6. [Persistence Layer](#persistence-layer)
+7. [Adding a New Language](#adding-a-new-language)
+8. [Adding a New Tool](#adding-a-new-tool)
+9. [Adding a New Opcode](#adding-a-new-opcode)
+10. [Adding a New Φ Marker](#adding-a-new--marker)
+11. [Angular Meta-Layer Architecture](#angular-meta-layer-architecture)
+12. [Configuration System](#configuration-system)
+13. [Testing Conventions](#testing-conventions)
+14. [Code Quality Gates](#code-quality-gates)
 
 ---
 
@@ -59,6 +61,8 @@ The core workflow is:
 4. **Encode** repeated tokens as short opcodes (`$c` = `class`, `$s` = `string`, etc.)
 5. **Report** token savings using the cl100k BPE estimator
 
+The **recommended entry point** is `provide_code_context` — a single tool that automatically handles compression, delta transport, Angular detection, and fidelity selection via a heuristics engine.
+
 ---
 
 ## Building & Testing
@@ -98,14 +102,18 @@ src/
 ├── lib.rs                  # Module declarations
 │
 ├── mcp/                    # MCP server layer
-│   ├── mod.rs              # run() entry point
+│   ├── mod.rs              # run() entry point + persistence init
 │   ├── server.rs           # Stdin/stdout JSON-RPC loop
 │   ├── router.rs           # Method dispatch
 │   ├── handlers.rs         # Lifecycle + discovery handlers
-│   ├── tools.rs            # Tool implementations
-│   ├── prompts.rs          # System prompts
+│   ├── tools.rs            # Tool implementations + persistence hooks
+│   ├── prompts.rs          # System prompts (cleanctx-notation + dashboard)
 │   ├── workspace.rs        # Workspace compression
-│   └── state.rs            # McpState (shared session state)
+│   ├── state.rs            # McpState (shared session state + persistence)
+│   ├── heuristics.rs       # Heuristics engine (fidelity + strategy selection)
+│   ├── context_store.rs    # ContextStore trait + InMemoryContextStore
+│   ├── sqlite_store.rs     # SqliteStore (SQLite-backed ContextStore)
+│   └── session_stats.rs    # SessionStats + dashboard rendering
 │
 ├── compression/            # Core compression engine
 │   ├── mod.rs              # Public API
@@ -117,7 +125,19 @@ src/
 │   ├── symbol_compression.rs # Symbol encoding pass
 │   ├── report.rs           # Output formatting
 │   ├── pipeline.rs         # Non-streaming orchestrator
-│   └── streaming.rs        # Streaming orchestrator
+│   ├── streaming.rs        # Streaming orchestrator
+│   ├── text_delta.rs       # Delta-aware text compression (line-level)
+│   └── workspace_symbols.rs # Global symbol table for workspace
+│
+├── ir/                     # IR Subsystem (Compiler IR + Delta Transport)
+│   ├── compiler.rs         # IRCompiler: source → CompiledIR
+│   ├── opcodes.rs          # CoreOp enum
+│   ├── wire.rs             # ir_to_wire: CompiledIR → tuple format
+│   ├── string_table.rs     # Compact index format
+│   ├── delta.rs            # DeltaComputer, IRDelta
+│   ├── replay.rs           # ContextState: apply deltas to baseline
+│   ├── binary_wire.rs      # Binary wire format for IR transport
+│   └── layers/             # Language-specific compilation layers
 │
 ├── angular_meta/           # Angular Meta-Layer (Phases 1–3)
 │   ├── mod.rs              # MetaBlock struct, run_meta_layer entry point
@@ -147,6 +167,115 @@ src/
 - **No network dependencies** — stdio-only MCP transport
 - **HashMap over BTreeMap** — no caller iterates in sorted order; HashMap is faster
 - **Meta-Layer is purely additive** — non-Angular files produce byte-identical output with zero overhead
+- **Non-fatal persistence** — DB writes are fire-and-forget; compression never fails due to DB issues
+
+---
+
+## Zero-Touch Workflow
+
+The zero-touch workflow is the **recommended entry point** for any file-related coding task. It orchestrates all subsystems automatically via `provide_code_context`.
+
+### How It Works
+
+1. **Heuristics Engine** (`src/mcp/heuristics.rs`) decides the optimal fidelity and strategy based on:
+   - Explicit intent parameter (`"edit"`, `"debug"`, `"overview"`, `"refactor"`, `"implement"`)
+   - Explicit fidelity override
+   - File characteristics (size, language, Angular detection)
+   - Existing baselines (text delta state, IR delta state)
+   - Project config overrides
+
+2. **Strategy Dispatch**:
+   - `FullCompress` — runs full compression pipeline + IR compilation + persistence save
+   - `DeltaTransport` — computes text-level and IR-level deltas + persistence save + delta append
+
+3. **Session Stats** (`src/mcp/session_stats.rs`) records compression metrics for the dashboard
+
+### Tools
+
+| Tool | Purpose |
+|------|---------|
+| `provide_code_context` | **Single entry point** — auto-detects, selects fidelity, uses delta transport on subsequent calls |
+| `restore_context` | Force full re-compression, clearing all baselines and DB entries |
+| `context_history` | View compression history and delta savings for tracked files |
+| `context_stats` | Dashboard: token savings, compression stats, session metrics |
+
+### Adding a New Strategy
+
+To add a new strategy to the heuristics engine:
+
+1. Add a variant to `ContextStrategy` in `src/mcp/heuristics.rs`
+2. Add selection logic in `decide()` function
+3. Add a dispatch arm in `handle_provide_code_context()` in `src/mcp/tools.rs`
+4. Add tests in `src/tests/mcp/heuristics.rs`
+
+---
+
+## Persistence Layer
+
+The persistence layer provides **cross-session persistence** for compression contexts via SQLite. It is enabled by setting the `CLEANCTX_PERSISTENCE_DB` environment variable.
+
+### Architecture
+
+```
+ContextStore trait (src/mcp/context_store.rs)
+    ├── InMemoryContextStore  (session-scoped, in RAM)
+    └── SqliteStore           (cross-session, SQLite on disk)
+```
+
+### ContextStore Trait
+
+The `ContextStore` trait abstracts how compression baselines, deltas, and metadata are persisted:
+
+```rust
+pub trait ContextStore {
+    fn save_context(&mut self, file_path: &str, fidelity: Fidelity, 
+                    compressed_output: &str, ir_blobs: Option<&[u8]>, 
+                    source_hash: &str) -> Result<String, Box<dyn std::error::Error>>;
+    fn load_latest(&self, file_path: &str) -> Result<Option<StoredContextMeta>, ...>;
+    fn has_context(&self, file_path: &str) -> bool;
+    fn append_delta(&mut self, context_id: &str, delta_payload: &[u8], 
+                    edit_type: Option<&str>) -> Result<(), ...>;
+    fn delta_count(&self, context_id: &str) -> usize;
+    fn clear_file(&mut self, file_path: &str);
+}
+```
+
+### SqliteStore
+
+The `SqliteStore` implementation (`src/mcp/sqlite_store.rs`) provides:
+
+- **WAL mode** for concurrent read/write safety
+- **Schema versioning** via `_schema_version` table
+- **Content-hash deterministic IDs** (`ctx-{sha256_hex}`) for idempotent saves
+- **`binary_wire::encode/decode`** for IR BLOB serialization
+- **`load_context_with_deltas()`** — replay baseline + deltas from DB
+- **`rebuild_stats()`** — reconstruct SessionStats from persisted data
+- **`purge_old_deltas(days)`** — trim old history
+
+### Schema (v1)
+
+- **`contexts`** — baselines (content-hash PK, IR BLOB, fidelity, pretty text)
+- **`deltas`** — sequential delta payloads (FK → contexts, auto-increment edit_sequence)
+- **`symbols`** — symbol table entries (FK → contexts, phi markers)
+- **`sessions`** — workspace session tracking
+- **`_schema_version`** — migration version tracking
+
+### Persistence Hooks
+
+Persistence hooks fire automatically in:
+- `provide_code_context` → `FullCompress` path (baseline save)
+- `provide_code_context` → `DeltaTransport` path (baseline + delta save)
+- `restore_context` → DB clear on file reset
+
+### Adding a New ContextStore Implementation
+
+To add a new storage backend:
+
+1. Create a new file `src/mcp/<backend>_store.rs`
+2. Implement the `ContextStore` trait
+3. Add the store variant to `McpState` in `src/mcp/state.rs`
+4. Add initialization logic in `src/mcp/mod.rs`
+5. Add tests in `src/tests/mcp/<backend>_store.rs`
 
 ---
 
@@ -637,7 +766,7 @@ Every pull request must pass these checks:
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test`** — all 121+ tests pass
+3. **`cargo test`** — all 798+ tests pass
 4. **`cargo audit`** — no known security vulnerabilities
 5. **No new `#![allow(...)]`** annotations without a `// SAFETY:` or `// Phase N:` comment
 6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
