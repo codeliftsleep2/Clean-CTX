@@ -26,6 +26,7 @@ use crate::diff::{build_snapshot, diff_snapshots, format_diff, diff_summary};
 use crate::ir::wire::ir_to_wire;
 use crate::ir::delta::{IRDelta, DeltaComputer};
 use crate::ir::replay::DeltaError;
+use crate::mcp::context_store::ContextStore;
 use crate::mcp::McpState;
 use crate::mcp::workspace;
 use crate::protocol::send_response;
@@ -131,6 +132,57 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "currentVersion": { "type": "integer", "description": "The current version of the file state (must match delta.from)." }
                 },
                 "required": ["delta", "currentVersion"]
+            }
+        }),
+        // ── Zero-Touch Workflow: provide_code_context ─────────────────
+        serde_json::json!({
+            "name": "provide_code_context",
+            "description": "Automatically provides the best possible compressed context for a file. This is the RECOMMENDED single entry point for any file-related coding task. First call performs full compression; subsequent calls automatically use delta transport for minimal token usage. Auto-detects Angular files and enables Meta-Layer with Φ markers. Chooses optimal fidelity based on file characteristics and intent. Use this tool for ANY coding task involving code context.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filePath": { "type": "string", "description": "Path to the source file." },
+                    "intent": { "type": "string", "description": "Optional intent: 'edit', 'refactor', 'overview', 'debug', 'implement'. Controls fidelity selection.", "enum": ["edit", "refactor", "overview", "debug", "implement"] },
+                    "fidelity": { "type": "string", "description": "Optional explicit fidelity override: 'low', 'medium', 'high'. Overrides intent-based selection." },
+                    "workspaceRoot": { "type": "string", "description": "Optional workspace root for relative paths." }
+                },
+                "required": ["filePath"]
+            }
+        }),
+        // ── Zero-Touch Workflow: restore_context ─────────────────────
+        serde_json::json!({
+            "name": "restore_context",
+            "description": "Explicitly restores compressed context for a file. Forces full re-compression from on-disk source, clearing any in-memory delta baselines and context store entries. Use when you need a guaranteed fresh context state.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filePath": { "type": "string", "description": "Path to the source file." },
+                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'." }
+                },
+                "required": ["filePath"]
+            }
+        }),
+        // ── Zero-Touch Workflow: context_history ────────────────────
+        serde_json::json!({
+            "name": "context_history",
+            "description": "View compression history and savings for tracked files. Shows per-file version count, delta hit rate, and estimated token savings.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filePath": { "type": "string", "description": "Optional: specific file. If omitted, shows all tracked files." }
+                }
+            }
+        }),
+        // ── Zero-Touch Workflow: context_stats (dashboard) ──────────
+        serde_json::json!({
+            "name": "context_stats",
+            "description": "View the Clean-CTX dashboard: token savings, compression stats, and session metrics. Shows per-file breakdown and session summary. Use this to monitor compression efficiency at any time.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filePath": { "type": "string", "description": "Optional: specific file to show stats for. If omitted, shows full session dashboard." },
+                    "format": { "type": "string", "description": "Output format: 'text' (human-readable, default) or 'json' (structured).", "enum": ["text", "json"] }
+                }
             }
         }),
     ]
@@ -294,6 +346,19 @@ pub(crate) fn dispatch_tools_call(
         }
         "apply_delta" => {
             handle_apply_delta(id, params, state);
+        }
+        // ── Zero-Touch Workflow dispatch ─────────────────────────
+        "provide_code_context" => {
+            handle_provide_code_context(id, params, state);
+        }
+        "restore_context" => {
+            handle_restore_context(id, params, state);
+        }
+        "context_history" => {
+            handle_context_history(id, params, state);
+        }
+        "context_stats" => {
+            handle_context_stats(id, params, state);
         }
         _ => {
             send_response(&serde_json::json!({
@@ -819,6 +884,462 @@ fn handle_apply_delta(
             }));
         }
     }
+}
+
+// ── Zero-Touch Workflow Handlers ─────────────────────────────────
+
+/// Handle `provide_code_context` — the unified entry point.
+///
+/// Orchestrates heuristics, compression/delta, Angular detection, and
+/// stats recording. Delegates to existing handlers internally.
+fn handle_provide_code_context(
+    id: &Value,
+    params: &Value,
+    state: &mut McpState,
+) {
+    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let explicit_intent = params["arguments"]["intent"].as_str();
+    let explicit_fidelity = params["arguments"]["fidelity"].as_str();
+    let workspace_root = params["arguments"]["workspaceRoot"].as_str();
+
+    if file_path_str.is_empty() {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": { "code": -32602, "message": "Missing required parameter: filePath" }
+        }));
+        return;
+    }
+
+    // Resolve absolute path
+    let resolved_path = resolve_file_path(file_path_str, workspace_root);
+
+    // Check exclusion
+    if state.config.is_excluded(&resolved_path) {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": {
+                "code": -32603,
+                "message": format!("File excluded by config: {}", file_path_str)
+            }
+        }));
+        return;
+    }
+
+    // Read source for heuristics
+    let source = match std::fs::read_to_string(&resolved_path) {
+        Ok(s) => s,
+        Err(e) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": { "code": -32603, "message": format!("Failed to read file: {}", e) }
+            }));
+            return;
+        }
+    };
+
+    // Run heuristics engine
+    let decision = crate::mcp::heuristics::decide(
+        &resolved_path,
+        explicit_fidelity,
+        explicit_intent,
+        &state.config,
+        &state.text_delta,
+        &state.ir_context,
+        &source,
+    );
+
+    // Get path alias for delta tracking
+    let path_alias = state.dict.get_or_create_alias(resolved_path.clone());
+
+    // Execute based on strategy
+    match decision.strategy {
+        crate::mcp::heuristics::ContextStrategy::FullCompress => {
+            // Full compression via existing pipeline
+            match compress_file(
+                PathBuf::from(&resolved_path),
+                &mut state.dict,
+                &mut state.cache,
+                decision.fidelity,
+            ) {
+                Ok(mut compressed_text) => {
+                    compressed_text.push_str(&state.dict.format_footer());
+
+                    // Store text delta baseline
+                    let body_lines: Vec<String> = compressed_text.lines().map(String::from).collect();
+                    state.text_delta.compute_and_store(&path_alias, body_lines);
+
+                    // Compile IR and store baseline
+                    let ir_result = compile_file_ir(&resolved_path, decision.fidelity, state);
+                    if let Ok(ir) = ir_result {
+                        state.ir_context.load_ir(ir);
+                    }
+
+                    // Record stats
+                    let raw_tokens = estimate_tokens(&source);
+                    let compressed_tokens = estimate_tokens(&compressed_text);
+                    state.session_stats.record_compression(
+                        &resolved_path,
+                        raw_tokens,
+                        compressed_tokens,
+                        &format!("{:?}", decision.fidelity).to_lowercase(),
+                        decision.is_angular,
+                        "full",
+                    );
+
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "result": {
+                            "content": [{ "type": "text", "text": compressed_text }],
+                            "_meta": {
+                                "fidelity": format!("{:?}", decision.fidelity).to_lowercase(),
+                                "strategy": "full_compress",
+                                "angular_detected": decision.is_angular,
+                                "line_count": decision.source_line_count,
+                                "version": state.text_delta.file_version(&path_alias),
+                                "decision_summary": decision.summary(),
+                            }
+                        }
+                    }));
+                }
+                Err(e) => {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32603, "message": e.to_string() }
+                    }));
+                }
+            }
+        }
+        crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
+            // Delta transport: delegate to delta_text_context logic
+            let body_lines_result = compress_text_body(&resolved_path, decision.fidelity, state);
+            let (body_lines, full_output) = match body_lines_result {
+                Ok(r) => r,
+                Err(e) => {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32603, "message": e.to_string() }
+                    }));
+                    return;
+                }
+            };
+
+            let delta = state.text_delta.compute_and_store(&path_alias, body_lines);
+
+            // Also compile IR for delta tracking
+            if let Ok(ir) = compile_file_ir(&resolved_path, decision.fidelity, state) {
+                state.ir_context.load_ir(ir);
+            }
+
+            let (output_text, is_delta) = match &delta {
+                Some(d) => (d.to_wire_format(), true),
+                None => (full_output, false),
+            };
+
+            // Record stats
+            let raw_tokens = estimate_tokens(&source);
+            let compressed_tokens = estimate_tokens(&output_text);
+            let strategy_label = if is_delta { "delta" } else { "full" };
+            state.session_stats.record_compression(
+                &resolved_path,
+                raw_tokens,
+                compressed_tokens,
+                &format!("{:?}", decision.fidelity).to_lowercase(),
+                decision.is_angular,
+                strategy_label,
+            );
+
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": output_text }],
+                    "_meta": {
+                        "fidelity": format!("{:?}", decision.fidelity).to_lowercase(),
+                        "strategy": if is_delta { "delta" } else { "full" },
+                        "angular_detected": decision.is_angular,
+                        "line_count": decision.source_line_count,
+                        "version": state.text_delta.file_version(&path_alias),
+                        "is_delta": is_delta,
+                        "decision_summary": decision.summary(),
+                    }
+                }
+            }));
+        }
+    }
+}
+
+/// Handle `restore_context` — forces full re-compression, clears baselines.
+fn handle_restore_context(
+    id: &Value,
+    params: &Value,
+    state: &mut McpState,
+) {
+    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let fidelity_str = params["arguments"]["fidelity"].as_str();
+
+    if file_path_str.is_empty() {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": { "code": -32602, "message": "Missing required parameter: filePath" }
+        }));
+        return;
+    }
+
+    let fidelity = match fidelity_str {
+        Some(s) => match Fidelity::parse(s) {
+            Ok(f) => f,
+            Err(e) => {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": { "code": -32602, "message": e.to_string() }
+                }));
+                return;
+            }
+        },
+        None => Fidelity::parse_or_default(&state.config.default_fidelity),
+    };
+
+    // Resolve path (no workspaceRoot arg, so just CWD-join for relative)
+    let resolved_path = resolve_file_path(file_path_str, None);
+
+    // Check exclusion against resolved path (consistent with provide_code_context)
+    if state.config.is_excluded(&resolved_path) {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": {
+                "code": -32603,
+                "message": format!("File excluded by config: {}", file_path_str)
+            }
+        }));
+        return;
+    }
+
+    // Clear baselines — overwrite text delta with empty baseline and clear IR/file store
+    let path_alias = state.dict.get_or_create_alias(file_path_str.to_string());
+    // TextDeltaComputer doesn't have clear_file, so we store an empty snapshot
+    // to overwrite any existing baseline.
+    state.text_delta.store_snapshot(&path_alias, Vec::new());
+    state.ir_context.remove_file(&path_alias);
+    state.context_store.clear_file(file_path_str);
+
+    // Full re-compression
+    match compress_file(
+        PathBuf::from(file_path_str),
+        &mut state.dict,
+        &mut state.cache,
+        fidelity,
+    ) {
+        Ok(mut compressed_text) => {
+            compressed_text.push_str(&state.dict.format_footer());
+
+            // Re-store baseline
+            let body_lines: Vec<String> = compressed_text.lines().map(String::from).collect();
+            state.text_delta.compute_and_store(&path_alias, body_lines);
+
+            // Re-compile IR
+            if let Ok(ir) = compile_file_ir(file_path_str, fidelity, state) {
+                state.ir_context.load_ir(ir);
+            }
+
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": compressed_text }],
+                    "_meta": {
+                        "fidelity": format!("{:?}", fidelity).to_lowercase(),
+                        "strategy": "restore",
+                        "baselines_cleared": true,
+                    }
+                }
+            }));
+        }
+        Err(e) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": { "code": -32603, "message": e.to_string() }
+            }));
+        }
+    }
+}
+
+/// Handle `context_history` — shows version/delta history for tracked files.
+fn handle_context_history(
+    id: &Value,
+    params: &Value,
+    state: &mut McpState,
+) {
+    let file_path = params["arguments"]["filePath"].as_str();
+
+    if let Some(fp) = file_path {
+        // Specific file
+        let path_alias = state.dict.get_or_create_alias(fp.to_string());
+        let version = state.text_delta.file_version(&path_alias);
+        let has_ir = state.ir_context.has_file(&path_alias);
+        let store_meta = state.context_store.load_latest(fp).ok().flatten();
+
+        let mut lines = Vec::new();
+        lines.push(format!("File: {}", fp));
+        lines.push(format!("  Text Delta Versions: {}", version));
+        lines.push(format!("  IR Baseline: {}", if has_ir { "yes" } else { "no" }));
+        lines.push(format!("  Context Store: {}", if store_meta.is_some() { "yes" } else { "no" }));
+        if let Some(meta) = store_meta {
+            lines.push(format!("  Context Version: {}", meta.version));
+        }
+
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "content": [{ "type": "text", "text": lines.join("\n") }]
+            }
+        }));
+    } else {
+        // All tracked files — show from session_stats
+        let stats = &state.session_stats;
+        let file_stats = stats.all_file_stats();
+        if file_stats.is_empty() {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": "No tracked files yet. Call `provide_code_context` first." }]
+                }
+            }));
+            return;
+        }
+
+        let mut output = String::from("Tracked Files:\n");
+        for (path, fstats) in file_stats {
+            output.push_str(&format!(
+                "  {} — v{}, {} deltas, {:.1}% savings\n",
+                path, fstats.version, fstats.delta_count, fstats.savings_pct
+            ));
+        }
+
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "content": [{ "type": "text", "text": output }]
+            }
+        }));
+    }
+}
+
+/// Handle `context_stats` — dashboard (text or JSON).
+fn handle_context_stats(
+    id: &Value,
+    params: &Value,
+    state: &mut McpState,
+) {
+    let file_path = params["arguments"]["filePath"].as_str();
+    let format = params["arguments"]["format"].as_str().unwrap_or("text");
+
+    if let Some(fp) = file_path {
+        // Stats for specific file
+        let stats = state.session_stats.file_stats(fp);
+        match stats {
+            Some(fs) => {
+                if format == "json" {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "result": {
+                            "content": [{ "type": "text", "text": serde_json::to_string_pretty(fs).unwrap_or_default() }]
+                        }
+                    }));
+                } else {
+                    let text = format!(
+                        "File: {}\n  Raw: {} → Compressed: {} ({:.1}% savings)\n  Version: {}, Deltas: {}, Fidelity: {}\n  Angular: {}, Strategy: {}",
+                        fs.file_path,
+                        fs.raw_tokens,
+                        fs.compressed_tokens,
+                        fs.savings_pct,
+                        fs.version,
+                        fs.delta_count,
+                        fs.fidelity,
+                        fs.is_angular,
+                        fs.strategy,
+                    );
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "result": {
+                            "content": [{ "type": "text", "text": text }]
+                        }
+                    }));
+                }
+            }
+            None => {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": {
+                        "content": [{ "type": "text", "text": format!("No stats for file: {}", fp) }]
+                    }
+                }));
+            }
+        }
+    } else {
+        // Full dashboard
+        if format == "json" {
+            let json = crate::mcp::session_stats::render_dashboard_json(&state.session_stats);
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": serde_json::to_string_pretty(&json).unwrap_or_default() }]
+                }
+            }));
+        } else {
+            let text = crate::mcp::session_stats::render_dashboard_text(&state.session_stats);
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": text }]
+                }
+            }));
+        }
+    }
+}
+
+/// Resolve a file path, handling relative paths with optional workspace root.
+fn resolve_file_path(path: &str, workspace_root: Option<&str>) -> String {
+    let path_obj = std::path::Path::new(path);
+    if path_obj.is_absolute() {
+        path.to_string()
+    } else if let Some(root) = workspace_root {
+        let root_path = std::path::Path::new(root);
+        if root_path.is_absolute() {
+            root_path.join(path).to_string_lossy().into_owned()
+        } else {
+            // workspace root is also relative — join with CWD
+            let cwd = std::env::current_dir().unwrap_or_default();
+            cwd.join(root).join(path).to_string_lossy().into_owned()
+        }
+    } else {
+        // Relative path with no workspace root — join with CWD
+        let cwd = std::env::current_dir().unwrap_or_default();
+        cwd.join(path).to_string_lossy().into_owned()
+    }
+}
+
+/// Rough token estimation (chars / 4).
+/// In production, use tiktoken-rs; this is a lightweight approximation.
+fn estimate_tokens(text: &str) -> usize {
+    text.len() / 4
 }
 
 // ── Helpers ────────────────────────────────────────────────────────

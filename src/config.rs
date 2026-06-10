@@ -5,6 +5,123 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
+// ── Smart defaults for intent-based fidelity selection ──────────────
+
+/// Smart defaults for intent-based fidelity selection.
+///
+/// Maps high-level intents (`"refactor"`, `"overview"`, `"debug"`,
+/// `"edit"`, `"implement"`) to compression fidelity levels. Used by
+/// the heuristics engine when an explicit `fidelity` arg is not provided
+/// but an `intent` is.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SmartDefaults {
+    /// Fidelity for refactoring tasks — requires full structural detail.
+    #[serde(default = "default_sd_refactor")]
+    pub refactor: String,
+    /// Fidelity for overview/summary tasks — maximum compression.
+    #[serde(default = "default_sd_overview")]
+    pub overview: String,
+    /// Fidelity for debugging tasks — balanced detail vs compression.
+    #[serde(default = "default_sd_debug")]
+    pub debug: String,
+    /// Fidelity for editing tasks — maximum compression, delta-friendly.
+    #[serde(default = "default_sd_edit")]
+    pub edit: String,
+    /// Fidelity for implementation tasks — moderate detail.
+    #[serde(default = "default_sd_implement")]
+    pub implement: String,
+}
+
+impl Default for SmartDefaults {
+    fn default() -> Self {
+        Self {
+            refactor: default_sd_refactor(),
+            overview: default_sd_overview(),
+            debug: default_sd_debug(),
+            edit: default_sd_edit(),
+            implement: default_sd_implement(),
+        }
+    }
+}
+
+fn default_sd_refactor() -> String { "high".to_string() }
+fn default_sd_overview() -> String { "low".to_string() }
+fn default_sd_debug() -> String { "medium".to_string() }
+fn default_sd_edit() -> String { "low".to_string() }
+fn default_sd_implement() -> String { "medium".to_string() }
+
+// ── Heuristics configuration ───────────────────────────────────────
+
+/// Heuristics configuration for automatic decisions.
+///
+/// Controls when `provide_code_context` switches between compression
+/// strategies and fidelity levels automatically.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeuristicsConfig {
+    /// Files above this line count are treated as "large" → low fidelity.
+    #[serde(default = "default_large_file_threshold")]
+    pub large_file_threshold: usize,
+    /// File extensions (glob patterns) that always get high fidelity.
+    /// Example: `["*.service.ts", "*.component.ts", "*.guard.ts"]`
+    #[serde(default)]
+    pub force_high_fidelity: Vec<String>,
+    /// Whether to automatically detect and use the Angular Meta-Layer.
+    #[serde(default = "default_true")]
+    pub use_angular_meta: bool,
+}
+
+impl Default for HeuristicsConfig {
+    fn default() -> Self {
+        Self {
+            large_file_threshold: default_large_file_threshold(),
+            force_high_fidelity: Vec::new(),
+            use_angular_meta: default_true(),
+        }
+    }
+}
+
+fn default_large_file_threshold() -> usize { 300 }
+
+// ── Persistence configuration (placeholder) ────────────────────────
+
+/// Persistence configuration (placeholder for future SQLite layer).
+///
+/// Currently parsed but not acted upon. The fields define where and
+/// how the SQLite-backed `ContextStore` will persist compression
+/// baselines, deltas, and session history across IDE restarts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersistenceConfig {
+    /// Master switch for persistence. When `false`, all operations
+    /// are purely in-memory (current behaviour).
+    #[serde(default)]
+    pub enabled: bool,
+    /// Automatically save context after each compression/delta operation.
+    #[serde(default = "default_true")]
+    pub auto_save: bool,
+    /// Maximum days to retain history before pruning.
+    #[serde(default = "default_max_history_days")]
+    pub max_history_days: u32,
+    /// Path to the SQLite database file (relative to project root).
+    #[serde(default = "default_db_path")]
+    pub db_path: String,
+}
+
+impl Default for PersistenceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            auto_save: default_true(),
+            max_history_days: default_max_history_days(),
+            db_path: default_db_path(),
+        }
+    }
+}
+
+fn default_max_history_days() -> u32 { 30 }
+fn default_db_path() -> String { ".clean-ctx/persistence.db".to_string() }
+
+// ── Main config struct ─────────────────────────────────────────────
+
 /// Project-level configuration loaded from `.clean-ctx.json`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CleanCtxConfig {
@@ -57,6 +174,26 @@ pub struct CleanCtxConfig {
     /// ```
     #[serde(default)]
     pub meta_layers: BTreeMap<String, MetaLayerConfig>,
+
+    /// Smart defaults for intent-based fidelity selection.
+    #[serde(default)]
+    pub smart_defaults: SmartDefaults,
+
+    /// Heuristics configuration for automatic decisions.
+    #[serde(default)]
+    pub heuristics: HeuristicsConfig,
+
+    /// Persistence configuration (placeholder for future SQLite layer).
+    #[serde(default)]
+    pub persistence: PersistenceConfig,
+
+    /// Auto-detect Angular files and enable Meta-Layer markers.
+    #[serde(default = "default_true")]
+    pub auto_angular: bool,
+
+    /// Automatically use deltas for follow-up edits in `provide_code_context`.
+    #[serde(default = "default_true")]
+    pub auto_delta: bool,
 }
 
 /// Per-framework Meta-Layer configuration.
@@ -101,6 +238,11 @@ impl Default for CleanCtxConfig {
             diff_compression: default_true(),
             workspace_type_detection: default_true(),
             meta_layers: BTreeMap::new(),
+            smart_defaults: SmartDefaults::default(),
+            heuristics: HeuristicsConfig::default(),
+            persistence: PersistenceConfig::default(),
+            auto_angular: default_true(),
+            auto_delta: default_true(),
         }
     }
 }
