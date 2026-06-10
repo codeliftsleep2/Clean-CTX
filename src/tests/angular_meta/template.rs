@@ -316,6 +316,59 @@ fn modern_template_marker_line_includes_at_tokens() {
 }
 
 #[test]
+fn extracts_self_closing_xhtml_component() {
+    let html = r#"<app-avatar [user]="user" />"#;
+    let shape = extract_template_shape(html);
+    assert!(shape.custom_elements.contains(&"app-avatar".to_string()));
+    assert!(shape.prop_bindings.contains(&"user".to_string()));
+}
+
+#[test]
+fn extracts_self_closing_xhtml_in_container() {
+    let html = r#"<div><app-avatar [user]="user" (click)="onClick()" /></div>"#;
+    let shape = extract_template_shape(html);
+    assert!(shape.tags.contains(&"div".to_string()));
+    assert!(shape.custom_elements.contains(&"app-avatar".to_string()));
+    assert!(shape.prop_bindings.contains(&"user".to_string()));
+    assert!(shape.event_bindings.contains(&"click".to_string()));
+}
+
+#[test]
+fn extracts_self_closing_in_control_flow() {
+    let html = r#"@if (cond) { <app-heavy [config]="cfg" /> }"#;
+    let shape = extract_template_shape(html);
+    assert!(shape.custom_elements.contains(&"app-heavy".to_string()));
+    assert!(shape.prop_bindings.contains(&"config".to_string()));
+    assert!(shape.control_flow_blocks.contains(&"if".to_string()));
+}
+
+#[test]
+fn extracts_void_element_with_bindings() {
+    let html = r#"<input [(ngModel)]="value" />"#;
+    let shape = extract_template_shape(html);
+    assert!(shape.tags.contains(&"input".to_string()));
+    assert!(shape.two_way_bindings.contains(&"ngModel".to_string()));
+}
+
+#[test]
+fn extracts_multiple_self_closing_at_root() {
+    let html = r#"<app-a /><app-b />"#;
+    let shape = extract_template_shape(html);
+    assert!(shape.custom_elements.contains(&"app-a".to_string()));
+    assert!(shape.custom_elements.contains(&"app-b".to_string()));
+}
+
+#[test]
+fn marker_line_includes_self_closing_components() {
+    let html = r#"<app-avatar [user]="user" (click)="onClick()" />"#;
+    let shape = extract_template_shape(html);
+    let line = shape.to_marker_line();
+    assert!(line.contains("app-avatar"));
+    assert!(line.contains("[user]"));
+    assert!(line.contains("(click)"));
+}
+
+#[test]
 fn mixed_legacy_and_modern() {
     let html = r#"<div *ngIf="legacyFlag">
   <span>{{ name }}</span>

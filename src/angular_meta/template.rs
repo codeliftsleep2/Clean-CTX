@@ -259,6 +259,11 @@ fn walk_node(
 }
 
 /// Process an `element` node (has start_tag, children, end_tag).
+///
+/// tree-sitter-html 0.20.x represents XHTML self-closing elements
+/// (`<app-heavy />`) as an `element` wrapping a `self_closing_tag`
+/// child, rather than having a `start_tag` child. We must check for
+/// both structures.
 fn process_element_node(
     node: tree_sitter::Node,
     source: &str,
@@ -266,6 +271,14 @@ fn process_element_node(
     current_depth: usize,
     shape: &mut TemplateShape,
 ) {
+    // Check if this element wraps a self_closing_tag (XHTML-style `<tag />`).
+    // In that case, extract tag name and attributes from the self_closing_tag child.
+    if let Some(self_closing) = find_child(node, "self_closing_tag") {
+        process_self_closing_tag_node(self_closing, source, shape);
+        // No further children to recurse into for XHTML self-closing elements.
+        return;
+    }
+
     // Extract tag name from the start_tag child.
     if let Some(tag_name) = extract_tag_name_from_element(node, source) {
         shape.tags.push(tag_name.clone());
