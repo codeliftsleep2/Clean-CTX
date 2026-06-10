@@ -44,5 +44,10 @@ tiktoken-rs = "0.11"
 # Parallel iteration for workspace compression passes (F-FULL-15)
 rayon = "1.10"
 
+# SQLite persistence layer for cross-session context survival
+rusqlite = { version = "0.32", features = ["bundled"] }
+# High-resolution timestamps for persistence metadata
+chrono = { version = "0.4", features = ["serde"] }
+
 [dev-dependencies]
 tempfile = "3.27.0"

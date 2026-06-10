@@ -1,7 +1,7 @@
 # Clean-CTX — Architecture Overview
 
-**Version:** 0.1.0
-**Last updated:** 2026-06-09 (added IR pipeline, delta transport, and 50-edit simulation benchmarks)
+**Version:** 0.1.6
+**Last updated:** 2026-06-10 (added zero-touch workflow, SQLite persistence, heuristics engine, session stats dashboard)
 
 ---
 
@@ -11,40 +11,29 @@
 ┌─────────────────────────────────────────────────────────┐
 │  MCP stdio Interface (JSON-RPC 2.0)                     │
 │                                                         │
-│  ┌───────────────┐  ┌──────────────┐  ┌─────────────┐   │
-│  │ compress_     │  │ decompress_  │  │ compress_   │   │
-│  │ code_context  │  │ code_context │  │ workspace   │   │
-│  └───────┬───────┘  └──────┬───────┘  └──────┬──────┘   │
-│          │                 │                 │          │
-│          │           ┌─────▼─────┐  ┌────────▼───────┐  │
-│          │           │  diff_    │  │  Tree-sitter   │  │
-│          │           │  code_    │  │  AST + baseline│  │
-│          │           │  context  │  │  snapshots     │  │
-│          │           └─────┬─────┘  └─────────┬──────┘  │
-│          │                 │                  │         │
-│  ┌───────▼────┐  ┌─────────▼───────────┐  ┌───▼───────┐ │
-│  │  delta_    │  │  delta_text_        │  │ Compressor│ │
-│  │  code_     │  │  context (line-     │  │ Engine    │ │
-│  │  context   │  │  level deltas)      │  │           │ │
-│  │  (IR insn  │  │                     │  │ AST→Filte │ │
-│  │   deltas)  │  │                     │  │ r→Opcode  │ │
-│  └───────┬────┘  └──────────┬──────────┘  └──── ┬─────┘ │
-│          │                  │                   │       │
-│  ┌───────▼──────────────────▼───────────────────▼─────┐ │
-│  │              Compressor Engine                     │ │
-│  │  AST Extraction → Fidelity Filter → Opcode Encode  │ │
-│  │  + Text Delta Snapshots + IR Source Cache          │ │
-│  └───────┬────────────────────────────────────────────┘ │
-│          │                                              │
-│  ┌───────▼──────────┐  ┌─────────────────────────────┐  │
-│  │ SymbolDictionary │  │ Decompressor                │  │
-│  │ PathDictionary   │  │ Opcode → Readable expansion │  │
-│  └───────┬──────────┘  └─────────────────────────────┘  │
-│          │                                              │
-│  ┌───────▼──────────┐  ┌─────────────────────────────┐  │
-│  │ Tree-sitter AST  │  │ LocalStateCache             │  │
-│  │ Parser (TS + C#) │  │ Hash + baseline snapshots   │  │
-│  └──────────────────┘  └─────────────────────────────┘  │
+│  ┌──────────────────────┐  ┌──────────────────────────┐ │
+│  │ Zero-Touch Workflow   │  │ Heuristics Engine         │ │
+│  │  provide_code_context │  │  fidelity + strategy      │ │
+│  │  restore_context      │  │  selection per file       │ │
+│  │  context_history      │  └──────────┬───────────────┘ │
+│  │  context_stats        │             │                 │
+│  └──────────┬───────────┘             │                 │
+│             │                         │                 │
+│  ┌──────────▼─────────────────────────▼──────────────┐  │
+│  │              Compressor Engine                     │  │
+│  │  AST Extraction → Fidelity Filter → Opcode Encode  │  │
+│  │  + Text Delta Snapshots + IR Source Cache          │  │
+│  └──────────┬────────────────────────────────────────┘  │
+│             │                                           │
+│  ┌──────────▼────────────┐  ┌────────────────────────┐  │
+│  │ SymbolDictionary      │  │ Decompressor            │  │
+│  │ PathDictionary        │  │ Opcode → Readable       │  │
+│  └──────────┬────────────┘  └────────────────────────┘  │
+│             │                                           │
+│  ┌──────────▼────────────┐  ┌────────────────────────┐  │
+│  │ Tree-sitter AST       │  │ LocalStateCache         │  │
+│  │ Parser (TS + C#)      │  │ Hash + baseline snaps   │  │
+│  └───────────────────────┘  └────────────────────────┘  │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
 │  │ TokenAnalytics (cl100k tiktoken estimator)       │   │
@@ -56,12 +45,17 @@
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
+│  │ ContextStore (ContextStore trait)                 │   │
+│  │  InMemoryContextStore | SqliteStore               │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐   │
 │  │ Angular Meta-Layer (Φ markers + graph)           │   │
 │  │   detect → decorators → markers → bundler → graph│   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ MCP Prompts (cleanctx-notation system guide)     │   │
+│  │ MCP Prompts (cleanctx-notation + dashboard)      │   │
 │  └──────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -109,6 +103,102 @@ The **IR Subsystem** provides an alternative transport path. Instead of sending 
 
 ---
 
+## Zero-Touch Workflow
+
+The zero-touch workflow is the **recommended entry point** for any file-related coding task. It orchestrates all subsystems automatically:
+
+```
+     provide_code_context(file)
+          │
+          ▼
+┌─────────────────────┐
+│   Heuristics Engine │  Decide fidelity + strategy based on:
+│   (heuristics.rs)   │  - file characteristics (size, language)
+└─────────┬───────────┘  - explicit intent ("edit", "debug", etc.)
+          │              - existing baselines (text delta, IR delta)
+          ▼              - Angular detection
+┌─────────────────────┐
+│ Strategy Dispatch   │
+│                     │
+│  FullCompress ──────┤──→ Full compression + IR compilation
+│                     │    + persistence save
+│  DeltaTransport ────┤──→ Delta computation (text + IR)
+│                     │    + persistence save + delta append
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ Session Stats       │  Record compression metrics:
+│ (session_stats.rs)  │  - raw/compressed tokens, strategy
+└─────────┬───────────┘  - Angular detection, fidelity
+          │
+          ▼
+┌─────────────────────┐
+│ Response            │  JSON-RPC response with content +
+│ (tools.rs)          │  _meta (fidelity, strategy, version)
+└─────────────────────┘
+```
+
+### Tools
+
+| Tool | Purpose |
+|------|---------|
+| `provide_code_context` | **Single entry point** — auto-detects, selects fidelity, uses delta transport on subsequent calls |
+| `restore_context` | Force full re-compression, clearing all baselines and DB entries |
+| `context_history` | View compression history and delta savings for tracked files |
+| `context_stats` | Dashboard: token savings, compression stats, session metrics |
+
+---
+
+## Persistence Layer
+
+The persistence layer provides **cross-session persistence** for compression contexts via SQLite. It is enabled by setting the `CLEANCTX_PERSISTENCE_DB` environment variable.
+
+```
+     provide_code_context(file)
+          │
+          ▼
+┌─────────────────────┐
+│ Compress + Compile  │  Full compression pipeline + IR compilation
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ SqliteStore         │  Non-fatal persistence (fire-and-forget)
+│ (sqlite_store.rs)   │
+│                     │
+│  contexts table     │  Baseline IR BLOB + compressed text
+│  deltas table       │  Sequential delta payloads
+│  symbols table      │  Symbol table entries
+│  sessions table     │  Workspace session tracking
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ WAL-mode SQLite     │  Concurrent read/write safety
+│ (rusqlite crate)    │  Schema versioning via _schema_version
+└─────────────────────┘
+```
+
+### Design Decisions
+
+- **Non-fatal persistence**: All DB writes are fire-and-forget with `eprintln!` warnings — compression never fails due to DB issues.
+- **Content-hash deterministic IDs**: `ctx-{sha256_hex}` ensures idempotent saves (same content → same ID → UPSERT).
+- **No Mutex**: MCP server is single-threaded (stdin/stdout loop), so no concurrent access protection needed.
+- **Lazy initialization**: DB only opens if `CLEANCTX_PERSISTENCE_DB` env var is set — zero overhead for users who don't need persistence.
+- **`binary_wire::encode/decode`**: IR is serialized/deserialized as BLOBs; `file_id` and `version` are restored from DB columns on load.
+
+### Tools
+
+| Tool | Purpose |
+|------|---------|
+| `save_context` | Explicit manual checkpoint to DB |
+| `list_sessions` | Show tracked sessions/files |
+| `replay_history` | Replay deltas from DB up to target sequence |
+| `purge_old_deltas` | Trim old delta history by age |
+
+---
+
 ## Module Structure
 
 ```
@@ -117,14 +207,18 @@ src/
 ├── lib.rs                        # Public module declarations
 │
 ├── mcp/                          # MCP server layer (JSON-RPC stdio)
-│   ├── mod.rs                    # run() entry point
+│   ├── mod.rs                    # run() entry point + persistence init
 │   ├── server.rs                 # Stdin/stdout loop (F-02: line-size cap)
 │   ├── router.rs                 # JSON-RPC method dispatch
 │   ├── handlers.rs               # initialize, tools/list, prompts/list
-│   ├── tools.rs                  # Tool definitions + dispatch
-│   ├── prompts.rs                # cleanctx-notation prompt content
+│   ├── tools.rs                  # Tool definitions + dispatch + persistence hooks
+│   ├── prompts.rs                # cleanctx-notation + dashboard prompt content
 │   ├── workspace.rs              # compress_workspace_dir + collect_source_files
-│   └── state.rs                  # McpState (shared path dict + cache + config)
+│   ├── state.rs                  # McpState (dict + cache + config + persistence)
+│   ├── heuristics.rs             # Heuristics engine (fidelity + strategy selection)
+│   ├── context_store.rs          # ContextStore trait + InMemoryContextStore
+│   ├── sqlite_store.rs           # SqliteStore (SQLite-backed ContextStore)
+│   └── session_stats.rs          # SessionStats + dashboard rendering
 │
 ├── compression/                  # Core compression engine
 │   ├── mod.rs                    # Public API: compress_file, CompressionProgress
@@ -305,6 +399,22 @@ Two delta pipelines serve different scenarios:
 | IR-level (`delta_code_context`) | Instruction-level diffs of compiled IR | Structured code analysis, workspace-aware refactoring | Field-patch encoding for maximum compactness |
 
 The text-level pipeline is faster and simpler for quick edits. The IR pipeline preserves structural semantics and enables workspace-level cross-file analysis.
+
+### Why SQLite for persistence?
+
+SQLite provides:
+- **Zero configuration** — embedded database, no server process
+- **WAL mode** — concurrent read/write safety without external locking
+- **BLOB support** — compact IR binary storage
+- **Schema versioning** — forward-compatible migrations via `_schema_version` table
+- **Portability** — single file can be backed up or moved
+
+### Why non-fatal persistence?
+
+All DB writes are fire-and-forget with `eprintln!` warnings. This ensures:
+- Compression **never fails** due to DB issues (disk full, permissions, etc.)
+- The MCP server remains **always available** even if persistence is misconfigured
+- Users can **opt-in** to persistence without breaking existing workflows
 
 ### Why string-based Meta-Layer extraction?
 
@@ -531,9 +641,11 @@ This codebase underwent a comprehensive FAANG-level audit (41 findings across 5 
 
 - [`docs/FAANG_AUDIT.md`](FAANG_AUDIT.md) — Complete audit findings and remediation status
 - [`docs/REFACTORING.md`](REFACTORING.md) — SOLID refactoring plan and execution history
+- [`docs/FAANG_AUDIT_ZERO_TOUCH.md`](FAANG_AUDIT_ZERO_TOUCH.md) — Zero-touch workflow + persistence audit
 
 **Key results:**
 - `cargo clippy --all-targets -- -D warnings`: 0 warnings
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks
+- 798 tests passing (including 13 SQLite persistence tests)
