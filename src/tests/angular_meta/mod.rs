@@ -6,6 +6,43 @@ use crate::angular_meta::run_meta_layer;
 use crate::compression::Fidelity;
 
 #[test]
+fn meta_layer_extracts_inline_template_shape() {
+    let source = r#"
+        import { Component } from '@angular/core';
+
+        @Component({
+            selector: 'app-hello',
+            template: '<div *ngIf="show"><span>{{ name }}</span></div>'
+        })
+        export class HelloComponent {
+            name = 'World';
+            show = true;
+        }
+    "#;
+    let class_captures = vec![r#"
+        @Component({
+            selector: 'app-hello',
+            template: '<div *ngIf="show"><span>{{ name }}</span></div>'
+        })
+        export class HelloComponent {
+            name = 'World';
+            show = true;
+        }
+    "#.to_string()];
+    let block = run_meta_layer(source, &class_captures, Fidelity::Medium).expect("should detect Angular");
+    let rendered = block.render();
+    // Should contain the Φcmp: marker
+    assert!(rendered.contains("Φcmp:HelloComponent"), "missing Φcmp marker: {}", rendered);
+    // Should contain the inline template shape extraction
+    assert!(rendered.contains("Φtpl:"), "missing Φtpl marker for inline template: {}", rendered);
+    // The inline template has div, span, *ngIf, and {{ }}
+    let tpl_line = rendered.lines().find(|l| l.contains("Φtpl:")).unwrap();
+    assert!(tpl_line.contains("div"), "missing div tag: {}", tpl_line);
+    assert!(tpl_line.contains("span"), "missing span tag: {}", tpl_line);
+    assert!(tpl_line.contains("[ngIf]"), "missing [ngIf] directive: {}", tpl_line);
+}
+
+#[test]
 fn meta_layer_returns_none_for_plain_typescript() {
     let src = r#"
         export class SampleService {
