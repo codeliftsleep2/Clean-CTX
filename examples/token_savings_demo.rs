@@ -57,7 +57,7 @@ fn compile_file_ir(file: &PathBuf, fidelity: Fidelity) -> Result<clean_ctx::ir::
     compiler.add_pattern_recognizer(Box::new(CodePatternRecognizer::new()));
     compiler.add_pattern_recognizer(Box::new(CompressingPatternRecognizer::new()));
 
-    let ir = compiler.compile(&source, &file_id, language, &query_string, fidelity)?;
+    let ir = compiler.compile(&source, &file_id, language, query_string, fidelity)?;
     Ok(ir)
 }
 
@@ -105,10 +105,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Delta savings: rename a class to generate a delta
             let mut modified_ir = ir.clone();
             modified_ir.version = ir.version + 1;
-            if let Some(first) = modified_ir.instructions.first_mut() {
-                if let clean_ctx::ir::CoreOp::DefClass(_, name) = first {
-                    name.push_str("V2");
-                }
+            if let Some(clean_ctx::ir::CoreOp::DefClass(_, name)) = modified_ir.instructions.first_mut() {
+                name.push_str("V2");
             }
 
             let delta_comp = DeltaComputer::new();
@@ -127,9 +125,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .display()
                 .to_string();
 
-            let tbl_pct = if named_tokens > 0 {
-                (named_tokens.saturating_sub(table_tokens) * 100) / named_tokens
-            } else { 0 };
+            let tbl_pct = named_tokens
+                .checked_sub(table_tokens)
+                .and_then(|diff| diff.checked_mul(100))
+                .and_then(|num| num.checked_div(named_tokens))
+                .unwrap_or(0);
 
             println!(
                 "  {:<40} {:>6} {:>6} {:>6} {:>4}%   │ {:>16}",
@@ -141,9 +141,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             total_table += table_tokens;
         }
 
-        let overall_pct = if total_named > 0 {
-            (total_named.saturating_sub(total_table) * 100) / total_named
-        } else { 0 };
+        let overall_pct = total_named
+            .checked_sub(total_table)
+            .and_then(|diff| diff.checked_mul(100))
+            .and_then(|num| num.checked_div(total_named))
+            .unwrap_or(0);
 
         println!("  {}", "─".repeat(110));
         println!(
@@ -162,9 +164,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for file in &sample_files() {
         let ir = compile_file_ir(file, Fidelity::Low)?;
         let (named_chars, table_chars) = estimate_savings(&ir);
-        let pct = if named_chars > 0 {
-            (named_chars.saturating_sub(table_chars) * 100) / named_chars
-        } else { 0 };
+        let pct = named_chars
+            .checked_sub(table_chars)
+            .and_then(|diff| diff.checked_mul(100))
+            .and_then(|num| num.checked_div(named_chars))
+            .unwrap_or(0);
         let name = file
             .strip_prefix(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/test_files/"))
             .unwrap_or(file)

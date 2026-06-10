@@ -503,7 +503,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let delta_chars = text_delta_cost(prev, &compressed_output);
                 // Add delta envelope overhead (file alias, version markers, etc) ~80 chars
                 let total_delta_chars = delta_chars + 80;
-                (total_delta_chars + 3) / 4 // Estimate tokens (ceil division by ~4 chars/token)
+                total_delta_chars.div_ceil(4) // Estimate tokens (ceil division by ~4 chars/token)
             } else {
                 0 // No change
             }
@@ -536,8 +536,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ─── Print per-edit table ──────────────────────────────────────────────
     println!("Per-Edit Results:");
-    println!("{}{:>4} │ {:<55} │ {:>7} │ {:>7} │ {:>7} │ {:>8} │ {:>8} │ {:>8}",
-        "Edit", "#", "Description",
+    println!("Edit{:>4} │ {:<55} │ {:>7} │ {:>7} │ {:>7} │ {:>8} │ {:>8} │ {:>8}",
+        "#", "Description",
         "Raw", "ReComp", "Delta",
         "CumRaw", "CumReC", "CumDel"
     );

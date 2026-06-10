@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct EditRecord {
     number: usize,
     description: String,
@@ -273,6 +274,7 @@ fn text_delta_cost(a: &str, b: &str) -> usize {
 
 struct FidelityRun {
     name: &'static str,
+    #[allow(dead_code)]
     fidelity: Fidelity,
     total_raw: usize,
     total_recomp: usize,
@@ -310,7 +312,7 @@ fn run_simulation(fidelity: Fidelity) -> FidelityRun {
             if prev != &compressed_output {
                 let delta_chars = text_delta_cost(prev, &compressed_output);
                 let total_delta_chars = delta_chars + 80;
-                (total_delta_chars + 3) / 4
+                total_delta_chars.div_ceil(4)
             } else { 0 }
         } else {
             compressed_tokens
