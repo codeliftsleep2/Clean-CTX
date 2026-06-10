@@ -62,6 +62,34 @@ pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str) {
                 ]
             }
         }));
+    } else if prompt_name == "dashboard" {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "description": "View the Clean-CTX token savings dashboard",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": {
+                            "type": "text",
+                            "text": concat!(
+                                "You have access to the Clean-CTX Dashboard. To view token savings and compression stats:\n\n",
+                                "- Call `context_stats` with no arguments to see the full session dashboard.\n",
+                                "- Call `context_stats` with a `filePath` to see stats for a specific file.\n",
+                                "- Use `format: \"json\"` for structured data, or `format: \"text\"` for human-readable output.\n\n",
+                                "The dashboard shows:\n",
+                                "- Session duration and file count\n",
+                                "- Total raw vs compressed tokens and savings percentage\n",
+                                "- Full compression vs delta operation counts\n",
+                                "- Per-file breakdown with version history and delta counts\n",
+                                "- Delta hit rate (how often deltas were used instead of full re-compression)\n",
+                            )
+                        }
+                    }
+                ]
+            }
+        }));
     } else {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0",
