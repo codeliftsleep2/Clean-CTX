@@ -30,6 +30,7 @@ use crate::compression::Fidelity;
 /// Apply structural deduplication to the assembled body (Low fidelity only).
 /// Higher fidelities have more verbose output where scope defaults would not
 /// provide meaningful savings.
+#[allow(dead_code)]
 pub fn apply_scope_defaults(body: &str, fidelity: Fidelity) -> String {
     if fidelity != Fidelity::Low {
         return body.to_string();

@@ -63,6 +63,7 @@ pub fn apply_micro_opcodes(body: &str, fidelity: Fidelity) -> String {
 /// Used by the decompression side to restore the original structural format.
 /// The expansion is order-independent since each micro-opcode maps to a
 /// unique original pattern with no overlap.
+#[allow(dead_code)]
 pub fn expand_micro_opcodes(body: &str) -> String {
     let mut result = body.to_string();
 
@@ -88,6 +89,7 @@ pub fn expand_micro_opcodes(body: &str) -> String {
 ///   `§C ClassName§C` → `ClassName{}`
 ///
 /// The alternation strategy: odd-numbered §C → `{`, even-numbered → `}`.
+#[allow(dead_code)]
 fn expand_class_markers(body: &str) -> String {
     let mut result = String::with_capacity(body.len());
     let mut class_marker_count: usize = 0;
@@ -109,6 +111,7 @@ fn expand_class_markers(body: &str) -> String {
 }
 
 /// Returns the list of micro-opcodes for documentation/testing purposes.
+#[allow(dead_code)]
 pub fn micro_opcode_table() -> &'static [(&'static str, &'static str, &'static str)] {
     MICRO_OPCODE_TABLE
 }

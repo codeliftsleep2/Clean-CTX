@@ -40,6 +40,7 @@ pub fn build_global_symbol_table(
 ///
 /// This is Pass 2. Call `begin_file()` before each file, then `encode_body()`,
 /// then `format_file_refs()` to get the per-file footer.
+#[allow(dead_code)]
 pub fn encode_with_global_symbols(
     table: &mut GlobalSymbolTable,
     body: &str,

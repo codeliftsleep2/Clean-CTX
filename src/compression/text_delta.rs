@@ -222,6 +222,7 @@ impl TextDeltaComputer {
 /// Apply a text delta to a set of baseline lines, producing the new lines.
 ///
 /// Returns an error message if the delta cannot be applied cleanly.
+#[allow(dead_code)]
 pub fn apply_text_delta(baseline: &[String], delta: &TextDelta) -> Result<Vec<String>, String> {
     let mut result = baseline.to_vec();
 
