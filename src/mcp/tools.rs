@@ -12,12 +12,20 @@
 // separate dict/cache arguments. Tool handlers consult the user's
 // `exclude_patterns` (via `is_excluded`) and `fidelity_overrides`
 // (via `get_fidelity_for_extension`) before any file I/O.
+//
+// Phase G: Integration & MCP Tools — wires the IR system into the MCP
+// tool interface. `compress_code_context` now includes IR output,
+// `delta_code_context` computes instruction-level deltas, and
+// `apply_delta` allows clients to update state incrementally.
 
 use std::path::PathBuf;
 use serde_json::Value;
 use crate::compressor::{compress_file, Fidelity};
 use crate::decompression::Decompressor;
 use crate::diff::{build_snapshot, diff_snapshots, format_diff, diff_summary};
+use crate::ir::wire::ir_to_wire;
+use crate::ir::delta::{IRDelta, DeltaComputer};
+use crate::ir::replay::DeltaError;
 use crate::mcp::McpState;
 use crate::mcp::workspace;
 use crate::protocol::send_response;
@@ -32,7 +40,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts or .cs file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%). Default: 'low'." }
+                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%). Default: 'low'." },
+                    "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." }
                 },
                 "required": ["filePath"]
             }
@@ -70,6 +79,58 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
                 },
                 "required": ["filePath"]
+            }
+        }),
+        serde_json::json!({
+            "name": "delta_code_context",
+            "description": "IR-level delta compression. Returns only the structural deltas (added/removed/modified instructions) between the file's previous in-session IR state and its current state, using the structured delta envelope format. First call with no baseline stores the IR; subsequent calls emit a compact delta with + / ~ / - operations.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filePath": { "type": "string", "description": "Absolute path to .ts or .cs file." },
+                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
+                },
+                "required": ["filePath"]
+            }
+        }),
+        serde_json::json!({
+            "name": "delta_text_context",
+            "description": "Text-level delta compression. Returns line-level deltas (+added/-removed/~modified) between the file's previous compressed body snapshot and its current state. First call stores the snapshot; subsequent calls emit a compact delta instead of full re-compression. Saves 70-90% on edit sessions.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filePath": { "type": "string", "description": "Absolute path to .ts or .cs file." },
+                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
+                },
+                "required": ["filePath"]
+            }
+        }),
+        serde_json::json!({
+            "name": "apply_delta",
+            "description": "Applies an IR delta envelope to the in-session state machine, incrementally updating the tracked IR state without re-compressing. Returns the updated state and re-rendered pretty output.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "delta": {
+                        "type": "object",
+                        "description": "The IR delta envelope from delta_code_context",
+                        "properties": {
+                            "file": { "type": "string" },
+                            "from": { "type": "integer" },
+                            "to": { "type": "integer" },
+                            "ops": {
+                                "type": "object",
+                                "properties": {
+                                    "+": { "type": "array", "items": { "type": "array" } },
+                                    "~": { "type": "array", "items": { "type": "object" } },
+                                    "-": { "type": "array", "items": { "type": "array" } }
+                                }
+                            }
+                        }
+                    },
+                    "currentVersion": { "type": "integer", "description": "The current version of the file state (must match delta.from)." }
+                },
+                "required": ["delta", "currentVersion"]
             }
         }),
     ]
@@ -136,62 +197,31 @@ pub(crate) fn dispatch_tools_call(
 ) {
     match tool_name {
         "compress_code_context" => {
-            let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
-            let fidelity = match parse_fidelity_arg(id, params) {
-                Ok(f) => f,
-                Err(()) => return,
-            };
+            let encoding = params["arguments"]["encoding"].as_str().unwrap_or("named");
+            handle_compress_code_context(id, params, state, encoding);
+        }
+        "decompress_code_context" => {
+            let compressed_text = params["arguments"]["compressedText"].as_str().unwrap_or("");
 
-            // F-05: consult `is_excluded` *before* any file I/O.
-            if state.config.is_excluded(file_path_str) {
+            // F-FULL-11: Validate compressedText length before processing.
+            // The MCP server's line limit caps the request to ~16 MB, but
+            // a string within that bound can still be large enough to cause
+            // memory pressure. Return a clean error for oversized input.
+            const MAX_DECOMPRESS_BYTES: usize = 4 * 1024 * 1024; // 4 MB
+            if compressed_text.len() > MAX_DECOMPRESS_BYTES {
                 send_response(&serde_json::json!({
                     "jsonrpc": "2.0",
                     "id": id,
                     "error": {
                         "code": -32603,
-                        "message": format!("File excluded by config: {}", file_path_str)
+                        "message": format!(
+                            "compressedText too large: {} bytes (max {}).",
+                            compressed_text.len(), MAX_DECOMPRESS_BYTES
+                        )
                     }
                 }));
                 return;
             }
-
-            // F-05: extension-based fidelity override (only kicks in
-            // when the caller didn't pass an explicit `fidelity`).
-            let explicit = params["arguments"]["fidelity"].as_str();
-            let path_buf = PathBuf::from(file_path_str);
-            let ext = path_buf.extension().and_then(|e| e.to_str());
-            let effective_fidelity = if explicit.is_some() {
-                fidelity
-            } else {
-                resolve_fidelity(explicit, ext, &state.config)
-            };
-
-            match compress_file(
-                PathBuf::from(file_path_str),
-                &mut state.dict,
-                &mut state.cache,
-                effective_fidelity,
-            ) {
-                Ok(mut compressed_text) => {
-                    compressed_text.push_str(&state.dict.format_footer());
-
-                    send_response(&serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "result": { "content": [{ "type": "text", "text": compressed_text }] }
-                    }));
-                }
-                Err(e) => {
-                    send_response(&serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "error": { "code": -32603, "message": e.to_string() }
-                    }));
-                }
-            }
-        }
-        "decompress_code_context" => {
-            let compressed_text = params["arguments"]["compressedText"].as_str().unwrap_or("");
 
             let mut decompressor = Decompressor::new();
             let decompressed = decompressor.quick_decompress(compressed_text);
@@ -216,6 +246,14 @@ pub(crate) fn dispatch_tools_call(
                     // the manifest as the primary text content; the
                     // errors are surfaced as a separate JSON field so
                     // MCP clients can inspect them programmatically.
+                    //
+                    // F-FINAL-04: `excluded` is now `Vec<(String, Vec<String>)>`
+                    // — `(path, matching_patterns)` — so MCP clients can
+                    // debug a misconfigured exclude list.
+                    //
+                    // F-FINAL-06: `warnings` is the per-session warning
+                    // buffer (duplicate class names, etc.) so MCP
+                    // clients can surface non-fatal anomalies.
                     send_response(&serde_json::json!({
                         "jsonrpc": "2.0",
                         "id": id,
@@ -225,7 +263,13 @@ pub(crate) fn dispatch_tools_call(
                                 "errors": result.errors.into_iter().map(|(p, e)| {
                                     serde_json::json!({ "path": p, "error": e })
                                 }).collect::<Vec<_>>(),
-                                "excluded": result.excluded,
+                                "excluded": result.excluded.into_iter().map(|(p, patterns)| {
+                                    serde_json::json!({
+                                        "path": p,
+                                        "matched_patterns": patterns,
+                                    })
+                                }).collect::<Vec<_>>(),
+                                "warnings": result.warnings,
                             }
                         }
                     }));
@@ -240,45 +284,16 @@ pub(crate) fn dispatch_tools_call(
             }
         }
         "diff_code_context" => {
-            let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
-            let fidelity = match parse_fidelity_arg(id, params) {
-                Ok(f) => f,
-                Err(()) => return,
-            };
-
-            // F-05: same exclusion check as `compress_code_context`.
-            if state.config.is_excluded(file_path_str) {
-                send_response(&serde_json::json!({
-                    "jsonrpc": "2.0",
-                    "id": id,
-                    "error": {
-                        "code": -32603,
-                        "message": format!("File excluded by config: {}", file_path_str)
-                    }
-                }));
-                return;
-            }
-
-            match diff_code_context_handler(
-                PathBuf::from(file_path_str),
-                &mut state.cache,
-                fidelity,
-            ) {
-                Ok(output) => {
-                    send_response(&serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "result": { "content": [{ "type": "text", "text": output }] }
-                    }));
-                }
-                Err(e) => {
-                    send_response(&serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "error": { "code": -32603, "message": e.to_string() }
-                    }));
-                }
-            }
+            handle_diff_code_context(id, params, state);
+        }
+        "delta_code_context" => {
+            handle_delta_code_context(id, params, state);
+        }
+        "delta_text_context" => {
+            handle_delta_text_context(id, params, state);
+        }
+        "apply_delta" => {
+            handle_apply_delta(id, params, state);
         }
         _ => {
             send_response(&serde_json::json!({
@@ -288,6 +303,621 @@ pub(crate) fn dispatch_tools_call(
             }));
         }
     }
+}
+
+// ── Handler: compress_code_context (upgraded, backward compatible) ──
+
+/// Handle `compress_code_context` — includes `ir` field alongside `pretty`.
+///
+/// Supports an optional `encoding` parameter:
+///   - `"named"` (default): standard tuple format with opcode strings
+///   - `"positional"`: stripped opcode format (30%+ savings per the spec)
+///   - `"tagged"`: positional with opcode preserved for mixed streams
+///
+/// F-08 (FAANG audit): the positional encoding was previously unreachable
+/// from the MCP surface. This change wires `ir_to_positional_wire` into
+/// the production path.
+fn handle_compress_code_context(
+    id: &Value,
+    params: &Value,
+    state: &mut McpState,
+    encoding: &str,
+) {
+    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let fidelity = match parse_fidelity_arg(id, params) {
+        Ok(f) => f,
+        Err(()) => return,
+    };
+
+    // F-05: consult `is_excluded` *before* any file I/O.
+    if state.config.is_excluded(file_path_str) {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": {
+                "code": -32603,
+                "message": format!("File excluded by config: {}", file_path_str)
+            }
+        }));
+        return;
+    }
+
+    // F-05: extension-based fidelity override (only kicks in
+    // when the caller didn't pass an explicit `fidelity`).
+    let explicit = params["arguments"]["fidelity"].as_str();
+    let path_buf = PathBuf::from(file_path_str);
+    let ext = path_buf.extension().and_then(|e| e.to_str());
+    let effective_fidelity = if explicit.is_some() {
+        fidelity
+    } else {
+        resolve_fidelity(explicit, ext, &state.config)
+    };
+
+    match compress_file(
+        PathBuf::from(file_path_str),
+        &mut state.dict,
+        &mut state.cache,
+        effective_fidelity,
+    ) {
+        Ok(mut compressed_text) => {
+            compressed_text.push_str(&state.dict.format_footer());
+
+            // Also compile IR and store in context state
+            let ir_result = compile_file_ir(file_path_str, effective_fidelity, state);
+
+            let response = if let Ok(ir) = ir_result {
+                // Store the full IR in context state for delta tracking
+                state.ir_context.load_ir(ir.clone());
+
+                // F-08: Determine the IR wire format based on the encoding parameter.
+                // Positional encoding strips opcode strings for ~30% size reduction.
+                let ir_value = match encoding {
+                    "positional" => {
+                        let config = crate::ir::positional::PositionalConfig::stripped();
+                        crate::ir::positional::ir_to_positional_wire(
+                            &ir.file_id, ir.version, &ir.instructions, config,
+                        )
+                    }
+                    "tagged" => {
+                        let config = crate::ir::positional::PositionalConfig::tagged();
+                        crate::ir::positional::ir_to_positional_wire(
+                            &ir.file_id, ir.version, &ir.instructions, config,
+                        )
+                    }
+                    _ => ir_to_wire(&ir),
+                };
+
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": {
+                        "content": [{ "type": "text", "text": compressed_text }],
+                        "ir": ir_value,
+                        "pretty": compressed_text,
+                        "v": ir.version,
+                        "file": ir.file_id
+                    }
+                })
+            } else {
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": { "content": [{ "type": "text", "text": compressed_text }] }
+                })
+            };
+
+            send_response(&response);
+        }
+        Err(e) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": { "code": -32603, "message": e.to_string() }
+            }));
+        }
+    }
+}
+
+// ── Handler: diff_code_context (existing, kept for backward compat) ──
+
+/// Handle `diff_code_context` — AST-level text diff (existing).
+fn handle_diff_code_context(
+    id: &Value,
+    params: &Value,
+    state: &mut McpState,
+) {
+    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let fidelity = match parse_fidelity_arg(id, params) {
+        Ok(f) => f,
+        Err(()) => return,
+    };
+
+    // F-05: same exclusion check as `compress_code_context`.
+    if state.config.is_excluded(file_path_str) {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": {
+                "code": -32603,
+                "message": format!("File excluded by config: {}", file_path_str)
+            }
+        }));
+        return;
+    }
+
+    match diff_code_context_handler(
+        PathBuf::from(file_path_str),
+        &mut state.cache,
+        fidelity,
+    ) {
+        Ok(output) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": { "content": [{ "type": "text", "text": output }] }
+            }));
+        }
+        Err(e) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": { "code": -32603, "message": e.to_string() }
+            }));
+        }
+    }
+}
+
+// ── Handler: delta_code_context (new — IR-level delta) ───────────────
+
+/// Handle `delta_code_context` — computes IR-level delta between
+/// the file's previous in-session IR state and its current state.
+fn handle_delta_code_context(
+    id: &Value,
+    params: &Value,
+    state: &mut McpState,
+) {
+    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let fidelity = match parse_fidelity_arg(id, params) {
+        Ok(f) => f,
+        Err(()) => return,
+    };
+
+    // Check exclusion
+    if state.config.is_excluded(file_path_str) {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": {
+                "code": -32603,
+                "message": format!("File excluded by config: {}", file_path_str)
+            }
+        }));
+        return;
+    }
+
+    // Compile current IR
+    let current_ir = match compile_file_ir(file_path_str, fidelity, state) {
+        Ok(ir) => ir,
+        Err(e) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": { "code": -32603, "message": e.to_string() }
+            }));
+            return;
+        }
+    };
+
+    // Check if we have a baseline IR in context state
+    let file_alias = current_ir.file_id.clone();
+    let result = if state.ir_context.has_file(&file_alias) {
+        // Get baseline version before loading new IR
+        let baseline_version = state.ir_context.file_version(&file_alias).unwrap_or(0);
+        let baseline_ir = {
+            // Reconstruct baseline CompiledIR from context state
+            let instructions = state.ir_context.get_ir(&file_alias).cloned().unwrap_or_default();
+            crate::ir::compiler::CompiledIR {
+                file_id: file_alias.clone(),
+                instructions: instructions.iter()
+                    .filter_map(|t| crate::ir::wire::tuple_to_op(t))
+                    .collect(),
+                version: baseline_version,
+            }
+        };
+
+        // Now store the new IR as baseline for next call
+        state.ir_context.load_ir(current_ir.clone());
+
+        // Compute delta
+        let computer = DeltaComputer::new();
+        match computer.compute(&baseline_ir, &current_ir) {
+            Some(delta) => {
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": {
+                        "content": [{ "type": "text", "text": format!("IR delta: v{} → v{}", delta.from, delta.to) }],
+                        "delta": delta,
+                        "file": file_alias,
+                        "from": delta.from,
+                        "to": delta.to,
+                        "ops": delta.ops
+                    }
+                })
+            }
+            None => {
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": {
+                        "content": [{ "type": "text", "text": format!("No changes (v{}).", current_ir.version) }],
+                        "delta": null,
+                        "file": file_alias,
+                        "v": current_ir.version
+                    }
+                })
+            }
+        }
+    } else {
+        // No baseline — store current IR as baseline
+        state.ir_context.load_ir(current_ir.clone());
+        serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "content": [{ "type": "text", "text": format!("No baseline — stored IR (v{}). Call again after editing to see delta.", current_ir.version) }],
+                "file": file_alias,
+                "v": current_ir.version,
+                "ir": ir_to_wire(&current_ir)
+            }
+        })
+    };
+
+    send_response(&result);
+}
+
+// ── Handler: delta_text_context (Phase IV — text-level delta) ──────
+
+/// Handle `delta_text_context` — computes text-level delta between
+/// the file's previous compressed body snapshot and its current state.
+///
+/// First call: stores the compressed body as baseline, returns full output.
+/// Subsequent calls: computes line-level delta, returns compact §Δ format.
+fn handle_delta_text_context(
+    id: &Value,
+    params: &Value,
+    state: &mut McpState,
+) {
+    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let fidelity = match parse_fidelity_arg(id, params) {
+        Ok(f) => f,
+        Err(()) => return,
+    };
+
+    // Check exclusion
+    if state.config.is_excluded(file_path_str) {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": {
+                "code": -32603,
+                "message": format!("File excluded by config: {}", file_path_str)
+            }
+        }));
+        return;
+    }
+
+    // Compress the file to get current compressed body lines
+    let path_alias = state.dict.get_or_create_alias(file_path_str.to_string());
+
+    // Run the full compression pipeline to get the body lines
+    let result = compress_text_body(file_path_str, fidelity, state);
+    let (body_lines, full_output) = match result {
+        Ok(r) => r,
+        Err(e) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": { "code": -32603, "message": e.to_string() }
+            }));
+            return;
+        }
+    };
+
+    // Use the text delta computer to compute delta or store baseline
+    let delta = state.text_delta.compute_and_store(&path_alias, body_lines);
+
+    let response = match delta {
+        Some(d) => {
+            // Delta computed — emit compact delta format
+            let wire = d.to_wire_format();
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": wire }],
+                    "delta": {
+                        "file": d.file,
+                        "from": d.from,
+                        "to": d.to,
+                        "adds": d.adds,
+                        "dels": d.dels,
+                        "mods": d.mods.into_iter().map(|(o, n)| {
+                            serde_json::json!({"old": o, "new": n})
+                        }).collect::<Vec<_>>(),
+                    },
+                    "format": "text_delta"
+                }
+            })
+        }
+        None => {
+            // No baseline or no changes — emit full output
+            let version = state.text_delta.file_version(&path_alias);
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": full_output }],
+                    "delta": null,
+                    "file": path_alias,
+                    "v": version,
+                    "format": "full"
+                }
+            })
+        }
+    };
+
+    send_response(&response);
+}
+
+/// Compress a file and extract the body lines (without header) for
+/// delta comparison. Returns `(body_lines, full_output)`.
+fn compress_text_body(
+    file_path: &str,
+    fidelity: Fidelity,
+    state: &mut McpState,
+) -> Result<(Vec<String>, String), Box<dyn std::error::Error>> {
+    use crate::compression::pipeline::{build_output_lines, assemble_body};
+    use crate::compression::micro_opcodes::apply_micro_opcodes;
+    use crate::compression::symbol_compression::apply_symbol_compression;
+    use crate::compaction::{
+        compact_expression, extract_class_name, extract_field,
+        extract_method_sig,
+    };
+    use crate::compression::capture_pipeline::run_capture_pipeline;
+    use crate::compression::language::language_for_extension;
+
+    let source_code = std::fs::read_to_string(file_path)?;
+    let path_buf = std::path::PathBuf::from(file_path);
+    let extension = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
+    let (language, query_string) = language_for_extension(extension)
+        .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
+
+    let all_captures = run_capture_pipeline(
+        language,
+        query_string,
+        &source_code,
+        fidelity,
+        |capture_name, raw, f| {
+            if capture_name == "class.root" {
+                Some(extract_class_name(raw))
+            } else if capture_name == "method.root" {
+                Some(extract_method_sig(raw, f))
+            } else if capture_name == "field.root" {
+                Some(extract_field(raw, f))
+            } else {
+                Some(compact_expression(raw, f))
+            }
+        },
+    )?;
+
+    let built = build_output_lines(&all_captures, &source_code, fidelity);
+    let mut body_content = assemble_body(&built.output_lines, fidelity);
+    if let Some(block) = &built.meta_block {
+        body_content.push_str(&block.render());
+    }
+    body_content = apply_micro_opcodes(&body_content, fidelity);
+    let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
+
+    // Split the body into lines for delta comparison
+    let body_lines: Vec<String> = display_body.lines().map(String::from).collect();
+
+    // Build full output (header + body + symbol footer)
+    let path_alias = state.dict.get_or_create_alias(file_path.to_string());
+    let compacted_body = crate::compression::report::format_compacted_body(
+        &display_body,
+        &sym_footer,
+        &path_alias,
+        fidelity,
+    );
+    let full_output = crate::compression::report::format_final_output(
+        &source_code,
+        &compacted_body,
+        fidelity,
+        built.class_count,
+        built.method_count,
+        built.import_count,
+    );
+
+    Ok((body_lines, full_output))
+}
+
+// ── Handler: apply_delta (new — client-side state update) ──────────
+
+/// Handle `apply_delta` — applies a delta envelope to the in-session
+/// state machine, returning the updated state.
+fn handle_apply_delta(
+    id: &Value,
+    params: &Value,
+    state: &mut McpState,
+) {
+    let delta_val = &params["arguments"]["delta"];
+
+    // Parse the delta from the JSON params
+    let delta: IRDelta = match serde_json::from_value(delta_val.clone()) {
+        Ok(d) => d,
+        Err(e) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": { "code": -32602, "message": format!("Invalid delta format: {}", e) }
+            }));
+            return;
+        }
+    };
+
+    // NF-03 + NF-10: Extract the file ID before the delta is consumed by apply().
+    let delta_file_id = delta.file.clone();
+
+    // Apply the delta.
+    // NF-04: Removed redundant version check — ContextState::apply is the
+    // single source of truth for version validation. The previous manual
+    // check produced -32602 while apply produces -32603 for the same
+    // condition. The 'currentVersion' parameter is still accepted for
+    // backward compatibility but is no longer validated here.
+    match state.ir_context.apply(delta) {
+        Ok(new_version) => {
+            // NF-03 + NF-10: Use delta's file ID instead of file_ids().last()
+            // file_ids() returns HashMap keys — non-deterministic in multi-file sessions.
+            let pretty = state.ir_context.render_pretty(&delta_file_id, Fidelity::Low);
+
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "ok": true,
+                    "newVersion": new_version,
+                    "pretty": pretty.unwrap_or_default()
+                }
+            }));
+        }
+        Err(DeltaError::UnknownFile(file)) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": {
+                    "code": -32603,
+                    "message": format!("Unknown file: {}. Use compress_code_context first to load the IR baseline.", file)
+                }
+            }));
+        }
+        Err(DeltaError::VersionMismatch { expected, got }) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": {
+                    "code": -32603,
+                    "message": format!("Version mismatch: state is v{}, delta expects v{}", expected, got)
+                }
+            }));
+        }
+        Err(e) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": { "code": -32603, "message": e.to_string() }
+            }));
+        }
+    }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+/// Compile a file to IR, detecting language and running the full
+/// 4-layer compilation pipeline.
+///
+/// Phase A (FAANG remediation): The compiler now instantiates the
+/// appropriate language layers (TypeScriptLayer, CSharpLayer) and
+/// meta layers (AngularMetaLayer) based on the detected language.
+///
+/// NF-02 fix: The version is set based on the previous version in the
+/// context state, ensuring a monotonic version chain across successive
+/// `delta_code_context` calls. If the file was previously tracked at
+/// version N, the new compiled IR gets version N+1. If untracked,
+/// version starts at 1.
+///
+/// NF-01 fix: The consumptive `CompressingPatternRecognizer` is wired
+/// into the compile path *after* the additive `CodePatternRecognizer`,
+/// so flags are emitted first, then patterns are consumed for wire-size
+/// reduction. This enables the Phase H 30% compression on edits.
+fn compile_file_ir(
+    file_path: &str,
+    fidelity: Fidelity,
+    state: &mut McpState,
+) -> Result<crate::ir::compiler::CompiledIR, Box<dyn std::error::Error>> {
+    use crate::ir::compiler::IRCompiler;
+    use crate::ir::layers::typescript::TypeScriptLayer;
+    use crate::ir::layers::csharp::CSharpLayer;
+    use crate::ir::layers::angular::AngularMetaLayer;
+    use crate::compression::language::language_for_extension;
+
+    let source = std::fs::read_to_string(file_path)?;
+    let path_buf = PathBuf::from(file_path);
+    let extension = path_buf.extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+
+    let (language, query_string) = language_for_extension(extension)
+        .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
+
+    // F-FULL-10: Use raw path for alias key for deterministic results.
+    // Canonicalize is still performed for the `α alias: <path>` footer
+    // display, but the alias key itself uses the raw path.
+    let path_alias = state.dict.get_or_create_alias(file_path.to_string());
+
+    // NF-02: Determine the next version based on the previous context state
+    let prev_version = state.ir_context.file_version(&path_alias).unwrap_or(0);
+
+    let mut compiler = IRCompiler::new();
+
+    // Add language-specific layers (Layer 2)
+    match extension {
+        "ts" | "js" => {
+            compiler.add_language_layer(Box::new(TypeScriptLayer::new()));
+        }
+        "cs" => {
+            compiler.add_language_layer(Box::new(CSharpLayer::new()));
+        }
+        _ => {}
+    }
+
+    // Add Angular meta layer (Layer 3) for TypeScript files
+    if extension == "ts" || extension == "js" {
+        compiler.add_meta_layer(Box::new(AngularMetaLayer::new()));
+    }
+
+    // F-07 (FAANG audit): Wire the additive CodePatternRecognizer into
+    // the compile path. This is the Layer 4 additive recognizer that
+    // emits CTOR/OBSERVABLE/GETTER/SETTER flags alongside the original
+    // instructions. The recognizer is always-on because it adds context
+    // without removing any instructions (zero regression).
+    compiler.add_pattern_recognizer(Box::new(
+        crate::ir::layers::patterns::CodePatternRecognizer::new(),
+    ));
+
+    // NF-01: Wire the consumptive CompressingPatternRecognizer *after*
+    // the additive recognizer. This enables the Phase H 30% compression
+    // on edits by consuming recognised patterns into single PAT ops.
+    // The additive recognizer's flags (CTOR/OBSERVABLE/GETTER/SETTER)
+    // are emitted first, then the consumptive recognizer collapses them
+    // where possible. This ordering ensures maximum compression.
+    compiler.add_pattern_recognizer(Box::new(
+        crate::ir::patterns::CompressingPatternRecognizer::new(),
+    ));
+
+    let mut compiled = compiler.compile(
+        &source,
+        &path_alias,
+        language,
+        query_string,
+        fidelity,
+    )?;
+
+    // NF-02: Override the version with the next monotonic value.
+    // The compiler always sets version=1; we fix it here.
+    compiled.version = prev_version.saturating_add(1);
+
+    Ok(compiled)
 }
 
 /// Compute an AST-level diff between the file's in-session baseline and

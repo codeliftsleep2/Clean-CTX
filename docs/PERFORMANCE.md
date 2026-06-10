@@ -6,12 +6,13 @@
 
 ## Compression Savings
 
-### Measured Results
+### Measured Results (Single Pass)
 
 | File | Raw Tokens | Low (Retained) | Low Savings | Medium (Retained) | Medium Savings | High (Retained) | High Savings |
 |------|-----------:|---------------:|------------:|------------------:|---------------:|----------------:|-------------:|
 | `sample_service.ts` (32 lines) | 193 | 36 | **81.35%** | 75 | **61.14%** | 75 | **61.14%** |
 | `LargeService.ts` (~400 lines) | 2,957 | 119 | **95.98%** | 476 | **83.90%** | 499 | **83.12%** |
+| `UserManagementService.ts` (~440 lines) | 3,912 | 155 | **96.04%** | — | — | — | — |
 
 **Key insight:** Larger files compress significantly better because structural overhead (class headers, method signatures, imports) is amortized across more methods. A service with 20+ methods at Low fidelity will consistently exceed 95% savings.
 
@@ -23,6 +24,141 @@
 | Method signature | `name(types):type` → 3-6 tokens | `name(types):type` + `$a` if async | Full keywords preserved |
 | Field | `name: type` → 2 tokens (or suppressed) | `name: type` → 2 tokens | `public readonly name: type` → 4+ tokens |
 | Import | `$im path` → 2 tokens | `$im path` → 2 tokens | `import { X } from 'path'` → 5+ tokens |
+
+---
+
+## 🧪 Edit Session Benchmarks (Delta Transport)
+
+We simulated a realistic developer editing session on `UserManagementService.ts` (~440 lines) applying 50 sequential edits across 5 categories. The simulation was run at **all three fidelity levels** to compare delta transport performance across compression settings.
+
+### Cross-Fidelity Comparison (50-Edit Cumulative)
+
+| Fidelity | Raw | ReComp | Delta | ReSav% | DelSav% | Delta vs ReComp |
+|----------|----:|------:|------:|------:|-------:|:---------------:|
+| **Low** | 227,310 | 7,823 | 8,490 | 96.6% | 96.3% | +8.5% overhead |
+| **Medium** | 227,310 | 37,338 | 18,287 | 83.6% | **92.0%** | **−51.0%** cheaper |
+| **High** | 227,310 | 48,556 | 22,955 | 78.6% | 89.9% | **−52.7%** cheaper |
+
+### Per-Fidelity Details
+
+<details>
+<summary><b>Low Fidelity</b> (max compression, daily-use default) — click to expand</summary>
+
+| Pipeline | Total Tokens | Avg per Edit | Savings vs Raw |
+|----------|-------------:|:------------:|:--------------:|
+| Raw (no compression) | **227,310** | 4,546 | — |
+| Clean-CTX full recompression | **7,823** | 156 | **96.6%** |
+| Clean-CTX + delta transport | **8,490** | 170 | **96.3%** |
+
+**Per-Edit Category Breakdown:**
+
+| Category | Edits | Raw | ReComp | Delta | ReSav% | DelSav% | Best Delta Edit | Worst Delta Edit |
+|----------|-------|----:|------:|------:|------:|-------:|:---------------:|:----------------:|
+| Small changes | 1-10 | 39,202 | 1,545 | 988 | 96.1% | 97.5% | #4 (100%) | #3/#8 (91.5%) |
+| Method-level | 11-20 | 41,370 | 1,498 | 1,580 | 96.4% | 96.2% | #17 (100%) | #13 (91.3%) |
+| Structural | 21-30 | 44,610 | 1,587 | 1,740 | 96.4% | 96.1% | #21 (99.2%) | #29 (91.5%) |
+| Cross-method | 31-40 | 49,598 | 1,383 | 2,436 | 97.2% | 95.1% | #33/#39 (100%) | #36 (90.8%) |
+| Refactor | 41-50 | 52,530 | 1,810 | 1,746 | 96.6% | 96.7% | #42 (99.4%) | #41 (90.8%) |
+</details>
+
+<details>
+<summary><b>Medium Fidelity</b> (balanced, preserves async/exports) — click to expand</summary>
+
+| Pipeline | Total Tokens | Avg per Edit | Savings vs Raw |
+|----------|-------------:|:------------:|:--------------:|
+| Raw (no compression) | **227,310** | 4,546 | — |
+| Clean-CTX full recompression | **37,338** | 747 | **83.6%** |
+| Clean-CTX + delta transport | **18,287** | 366 | **92.0%** |
+
+**Per-Edit Category Breakdown:**
+
+| Category | Edits | ReSav% | DelSav% | Delta vs ReComp |
+|----------|-------|------:|-------:|:---------------:|
+| Small changes | 1-10 | 80.7% | 96.1% | −79.7% cheaper |
+| Method-level | 11-20 | 82.3% | 92.8% | −58.9% cheaper |
+| Structural | 21-30 | 82.7% | 91.6% | −51.2% cheaper |
+| Cross-method | 31-40 | 87.2% | 89.5% | −18.0% cheaper |
+| Refactor | 41-50 | 83.9% | 90.9% | −43.2% cheaper |
+</details>
+
+<details>
+<summary><b>High Fidelity</b> (full detail, best for code review) — click to expand</summary>
+
+| Pipeline | Total Tokens | Avg per Edit | Savings vs Raw |
+|----------|-------------:|:------------:|:--------------:|
+| Raw (no compression) | **227,310** | 4,546 | — |
+| Clean-CTX full recompression | **48,556** | 971 | **78.6%** |
+| Clean-CTX + delta transport | **22,955** | 459 | **89.9%** |
+
+**Per-Edit Category Breakdown:**
+
+| Category | Edits | ReSav% | DelSav% | Delta vs ReComp |
+|----------|-------|------:|-------:|:---------------:|
+| Small changes | 1-10 | 75.9% | 95.5% | −81.4% cheaper |
+| Method-level | 11-20 | 77.2% | 91.2% | −61.3% cheaper |
+| Structural | 21-30 | 77.2% | 89.4% | −53.8% cheaper |
+| Cross-method | 31-40 | 83.2% | 86.5% | −20.0% cheaper |
+| Refactor | 41-50 | 78.7% | 88.3% | −45.0% cheaper |
+</details>
+
+### Key Performance Metrics
+
+| Metric | Low | Medium | High |
+|--------|:---:|:------:|:----:|
+| Break-even edit | #1 | #1 | #1 |
+| Single-pass compression ratio | **25.2×** | 5.2× | 4.1× |
+| Best delta savings vs raw | 100.0% (edit #4) | 100.0% (edit #4) | 100.0% (edit #4) |
+| Worst delta savings vs raw | 90.8% (edit #41) | 86.5% (edit #36) | 82.0% (edit #36) |
+| Delta vs ReComp advantage | +8.5% overhead | **−51.0% cheaper** | **−52.7% cheaper** |
+| Simulation runtime | 5.65s | 6.87s | 6.27s |
+
+### Key Findings
+
+1. **Low fidelity** (daily default): Delta delivers 96.3% savings vs raw, within 0.3 pp of recompression. The fixed delta envelope cost (~80 chars) adds +8.5% overhead because compressed output is so tiny (avg 156 tokens).
+2. **Medium and High fidelities**: Delta transport is **actually cheaper** than full recompression — by 51% and 52.7% respectively. This is because larger compressed outputs (5–6× bigger than Low) make the line-level delta significantly smaller than re-running the full compression pipeline.
+3. **Delta breaks even immediately** at all fidelities — cumulative delta cost ≤ full recompression from Edit #1.
+4. **Higher delta overhead on cross-method edits**: The "Cross-method" category shows the smallest delta advantage (−18% to −20%) because these edits restructure code across many methods, producing large deltas relative to the compressed baseline.
+
+### Run It Yourself
+
+```bash
+# Low fidelity (the fifty_edit_simulation example)
+cargo run --example fifty_edit_simulation
+
+# All three fidelities (cross-fidelity comparison)
+cargo run --example fidelity_comparison
+```
+Both examples generate full per-edit tables with raw/recompression/delta costs and cumulative totals.
+
+---
+
+## Delta Pipeline Performance
+
+The delta pipeline's performance depends on the **edit size ratio** — how many lines changed vs. how many stayed the same:
+
+| Edit Size Ratio | Full Recompression | Delta Transport | Delta Advantage |
+|:---------------:|:------------------:|:---------------:|:---------------:|
+| 0% (no change) | ~80 ms (cached: ~50 µs) | ~50 µs | **Match** |
+| 1-5% (small edit) | ~80 ms | ~40 ms | ~2× faster |
+| 5-20% (medium edit) | ~80 ms | ~45 ms | ~1.8× faster |
+| >20% (large edit) | ~80 ms | ~55 ms | ~1.5× faster |
+
+Delta transport avoids the full parse-compress-BPE pipeline by computing line-level diffs between compressed body snapshots. For small edits, this is significantly faster. For large restructures, full recompression may be preferred (the delta pipeline can issue a full snapshot as a fallback).
+
+### Fidelity-Dependent Delta Trade-Off
+
+The delta overhead vs full recompression is fidelity-dependent:
+
+| Fidelity | Compressed Size | Delta Overhead | Why? |
+|----------|:---------------:|:--------------:|------|
+| **Low** | ~155 tokens (tiny) | +8.5% | Fixed delta envelope (~80 chars) is proportionally large |
+| **Medium** | ~747 tokens | **−51% cheaper** | Delta lines < re-compressed lines |
+| **High** | ~971 tokens | **−52.7% cheaper** | Delta lines < re-compressed lines |
+
+**Practical guidance:**
+- If you use **Low fidelity** and the compressed output is already tiny, full recompression's overhead is negligible — delta doesn't hurt but doesn't help much either
+- If you use **Medium or High fidelity**, delta transport provides a significant additional savings on top of the base compression
+- For maximum edit-session efficiency, the pipeline could auto-detect fidelity and choose the optimal transport strategy
 
 ---
 
@@ -159,6 +295,8 @@ cargo test workspace_shares_aliases_with_per_file_tool
 |-------|-------------|-------------|
 | F-19 | Streaming workspace walk (replace collect-then-sort) | Future release |
 | F-20 | Rayon parallelization for `compress_workspace` | Future release (blocked by tree-sitter `!Send`) |
+| — | IR-level delta pipeline integration with MCP `delta_code_context` tool | Current release |
+| — | Text-level delta auto-detection: switch between full recompression and delta based on edit size ratio | Future release |
 
 ---
 

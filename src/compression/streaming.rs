@@ -19,6 +19,7 @@ use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::language::language_for_extension;
 use crate::compression::pipeline::{assemble_body, build_output_lines};
 use crate::compression::report::{format_compacted_body, format_final_output};
+use crate::compression::micro_opcodes::apply_micro_opcodes;
 use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
@@ -53,7 +54,12 @@ where
 {
     let metadata = fs::metadata(&file)?;
     let total_bytes = metadata.len() as usize;
-    let absolute_path = fs::canonicalize(&file)?.to_string_lossy().into_owned();
+    // F-FINAL-05: Use the raw path as the alias key (not the
+    // canonicalized path) for consistency with the non-streaming
+    // variant and `bundle_pass` / `graph_pass`. On Windows, `canonicalize`
+    // returns UNC paths that would produce a different alias from the
+    // raw-path aliases used everywhere else.
+    let absolute_path = file.to_string_lossy().into_owned();
     let path_alias = dict.get_or_create_alias(absolute_path.clone());
 
     // --- Phase 1: streaming read with progress reporting -----------------
@@ -90,6 +96,44 @@ where
     let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
     let is_modified = cache.update_and_verify(&cache_key, &current_hash);
     if !is_modified {
+        // Phase III (Idea #8 — Progressive Header Elision):
+        // Low fidelity uses the compact cache-hit format.
+        if fidelity == Fidelity::Low {
+            let meta = if let Some(raw_tokens) = cache.get_raw_token_count(&current_hash) {
+                let bpe = crate::analytics::bpe();
+                let cached_notice = format!(
+                    "// [CACHE_HIT] {} unchanged. Use historic memory.\n",
+                    path_alias
+                );
+                let compressed_tokens = bpe.encode_with_special_tokens(&cached_notice).len();
+                let savings_percentage = if raw_tokens > 0 {
+                    let saved = raw_tokens.saturating_sub(compressed_tokens);
+                    (saved as f64 / raw_tokens as f64) * 100.0
+                } else {
+                    0.0
+                };
+                crate::analytics::TokenMetadata {
+                    raw_tokens,
+                    compressed_tokens,
+                    savings_percentage,
+                }
+            } else {
+                calculate_savings(&source_code, "// [CACHE_HIT]")
+            };
+            let compact = crate::compression::report::format_compact_cache_hit(
+                meta.raw_tokens,
+                meta.compressed_tokens,
+                meta.savings_percentage,
+                &path_alias,
+            );
+            on_progress(CompressionProgress {
+                progress: 1.0,
+                phase: "cache-hit".to_string(),
+                partial: Some(compact.clone()),
+            })?;
+            return Ok(compact);
+        }
+
         let cached_notice = format!(
             "// [CACHE_HIT] {} unchanged. Use historic memory.\n",
             path_alias
@@ -189,6 +233,10 @@ where
     if let Some(block) = &built.meta_block {
         body_content.push_str(&block.render());
     }
+
+    // Phase III (Idea #11 — Micro-Opcode Table for Text):
+    // Apply micro-opcodes before symbol compression.
+    body_content = apply_micro_opcodes(&body_content, fidelity);
 
     // --- Phase 4: symbol opcode compression (Low fidelity only) ----------
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);

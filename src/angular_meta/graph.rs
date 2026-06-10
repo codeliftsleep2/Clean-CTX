@@ -91,6 +91,10 @@ pub struct AngularGraphBuilder {
     classes: HashMap<String, ClassEntry>,
     /// selector → className (for component/directive selector lookup).
     selectors: HashMap<String, String>,
+    /// F-FINAL-06: Non-fatal warnings collected during
+    /// `register_class` (currently: duplicate class name).
+    /// Propagated to the `AngularGraph` by `build()`.
+    pub(crate) warnings: Vec<String>,
 }
 
 impl AngularGraphBuilder {
@@ -99,15 +103,22 @@ impl AngularGraphBuilder {
         Self {
             classes: HashMap::new(),
             selectors: HashMap::new(),
+            warnings: Vec::new(),
         }
     }
 
     /// Register a class in the graph. If the class name already exists
     /// (possible with duplicate class names in different files), the
-    /// last registration wins and a warning is logged via `eprintln!`
-    /// (F-ANG-17). Two classes with the same name in different files
-    /// usually indicates a workspace misconfiguration — callers should
-    /// rename one of the classes.
+    /// last registration wins and a warning is recorded (F-ANG-17).
+    /// Two classes with the same name in different files usually
+    /// indicates a workspace misconfiguration — callers should rename
+    /// one of the classes.
+    ///
+    /// F-FINAL-06: the warning is now collected into
+    /// `self.warnings` (a `Vec<String>`) instead of being printed to
+    /// stderr via `eprintln!`. The MCP workspace pass drains these
+    /// warnings into `WorkspaceResult.warnings` so the JSON-RPC
+    /// `_warnings` field surfaces them.
     ///
     /// This method is only available on the builder. Once the builder
     /// is consumed by [`build`](Self::build), the resulting
@@ -123,10 +134,10 @@ impl AngularGraphBuilder {
         pipe_name: Option<&str>,
     ) {
         if let Some(prev) = self.classes.get(class_name) {
-            eprintln!(
-                "[clean-ctx] WARN: AngularGraph: duplicate class name '{}' (prev alias={}, new alias={}); last-write-wins",
+            self.warnings.push(format!(
+                "AngularGraph: duplicate class name '{}' (prev alias={}, new alias={}); last-write-wins",
                 class_name, prev.file_alias, file_alias
-            );
+            ));
         }
 
         let entry = ClassEntry {
@@ -169,6 +180,11 @@ impl AngularGraphBuilder {
             classes: self.classes,
             selectors: self.selectors,
             injected_by,
+            // F-FINAL-06: propagate the builder's warnings into the
+            // resolved graph so the workspace pass can drain them
+            // into `WorkspaceResult.warnings` (and ultimately the
+            // JSON-RPC `_warnings` field).
+            warnings: self.warnings,
             // Builder-side invariant: every `AngularGraph` produced by
             // `build()` is resolved. The flag is kept (privately) so
             // query methods can assert the invariant without forcing
@@ -213,6 +229,11 @@ pub struct AngularGraph {
     /// className → set of classNames that inject this class.
     /// Built by [`AngularGraphBuilder::build`].
     injected_by: HashMap<String, BTreeSet<String>>,
+    /// F-FINAL-06: Non-fatal warnings propagated from the builder
+    /// (e.g. duplicate class names). Drained by callers via
+    /// [`take_warnings`] when surfacing via the JSON-RPC
+    /// `_warnings` field.
+    pub(crate) warnings: Vec<String>,
     /// Whether graph has been resolved. Always `true` for graphs
     /// produced by [`AngularGraphBuilder::build`] (the public
     /// construction path). Kept for `is_resolved` symmetry and to
@@ -228,6 +249,19 @@ impl AngularGraph {
     /// symmetry and for `pub(crate)` direct construction paths.
     pub fn is_resolved(&self) -> bool {
         self.resolved
+    }
+
+    /// F-FINAL-06: Drain the warnings collected during graph
+    /// construction (e.g. duplicate class names). Returns a `Vec`
+    /// that the caller embeds in the JSON-RPC `_warnings` field.
+    /// Idempotent — a second call returns an empty `Vec`.
+    pub fn take_warnings(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.warnings)
+    }
+
+    /// F-FINAL-06: Borrow the warnings (read-only).
+    pub fn warnings(&self) -> &[String] {
+        &self.warnings
     }
 
     /// Get the number of registered classes.

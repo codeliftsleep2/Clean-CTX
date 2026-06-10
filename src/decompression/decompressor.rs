@@ -142,8 +142,12 @@ impl Decompressor {
 
         for line in compressed.lines() {
             let trimmed = line.trim();
+            // F-FULL-18: Skip ALL comment lines (starting with //) before
+            // checking section starts. This prevents accidental section
+            // detection on commented-out metadata like `// §PATHMAP`.
             if trimmed.starts_with("// ---") || trimmed.starts_with("// Raw")
                 || trimmed.starts_with("// Fidelity") || trimmed.starts_with("// [CACHE")
+                || trimmed.starts_with("//")
             {
                 continue;
             }

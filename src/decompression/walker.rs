@@ -54,5 +54,9 @@ pub fn classify(line: &str) -> LineKind {
 /// skipped (PATHMAP, SYM, or any other §-prefixed footer).
 pub fn is_section_start(line: &str) -> bool {
     let trimmed = line.trim();
+    // F-FULL-18: reject lines that are commented out (e.g. // §PATHMAP).
+    if trimmed.starts_with("//") {
+        return false;
+    }
     trimmed.starts_with('§')
 }

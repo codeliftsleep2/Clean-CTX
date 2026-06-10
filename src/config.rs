@@ -174,42 +174,57 @@ impl CleanCtxConfig {
     ///    `".test."` or `"*.spec.ts"`): glob matching against the full file
     ///    name, allowing the pattern to appear anywhere within it.
     pub fn is_excluded(&self, path: &str) -> bool {
-        let path_obj = Path::new(path);
+        self.matching_exclude_patterns(path).is_some()
+    }
 
-        // Extract the file name for the substring-glob tier.
+    /// F-FINAL-04: Return the *list* of exclude patterns that matched
+    /// the given path (empty if the path is not excluded). The
+    /// `is_excluded` shim above is preserved for backward compatibility.
+    /// This richer variant is what the workspace manifest emits so the
+    /// user can see *why* a file was excluded.
+    pub fn matching_exclude_patterns(&self, path: &str) -> Option<Vec<String>> {
+        let path_obj = Path::new(path);
         let file_name = path_obj
             .file_name()
             .map(|f| f.to_string_lossy().into_owned())
             .unwrap_or_default();
 
+        let mut matched: Vec<String> = Vec::new();
         for pattern in &self.exclude_patterns {
             // Tier 1: exact-segment glob match.
+            let mut tier1_matched = false;
             for component in path_obj.components() {
                 let segment = component.as_os_str().to_string_lossy();
                 if glob_match(pattern, &segment) {
-                    return true;
+                    tier1_matched = true;
+                    break;
                 }
             }
 
-            // Tier 2: if the pattern contains a dot, it is likely a
-            // filename-oriented pattern (e.g. ".test.", "*.spec.ts").
-            // If it also contains glob chars, do glob matching against
-            // the full file name; otherwise, do substring matching so
-            // that ".test." matches "file.test.ts".
+            // Tier 2: filename-oriented pattern.
+            let mut tier2_matched = false;
             if pattern.contains('.') {
                 if (pattern.contains('*') || pattern.contains('?'))
                     && glob_match(pattern, &file_name)
                 {
-                    return true;
+                    tier2_matched = true;
                 }
                 if !pattern.contains('*') && !pattern.contains('?')
                     && file_name.contains(pattern.as_str())
                 {
-                    return true;
+                    tier2_matched = true;
                 }
             }
+
+            if tier1_matched || tier2_matched {
+                matched.push(pattern.clone());
+            }
         }
-        false
+        if matched.is_empty() {
+            None
+        } else {
+            Some(matched)
+        }
     }
 
     /// Get fidelity override for a file extension
