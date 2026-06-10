@@ -82,9 +82,16 @@ pub(crate) const SYSTEM_PROMPT: &str = concat!(
 
 /// Return the list of available prompt definitions (for `prompts/list`).
 pub(crate) fn prompt_list() -> Vec<serde_json::Value> {
-    vec![serde_json::json!({
-        "name": "cleanctx-notation",
-        "description": "System instructions for reading and writing Clean-CTX compressed notation",
-        "arguments": []
-    })]
+    vec![
+        serde_json::json!({
+            "name": "cleanctx-notation",
+            "description": "System instructions for reading and writing Clean-CTX compressed notation",
+            "arguments": []
+        }),
+        serde_json::json!({
+            "name": "dashboard",
+            "description": "View the Clean-CTX token savings dashboard. Shows session stats, per-file breakdown, and compression efficiency metrics.",
+            "arguments": []
+        }),
+    ]
 }

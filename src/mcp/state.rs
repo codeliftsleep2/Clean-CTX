@@ -25,6 +25,8 @@ use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
 use crate::compression::text_delta::TextDeltaComputer;
 use crate::ir::replay::ContextState;
+use crate::mcp::context_store::InMemoryContextStore;
+use crate::mcp::session_stats::SessionStats;
 
 /// Per-session state shared by all MCP tool handlers.
 pub struct McpState {
@@ -60,6 +62,11 @@ pub struct McpState {
     /// (e.g. duplicate class name in the Angular graph) now push
     /// here. Drained by tool handlers before each response.
     pub warnings: Vec<String>,
+    /// Session-level stats accumulator for the dashboard.
+    /// Every `provide_code_context` call records token savings here.
+    pub session_stats: SessionStats,
+    /// In-memory context store for persistence-ready baselines.
+    pub context_store: InMemoryContextStore,
 }
 
 impl McpState {
@@ -76,6 +83,8 @@ impl McpState {
             source_cache: HashMap::new(),
             // F-FINAL-06: empty warning buffer at session start.
             warnings: Vec::new(),
+            session_stats: SessionStats::new(),
+            context_store: InMemoryContextStore::new(),
         }
     }
 
