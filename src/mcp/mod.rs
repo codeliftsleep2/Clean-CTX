@@ -12,9 +12,12 @@
 //   - state      : per-session state shared by all tool handlers (F-05)
 
 mod handlers;
+pub(crate) mod context_store;
+pub(crate) mod heuristics;
 pub(crate) mod prompts;
 mod router;
 mod server;
+pub(crate) mod session_stats;
 pub(crate) mod state;
 pub(crate) mod tools;
 pub(crate) mod workspace;
