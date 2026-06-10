@@ -60,7 +60,7 @@ impl TextDelta {
             out.push('\n');
             out.push('~');
             out.push_str(old);
-            out.push_str("→");
+            out.push('→');
             out.push_str(new);
         }
         out

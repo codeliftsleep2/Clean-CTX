@@ -60,7 +60,7 @@ fn test_string_table_from_instructions() {
     let instructions = sample_instructions();
     let table = StringTable::from_instructions(&instructions);
     // Should contain "C1", "SampleService", "M1", "$s", etc.
-    assert!(table.len() > 0);
+    assert!(!table.is_empty());
     // Verify strings exist via lookup - use the inverse: find indices of expected strings
     let strings: Vec<&str> = table.strings().iter().map(|s| s.as_str()).collect();
     assert!(strings.contains(&"C1"));

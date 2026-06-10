@@ -361,11 +361,11 @@ fn compress_pass_with_global_symbols(
 ///
 /// This function returns everything after the header (after the `// αN` line).
 fn extract_body_from_compressed(compressed: &str) -> String {
-    let mut lines = compressed.lines();
+    let lines = compressed.lines();
     let mut header_ended = false;
     let mut body = String::new();
 
-    while let Some(line) = lines.next() {
+    for line in lines {
         if header_ended {
             if !body.is_empty() {
                 body.push('\n');
