@@ -23,6 +23,7 @@ fn test_first_call_full_compress() {
         &text_delta,
         &ir_ctx,
         empty_source(),
+        None,
     );
     assert_eq!(decision.strategy, heuristics::ContextStrategy::FullCompress);
 }
@@ -44,6 +45,7 @@ fn test_delta_after_baseline() {
         &text_delta,
         &ir_ctx,
         empty_source(),
+        Some("α1"),
     );
     assert_eq!(decision.strategy, heuristics::ContextStrategy::DeltaTransport);
 }
@@ -61,6 +63,7 @@ fn test_intent_refactor_high_fidelity() {
         &text_delta,
         &ir_ctx,
         empty_source(),
+        None,
     );
     assert_eq!(decision.fidelity, Fidelity::High);
 }
@@ -78,6 +81,7 @@ fn test_intent_overview_low_fidelity() {
         &text_delta,
         &ir_ctx,
         empty_source(),
+        None,
     );
     assert_eq!(decision.fidelity, Fidelity::Low);
 }
@@ -97,6 +101,7 @@ fn test_large_file_low_fidelity() {
         &text_delta,
         &ir_ctx,
         &large_source,
+        None,
     );
     assert_eq!(decision.fidelity, Fidelity::Low);
 }
@@ -119,6 +124,7 @@ fn test_angular_detection() {
         &text_delta,
         &ir_ctx,
         angular_source,
+        None,
     );
     assert!(decision.is_angular);
 }
@@ -136,6 +142,7 @@ fn test_non_angular_not_detected() {
         &text_delta,
         &ir_ctx,
         "export class PlainClass {}",
+        None,
     );
     assert!(!decision.is_angular);
 }
@@ -153,6 +160,7 @@ fn test_decision_summary_includes_details() {
         &text_delta,
         &ir_ctx,
         empty_source(),
+        None,
     );
     let summary = decision.summary();
     assert!(summary.contains("fidelity="));

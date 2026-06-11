@@ -54,6 +54,11 @@ pub(crate) const MODIFIERS_CLASS: &[&str] = &[
     "final ",
 ];
 
+/// Modifiers stripped from Rust struct/trait/enum declarations.
+pub(crate) const MODIFIERS_STRUCT_RS: &[&str] = &[
+    "pub ", "pub(crate) ", "pub(super) ",
+];
+
 /// Repeatedly strip any of `modifiers` from the start of `s`, trimming
 /// whitespace between prefixes. Loops until a pass removes nothing,
 /// so an input like `"public static abstract class Foo"` produces

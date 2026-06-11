@@ -19,7 +19,8 @@ const MAX_FILE_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
 use crate::cache::LocalStateCache;
 use crate::compaction::{
     compact_expression, compact_import, extract_class_name, extract_field,
-    extract_method_sig, format_class_entry, simple_compact,
+    extract_method_sig, extract_rust_struct_name, format_class_entry,
+    format_rust_type_entry, simple_compact,
 };
 use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::language::language_for_extension;
@@ -65,18 +66,41 @@ pub fn compress_file(
     cache: &mut LocalStateCache,
     fidelity: Fidelity,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    // F-18: guard against reading an unbounded file into memory.
-    let meta = fs::metadata(&file)?;
-    if meta.len() > MAX_FILE_BYTES {
-        return Err(format!(
-            "File too large ({} bytes; max {} bytes). \
-             Use compress_workspace or the streaming variant for large files.",
-            meta.len(),
-            MAX_FILE_BYTES,
-        )
-        .into());
+    compress_file_with_source(file, None, dict, cache, fidelity)
+}
+
+/// Like [`compress_file`], but accepts an optional pre-read source string
+/// to avoid redundant disk reads. When `source_override` is `Some`, the
+/// file-size check and `fs::read_to_string` are skipped.
+///
+/// Finding F (Token Efficiency Audit): callers that already have the
+/// source content (e.g. via `state.read_source()`) can pass it here,
+/// eliminating the double-read when `compile_file_ir` or other
+/// downstream functions also need the source.
+pub fn compress_file_with_source(
+    file: PathBuf,
+    source_override: Option<&str>,
+    dict: &mut PathDictionary,
+    cache: &mut LocalStateCache,
+    fidelity: Fidelity,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let source_code;
+    if let Some(src) = source_override {
+        source_code = src.to_string();
+    } else {
+        // F-18: guard against reading an unbounded file into memory.
+        let meta = fs::metadata(&file)?;
+        if meta.len() > MAX_FILE_BYTES {
+            return Err(format!(
+                "File too large ({} bytes; max {} bytes). \
+                 Use compress_workspace or the streaming variant for large files.",
+                meta.len(),
+                MAX_FILE_BYTES,
+            )
+            .into());
+        }
+        source_code = fs::read_to_string(&file)?;
     }
-    let source_code = fs::read_to_string(&file)?;
     let source_bytes = source_code.as_bytes();
 
     let current_hash = cache.compute_hash(source_bytes);
@@ -175,14 +199,19 @@ pub fn compress_file(
         &source_code,
         fidelity,
         |capture_name, raw, f| {
-            if capture_name == "class.root" {
-                Some(extract_class_name(raw))
-            } else if capture_name == "method.root" {
-                Some(extract_method_sig(raw, f))
-            } else if capture_name == "field.root" {
-                Some(extract_field(raw, f))
-            } else {
-                Some(compact_expression(raw, f))
+            match capture_name {
+                "class.root" => Some(extract_class_name(raw)),
+                // Rust type declarations: struct, enum, trait, impl
+                "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+                    Some(extract_rust_struct_name(raw))
+                }
+                "method.root" => Some(extract_method_sig(raw, f)),
+                "field.root" => Some(extract_field(raw, f)),
+                // Rust mod declarations are structural like imports
+                "mod.root" => Some(compact_import(raw, f)),
+                // Rust type aliases
+                "type.root" => Some(compact_expression(raw, f)),
+                _ => Some(compact_expression(raw, f)),
             }
         },
     )?;
@@ -245,7 +274,7 @@ pub fn build_output_lines(
 
     for cap in all_captures {
         match cap.name.as_str() {
-            "import.root" => {
+            "import.root" | "mod.root" => {
                 let compact = compact_import(&cap.text, fidelity);
                 if !compact.is_empty() {
                     imports.push(compact);
@@ -257,6 +286,18 @@ pub fn build_output_lines(
                     output_lines.push(String::new());
                 }
                 output_lines.push(format_class_entry(&cap.text, &fields, fidelity));
+                class_captures.push(cap.text.clone());
+                class_count += 1;
+                fields.clear();
+                markers.clear();
+            }
+            // Rust type declarations: struct, enum, trait, impl
+            // Use Rust-specific formatting (no "class" prefix)
+            "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium) {
+                    output_lines.push(String::new());
+                }
+                output_lines.push(format_rust_type_entry(&cap.text, &fields, fidelity));
                 class_captures.push(cap.text.clone());
                 class_count += 1;
                 fields.clear();
@@ -432,14 +473,19 @@ pub fn compress_source(
         source_code,
         fidelity,
         |capture_name, raw, f| {
-            if capture_name == "class.root" {
-                Some(crate::compaction::extract_class_name(raw))
-            } else if capture_name == "method.root" {
-                Some(crate::compaction::extract_method_sig(raw, f))
-            } else if capture_name == "field.root" {
-                Some(crate::compaction::extract_field(raw, f))
-            } else {
-                Some(crate::compaction::compact_expression(raw, f))
+            match capture_name {
+                "class.root" => Some(crate::compaction::extract_class_name(raw)),
+                // Rust type declarations: struct, enum, trait, impl
+                "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+                    Some(crate::compaction::extract_rust_struct_name(raw))
+                }
+                "method.root" => Some(crate::compaction::extract_method_sig(raw, f)),
+                "field.root" => Some(crate::compaction::extract_field(raw, f)),
+                // Rust mod declarations are structural like imports
+                "mod.root" => Some(crate::compaction::compact_import(raw, f)),
+                // Rust type aliases
+                "type.root" => Some(crate::compaction::compact_expression(raw, f)),
+                _ => Some(crate::compaction::compact_expression(raw, f)),
             }
         },
     )?;

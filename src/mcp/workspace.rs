@@ -27,7 +27,6 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use crate::compressor::compress_file;
 use crate::compression::Fidelity;
 use crate::compression::pipeline::compress_source;
 use crate::compression::workspace_symbols::build_global_symbol_table;
@@ -184,6 +183,8 @@ fn compress_pass(
     ctx: &mut PassContext,
     manifest: &mut String,
 ) {
+    use crate::compression::pipeline::compress_file_with_source;
+
     let compressible: Vec<String> = ctx
         .kept
         .iter()
@@ -196,15 +197,21 @@ fn compress_pass(
         .cloned()
         .collect();
 
-    let McpState { dict, cache, .. } = state;
-
     for entry in &compressible {
-        match compress_file(PathBuf::from(entry), dict, cache, fidelity) {
+        // Pre-read via source_cache so bundle_pass/graph_pass
+        // get cache hits instead of re-reading from disk.
+        let source_arc = state.read_source(entry).ok();
+        let source_ref = source_arc.as_ref().map(|s| s.as_str());
+
+        match compress_file_with_source(
+            PathBuf::from(&entry),
+            source_ref,
+            &mut state.dict,
+            &mut state.cache,
+            fidelity,
+        ) {
             Ok(compressed) => {
-                // F-FULL-10: Always use the raw path as the alias key so the
-                // alias is deterministic even if canonicalize fails on some
-                // files but succeeds on others (e.g., permission issues).
-                let alias = dict.get_or_create_alias(entry.clone());
+                let alias = state.dict.get_or_create_alias(entry.clone());
                 manifest.push_str(&format!(
                     "// ===== FILE: {} =====\n// α alias: {}\n",
                     entry, alias
@@ -256,45 +263,41 @@ fn compress_pass_with_global_symbols(
 
     let mut entries: Vec<CompressedEntry> = Vec::new();
 
-    {
-        let McpState { dict, cache, .. } = state;
+    for entry in &compressible {
+        // Read the source code via source_cache (Finding 1 / workspace.rs).
+        let source_code = match state.read_source(entry) {
+            Ok(arc) => (*arc).clone(),
+            Err(e) => {
+                ctx.errors.push((entry.clone(), e.to_string()));
+                manifest.push_str(&format!(
+                    "// ERROR reading {}: {}\n\n",
+                    entry, e
+                ));
+                continue;
+            }
+        };
 
-        for entry in &compressible {
-            // Read the source code.
-            let source_code = match std::fs::read_to_string(entry) {
-                Ok(s) => s,
-                Err(e) => {
-                    ctx.errors.push((entry.clone(), e.to_string()));
-                    manifest.push_str(&format!(
-                        "// ERROR reading {}: {}\n\n",
-                        entry, e
-                    ));
-                    continue;
-                }
-            };
-
-            // Compress without per-file symbol compression.
-            match compress_source(&source_code, entry, dict, cache, fidelity) {
-                Ok(compressed) => {
-                    let alias = dict.get_or_create_alias(entry.clone());
-                    // Extract the body from the compressed output.
-                    // The compressed output has the report header + body.
-                    // We need the body for global symbol encoding.
-                    let body = extract_body_from_compressed(&compressed);
-                    entries.push(CompressedEntry {
-                        path: entry.clone(),
-                        alias,
-                        compressed,
-                        body,
-                    });
-                }
-                Err(e) => {
-                    ctx.errors.push((entry.clone(), e.to_string()));
-                    manifest.push_str(&format!(
-                        "// ERROR compressing {}: {}\n\n",
-                        entry, e
-                    ));
-                }
+        // Compress without per-file symbol compression.
+        match compress_source(&source_code, entry, &mut state.dict, &mut state.cache, fidelity) {
+            Ok(compressed) => {
+                let alias = state.dict.get_or_create_alias(entry.clone());
+                // Extract the body from the compressed output.
+                // The compressed output has the report header + body.
+                // We need the body for global symbol encoding.
+                let body = extract_body_from_compressed(&compressed);
+                entries.push(CompressedEntry {
+                    path: entry.clone(),
+                    alias,
+                    compressed,
+                    body,
+                });
+            }
+            Err(e) => {
+                ctx.errors.push((entry.clone(), e.to_string()));
+                manifest.push_str(&format!(
+                    "// ERROR compressing {}: {}\n\n",
+                    entry, e
+                ));
             }
         }
     }

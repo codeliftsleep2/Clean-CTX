@@ -1,8 +1,9 @@
 // src/compaction/class.rs
 //
 // Class-level extraction and formatting helpers.
+// Extended to support Rust structs, enums, and traits.
 
-use crate::compaction::modifiers::{strip_modifiers, MODIFIERS_CLASS};
+use crate::compaction::modifiers::{strip_modifiers, MODIFIERS_CLASS, MODIFIERS_STRUCT_RS};
 use crate::compression::Fidelity;
 
 /// Extract just the class name (and optional base/interface list) from the
@@ -120,6 +121,187 @@ fn extract_base_types(decl: &str, keyword: &str) -> Vec<String> {
         })
         .filter(|s| !s.is_empty())
         .collect()
+}
+
+/// Extract name from a Rust struct, enum, trait, or impl declaration.
+///
+/// Input examples:
+///   "pub struct MyStruct<T> where T: Clone { ... }"
+///   "enum Status { ... }"
+///   "trait Repository { ... }"
+///   "pub(crate) struct Service { ... }"
+///   "impl MyStruct { ... }"
+///   "impl Display for MyStruct { ... }"
+///   "impl<T> Repository<T> for PostgresRepo { ... }"
+///
+/// Output examples:
+///   "MyStruct", "Status", "Repository", "MyStruct", "MyStruct:Display"
+///   "PostgresRepo:Repository<T>" (Phase E: preserves trait generics)
+pub fn extract_rust_struct_name(text: &str) -> String {
+    // Take only the declaration line (everything before the first `{`)
+    let decl = text.lines().next().unwrap_or(text);
+    let decl = decl.split('{').next().unwrap_or(decl).trim();
+
+    // Strip leading modifiers: pub, pub(crate), pub(super)
+    let rest = strip_modifiers(decl, MODIFIERS_STRUCT_RS);
+
+    // Trim where clause if present — captures the segment before `where`
+    let (rest, _where_clause) = if let Some(where_pos) = rest.find(" where ") {
+        (&rest[..where_pos], Some(rest[where_pos + 7..].trim()))
+    } else {
+        (rest.as_str(), None)
+    };
+
+    // Check if this is an impl block — extract meaningful name
+    if let Some(impl_rest) = rest.strip_prefix("impl") {
+        let impl_rest = impl_rest.trim();
+        // "impl Trait for Type" → "Type:Trait"
+        // "impl<T> Trait<T> for Type" → "Type:Trait<T>"
+        if let Some(for_pos) = impl_rest.find(" for ") {
+            let trait_part = impl_rest[..for_pos].trim();
+            let type_part = impl_rest[for_pos + 5..].trim();
+
+            // Phase E: extract names preserving generics
+            let type_name = extract_name_with_generics(type_part);
+            let trait_name = extract_trait_name_from_impl(trait_part);
+
+            if !type_name.is_empty() && !trait_name.is_empty() {
+                return format!("{}:{}", type_name, trait_name);
+            }
+        }
+        // Inherent impl "impl Type" → just the type name (with generics)
+        return extract_name_with_generics(impl_rest);
+    }
+
+    // Strip struct/enum/trait keyword
+    let rest = rest
+        .strip_prefix("struct ")
+        .or_else(|| rest.strip_prefix("enum "))
+        .or_else(|| rest.strip_prefix("trait "))
+        .unwrap_or(rest)
+        .trim();
+
+    // Extract name (up to whitespace, keeping generics intact)
+    let name = rest.split_whitespace().next().unwrap_or(rest);
+    let name = name.trim_end_matches(['{', '}', ':']);
+
+    name.to_string()
+}
+
+/// Extract a name with its generic parameters from a type string.
+///
+/// Takes the first whitespace-delimited token and preserves its `<...>` generics.
+/// For example: "PostgresRepo" → "PostgresRepo", "Vec<T>" → "Vec<T>"
+/// Also handles leading generic parameters like "<T> Cache<T>" → "Cache<T>"
+fn extract_name_with_generics(text: &str) -> String {
+    let text = text.trim();
+    // Skip past any leading generic parameters <...>
+    let text = if text.starts_with('<') {
+        let mut depth = 0i32;
+        let mut past_generics = text;
+        for (i, ch) in text.char_indices() {
+            match ch {
+                '<' => depth += 1,
+                '>' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        past_generics = text[i + 1..].trim();
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        past_generics
+    } else {
+        text
+    };
+    let name = text.split_whitespace().next().unwrap_or(text);
+    name.trim_end_matches(['{', '}', ':']).to_string()
+}
+
+/// Extract the trait name (with its own generics) from an impl block's trait part.
+///
+/// The trait part may be:
+///   - "Repository<T>" → "Repository<T>"
+///   - "impl<T> Repository<T>" → "Repository<T>"
+///   - "Display" → "Display"
+///
+/// We skip the impl-level generic parameters `<T>` (which come after "impl")
+/// and extract the trait name + its own generics.
+fn extract_trait_name_from_impl(trait_part: &str) -> String {
+    // Skip past "impl" keyword and any impl-level generics
+    let after_impl = trait_part.strip_prefix("impl").unwrap_or(trait_part).trim();
+
+    // Skip past any impl-level generic parameters <...>
+    let mut depth = 0i32;
+    let mut past_generics = after_impl;
+    for (i, ch) in after_impl.char_indices() {
+        match ch {
+            '<' => depth += 1,
+            '>' => {
+                depth -= 1;
+                if depth == 0 {
+                    past_generics = after_impl[i + 1..].trim();
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // If depth > 0, we never closed all generics — just use the whole thing
+    if depth > 0 {
+        past_generics = after_impl;
+    }
+
+    // Extract the trait name (preserving its own generics)
+    // "Repository<T>" → "Repository<T>" (split_whitespace gives the whole token)
+    let trait_name = past_generics
+        .split_whitespace()
+        .next()
+        .unwrap_or(past_generics)
+        .trim()
+        .trim_end_matches(['{', '}', ':']);
+
+    trait_name.to_string()
+}
+
+/// Format a Rust type entry line, embedding any accumulated field signatures.
+/// Unlike `format_class_entry`, this does NOT prepend "class".
+///
+/// Low:    "MyStruct{field1;field2}"
+/// Medium: "MyStruct { field1; field2 }"
+/// High:   "MyStruct {\n  field1\n  field2\n}"
+pub fn format_rust_type_entry(name: &str, fields: &[String], fidelity: Fidelity) -> String {
+    match fidelity {
+        Fidelity::Low => {
+            if fields.is_empty() {
+                name.to_string()
+            } else {
+                format!("{}{{{}}}", name, fields.join(";"))
+            }
+        }
+        Fidelity::Medium => {
+            if fields.is_empty() {
+                format!("{} {{", name)
+            } else {
+                format!("{} {{ {} }}", name, fields.join("; "))
+            }
+        }
+        Fidelity::High => {
+            if fields.is_empty() {
+                format!("{} {{", name)
+            } else {
+                let field_lines = fields
+                    .iter()
+                    .map(|f| format!("  {}", f))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                format!("{} {{\n{}", name, field_lines)
+            }
+        }
+    }
 }
 
 #[cfg(test)]

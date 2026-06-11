@@ -17,7 +17,7 @@
 //   - F-31: `id_counter` is `u64` (not `u32`) to avoid arithmetic overflow
 //           after 4,294,967,295 instructions.
 
-use crate::compaction::{extract_class_name, extract_field, extract_method_sig};
+use crate::compaction::{extract_class_name, extract_field, extract_method_sig, extract_rust_struct_name};
 use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::Fidelity;
 use super::layers::{LanguageLayer, LayerContext, MetaLayer, PatternRecognizer};
@@ -155,6 +155,10 @@ impl IRCompiler {
                 // and fields are properly formatted.
                 match capture_name {
                     "class.root" => Some(extract_class_name(raw)),
+                    // Rust type declarations: extract clean names
+                    "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+                        Some(extract_rust_struct_name(raw))
+                    }
                     "method.root" => Some(extract_method_sig(raw, fidelity)),
                     "field.root" => Some(extract_field(raw, fidelity)),
                     _ => Some(raw.to_string()),
@@ -199,6 +203,78 @@ impl IRCompiler {
                     // Invoke language layers for class captures.
                     // Pass raw_text so layers can parse extends/implements
                     // from the full class head declaration.
+                    for ll in self.language_layers.iter_mut() {
+                        let layer_ops = ll.process_capture(
+                            &cap.name,
+                            &cap.raw_text,
+                            &mut layer_context,
+                        );
+                        instructions.extend(layer_ops);
+                    }
+                }
+                // Rust type declarations: struct, enum, trait
+                // These are treated as class definitions in the IR.
+                "struct.root" | "enum.root" | "trait.root" => {
+                    let class_id = self.next_id("C");
+                    instructions.push(CoreOp::DefClass(
+                        class_id.clone(),
+                        cap.text.clone(),
+                    ));
+                    self.current_class = Some(class_id.clone());
+                    layer_context.current_class = Some(class_id.clone());
+                    layer_context.current_class_name = Some(cap.raw_text.clone());
+                    layer_context.current_class_bare_name = Some(cap.text.clone());
+
+                    layer_context.symbol_table_mut().register(
+                        class_id.clone(),
+                        cap.text.clone(),
+                        SymbolKind::Class,
+                        file_id,
+                    );
+
+                    // Invoke language layers for Rust type captures.
+                    for ll in self.language_layers.iter_mut() {
+                        let layer_ops = ll.process_capture(
+                            &cap.name,
+                            &cap.raw_text,
+                            &mut layer_context,
+                        );
+                        instructions.extend(layer_ops);
+                    }
+                }
+                // Rust impl blocks: emit trait impls with a class context.
+                // If no current class exists (standalone impl block without
+                // a preceding struct/enum/trait), emit a DefClass for the
+                // self-type so methods inside the impl are not silently lost.
+                // This mirrors the text pipeline's behavior where impl.root
+                // creates a structural entry via format_rust_type_entry.
+                //
+                // Phase C: The extracted cap.text for impl.root has the form
+                // "Type:Trait" (trait impl) or "Type" (inherent impl) after
+                // extract_rust_struct_name processing. We use only the type
+                // part (before ':') for the class name.
+                "impl.root" => {
+                    if self.current_class.is_none() {
+                        // Extract the self-type name from the impl head.
+                        // cap.text is already processed through extract_rust_struct_name:
+                        //   "impl Trait for Type" → "Type:Trait"
+                        //   "impl Type" → "Type"
+                        let self_type = cap.text.split(':').next()
+                            .unwrap_or(&cap.text)
+                            .to_string();
+                        if !self_type.is_empty() {
+                            let class_id = self.next_id("C");
+                            instructions.push(CoreOp::DefClass(
+                                class_id.clone(),
+                                self_type.clone(),
+                            ));
+                            self.current_class = Some(class_id.clone());
+                            layer_context.current_class = Some(class_id);
+                            layer_context.current_class_name = Some(cap.raw_text.clone());
+                            layer_context.current_class_bare_name = Some(self_type);
+                        }
+                    }
+
                     for ll in self.language_layers.iter_mut() {
                         let layer_ops = ll.process_capture(
                             &cap.name,
@@ -273,6 +349,37 @@ impl IRCompiler {
                     self.emit_import_ir(&mut instructions, &cap.text);
 
                     // Invoke language layers for import captures
+                    for ll in self.language_layers.iter_mut() {
+                        let layer_ops = ll.process_capture(
+                            &cap.name,
+                            &cap.text,
+                            &mut layer_context,
+                        );
+                        instructions.extend(layer_ops);
+                    }
+                }
+                // Rust type aliases: type Foo = Bar; → TypeAlias
+                "type.root" => {
+                    let alias_id = self.next_id("T");
+                    // The extracted text is the alias name (e.g., "UserId")
+                    instructions.push(CoreOp::TypeAlias(
+                        alias_id,
+                        cap.text.clone(),
+                    ));
+
+                    // Invoke language layers for type alias captures
+                    for ll in self.language_layers.iter_mut() {
+                        let layer_ops = ll.process_capture(
+                            &cap.name,
+                            &cap.text,
+                            &mut layer_context,
+                        );
+                        instructions.extend(layer_ops);
+                    }
+                }
+                // Rust mod declarations: treated as structural imports
+                "mod.root" => {
+                    // Invoke language layers for mod captures
                     for ll in self.language_layers.iter_mut() {
                         let layer_ops = ll.process_capture(
                             &cap.name,
@@ -626,4 +733,3 @@ fn resolve_forward_aliases(instructions: &mut [CoreOp]) {
 #[cfg(test)]
 #[path = "../tests/ir/compiler.rs"]
 mod tests;
-           

@@ -42,3 +42,28 @@ pub const CS_QUERY: &str = r#"
     (return_statement) @return.root
     (using_directive) @import.root
 "#;
+
+// Rust AST node types: struct_item, enum_item, trait_item, impl_item,
+//   function_item, type_item, field_declaration, use_declaration,
+//   return_expression, if_expression, for_expression, while_expression,
+//   match_expression, macro_invocation, mod_item
+pub const RS_QUERY: &str = r#"
+    ; Core structural captures
+    (struct_item) @struct.root
+    (enum_item) @enum.root
+    (trait_item) @trait.root
+    (impl_item) @impl.root
+    (function_item) @method.root
+    (type_item) @type.root
+    (field_declaration) @field.root
+    (use_declaration) @import.root
+    (mod_item) @mod.root
+    ; Control flow captures
+    (return_expression) @return.root
+    (if_expression) @if.root
+    (for_expression) @for.root
+    (while_expression) @while.root
+    (match_expression) @match.root
+    ; Macro captures
+    (macro_invocation) @macro.root
+"#;

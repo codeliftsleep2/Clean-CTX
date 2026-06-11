@@ -21,6 +21,7 @@
 use std::path::PathBuf;
 use serde_json::Value;
 use crate::compressor::{compress_file, Fidelity};
+use crate::compression::pipeline::compress_file_with_source;
 use crate::decompression::Decompressor;
 use crate::diff::{build_snapshot, diff_snapshots, format_diff, diff_summary};
 use crate::ir::wire::ir_to_wire;
@@ -41,7 +42,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Absolute path to .ts or .cs file." },
+                    "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
                     "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%). Default: 'low'." },
                     "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." }
                 },
@@ -61,7 +62,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "compress_workspace",
-            "description": "Compresses all TypeScript/C# files in a directory tree. Outputs a manifest of compressed file signatures with shared opcode dictionary.",
+            "description": "Compresses all TypeScript, C#, and Rust files in a directory tree. Outputs a manifest of compressed file signatures with shared opcode dictionary.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -77,7 +78,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Absolute path to .ts or .cs file." },
+                    "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
                     "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
                 },
                 "required": ["filePath"]
@@ -89,8 +90,9 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Absolute path to .ts or .cs file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
+                    "filePath": { "type": "string", "description": "Path to the source file." },
+                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." },
+                    "workspaceRoot": { "type": "string", "description": "Optional workspace root for relative paths." }
                 },
                 "required": ["filePath"]
             }
@@ -101,7 +103,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Absolute path to .ts or .cs file." },
+                    "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
                     "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
                 },
                 "required": ["filePath"]
@@ -478,8 +480,14 @@ fn handle_compress_code_context(
         resolve_fidelity(explicit, ext, &state.config)
     };
 
-    match compress_file(
+    // Finding F: Pre-read source into source_cache so compile_file_ir
+    // gets a cache hit instead of a redundant disk read.
+    let source_arc = state.read_source(file_path_str).ok();
+    let source_ref = source_arc.as_ref().map(|s| s.as_str());
+
+    match compress_file_with_source(
         PathBuf::from(file_path_str),
+        source_ref,
         &mut state.dict,
         &mut state.cache,
         effective_fidelity,
@@ -557,8 +565,11 @@ fn handle_diff_code_context(
         Err(()) => return,
     };
 
+    // Resolve path for consistency with other handlers
+    let resolved_path = resolve_file_path(file_path_str, None);
+
     // F-05: same exclusion check as `compress_code_context`.
-    if state.config.is_excluded(file_path_str) {
+    if state.config.is_excluded(&resolved_path) {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -571,7 +582,7 @@ fn handle_diff_code_context(
     }
 
     match diff_code_context_handler(
-        PathBuf::from(file_path_str),
+        PathBuf::from(&resolved_path),
         &mut state.cache,
         fidelity,
     ) {
@@ -602,13 +613,26 @@ fn handle_delta_code_context(
     state: &mut McpState,
 ) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let workspace_root = params["arguments"]["workspaceRoot"].as_str();
     let fidelity = match parse_fidelity_arg(id, params) {
         Ok(f) => f,
         Err(()) => return,
     };
 
-    // Check exclusion
-    if state.config.is_excluded(file_path_str) {
+    if file_path_str.is_empty() {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": { "code": -32602, "message": "Missing required parameter: filePath" }
+        }));
+        return;
+    }
+
+    // Resolve absolute path (using workspaceRoot if provided)
+    let resolved_path = resolve_file_path(file_path_str, workspace_root);
+
+    // Check exclusion against resolved path
+    if state.config.is_excluded(&resolved_path) {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -620,8 +644,8 @@ fn handle_delta_code_context(
         return;
     }
 
-    // Compile current IR
-    let current_ir = match compile_file_ir(file_path_str, fidelity, state) {
+    // Compile current IR using resolved path for consistency
+    let current_ir = match compile_file_ir(&resolved_path, fidelity, state) {
         Ok(ir) => ir,
         Err(e) => {
             send_response(&serde_json::json!({
@@ -719,8 +743,11 @@ fn handle_delta_text_context(
         Err(()) => return,
     };
 
-    // Check exclusion
-    if state.config.is_excluded(file_path_str) {
+    // Resolve path for consistency with other handlers
+    let resolved_path = resolve_file_path(file_path_str, None);
+
+    // Check exclusion against resolved path
+    if state.config.is_excluded(&resolved_path) {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -733,10 +760,10 @@ fn handle_delta_text_context(
     }
 
     // Compress the file to get current compressed body lines
-    let path_alias = state.dict.get_or_create_alias(file_path_str.to_string());
+    let path_alias = state.dict.get_or_create_alias(resolved_path.clone());
 
     // Run the full compression pipeline to get the body lines
-    let result = compress_text_body(file_path_str, fidelity, state);
+    let result = compress_text_body(&resolved_path, fidelity, state);
     let (body_lines, full_output) = match result {
         Ok(r) => r,
         Err(e) => {
@@ -806,13 +833,15 @@ fn compress_text_body(
     use crate::compression::micro_opcodes::apply_micro_opcodes;
     use crate::compression::symbol_compression::apply_symbol_compression;
     use crate::compaction::{
-        compact_expression, extract_class_name, extract_field,
-        extract_method_sig,
+        compact_expression, compact_import, extract_class_name, extract_field,
+        extract_method_sig, extract_rust_struct_name,
     };
     use crate::compression::capture_pipeline::run_capture_pipeline;
     use crate::compression::language::language_for_extension;
 
-    let source_code = std::fs::read_to_string(file_path)?;
+    // Use source_cache via state.read_source() — Finding 1
+    let source_code_arc = state.read_source(file_path)?;
+    let source_code = source_code_arc.as_ref().clone();
     let path_buf = std::path::PathBuf::from(file_path);
     let extension = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
     let (language, query_string) = language_for_extension(extension)
@@ -824,14 +853,19 @@ fn compress_text_body(
         &source_code,
         fidelity,
         |capture_name, raw, f| {
-            if capture_name == "class.root" {
-                Some(extract_class_name(raw))
-            } else if capture_name == "method.root" {
-                Some(extract_method_sig(raw, f))
-            } else if capture_name == "field.root" {
-                Some(extract_field(raw, f))
-            } else {
-                Some(compact_expression(raw, f))
+            match capture_name {
+                "class.root" => Some(extract_class_name(raw)),
+                // Rust type declarations: struct, enum, trait, impl
+                "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+                    Some(extract_rust_struct_name(raw))
+                }
+                "method.root" => Some(extract_method_sig(raw, f)),
+                "field.root" => Some(extract_field(raw, f)),
+                // Rust mod declarations are structural like imports
+                "mod.root" => Some(compact_import(raw, f)),
+                // Rust type aliases
+                "type.root" => Some(compact_expression(raw, f)),
+                _ => Some(compact_expression(raw, f)),
             }
         },
     )?;
@@ -987,9 +1021,9 @@ fn handle_provide_code_context(
         return;
     }
 
-    // Read source for heuristics
-    let source = match std::fs::read_to_string(&resolved_path) {
-        Ok(s) => s,
+    // Read source for heuristics (uses source_cache)
+    let source = match state.read_source(&resolved_path) {
+        Ok(s) => s.as_ref().clone(),
         Err(e) => {
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0",
@@ -1000,6 +1034,10 @@ fn handle_provide_code_context(
         }
     };
 
+    // Get path alias for delta tracking (must be before heuristics
+    // so delta baselines stored under the alias key can be found)
+    let path_alias = state.dict.get_or_create_alias(resolved_path.clone());
+
     // Run heuristics engine
     let decision = crate::mcp::heuristics::decide(
         &resolved_path,
@@ -1009,10 +1047,8 @@ fn handle_provide_code_context(
         &state.text_delta,
         &state.ir_context,
         &source,
+        Some(&path_alias),
     );
-
-    // Get path alias for delta tracking
-    let path_alias = state.dict.get_or_create_alias(resolved_path.clone());
 
     // Execute based on strategy
     match decision.strategy {
@@ -1093,6 +1129,20 @@ fn handle_provide_code_context(
         }
         crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
             // Delta transport: delegate to delta_text_context logic
+
+            // Finding 4: Hash source *before* any mutable state borrows,
+            // so persistence can use the hash without borrow conflicts.
+            use sha2::Digest;
+            let source_hash_hex = format!("{:x}", sha2::Sha256::digest(source.as_bytes()));
+
+            // Finding 2: Compile IR once, reuse for both context tracking and
+            // persistence — eliminates the redundant second compile_file_ir call
+            // that previously existed in the persistence block.
+            let compiled_ir = compile_file_ir(&resolved_path, decision.fidelity, state);
+            if let Ok(ref ir) = compiled_ir {
+                state.ir_context.load_ir(ir.clone());
+            }
+
             let body_lines_result = compress_text_body(&resolved_path, decision.fidelity, state);
             let (body_lines, full_output) = match body_lines_result {
                 Ok(r) => r,
@@ -1108,32 +1158,24 @@ fn handle_provide_code_context(
 
             let delta = state.text_delta.compute_and_store(&path_alias, body_lines);
 
-            // Also compile IR for delta tracking
-            if let Ok(ir) = compile_file_ir(&resolved_path, decision.fidelity, state) {
-                state.ir_context.load_ir(ir.clone());
-            }
-
             let (output_text, is_delta) = match &delta {
                 Some(d) => (d.to_wire_format(), true),
                 None => (full_output, false),
             };
 
-            // Persistence hook: save baseline + delta
-            // Compile IR outside the borrow scope to avoid double mutable borrow
-            let persist_ir = compile_file_ir(&resolved_path, decision.fidelity, state);
+            // Persistence hook: save baseline + delta.
+            // Uses compiled_ir from above (Single Compile pattern) and
+            // source_hash_hex (pre-computed) to avoid redundant work.
             if let Some(store) = &mut state.persistence_store {
-                use sha2::Digest;
-                let source_hash = sha2::Sha256::digest(source.as_bytes());
-                let hash_hex = format!("{:x}", source_hash);
-                if let Ok(ir) = persist_ir {
-                    let ir_binary = crate::ir::binary_wire::encode(&ir);
+                if let Ok(ref ir) = compiled_ir {
+                    let ir_binary = crate::ir::binary_wire::encode(ir);
 
                     if let Err(e) = store.save_context(
                         &resolved_path,
                         decision.fidelity,
                         &output_text,
                         Some(&ir_binary),
-                        &hash_hex,
+                        &source_hash_hex,
                     ) {
                         eprintln!("[clean-ctx] WARNING: Failed to persist context: {e}");
                     }
@@ -1141,7 +1183,7 @@ fn handle_provide_code_context(
 
                 if let Some(d) = &delta {
                     let delta_bytes = serde_json::to_vec(d).unwrap_or_default();
-                    if let Err(e) = store.append_delta(&hash_hex, &delta_bytes, Some("edit")) {
+                    if let Err(e) = store.append_delta(&source_hash_hex, &delta_bytes, Some("edit")) {
                         eprintln!("[clean-ctx] WARNING: Failed to persist delta: {e}");
                     }
                 }
@@ -1229,18 +1271,18 @@ fn handle_restore_context(
         return;
     }
 
-    // Clear baselines — clear both in-memory and DB stores
-    let path_alias = state.dict.get_or_create_alias(file_path_str.to_string());
+    // Finding 3: Use resolved_path consistently for dict alias, compress, and IR
+    let path_alias = state.dict.get_or_create_alias(resolved_path.clone());
     state.text_delta.store_snapshot(&path_alias, Vec::new());
     state.ir_context.remove_file(&path_alias);
-    state.context_store.clear_file(file_path_str);
+    state.context_store.clear_file(&resolved_path);
     if let Some(store) = &mut state.persistence_store {
-        store.clear_file(file_path_str);
+        store.clear_file(&resolved_path);
     }
 
     // Full re-compression
     match compress_file(
-        PathBuf::from(file_path_str),
+        PathBuf::from(&resolved_path),
         &mut state.dict,
         &mut state.cache,
         fidelity,
@@ -1252,8 +1294,8 @@ fn handle_restore_context(
             let body_lines: Vec<String> = compressed_text.lines().map(String::from).collect();
             state.text_delta.compute_and_store(&path_alias, body_lines);
 
-            // Re-compile IR
-            if let Ok(ir) = compile_file_ir(file_path_str, fidelity, state) {
+            // Re-compile IR (uses resolved_path for consistency — Finding 3)
+            if let Ok(ir) = compile_file_ir(&resolved_path, fidelity, state) {
                 state.ir_context.load_ir(ir);
             }
 
@@ -1479,7 +1521,9 @@ fn compile_file_ir(
     use crate::ir::layers::angular::AngularMetaLayer;
     use crate::compression::language::language_for_extension;
 
-    let source = std::fs::read_to_string(file_path)?;
+    // Use source_cache via state.read_source() — Finding 1
+    let source_arc = state.read_source(file_path)?;
+    let source = source_arc.as_str();
     let path_buf = PathBuf::from(file_path);
     let extension = path_buf.extension()
         .and_then(|e| e.to_str())
@@ -1505,6 +1549,11 @@ fn compile_file_ir(
         }
         "cs" => {
             compiler.add_language_layer(Box::new(CSharpLayer::new()));
+        }
+        "rs" => {
+            compiler.add_language_layer(Box::new(
+                crate::ir::layers::rust::RustLayer::new()
+            ));
         }
         _ => {}
     }
@@ -1534,7 +1583,7 @@ fn compile_file_ir(
     ));
 
     let mut compiled = compiler.compile(
-        &source,
+        source,
         &path_alias,
         language,
         query_string,

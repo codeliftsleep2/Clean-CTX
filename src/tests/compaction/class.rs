@@ -39,3 +39,69 @@ fn extract_class_name_handles_extends_and_implements() {
 fn extract_class_name_strips_generic_parameters() {
     assert_eq!(extract_class_name("class Foo<T>"), "Foo");
 }
+
+// ── Phase E: Rust impl generic preservation regression tests ───────
+
+#[test]
+fn rust_extract_struct_name_basic_struct() {
+    assert_eq!(extract_rust_struct_name("pub struct MyStruct"), "MyStruct");
+}
+
+#[test]
+fn rust_extract_struct_name_enum() {
+    assert_eq!(extract_rust_struct_name("pub enum Status"), "Status");
+}
+
+#[test]
+fn rust_extract_struct_name_trait() {
+    assert_eq!(extract_rust_struct_name("pub trait Repository"), "Repository");
+}
+
+#[test]
+fn rust_extract_struct_name_inherent_impl() {
+    assert_eq!(extract_rust_struct_name("impl MyStruct"), "MyStruct");
+}
+
+#[test]
+fn rust_extract_struct_name_trait_impl() {
+    assert_eq!(
+        extract_rust_struct_name("impl Display for MyStruct"),
+        "MyStruct:Display"
+    );
+}
+
+/// Phase E regression: generics must be preserved for trait impls.
+#[test]
+fn rust_extract_struct_name_generic_trait_impl() {
+    assert_eq!(
+        extract_rust_struct_name("impl<T> Repository<T> for PostgresRepo"),
+        "PostgresRepo:Repository<T>"
+    );
+}
+
+/// Phase E regression: inherent impl with generics.
+#[test]
+fn rust_extract_struct_name_inherent_impl_with_generics() {
+    assert_eq!(
+        extract_rust_struct_name("impl<T> Cache<T>"),
+        "Cache<T>"
+    );
+}
+
+/// Phase E regression: complex generics with nested types.
+#[test]
+fn rust_extract_struct_name_complex_generics() {
+    assert_eq!(
+        extract_rust_struct_name("impl<T> Repository<T> for Vec<T>"),
+        "Vec<T>:Repository<T>"
+    );
+}
+
+/// Phase E regression: where clause should be stripped.
+#[test]
+fn rust_extract_struct_name_where_clause() {
+    assert_eq!(
+        extract_rust_struct_name("pub struct MyStruct<T> where T: Clone"),
+        "MyStruct<T>"
+    );
+}

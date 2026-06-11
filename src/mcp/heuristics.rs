@@ -178,6 +178,7 @@ fn count_lines(source: &str) -> usize {
 /// Takes all available inputs and returns a [`ContextDecision`] that
 /// tells the caller exactly what to do (full compress or delta, which
 /// fidelity, whether Angular is detected).
+#[allow(clippy::too_many_arguments)]
 pub fn decide(
     file_path: &str,
     explicit_fidelity: Option<&str>,
@@ -186,6 +187,9 @@ pub fn decide(
     text_delta_state: &TextDeltaComputer,
     ir_context: &ContextState,
     source: &str,
+    // The dict alias (e.g. "α1") for this file — used to look up
+    // delta baselines that were stored under the alias.
+    path_alias: Option<&str>,
 ) -> ContextDecision {
     let path = Path::new(file_path);
 
@@ -204,10 +208,11 @@ pub fn decide(
         config,
     );
 
-    // Determine strategy
-    let path_alias = file_path.to_string(); // We'll use the alias from dict in the handler
-    let has_delta_baseline = text_delta_state.has_baseline(&path_alias);
-    let has_ir_baseline = ir_context.has_file(&path_alias);
+    // Determine strategy: check for baselines using the dict alias
+    // (where they're actually stored), falling back to raw path.
+    let check_key = path_alias.unwrap_or(file_path);
+    let has_delta_baseline = text_delta_state.has_baseline(check_key);
+    let has_ir_baseline = ir_context.has_file(check_key);
 
     let strategy = if config.auto_delta && (has_delta_baseline || has_ir_baseline) {
         ContextStrategy::DeltaTransport

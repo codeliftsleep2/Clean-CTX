@@ -120,6 +120,8 @@ pub const FLAG_PRIVATE: &str = "PRIVATE";
 pub const FLAG_PROTECTED: &str = "PROTECTED";
 /// Abstract class/method
 pub const FLAG_ABSTRACT: &str = "ABSTRACT";
+/// Unsafe function/trait/impl (Rust-specific)
+pub const FLAG_UNSAFE: &str = "UNSAFE";
 
 // ── Built-in Type Opcodes ──────────────────────────────────────
 

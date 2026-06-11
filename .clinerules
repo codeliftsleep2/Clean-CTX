@@ -1,0 +1,21 @@
+# Clean-CTX Integration Rules
+
+## Default File Context
+When you need to understand a TypeScript, JavaScript, or C# file, use the `provide_code_context` MCP tool FIRST before using `read_file`. This gives you a compressed but semantically complete view of the file structure, classes, methods, and types.
+
+- Use `provide_code_context` with `intent` set based on what you're doing:
+  - `"overview"` — understanding file structure (lowest tokens)
+  - `"edit"` — planning an edit (balanced)
+  - `"refactor"` — major restructuring (highest detail)
+  - `"debug"` — finding issues (medium detail)
+  - `"implement"` — adding new code (high detail)
+
+- Use `"filePath"` with the relative or absolute path to the file.
+
+- The server handles Angular detection, delta transport (repeat calls use minimal tokens), fidelity selection, and persistence automatically.
+
+## Token Savings Dashboard
+To view compression savings stats, call `context_stats` with no arguments. This shows session-level metrics including raw vs compressed tokens, delta hit rate, and per-file breakdowns.
+
+## Fallback to read_file
+Only use `read_file` directly when `provide_code_context` fails or when you need exact line-by-line content (e.g., for regex search or byte-level analysis).
