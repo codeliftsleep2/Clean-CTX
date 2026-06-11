@@ -32,3 +32,94 @@ fn build_snapshot_falls_back_to_other_language() {
     let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot");
     assert!(!snap.classes.is_empty() || !snap.imports.is_empty());
 }
+
+// ── Phase D: Rust diff regression tests ──────────────────────────
+
+#[test]
+fn build_snapshot_parses_rust_struct() {
+    let src = r#"
+        pub struct UserService {
+            users: Vec<String>,
+            cache: HashMap<u64, String>,
+        }
+    "#;
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot for Rust struct");
+    assert!(!snap.classes.is_empty(), "should detect UserService class");
+    assert_eq!(snap.classes[0].name, "UserService");
+}
+
+#[test]
+fn build_snapshot_parses_rust_enum() {
+    let src = r#"
+        pub enum Status {
+            Active,
+            Inactive,
+        }
+    "#;
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot for Rust enum");
+    assert!(!snap.classes.is_empty(), "should detect Status enum");
+    assert_eq!(snap.classes[0].name, "Status");
+}
+
+#[test]
+fn build_snapshot_parses_rust_trait() {
+    let src = r#"
+        pub trait Repository {
+            fn find(&self, id: u64) -> bool;
+            fn save(&self, item: String);
+        }
+    "#;
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot for Rust trait");
+    assert!(!snap.classes.is_empty(), "should detect Repository trait");
+    assert_eq!(snap.classes[0].name, "Repository");
+}
+
+#[test]
+fn build_snapshot_parses_rust_impl_block() {
+    let src = r#"
+        impl UserService {
+            fn new() -> Self { UserService { users: Vec::new() } }
+            pub fn get_user(&self, id: u64) -> Option<String> { None }
+        }
+    "#;
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot for Rust impl");
+    assert!(!snap.classes.is_empty(), "should detect impl class");
+}
+
+#[test]
+fn build_snapshot_parses_rust_trait_impl() {
+    let src = r#"
+        impl Repository for UserService {
+            fn find(&self, id: u64) -> bool { false }
+        }
+    "#;
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot for Rust trait impl");
+    assert!(!snap.classes.is_empty(), "should detect trait impl class");
+}
+
+#[test]
+fn build_snapshot_parses_rust_full_file() {
+    // Verify that a complete Rust file with struct, impl, and use
+    // declarations is correctly parsed.
+    let src = r#"
+        use std::collections::HashMap;
+
+        pub struct UserService {
+            users: Vec<String>,
+        }
+
+        impl UserService {
+            pub fn new() -> Self {
+                UserService { users: Vec::new() }
+            }
+        }
+    "#;
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot for Rust file");
+    assert!(!snap.classes.is_empty(), "should detect Rust classes");
+    let names: Vec<&str> = snap.classes.iter().map(|c| c.name.as_str()).collect();
+    assert!(
+        names.contains(&"UserService"),
+        "should contain UserService, got: {:?}",
+        names
+    );
+}

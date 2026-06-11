@@ -5,6 +5,7 @@
 #[cfg(test)]
 mod rust_compression_tests {
     use crate::compression::language::{language_for_extension, looks_like_rust};
+    use crate::compression::Fidelity;
 
     #[test]
     fn test_rs_extension_detection() {
@@ -90,5 +91,91 @@ mod rust_compression_tests {
     #[test]
     fn test_not_looks_like_rust_plain_text() {
         assert!(!looks_like_rust("Hello, world!"));
+    }
+
+    // ── Phase F: End-to-end pipeline tests ─────────────────────────
+
+    /// Verify that compress_file_with_source works for .rs content.
+    /// This is the pipeline provide_code_context uses for .rs files.
+    #[test]
+    fn test_rust_compress_file_pipeline() {
+        use crate::cache::LocalStateCache;
+        use crate::dictionary::PathDictionary;
+        use crate::compression::pipeline::compress_file_with_source;
+        use std::path::PathBuf;
+
+        let mut dict = PathDictionary::new();
+        let mut cache = LocalStateCache::new();
+
+        let source = r#"
+            use std::collections::HashMap;
+
+            pub struct UserService {
+                users: Vec<String>,
+                cache: HashMap<u64, String>,
+            }
+
+            impl UserService {
+                pub fn new() -> Self {
+                    UserService { users: Vec::new(), cache: HashMap::new() }
+                }
+
+                pub async fn get_user(&self, id: u64) -> Option<&String> {
+                    self.cache.get(&id)
+                }
+            }
+        "#;
+
+        let result = compress_file_with_source(
+            PathBuf::from("test.rs"),
+            Some(source),
+            &mut dict,
+            &mut cache,
+            Fidelity::Low,
+        );
+
+        assert!(result.is_ok(), "compress_file_with_source should succeed for .rs: {:?}", result.err());
+        let output = result.unwrap();
+        assert!(!output.is_empty(), "output should not be empty");
+        assert!(
+            output.contains("UserService"),
+            "output should contain class name 'UserService', got: {}",
+            output
+        );
+        assert!(
+            output.contains("get_user"),
+            "output should contain method 'get_user', got: {}",
+            output
+        );
+    }
+
+    /// Verify that Medium fidelity works for .rs files.
+    #[test]
+    fn test_rust_compress_medium_fidelity() {
+        use crate::cache::LocalStateCache;
+        use crate::dictionary::PathDictionary;
+        use crate::compression::pipeline::compress_file_with_source;
+        use std::path::PathBuf;
+
+        let mut dict = PathDictionary::new();
+        let mut cache = LocalStateCache::new();
+
+        let source = r#"
+            pub struct Simple {
+                field: i32,
+            }
+        "#;
+
+        let result = compress_file_with_source(
+            PathBuf::from("test.rs"),
+            Some(source),
+            &mut dict,
+            &mut cache,
+            Fidelity::Medium,
+        );
+
+        assert!(result.is_ok(), "Medium fidelity for .rs should succeed: {:?}", result.err());
+        let output = result.unwrap();
+        assert!(output.contains("Simple"), "output should contain 'Simple'");
     }
 }
