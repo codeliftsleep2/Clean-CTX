@@ -16,6 +16,7 @@ use crate::compression::Fidelity;
 
 pub mod typescript;
 pub mod csharp;
+pub mod rust;
 pub mod angular;
 pub mod patterns;
 

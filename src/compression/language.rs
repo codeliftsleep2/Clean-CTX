@@ -30,16 +30,50 @@ pub fn looks_like_csharp(source: &str) -> bool {
         || source.contains("private void ")
 }
 
+/// Returns `true` if the source text looks like Rust. The heuristic
+/// requires multiple Rust-specific signals to reduce false positives.
+/// Single keywords like `use` or `mod` appear in other languages (Python,
+/// CSS, TypeScript), so we require at least two signals or one strong
+/// signal (`impl`, `trait`, `fn` with `pub`).
+pub fn looks_like_rust(source: &str) -> bool {
+    let has_fn = source.contains("fn ");
+    let has_struct = source.contains("struct ");
+    let has_enum = source.contains("enum ");
+    let has_impl = source.contains("impl ");
+    let has_trait = source.contains("trait ");
+    let has_pub = source.contains("pub ") || source.contains("pub(");
+    let has_use = source.contains("use ");
+    let has_mod = source.contains("mod ");
+
+    // Strong signals: impl and trait are very Rust-specific
+    let strong = has_impl || has_trait;
+
+    // Count all signals
+    let signals = [
+        has_fn, has_struct, has_enum, has_impl, has_trait,
+        has_pub, has_use, has_mod,
+    ]
+    .iter()
+    .filter(|&&x| x)
+    .count();
+
+    // Require either a strong signal or at least 2 signals
+    strong || signals >= 2
+}
+
 /// Pick the tree-sitter `Language` and query string for the given source
 /// content. When `extension` is supplied it is used as a hint to break
 /// ties; otherwise the content heuristic alone decides.
 ///
 /// The returned tuple is `(Language, &'static str query)` — the static
-/// query reference is safe because `crate::queries::TS_QUERY` and
-/// `crate::queries::CS_QUERY` are both `'static` `&str` constants.
+/// query reference is safe because `crate::queries::TS_QUERY`,
+/// `crate::queries::CS_QUERY`, and `crate::queries::RS_QUERY` are all
+/// `'static` `&str` constants.
 pub fn detect_language(source: &str) -> (Language, &'static str) {
     if looks_like_csharp(source) {
         (tree_sitter_c_sharp::language(), queries::CS_QUERY)
+    } else if looks_like_rust(source) {
+        (tree_sitter_rust::language(), queries::RS_QUERY)
     } else {
         (tree_sitter_typescript::language_typescript(), queries::TS_QUERY)
     }
@@ -58,6 +92,7 @@ pub fn language_for_extension(extension: &str) -> Option<(Language, &'static str
     match extension {
         "ts" => Some((tree_sitter_typescript::language_typescript(), queries::TS_QUERY)),
         "cs" => Some((tree_sitter_c_sharp::language(), queries::CS_QUERY)),
+        "rs" => Some((tree_sitter_rust::language(), queries::RS_QUERY)),
         _ => None,
     }
 }
@@ -65,3 +100,7 @@ pub fn language_for_extension(extension: &str) -> Option<(Language, &'static str
 #[cfg(test)]
 #[path = "../tests/compression/language.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/compression/rust.rs"]
+mod rust_tests;

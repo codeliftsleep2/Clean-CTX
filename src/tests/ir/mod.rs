@@ -12,3 +12,15 @@ mod integration;
 // Verifies that the full 4-layer pipeline is wired through IRCompiler.
 #[path = "layers_integration.rs"]
 mod layers_integration;
+
+// Rust language support integration tests:
+// Verifies that Rust source files are correctly compiled through the
+// full IR pipeline with the Rust language layer.
+#[path = "rust_integration.rs"]
+mod rust_integration;
+
+// Rust token tracking integration tests:
+// Verifies that Rust files produce proper token savings through the
+// analytics pipeline and session stats tracking.
+#[path = "rust_stats_integration.rs"]
+mod rust_stats_integration;

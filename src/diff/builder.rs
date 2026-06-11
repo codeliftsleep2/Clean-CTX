@@ -12,6 +12,7 @@
 
 use crate::compaction::{
     compact_expression, compact_import, extract_class_name, extract_field, extract_method_sig,
+    extract_rust_struct_name,
 };
 use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::language::detect_language;
@@ -21,27 +22,73 @@ use crate::queries;
 
 use super::snapshot::{CapturedClass, CapturedMethod, CapturedStructure};
 
+/// A parser configuration: language factory, query string, and label.
+type ParserConfig = (fn() -> tree_sitter::Language, &'static str, &'static str);
+
+/// All supported parser configurations, in the order they should be tried.
+const ALL_PARSERS: &[ParserConfig] = &[
+    (tree_sitter_rust::language, queries::RS_QUERY, "rust"),
+    (tree_sitter_c_sharp::language, queries::CS_QUERY, "csharp"),
+    (tree_sitter_typescript::language_typescript, queries::TS_QUERY, "typescript"),
+];
+
 /// Build a structural snapshot by parsing the source with tree-sitter and
 /// walking the captures. Mirrors the capture logic in `compressor::compress_file`
 /// so the two are directly comparable.
+///
+/// Phase D: The fallback now tries all three supported languages (Rust, C#, TS)
+/// instead of only TS ↔ C#. If the first parser chosen by `detect_language`
+/// yields no captures, the remaining two are tried in priority order.
 pub fn build_snapshot(
     source: &str,
     fidelity: Fidelity,
 ) -> Result<CapturedStructure, Box<dyn std::error::Error>> {
-    let (language, query_string) = detect_language(source);
-    // Try the chosen language first; if it yields no captures (e.g. wrong
-    // file content for the heuristic), fall back to the other parser.
-    match try_build_with(language, query_string, source, fidelity) {
-        Ok(snap) if !snap.classes.is_empty() || !snap.imports.is_empty() => Ok(snap),
-        _ => {
-            let (other_lang, other_query) = if query_string == queries::TS_QUERY {
-                (tree_sitter_c_sharp::language(), queries::CS_QUERY)
-            } else {
-                (tree_sitter_typescript::language_typescript(), queries::TS_QUERY)
-            };
-            try_build_with(other_lang, other_query, source, fidelity)
+    let (first_lang, first_query) = detect_language(source);
+
+    // Phase D: Build an ordered list of parsers to try, starting with the
+    // detected language, followed by the others (deduplicating).
+    //
+    // We match against the query string to identify which parser was chosen.
+    let first_label = if first_query == queries::RS_QUERY {
+        "rust"
+    } else if first_query == queries::CS_QUERY {
+        "csharp"
+    } else {
+        "typescript"
+    };
+
+    // Collect parsers to try: first choice first, then the others.
+    let mut candidates: Vec<(&str, tree_sitter::Language, &str)> = Vec::with_capacity(3);
+    // Push the detected parser first
+    candidates.push((first_label, first_lang, first_query));
+    // Push the remaining two in ALL_PARSERS order, skipping the detected one
+    for (lang_fn, query, label) in ALL_PARSERS {
+        if *label != first_label {
+            candidates.push((label, lang_fn(), query));
         }
     }
+
+    // Try each parser in order. Return the first one that produces captures,
+    // or the last result (even if empty).
+    let mut last_result: Option<Result<CapturedStructure, Box<dyn std::error::Error>>> = None;
+    for (_label, lang, query) in &candidates {
+        let result = try_build_with(*lang, query, source, fidelity);
+        match &result {
+            Ok(snap) if !snap.classes.is_empty() || !snap.imports.is_empty() => {
+                return result;
+            }
+            _ => {
+                last_result = Some(result);
+            }
+        }
+    }
+
+    // If none produced meaningful captures, return the last attempt's result
+    // (even if empty, so callers get a valid CapturedStructure).
+    last_result.unwrap_or_else(|| {
+        // Safety net: should never reach here since we always push 3 candidates
+        try_build_with(first_lang, first_query, source, fidelity)
+    })
 }
 
 fn try_build_with(
@@ -60,16 +107,17 @@ fn try_build_with(
         source,
         fidelity,
         |capture_name, raw, f| {
-            if capture_name == "class.root" {
-                Some(extract_class_name(raw))
-            } else if capture_name == "method.root" {
-                Some(extract_method_sig(raw, f))
-            } else if capture_name == "field.root" {
-                Some(extract_field(raw, f))
-            } else if capture_name == "import.root" {
-                Some(compact_import(raw, f))
-            } else {
-                Some(compact_expression(raw, f))
+            match capture_name {
+                "class.root" => Some(extract_class_name(raw)),
+                // Rust type declarations: struct, enum, trait, impl
+                "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+                    Some(extract_rust_struct_name(raw))
+                }
+                "method.root" => Some(extract_method_sig(raw, f)),
+                "field.root" => Some(extract_field(raw, f)),
+                "import.root" | "mod.root" => Some(compact_import(raw, f)),
+                "type.root" => Some(compact_expression(raw, f)),
+                _ => Some(compact_expression(raw, f)),
             }
         },
     )?;
@@ -87,7 +135,7 @@ fn try_build_with(
                     imports.push(cap.text.clone());
                 }
             }
-            "class.root" => {
+            "class.root" | "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
                 if let Some(last) = classes.last_mut() {
                     if last.fields.is_empty() && !pending_fields.is_empty() {
                         last.fields = std::mem::take(&mut pending_fields);

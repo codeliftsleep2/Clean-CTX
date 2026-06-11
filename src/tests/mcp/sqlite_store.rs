@@ -31,7 +31,7 @@ fn test_ir(file_id: &str, version: u64) -> CompiledIR {
 fn test_sqlite_store_open_and_migrate() {
     let store = in_memory_store();
     // If open + migrate succeeds, the store is valid
-    assert!(store.has_context("/nonexistent.ts") == false);
+    assert!(!store.has_context("/nonexistent.ts"));
 }
 
 #[test]
