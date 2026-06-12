@@ -652,4 +652,4 @@ See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for full per-edit breakdown and the 
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks
-- 798 tests passing (including 13 SQLite persistence tests)
+- 945 tests passing (unit + integration + E2E workflow tests)

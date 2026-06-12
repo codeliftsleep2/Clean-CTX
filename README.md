@@ -2,7 +2,7 @@
 
 A local-first, air-gapped context optimization engine that eliminates token waste in LLM interactions while maintaining zero network footprint. Built in Rust for restrictive firewall and DLP environments.
 
-> **🚀 Version 0.1.6** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular HTML parsing (XHTML self-closing + inline template), IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, and 798 tests all passing.
+> **🚀 Version 0.1.6** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular HTML parsing (XHTML self-closing + inline template), IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, and 945 tests all passing.
 
 ---
 
@@ -448,7 +448,7 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — 0 warnings |
-| Tests | ✅ 798 passing |
+| Tests | ✅ 945 passing (870 unit + 70 integration + 5 E2E workflow) |
 | Audit | ✅ FAANG-level audit — all 41 findings resolved |
 | Largest file | ~170 lines (down from 913) |
 | Unsafe code | 0 blocks |

@@ -36,7 +36,7 @@ Clean-CTX is designed for **air-gapped environments** with restrictive firewall 
 |-------------|--------|--------|
 | Unsafe code | ✅ **ZERO** | `#![forbid(unsafe_code)]` would pass |
 | Clippy warnings | ✅ 0 | `cargo clippy --all-targets -- -D warnings` passes |
-| Test coverage | ✅ 798 tests | All tests pass; fuzz-style edge cases covered |
+| Test coverage | ✅ 945 tests | All tests pass; fuzz-style edge cases covered |
 
 ### Data Handling
 
