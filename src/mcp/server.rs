@@ -22,6 +22,36 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 use crate::protocol::JsonRpcRequest;
 
+/// Cached project root, resolved once per process lifetime.
+/// Walks up from the executable's directory looking for `.clean-ctx.json`
+/// or `Cargo.toml` to anchor all relative paths (config,, DB, debug log).
+static PROJECT_ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Resolve the project root directory. Walks up from the executable's
+/// location looking for `.clean-ctx.json` or `Cargo.toml`. Falls back
+/// to `current_dir()` if nothing is found.
+pub(crate) fn find_project_root() -> &'static PathBuf {
+    PROJECT_ROOT.get_or_init(|| {
+        // Start from the executable's directory (e.g. target/release/)
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."));
+
+        let mut current = exe_dir;
+        loop {
+            if current.join(".clean-ctx.json").exists() || current.join("Cargo.toml").exists() {
+                return current;
+            }
+            if !current.pop() {
+                break;
+            }
+        }
+        // Fallback to CWD
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    })
+}
+
 /// Maximum size, in bytes, of a single JSON-RPC request line. Anything
 /// larger is rejected with a `-32600` error rather than OOMing the
 /// process. 16 MiB is comfortably above any legitimate request (the
@@ -44,9 +74,9 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // F-05: load the project config and bundle it into the
     // per-session state. The config is no longer bound to `_` and
     // thrown away; tool handlers consult it via `state.config`.
-    let config = CleanCtxConfig::load(
-        &std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-    );
+    let project_root = find_project_root();
+    eprintln!("[clean-ctx] Project root: {}", project_root.display());
+    let config = CleanCtxConfig::load(project_root);
     let mut state = McpState::new(config);
 
     let stdin = io::stdin();

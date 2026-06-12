@@ -213,20 +213,17 @@ impl ContextStore for InMemoryContextStore {
 
     fn clear_file(&mut self, file_path: &str) {
         // Remove context metadata
-        if let Some(meta) = self.contexts.remove(file_path) {
-            // Find and remove associated ID mappings
-            let id_to_remove: Vec<String> = self.id_to_path
+        if let Some(_meta) = self.contexts.remove(file_path) {
+            // Find and remove associated ID mappings and their deltas
+            let ids_to_remove: Vec<String> = self.id_to_path
                 .iter()
                 .filter(|(_, v)| *v == file_path)
                 .map(|(k, _)| k.clone())
                 .collect();
-            for id in &id_to_remove {
+            for id in &ids_to_remove {
                 self.deltas.remove(id);
                 self.id_to_path.remove(id);
             }
-            // Also try matching by derivation (reverse lookup)
-            // Since IDs are hash-derived, this is best-effort.
-            let _ = meta; // suppress unused
         }
     }
 }

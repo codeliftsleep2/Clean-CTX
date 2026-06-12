@@ -109,7 +109,7 @@ pub struct PersistenceConfig {
 impl Default for PersistenceConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             auto_save: default_true(),
             max_history_days: default_max_history_days(),
             db_path: default_db_path(),

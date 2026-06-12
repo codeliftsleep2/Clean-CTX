@@ -25,6 +25,7 @@ use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
 use crate::compression::text_delta::TextDeltaComputer;
 use crate::ir::replay::ContextState;
+use crate::mcp::buffered_store::BufferedStore;
 use crate::mcp::context_store::InMemoryContextStore;
 use crate::mcp::session_stats::SessionStats;
 use crate::mcp::sqlite_store::SqliteStore;
@@ -68,23 +69,26 @@ pub struct McpState {
     pub session_stats: SessionStats,
     /// In-memory context store for persistence-ready baselines.
     pub context_store: InMemoryContextStore,
-    /// Optional SQLite persistence store for cross-session survival.
+    /// Optional buffered SQLite persistence store for cross-session survival.
+    /// Writes are queued in memory and flushed in batch transactions.
     /// Initialized from `config.persistence` — `None` if disabled or
     /// if DB open fails.
-    pub persistence_store: Option<SqliteStore>,
+    pub persistence_store: Option<BufferedStore>,
 }
 
 impl McpState {
     /// Create a fresh state object with the given config and empty
     /// registries.
     pub fn new(config: CleanCtxConfig) -> Self {
-        // Initialize SQLite persistence store if enabled in config
+        // Initialize buffered persistence store if enabled in config
         let persistence_store = if config.persistence.enabled {
-            let db_path = std::path::Path::new(&config.persistence.db_path);
-            match SqliteStore::open(db_path) {
+            // Resolve DB path relative to project root, not CWD
+            let project_root = crate::mcp::server::find_project_root();
+            let db_path = project_root.join(&config.persistence.db_path);
+            match SqliteStore::open(&db_path) {
                 Ok(store) => {
                     eprintln!("[clean-ctx] Persistence enabled: {}", db_path.display());
-                    Some(store)
+                    Some(BufferedStore::new(store, project_root.clone()))
                 }
                 Err(e) => {
                     eprintln!("[clean-ctx] WARNING: Failed to open persistence DB: {e}");
@@ -94,6 +98,24 @@ impl McpState {
         } else {
             None
         };
+
+        // Rehydrate session stats from DB if available
+        let mut session_stats = SessionStats::new();
+        if let Some(ref store) = persistence_store {
+            // Flush any pending writes, then rebuild stats from DB
+            store.flush();
+            if let Some(guard) = store.sqlite() {
+                match guard.rebuild_stats() {
+                    Ok(stats) => {
+                        session_stats = stats;
+                        eprintln!("[clean-ctx] Loaded persisted session stats.");
+                    }
+                    Err(e) => {
+                        eprintln!("[clean-ctx] WARNING: Failed to rebuild stats from DB: {e}");
+                    }
+                }
+            }
+        }
 
         Self {
             dict: PathDictionary::new(),
@@ -105,9 +127,19 @@ impl McpState {
             source_cache: HashMap::new(),
             // F-FINAL-06: empty warning buffer at session start.
             warnings: Vec::new(),
-            session_stats: SessionStats::new(),
+            session_stats,
             context_store: InMemoryContextStore::new(),
             persistence_store,
+        }
+    }
+
+    /// Flush any pending persistence writes to SQLite.
+    /// Returns the number of operations flushed.
+    pub fn flush_persistence(&self) -> usize {
+        if let Some(ref store) = self.persistence_store {
+            store.flush()
+        } else {
+            0
         }
     }
 
@@ -162,3 +194,7 @@ impl McpState {
         Ok(content)
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/mcp/state.rs"]
+mod tests;

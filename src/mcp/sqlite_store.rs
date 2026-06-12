@@ -12,7 +12,9 @@
 //   - Version tracking derived from `COUNT(deltas) + 1`.
 //   - `binary_wire::decode()` loses `file_id` and `version` (Gap 2 in plan);
 //     those are restored from DB columns on load.
-//   - No Mutex needed — MCP server is single-threaded (stdin/stdout loop).
+//   - LOW-05: SqliteStore is now wrapped in `Arc<Mutex<>>` by BufferedStore
+//     for the retry/fallback pattern. The comment has been updated to reflect
+//     that the store is used in a multi-threaded context (retry with sleep).
 
 use std::path::Path;
 use rusqlite::{Connection, params};
@@ -209,15 +211,40 @@ impl SqliteStore {
             let (path, _fid, dc) = row?;
             // Record as a delta compression (delta_count is tracked via FileStats)
             let strategy = if dc > 0 { "delta" } else { "full" };
+            // HIGH-03 known limitation: token counts are placeholder values (100/30)
+            // because the contexts table doesn't store raw/compressed token counts.
+            // A schema migration (v2) adding raw_tokens/compressed_tokens columns
+            // to the contexts table would fix this. For now, the dashboard shows
+            // approximate data after a server restart.
             stats.record_compression(
                 &path, 100, 30, "low", false, strategy
             );
-            // Note: FileStats.delta_count will be 0 here since record_compression
-            // doesn't increment it from DB. This is acceptable for Phase 1 —
-            // full delta_count rehydration is a future enhancement.
         }
 
         Ok(stats)
+    }
+
+    /// Begin a SQLite transaction.
+    pub fn begin_transaction(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.conn.execute_batch("BEGIN TRANSACTION")?;
+        Ok(())
+    }
+
+    /// Commit the current SQLite transaction.
+    pub fn commit(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.conn.execute_batch("COMMIT")?;
+        Ok(())
+    }
+
+    /// Rollback the current SQLite transaction.
+    pub fn rollback(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.conn.execute_batch("ROLLBACK")?;
+        Ok(())
+    }
+
+    /// Execute a WAL checkpoint to keep file size bounded.
+    pub fn wal_checkpoint(&self) {
+        let _ = self.conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
     }
 
     /// Purge deltas older than the specified number of days.
@@ -230,7 +257,7 @@ impl SqliteStore {
         Ok(affected)
     }
 
-    /// Get delta count for a specific file (helper for purge handler).
+/// Get delta count for a specific file (helper for purge handler).
     pub fn delta_count_for_file(&self, file_path: &str) -> usize {
         self.conn
             .query_row(
@@ -239,6 +266,20 @@ impl SqliteStore {
                 |row| row.get::<_, i32>(0),
             )
             .unwrap_or(0) as usize
+    }
+}
+
+/// Parse a SQLite datetime string (e.g. "2026-06-12 18:47:09") into SystemTime.
+/// SQLite timestamps are naive (no timezone), so we use NaiveDateTime
+/// and treat them as UTC. Falls back to SystemTime::now() if parsing fails.
+fn chrono_parse_or_now(dt_str: &str) -> std::time::SystemTime {
+    // SQLite datetime('now') produces "YYYY-MM-DD HH:MM:SS" format
+    use std::time::Duration;
+    if let Ok(parsed) = chrono::NaiveDateTime::parse_from_str(dt_str, "%Y-%m-%d %H:%M:%S") {
+        let secs = parsed.and_utc().timestamp() as u64;
+        std::time::UNIX_EPOCH + Duration::from_secs(secs)
+    } else {
+        std::time::SystemTime::now()
     }
 }
 
@@ -269,8 +310,9 @@ impl ContextStore for SqliteStore {
         file_path: &str,
     ) -> Result<Option<StoredContextMeta>, Box<dyn std::error::Error>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, file_path, content_hash, fidelity, pretty_text, created_at
-             FROM contexts WHERE file_path = ?1 ORDER BY updated_at DESC LIMIT 1"
+            "SELECT c.id, c.file_path, c.content_hash, c.fidelity, c.pretty_text, c.created_at,
+                    (SELECT COUNT(*) FROM deltas d WHERE d.context_id = c.id) as delta_count
+             FROM contexts c WHERE c.file_path = ?1 ORDER BY c.updated_at DESC LIMIT 1"
         )?;
 
         let mut rows = stmt.query(params![file_path])?;
@@ -280,7 +322,8 @@ impl ContextStore for SqliteStore {
             let hash: String = row.get(2)?;
             let fid: i32 = row.get(3)?;
             let _pretty: Option<String> = row.get(4)?;
-            let _created: String = row.get(5)?;
+            let created_at_str: String = row.get(5)?;
+            let delta_count: i32 = row.get(6)?;
 
             // Parse Fidelity from i32
             let fidelity = match fid {
@@ -290,13 +333,19 @@ impl ContextStore for SqliteStore {
                 _ => Fidelity::Low,
             };
 
+            // HIGH-01 fix: compute version from delta count
+            let version = (delta_count as u64) + 1;
+
+            // HIGH-02 fix: parse actual created_at from DB
+            let created_at = chrono_parse_or_now(&created_at_str);
+
             Ok(Some(StoredContextMeta {
                 file_path: fp,
                 fidelity,
-                version: 0,
+                version,
                 is_angular: false,
                 source_hash: hash,
-                created_at: std::time::SystemTime::now(),
+                created_at,
             }))
         } else {
             Ok(None)

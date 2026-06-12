@@ -58,7 +58,7 @@ fn generate_default_config() -> String {
         "autoAngular": true,
         "autoDelta": true,
         "persistence": {
-            "enabled": false,
+            "enabled": true,
             "autoSave": true,
             "maxHistoryDays": 30,
             "dbPath": ".clean-ctx/persistence.db"

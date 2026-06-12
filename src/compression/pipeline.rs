@@ -248,6 +248,71 @@ pub fn compress_file_with_source(
     Ok(final_output)
 }
 
+/// Pure compression function with no MCP dependencies.
+///
+/// Takes source code, file extension, fidelity, and a path alias string.
+/// Returns `(body_lines, full_output)` — the body lines for delta
+/// comparison and the full formatted output with header.
+///
+/// This is the core compression logic extracted from `compress_text_body`
+/// in the MCP layer, enabling reuse without MCP-specific state types.
+pub fn compress_text(
+    source_code: &str,
+    extension: &str,
+    fidelity: Fidelity,
+    path_alias: &str,
+) -> Result<(Vec<String>, String), Box<dyn std::error::Error>> {
+    let (language, query_string) = language_for_extension(extension)
+        .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
+
+    let all_captures: Vec<CapEntry> = run_capture_pipeline(
+        language,
+        query_string,
+        source_code,
+        fidelity,
+        |capture_name, raw, f| {
+            match capture_name {
+                "class.root" => Some(extract_class_name(raw)),
+                // Rust type declarations: struct, enum, trait, impl
+                "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+                    Some(extract_rust_struct_name(raw))
+                }
+                "method.root" => Some(extract_method_sig(raw, f)),
+                "field.root" => Some(extract_field(raw, f)),
+                // Rust mod declarations are structural like imports
+                "mod.root" => Some(compact_import(raw, f)),
+                // Rust type aliases
+                "type.root" => Some(compact_expression(raw, f)),
+                _ => Some(compact_expression(raw, f)),
+            }
+        },
+    )?;
+
+    let built = build_output_lines(&all_captures, source_code, fidelity);
+    let mut body_content = assemble_body(&built.output_lines, fidelity);
+    if let Some(block) = &built.meta_block {
+        body_content.push_str(&block.render());
+    }
+    body_content = apply_micro_opcodes(&body_content, fidelity);
+    let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
+
+    // Split the body into lines for delta comparison
+    let body_lines: Vec<String> = display_body.lines().map(String::from).collect();
+
+    // Build full output (header + body + symbol footer)
+    let compacted_body = format_compacted_body(&display_body, &sym_footer, path_alias, fidelity);
+    let full_output = format_final_output(
+        source_code,
+        &compacted_body,
+        fidelity,
+        built.class_count,
+        built.method_count,
+        built.import_count,
+    );
+
+    Ok((body_lines, full_output))
+}
+
 // ---------------------------------------------------------------------------
 // Shared pipeline helpers
 // ---------------------------------------------------------------------------
