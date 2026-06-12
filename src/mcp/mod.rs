@@ -12,6 +12,9 @@
 //   - state      : per-session state shared by all tool handlers (F-05)
 
 mod handlers;
+mod tool_handlers;
+mod tool_helpers;
+pub(crate) mod buffered_store;
 pub(crate) mod context_store;
 pub(crate) mod heuristics;
 pub(crate) mod prompts;
@@ -22,6 +25,7 @@ pub(crate) mod sqlite_store;
 pub(crate) mod state;
 pub(crate) mod tools;
 pub(crate) mod workspace;
+pub(crate) mod workspace_util;
 
 pub use state::McpState;
 

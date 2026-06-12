@@ -1,0 +1,8 @@
+{
+  "persistence": {
+    "enabled": true,
+    "auto_save": true,
+    "max_history_days": 30,
+    "db_path": ".clean-ctx/persistence.db"
+  }
+}

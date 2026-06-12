@@ -97,3 +97,23 @@ fn empty_input_returns_none() {
     let result = read_request_line(&mut handle);
     assert!(result.is_none(), "empty stdin should produce None (clean EOF)");
 }
+
+#[test]
+fn find_project_root_returns_valid_path() {
+    let root = super::find_project_root();
+    // The project root should exist and contain Cargo.toml
+    assert!(root.exists(), "project root should exist: {}", root.display());
+    assert!(
+        root.join("Cargo.toml").exists() || root.join(".clean-ctx.json").exists(),
+        "project root should contain Cargo.toml or .clean-ctx.json: {}",
+        root.display()
+    );
+}
+
+#[test]
+fn find_project_root_is_stable() {
+    // Calling twice should return the same path (OnceLock)
+    let root1 = super::find_project_root();
+    let root2 = super::find_project_root();
+    assert_eq!(root1, root2, "find_project_root should return the same path on repeated calls");
+}

@@ -19,6 +19,7 @@
 
 pub mod opcodes;
 pub mod compiler;
+pub(crate) mod compiler_methods;
 pub mod render;
 pub mod wire;
 pub mod symbol_table;
@@ -34,6 +35,7 @@ pub mod binary_wire;
 // Re-export public types for downstream consumers.
 pub use opcodes::CoreOp;
 pub use compiler::{CompiledIR, CompileError, IRCompiler};
+pub use compiler_methods::MethodSig;
 pub use render::{ir_to_text, ir_to_text_ops};
 pub use wire::{ir_to_wire, op_to_tuple};
 pub use symbol_table::{GlobalSymbolTable, SymbolEntry, SymbolKind};

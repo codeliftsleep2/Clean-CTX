@@ -1,0 +1,243 @@
+// src/mcp/tool_helpers.rs
+//
+// Shared helper functions used by multiple tool handlers.
+// Extracted from tools.rs during the Phase 1 module split.
+
+use std::path::PathBuf;
+use crate::compressor::Fidelity;
+use crate::mcp::McpState;
+
+/// Compress a file and extract the body lines (without header) for
+/// delta comparison. Returns `(body_lines, full_output)`.
+///
+/// Thin MCP wrapper that reads source from state, then delegates to
+/// the pure [`crate::compression::pipeline::compress_text`] function.
+pub(super) fn compress_text_body(
+    file_path: &str,
+    fidelity: Fidelity,
+    state: &mut McpState,
+) -> Result<(Vec<String>, String), Box<dyn std::error::Error>> {
+    // Use source_cache via state.read_source() — Finding 1
+    let source_code_arc = state.read_source(file_path)?;
+    let source_code = source_code_arc.as_ref().clone();
+    let path_buf = std::path::PathBuf::from(file_path);
+    let extension = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
+    let path_alias = state.dict.get_or_create_alias(file_path.to_string());
+
+    crate::compression::pipeline::compress_text(
+        &source_code,
+        extension,
+        fidelity,
+        &path_alias,
+    )
+}
+
+/// Resolve a file path, handling relative paths with optional workspace root.
+pub(super) fn resolve_file_path(path: &str, workspace_root: Option<&str>) -> String {
+    let path_obj = std::path::Path::new(path);
+    if path_obj.is_absolute() {
+        path.to_string()
+    } else if let Some(root) = workspace_root {
+        let root_path = std::path::Path::new(root);
+        if root_path.is_absolute() {
+            root_path.join(path).to_string_lossy().into_owned()
+        } else {
+            // workspace root is also relative — join with CWD
+            let cwd = std::env::current_dir().unwrap_or_default();
+            cwd.join(root).join(path).to_string_lossy().into_owned()
+        }
+    } else {
+        // Relative path with no workspace root — join with CWD
+        let cwd = std::env::current_dir().unwrap_or_default();
+        cwd.join(path).to_string_lossy().into_owned()
+    }
+}
+
+/// Rough token estimation (chars / 4).
+/// In production, use tiktoken-rs; this is a lightweight approximation.
+pub(super) fn estimate_tokens(text: &str) -> usize {
+    text.len() / 4
+}
+
+/// Compile a file to IR, detecting language and running the full
+/// 4-layer compilation pipeline.
+///
+/// Phase A (FAANG remediation): The compiler now instantiates the
+/// appropriate language layers (TypeScriptLayer, CSharpLayer) and
+/// meta layers (AngularMetaLayer) based on the detected language.
+///
+/// NF-02 fix: The version is set based on the previous version in the
+/// context state, ensuring a monotonic version chain across successive
+/// `delta_code_context` calls. If the file was previously tracked at
+/// version N, the new compiled IR gets version N+1. If untracked,
+/// version starts at 1.
+///
+/// NF-01 fix: The consumptive `CompressingPatternRecognizer` is wired
+/// into the compile path *after* the additive `CodePatternRecognizer`,
+/// so flags are emitted first, then patterns are consumed for wire-size
+/// reduction. This enables the Phase H 30% compression on edits.
+pub(super) fn compile_file_ir(
+    file_path: &str,
+    fidelity: Fidelity,
+    state: &mut McpState,
+) -> Result<crate::ir::compiler::CompiledIR, Box<dyn std::error::Error>> {
+    use crate::ir::compiler::IRCompiler;
+    use crate::ir::layers::typescript::TypeScriptLayer;
+    use crate::ir::layers::csharp::CSharpLayer;
+    use crate::ir::layers::angular::AngularMetaLayer;
+    use crate::compression::language::language_for_extension;
+
+    // Use source_cache via state.read_source() — Finding 1
+    let source_arc = state.read_source(file_path)?;
+    let source = source_arc.as_str();
+    let path_buf = PathBuf::from(file_path);
+    let extension = path_buf.extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+
+    let (language, query_string) = language_for_extension(extension)
+        .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
+
+    // F-FULL-10: Use raw path for alias key for deterministic results.
+    // Canonicalize is still performed for the `α alias: <path>` footer
+    // display, but the alias key itself uses the raw path.
+    let path_alias = state.dict.get_or_create_alias(file_path.to_string());
+
+    // NF-02: Determine the next version based on the previous context state
+    let prev_version = state.ir_context.file_version(&path_alias).unwrap_or(0);
+
+    let mut compiler = IRCompiler::new();
+
+    // Add language-specific layers (Layer 2)
+    match extension {
+        "ts" | "js" => {
+            compiler.add_language_layer(Box::new(TypeScriptLayer::new()));
+        }
+        "cs" => {
+            compiler.add_language_layer(Box::new(CSharpLayer::new()));
+        }
+        "rs" => {
+            compiler.add_language_layer(Box::new(
+                crate::ir::layers::rust::RustLayer::new()
+            ));
+        }
+        _ => {}
+    }
+
+    // Add Angular meta layer (Layer 3) for TypeScript files
+    if extension == "ts" || extension == "js" {
+        compiler.add_meta_layer(Box::new(AngularMetaLayer::new()));
+    }
+
+    // F-07 (FAANG audit): Wire the additive CodePatternRecognizer into
+    // the compile path. This is the Layer 4 additive recognizer that
+    // emits CTOR/OBSERVABLE/GETTER/SETTER flags alongside the original
+    // instructions. The recognizer is always-on because it adds context
+    // without removing any instructions (zero regression).
+    compiler.add_pattern_recognizer(Box::new(
+        crate::ir::layers::patterns::CodePatternRecognizer::new(),
+    ));
+
+    // NF-01: Wire the consumptive CompressingPatternRecognizer *after*
+    // the additive recognizer. This enables the Phase H 30% compression
+    // on edits by consuming recognised patterns into single PAT ops.
+    // The additive recognizer's flags (CTOR/OBSERVABLE/GETTER/SETTER)
+    // are emitted first, then the consumptive recognizer collapses them
+    // where possible. This ordering ensures maximum compression.
+    compiler.add_pattern_recognizer(Box::new(
+        crate::ir::patterns::CompressingPatternRecognizer::new(),
+    ));
+
+    let mut compiled = compiler.compile(
+        source,
+        &path_alias,
+        language,
+        query_string,
+        fidelity,
+    )?;
+
+    // NF-02: Override the version with the next monotonic value.
+    // The compiler always sets version=1; we fix it here.
+    compiled.version = prev_version.saturating_add(1);
+
+    Ok(compiled)
+}
+
+/// Compute an AST-level diff between the file's in-session baseline and
+/// its current on-disk state.
+///
+/// F-21 (FAANG audit): before calling the expensive `build_snapshot`,
+/// the handler hashes the source and checks if a baseline exists *and*
+/// the hash matches. On match, it returns a "no changes" message
+/// without re-parsing the file with tree-sitter.
+pub(crate) fn diff_code_context_handler(
+    file: PathBuf,
+    cache: &mut crate::cache::LocalStateCache,
+    fidelity: Fidelity,
+) -> Result<String, Box<dyn std::error::Error>> {
+    use crate::diff::{build_snapshot, diff_snapshots, format_diff, diff_summary};
+
+    let absolute_path = match std::fs::canonicalize(&file) {
+        Ok(p) => p.to_string_lossy().into_owned(),
+        Err(_) => file.to_string_lossy().into_owned(),
+    };
+    let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
+
+    // MED-02: This handler intentionally reads from disk directly rather than
+    // going through state.read_source() because the diff handler's signature
+    // predates the McpState pattern. The source_cache integration would require
+    // threading &mut McpState through the handler chain, which is a larger
+    // refactor. This is acceptable for now — the diff handler is called once
+    // per file per edit, not in a tight loop.
+    let source = std::fs::read_to_string(&file)?;
+
+    // F-21: hash the source content and check if the baseline is
+    // still valid before paying for the expensive tree-sitter parse.
+    let source_hash = cache.compute_hash(source.as_bytes());
+    if let Some(stored_hash) = cache.get_baseline_hash(&cache_key)
+        && stored_hash == source_hash
+        && let Some(baseline_snap) = cache.get_baseline(&cache_key).cloned()
+    {
+        // Content is byte-identical to the stored baseline — no
+        // structural changes possible.
+        let class_count = baseline_snap.classes.len();
+        return Ok(format!(
+            "// --- AST Diff ---\n// No changes since last snapshot ({} classes).\n// Hash: {}",
+            class_count, &source_hash[..12],
+        ));
+    }
+
+    let current = build_snapshot(&source, fidelity)?;
+
+    let baseline = cache.get_baseline(&cache_key).cloned();
+    let body = match baseline {
+        None => {
+            let class_count = current.classes.len();
+            // F-21: store the hash BEFORE `store_baseline` takes
+            // ownership of `cache_key`.
+            cache.store_baseline_hash(&cache_key, &source_hash);
+            cache.store_baseline(cache_key, current);
+            format!(
+                "// --- AST Diff ---\n// No baseline snapshot for this file yet.\n// Current state stored as baseline ({} classes).\n// Call diff_code_context again after the file changes to see the delta.",
+                class_count
+            )
+        }
+        Some(baseline_snap) => {
+            let actions = diff_snapshots(&baseline_snap, &current);
+            let (added, removed, modified, unchanged) = diff_summary(&actions);
+            let header = format!(
+                "// --- AST Diff: {} ---\n// +{} -{} ~{} ={} (classes/methods/fields/imports)\n",
+                absolute_path, added, removed, modified, unchanged
+            );
+            let body = format_diff(&actions, fidelity);
+            cache.store_baseline_hash(&cache_key, &source_hash);
+            cache.store_baseline(cache_key, current);
+            format!("{}{}", header, body)
+        }
+    };
+    Ok(body)
+}
+
+#[cfg(test)]
+#[path = "../tests/mcp/tool_helpers.rs"]
+mod tests;
