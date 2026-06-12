@@ -45,7 +45,7 @@ Every pull request **must** pass these checks. The full checklist is in [`PULL_R
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test`** — all 798+ tests pass
+3. **`cargo test`** — all 945 tests pass
 4. **`cargo audit`** — no known security vulnerabilities
 5. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
 6. **No `let _ = ...` dead-code suppression** — remove the unused variable instead
