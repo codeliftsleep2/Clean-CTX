@@ -466,7 +466,7 @@ impl ContextStore for BufferedStore {
             });
         }
         self.flush();
-        if let Some(mut guard) = self.inner.lock().ok() {
+        if let Ok(mut guard) = self.inner.lock() {
             guard.clear_file(file_path);
         }
     }

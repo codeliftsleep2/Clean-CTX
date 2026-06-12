@@ -8,11 +8,13 @@ Thank you for your interest in contributing! Clean-CTX is an open-source project
 
 - [Developer Documentation](docs/DEVELOPER_DOCUMENTATION.md) — build, test, extend
 - [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md) — system design and module structure
+- [Compiler IR Specification](docs/COMPILER_IR.md) — IR protocol, delta transport, wire format
+- [Angular Meta-Layer](docs/ANGULAR_META_LAYER.md) — framework annotation layer design
 - [Performance Guide](docs/PERFORMANCE.md) — benchmarks and optimization
 - [Security Guide](docs/SECURITY.md) — compliance and hardening
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) — common issues
-- [FAANG Audit](docs/FAANG_AUDIT.md) — audit findings and remediation
 - [Changelog](docs/CHANGELOG.md) — version history
+- [Roadmap](docs/ROADMAP.md) — future plans and priorities
 
 ---
 
@@ -43,7 +45,7 @@ Every pull request **must** pass these checks. The full checklist is in [`PULL_R
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test`** — all 121+ tests pass
+3. **`cargo test`** — all 798+ tests pass
 4. **`cargo audit`** — no known security vulnerabilities
 5. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
 6. **No `let _ = ...` dead-code suppression** — remove the unused variable instead
@@ -157,12 +159,14 @@ See [Developer Documentation → Testing Conventions](docs/DEVELOPER_DOCUMENTATI
 | `CONTRIBUTING.md` | Contributors | This file — overview and process |
 | `docs/DEVELOPER_DOCUMENTATION.md` | Contributors | Detailed build/test/extend guide |
 | `docs/ARCHITECTURE_OVERVIEW.md` | Architects | System design, module structure |
+| `docs/COMPILER_IR.md` | Architects | Compiler IR protocol, delta state transport, wire format |
+| `docs/ANGULAR_META_LAYER.md` | Developers | Angular Meta-Layer design, marker vocabulary, graph |
+| `docs/EDIT_TYPE.md` | Developers | Edit categorization for delta transport |
 | `docs/PERFORMANCE.md` | Architects | Benchmarks, caching, optimization |
 | `docs/SECURITY.md` | Enterprise admins | Compliance, hardening, deployment |
 | `docs/TROUBLESHOOTING.md` | Users | Common issues and resolutions |
 | `docs/CHANGELOG.md` | All | Version history |
-| `docs/FAANG_AUDIT.md` | Auditors | Audit findings and remediation |
-| `docs/REFACTORING.md` | Developers | SOLID refactoring plan |
+| `docs/ROADMAP.md` | Contributors | Future plans and priorities |
 
 ---
 

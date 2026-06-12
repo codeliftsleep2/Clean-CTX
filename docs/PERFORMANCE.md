@@ -1,6 +1,6 @@
 # Clean-CTX — Performance Guide
 
-**Last updated:** 2026-06-07
+**Last updated:** 2026-06-12
 
 ---
 
@@ -10,9 +10,9 @@
 
 | File | Raw Tokens | Low (Retained) | Low Savings | Medium (Retained) | Medium Savings | High (Retained) | High Savings |
 |------|-----------:|---------------:|------------:|------------------:|---------------:|----------------:|-------------:|
-| `sample_service.ts` (32 lines) | 193 | 36 | **81.35%** | 75 | **61.14%** | 75 | **61.14%** |
-| `LargeService.ts` (~400 lines) | 2,957 | 119 | **95.98%** | 476 | **83.90%** | 499 | **83.12%** |
-| `UserManagementService.ts` (~440 lines) | 3,912 | 155 | **96.04%** | — | — | — | — |
+| `sample_service.ts` (32 lines) | 193 | 44 | **77.20%** | 127 | **34.20%** | 135 | **30.05%** |
+| `LargeService.ts` (438 lines) | 2,957 | 74 | **97.50%** | 404 | **86.34%** | 673 | **77.24%** |
+| `UserManagementService.ts` (575 lines) | 3,912 | 155 | **96.04%** | 754 | **80.73%** | 943 | **75.89%** |
 
 **Key insight:** Larger files compress significantly better because structural overhead (class headers, method signatures, imports) is amortized across more methods. A service with 20+ methods at Low fidelity will consistently exceed 95% savings.
 

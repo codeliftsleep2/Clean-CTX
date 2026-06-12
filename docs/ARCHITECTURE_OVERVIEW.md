@@ -12,27 +12,27 @@
 │  MCP stdio Interface (JSON-RPC 2.0)                     │
 │                                                         │
 │  ┌──────────────────────┐  ┌──────────────────────────┐ │
-│  │ Zero-Touch Workflow   │  │ Heuristics Engine         │ │
-│  │  provide_code_context │  │  fidelity + strategy      │ │
-│  │  restore_context      │  │  selection per file       │ │
-│  │  context_history      │  └──────────┬───────────────┘ │
-│  │  context_stats        │             │                 │
+│  │ Zero-Touch Workflow  │  │ Heuristics Engine        │ │
+│  │ provide_code_context │  │  fidelity + strategy     │ │
+│  │  restore_context     │  │  selection per file      │ │
+│  │  context_history     │  └──────────┬───────────────┘ │
+│  │  context_stats       │             │                 │
 │  └──────────┬───────────┘             │                 │
 │             │                         │                 │
 │  ┌──────────▼─────────────────────────▼──────────────┐  │
-│  │              Compressor Engine                     │  │
-│  │  AST Extraction → Fidelity Filter → Opcode Encode  │  │
-│  │  + Text Delta Snapshots + IR Source Cache          │  │
+│  │              Compressor Engine                    │  │
+│  │  AST Extraction → Fidelity Filter → Opcode Encode │  │
+│  │  + Text Delta Snapshots + IR Source Cache         │  │
 │  └──────────┬────────────────────────────────────────┘  │
 │             │                                           │
 │  ┌──────────▼────────────┐  ┌────────────────────────┐  │
-│  │ SymbolDictionary      │  │ Decompressor            │  │
-│  │ PathDictionary        │  │ Opcode → Readable       │  │
+│  │ SymbolDictionary      │  │ Decompressor           │  │
+│  │ PathDictionary        │  │ Opcode → Readable      │  │
 │  └──────────┬────────────┘  └────────────────────────┘  │
 │             │                                           │
 │  ┌──────────▼────────────┐  ┌────────────────────────┐  │
-│  │ Tree-sitter AST       │  │ LocalStateCache         │  │
-│  │ Parser (TS + C#)      │  │ Hash + baseline snaps   │  │
+│  │ Tree-sitter AST       │  │ LocalStateCache        │  │
+│  │ Parser (TS + C#)      │  │ Hash + baseline snaps  │  │
 │  └───────────────────────┘  └────────────────────────┘  │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
@@ -45,8 +45,8 @@
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ ContextStore (ContextStore trait)                 │   │
-│  │  InMemoryContextStore | SqliteStore               │   │
+│  │ ContextStore (ContextStore trait)                │   │
+│  │InMemoryContextStore | BufferedStore → SqliteStore│   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
@@ -211,13 +211,17 @@ src/
 │   ├── server.rs                 # Stdin/stdout loop (F-02: line-size cap)
 │   ├── router.rs                 # JSON-RPC method dispatch
 │   ├── handlers.rs               # initialize, tools/list, prompts/list
-│   ├── tools.rs                  # Tool definitions + dispatch + persistence hooks
+│   ├── tools.rs                  # Tool definitions + get_tool_definitions()
+│   ├── tool_handlers.rs          # Tool handler implementations (handle_*)
+│   ├── tool_helpers.rs           # Shared helper functions for tool handlers
 │   ├── prompts.rs                # cleanctx-notation + dashboard prompt content
 │   ├── workspace.rs              # compress_workspace_dir + collect_source_files
+│   ├── workspace_util.rs         # Workspace utility functions
 │   ├── state.rs                  # McpState (dict + cache + config + persistence)
 │   ├── heuristics.rs             # Heuristics engine (fidelity + strategy selection)
 │   ├── context_store.rs          # ContextStore trait + InMemoryContextStore
 │   ├── sqlite_store.rs           # SqliteStore (SQLite-backed ContextStore)
+│   ├── buffered_store.rs         # BufferedStore (three-tier persistence wrapper)
 │   └── session_stats.rs          # SessionStats + dashboard rendering
 │
 ├── compression/                  # Core compression engine
@@ -239,19 +243,25 @@ src/
 ├── ir/                           # IR Subsystem (Compiler IR + Delta Transport)
 │   ├── mod.rs                    # Public module declarations
 │   ├── compiler.rs               # IRCompiler: source → CompiledIR
+│   ├── compiler_methods.rs       # Compiler method implementations
 │   ├── opcodes.rs                # CoreOp enum (DefClass, DefMethod, etc.)
 │   ├── wire.rs                   # ir_to_wire: CompiledIR → tuple format
 │   ├── string_table.rs           # ir_to_string_table_wire: compact index format
+│   ├── symbol_table.rs           # IR symbol table for cross-file resolution
 │   ├── delta.rs                  # DeltaComputer, IRDelta, compact_encode
 │   ├── replay.rs                 # DeltaReplay: apply deltas to baseline
 │   ├── hierarchical.rs           # Hierarchical IR (grouped by file/class/method)
+│   ├── positional.rs             # Positional encoding for compact IR format
+│   ├── render.rs                 # IR rendering to text
 │   ├── binary_wire.rs            # Binary wire format for IR transport
-│   ├── layers/
-│   │   ├── mod.rs
-│   │   ├── typescript.rs         # TypeScriptLayer for IR compilation
-│   │   ├── angular.rs            # AngularMetaLayer for IR compilation
-│   │   └── patterns.rs           # CodePatternRecognizer for IR compilation
-│   └── patterns.rs               # CompressingPatternRecognizer
+│   ├── patterns.rs               # CompressingPatternRecognizer
+│   └── layers/
+│       ├── mod.rs
+│       ├── typescript.rs         # TypeScriptLayer for IR compilation
+│       ├── csharp.rs             # C#Layer for IR compilation
+│       ├── angular.rs            # AngularMetaLayer for IR compilation
+│       ├── rust.rs               # RustLayer for IR compilation
+│       └── patterns.rs           # CodePatternRecognizer for IR compilation
 │
 ├── diff/                         # AST-level structural diff
 │   ├── mod.rs                    # Public API
@@ -375,9 +385,9 @@ Regex-based extraction of code structure is fragile — it breaks on comments co
 
 Different LLM tasks need different amounts of structural detail. Numbers below are **measured** on the in-repo fixtures (`sample_service.ts`, 32 lines / 193 raw tokens; `LargeService.ts`, 438 lines / 2,957 raw tokens) using the cl100k BPE estimator:
 
-- **Low** (86.53% – 97.46% savings): Best for "get the shape of this code" — class names, method signatures, parameter types, and one-line control-flow markers (`⊕guard`, `⊕loop`, `⊕⇒return …`). On `LargeService.ts` this drops 2,957 → 75 tokens; on `sample_service.ts` 193 → 26.
-- **Medium** (63.73% – 88.33% savings): Best for "understand control flow" — preserves `async`/`export`/`public` keywords, full method signatures, and inline behavior markers for every guard, throw, and early-return. On `LargeService.ts` 2,957 → 345; on `sample_service.ts` 193 → 70.
-- **High** (59.59% – 79.24% savings): Best for code review — preserves every TypeScript keyword, full type annotations, and embeds behavior markers directly in the method body braces. On `LargeService.ts` 2,957 → 614; on `sample_service.ts` 193 → 78.
+- **Low** (77.20% – 97.50% savings): Best for "get the shape of this code" — class names, method signatures, parameter types, and one-line control-flow markers (`⊕guard`, `⊕loop`, `⊕⇒return …`). On `LargeService.ts` this drops 2,957 → 74 tokens; on `sample_service.ts` 193 → 44.
+- **Medium** (34.20% – 86.34% savings): Best for "understand control flow" — preserves `async`/`export`/`public` keywords, full method signatures, and inline behavior markers for every guard, throw, and early-return. On `LargeService.ts` 2,957 → 404; on `sample_service.ts` 193 → 127.
+- **High** (30.05% – 77.24% savings): Best for code review — preserves every TypeScript keyword, full type annotations, and embeds behavior markers directly in the method body braces. On `LargeService.ts` 2,957 → 673; on `sample_service.ts` 193 → 135.
 
 **Scale matters:** compression efficiency grows with file size because structural overhead (class headers, import blocks, method signatures) is amortized across more methods. A service with 20+ methods at Low fidelity will consistently exceed 95% savings.
 
@@ -581,30 +591,32 @@ All numbers below were produced by the `compress_code_context` tool on the in-re
 ### Per-file results (single pass)
 
 | File | Lines | Raw tokens | Fidelity | Retained | Saved | Reduction |
-|---|---:|---:|---|---:|---:|---:|
-| `sample_service.ts` | 32 | 193 | **Low**    | 26  | 167 | **86.53%** |
-| `sample_service.ts` | 32 | 193 | **Medium** | 70  | 123 | **63.73%** |
-| `sample_service.ts` | 32 | 193 | **High**   | 78  | 115 | **59.59%** |
-| `LargeService.ts`   | 438 | 2,957 | **Low**    | 75  | 2,882 | **97.46%** |
-| `LargeService.ts`   | 438 | 2,957 | **Medium** | 345 | 2,612 | **88.33%** |
-| `LargeService.ts`   | 438 | 2,957 | **High**   | 614 | 2,343 | **79.24%** |
-| `UserManagementService.ts` | 440 | 3,912 | **Low**    | 155 | 3,757 | **96.04%** |
+| |---|---:|---:|---|---:|---:|---:|
+| `sample_service.ts` | 32 | 193 | **Low**    | 44  | 149 | **77.20%** |
+| `sample_service.ts` | 32 | 193 | **Medium** | 127 | 66  | **34.20%** |
+| `sample_service.ts` | 32 | 193 | **High**   | 135 | 58  | **30.05%** |
+| `LargeService.ts`   | 438 | 2,957 | **Low**    | 74  | 2,883 | **97.50%** |
+| `LargeService.ts`   | 438 | 2,957 | **Medium** | 404 | 2,553 | **86.34%** |
+| `LargeService.ts`   | 438 | 2,957 | **High**   | 673 | 2,284 | **77.24%** |
+| `UserManagementService.ts` | 575 | 3,912 | **Low**    | 155 | 3,757 | **96.04%** |
+| `UserManagementService.ts` | 575 | 3,912 | **Medium** | 754 | 3,158 | **80.73%** |
+| `UserManagementService.ts` | 575 | 3,912 | **High**   | 943 | 2,969 | **75.89%** |
 
 ### Per-fidelity range
 
 | Fidelity | Range across fixtures | Best for |
 |---|---|---|
-| **Low**    | 86.53% – **97.46%** | "Get the shape" — class names + method signatures only |
-| **Medium** | 63.73% – **88.33%** | "Understand control flow" — signatures + behavior markers |
-| **High**   | 59.59% – **79.24%** | Code review — full TypeScript keywords preserved |
+| **Low**    | 77.20% – **97.50%** | "Get the shape" — class names + method signatures only |
+| **Medium** | 34.20% – **86.34%** | "Understand control flow" — signatures + behavior markers |
+| **High**   | 30.05% – **77.24%** | Code review — full TypeScript keywords preserved |
 
-### Aggregate (both fixtures, summed)
+### Aggregate (all three fixtures, summed)
 
 | Scenario | Total raw | Total retained | Reduction |
 |---|---:|---:|---:|
-| All Low fidelity      | 3,150 | 101  | **96.79%** |
-| All Medium fidelity   | 3,150 | 415  | **86.83%** |
-| All High fidelity     | 3,150 | 692  | **78.03%** |
+| All Low fidelity      | 7,062 | 273  | **96.13%** |
+| All Medium fidelity   | 7,062 | 1,285 | **81.80%** |
+| All High fidelity     | 7,062 | 1,751 | **75.21%** |
 
 ### 50-Edit Session Simulation (Delta Transport, All Fidelities)
 
@@ -635,15 +647,7 @@ See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for full per-edit breakdown and the 
 
 ---
 
-## FAANG Audit & Refactoring
-
-This codebase underwent a comprehensive FAANG-level audit (41 findings across 5 phases) and a full SOLID refactoring (5 phases). See:
-
-- [`docs/FAANG_AUDIT.md`](FAANG_AUDIT.md) — Complete audit findings and remediation status
-- [`docs/REFACTORING.md`](REFACTORING.md) — SOLID refactoring plan and execution history
-- [`docs/FAANG_AUDIT_ZERO_TOUCH.md`](FAANG_AUDIT_ZERO_TOUCH.md) — Zero-touch workflow + persistence audit
-
-**Key results:**
+**Key results from the FAANG audit and SOLID refactoring:**
 - `cargo clippy --all-targets -- -D warnings`: 0 warnings
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
