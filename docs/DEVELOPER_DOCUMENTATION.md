@@ -9,18 +9,20 @@
 
 1. [Getting Started](#getting-started)
 2. [Project Overview](#project-overview)
-3. [Building & Testing](#building--testing)
-4. [Codebase Organization](#codebase-organization)
-5. [Zero-Touch Workflow](#zero-touch-workflow)
-6. [Persistence Layer](#persistence-layer)
-7. [Adding a New Language](#adding-a-new-language)
-8. [Adding a New Tool](#adding-a-new-tool)
-9. [Adding a New Opcode](#adding-a-new-opcode)
-10. [Adding a New Φ Marker](#adding-a-new--marker)
-11. [Angular Meta-Layer Architecture](#angular-meta-layer-architecture)
-12. [Configuration System](#configuration-system)
-13. [Testing Conventions](#testing-conventions)
-14. [Code Quality Gates](#code-quality-gates)
+3. [Architecture Overview](#architecture-overview)
+4. [Building & Testing](#building--testing)
+5. [Codebase Organization](#codebase-organization)
+6. [Zero-Touch Workflow](#zero-touch-workflow)
+7. [Persistence Layer](#persistence-layer)
+8. [Compiler IR Subsystem](#compiler-ir-subsystem)
+9. [Adding a New Language](#adding-a-new-language)
+10. [Adding a New Tool](#adding-a-new-tool)
+11. [Adding a New Opcode](#adding-a-new-opcode)
+12. [Adding a New Φ Marker](#adding-a-new--marker)
+13. [Meta-Layer Architecture](#meta-layer-architecture)
+14. [Configuration System](#configuration-system)
+15. [Testing Conventions](#testing-conventions)
+16. [Code Quality Gates](#code-quality-gates)
 
 ---
 
@@ -65,6 +67,22 @@ The **recommended entry point** is `provide_code_context` — a single tool that
 
 ---
 
+## Architecture Overview
+
+The system architecture is documented in detail in [`docs/ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md). The key subsystems are:
+
+- **MCP stdio Interface** — JSON-RPC 2.0 request/response loop over stdin/stdout
+- **Heuristics Engine** — selects fidelity and strategy per file based on intent, size, language, and Angular detection
+- **Compressor Engine** — AST extraction → fidelity filter → opcode encoding → text delta snapshots
+- **IR Subsystem** — structured intermediate representation with delta-based state transport (see [Compiler IR Subsystem](#compiler-ir-subsystem))
+- **Decompressor** — opcode → readable expansion (precomputed sorted opcodes for O(L×N) performance)
+- **Meta-Layer** — framework/dialect-specific annotation layers that enrich compressed output (see [Meta-Layer Architecture](#meta-layer-architecture))
+- **Persistence Layer** — built-in SQLite cross-session storage for baselines and deltas, with three-tier reliability (batched writes, exponential backoff retry, JSON file fallback) — see [Persistence Layer](#persistence-layer)
+
+For the full system diagram, module dependency graph, and design decisions (tree-sitter, no network, HashMap over BTreeMap), see [`docs/ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md).
+
+---
+
 ## Building & Testing
 
 ```bash
@@ -106,13 +124,17 @@ src/
 │   ├── server.rs           # Stdin/stdout JSON-RPC loop
 │   ├── router.rs           # Method dispatch
 │   ├── handlers.rs         # Lifecycle + discovery handlers
-│   ├── tools.rs            # Tool implementations + persistence hooks
+│   ├── tools.rs            # Tool definitions + get_tool_definitions()
+│   ├── tool_handlers.rs    # Tool handler implementations (handle_*)
+│   ├── tool_helpers.rs     # Shared helper functions for tool handlers
 │   ├── prompts.rs          # System prompts (cleanctx-notation + dashboard)
 │   ├── workspace.rs        # Workspace compression
+│   ├── workspace_util.rs   # Workspace utility functions
 │   ├── state.rs            # McpState (shared session state + persistence)
 │   ├── heuristics.rs       # Heuristics engine (fidelity + strategy selection)
 │   ├── context_store.rs    # ContextStore trait + InMemoryContextStore
 │   ├── sqlite_store.rs     # SqliteStore (SQLite-backed ContextStore)
+│   ├── buffered_store.rs   # BufferedStore (three-tier persistence wrapper)
 │   └── session_stats.rs    # SessionStats + dashboard rendering
 │
 ├── compression/            # Core compression engine
@@ -131,13 +153,25 @@ src/
 │
 ├── ir/                     # IR Subsystem (Compiler IR + Delta Transport)
 │   ├── compiler.rs         # IRCompiler: source → CompiledIR
+│   ├── compiler_methods.rs # Compiler method implementations
 │   ├── opcodes.rs          # CoreOp enum
 │   ├── wire.rs             # ir_to_wire: CompiledIR → tuple format
 │   ├── string_table.rs     # Compact index format
+│   ├── symbol_table.rs     # IR symbol table for cross-file resolution
 │   ├── delta.rs            # DeltaComputer, IRDelta
 │   ├── replay.rs           # ContextState: apply deltas to baseline
+│   ├── hierarchical.rs     # Hierarchical IR (grouped by file/class/method)
+│   ├── positional.rs       # Positional encoding for compact IR format
+│   ├── render.rs           # IR rendering to text
 │   ├── binary_wire.rs      # Binary wire format for IR transport
-│   └── layers/             # Language-specific compilation layers
+│   ├── patterns.rs         # CompressingPatternRecognizer
+│   └── layers/
+│       ├── mod.rs
+│       ├── typescript.rs   # TypeScriptLayer for IR compilation
+│       ├── csharp.rs       # C#Layer for IR compilation
+│       ├── angular.rs      # AngularMetaLayer for IR compilation
+│       ├── rust.rs         # RustLayer for IR compilation
+│       └── patterns.rs     # CodePatternRecognizer for IR compilation
 │
 ├── angular_meta/           # Angular Meta-Layer (Phases 1–3)
 │   ├── mod.rs              # MetaBlock struct, run_meta_layer entry point
@@ -212,15 +246,21 @@ To add a new strategy to the heuristics engine:
 
 ## Persistence Layer
 
-The persistence layer provides **cross-session persistence** for compression contexts via SQLite. It is enabled by setting the `CLEANCTX_PERSISTENCE_DB` environment variable.
+The persistence layer provides **cross-session persistence** for compression contexts via SQLite. It is **enabled by default** (stored in `.clean-ctx/persistence.db` relative to the project root) and can be disabled in `.clean-ctx.json` with `"persistence": { "enabled": false }`.
 
 ### Architecture
 
 ```
 ContextStore trait (src/mcp/context_store.rs)
     ├── InMemoryContextStore  (session-scoped, in RAM)
-    └── SqliteStore           (cross-session, SQLite on disk)
+    ├── SqliteStore           (cross-session, SQLite on disk)
+    └── BufferedStore         (three-tier reliability wrapper)
 ```
+
+The `BufferedStore` wraps `SqliteStore` with a **three-tier reliability stack**:
+1. **Batched writes** — operations queue in memory and flush as a single SQLite transaction when the buffer reaches 5 pending ops (or on explicit flush)
+2. **Retry with exponential backoff** — transient DB failures (file lock, WAL contention) are retried up to 3 times with [0ms, 50ms, 200ms] delays
+3. **JSON file fallback** — if all retries fail, data writes as standalone JSON files in `.clean-ctx/fallback/`. On the next successful flush, fallback files are re-imported automatically
 
 ### ContextStore Trait
 
@@ -276,6 +316,23 @@ To add a new storage backend:
 3. Add the store variant to `McpState` in `src/mcp/state.rs`
 4. Add initialization logic in `src/mcp/mod.rs`
 5. Add tests in `src/tests/mcp/<backend>_store.rs`
+
+---
+
+## Compiler IR Subsystem
+
+The Compiler IR subsystem transforms source code into a structured intermediate representation (IR) for efficient delta-based state transport. It is documented in full in [`docs/COMPILER_IR.md`](COMPILER_IR.md). Key capabilities:
+
+- **Compilation** — `IRCompiler` transforms source → `CompiledIR` (a sequence of structured instructions with CoreOp opcodes)
+- **Wire formats** — `ir_to_wire` serializes CompiledIR into compact tuple format; `binary_wire::encode/decode` provides a binary BLOB format for persistence
+- **String tables** — reduces repeated identifiers to compact index references
+- **Delta transport** — `DeltaComputer` computes instruction-level deltas between two IR states; deltas are represented as `IRDelta` envelopes with `+`/`-`/`~` operations
+- **State replay** — `ContextState` maintains a baseline and applies deltas incrementally without re-compilation
+- **Language-specific compilation layers** — `src/ir/layers/` contains per-language compilation rules
+
+The IR subsystem powers the `delta_code_context` MCP tool and the persistence layer's delta append/replay features.
+
+For the full protocol specification, state machine lifecycle, and all phase implementations (A through H), see [`docs/COMPILER_IR.md`](COMPILER_IR.md).
 
 ---
 
@@ -575,84 +632,45 @@ Wire the new marker into `decorators.rs` (for class-level markers) or the approp
 
 ---
 
-## Angular Meta-Layer Architecture
+## Meta-Layer Architecture
 
-The Meta-Layer is a three-tier system that enriches compressed output with Angular framework context. It is **purely additive** — it never modifies existing TS compaction output.
+Meta-Layers are framework/dialect-specific annotation layers that enrich compressed output with structured metadata. They are **purely additive** — they never modify or interfere with the base compression output and have zero overhead for files that don't match the target framework.
 
-### Module Overview
+### Concept
 
-| Module | Tier | Purpose |
-|--------|------|---------|
-| `detect.rs` | 0 | Heuristic: is this file Angular? |
-| `decorators.rs` | 1 | Extract `@Component`/`@Injectable`/etc. from class captures |
-| `markers.rs` | 1 | Φ marker construction, rendering, and expansion |
-| `bundler.rs` | 2 | Resolve `*.component.ts` → `.html` + `.scss` file triplets |
-| `template.rs` | 2 | tree-sitter-html Angular-syntax template shape extraction |
-| `style.rs` | 2 | CSS/SCSS class selector and variable extraction |
-| `footer.rs` | 2 | `§ΦMAP` workspace footer formatting |
-| `graph.rs` | 3 | Cross-file DI injection + selector linkage graph |
-| `graph_state.rs` | 3 | `McpState` integration wrapper |
+A Meta-Layer is a pluggable module that:
 
-### Detection Strategy (`detect.rs`)
+1. **Detects** whether a file belongs to a particular framework or dialect
+2. **Extracts** framework-specific metadata (decorators, templates, dependency graphs)
+3. **Annotates** the compressed output with structured markers using a unique prefix
+4. **Augments** workspace-level output with cross-file dependency information
 
-A file is "Angular" if it meets either condition:
-1. Contains a **strong** decorator signal: `@Component(`, `@Injectable(`, `@NgModule(`, `@Directive(`, `@Pipe(`, etc.
-2. Imports from `@angular/core` AND has at least one `@Input`/`@Output` (weak signal paired with import).
+Each Meta-Layer uses a unique Greek-letter prefix for its markers to avoid collisions:
+- `Φ` (Phi) — Angular
+- Future layers will use their own prefixes (e.g., `Ψ` for React, `Ω` for Vue)
 
-Plain `@Input`/`@Output` alone (no strong signal, no `@angular/core` import) returns `false` — these decorators are also used by MobX/Vue.
+### Angular Meta-Layer (Φ)
 
-### Extraction Strategy (`decorators.rs`)
+The Angular Meta-Layer is the **first reference implementation** of the Meta-Layer pattern. It is a fully built-out, three-tier system that enriches compressed output with Angular framework context. Angular is the only framework currently supported.
 
-The extractor walks raw text of `class.root` tree-sitter captures (no AST re-parse):
-1. Find the text before `class <Name>` keyword (the "head")
-2. Collect all `@...(...)` decorator calls from the head
-3. Classify each decorator and emit the corresponding Φ marker line
-4. Optionally scan the class body for field-level `@Input`/`@Output` and signal-based APIs
+For complete details on the Angular Meta-Layer — including detection strategy, decorator extraction, template shape extraction, file-triplet bundling, cross-file dependency graphs, fidelity control, and the full marker vocabulary — see [`docs/ANGULAR_META_LAYER.md`](ANGULAR_META_LAYER.md).
 
-### Fidelity Control (F-ANG-23)
+### Edit Type System
 
-The `fidelity` parameter controls Meta-Layer verbosity:
+The edit type system (`docs/EDIT_TYPE.md`) defines the vocabulary for categorizing edits as deltas are applied to compressed contexts. It provides a structured way to report what kind of changes occurred in a delta: small changes, method-level edits, structural refactors, cross-method changes, and more. This is used by the delta transport layer to annotate delta payloads.
 
-| Fidelity | Class-level | Field-level | DI/Signals |
-|----------|------------|-------------|------------|
-| Low | Φcmp, Φsvc, Φmod, Φdir, Φpipe | — | — |
-| Medium | All above | Φin, Φout | — |
-| High | All above | Φin, Φout | Φinjects, Φmodel, input()/output() signals |
+### Extending to New Frameworks
 
-### Template Extraction (`template.rs`)
+The Meta-Layer pattern is designed to be extensible. To add a new framework Meta-Layer:
 
-Uses `tree-sitter-html` to parse Angular templates and extract structural shape:
-- **Tags** and **custom elements** (tags containing a hyphen)
-- **Property bindings** (`[prop]="expr"`) and **event bindings** (`(event)="handler"`)
-- **Two-way bindings** (`[(ngModel)]="value"`)
-- **Structural directives** (`*ngIf`, `*ngFor`)
-- **Modern control flow** (`@if`, `@for`, `@switch`) — detected via text-node word-boundary scanning since these are not valid HTML
-- **Defer blocks** with trigger extraction (`@defer (on viewport)`)
-- **`@let` declarations** (Angular 18+)
-- **Self-closing tags** (`<app-avatar />`)
-
-Raw HTML content is **never** included — only the structural summary.
-
-### Cross-File Graph (`graph.rs`)
-
-Built once per `compress_workspace` call using the typestate pattern:
-
-1. **Collection phase** — each file's `extract_graph_entries` produces `(class_name, file_alias, kind, selector, injects, pipe_name)` tuples
-2. **Registration** — `AngularGraphBuilder::register_class` adds entries to the mutable builder
-3. **Resolution** — `builder.build()` consumes the builder, builds `injected_by` reverse edges, and returns the immutable `AngularGraph`
-4. **Querying** — `resolve_inject_type("UserService")` → `"UserService@α12"`, `resolve_selector("app-user-card")` → `"UserCardComponent@α9"`
-
-The graph is purely in-memory and discarded after the workspace manifest is emitted.
-
-### Adding a New Framework Meta-Layer
-
-The Meta-Layer pattern is designed to be extensible to other frameworks (React, Vue, Svelte). To add a new framework:
-
-1. Create `src/<framework>_meta/` with the same module structure
+1. Create `src/<framework>_meta/` following the module structure in `src/angular_meta/`
 2. Implement detection (`is_<framework>_file`)
-3. Define a marker vocabulary in `markers.rs`
-4. Implement extraction in `decorators.rs` (or equivalent)
-5. The `Φ` prefix is Angular-specific; use a different Greek letter for new frameworks (e.g., `Ψ` for React, `Ω` for Vue)
+3. Define a marker vocabulary using a unique Greek letter prefix
+4. Implement extraction for the framework's specific annotations
+5. Wire the new Meta-Layer into the compiler pipeline
+6. Add tests in `src/tests/<framework>_meta/`
+
+See [`docs/ANGULAR_META_LAYER.md`](ANGULAR_META_LAYER.md) for the reference implementation pattern.
 
 ---
 

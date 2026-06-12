@@ -80,9 +80,9 @@ The workflow automatically:
 | `delta_code_context` | IR-level delta compression — instruction-level deltas between compiled IR states |
 | `delta_text_context` | Text-level delta compression — line-level deltas between compressed body snapshots |
 
-### Persistence Layer (Optional)
+### Persistence Layer (Built-in)
 
-Optionally, Clean-CTX can persist compression contexts across sessions using SQLite:
+Compression contexts persist automatically across sessions using SQLite (enabled by default, stored in `.clean-ctx/persistence.db`):
 
 | Tool | Purpose |
 |------|---------|
@@ -91,10 +91,12 @@ Optionally, Clean-CTX can persist compression contexts across sessions using SQL
 | `replay_history` | Replay deltas from DB (crash recovery) |
 | `purge_old_deltas` | Trim old delta history |
 
-Enable by setting the `CLEANCTX_PERSISTENCE_DB` environment variable:
-```bash
-set CLEANCTX_PERSISTENCE_DB=C:\Users\you\.clean-ctx\contexts.db
-```
+Persistence uses a **three-tier reliability stack**:
+1. **Batched writes** — operations queue in memory and flush as single transactions
+2. **Retry with exponential backoff** — transient DB failures retry up to 3 times
+3. **JSON file fallback** — if all retries fail, data writes to `.clean-ctx/fallback/` and re-imports on next successful flush
+
+Disable in `.clean-ctx.json` with: `"persistence": { "enabled": false }`
 
 ### Smart Caching
 
@@ -219,103 +221,33 @@ First call stores the current state as baseline. Subsequent calls return only th
 
 ---
 
-## 🗜️ Token Compression Test Results
+## 📊 Performance Benchmarks
 
-Results from running the `compress_code_context` tool on both test files (the only `.ts` files available in `src/test_files/`: `sample_service.ts` and `LargeService.ts`) at all three fidelity levels.
+### Token Compression
 
----
+Clean-CTX delivers **75–97% token waste reduction** on real-world files. See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for the full per-file breakdown across all three fidelity levels (Low/Medium/High) and aggregated savings across all test files.
 
-### 📁 `sample_service.ts` (small — 32 lines)
-**Raw tokens: 193**
+Key highlights:
+- **Low fidelity**: Up to **97.5% savings** on large files (438 lines)
+- **Medium fidelity**: Up to **86.3% savings** — balanced detail with behavior markers
+- **High fidelity**: Up to **77.2% savings** with full type annotations preserved
+- **Aggregate** (3 test files): **96.1% worst-case reduction** at Low fidelity
 
-| Fidelity | Retained | Saved | Reduction |
-|----------|----------|-------|-----------|
-| **Low** | 26 | 167 | **86.53%** |
-| **Medium** | 70 | 123 | **63.73%** |
-| **High** | 78 | 115 | **59.59%** |
+### Delta Transport (50-Edit Session)
 
-- **Low** → Just the structural skeleton: `class SampleService; $ctor(); processComplexData(payload); healthCheck()`
-- **Medium** → Class shell + method signatures + behavior markers (⊕guard, ⊕loop, ⊕⇒return)
-- **High** → Full type signatures preserved with public modifiers and inline behavior markers
+Simulated 50 sequential edits on a ~440-line file across all three fidelity levels:
 
----
+| Fidelity | Savings vs Raw | Delta vs ReComp |
+|----------|:--------------:|:----------------:|
+| **Low** | 96.3% | +8.5% overhead |
+| **Medium** | **92.0%** | **−51% cheaper** |
+| **High** | 89.9% | **−53% cheaper** |
 
-### 📁 `LargeService.ts` (large — 438 lines)
-**Raw tokens: 2,957** (15.3× the size of the small file)
+- Delta transport **breaks even from Edit #1** at all fidelities
+- At Medium/High, delta is **51–53% cheaper** than full recompression
+- Run the simulations: `cargo run --example fifty_edit_simulation` (Low), `cargo run --example fidelity_comparison` (all three)
 
-| Fidelity | Retained | Saved | Reduction |
-|----------|----------|-------|-----------|
-| **Low** | 75 | 2,882 | **97.46%** |
-| **Medium** | 345 | 2,613 | **88.33%** |
-| **High** | 614 | 2,343 | **79.24%** |
-
-- **Low** → Aggressive skeleton: stripped 20 imports to `; ; ; ; …`, kept class name + 9 method signatures
-- **Medium** → Imports listed (without paths), all method signatures with `async`/types, behavior markers preserved for error/return guards
-- **High** → All 20 imports retained with full module paths, full type annotations, and method body behavior markers
-
----
-
-### 🔍 Key Insights
-
-1. **Scale matters** — Larger files compress much more efficiently. The 438-line file saved nearly **2,900 tokens** at low fidelity, vs. only 167 on the 32-line file.
-2. **Fidelity trade-off is clear**:
-   - **Low** = best for overview/structural reasoning (≤10% of original tokens)
-   - **Medium** = balanced — signatures + key branches (≈10–15% of original)
-   - **High** = best for refactoring/editing where type info matters (≈20% of original)
-3. **Path aliasing** — Both files share a §PATHMAP dictionary, so the second file got even better compression because the path context was already established (α1 → α2 reuse).
-4. **Behavior markers (⊕guard, ⊕loop, ⊕⇒return, ⊕!throw)** carry the control-flow semantics even at low fidelity, which is what makes the output actually useful for an LLM to reason about.
-
-### 📊 Aggregated Savings
-- **Total raw tokens** across 6 compressions: 3,150 tokens (193 × 3 + 2,957 × 3 averaged… actually 193 + 2,957 = 3,150 per pass, 6 passes)
-- **Best case (low fidelity on both)**: 193 + 2,957 = 3,150 → 26 + 75 = 101 tokens = **96.79% aggregate reduction**
-- **Worst case (high fidelity on both)**: 3,150 → 78 + 614 = 692 tokens = **78.03% aggregate reduction**
-
-The tool delivers **78–97% token waste reduction** in real-world conditions. ✅
-
----
-
-## 🧪 50-Edit Session Simulation: Delta Transport Savings
-
-We simulated a realistic afternoon developer session on an Angular service file (`UserManagementService.ts`, ~440 lines) with **50 sequential edits** grouped into 5 categories. The simulation was run at **all three fidelity levels** for comparison. Each edit was measured across three pipelines:
-
-### Cross-Fidelity Results
-
-| Fidelity | Raw | ReComp | Delta | ReSav% | DelSav% | Delta vs ReComp |
-|----------|----:|------:|------:|------:|-------:|:---------------:|
-| **Low** (max compress) | 227,310 | 7,823 | 8,490 | 96.6% | 96.3% | +8.5% overhead |
-| **Medium** (balanced) | 227,310 | 37,338 | 18,287 | 83.6% | **92.0%** | **−51.0%** cheaper |
-| **High** (full detail) | 227,310 | 48,556 | 22,955 | 78.6% | 89.9% | **−52.7%** cheaper |
-
-> **Key insight:** At Medium and High fidelity, delta transport is **actually cheaper** than full recompression! This is because compressed output at these fidelities is 5–6× larger, making the text-level delta (which only sends changed lines) significantly smaller than re-running the full compression pipeline. At Low fidelity the compressed output is so tiny (avg 156 tokens) that the fixed delta envelope cost (~80 chars) adds measurable overhead.
-
-### Low Fidelity — Savings by Edit Category (most common daily-use setting)
-
-| Category | Edits | Raw | ReComp | Delta | ReSav% | DelSav% |
-|----------|-------|----:|------:|------:|------:|------:|
-| Small changes | 1-10 | 39,202 | 1,545 | 988 | 96.1% | **97.5%** |
-| Method-level | 11-20 | 41,370 | 1,498 | 1,580 | 96.4% | 96.2% |
-| Structural | 21-30 | 44,610 | 1,587 | 1,740 | 96.4% | 96.1% |
-| Cross-method | 31-40 | 49,598 | 1,383 | 2,436 | **97.2%** | 95.1% |
-| Refactor | 41-50 | 52,530 | 1,810 | 1,746 | 96.6% | 96.7% |
-
-### Single-Pass Compression Baselines (Edit #1)
-
-| Fidelity | Raw | Compressed | Ratio |
-|----------|----:|----------:|:-----:|
-| Low | 3,912 | 155 | 25.2× |
-| Medium | 3,912 | 754 | 5.2× |
-| High | 3,912 | 943 | 4.1× |
-
-### Key Insights
-
-- **Low fidelity** (daily-use default): Delta transport delivers **96.3% savings** vs raw, within 0.3 pp of full recompression. Delta overhead is +8.5% due to the tiny compressed output size.
-- **Medium fidelity**: Delta transport saves **92.0%** vs raw and is **51% cheaper** than full recompression — avoiding re-parsing pays off.
-- **High fidelity**: Delta transport saves **89.9%** vs raw and is **52.7% cheaper** than full recompression.
-- **Delta breaks even immediately** at all fidelities — cumulative delta cost ≤ full recompression from Edit #1 onward.
-- **Worst-case delta saving** (Low fidelity, Edit #41): **90.8%** — even the most expensive edit saves over 90%.
-- Run the simulations yourself: `cargo run --example fifty_edit_simulation` (Low) and `cargo run --example fidelity_comparison` (all three).
-
-See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for full per-edit breakdown and cross-fidelity comparison tables.
+See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for per-edit breakdowns, caching analysis, microbenchmarks, and optimization checklist.
 
 ---
 
@@ -522,7 +454,7 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 | Unsafe code | 0 blocks |
 | Meta-Layer | ✅ Phases 1–3 complete (decorators, bundling, graph) |
 | Workflow | ✅ Zero-touch workflow with heuristics engine |
-| Persistence | ✅ SQLite cross-session persistence (optional) |
+| Persistence | ✅ SQLite cross-session persistence (built-in, three-tier reliability) |
 
 ---
 
@@ -534,12 +466,14 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contributors | Overview, process, quick links to detailed docs |
 | [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md) | Architects | System design, module structure, pipeline stages, design decisions |
 | [`docs/DEVELOPER_DOCUMENTATION.md`](docs/DEVELOPER_DOCUMENTATION.md) | Contributors | Building, testing, adding languages/tools/opcodes, code quality gates |
+| [`docs/COMPILER_IR.md`](docs/COMPILER_IR.md) | Architects | Compiler IR protocol, delta state transport, wire format, phase implementation |
+| [`docs/ANGULAR_META_LAYER.md`](docs/ANGULAR_META_LAYER.md) | Developers | Angular Meta-Layer design, marker vocabulary, template extraction, graph |
+| [`docs/EDIT_TYPE.md`](docs/EDIT_TYPE.md) | Developers | Edit categorization vocabulary for delta transport annotation |
 | [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Users | Common issues, error codes, diagnostic commands |
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Architects | Benchmarks, caching, memory profile, optimization checklist |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Administrators | Compliance checklist, hardening, SBOM, air-gap deployment |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | All | Version history with all additions, fixes, and deferrals |
-| [`docs/FAANG_AUDIT.md`](docs/FAANG_AUDIT.md) | Auditors | Complete audit findings and remediation status |
-| [`docs/REFACTORING.md`](docs/REFACTORING.md) | Developers | SOLID refactoring plan and execution history |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Contributors | Future plans, prioritized items, carry-over from audit |
 
 ---
 
