@@ -473,6 +473,7 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Architects | Benchmarks, caching, memory profile, optimization checklist |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Administrators | Compliance checklist, hardening, SBOM, air-gap deployment |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | All | Version history with all additions, fixes, and deferrals |
+| [`docs/INTELLIGENCE_LAYER_PLAN.md`](docs/INTELLIGENCE_LAYER_PLAN.md) | Architects | Intelligence Layer: PageRank scoring, blast radius, token budget packing |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Contributors | Future plans, prioritized items, carry-over from audit |
 
 ---
