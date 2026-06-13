@@ -138,9 +138,11 @@ impl SessionStats {
             _ => self.full_compress_count += 1,
         }
 
-        // Compute savings as percentage
+        // Compute savings as percentage (use saturating_sub to avoid overflow
+        // when compressed_tokens > raw_tokens, e.g. for very small files)
         let savings_pct = if raw_tokens > 0 {
-            ((raw_tokens - compressed_tokens) as f64 / raw_tokens as f64) * 100.0
+            let saved = raw_tokens.saturating_sub(compressed_tokens);
+            (saved as f64 / raw_tokens as f64) * 100.0
         } else {
             0.0
         };
@@ -174,25 +176,28 @@ impl SessionStats {
 
     /// Merge another `SessionStats` into this one.
     ///
-    /// Files not already present in `self` are added. For files that
-    /// exist in both, the version adds up (cumulative across sessions).
-    /// Totals are recalculated from the merged file set.
+    /// **In-memory data always wins for freshness.**  DB-recovered stats
+    /// (from `rebuild_stats()`) may carry placeholder values, so we
+    /// treat them as supplementary: only files NOT already tracked
+    /// in memory are imported.  For files that appear in both, the
+    /// in-memory counters are preserved untouched.
+    ///
+    /// Session-level counters (`full_compress_count`, `delta_count`)
+    /// are still merged so the dashboard header reflects cumulative
+    /// work across sessions.
     pub fn merge(&mut self, other: &SessionStats) {
         for (path, other_fs) in &other.files {
-            if let Some(existing) = self.files.get_mut(path) {
-                // File exists in both: combine version + delta counts
-                existing.version += other_fs.version;
-                existing.delta_count += other_fs.delta_count;
-                // Use the larger token counts (more data = better estimate)
-                existing.raw_tokens = existing.raw_tokens.max(other_fs.raw_tokens);
-                existing.compressed_tokens = existing.compressed_tokens.max(other_fs.compressed_tokens);
-                existing.savings_pct = if existing.raw_tokens > 0 {
-                    ((existing.raw_tokens - existing.compressed_tokens) as f64 / existing.raw_tokens as f64) * 100.0
-                } else {
-                    0.0
-                };
+            if self.files.contains_key(path) {
+                // File already has in-memory stats — in-memory is fresher,
+                // so skip overwriting. We still merge version to avoid
+                // the dashboard showing lower versions after restart.
+                // Deliberately do NOT overwrite tokens/fidelity/strategy.
+                if let Some(existing) = self.files.get_mut(path) {
+                    existing.version = existing.version.max(other_fs.version);
+                    existing.delta_count += other_fs.delta_count;
+                }
             } else {
-                // New file from DB: add it
+                // DB-only file — import as-is so it appears in the dashboard.
                 self.files.insert(path.clone(), other_fs.clone());
             }
         }

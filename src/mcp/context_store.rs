@@ -17,12 +17,8 @@ use std::time::SystemTime;
 use crate::compression::Fidelity;
 
 /// Metadata about a stored compression context for a file.
-///
-/// Some fields are not yet read by the in-memory implementation; they
-/// are defined to match the future SQLite schema. Suppressed to keep
-/// the codebase warning-free.
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct StoredContextMeta {
     /// The original file path.
     pub file_path: String,
@@ -36,6 +32,10 @@ pub struct StoredContextMeta {
     pub source_hash: String,
     /// When this context was first created.
     pub created_at: SystemTime,
+    /// Raw token count at time of compression (0 if unknown).
+    pub raw_tokens: u64,
+    /// Compressed token count at time of compression (0 if unknown).
+    pub compressed_tokens: u64,
 }
 
 /// A delta record appended to a context's history.
@@ -71,6 +71,8 @@ pub trait ContextStore {
     ///
     /// Returns a context ID string that can be used for subsequent
     /// `append_delta` calls.
+    /// `raw_tokens` and `compressed_tokens` may be 0 if unknown.
+    #[allow(clippy::too_many_arguments)]
     fn save_context(
         &mut self,
         file_path: &str,
@@ -78,6 +80,8 @@ pub trait ContextStore {
         compressed_output: &str,
         ir_blobs: Option<&[u8]>,
         source_hash: &str,
+        raw_tokens: u64,
+        compressed_tokens: u64,
     ) -> Result<String, Box<dyn std::error::Error>>;
 
     /// Load the latest context metadata for a file, if any.
@@ -153,6 +157,8 @@ impl ContextStore for InMemoryContextStore {
         _compressed_output: &str,
         _ir_blobs: Option<&[u8]>,
         source_hash: &str,
+        raw_tokens: u64,
+        compressed_tokens: u64,
     ) -> Result<String, Box<dyn std::error::Error>> {
         let id = Self::generate_id(file_path);
         let meta = StoredContextMeta {
@@ -162,6 +168,8 @@ impl ContextStore for InMemoryContextStore {
             is_angular: false,
             source_hash: source_hash.to_string(),
             created_at: SystemTime::now(),
+            raw_tokens,
+            compressed_tokens,
         };
         self.contexts.insert(file_path.to_string(), meta);
         self.id_to_path.insert(id.clone(), file_path.to_string());

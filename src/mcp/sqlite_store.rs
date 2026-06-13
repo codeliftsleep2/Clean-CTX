@@ -112,6 +112,15 @@ impl SqliteStore {
             ")?;
         }
 
+        if current_version < 2 {
+            // v2: Add token count columns so rebuild_stats() uses real data
+            self.conn.execute_batch("
+                ALTER TABLE contexts ADD COLUMN raw_tokens INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE contexts ADD COLUMN compressed_tokens INTEGER NOT NULL DEFAULT 0;
+                INSERT INTO _schema_version (version) VALUES (2);
+            ")?;
+        }
+
         Ok(())
     }
 
@@ -187,7 +196,7 @@ impl SqliteStore {
         Ok(Some((final_ir, version as u32)))
     }
 
-    /// Rebuild SessionStats from DB.
+    /// Rebuild SessionStats from DB (schema v2 — reads real token counts).
     ///
     /// Queries all contexts and their delta counts to reconstruct
     /// a SessionStats that reflects what's persisted.
@@ -196,6 +205,8 @@ impl SqliteStore {
 
         let mut stmt = self.conn.prepare(
             "SELECT c.file_path, c.fidelity,
+                    COALESCE(c.raw_tokens, 0) as raw_tokens,
+                    COALESCE(c.compressed_tokens, 0) as compressed_tokens,
                     (SELECT COUNT(*) FROM deltas d WHERE d.context_id = c.id) as delta_count
              FROM contexts c"
         )?;
@@ -203,21 +214,27 @@ impl SqliteStore {
         let rows = stmt.query_map([], |row| {
             let path: String = row.get(0)?;
             let fid: i32 = row.get(1)?;
-            let dc: i32 = row.get(2)?;
-            Ok((path, fid, dc))
+            let raw_tokens: i64 = row.get(2)?;
+            let compressed_tokens: i64 = row.get(3)?;
+            let dc: i32 = row.get(4)?;
+            Ok((path, fid, raw_tokens, compressed_tokens, dc))
         })?;
 
         for row in rows {
-            let (path, _fid, dc) = row?;
-            // Record as a delta compression (delta_count is tracked via FileStats)
+            let (path, fid, raw_tokens, compressed_tokens, dc) = row?;
             let strategy = if dc > 0 { "delta" } else { "full" };
-            // HIGH-03 known limitation: token counts are placeholder values (100/30)
-            // because the contexts table doesn't store raw/compressed token counts.
-            // A schema migration (v2) adding raw_tokens/compressed_tokens columns
-            // to the contexts table would fix this. For now, the dashboard shows
-            // approximate data after a server restart.
+            // Use real token counts from the DB, falling back to estimates
+            // for rows created before the v2 migration.
+            let raw = if raw_tokens > 0 { raw_tokens as usize } else { 0 };
+            let compressed = if compressed_tokens > 0 { compressed_tokens as usize } else { 0 };
+            let fidelity_str = match fid {
+                0 => "low",
+                1 => "medium",
+                2 => "high",
+                _ => "low",
+            };
             stats.record_compression(
-                &path, 100, 30, "low", false, strategy
+                &path, raw, compressed, fidelity_str, false, strategy
             );
         }
 
@@ -291,15 +308,17 @@ impl ContextStore for SqliteStore {
         compressed_output: &str,
         ir_blobs: Option<&[u8]>,
         source_hash: &str,
+        raw_tokens: u64,
+        compressed_tokens: u64,
     ) -> Result<String, Box<dyn std::error::Error>> {
         let id = format!("ctx-{}", source_hash); // deterministic ID from content hash
         let fid = fidelity as i32;
         let ir_binary = ir_blobs.unwrap_or(&[]);
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO contexts (id, file_path, content_hash, fidelity, ir_binary, pretty_text, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))",
-            params![id, file_path, source_hash, fid, ir_binary, compressed_output],
+            "INSERT OR REPLACE INTO contexts (id, file_path, content_hash, fidelity, ir_binary, pretty_text, updated_at, raw_tokens, compressed_tokens)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'), ?7, ?8)",
+            params![id, file_path, source_hash, fid, ir_binary, compressed_output, raw_tokens as i64, compressed_tokens as i64],
         )?;
 
         Ok(id)
@@ -346,6 +365,8 @@ impl ContextStore for SqliteStore {
                 is_angular: false,
                 source_hash: hash,
                 created_at,
+                raw_tokens: 0,
+                compressed_tokens: 0,
             }))
         } else {
             Ok(None)

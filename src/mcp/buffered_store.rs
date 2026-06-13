@@ -42,6 +42,8 @@ enum WriteOp {
         compressed_output: String,
         ir_binary: Vec<u8>,
         source_hash: String,
+        raw_tokens: u64,
+        compressed_tokens: u64,
     },
     AppendDelta {
         context_id: String,
@@ -143,7 +145,7 @@ impl BufferedStore {
         let mut flushed = 0;
         for op in ops {
             match op {
-                WriteOp::SaveContext { file_path, fidelity, compressed_output, ir_binary, source_hash } => {
+                WriteOp::SaveContext { file_path, fidelity, compressed_output, ir_binary, source_hash, raw_tokens, compressed_tokens } => {
                     if let Err(e) = crate::mcp::context_store::ContextStore::save_context(
                         &mut *conn,
                         file_path,
@@ -151,6 +153,8 @@ impl BufferedStore {
                         compressed_output,
                         Some(ir_binary),
                         source_hash,
+                        *raw_tokens,
+                        *compressed_tokens,
                     ) {
                         let _ = conn.rollback();
                         return Err(format!("save_context failed: {e}"));
@@ -195,7 +199,7 @@ impl BufferedStore {
             let path = fallback_dir.join(&filename);
 
             let json = match op {
-                WriteOp::SaveContext { file_path, fidelity, compressed_output, ir_binary, source_hash } => {
+                WriteOp::SaveContext { file_path, fidelity, compressed_output, ir_binary, source_hash, raw_tokens, compressed_tokens } => {
                     serde_json::json!({
                         "type": "save_context",
                         "file_path": file_path,
@@ -203,6 +207,8 @@ impl BufferedStore {
                         "compressed_output": compressed_output,
                         "ir_binary": base64::engine::general_purpose::STANDARD.encode(ir_binary),
                         "source_hash": source_hash,
+                        "raw_tokens": raw_tokens,
+                        "compressed_tokens": compressed_tokens,
                     })
                 }
                 WriteOp::AppendDelta { context_id, delta_payload, edit_type } => {
@@ -275,10 +281,13 @@ impl BufferedStore {
                     let source_hash = json["source_hash"].as_str().unwrap_or("");
                     let ir_b64 = json["ir_binary"].as_str().unwrap_or("");
                     let ir_binary = base64::engine::general_purpose::STANDARD.decode(ir_b64).unwrap_or_default();
+                    let raw_tokens = json["raw_tokens"].as_u64().unwrap_or(0);
+                    let compressed_tokens = json["compressed_tokens"].as_u64().unwrap_or(0);
 
                     if let Err(e) = conn.save_context(
                         file_path, fidelity, compressed,
                         Some(&ir_binary), source_hash,
+                        raw_tokens, compressed_tokens,
                     ) {
                         eprintln!("[clean-ctx] Fallback reimport save_context failed: {e}");
                         continue;
@@ -339,6 +348,8 @@ impl BufferedStore {
                 compressed_output: compressed_output.to_string(),
                 ir_binary: ir_binary.to_vec(),
                 source_hash: source_hash.to_string(),
+                raw_tokens: 0,
+                compressed_tokens: 0,
             });
             let len = pending.len();
             if len >= BATCH_THRESHOLD {
@@ -392,6 +403,8 @@ impl ContextStore for BufferedStore {
         compressed_output: &str,
         ir_blobs: Option<&[u8]>,
         source_hash: &str,
+        raw_tokens: u64,
+        compressed_tokens: u64,
     ) -> Result<String, Box<dyn std::error::Error>> {
         let id = format!("ctx-{}", source_hash);
         if let Ok(mut pending) = self.pending.lock() {
@@ -401,6 +414,8 @@ impl ContextStore for BufferedStore {
                 compressed_output: compressed_output.to_string(),
                 ir_binary: ir_blobs.unwrap_or(&[]).to_vec(),
                 source_hash: source_hash.to_string(),
+                raw_tokens,
+                compressed_tokens,
             });
             let len = pending.len();
             if len >= BATCH_THRESHOLD {

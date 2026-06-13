@@ -204,6 +204,19 @@ fn compress_pass(
                 ));
                 manifest.push_str(&compressed);
                 manifest.push('\n');
+
+                // Record per-file stats for workspace compression (Phase 1 fix)
+                let ws_source = source_ref.unwrap_or("");
+                let ws_raw = super::tool_helpers::estimate_tokens(ws_source);
+                let ws_compressed = super::tool_helpers::estimate_tokens(&compressed);
+                state.session_stats.record_compression(
+                    entry,
+                    ws_raw,
+                    ws_compressed,
+                    &format!("{:?}", fidelity).to_lowercase(),
+                    false,
+                    "workspace",
+                );
             }
             Err(e) => {
                 ctx.errors.push((entry.clone(), e.to_string()));
@@ -271,6 +284,19 @@ fn compress_pass_with_global_symbols(
                 // The compressed output has the report header + body.
                 // We need the body for global symbol encoding.
                 let body = extract_body_from_compressed(&compressed);
+
+                // Record per-file stats for global-symbol workspace compression (Phase 1 fix)
+                let gs_raw = super::tool_helpers::estimate_tokens(&source_code);
+                let gs_compressed = super::tool_helpers::estimate_tokens(&compressed);
+                state.session_stats.record_compression(
+                    entry,
+                    gs_raw,
+                    gs_compressed,
+                    &format!("{:?}", fidelity).to_lowercase(),
+                    false,
+                    "workspace_gsym",
+                );
+
                 entries.push(CompressedEntry {
                     path: entry.clone(),
                     alias,
