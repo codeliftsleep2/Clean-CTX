@@ -135,7 +135,7 @@ pub fn compress_file_with_source(
                     savings_percentage,
                 }
             } else {
-                calculate_savings(&source_code, "// [CACHE_HIT]")
+                calculate_savings(&source_code, "// [CACHE_HIT]", None)
             };
             return Ok(crate::compression::report::format_compact_cache_hit(
                 meta.raw_tokens,
@@ -168,7 +168,7 @@ pub fn compress_file_with_source(
                 savings_percentage,
             }
         } else {
-            calculate_savings(&source_code, &cached_notice)
+            calculate_savings(&source_code, &cached_notice, None)
         };
 
         // F-04: also surface the Structures line on a cache hit so
@@ -482,7 +482,7 @@ pub fn compress_source(
                     savings_percentage,
                 }
             } else {
-                crate::analytics::calculate_savings(source_code, "// [CACHE_HIT]")
+                crate::analytics::calculate_savings(source_code, "// [CACHE_HIT]", None)
             };
             return Ok(crate::compression::report::format_compact_cache_hit(
                 meta.raw_tokens,
@@ -511,7 +511,7 @@ pub fn compress_source(
                 savings_percentage,
             }
         } else {
-            crate::analytics::calculate_savings(source_code, &cached_notice)
+            crate::analytics::calculate_savings(source_code, &cached_notice, None)
         };
 
         let ratio_report = format!(

@@ -59,6 +59,20 @@ pub(super) fn estimate_tokens(text: &str) -> usize {
     text.len() / 4
 }
 
+/// Count tokens using the provided pluggable tokenizer (R-19).
+///
+/// When `tokenizer` is `Some`, uses the pluggable tokenizer for accurate
+/// token counting. When `None`, falls back to the rough chars/4 estimate.
+pub(super) fn count_tokens_with_tokenizer(
+    text: &str,
+    tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
+) -> usize {
+    match tokenizer {
+        Some(tok) => tok.count_tokens(text),
+        None => estimate_tokens(text),
+    }
+}
+
 /// Compile a file to IR, detecting language and running the full
 /// 4-layer compilation pipeline.
 ///

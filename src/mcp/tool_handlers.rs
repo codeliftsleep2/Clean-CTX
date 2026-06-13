@@ -39,8 +39,8 @@ use crate::mcp::McpState;
 use crate::mcp::context_store::ContextStore;
 use crate::protocol::send_response;
 
-use super::tools::{parse_fidelity_arg, resolve_fidelity};
-use super::tool_helpers::{compress_text_body, compile_file_ir, resolve_file_path, estimate_tokens, diff_code_context_handler};
+use super::tools::{parse_fidelity_arg, resolve_fidelity, parse_tokenizer_arg};
+use super::tool_helpers::{compress_text_body, compile_file_ir, resolve_file_path, estimate_tokens, diff_code_context_handler, count_tokens_with_tokenizer};
 
 #[cfg(test)]
 #[path = "../tests/mcp/tool_handlers.rs"]
@@ -114,9 +114,15 @@ pub(super) fn handle_compress_code_context(
             // Also compile IR and store in context state
             let ir_result = compile_file_ir(file_path_str, effective_fidelity, state);
 
-            // Record stats before building response
-            let raw_tokens = estimate_tokens(source_text);
-            let compressed_tokens = estimate_tokens(&compressed_text);
+    // R-19: Resolve tokenizer from tool arg + config
+    let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
+    let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind)
+        .ok();
+    let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
+
+    // Record stats using pluggable tokenizer (R-19)
+    let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
+    let compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
             state.session_stats.record_compression(
                 file_path_str,
                 raw_tokens,
@@ -381,8 +387,17 @@ pub(super) fn handle_delta_code_context(
         })
     };
 
-    // Record stats for the IR delta operation
-    let delta_compressed_tokens = current_ir.instructions.len();
+    // R-19: Resolve tokenizer from tool arg + config
+    let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
+    let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind)
+        .ok();
+    let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
+
+    // Record stats for the IR delta operation using pluggable tokenizer
+    let delta_compressed_tokens = count_tokens_with_tokenizer(
+        &delta_source_text,
+        tokenizer_ref,
+    );
     state.session_stats.record_compression(
         &resolved_path,
         delta_raw_tokens,
@@ -1005,7 +1020,7 @@ pub(super) fn handle_context_history(
 
 /// Handle `context_stats` — dashboard (text or JSON).
 /// Auto-flushes any pending persistence writes before generating stats.
-/// Appends DB-persisted stats to show what survived to SQLite.
+/// Merges in-memory stats with DB-persisted stats for a cumulative view.
 pub(super) fn handle_context_stats(
     id: &Value,
     params: &Value,
@@ -1014,17 +1029,23 @@ pub(super) fn handle_context_stats(
     // Flush any pending persistence writes before returning stats
     state.flush_persistence();
 
-    // Query DB for persisted stats (after flush) to show persistence status
+    // Query DB for persisted stats (after flush)
     let db_stats = state.persistence_store.as_ref().and_then(|store| {
         store.sqlite().and_then(|guard| guard.rebuild_stats().ok())
     });
+
+    // Build a merged cumulative stats view: in-memory + DB
+    let mut merged = state.session_stats.clone();
+    if let Some(ref db) = db_stats {
+        merged.merge(db);
+    }
 
     let file_path = params["arguments"]["filePath"].as_str();
     let format = params["arguments"]["format"].as_str().unwrap_or("text");
 
     if let Some(fp) = file_path {
-        // Stats for specific file
-        let stats = state.session_stats.file_stats(fp);
+        // Stats for specific file (from merged view)
+        let stats = merged.file_stats(fp);
         match stats {
             Some(fs) => {
                 let mut text = format!(
@@ -1039,23 +1060,15 @@ pub(super) fn handle_context_stats(
                     fs.is_angular,
                     fs.strategy,
                 );
-                // Append persistence info
-                if let Some(ref db) = db_stats {
-                    let in_db = db.file_stats(fp).is_some();
-                    text.push_str(&format!("\n  Persistence: {} in DB", if in_db { "yes" } else { "no" }));
+                // Persistence info
+                if db_stats.is_some() {
+                    text.push_str("\n  Persistence: enabled");
                 } else {
                     text.push_str("\n  Persistence: disabled");
                 }
                 if format == "json" {
                     let mut json = serde_json::json!(fs);
-                    if let Some(ref db) = db_stats {
-                        json["persistence"] = serde_json::json!({
-                            "in_db": db.file_stats(fp).is_some(),
-                            "enabled": true
-                        });
-                    } else {
-                        json["persistence"] = serde_json::json!({"enabled": false});
-                    }
+                    json["persistence"] = serde_json::json!({"enabled": db_stats.is_some()});
                     send_response(&serde_json::json!({
                         "jsonrpc": "2.0",
                         "id": id,
@@ -1074,12 +1087,9 @@ pub(super) fn handle_context_stats(
                 }
             }
             None => {
-                let mut text = format!("No in-memory stats for file: {}", fp);
-                if let Some(ref db) = db_stats {
-                    if db.file_stats(fp).is_some() {
-                        text.push_str("\n  But file IS persisted in DB (from a previous session)");
-                    }
-                    text.push_str("\n  Persistence: enabled");
+                let mut text = format!("No stats for file: {}", fp);
+                if db_stats.is_some() {
+                    text.push_str("\n  Persistence: enabled (no data for this file)");
                 } else {
                     text.push_str("\n  Persistence: disabled");
                 }
@@ -1093,33 +1103,30 @@ pub(super) fn handle_context_stats(
             }
         }
     } else {
-        // Full dashboard
-        let mut text = crate::mcp::session_stats::render_dashboard_text(&state.session_stats);
-        // Append persistence section
-        if let Some(ref db) = db_stats {
-            let db_summary = db.summary();
+        // Full cumulative dashboard: in-memory + DB merged
+        let mut text = crate::mcp::session_stats::render_dashboard_text(&merged);
+
+        // R-19: Show active tokenizer
+        let active_tokenizer = state.config.tokenizer.to_string();
+        text.push_str(&format!("── Tokenizer ──\n  Active: {} (config: {})\n", active_tokenizer, active_tokenizer));
+
+        // Persistence status line
+        if db_stats.is_some() {
+            let db_summary = db_stats.as_ref().map(|db| db.summary()).unwrap();
             text.push_str(&format!(
-                "\n── Persistence (SQLite) ──\n  DB Files Tracked: {}\n  DB Full Compressions: {}\n  DB Delta Operations: {}",
+                "── Persistence (SQLite) ──\n  Status: enabled\n  DB Files: {}\n  DB Compressions: {}\n  DB Deltas: {}\n",
                 db_summary.total_files,
                 db_summary.full_compress_count,
                 db_summary.delta_count,
             ));
         } else {
-            text.push_str("\n── Persistence (SQLite) ──\n  Persistence: disabled");
+            text.push_str("── Persistence (SQLite) ──\n  Status: disabled\n");
         }
 
         if format == "json" {
-            let mut json = crate::mcp::session_stats::render_dashboard_json(&state.session_stats);
-            if let Some(ref db) = db_stats {
-                json["persistence"] = serde_json::json!({
-                    "enabled": true,
-                    "db_files_tracked": db.summary().total_files,
-                    "db_full_compressions": db.summary().full_compress_count,
-                    "db_delta_ops": db.summary().delta_count,
-                });
-            } else {
-                json["persistence"] = serde_json::json!({"enabled": false});
-            }
+            let mut json = crate::mcp::session_stats::render_dashboard_json(&merged);
+            json["tokenizer"] = serde_json::json!(state.config.tokenizer.to_string());
+            json["persistence"] = serde_json::json!({"enabled": db_stats.is_some()});
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": id,

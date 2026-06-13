@@ -118,7 +118,7 @@ where
                     savings_percentage,
                 }
             } else {
-                calculate_savings(&source_code, "// [CACHE_HIT]")
+                calculate_savings(&source_code, "// [CACHE_HIT]", None)
             };
             let compact = crate::compression::report::format_compact_cache_hit(
                 meta.raw_tokens,
@@ -155,7 +155,7 @@ where
                 savings_percentage,
             }
         } else {
-            calculate_savings(&source_code, &cached_notice)
+            calculate_savings(&source_code, &cached_notice, None)
         };
 
         on_progress(CompressionProgress {

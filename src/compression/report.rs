@@ -63,7 +63,7 @@ pub fn format_final_output(
             import_count,
         );
     }
-    let meta = calculate_savings(source_code, compacted_body);
+    let meta = calculate_savings(source_code, compacted_body, None);
     let ratio_report = format!(
         "// Structures: {} classes, {} methods, {} imports | {}/{} tokens",
         class_count,
@@ -92,7 +92,7 @@ fn format_final_output_compact(
     method_count: usize,
     import_count: usize,
 ) -> String {
-    let meta = calculate_savings(source_code, compacted_body);
+    let meta = calculate_savings(source_code, compacted_body, None);
     // Compact header: §raw:compressed:savings_pct|L|classes:methods:imports|alias§
     // Round savings to 1 decimal place (max 5 chars e.g. 99.9)
     let savings_str = format_savings_pct(meta.savings_percentage);

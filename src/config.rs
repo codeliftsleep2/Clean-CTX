@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use crate::tokenizer::TokenizerKind;
 
 // ── Smart defaults for intent-based fidelity selection ──────────────
 
@@ -194,6 +195,13 @@ pub struct CleanCtxConfig {
     /// Automatically use deltas for follow-up edits in `provide_code_context`.
     #[serde(default = "default_true")]
     pub auto_delta: bool,
+
+    /// Default tokenizer backend for token counting.
+    ///
+    /// Supported values: `"cl100k"` (default), `"o200k"`, `"claude"`, `"llama3"`.
+    /// This can be overridden per-tool-call via the `tokenizer` argument.
+    #[serde(default)]
+    pub tokenizer: TokenizerKind,
 }
 
 /// Per-framework Meta-Layer configuration.
@@ -243,6 +251,7 @@ impl Default for CleanCtxConfig {
             persistence: PersistenceConfig::default(),
             auto_angular: default_true(),
             auto_delta: default_true(),
+            tokenizer: TokenizerKind::default(),
         }
     }
 }

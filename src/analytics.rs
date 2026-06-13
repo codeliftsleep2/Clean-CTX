@@ -1,7 +1,9 @@
 // src/analytics.rs
 //
-// Token analytics: exact local token counts using the tiktoken cl100k model
-// (the same model family used by GPT-4 and many Claude context estimators).
+// Token analytics: exact local token counts using pluggable tokenizers
+// (R-19). The default is cl100k (the same model family used by GPT-4
+// and many Claude context estimators), but callers can select o200k
+// (GPT-4o), claude, or llama3 via tool arguments or config.
 //
 // Phase 1 (FAANG audit F-01): the BPE engine used to be re-loaded on every
 // call via `tiktoken_rs::cl100k_base().unwrap()`. A failed BPE load would
@@ -16,11 +18,17 @@
 // (e.g. Docker `--read-only`) and in sandboxed environments. The
 // `bpe_or_init()` call at server startup serves as a defence-in-depth
 // check that the embedded data is intact.
+//
+// R-19 (Pluggable tokenizers): `calculate_savings` now accepts an
+// optional `&dyn Tokenizer` parameter. When `None`, the legacy
+// cl100k BPE engine is used for backward compatibility.
 
 use std::fmt;
 use std::sync::OnceLock;
 
 use tiktoken_rs::CoreBPE;
+
+use crate::tokenizer::Tokenizer;
 
 /// Returned by [`bpe`] when the BPE data cannot be loaded.
 #[derive(Debug)]
@@ -87,17 +95,21 @@ pub struct TokenMetadata {
     pub savings_percentage: f64,
 }
 
-/// Measures exact local token counts completely offline using the tiktoken cl100k model.
+/// Measures exact local token counts using the provided tokenizer.
 ///
-/// Uses the cached BPE engine from [`bpe`]; see [`bpe_or_init`] for the
-/// preferred startup-time initialisation that converts load failures into
-/// a recoverable error.
-pub fn calculate_savings(raw_text: &str, compressed_text: &str) -> TokenMetadata {
-    let bpe = bpe();
-
-    // Count exact token vector lengths
-    let raw_tokens = bpe.encode_with_special_tokens(raw_text).len();
-    let compressed_tokens = bpe.encode_with_special_tokens(compressed_text).len();
+/// When `tokenizer` is `None`, falls back to the legacy cl100k BPE
+/// engine for backward compatibility.
+///
+/// R-19: The new `tokenizer` parameter allows callers to use o200k,
+/// claude, or llama3 tokenizers for more accurate token counts.
+pub fn calculate_savings(raw_text: &str, compressed_text: &str, tokenizer: Option<&dyn Tokenizer>) -> TokenMetadata {
+    let (raw_tokens, compressed_tokens) = if let Some(tok) = tokenizer {
+        (tok.count_tokens(raw_text), tok.count_tokens(compressed_text))
+    } else {
+        let bpe = bpe();
+        (bpe.encode_with_special_tokens(raw_text).len(),
+         bpe.encode_with_special_tokens(compressed_text).len())
+    };
 
     let savings_percentage = if raw_tokens > 0 {
         let saved = raw_tokens.saturating_sub(compressed_tokens);

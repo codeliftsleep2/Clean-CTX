@@ -19,7 +19,7 @@ fn rust_compression_has_token_savings() {
     let source = include_str!("../../test_files/rust/sample_service.rs");
 
     // Calculate token savings directly from the source text
-    let meta = calculate_savings(source, source);
+    let meta = calculate_savings(source, source, None);
     assert!(
         meta.raw_tokens > 0,
         "Rust source should have >0 raw tokens, got {}",

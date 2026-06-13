@@ -39,7 +39,7 @@ fn calculate_savings_smoke_test() {
     let raw = "the quick brown fox jumps over the lazy dog the quick brown fox";
     let compressed = "$0 $1 $2 $3 $4 $5 $6 $7 $8 $0 $1 $2";
 
-    let meta = calculate_savings(raw, compressed);
+    let meta = calculate_savings(raw, compressed, None);
 
     assert!(meta.raw_tokens > 0, "raw token count must be > 0");
     assert!(meta.compressed_tokens > 0, "compressed token count must be > 0");
@@ -53,7 +53,7 @@ fn calculate_savings_smoke_test() {
 #[test]
 fn calculate_savings_empty_input() {
     // Empty input should not divide-by-zero and should report 0% savings.
-    let meta = calculate_savings("", "anything");
+    let meta = calculate_savings("", "anything", None);
 
     assert_eq!(meta.raw_tokens, 0);
     assert_eq!(meta.savings_percentage, 0.0);
