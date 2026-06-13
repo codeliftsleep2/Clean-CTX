@@ -26,12 +26,12 @@ pub(crate) fn dispatch(
         }
         "tools/list" => {
             if let Some(ref id) = req.id {
-                handlers::handle_tools_list(id);
+                handlers::handle_tools_list(id, state);
             }
         }
         "prompts/list" => {
             if let Some(ref id) = req.id {
-                handlers::handle_prompts_list(id);
+                handlers::handle_prompts_list(id, state);
             }
         }
         "prompts/get" => {
@@ -39,7 +39,7 @@ pub(crate) fn dispatch(
                 match req.params.as_ref() {
                     Some(params) => {
                         let prompt_name = params["name"].as_str().unwrap_or("");
-                        handlers::handle_prompts_get(id, prompt_name);
+                        handlers::handle_prompts_get(id, prompt_name, state);
                     }
                     None => {
                         send_response(&serde_json::json!({

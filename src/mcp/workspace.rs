@@ -183,6 +183,12 @@ fn compress_pass(
         .cloned()
         .collect();
 
+    // C-1 fix: Create tokenizer once before the loop instead of per-file.
+    let ws_tok = crate::tokenizer::create_tokenizer(
+        crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
+    ).ok();
+    let ws_tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = ws_tok.as_deref();
+
     for entry in &compressible {
         // Pre-read via source_cache so bundle_pass/graph_pass
         // get cache hits instead of re-reading from disk.
@@ -205,10 +211,10 @@ fn compress_pass(
                 manifest.push_str(&compressed);
                 manifest.push('\n');
 
-                // Record per-file stats for workspace compression (Phase 1 fix)
+                // Record per-file stats for workspace compression (MED-2 fix: use pluggable tokenizer)
                 let ws_source = source_ref.unwrap_or("");
-                let ws_raw = super::tool_helpers::estimate_tokens(ws_source);
-                let ws_compressed = super::tool_helpers::estimate_tokens(&compressed);
+                let ws_raw = super::tool_helpers::count_tokens_with_tokenizer(ws_source, ws_tok_ref);
+                let ws_compressed = super::tool_helpers::count_tokens_with_tokenizer(&compressed, ws_tok_ref);
                 state.session_stats.record_compression(
                     entry,
                     ws_raw,
@@ -262,6 +268,12 @@ fn compress_pass_with_global_symbols(
 
     let mut entries: Vec<CompressedEntry> = Vec::new();
 
+    // C-1 fix: Create tokenizer once before the loop instead of per-file.
+    let gs_tok = crate::tokenizer::create_tokenizer(
+        crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
+    ).ok();
+    let gs_tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = gs_tok.as_deref();
+
     for entry in &compressible {
         // Read the source code via source_cache (Finding 1 / workspace.rs).
         let source_code = match state.read_source(entry) {
@@ -285,9 +297,9 @@ fn compress_pass_with_global_symbols(
                 // We need the body for global symbol encoding.
                 let body = extract_body_from_compressed(&compressed);
 
-                // Record per-file stats for global-symbol workspace compression (Phase 1 fix)
-                let gs_raw = super::tool_helpers::estimate_tokens(&source_code);
-                let gs_compressed = super::tool_helpers::estimate_tokens(&compressed);
+                // Record per-file stats for global-symbol workspace compression (MED-2 fix: use pluggable tokenizer)
+                let gs_raw = super::tool_helpers::count_tokens_with_tokenizer(&source_code, gs_tok_ref);
+                let gs_compressed = super::tool_helpers::count_tokens_with_tokenizer(&compressed, gs_tok_ref);
                 state.session_stats.record_compression(
                     entry,
                     gs_raw,

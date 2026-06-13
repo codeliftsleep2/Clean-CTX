@@ -83,6 +83,80 @@ impl Default for HeuristicsConfig {
 
 fn default_large_file_threshold() -> usize { 300 }
 
+// ── Cache configuration ──────────────────────────────────────────
+
+/// Prompt cache configuration for Anthropic API breakpoint optimization.
+///
+/// Controls cache breakpoint injection into JSON-RPC `_meta.cache_hints`
+/// fields. When enabled, the MCP server annotates stable content responses
+/// (system prompt vocabulary, tool definitions, persisted baselines) with
+/// `cache_control` hints so the LLM never re-pays the 1.25× write
+/// multiplier on content that hasn't changed.
+///
+/// Defaults are chosen for out-of-the-box savings: stable regions get
+/// a 1-hour TTL, the rolling tail (dynamic content) gets the Anthropic
+/// 5-minute default fallback.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheConfig {
+    /// Master switch for prompt cache optimization annotations.
+    /// When `false`, no `_meta.cache_hints` are injected into any response.
+    #[serde(default = "default_cache_enabled")]
+    pub enabled: bool,
+
+    /// TTL for the system prompt / opcode vocabulary prompt resource.
+    /// The vocabulary is stable across every session — it only changes
+    /// on a binary version bump. Default: "1h".
+    #[serde(default = "default_stable_ttl")]
+    pub system_prompt_ttl: String,
+
+    /// TTL for the MCP tool definitions block (~24k tokens).
+    /// Tool definitions are stable across every session — they only
+    /// change when tools are added/removed. Default: "1h".
+    #[serde(default = "default_stable_ttl")]
+    pub tools_ttl: String,
+
+    /// TTL for persisted workspace baselines (unchanged files).
+    /// Stable until file content changes. Default: "1h".
+    #[serde(default = "default_stable_ttl")]
+    pub baseline_ttl: String,
+
+    /// TTL for the rolling tail (dynamic content that changes each turn).
+    /// Matches Anthropic's 5-minute default fallback so we don't pay the
+    /// 2.0× write multiplier on content that changes every turn.
+    #[serde(default = "default_tail_ttl")]
+    pub tail_ttl: String,
+
+    /// Semantic version of the opcode vocabulary.
+    /// Bumped only when opcodes/markers change in the codebase.
+    #[serde(default = "default_vocab_version")]
+    pub vocab_version: String,
+
+    /// Semantic version of the tool definitions.
+    /// Bumped only when tools are added or removed.
+    #[serde(default = "default_tool_version")]
+    pub tool_defs_version: String,
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_cache_enabled(),
+            system_prompt_ttl: default_stable_ttl(),
+            tools_ttl: default_stable_ttl(),
+            baseline_ttl: default_stable_ttl(),
+            tail_ttl: default_tail_ttl(),
+            vocab_version: default_vocab_version(),
+            tool_defs_version: default_tool_version(),
+        }
+    }
+}
+
+fn default_cache_enabled() -> bool { true }
+fn default_stable_ttl() -> String { "1h".to_string() }
+fn default_tail_ttl() -> String { "5m".to_string() }
+fn default_vocab_version() -> String { "v1".to_string() }
+fn default_tool_version() -> String { "v1".to_string() }
+
 // ── Persistence configuration (placeholder) ────────────────────────
 
 /// Persistence configuration (placeholder for future SQLite layer).
@@ -202,6 +276,12 @@ pub struct CleanCtxConfig {
     /// This can be overridden per-tool-call via the `tokenizer` argument.
     #[serde(default)]
     pub tokenizer: TokenizerKind,
+
+    /// Prompt cache configuration for Anthropic API breakpoint optimization.
+    /// Controls injection of `_meta.cache_hints` into MCP responses for
+    /// stable content regions (vocabulary, tools, baselines).
+    #[serde(default)]
+    pub cache: CacheConfig,
 }
 
 /// Per-framework Meta-Layer configuration.
@@ -252,6 +332,7 @@ impl Default for CleanCtxConfig {
             auto_angular: default_true(),
             auto_delta: default_true(),
             tokenizer: TokenizerKind::default(),
+            cache: CacheConfig::default(),
         }
     }
 }

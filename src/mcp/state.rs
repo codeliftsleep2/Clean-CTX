@@ -17,7 +17,7 @@
 // arguments; the dict and cache stay single-threaded (the MCP server
 // is single-threaded by design) and the config is shared immutably.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use crate::angular_meta::graph_state::AngularGraphHandle;
 use crate::cache::LocalStateCache;
@@ -26,6 +26,7 @@ use crate::dictionary::PathDictionary;
 use crate::compression::text_delta::TextDeltaComputer;
 use crate::ir::replay::ContextState;
 use crate::mcp::buffered_store::BufferedStore;
+use crate::mcp::cache_hints::CacheMetrics;
 use crate::mcp::context_store::InMemoryContextStore;
 use crate::mcp::session_stats::SessionStats;
 use crate::mcp::sqlite_store::SqliteStore;
@@ -74,6 +75,15 @@ pub struct McpState {
     /// Initialized from `config.persistence` — `None` if disabled or
     /// if DB open fails.
     pub persistence_store: Option<BufferedStore>,
+
+    /// Tracks which cache breakpoints have already been emitted this session.
+    /// Key format: "{region}::{breaker}" — e.g., "tools::tools-v1".
+    /// Deduplication prevents paying the 2.0× write multiplier on re-emission.
+    pub emitted_breakpoints: HashSet<String>,
+
+    /// Cache efficiency metrics for the dashboard.
+    /// Records hits, misses, tokens_saved, and per-region status.
+    pub cache_metrics: CacheMetrics,
 }
 
 impl McpState {
@@ -130,6 +140,8 @@ impl McpState {
             session_stats,
             context_store: InMemoryContextStore::new(),
             persistence_store,
+            emitted_breakpoints: HashSet::new(),
+            cache_metrics: CacheMetrics::default(),
         }
     }
 

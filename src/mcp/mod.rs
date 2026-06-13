@@ -15,6 +15,7 @@ mod handlers;
 mod tool_handlers;
 mod tool_helpers;
 pub(crate) mod buffered_store;
+pub(crate) mod cache_hints;
 pub(crate) mod context_store;
 pub(crate) mod heuristics;
 pub(crate) mod prompts;
@@ -33,3 +34,7 @@ pub use state::McpState;
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     server::run()
 }
+
+#[cfg(test)]
+#[path = "../tests/mcp/regression.rs"]
+mod regression;

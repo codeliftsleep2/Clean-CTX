@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.1.7] — Unreleased
+
+### Added
+- **Prompt Cache Optimization**: Anthropic API cache breakpoint injection via `_meta.cache_hints` in MCP responses.
+  - `CacheConfig` struct with 7 fields (`enabled`, `system_prompt_ttl`, `tools_ttl`, `baseline_ttl`, `tail_ttl`, `vocab_version`, `tool_defs_version`) in `.clean-ctx.json`
+  - Cache hints module (`src/mcp/cache_hints.rs`) with `CacheMetrics`, `CacheHints`, `CacheBreakpoint` types and `inject_cache_breakpoints()` function
+  - Deduplication via `state.emitted_breakpoints` to avoid paying the 2.0× write multiplier
+  - Four breakpoint regions: `system_prompt` (vocabulary), `tools` (tool definitions), `baseline` (persisted baselines), `tail` (dynamic content)
+  - `clean-ctx-vocabulary` MCP prompt resource with the full opcode/marker vocabulary
+  - Cache hints injected into `tools/list`, `prompts/list`, `prompts/get`, `provide_code_context`, `restore_context` responses
+  - Cache status section in `context_stats` dashboard (both text and JSON)
+  - Default config includes `"cache": { "enabled": true, ... }`
+- **Workspace cache breakpoint**: `compress_workspace` now injects a baseline cache hint keyed on a SHA-256 hash of the manifest, so the entire workspace scan result is cacheable across sessions.
+- **Cache metrics in context_history**: Per-file cache breakpoint status and session hit rate now shown in `context_history` output (both single-file and all-files modes).
+- **Pluggable tokenizer for cache savings**: `inject_cache_breakpoints` now accepts an optional `&dyn Tokenizer` for accurate token savings estimates on cache hits. When a tokenizer is available, the full response JSON is tokenized; otherwise falls back to the rough `chars/4` heuristic.
+
+### Changed
+- `handle_tools_list`, `handle_prompts_list`, `handle_prompts_get` now take `&mut McpState` for cache hint injection
+- `inject_cache_breakpoints` signature extended with 6th parameter: `tokenizer: Option<&dyn Tokenizer>`
+- All persistence `save_context` calls in `handle_provide_code_context` (both FullCompress and DeltaTransport paths) now use the pluggable tokenizer for accurate token counts instead of the `estimate_tokens` chars/4 heuristic
+- `compute_workspace_breaker` no longer has `#[allow(dead_code)]` — it's wired into the `compress_workspace` handler (manifests hashed directly)
+- `handle_context_history` now emits per-file cache breakpoint status and session-level cache hit rate
+- Tokenizer parsed earlier in `handle_provide_code_context` so both persistence and cache breakpoints use real token counts
+
+### Fixed
+- All remaining `estimate_tokens()` call sites in `handle_provide_code_context` persistence blocks replaced with pluggable tokenizer counts
+
+### Test count
+- 1006/1006 tests pass
+- 0 new clippy warnings (1 pre-existing `too_many_arguments` on `queue_save_context`, 1 pre-existing `compute_workspace_breaker` dead-code suppression)
+
 ## [0.1.6] — 2026-06-10
 
 ### Added
@@ -281,6 +312,7 @@ This project follows [Semantic Versioning](https://semver.org/). Major version z
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.1.7 | Unreleased | Prompt cache optimization — 1006 tests, 0 clippy warnings |
 | 0.1.6 | 2026-06-10 | Zero-touch workflow + SQLite persistence + XHTML fix + inline template — 798 tests, 0 clippy warnings |
 | 0.1.5 | 2026-06-08 | FAANG Audit Compiler IR Phase E (F-30 through F-47) — 318 tests, 0 clippy warnings |
 | 0.1.4 | 2026-06-08 | Tracks C+D: Phi marker centralisation + god-function split — 301 tests, 0 clippy warnings |

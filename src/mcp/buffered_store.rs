@@ -185,6 +185,10 @@ impl BufferedStore {
     }
 
     /// Write failed ops to JSON fallback files.
+    ///
+    /// LOW-03: Timestamp collision is a non-issue because the index prefix
+    /// (`op_{i}_{ts}.json`) uniquely identifies each operation even if
+    /// multiple ops share the same nanosecond timestamp.
     fn write_fallback_files(&self, ops: &[WriteOp]) {
         let fallback_dir = self.project_root.join(".clean-ctx").join("fallback");
         let _ = std::fs::create_dir_all(&fallback_dir);
@@ -333,6 +337,7 @@ impl BufferedStore {
     }
 
     /// Queue a save_context operation. Auto-flushes if threshold reached.
+    #[allow(clippy::too_many_arguments)]
     pub fn queue_save_context(
         &self,
         file_path: &str,
@@ -340,6 +345,8 @@ impl BufferedStore {
         compressed_output: &str,
         ir_binary: &[u8],
         source_hash: &str,
+        raw_tokens: u64,
+        compressed_tokens: u64,
     ) {
         if let Ok(mut pending) = self.pending.lock() {
             pending.push(WriteOp::SaveContext {
@@ -348,8 +355,8 @@ impl BufferedStore {
                 compressed_output: compressed_output.to_string(),
                 ir_binary: ir_binary.to_vec(),
                 source_hash: source_hash.to_string(),
-                raw_tokens: 0,
-                compressed_tokens: 0,
+                raw_tokens,
+                compressed_tokens,
             });
             let len = pending.len();
             if len >= BATCH_THRESHOLD {
@@ -430,13 +437,60 @@ impl ContextStore for BufferedStore {
         &self,
         file_path: &str,
     ) -> Result<Option<StoredContextMeta>, Box<dyn std::error::Error>> {
-        // Flush first so pending writes are visible
-        self.flush();
-        if let Some(guard) = self.sqlite() {
-            guard.load_latest(file_path)
-        } else {
-            Ok(None)
+        // MED-02: Flush pending ops and read in a single lock scope to avoid
+        // the double-lock that occurs when flush() acquires the inner lock
+        // then releases it before sqlite() acquires it again.
+        let ops = match self.pending.lock() {
+            Ok(mut p) => std::mem::take(&mut *p),
+            Err(e) => {
+                eprintln!("[clean-ctx] WARNING: pending mutex poisoned: {e}");
+                return Ok(None);
+            }
+        };
+        let mut conn = match self.inner.lock() {
+            Ok(c) => c,
+            Err(_) => return Ok(None),
+        };
+        if !ops.is_empty() {
+            // Best-effort flush inside the same lock scope
+            if let Err(e) = conn.begin_transaction() {
+                eprintln!("[clean-ctx] BEGIN failed during load_latest flush: {e}");
+            } else {
+                let mut flushed = false;
+                for op in &ops {
+                    match op {
+                        WriteOp::SaveContext { file_path, fidelity, compressed_output, ir_binary, source_hash, raw_tokens, compressed_tokens } => {
+                            if let Err(e) = crate::mcp::context_store::ContextStore::save_context(
+                                &mut *conn, file_path, *fidelity, compressed_output,
+                                Some(ir_binary), source_hash, *raw_tokens, *compressed_tokens,
+                            ) {
+                                let _ = conn.rollback();
+                                eprintln!("[clean-ctx] save_context during load_latest flush failed: {e}");
+                                break;
+                            }
+                        }
+                        WriteOp::AppendDelta { context_id, delta_payload, edit_type } => {
+                            if let Err(e) = crate::mcp::context_store::ContextStore::append_delta(
+                                &mut *conn, context_id, delta_payload, edit_type.as_deref(),
+                            ) {
+                                let _ = conn.rollback();
+                                eprintln!("[clean-ctx] append_delta during load_latest flush failed: {e}");
+                                break;
+                            }
+                        }
+                        WriteOp::ClearFile { file_path } => {
+                            conn.clear_file(file_path);
+                        }
+                    }
+                    flushed = true;
+                }
+                if flushed {
+                    let _ = conn.commit();
+                    conn.wal_checkpoint();
+                }
+            }
         }
+        conn.load_latest(file_path)
     }
 
     fn has_context(&self, file_path: &str) -> bool {
