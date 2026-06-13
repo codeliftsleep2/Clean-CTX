@@ -166,6 +166,7 @@ See [Developer Documentation → Testing Conventions](docs/DEVELOPER_DOCUMENTATI
 | `docs/SECURITY.md` | Enterprise admins | Compliance, hardening, deployment |
 | `docs/TROUBLESHOOTING.md` | Users | Common issues and resolutions |
 | `docs/CHANGELOG.md` | All | Version history |
+| `docs/INTELLIGENCE_LAYER_PLAN.md` | Architects | Intelligence Layer: PageRank scoring, blast radius, token budget packing |
 | `docs/ROADMAP.md` | Contributors | Future plans and priorities |
 
 ---
