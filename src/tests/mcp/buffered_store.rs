@@ -119,7 +119,7 @@ fn test_context_store_save_and_load() {
     let (mut store, _tmp) = make_store();
 
     let id = store.save_context(
-        "/test/file.ts", Fidelity::Medium, "compressed output", None, "hash1",
+        "/test/file.ts", Fidelity::Medium, "compressed output", None, "hash1", 0, 0,
     ).expect("save_context should succeed");
     assert_eq!(id, "ctx-hash1");
 
@@ -141,7 +141,7 @@ fn test_context_store_has_context() {
     assert!(!store.has_context("/test/file.ts"));
 
     store.save_context(
-        "/test/file.ts", Fidelity::Low, "out", None, "h1",
+        "/test/file.ts", Fidelity::Low, "out", None, "h1", 0, 0,
     ).unwrap();
     store.flush();
 
@@ -153,7 +153,7 @@ fn test_context_store_delta_count() {
     let (mut store, _tmp) = make_store();
 
     store.save_context(
-        "/test/file.ts", Fidelity::Low, "out", None, "h1",
+        "/test/file.ts", Fidelity::Low, "out", None, "h1", 0, 0,
     ).unwrap();
     store.flush();
 
@@ -172,7 +172,7 @@ fn test_context_store_clear_file() {
     let (mut store, _tmp) = make_store();
 
     store.save_context(
-        "/test/file.ts", Fidelity::Low, "out", None, "h1",
+        "/test/file.ts", Fidelity::Low, "out", None, "h1", 0, 0,
     ).unwrap();
     store.flush();
 

@@ -123,8 +123,9 @@ pub(super) fn handle_compress_code_context(
     // Record stats using pluggable tokenizer (R-19)
     let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
     let compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
+            let ccc_canonical = resolve_file_path(file_path_str, None);
             state.session_stats.record_compression(
-                file_path_str,
+                &ccc_canonical,
                 raw_tokens,
                 compressed_tokens,
                 &format!("{:?}", effective_fidelity).to_lowercase(),
@@ -150,6 +151,8 @@ pub(super) fn handle_compress_code_context(
                     &compressed_text,
                     ir_binary.as_deref(),
                     &hash_hex,
+                    raw_tokens as u64,
+                    compressed_tokens as u64,
                 ) {
                     Ok(ctx_id) => debug_log(format!("handle_compress: save_context OK id={}", ctx_id)),
                     Err(e) => debug_log(format!("handle_compress: save_context FAILED: {e}")),
@@ -247,6 +250,20 @@ pub(super) fn handle_diff_code_context(
         fidelity,
     ) {
         Ok(output) => {
+            // Record stats for this file (was previously missing — Phase 1 fix)
+            let source_opt = state.read_source(&resolved_path).ok();
+            let source_text = source_opt.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let raw_tokens = estimate_tokens(source_text);
+            let compressed_tokens = estimate_tokens(&output);
+            state.session_stats.record_compression(
+                &resolved_path,
+                raw_tokens,
+                compressed_tokens,
+                &format!("{:?}", fidelity).to_lowercase(),
+                false,
+                "diff",
+            );
+
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": id,
@@ -395,7 +412,7 @@ pub(super) fn handle_delta_code_context(
 
     // Record stats for the IR delta operation using pluggable tokenizer
     let delta_compressed_tokens = count_tokens_with_tokenizer(
-        &delta_source_text,
+        delta_source_text,
         tokenizer_ref,
     );
     state.session_stats.record_compression(
@@ -715,6 +732,8 @@ pub(super) fn handle_provide_code_context(
                                 &compressed_text,
                                 Some(&ir_binary),
                                 &hash_hex,
+                                estimate_tokens(&source) as u64,
+                                estimate_tokens(&compressed_text) as u64,
                             ) {
                                 eprintln!("[clean-ctx] WARNING: Failed to persist context: {e}");
                             }
@@ -807,6 +826,8 @@ pub(super) fn handle_provide_code_context(
                         &output_text,
                         Some(&ir_binary),
                         &source_hash_hex,
+                        estimate_tokens(&source) as u64,
+                        estimate_tokens(&output_text) as u64,
                     ) {
                         eprintln!("[clean-ctx] WARNING: Failed to persist context: {e}");
                     }
@@ -930,6 +951,20 @@ pub(super) fn handle_restore_context(
             if let Ok(ir) = compile_file_ir(&resolved_path, fidelity, state) {
                 state.ir_context.load_ir(ir);
             }
+
+            // Record stats (was previously missing — Phase 1 fix)
+            let rc_source = state.read_source(&resolved_path).ok();
+            let rc_source_text = rc_source.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let rc_raw_tokens = estimate_tokens(rc_source_text);
+            let rc_compressed_tokens = estimate_tokens(&compressed_text);
+            state.session_stats.record_compression(
+                &resolved_path,
+                rc_raw_tokens,
+                rc_compressed_tokens,
+                &format!("{:?}", fidelity).to_lowercase(),
+                false,
+                "restore",
+            );
 
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0",
@@ -1178,8 +1213,10 @@ pub(super) fn handle_save_context(
                 // MED-03: Include compressed_output when saving (previously empty string "")
                 let compressed_text = state.ir_context.render_pretty(&path_alias, Fidelity::Low)
                     .unwrap_or_default();
+                // save_context in the explicit save handler doesn't have access to
+                // real token counts — pass 0, 0 and let rebuild_stats() estimate
                 if let Err(e) = store.save_context(
-                    fp, Fidelity::Low, &compressed_text, Some(&ir_binary), &hash
+                    fp, Fidelity::Low, &compressed_text, Some(&ir_binary), &hash, 0, 0
                 ) {
                     eprintln!("[clean-ctx] WARNING: Failed to persist context for {}: {e}", fp);
                 } else {
@@ -1208,7 +1245,7 @@ pub(super) fn handle_save_context(
                     let compressed_text = state.ir_context.render_pretty(&path_alias, Fidelity::Low)
                         .unwrap_or_default();
                     if let Err(e) = store.save_context(
-                        fp, Fidelity::Low, &compressed_text, Some(&ir_binary), &hash
+                        fp, Fidelity::Low, &compressed_text, Some(&ir_binary), &hash, 0, 0
                     ) {
                         eprintln!("[clean-ctx] WARNING: Failed to persist context for {}: {e}", fp);
                     } else {

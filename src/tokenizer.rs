@@ -21,10 +21,11 @@ use tiktoken_rs::CoreBPE;
 ///
 /// Each variant maps to a specific tokenizer implementation. The default
 /// is `Cl100k` which preserves backward compatibility with v0.1.x.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TokenizerKind {
     /// GPT-4 / GPT-3.5 tokenizer (cl100k_base). Default.
+    #[default]
     Cl100k,
     /// GPT-4o tokenizer (o200k_base).
     O200k,
@@ -34,11 +35,6 @@ pub enum TokenizerKind {
     Llama3,
 }
 
-impl Default for TokenizerKind {
-    fn default() -> Self {
-        Self::Cl100k
-    }
-}
 
 impl fmt::Display for TokenizerKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -236,3 +236,63 @@ SystemTime { intervals: 134257985847147425 }] handle_compress: save_context OK i
 [SystemTime { intervals: 134257985847406207 }] handle_compress: persist_store=true
 [SystemTime { intervals: 134257985847410313 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\lib.rs
 [SystemTime { intervals: 134257985847412980 }] handle_compress: save_context OK id=ctx-4dc1d302270ff2ae52a10705cf49a890a2cb19f2d0d42429cc9cc2dcc97e672e
+[SystemTime[[ { SystemTimeSystemTime[intervals {  { SystemTime: intervalsintervals { 134258370361807763: : intervals }134258370361811521134258370361833101: ]  } }134258370361816729handle_compress: persist_store=true] ]  }
+handle_compress: persist_store=truehandle_compress: persist_store=true] 
+
+handle_compress: persist_store=true
+[SystemTime[SystemTime { intervals[ { : SystemTimeintervals134258370362928057 { :  }intervals134258370362927926[: ] 134258370362929106 } }handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rsSystemTime] ] 
+ { handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rshandle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rsintervals
+
+: 134258370362928132 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[[SystemTimeSystemTime { intervals { : intervals134258370362935211:  }134258370362937475]  }handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1[
+] SystemTimehandle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1 { 
+intervals[SystemTime { intervals: 134258370362936418 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+: 134258370362939749 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258370363199318 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258370363203742 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\lib.rs
+[SystemTime { intervals: 134258370363206608 }] handle_compress: save_context OK id=ctx-4dc1d302270ff2ae52a10705cf49a890a2cb19f2d0d42429cc9cc2dcc97e672e
+[SystemTime { intervals: 134258426148036475 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258426148043644 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258426148046631 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258426148517963 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258426148522787 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258426148525396 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258426148780585 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258426148784654 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\lib.rs
+[SystemTime { intervals: 134258426148787238 }] handle_compress: save_context OK id=ctx-4dc1d302270ff2ae52a10705cf49a890a2cb19f2d0d42429cc9cc2dcc97e672e
+[SystemTime { intervals: 134258426153594081 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258426153598970 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258426153601503 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258426165512679 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258426165517508 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258426165520142 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258434644695306 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258434644702254 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258434644705585 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258434648486287 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258434648491604 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258434648494512 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258434648739478 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258434648743575 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\lib.rs
+[SystemTime { intervals: 134258434648746297 }] handle_compress: save_context OK id=ctx-4dc1d302270ff2ae52a10705cf49a890a2cb19f2d0d42429cc9cc2dcc97e672e
+[SystemTime { intervals: 134258434654283666 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258434654288521 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258434654291063 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258434654791696 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258434654796709 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258434654799422 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258441973744928 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258441973750036 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258441973752647 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258441976699283 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258441976704205 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258441976706798 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258441979700347 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258441979704913 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258441979707192 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258441985727462 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258441985732620 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\main.rs
+[SystemTime { intervals: 134258441985735630 }] handle_compress: save_context OK id=ctx-ca2886707118784abf7850f98e8c77dd301dcc659ad69c163c223f380d7e83c1
+[SystemTime { intervals: 134258441986034282 }] handle_compress: persist_store=true
+[SystemTime { intervals: 134258441986038348 }] handle_compress: calling save_context for C:\Users\MNasty\Desktop\RustContextLayerAI\src\lib.rs
+[SystemTime { intervals: 134258441986041059 }] handle_compress: save_context OK id=ctx-4dc1d302270ff2ae52a10705cf49a890a2cb19f2d0d42429cc9cc2dcc97e672e

@@ -252,6 +252,30 @@ pub(crate) fn diff_code_context_handler(
     Ok(body)
 }
 
+/// Centralized stats recording helper — ensures every handler uses a
+/// consistent canonical path so files aren't duplicated in per_file_stats.
+///
+/// All tool handlers that process a file MUST call this (or at minimum
+/// resolve the path to canonical form) when recording compression stats.
+#[allow(dead_code)]
+pub(super) fn record_file_stats(
+    state: &mut McpState,
+    file_path: &str,
+    raw_tokens: usize,
+    compressed_tokens: usize,
+    fidelity: &str,
+    is_angular: bool,
+    strategy: &str,
+) {
+    // Always resolve to a canonical path so all handlers produce the
+    // same map key for the same file.
+    let canonical = resolve_file_path(file_path, None);
+    state.session_stats.record_compression(
+        &canonical, raw_tokens, compressed_tokens,
+        fidelity, is_angular, strategy,
+    );
+}
+
 #[cfg(test)]
 #[path = "../tests/mcp/tool_helpers.rs"]
 mod tests;
