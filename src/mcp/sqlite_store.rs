@@ -311,6 +311,13 @@ impl ContextStore for SqliteStore {
         raw_tokens: u64,
         compressed_tokens: u64,
     ) -> Result<String, Box<dyn std::error::Error>> {
+        // MED-01: INSERT OR REPLACE is intentional — re-saving the same file
+        // overwrites the previous context. This is by design because:
+        //   1. The context ID is deterministic from the content hash, so
+        //      re-saving the same content is idempotent.
+        //   2. Version history is preserved via delta rows in the deltas table,
+        //      not via multiple context rows.
+        //   3. The `updated_at` timestamp tracks the latest save.
         let id = format!("ctx-{}", source_hash); // deterministic ID from content hash
         let fid = fidelity as i32;
         let ir_binary = ir_blobs.unwrap_or(&[]);
@@ -330,6 +337,8 @@ impl ContextStore for SqliteStore {
     ) -> Result<Option<StoredContextMeta>, Box<dyn std::error::Error>> {
         let mut stmt = self.conn.prepare(
             "SELECT c.id, c.file_path, c.content_hash, c.fidelity, c.pretty_text, c.created_at,
+                    COALESCE(c.raw_tokens, 0) as raw_tokens,
+                    COALESCE(c.compressed_tokens, 0) as compressed_tokens,
                     (SELECT COUNT(*) FROM deltas d WHERE d.context_id = c.id) as delta_count
              FROM contexts c WHERE c.file_path = ?1 ORDER BY c.updated_at DESC LIMIT 1"
         )?;
@@ -342,7 +351,9 @@ impl ContextStore for SqliteStore {
             let fid: i32 = row.get(3)?;
             let _pretty: Option<String> = row.get(4)?;
             let created_at_str: String = row.get(5)?;
-            let delta_count: i32 = row.get(6)?;
+            let raw_tokens: i64 = row.get(6)?;
+            let compressed_tokens: i64 = row.get(7)?;
+            let delta_count: i32 = row.get(8)?;
 
             // Parse Fidelity from i32
             let fidelity = match fid {
@@ -365,8 +376,8 @@ impl ContextStore for SqliteStore {
                 is_angular: false,
                 source_hash: hash,
                 created_at,
-                raw_tokens: 0,
-                compressed_tokens: 0,
+                raw_tokens: raw_tokens as u64,
+                compressed_tokens: compressed_tokens as u64,
             }))
         } else {
             Ok(None)

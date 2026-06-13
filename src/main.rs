@@ -74,6 +74,15 @@ fn generate_default_config() -> String {
             "debug": "medium",
             "edit": "low",
             "implement": "medium"
+        },
+        "cache": {
+            "enabled": true,
+            "system_prompt_ttl": "1h",
+            "tools_ttl": "1h",
+            "baseline_ttl": "1h",
+            "tail_ttl": "5m",
+            "vocab_version": "v1",
+            "tool_defs_version": "v1"
         }
     }))
     .unwrap_or_else(|_| "{}".to_string())

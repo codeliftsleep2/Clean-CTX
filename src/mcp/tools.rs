@@ -20,12 +20,17 @@
 //
 // Phase 1 Module Split: handlers extracted to `tool_handlers.rs`,
 // shared helpers extracted to `tool_helpers.rs`.
+//
+// Phase 1 (workspace cache): compress_workspace now injects a baseline
+// cache breakpoint keyed on a SHA-256 hash of the manifest, so the
+// entire workspace scan result is cacheable.
 
 use serde_json::Value;
 use crate::compressor::Fidelity;
 use crate::decompression::Decompressor;
 use crate::mcp::McpState;
 use crate::mcp::workspace;
+use crate::mcp::cache_hints::{inject_cache_breakpoints, compute_workspace_breaker};
 use crate::protocol::send_response;
 use crate::tokenizer::{TokenizerKind, resolve_tokenizer_kind};
 
@@ -368,7 +373,10 @@ pub(crate) fn dispatch_tools_call(
                     // F-FINAL-06: `warnings` is the per-session warning
                     // buffer (duplicate class names, etc.) so MCP
                     // clients can surface non-fatal anomalies.
-                    send_response(&serde_json::json!({
+                    //
+                    // Phase 1: Inject a workspace-level baseline cache
+                    // breakpoint keyed on a SHA-256 hash of the manifest.
+                    let mut response = serde_json::json!({
                         "jsonrpc": "2.0",
                         "id": id,
                         "result": {
@@ -386,7 +394,20 @@ pub(crate) fn dispatch_tools_call(
                                 "warnings": result.warnings,
                             }
                         }
-                    }));
+                    });
+
+                    // Inject workspace baseline cache breakpoint via manifest hash
+                    if state.config.cache.enabled {
+                        let ttl = state.config.cache.baseline_ttl.clone();
+                        let breaker = compute_workspace_breaker(std::slice::from_ref(&result.manifest));
+                        let tok_box = crate::tokenizer::create_tokenizer(
+                            crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
+                        ).ok();
+                        let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
+                        inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref);
+                    }
+
+                    send_response(&response);
                 }
                 Err(e) => {
                     send_response(&serde_json::json!({

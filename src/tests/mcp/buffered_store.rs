@@ -29,7 +29,7 @@ fn test_queue_save_context_and_flush() {
     let (store, _tmp) = make_store();
 
     store.queue_save_context(
-        "/test/file.ts", Fidelity::Low, "compressed", b"ir_data", "hash1",
+        "/test/file.ts", Fidelity::Low, "compressed", b"ir_data", "hash1", 0, 0,
     );
     // Should have 1 pending op
     assert_eq!(store.pending_count(), 1);
@@ -50,7 +50,7 @@ fn test_queue_append_delta_and_flush() {
 
     // First save a context to have a valid context_id
     store.queue_save_context(
-        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1",
+        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1", 0, 0,
     );
     store.flush();
 
@@ -71,7 +71,7 @@ fn test_queue_clear_file_and_flush() {
 
     // Save a context first
     store.queue_save_context(
-        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1",
+        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1", 0, 0,
     );
     store.flush();
 
@@ -99,6 +99,7 @@ fn test_auto_flush_at_threshold() {
             "compressed",
             b"",
             &format!("hash_{}", i),
+            0, 0,
         );
     }
 
@@ -188,9 +189,9 @@ fn test_clear_file_removes_pending_ops() {
     let (store, _tmp) = make_store();
 
     // Queue 3 ops for the same file
-    store.queue_save_context("/test/file.ts", Fidelity::Low, "out1", b"", "h1");
-    store.queue_save_context("/test/file.ts", Fidelity::Low, "out2", b"", "h2");
-    store.queue_save_context("/test/file.ts", Fidelity::Low, "out3", b"", "h3");
+    store.queue_save_context("/test/file.ts", Fidelity::Low, "out1", b"", "h1", 0, 0);
+    store.queue_save_context("/test/file.ts", Fidelity::Low, "out2", b"", "h2", 0, 0);
+    store.queue_save_context("/test/file.ts", Fidelity::Low, "out3", b"", "h3", 0, 0);
 
     assert_eq!(store.pending_count(), 3);
 
@@ -218,7 +219,7 @@ fn test_flush_is_idempotent() {
     let (store, _tmp) = make_store();
 
     store.queue_save_context(
-        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1",
+        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1", 0, 0,
     );
 
     let flushed1 = store.flush();
@@ -244,7 +245,7 @@ fn test_fallback_dir_is_created_on_flush_failure() {
 
     // Normal flush should not create the fallback dir
     store.queue_save_context(
-        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1",
+        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1", 0, 0,
     );
     store.flush();
 
@@ -295,7 +296,7 @@ fn test_fallback_append_delta_reimport() {
 
     // First save a context to SQLite so the delta has a valid parent
     store.queue_save_context(
-        "/test/delta.ts", Fidelity::Low, "baseline", b"", "delta_hash",
+        "/test/delta.ts", Fidelity::Low, "baseline", b"", "delta_hash", 0, 0,
     );
     store.flush();
 
@@ -334,7 +335,7 @@ fn test_fallback_clear_file_reimport() {
 
     // Save a context first
     store.queue_save_context(
-        "/test/clear.ts", Fidelity::Low, "output", b"", "clear_hash",
+        "/test/clear.ts", Fidelity::Low, "output", b"", "clear_hash", 0, 0,
     );
     store.flush();
 
@@ -402,10 +403,10 @@ fn test_pending_count_reflects_queue_state() {
 
     assert_eq!(store.pending_count(), 0);
 
-    store.queue_save_context("/a.ts", Fidelity::Low, "out", b"", "h1");
+    store.queue_save_context("/a.ts", Fidelity::Low, "out", b"", "h1", 0, 0);
     assert_eq!(store.pending_count(), 1);
 
-    store.queue_save_context("/b.ts", Fidelity::Low, "out", b"", "h2");
+    store.queue_save_context("/b.ts", Fidelity::Low, "out", b"", "h2", 0, 0);
     assert_eq!(store.pending_count(), 2);
 
     store.flush();

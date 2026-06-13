@@ -36,11 +36,12 @@ use crate::ir::delta::{IRDelta, DeltaComputer};
 use crate::ir::replay::DeltaError;
 use sha2::Digest;
 use crate::mcp::McpState;
+use crate::mcp::cache_hints::{inject_cache_breakpoints, compute_baseline_breaker, mark_tail_ephemeral, render_cache_text, render_cache_json};
 use crate::mcp::context_store::ContextStore;
 use crate::protocol::send_response;
 
 use super::tools::{parse_fidelity_arg, resolve_fidelity, parse_tokenizer_arg};
-use super::tool_helpers::{compress_text_body, compile_file_ir, resolve_file_path, estimate_tokens, diff_code_context_handler, count_tokens_with_tokenizer};
+use super::tool_helpers::{compress_text_body, compile_file_ir, resolve_file_path, diff_code_context_handler, count_tokens_with_tokenizer};
 
 #[cfg(test)]
 #[path = "../tests/mcp/tool_handlers.rs"]
@@ -253,8 +254,12 @@ pub(super) fn handle_diff_code_context(
             // Record stats for this file (was previously missing — Phase 1 fix)
             let source_opt = state.read_source(&resolved_path).ok();
             let source_text = source_opt.as_ref().map(|s| s.as_str()).unwrap_or("");
-            let raw_tokens = estimate_tokens(source_text);
-            let compressed_tokens = estimate_tokens(&output);
+            // HIGH-1 fix: Use pluggable tokenizer for accurate token counts
+            let tok_kind_diff = parse_tokenizer_arg(params, &state.config);
+            let tok_box_diff = crate::tokenizer::create_tokenizer(tok_kind_diff).ok();
+            let tok_ref_diff: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_diff.as_deref();
+            let raw_tokens = count_tokens_with_tokenizer(source_text, tok_ref_diff);
+            let compressed_tokens = count_tokens_with_tokenizer(&output, tok_ref_diff);
             state.session_stats.record_compression(
                 &resolved_path,
                 raw_tokens,
@@ -334,10 +339,14 @@ pub(super) fn handle_delta_code_context(
         }
     };
 
-    // Estimate tokens from source for stats
+    // Read source for stats
     let delta_source = state.read_source(&resolved_path).ok();
     let delta_source_text = delta_source.as_ref().map(|s| s.as_str()).unwrap_or("");
-    let delta_raw_tokens = estimate_tokens(delta_source_text);
+    // HIGH-1 fix: raw tokens also use pluggable tokenizer (was estimate_tokens before)
+    let tok_kind_dc = parse_tokenizer_arg(params, &state.config);
+    let tok_box_dc = crate::tokenizer::create_tokenizer(tok_kind_dc).ok();
+    let tok_ref_dc: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_dc.as_deref();
+    let delta_raw_tokens = count_tokens_with_tokenizer(delta_source_text, tok_ref_dc);
 
     // Check if we have a baseline IR in context state
     let file_alias = current_ir.file_id.clone();
@@ -404,16 +413,12 @@ pub(super) fn handle_delta_code_context(
         })
     };
 
-    // R-19: Resolve tokenizer from tool arg + config
-    let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
-    let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind)
-        .ok();
-    let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
-
-    // Record stats for the IR delta operation using pluggable tokenizer
+    // CRIT-3 fix: Count tokens on the delta wire output (what the client actually
+    // receives), NOT on the raw source text. This gives accurate savings %.
+    let delta_output_text = serde_json::to_string(&result).unwrap_or_default();
     let delta_compressed_tokens = count_tokens_with_tokenizer(
-        delta_source_text,
-        tokenizer_ref,
+        &delta_output_text,
+        tok_ref_dc,
     );
     state.session_stats.record_compression(
         &resolved_path,
@@ -461,10 +466,14 @@ pub(super) fn handle_delta_text_context(
         return;
     }
 
-    // Read source for token estimation
+    // Read source for token counting
     let dt_source = state.read_source(&resolved_path).ok();
     let dt_source_text = dt_source.as_ref().map(|s| s.as_str()).unwrap_or("");
-    let dt_raw_tokens = estimate_tokens(dt_source_text);
+    // HIGH-1 fix: Use pluggable tokenizer for accurate token counts
+    let tok_kind_dt = parse_tokenizer_arg(params, &state.config);
+    let tok_box_dt = crate::tokenizer::create_tokenizer(tok_kind_dt).ok();
+    let tok_ref_dt: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_dt.as_deref();
+    let dt_raw_tokens = count_tokens_with_tokenizer(dt_source_text, tok_ref_dt);
 
     // Compress the file to get current compressed body lines
     let path_alias = state.dict.get_or_create_alias(resolved_path.clone());
@@ -490,7 +499,7 @@ pub(super) fn handle_delta_text_context(
         Some(d) => {
             // Delta computed — emit compact delta format
             let wire = d.to_wire_format();
-            let dt_compressed_tokens = estimate_tokens(&wire);
+            let dt_compressed_tokens = count_tokens_with_tokenizer(&wire, tok_ref_dt);
             // Record stats for delta transport
             state.session_stats.record_compression(
                 &resolved_path,
@@ -522,7 +531,7 @@ pub(super) fn handle_delta_text_context(
         None => {
             // No baseline or no changes — emit full output
             let version = state.text_delta.file_version(&path_alias);
-            let dt_compressed_tokens = estimate_tokens(&full_output);
+            let dt_compressed_tokens = count_tokens_with_tokenizer(&full_output, tok_ref_dt);
             // Record stats for full compress
             state.session_stats.record_compression(
                 &resolved_path,
@@ -715,12 +724,22 @@ pub(super) fn handle_provide_code_context(
                     let body_lines: Vec<String> = compressed_text.lines().map(String::from).collect();
                     state.text_delta.compute_and_store(&path_alias, body_lines);
 
+                    // HIGH-1 fix: Use pluggable tokenizer for accurate token counts.
+                    // Parse tokenizer EARLY so persistence uses it instead of
+                    // the old estimate_tokens heuristic.
+                    let tok_kind_pcc = parse_tokenizer_arg(params, &state.config);
+                    let tok_box_pcc = crate::tokenizer::create_tokenizer(tok_kind_pcc).ok();
+                    let tok_ref_pcc: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_pcc.as_deref();
+                    let raw_tokens = count_tokens_with_tokenizer(&source, tok_ref_pcc);
+                    let compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tok_ref_pcc);
+
                     // Compile IR and store baseline
                     let ir_result = compile_file_ir(&resolved_path, decision.fidelity, state);
                     if let Ok(ir) = ir_result {
                         state.ir_context.load_ir(ir.clone());
 
-                        // Persistence hook: save baseline context + IR binary
+                        // Persistence hook: save baseline context + IR binary.
+                        // Uses pluggable tokenizer counts instead of estimate_tokens.
                         if let Some(store) = &mut state.persistence_store {
                             let source_hash = sha2::Sha256::digest(source.as_bytes());
                             let hash_hex = format!("{:x}", source_hash);
@@ -732,17 +751,14 @@ pub(super) fn handle_provide_code_context(
                                 &compressed_text,
                                 Some(&ir_binary),
                                 &hash_hex,
-                                estimate_tokens(&source) as u64,
-                                estimate_tokens(&compressed_text) as u64,
+                                raw_tokens as u64,
+                                compressed_tokens as u64,
                             ) {
                                 eprintln!("[clean-ctx] WARNING: Failed to persist context: {e}");
                             }
                         }
                     }
 
-                    // Record stats
-                    let raw_tokens = estimate_tokens(&source);
-                    let compressed_tokens = estimate_tokens(&compressed_text);
                     state.session_stats.record_compression(
                         &resolved_path,
                         raw_tokens,
@@ -752,7 +768,7 @@ pub(super) fn handle_provide_code_context(
                         "full",
                     );
 
-                    send_response(&serde_json::json!({
+                    let mut response = serde_json::json!({
                         "jsonrpc": "2.0",
                         "id": id,
                         "result": {
@@ -766,7 +782,17 @@ pub(super) fn handle_provide_code_context(
                                 "decision_summary": decision.summary(),
                             }
                         }
-                    }));
+                    });
+
+                    // Inject baseline cache breakpoint for stable content
+                    let cache_enabled = state.config.cache.enabled;
+                    if cache_enabled {
+                        let ttl = state.config.cache.baseline_ttl.clone();
+                        let breaker = compute_baseline_breaker(&compressed_text);
+                        inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref_pcc);
+                    }
+
+                    send_response(&response);
                 }
                 Err(e) => {
                     send_response(&serde_json::json!({
@@ -813,9 +839,18 @@ pub(super) fn handle_provide_code_context(
                 None => (full_output, false),
             };
 
+            // HIGH-1 fix: Use pluggable tokenizer for accurate token counts.
+            // Parse tokenizer EARLY so persistence uses it instead of estimate_tokens.
+            let tok_kind_dt2 = parse_tokenizer_arg(params, &state.config);
+            let tok_box_dt2 = crate::tokenizer::create_tokenizer(tok_kind_dt2).ok();
+            let tok_ref_dt2: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_dt2.as_deref();
+            let raw_tokens = count_tokens_with_tokenizer(&source, tok_ref_dt2);
+            let compressed_tokens = count_tokens_with_tokenizer(&output_text, tok_ref_dt2);
+
             // Persistence hook: save baseline + delta.
             // Uses compiled_ir from above (Single Compile pattern) and
             // source_hash_hex (pre-computed) to avoid redundant work.
+            // Uses pluggable tokenizer counts instead of estimate_tokens.
             if let Some(store) = &mut state.persistence_store {
                 if let Ok(ref ir) = compiled_ir {
                     let ir_binary = crate::ir::binary_wire::encode(ir);
@@ -826,8 +861,8 @@ pub(super) fn handle_provide_code_context(
                         &output_text,
                         Some(&ir_binary),
                         &source_hash_hex,
-                        estimate_tokens(&source) as u64,
-                        estimate_tokens(&output_text) as u64,
+                        raw_tokens as u64,
+                        compressed_tokens as u64,
                     ) {
                         eprintln!("[clean-ctx] WARNING: Failed to persist context: {e}");
                     }
@@ -841,9 +876,6 @@ pub(super) fn handle_provide_code_context(
                 }
             }
 
-            // Record stats
-            let raw_tokens = estimate_tokens(&source);
-            let compressed_tokens = estimate_tokens(&output_text);
             let strategy_label = if is_delta { "delta" } else { "full" };
             state.session_stats.record_compression(
                 &resolved_path,
@@ -854,7 +886,7 @@ pub(super) fn handle_provide_code_context(
                 strategy_label,
             );
 
-            send_response(&serde_json::json!({
+            let mut response = serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": {
@@ -869,7 +901,17 @@ pub(super) fn handle_provide_code_context(
                         "decision_summary": decision.summary(),
                     }
                 }
-            }));
+            });
+
+            // Inject tail cache breakpoint for dynamic content (5m TTL, never cached across turns)
+            let cache_enabled = state.config.cache.enabled;
+            if cache_enabled {
+                let ttl = state.config.cache.tail_ttl.clone();
+                inject_cache_breakpoints(&mut response, state, "tail", &ttl, "rolling", tok_ref_dt2);
+                mark_tail_ephemeral(state);
+            }
+
+            send_response(&response);
         }
     }
 }
@@ -955,8 +997,12 @@ pub(super) fn handle_restore_context(
             // Record stats (was previously missing — Phase 1 fix)
             let rc_source = state.read_source(&resolved_path).ok();
             let rc_source_text = rc_source.as_ref().map(|s| s.as_str()).unwrap_or("");
-            let rc_raw_tokens = estimate_tokens(rc_source_text);
-            let rc_compressed_tokens = estimate_tokens(&compressed_text);
+            // HIGH-1 fix: Use pluggable tokenizer for accurate token counts
+            let tok_kind_rc = parse_tokenizer_arg(params, &state.config);
+            let tok_box_rc = crate::tokenizer::create_tokenizer(tok_kind_rc).ok();
+            let tok_ref_rc: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_rc.as_deref();
+            let rc_raw_tokens = count_tokens_with_tokenizer(rc_source_text, tok_ref_rc);
+            let rc_compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tok_ref_rc);
             state.session_stats.record_compression(
                 &resolved_path,
                 rc_raw_tokens,
@@ -966,7 +1012,7 @@ pub(super) fn handle_restore_context(
                 "restore",
             );
 
-            send_response(&serde_json::json!({
+            let mut response = serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": {
@@ -977,7 +1023,17 @@ pub(super) fn handle_restore_context(
                         "baselines_cleared": true,
                     }
                 }
-            }));
+            });
+
+            // restore_context returns stable persisted state — emit baseline cache hint
+            let cache_enabled = state.config.cache.enabled;
+            if cache_enabled {
+                let ttl = state.config.cache.baseline_ttl.clone();
+                let breaker = compute_baseline_breaker(&compressed_text);
+                inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref_rc);
+            }
+
+            send_response(&response);
         }
         Err(e) => {
             send_response(&serde_json::json!({
@@ -1013,6 +1069,22 @@ pub(super) fn handle_context_history(
             lines.push(format!("  Context Version: {}", meta.version));
         }
 
+        // Cache metrics for this file (Phase 2: session-level cache status)
+        // Note: cache_metrics.breakpoints is keyed by region ("baseline",
+        // "tools", etc.), not by file path. We show session-level cache
+        // hit/miss metrics which apply to all files uniformly.
+        let total = state.cache_metrics.hits + state.cache_metrics.misses;
+        lines.push(format!("  Cache Hit Rate: {}/{} ({}%)",
+            state.cache_metrics.hits,
+            total,
+            if total > 0 {
+                (state.cache_metrics.hits as f64 / total as f64 * 100.0) as usize
+            } else {
+                0
+            },
+        ));
+        lines.push(format!("  Cache Tokens Saved: {}", state.cache_metrics.tokens_saved));
+
         send_response(&serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -1042,6 +1114,20 @@ pub(super) fn handle_context_history(
                 path, fstats.version, fstats.delta_count, fstats.savings_pct
             ));
         }
+
+        // Cache metrics summary (Phase 2)
+        let hit_rate = if state.cache_metrics.hits + state.cache_metrics.misses > 0 {
+            state.cache_metrics.hits as f64 / (state.cache_metrics.hits + state.cache_metrics.misses) as f64
+        } else {
+            0.0
+        };
+        output.push_str(&format!(
+            "── Cache ──\n  Hits: {} | Misses: {} | Hit Rate: {:.0}% | Tokens Saved: {}\n",
+            state.cache_metrics.hits,
+            state.cache_metrics.misses,
+            hit_rate * 100.0,
+            state.cache_metrics.tokens_saved,
+        ));
 
         send_response(&serde_json::json!({
             "jsonrpc": "2.0",
@@ -1158,10 +1244,14 @@ pub(super) fn handle_context_stats(
             text.push_str("── Persistence (SQLite) ──\n  Status: disabled\n");
         }
 
+        // Cache status section (always shown, with enabled/disabled status)
+        text.push_str(&render_cache_text(&state.cache_metrics, state.config.cache.enabled));
+
         if format == "json" {
             let mut json = crate::mcp::session_stats::render_dashboard_json(&merged);
             json["tokenizer"] = serde_json::json!(state.config.tokenizer.to_string());
             json["persistence"] = serde_json::json!({"enabled": db_stats.is_some()});
+            json["cache"] = render_cache_json(&state.cache_metrics, state.config.cache.enabled);
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": id,
@@ -1213,10 +1303,14 @@ pub(super) fn handle_save_context(
                 // MED-03: Include compressed_output when saving (previously empty string "")
                 let compressed_text = state.ir_context.render_pretty(&path_alias, Fidelity::Low)
                     .unwrap_or_default();
-                // save_context in the explicit save handler doesn't have access to
-                // real token counts — pass 0, 0 and let rebuild_stats() estimate
+                // CRIT-2 fix: Look up token counts + fidelity from session_stats
+                let (rt, ct, fidelity_str) = state.session_stats.file_stats(fp)
+                    .map(|fs| (fs.raw_tokens as u64, fs.compressed_tokens as u64, fs.fidelity.clone()))
+                    .unwrap_or((0, 0, "low".to_string()));
+                // MED-03 fix: Use actual fidelity from session_stats instead of hardcoded Low
+                let actual_fidelity = Fidelity::parse(&fidelity_str).unwrap_or(Fidelity::Low);
                 if let Err(e) = store.save_context(
-                    fp, Fidelity::Low, &compressed_text, Some(&ir_binary), &hash, 0, 0
+                    fp, actual_fidelity, &compressed_text, Some(&ir_binary), &hash, rt, ct
                 ) {
                     eprintln!("[clean-ctx] WARNING: Failed to persist context for {}: {e}", fp);
                 } else {
@@ -1244,8 +1338,14 @@ pub(super) fn handle_save_context(
                     // MED-03: Include compressed_output when saving (previously empty string "")
                     let compressed_text = state.ir_context.render_pretty(&path_alias, Fidelity::Low)
                         .unwrap_or_default();
+                    // CRIT-2 fix: Look up token counts + fidelity from session_stats
+                    let (rt, ct, fidelity_str) = state.session_stats.file_stats(fp)
+                        .map(|fs| (fs.raw_tokens as u64, fs.compressed_tokens as u64, fs.fidelity.clone()))
+                        .unwrap_or((0, 0, "low".to_string()));
+                    // MED-03 fix: Use actual fidelity from session_stats instead of hardcoded Low
+                    let actual_fidelity = Fidelity::parse(&fidelity_str).unwrap_or(Fidelity::Low);
                     if let Err(e) = store.save_context(
-                        fp, Fidelity::Low, &compressed_text, Some(&ir_binary), &hash, 0, 0
+                        fp, actual_fidelity, &compressed_text, Some(&ir_binary), &hash, rt, ct
                     ) {
                         eprintln!("[clean-ctx] WARNING: Failed to persist context for {}: {e}", fp);
                     } else {

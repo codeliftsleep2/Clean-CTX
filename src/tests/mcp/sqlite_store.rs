@@ -222,12 +222,18 @@ fn test_sqlite_rebuild_stats() {
     let stats = store.rebuild_stats().expect("rebuild_stats should succeed");
     let file_stats = stats.all_file_stats();
     assert!(!file_stats.is_empty());
-    // Check that real token counts are preserved
-    let stats_a = stats.file_stats("/test/a.ts");
-    if stats_a.is_some() {
-        let fs = stats_a.unwrap();
-        assert!(fs.raw_tokens > 0, "raw_tokens should be read from DB");
-    }
+
+    // Verify exact token counts for file A
+    let fs_a = stats.file_stats("/test/a.ts")
+        .expect("file A should be in stats");
+    assert_eq!(fs_a.raw_tokens, 500, "file A raw_tokens should be 500");
+    assert_eq!(fs_a.compressed_tokens, 100, "file A compressed_tokens should be 100");
+
+    // Verify exact token counts for file B
+    let fs_b = stats.file_stats("/test/b.ts")
+        .expect("file B should be in stats");
+    assert_eq!(fs_b.raw_tokens, 1000, "file B raw_tokens should be 1000");
+    assert_eq!(fs_b.compressed_tokens, 200, "file B compressed_tokens should be 200");
 }
 
 #[test]

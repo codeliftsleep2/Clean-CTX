@@ -7,6 +7,9 @@ use serde_json::Value;
 use crate::protocol::send_response;
 use crate::mcp::tools;
 use crate::mcp::prompts;
+use crate::mcp::McpState;
+use crate::mcp::cache_hints::{inject_cache_breakpoints, generate_vocabulary_text};
+use crate::tokenizer::{create_tokenizer, resolve_tokenizer_kind};
 
 /// Handle `initialize` — returns server capabilities and protocol version.
 pub(crate) fn handle_initialize(id: &Value) {
@@ -21,32 +24,57 @@ pub(crate) fn handle_initialize(id: &Value) {
     }));
 }
 
-/// Handle `tools/list` — returns the list of available tools.
-pub(crate) fn handle_tools_list(id: &Value) {
-    send_response(&serde_json::json!({
+/// Handle `tools/list` — returns the list of available tools with cache hints.
+pub(crate) fn handle_tools_list(id: &Value, state: &mut McpState) {
+    let mut response = serde_json::json!({
         "jsonrpc": "2.0",
         "id": id,
         "result": {
             "tools": tools::tool_list()
         }
-    }));
+    });
+
+    // Inject tools cache breakpoint when caching is enabled
+    // Extract values before mutable borrow to satisfy borrow checker
+    let cache_enabled = state.config.cache.enabled;
+    let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
+    let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
+    if cache_enabled {
+        let ttl = state.config.cache.tools_ttl.clone();
+        let breaker = format!("tools-{}", state.config.cache.tool_defs_version);
+        inject_cache_breakpoints(&mut response, state, "tools", &ttl, &breaker, tok_ref);
+    }
+
+    send_response(&response);
 }
 
-/// Handle `prompts/list` — returns the list of available prompts.
-pub(crate) fn handle_prompts_list(id: &Value) {
-    send_response(&serde_json::json!({
+/// Handle `prompts/list` — returns the list of available prompts with cache hints.
+pub(crate) fn handle_prompts_list(id: &Value, state: &mut McpState) {
+    let mut response = serde_json::json!({
         "jsonrpc": "2.0",
         "id": id,
         "result": {
             "prompts": prompts::prompt_list()
         }
-    }));
+    });
+
+    // Inject system prompt cache breakpoint when caching is enabled
+    let cache_enabled = state.config.cache.enabled;
+    let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
+    let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
+    if cache_enabled {
+        let ttl = state.config.cache.system_prompt_ttl.clone();
+        let breaker = format!("vocab-{}", state.config.cache.vocab_version);
+        inject_cache_breakpoints(&mut response, state, "system_prompt", &ttl, &breaker, tok_ref);
+    }
+
+    send_response(&response);
 }
 
 /// Handle `prompts/get` — returns the content of a specific prompt.
-pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str) {
+pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str, state: &mut McpState) {
     if prompt_name == "cleanctx-notation" {
-        send_response(&serde_json::json!({
+        let mut response = serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
             "result": {
@@ -61,7 +89,19 @@ pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str) {
                     }
                 ]
             }
-        }));
+        });
+
+        // Inject system prompt cache breakpoint
+        let cache_enabled = state.config.cache.enabled;
+        let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
+        let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
+        if cache_enabled {
+            let ttl = state.config.cache.system_prompt_ttl.clone();
+            let breaker = format!("vocab-{}", state.config.cache.vocab_version);
+            inject_cache_breakpoints(&mut response, state, "system_prompt", &ttl, &breaker, tok_ref);
+        }
+
+        send_response(&response);
     } else if prompt_name == "dashboard" {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0",
@@ -90,6 +130,35 @@ pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str) {
                 ]
             }
         }));
+    } else if prompt_name == "clean-ctx-vocabulary" {
+        let mut response = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "description": "Clean-CTX opcode/marker vocabulary for reading compressed code context",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": {
+                            "type": "text",
+                            "text": generate_vocabulary_text()
+                        }
+                    }
+                ]
+            }
+        });
+
+        // Inject system prompt cache breakpoint
+        let cache_enabled = state.config.cache.enabled;
+        let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
+        let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
+        if cache_enabled {
+            let ttl = state.config.cache.system_prompt_ttl.clone();
+            let breaker = format!("vocab-{}", state.config.cache.vocab_version);
+            inject_cache_breakpoints(&mut response, state, "system_prompt", &ttl, &breaker, tok_ref);
+        }
+
+        send_response(&response);
     } else {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0",

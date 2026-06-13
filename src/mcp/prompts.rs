@@ -93,5 +93,10 @@ pub(crate) fn prompt_list() -> Vec<serde_json::Value> {
             "description": "View the Clean-CTX token savings dashboard. Shows session stats, per-file breakdown, and compression efficiency metrics.",
             "arguments": []
         }),
+        serde_json::json!({
+            "name": "clean-ctx-vocabulary",
+            "description": "Clean-CTX opcode/marker vocabulary for reading compressed code context. Contains all recognized opcodes ($c, ⊕guard, Φcmp, etc.) and their meanings.",
+            "arguments": []
+        }),
     ]
 }

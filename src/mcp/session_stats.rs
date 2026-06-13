@@ -202,11 +202,18 @@ impl SessionStats {
             }
         }
 
-        // Recalculate totals from merged files
+        // Recalculate ALL totals from merged files to ensure consistency.
+        // This avoids the over-counting bug where session-level counters
+        // were blindly added even for files that were skipped during merge.
         self.total_raw_tokens = self.files.values().map(|f| f.raw_tokens).sum();
         self.total_compressed_tokens = self.files.values().map(|f| f.compressed_tokens).sum();
-        self.full_compress_count += other.full_compress_count;
-        self.delta_count += other.delta_count;
+        // Recalculate operation counts from the merged file entries
+        self.full_compress_count = self.files.values()
+            .filter(|f| f.strategy != "delta")
+            .count();
+        self.delta_count = self.files.values()
+            .filter(|f| f.strategy == "delta")
+            .count();
     }
 
     /// Get stats for a specific file, if tracked.
@@ -225,7 +232,7 @@ impl SessionStats {
         let total_raw = self.total_raw_tokens;
         let total_compressed = self.total_compressed_tokens;
         let total_savings_pct = if total_raw > 0 {
-            ((total_raw - total_compressed) as f64 / total_raw as f64) * 100.0
+            ((total_raw.saturating_sub(total_compressed)) as f64 / total_raw as f64) * 100.0
         } else {
             0.0
         };
