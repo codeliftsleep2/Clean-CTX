@@ -172,6 +172,38 @@ impl SessionStats {
         }
     }
 
+    /// Merge another `SessionStats` into this one.
+    ///
+    /// Files not already present in `self` are added. For files that
+    /// exist in both, the version adds up (cumulative across sessions).
+    /// Totals are recalculated from the merged file set.
+    pub fn merge(&mut self, other: &SessionStats) {
+        for (path, other_fs) in &other.files {
+            if let Some(existing) = self.files.get_mut(path) {
+                // File exists in both: combine version + delta counts
+                existing.version += other_fs.version;
+                existing.delta_count += other_fs.delta_count;
+                // Use the larger token counts (more data = better estimate)
+                existing.raw_tokens = existing.raw_tokens.max(other_fs.raw_tokens);
+                existing.compressed_tokens = existing.compressed_tokens.max(other_fs.compressed_tokens);
+                existing.savings_pct = if existing.raw_tokens > 0 {
+                    ((existing.raw_tokens - existing.compressed_tokens) as f64 / existing.raw_tokens as f64) * 100.0
+                } else {
+                    0.0
+                };
+            } else {
+                // New file from DB: add it
+                self.files.insert(path.clone(), other_fs.clone());
+            }
+        }
+
+        // Recalculate totals from merged files
+        self.total_raw_tokens = self.files.values().map(|f| f.raw_tokens).sum();
+        self.total_compressed_tokens = self.files.values().map(|f| f.compressed_tokens).sum();
+        self.full_compress_count += other.full_compress_count;
+        self.delta_count += other.delta_count;
+    }
+
     /// Get stats for a specific file, if tracked.
     pub fn file_stats(&self, file_path: &str) -> Option<&FileStats> {
         self.files.get(file_path)
