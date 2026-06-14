@@ -756,9 +756,7 @@ fn regression_m1_cache_section_shown_when_disabled() {
     assert!(text_disabled.is_none(), "disabled+never active should return None (hidden)");
 
     // With hits+misses > 0, disabled still returns Some (shows disabled status)
-    let mut active_metrics = crate::mcp::cache_hints::CacheMetrics::default();
-    active_metrics.hits = 1;
-    active_metrics.misses = 2;
+    let active_metrics = crate::mcp::cache_hints::CacheMetrics { hits: 1, misses: 2, ..Default::default() };
     let text_disabled_active = crate::mcp::cache_hints::render_cache_text(&active_metrics, false);
     assert!(text_disabled_active.is_some_and(|t| t.contains("disabled")),
         "disabled with activity should show disabled status");

@@ -173,7 +173,7 @@ fn test_merge_in_memory_wins_for_existing_file() {
     assert_eq!(shared.strategy, "full", "in-memory strategy should win");
     assert_eq!(shared.fidelity, "low", "in-memory fidelity should win");
     // Version should be max of both versions
-    assert_eq!(shared.version, 1.max(1));
+    assert_eq!(shared.version, 1);
 }
 
 #[test]
@@ -228,7 +228,7 @@ fn test_merge_version_max() {
     // After a: version = 2. After merge: max(2, 1) = 2
     a.merge(&b);
     let fs = a.file_stats("/test/f.ts").unwrap();
-    assert_eq!(fs.version, 2.max(1), "version should be max of both");
+    assert_eq!(fs.version, 2, "version should be max of both");
 }
 
 // ── Strategy Label Tests ────────────────────────────────────────

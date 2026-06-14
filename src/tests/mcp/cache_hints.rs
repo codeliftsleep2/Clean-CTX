@@ -203,10 +203,7 @@ fn test_cache_metrics_accumulate() {
 /// Verify that render_cache_text returns the expected format.
 #[test]
 fn test_cache_dashboard_text() {
-    let mut metrics = CacheMetrics::default();
-    metrics.hits = 12;
-    metrics.misses = 3;
-    metrics.tokens_saved = 18420;
+    let mut metrics = CacheMetrics { hits: 12, misses: 3, tokens_saved: 18420, ..Default::default() };
     metrics.breakpoints.insert("tools".to_string(), "hit".to_string());
 
     // With hits+misses > 0, enabled=true returns Some with full stats
@@ -225,10 +222,7 @@ fn test_cache_dashboard_text() {
 /// Verify that render_cache_json returns the expected structured output.
 #[test]
 fn test_cache_dashboard_json() {
-    let mut metrics = CacheMetrics::default();
-    metrics.hits = 12;
-    metrics.misses = 3;
-    metrics.tokens_saved = 18420;
+    let mut metrics = CacheMetrics { hits: 12, misses: 3, tokens_saved: 18420, ..Default::default() };
     metrics.breakpoints.insert("tools".to_string(), "hit".to_string());
 
     let json = render_cache_json(&metrics, true);
