@@ -94,6 +94,7 @@ fn rust_session_stats_reports_token_savings() {
         "medium",
         false, // is_angular
         "full",
+        None,
     );
 
     let summary = stats.summary();
@@ -144,6 +145,7 @@ fn rust_json_dashboard_includes_rust_files() {
         "low",
         false,
         "full",
+        None,
     );
 
     let json = crate::mcp::session_stats::render_dashboard_json(&stats);

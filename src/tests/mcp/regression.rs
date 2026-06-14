@@ -269,12 +269,12 @@ fn regression_high3_merge_no_overcounting() {
     // After merge, totals should reflect the merged file entries,
     // not the sum of both session-level counters.
     let mut in_memory = SessionStats::new();
-    in_memory.record_compression("/test/a.ts", 1000, 200, "low", false, "full");
-    in_memory.record_compression("/test/b.ts", 2000, 400, "low", false, "full");
+    in_memory.record_compression("/test/a.ts", 1000, 200, "low", false, "full", None);
+    in_memory.record_compression("/test/b.ts", 2000, 400, "low", false, "full", None);
 
     let mut db = SessionStats::new();
-    db.record_compression("/test/a.ts", 500, 100, "low", false, "delta");
-    db.record_compression("/test/c.ts", 3000, 600, "medium", false, "full");
+    db.record_compression("/test/a.ts", 500, 100, "low", false, "delta", None);
+    db.record_compression("/test/c.ts", 3000, 600, "medium", false, "full", None);
 
     in_memory.merge(&db);
 
@@ -295,12 +295,12 @@ fn regression_high3_merge_operation_counts_accurate() {
     // After merge, full_compress_count and delta_count should reflect
     // the actual strategy of each file, not blindly add session-level counts.
     let mut in_memory = SessionStats::new();
-    in_memory.record_compression("/test/a.ts", 1000, 200, "low", false, "full");
-    in_memory.record_compression("/test/b.ts", 2000, 400, "low", false, "delta");
+    in_memory.record_compression("/test/a.ts", 1000, 200, "low", false, "full", None);
+    in_memory.record_compression("/test/b.ts", 2000, 400, "low", false, "delta", None);
 
     let mut db = SessionStats::new();
-    db.record_compression("/test/a.ts", 500, 100, "low", false, "delta");
-    db.record_compression("/test/c.ts", 3000, 600, "medium", false, "full");
+    db.record_compression("/test/a.ts", 500, 100, "low", false, "delta", None);
+    db.record_compression("/test/c.ts", 3000, 600, "medium", false, "full", None);
 
     in_memory.merge(&db);
 

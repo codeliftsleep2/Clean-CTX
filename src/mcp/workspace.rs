@@ -222,6 +222,7 @@ fn compress_pass(
                     &format!("{:?}", fidelity).to_lowercase(),
                     false,
                     "workspace",
+                    None,
                 );
             }
             Err(e) => {
@@ -307,6 +308,7 @@ fn compress_pass_with_global_symbols(
                     &format!("{:?}", fidelity).to_lowercase(),
                     false,
                     "workspace_gsym",
+                    None,
                 );
 
                 entries.push(CompressedEntry {

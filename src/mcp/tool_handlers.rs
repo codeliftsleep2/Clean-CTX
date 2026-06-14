@@ -132,6 +132,7 @@ pub(super) fn handle_compress_code_context(
                 &format!("{:?}", effective_fidelity).to_lowercase(),
                 false,
                 "full",
+                None,
             );
 
             // Persistence hook: save baseline context (with or without IR)
@@ -267,6 +268,7 @@ pub(super) fn handle_diff_code_context(
                 &format!("{:?}", fidelity).to_lowercase(),
                 false,
                 "diff",
+                None,
             );
 
             send_response(&serde_json::json!({
@@ -427,6 +429,7 @@ pub(super) fn handle_delta_code_context(
         &format!("{:?}", fidelity).to_lowercase(),
         false,
         "delta",
+        None,
     );
 
     send_response(&result);
@@ -500,6 +503,8 @@ pub(super) fn handle_delta_text_context(
             // Delta computed — emit compact delta format
             let wire = d.to_wire_format();
             let dt_compressed_tokens = count_tokens_with_tokenizer(&wire, tok_ref_dt);
+            // Full compressed tokens for delta efficiency computation
+            let dt_full_compressed = count_tokens_with_tokenizer(&full_output, tok_ref_dt);
             // Record stats for delta transport
             state.session_stats.record_compression(
                 &resolved_path,
@@ -508,6 +513,7 @@ pub(super) fn handle_delta_text_context(
                 &format!("{:?}", fidelity).to_lowercase(),
                 false,
                 "delta",
+                Some(dt_full_compressed),
             );
             serde_json::json!({
                 "jsonrpc": "2.0",
@@ -540,6 +546,7 @@ pub(super) fn handle_delta_text_context(
                 &format!("{:?}", fidelity).to_lowercase(),
                 false,
                 "full",
+                None,
             );
             serde_json::json!({
                 "jsonrpc": "2.0",
@@ -772,6 +779,7 @@ pub(super) fn handle_provide_code_context(
                         &format!("{:?}", decision.fidelity).to_lowercase(),
                         decision.is_angular,
                         "full",
+                        None,
                     );
 
                     let mut response = serde_json::json!({
@@ -840,16 +848,19 @@ pub(super) fn handle_provide_code_context(
 
             let delta = state.text_delta.compute_and_store(&path_alias, body_lines);
 
+            // Parse tokenizer EARLY so persistence and delta efficiency use it
+            let tok_kind_dt2 = parse_tokenizer_arg(params, &state.config);
+            let tok_box_dt2 = crate::tokenizer::create_tokenizer(tok_kind_dt2).ok();
+            let tok_ref_dt2: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_dt2.as_deref();
+            // Tokenize full_output BEFORE it's consumed by the match below (borrow after move)
+            let dt2_full_compressed = count_tokens_with_tokenizer(&full_output, tok_ref_dt2);
+
             let (output_text, is_delta) = match &delta {
                 Some(d) => (d.to_wire_format(), true),
                 None => (full_output, false),
             };
 
             // HIGH-1 fix: Use pluggable tokenizer for accurate token counts.
-            // Parse tokenizer EARLY so persistence uses it instead of estimate_tokens.
-            let tok_kind_dt2 = parse_tokenizer_arg(params, &state.config);
-            let tok_box_dt2 = crate::tokenizer::create_tokenizer(tok_kind_dt2).ok();
-            let tok_ref_dt2: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_dt2.as_deref();
             let raw_tokens = count_tokens_with_tokenizer(&source, tok_ref_dt2);
             let compressed_tokens = count_tokens_with_tokenizer(&output_text, tok_ref_dt2);
 
@@ -890,6 +901,7 @@ pub(super) fn handle_provide_code_context(
                 &format!("{:?}", decision.fidelity).to_lowercase(),
                 decision.is_angular,
                 strategy_label,
+                if is_delta { Some(dt2_full_compressed) } else { None },
             );
 
             let mut response = serde_json::json!({
@@ -1016,6 +1028,7 @@ pub(super) fn handle_restore_context(
                 &format!("{:?}", fidelity).to_lowercase(),
                 false,
                 "restore",
+                None,
             );
 
             let mut response = serde_json::json!({

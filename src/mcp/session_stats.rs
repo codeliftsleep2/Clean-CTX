@@ -6,8 +6,9 @@
 // records token savings into `SessionStats`. The `context_stats`
 // tool reads from this accumulator to display the dashboard.
 //
-// Persistence-ready: `SessionStats` can be serialized to SQLite for
-// cross-session history when the persistence layer arrives.
+// Delta files report `delta_efficiency_pct` (CPU savings vs full
+// re-compress) instead of LLM `savings_pct` (which would be
+// misleading for delta wire formats).
 
 use std::collections::HashMap;
 use std::time::SystemTime;
@@ -22,6 +23,7 @@ pub struct FileStats {
     /// Compressed token count.
     pub compressed_tokens: usize,
     /// Savings as a percentage (0.0 to 100.0).
+    /// For "delta" strategy files, this is 0.0 (LLM savings don't apply).
     pub savings_pct: f64,
     /// Current version number.
     pub version: u64,
@@ -33,6 +35,20 @@ pub struct FileStats {
     pub is_angular: bool,
     /// Strategy used ("full" or "delta").
     pub strategy: String,
+    /// Token count from the most recent full compression of this file.
+    /// Used to compute delta efficiency. Only meaningful when strategy is "delta".
+    pub full_compressed_tokens: Option<usize>,
+    /// Delta efficiency: how much CPU is saved vs a full re-compression.
+    /// Computed as `1.0 - (delta_tokens / full_compressed_tokens) * 100.0`.
+    /// Only meaningful when strategy is "delta".
+    pub delta_efficiency_pct: Option<f64>,
+}
+
+impl FileStats {
+    /// True if this file's savings percentage represents real LLM token savings.
+    pub fn has_llm_savings(&self) -> bool {
+        self.strategy != "delta"
+    }
 }
 
 /// Summary of the entire session.
@@ -54,6 +70,8 @@ pub struct SessionSummary {
     pub session_duration_secs: u64,
     /// Average compression savings across all files.
     pub avg_savings_pct: f64,
+    /// Average delta efficiency across delta-strategy files (CPU savings % vs full re-compress).
+    pub avg_delta_efficiency_pct: Option<f64>,
 }
 
 /// Session-level stats accumulator.
@@ -98,6 +116,11 @@ impl SessionStats {
 
     /// Record a compression event (full compression or delta).
     ///
+    /// `full_compressed_tokens`: When `strategy == "delta"`, pass
+    /// `Some(full_compress_token_count)` so delta efficiency can be
+    /// computed (CPU savings vs re-compressing from scratch).
+    /// For non-delta strategies, pass `None`.
+    ///
     /// Updates both the per-file entry and the session totals.
     pub fn record_compression(
         &mut self,
@@ -107,6 +130,7 @@ impl SessionStats {
         fidelity: &str,
         is_angular: bool,
         strategy: &str,
+        full_compressed_tokens: Option<usize>,
     ) {
         // Deduct previous per-file counters if this file was already tracked
         // (to avoid double-counting across calls)
@@ -136,13 +160,28 @@ impl SessionStats {
             _ => self.full_compress_count += 1,
         }
 
-        // Compute savings as percentage (use saturating_sub to avoid overflow
-        // when compressed_tokens > raw_tokens, e.g. for very small files)
-        let savings_pct = if raw_tokens > 0 {
-            let saved = raw_tokens.saturating_sub(compressed_tokens);
-            (saved as f64 / raw_tokens as f64) * 100.0
+        // Compute savings as percentage. For delta strategies, savings
+        // represent CPU efficiency vs full re-compress, NOT LLM token savings.
+        let is_delta = strategy == "delta";
+        let (savings_pct, delta_eff_pct) = if is_delta {
+            if let Some(full_ct) = full_compressed_tokens {
+                if full_ct > 0 && compressed_tokens < full_ct {
+                    let eff = ((full_ct - compressed_tokens) as f64 / full_ct as f64) * 100.0;
+                    (0.0, Some(eff))
+                } else {
+                    (0.0, None)
+                }
+            } else {
+                (0.0, None)
+            }
         } else {
-            0.0
+            let sp = if raw_tokens > 0 {
+                let saved = raw_tokens.saturating_sub(compressed_tokens);
+                (saved as f64 / raw_tokens as f64) * 100.0
+            } else {
+                0.0
+            };
+            (sp, None)
         };
 
         // Get or create per-file entry
@@ -157,6 +196,8 @@ impl SessionStats {
                 fidelity: fidelity.to_string(),
                 is_angular,
                 strategy: strategy.to_string(),
+                full_compressed_tokens: None,
+                delta_efficiency_pct: None,
             }
         });
 
@@ -167,9 +208,11 @@ impl SessionStats {
         entry.fidelity = fidelity.to_string();
         entry.is_angular = is_angular;
         entry.strategy = strategy.to_string();
-        if strategy == "delta" {
+        if is_delta {
             entry.delta_count += 1;
         }
+        entry.full_compressed_tokens = full_compressed_tokens;
+        entry.delta_efficiency_pct = delta_eff_pct;
     }
 
     /// Merge another `SessionStats` into this one.
@@ -244,6 +287,19 @@ impl SessionStats {
             0.0
         };
 
+        // Compute average delta efficiency across all delta-strategy files
+        let delta_files: Vec<&FileStats> = self.files.values()
+            .filter(|f| f.strategy == "delta" && f.delta_efficiency_pct.is_some())
+            .collect();
+        let avg_delta_eff = if !delta_files.is_empty() {
+            let sum: f64 = delta_files.iter()
+                .filter_map(|f| f.delta_efficiency_pct)
+                .sum();
+            Some(sum / delta_files.len() as f64)
+        } else {
+            None
+        };
+
         let session_duration_secs = self
             .started_at
             .elapsed()
@@ -259,6 +315,7 @@ impl SessionStats {
             delta_count: self.delta_count,
             session_duration_secs,
             avg_savings_pct: (avg_savings_pct * 10.0).round() / 10.0,
+            avg_delta_efficiency_pct: avg_delta_eff.map(|v| (v * 10.0).round() / 10.0),
         }
     }
 
@@ -290,6 +347,13 @@ pub fn render_dashboard_text(stats: &SessionStats) -> String {
         summary.full_compress_count,
         summary.delta_count,
     ));
+    // Delta efficiency summary line (only shown when there are actual delta ops)
+    if let Some(avg_eff) = summary.avg_delta_efficiency_pct {
+        output.push_str(&format!(
+            "  Δ Efficiency: avg {:.1}% CPU savings vs full re-compress\n",
+            avg_eff,
+        ));
+    }
     output.push_str("───────────────────────────────────────────────────────────────\n");
     output.push_str("  Per-File Breakdown:\n");
 
@@ -314,14 +378,33 @@ pub fn render_dashboard_text(stats: &SessionStats) -> String {
         } else {
             file.file_path.clone()
         };
+
+        // Show "N/A" for delta files (LLM token savings don't apply)
+        let save_display = if file.has_llm_savings() {
+            format!("{:>6.1}%", file.savings_pct)
+        } else {
+            format!("{:>7}", "N/A")
+        };
+
         output.push_str(&format!(
-            "  {:<40} {:>7} {:>7} {:>6.1}% {:>7}\n",
+            "  {:<40} {:>7} {:>7} {} {:>7}",
             display_path,
             format_number(file.raw_tokens),
             format_number(file.compressed_tokens),
-            file.savings_pct,
+            save_display,
             file.delta_count,
         ));
+
+        // Show delta efficiency on a sub-row if applicable
+        if file.strategy == "delta" {
+            if let Some(eff) = file.delta_efficiency_pct {
+                output.push_str(&format!("\n  {:>40} {:>7} Δ eff: {:>5.1}%", "", "", eff));
+            } else {
+                output.push_str(&format!("\n  {:>40} {:>7}", "", "Δ: CPU only"));
+            }
+        }
+
+        output.push('\n');
     }
 
     output.push_str("═══════════════════════════════════════════════════════════════\n");
@@ -339,12 +422,23 @@ pub fn render_dashboard_json(stats: &SessionStats) -> serde_json::Value {
                 "file_path": f.file_path,
                 "raw_tokens": f.raw_tokens,
                 "compressed_tokens": f.compressed_tokens,
-                "savings_pct": (f.savings_pct * 10.0).round() / 10.0,
+                // null for delta files, numeric for LLM savings
+                "savings_pct": if f.has_llm_savings() {
+                    serde_json::Value::Number(serde_json::Number::from_f64(
+                        (f.savings_pct * 10.0).round() / 10.0
+                    ).unwrap_or(serde_json::Number::from(0)))
+                } else {
+                    serde_json::Value::Null
+                },
                 "version": f.version,
                 "delta_count": f.delta_count,
                 "fidelity": f.fidelity,
                 "is_angular": f.is_angular,
                 "strategy": f.strategy,
+                "full_compressed_tokens": f.full_compressed_tokens,
+                "delta_efficiency_pct": f.delta_efficiency_pct.map(|v| {
+                    (v * 10.0).round() / 10.0
+                }),
             })
         })
         .collect();
@@ -358,6 +452,7 @@ pub fn render_dashboard_json(stats: &SessionStats) -> serde_json::Value {
             "total_savings_pct": summary.total_savings_pct,
             "full_compress_count": summary.full_compress_count,
             "delta_count": summary.delta_count,
+            "avg_delta_efficiency_pct": summary.avg_delta_efficiency_pct,
         },
         "files": files,
     })
