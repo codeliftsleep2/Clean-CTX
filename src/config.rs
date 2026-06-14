@@ -57,9 +57,15 @@ fn default_sd_implement() -> String { "medium".to_string() }
 ///
 /// Controls when `provide_code_context` switches between compression
 /// strategies and fidelity levels automatically.
+///
+/// V2 (auto-inferred intent): files are now classified by content
+/// signals (test, config, model/types, service/complex, implementation)
+/// and fidelity is chosen based on classification + complexity score.
+/// The core principle: more complex files → higher fidelity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeuristicsConfig {
-    /// Files above this line count are treated as "large" → low fidelity.
+    /// Files above this line count are treated as "large" → contributes
+    /// to complexity scoring (no longer a direct Low trigger).
     #[serde(default = "default_large_file_threshold")]
     pub large_file_threshold: usize,
     /// File extensions (glob patterns) that always get high fidelity.
@@ -69,6 +75,28 @@ pub struct HeuristicsConfig {
     /// Whether to automatically detect and use the Angular Meta-Layer.
     #[serde(default = "default_true")]
     pub use_angular_meta: bool,
+
+    // ── V2: Auto-classify thresholds ──────────────────────────────
+
+    /// Min imports to classify as "service/complex" (High fidelity).
+    #[serde(default = "default_complex_import_threshold")]
+    pub complex_import_threshold: usize,
+    /// Min functions to classify as "service/complex" (High fidelity).
+    #[serde(default = "default_complex_fn_threshold")]
+    pub complex_fn_threshold: usize,
+    /// Min lines for complexity fallback to Medium fidelity.
+    #[serde(default = "default_medium_lines")]
+    pub medium_lines: usize,
+    /// Min lines for complexity fallback to High fidelity.
+    #[serde(default = "default_high_lines")]
+    pub high_lines: usize,
+    /// Whether to auto-classify files by content signals.
+    /// When false, falls back to the old V1 behavior.
+    #[serde(default = "default_true")]
+    pub auto_classify: bool,
+    /// Whether to check DB for prior fidelity on file re-visits.
+    #[serde(default = "default_true")]
+    pub session_aware_fidelity: bool,
 }
 
 impl Default for HeuristicsConfig {
@@ -77,11 +105,21 @@ impl Default for HeuristicsConfig {
             large_file_threshold: default_large_file_threshold(),
             force_high_fidelity: Vec::new(),
             use_angular_meta: default_true(),
+            complex_import_threshold: default_complex_import_threshold(),
+            complex_fn_threshold: default_complex_fn_threshold(),
+            medium_lines: default_medium_lines(),
+            high_lines: default_high_lines(),
+            auto_classify: default_true(),
+            session_aware_fidelity: default_true(),
         }
     }
 }
 
 fn default_large_file_threshold() -> usize { 300 }
+fn default_complex_import_threshold() -> usize { 15 }
+fn default_complex_fn_threshold() -> usize { 10 }
+fn default_medium_lines() -> usize { 300 }
+fn default_high_lines() -> usize { 500 }
 
 // ── Cache configuration ──────────────────────────────────────────
 
