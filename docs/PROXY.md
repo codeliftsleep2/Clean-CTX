@@ -1,6 +1,8 @@
 # Clean-CTX Anthropic Proxy
 
-A Rust HTTP proxy that sits between your LLM client (Cline, Cursor, etc.) and the Anthropic API, automatically injecting prompt-cache breakpoints to achieve ~90% API cost savings on cached turns.
+A Rust HTTP proxy that sits between your LLM client and the Anthropic API, automatically injecting prompt-cache breakpoints to achieve ~90% API cost savings on cached turns.
+
+Works with any client that sends Anthropic-format `POST /v1/messages` requests: Cline, Cursor, Aider, Continue.dev, GitHub Copilot (BYOK), and custom Anthropic clients.
 
 ## Why?
 
@@ -18,6 +20,8 @@ cargo run --release -p clean-ctx-proxy
 
 The proxy binds to `http://127.0.0.1:8787` by default. Point your client at it:
 
+### Cline / Cursor / Aider / Continue.dev
+
 ```bash
 # PowerShell
 $env:ANTHROPIC_BASE_URL = "http://127.0.0.1:8787"
@@ -25,6 +29,18 @@ $env:ANTHROPIC_BASE_URL = "http://127.0.0.1:8787"
 # Bash
 export ANTHROPIC_BASE_URL=http://127.0.0.1:8787
 ```
+
+### GitHub Copilot (BYOK)
+
+VS Code Copilot supports custom endpoints via Bring Your Own Key:
+
+1. Open Copilot Chat → model dropdown → **Manage Language Models**
+2. Click **Add Models** → select **Custom Endpoint**
+3. Set API Type to **Messages** (Anthropic format)
+4. Set Endpoint URL to `http://127.0.0.1:8787/v1`
+
+For enterprise teams, configure this at the org level:
+**GitHub Organization Settings → AI Controls → Copilot → Custom Models**
 
 ## Configuration
 
@@ -37,7 +53,7 @@ All settings are controlled via environment variables. Defaults are sensible for
 | `AUTO_CACHE` | `false` | Enable cache breakpoint injection |
 | `TAIL_TTL` | `5m` | TTL for the rolling-tail breakpoint |
 | `DROP_TOOLS` | _(none)_ | Comma-separated tool names to remove (e.g. `NotebookEdit,CronCreate`) |
-| `STRIP_ANSI` | `true` | Strip ANSI escape codes from text blocks |
+| `STRIP_ANSI` | `false` | Strip ANSI escape codes from text blocks (opt-in) |
 | `TRIM_BASH_GIT` | `false` | Truncate Bash tool's git commit/PR sections |
 | `MODEL_OVERRIDE` | _(none)_ | Override model name (e.g. `claude-opus-4-6`) |
 | `LOG_BODIES` | `false` | Log request/response bodies to disk |
@@ -59,7 +75,7 @@ This enables all cost-saving features:
 ### Request Flow
 
 ```
-Client (Cline) → Proxy (127.0.0.1:8787) → Anthropic API
+Client (Cline, Copilot, Cursor, etc.) → Proxy (127.0.0.1:8787) → Anthropic API
 ```
 
 1. Client sends a normal `/v1/messages` request
@@ -110,7 +126,8 @@ proxy/
 │   ├── logger.rs        # Request/response body logging
 │   └── error.rs         # Error types
 ├── tests/
-│   └── integration_test.rs  # End-to-end test with mock upstream
+│   ├── integration_test.rs    # End-to-end test with mock upstream
+│   └── audit_regression.rs   # 18 regression tests for all audit findings
 └── Cargo.toml
 ```
 
@@ -124,17 +141,25 @@ proxy/
 ## Testing
 
 ```bash
-# Run all proxy tests (unit + integration)
+# Run all proxy tests (unit + regression + integration)
 cargo test -p clean-ctx-proxy
 
 # Run only unit tests
 cargo test -p clean-ctx-proxy --lib
 
+# Run regression tests only (audit findings)
+cargo test -p clean-ctx-proxy --test audit_regression
+
 # Run integration test only
 cargo test -p clean-ctx-proxy --test integration_test
 ```
 
-The integration test spins up a mock Anthropic server, sends requests through the proxy, and verifies the transforms are applied correctly.
+The test suite includes 51 tests: 32 unit tests, 18 audit regression tests (covering all FAANG-principal code review findings), and 1 end-to-end integration test with a mock Anthropic server.
+
+## Limitations
+
+- **Response streaming**: The proxy buffers the full response from Anthropic before returning it to the client. This means Copilot and other IDEs will see responses as a complete block rather than token-by-token streaming. Response content is fully intact and correct — only the progressive rendering timing is affected.
+- **Copilot requires BYOK**: Default Copilot traffic routes through GitHub's own API gateway and never reaches the proxy. You must configure a custom endpoint as described above.
 
 ## Troubleshooting
 
@@ -144,6 +169,8 @@ The integration test spins up a mock Anthropic server, sends requests through th
 | Proxy returns 502 | Upstream URL is wrong or Anthropic is unreachable. Check `ANTHROPIC_BASE_URL` |
 | Cache savings not showing | Make sure `AUTO_CACHE=1` is set |
 | Tools still appear in request | Check `DROP_TOOLS` is set correctly (comma-separated, no spaces) |
+| Copilot not using proxy | Make sure you've configured a custom endpoint in VS Code (not using default GitHub routing) |
+| Response appears all at once | Expected — the proxy buffers responses. Content is correct; only streaming timing differs |
 
 ## License
 
