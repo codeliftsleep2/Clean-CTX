@@ -696,6 +696,11 @@ pub(super) fn handle_provide_code_context(
     let path_alias = state.dict.get_or_create_alias(resolved_path.clone());
 
     // Run heuristics engine
+    // C-1: pass persisted fidelity from DB for session-aware re-use
+    let stored_fidelity = state.context_store.load_latest(&resolved_path)
+        .ok()
+        .flatten()
+        .map(|meta| meta.fidelity);
     let decision = crate::mcp::heuristics::decide(
         &resolved_path,
         explicit_fidelity,
@@ -705,6 +710,7 @@ pub(super) fn handle_provide_code_context(
         &state.ir_context,
         &source,
         Some(&path_alias),
+        stored_fidelity,
     );
 
     // Execute based on strategy
