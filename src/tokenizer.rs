@@ -1,8 +1,8 @@
 // src/tokenizer.rs — Pluggable tokenizer abstraction (R-19)
 //
 // Provides a `Tokenizer` trait with multiple implementations:
-//   - `cl100k`   : GPT-4 / GPT-3.5 (existing default, via tiktoken-rs)
-//   - `o200k`    : GPT-4o (via tiktoken-rs)
+//   - `cl100k`   : GPT-4 / GPT-3.5 (via tiktoken-rs)
+//   - `o200k`    : GPT-4o (default, via tiktoken-rs)
 //   - `claude`   : Claude approximation (uses cl100k BPE with adjusted ratio)
 //   - `llama3`   : Llama-3 approximation (uses o200k BPE with adjusted ratio)
 //
@@ -20,14 +20,14 @@ use tiktoken_rs::CoreBPE;
 /// Supported tokenizer backends.
 ///
 /// Each variant maps to a specific tokenizer implementation. The default
-/// is `Cl100k` which preserves backward compatibility with v0.1.x.
+/// is `O200k` (GPT-4o) as it's the newest model with the best accuracy.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TokenizerKind {
-    /// GPT-4 / GPT-3.5 tokenizer (cl100k_base). Default.
-    #[default]
+    /// GPT-4 / GPT-3.5 tokenizer (cl100k_base).
     Cl100k,
-    /// GPT-4o tokenizer (o200k_base).
+    /// GPT-4o tokenizer (o200k_base). Default.
+    #[default]
     O200k,
     /// Claude tokenizer approximation (cl100k-based with ratio adjustment).
     Claude,
@@ -224,7 +224,7 @@ pub fn init_all_tokenizers() -> Result<(), TokenizerError> {
 /// default. Priority:
 ///   1. Explicit `tool_arg` (if present and valid).
 ///   2. `config_default` (if present and valid).
-///   3. `TokenizerKind::default()` (cl100k).
+///   3. `TokenizerKind::default()` (o200k).
 pub fn resolve_tokenizer_kind(
     tool_arg: Option<&str>,
     config_default: Option<&str>,

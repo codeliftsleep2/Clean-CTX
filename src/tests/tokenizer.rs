@@ -53,7 +53,7 @@ fn tokenizer_kind_display() {
 
 #[test]
 fn tokenizer_kind_default() {
-    assert_eq!(TokenizerKind::default(), TokenizerKind::Cl100k);
+    assert_eq!(TokenizerKind::default(), TokenizerKind::O200k);
 }
 
 #[test]
@@ -118,9 +118,9 @@ fn resolve_tokenizer_kind_config_default() {
 
 #[test]
 fn resolve_tokenizer_kind_fallback() {
-    // Falls back to cl100k when both are None
+    // Falls back to o200k (the new default) when both are None
     let kind = resolve_tokenizer_kind(None, None);
-    assert_eq!(kind, TokenizerKind::Cl100k);
+    assert_eq!(kind, TokenizerKind::O200k);
 }
 
 #[test]
@@ -132,9 +132,9 @@ fn resolve_tokenizer_kind_invalid_tool_arg() {
 
 #[test]
 fn resolve_tokenizer_kind_invalid_config() {
-    // Invalid config falls through to default
+    // Invalid config falls through to default (o200k)
     let kind = resolve_tokenizer_kind(None, Some("invalid"));
-    assert_eq!(kind, TokenizerKind::Cl100k);
+    assert_eq!(kind, TokenizerKind::O200k);
 }
 
 #[test]

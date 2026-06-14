@@ -52,7 +52,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
                     "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%). Default: 'low'." },
                     "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." },
-                    "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'cl100k' (GPT-4, default), 'o200k' (GPT-4o), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." }
+                    "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." }
                 },
                 "required": ["filePath"]
             }
@@ -156,7 +156,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "intent": { "type": "string", "description": "Optional intent: 'edit', 'refactor', 'overview', 'debug', 'implement'. Controls fidelity selection.", "enum": ["edit", "refactor", "overview", "debug", "implement"] },
                     "fidelity": { "type": "string", "description": "Optional explicit fidelity override: 'low', 'medium', 'high'. Overrides intent-based selection." },
                     "workspaceRoot": { "type": "string", "description": "Optional workspace root for relative paths." },
-                    "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'cl100k' (GPT-4, default), 'o200k' (GPT-4o), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." }
+                    "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." }
                 },
                 "required": ["filePath"]
             }
