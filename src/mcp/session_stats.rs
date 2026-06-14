@@ -122,6 +122,7 @@ impl SessionStats {
     /// For non-delta strategies, pass `None`.
     ///
     /// Updates both the per-file entry and the session totals.
+    #[allow(clippy::too_many_arguments)]
     pub fn record_compression(
         &mut self,
         file_path: &str,
