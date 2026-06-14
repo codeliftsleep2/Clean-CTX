@@ -193,41 +193,52 @@ pub fn mark_tail_ephemeral(state: &mut crate::mcp::McpState) {
 
 /// Render the cache metrics section for the text dashboard.
 ///
-/// `enabled` controls the "Status: enabled/disabled" line so the
-/// dashboard always shows the cache section even when cache is off.
-pub fn render_cache_text(metrics: &CacheMetrics, enabled: bool) -> String {
+/// Returns `None` if cache is disabled or has zero activity
+/// (no breakpoints ever emitted). This avoids showing a misleading
+/// "0% hit rate" section when the cache isn't actually in use.
+///
+/// Returns `Some(text)` with the cache section when cache has real activity.
+pub fn render_cache_text(metrics: &CacheMetrics, enabled: bool) -> Option<String> {
+    if !enabled && metrics.hits == 0 && metrics.misses == 0 {
+        return None; // disabled and never active — don't show
+    }
     let status = if enabled { "enabled" } else { "disabled" };
-    let hit_rate = if metrics.hits + metrics.misses > 0 {
-        metrics.hits as f64 / (metrics.hits + metrics.misses) as f64
-    } else {
-        0.0
-    };
-    format!(
-        "── Prompt Cache ──\n  Status: {}\n  Hits: {} | Misses: {} | Hit Rate: {:.0}%\n  Tokens Saved (est): {}\n",
+    let total = metrics.hits + metrics.misses;
+    if total == 0 {
+        // Enabled but no activity yet — show status only
+        return Some(format!(
+            "── Prompt Cache (LLM) ──\n  Status: {} (no activity yet)\n",
+            status,
+        ));
+    }
+    let hit_rate = metrics.hits as f64 / total as f64;
+    Some(format!(
+        "── Prompt Cache (LLM token savings) ──\n  Status: {}\n  Hits: {} | Misses: {} | Hit Rate: {:.0}%\n  LLM Tokens Saved: {}\n",
         status,
         metrics.hits,
         metrics.misses,
         hit_rate * 100.0,
         metrics.tokens_saved,
-    )
+    ))
 }
 
 /// Render the cache metrics as a JSON value for the structured dashboard.
 ///
-/// `enabled` controls the "enabled" field so the dashboard always
-/// shows the cache section even when cache is off.
+/// Returns the enabled/disabled status regardless of activity level.
 pub fn render_cache_json(metrics: &CacheMetrics, enabled: bool) -> serde_json::Value {
-    let hit_rate = if metrics.hits + metrics.misses > 0 {
-        metrics.hits as f64 / (metrics.hits + metrics.misses) as f64
+    let total = metrics.hits + metrics.misses;
+    let hit_rate = if total > 0 {
+        metrics.hits as f64 / total as f64
     } else {
         0.0
     };
     serde_json::json!({
         "enabled": enabled,
+        "active": total > 0,
         "hits": metrics.hits,
         "misses": metrics.misses,
         "hit_rate": (hit_rate * 100.0).round() / 100.0,
-        "tokens_saved": metrics.tokens_saved,
+        "llm_tokens_saved": metrics.tokens_saved,
         "breakpoints": metrics.breakpoints,
     })
 }
