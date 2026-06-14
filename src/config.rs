@@ -272,7 +272,7 @@ pub struct CleanCtxConfig {
 
     /// Default tokenizer backend for token counting.
     ///
-    /// Supported values: `"cl100k"` (default), `"o200k"`, `"claude"`, `"llama3"`.
+    /// Supported values: `"o200k"` (default), `"cl100k"`, `"claude"`, `"llama3"`.
     /// This can be overridden per-tool-call via the `tokenizer` argument.
     #[serde(default)]
     pub tokenizer: TokenizerKind,
