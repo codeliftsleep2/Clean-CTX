@@ -1244,8 +1244,10 @@ pub(super) fn handle_context_stats(
             text.push_str("── Persistence (SQLite) ──\n  Status: disabled\n");
         }
 
-        // Cache status section (always shown, with enabled/disabled status)
-        text.push_str(&render_cache_text(&state.cache_metrics, state.config.cache.enabled));
+        // Cache status section (only shown when active or enabled)
+        if let Some(cache_text) = render_cache_text(&state.cache_metrics, state.config.cache.enabled) {
+            text.push_str(&cache_text);
+        }
 
         if format == "json" {
             let mut json = crate::mcp::session_stats::render_dashboard_json(&merged);

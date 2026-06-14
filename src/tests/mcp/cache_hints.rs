@@ -209,14 +209,16 @@ fn test_cache_dashboard_text() {
     metrics.tokens_saved = 18420;
     metrics.breakpoints.insert("tools".to_string(), "hit".to_string());
 
-    let text = render_cache_text(&metrics, true);
+    // With hits+misses > 0, enabled=true returns Some with full stats
+    let text = render_cache_text(&metrics, true).expect("should return text when active");
     assert!(text.contains("12"), "should show 12 hits");
     assert!(text.contains("3"), "should show 3 misses");
-    assert!(text.contains("Prompt Cache"), "should contain header");
+    assert!(text.contains("Prompt Cache (LLM"), "should contain LLM header");
     assert!(text.contains("enabled"), "should show enabled status");
+    assert!(text.contains("LLM Tokens Saved"), "should show LLM token savings");
 
-    // M-1 regression: disabled status should show "disabled"
-    let text_disabled = render_cache_text(&metrics, false);
+    // With hits+misses > 0, enabled=false still returns Some (shows disabled status)
+    let text_disabled = render_cache_text(&metrics, false).expect("should return text with disabled status");
     assert!(text_disabled.contains("disabled"), "should show disabled status when cache is off");
 }
 
@@ -233,7 +235,7 @@ fn test_cache_dashboard_json() {
     assert_eq!(json["hits"], 12);
     assert_eq!(json["misses"], 3);
     assert!(json["hit_rate"].as_f64().unwrap() > 0.75);
-    assert_eq!(json["tokens_saved"], 18420);
+    assert_eq!(json["llm_tokens_saved"], 18420);
     assert_eq!(json["breakpoints"]["tools"], "hit");
     assert_eq!(json["enabled"], true, "enabled should be true");
 

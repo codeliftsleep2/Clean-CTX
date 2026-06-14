@@ -750,12 +750,22 @@ fn regression_m1_cache_section_shown_when_disabled() {
     crate::mcp::tool_handlers::handle_context_stats(&id, &params, &mut state);
 
     // Also verify the render functions directly
+    // When cache is disabled and never active, render_cache_text returns None
     let metrics = crate::mcp::cache_hints::CacheMetrics::default();
-    let text = crate::mcp::cache_hints::render_cache_text(&metrics, false);
-    assert!(text.contains("disabled"), "text should show 'disabled' when cache is off: {}", text);
+    let text_disabled = crate::mcp::cache_hints::render_cache_text(&metrics, false);
+    assert!(text_disabled.is_none(), "disabled+never active should return None (hidden)");
+
+    // With hits+misses > 0, disabled still returns Some (shows disabled status)
+    let mut active_metrics = crate::mcp::cache_hints::CacheMetrics::default();
+    active_metrics.hits = 1;
+    active_metrics.misses = 2;
+    let text_disabled_active = crate::mcp::cache_hints::render_cache_text(&active_metrics, false);
+    assert!(text_disabled_active.is_some_and(|t| t.contains("disabled")),
+        "disabled with activity should show disabled status");
 
     let json = crate::mcp::cache_hints::render_cache_json(&metrics, false);
     assert_eq!(json["enabled"], false, "json enabled should be false when cache is off");
+    assert_eq!(json["active"], false, "json active should be false with no cache activity");
 }
 
 // ══════════════════════════════════════════════════════════════════

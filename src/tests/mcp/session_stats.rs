@@ -32,7 +32,6 @@ fn test_session_stats_summary() {
     assert!(summary.total_savings_pct > 0.0);
     assert_eq!(summary.full_compress_count, 1);
     assert_eq!(summary.delta_count, 1);
-    assert_eq!(summary.delta_hit_rate, 50.0);
 }
 
 #[test]
@@ -42,7 +41,6 @@ fn test_empty_stats() {
     assert_eq!(summary.total_files, 0);
     assert_eq!(summary.total_raw_tokens, 0);
     assert_eq!(summary.total_compressed_tokens, 0);
-    assert_eq!(summary.delta_hit_rate, 0.0);
 }
 
 #[test]

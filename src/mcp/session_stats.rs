@@ -44,17 +44,15 @@ pub struct SessionSummary {
     pub total_raw_tokens: usize,
     /// Sum of compressed tokens across all files.
     pub total_compressed_tokens: usize,
-    /// Overall savings percentage.
+    /// Overall compression savings percentage (LLM token reduction).
     pub total_savings_pct: f64,
-    /// Number of full compression operations.
+    /// Number of full compression operations (producing LLM token savings).
     pub full_compress_count: usize,
-    /// Number of delta operations.
+    /// Number of delta operations (local CPU-only, no LLM token impact).
     pub delta_count: usize,
-    /// Delta hit rate (0.0 to 100.0).
-    pub delta_hit_rate: f64,
     /// Session duration in seconds.
     pub session_duration_secs: u64,
-    /// Average savings across all files.
+    /// Average compression savings across all files.
     pub avg_savings_pct: f64,
 }
 
@@ -236,12 +234,6 @@ impl SessionStats {
         } else {
             0.0
         };
-        let total_ops = self.full_compress_count + self.delta_count;
-        let delta_hit_rate = if total_ops > 0 {
-            (self.delta_count as f64 / total_ops as f64) * 100.0
-        } else {
-            0.0
-        };
         let avg_savings_pct = if total_files > 0 {
             self.files
                 .values()
@@ -265,7 +257,6 @@ impl SessionStats {
             total_savings_pct: (total_savings_pct * 10.0).round() / 10.0,
             full_compress_count: self.full_compress_count,
             delta_count: self.delta_count,
-            delta_hit_rate: (delta_hit_rate * 10.0).round() / 10.0,
             session_duration_secs,
             avg_savings_pct: (avg_savings_pct * 10.0).round() / 10.0,
         }
@@ -293,10 +284,12 @@ pub fn render_dashboard_text(stats: &SessionStats) -> String {
     output.push_str(&format!("  Files Tracked: {}\n", summary.total_files));
     output.push_str(&format!("  Total Raw Tokens: {}\n", format_number(summary.total_raw_tokens)));
     output.push_str(&format!("  Total Compressed Tokens: {}\n", format_number(summary.total_compressed_tokens)));
-    output.push_str(&format!("  Total Savings: {:.1}%\n", summary.total_savings_pct));
-    output.push_str(&format!("  Full Compressions: {}\n", summary.full_compress_count));
-    output.push_str(&format!("  Delta Operations: {}\n", summary.delta_count));
-    output.push_str(&format!("  Delta Hit Rate: {:.1}%\n", summary.delta_hit_rate));
+    output.push_str(&format!("  Total LLM Token Savings: {:.1}%\n", summary.total_savings_pct));
+    output.push_str(&format!(
+        "  Operations: {} full compressions, {} deltas (local CPU only)\n",
+        summary.full_compress_count,
+        summary.delta_count,
+    ));
     output.push_str("───────────────────────────────────────────────────────────────\n");
     output.push_str("  Per-File Breakdown:\n");
 
@@ -365,7 +358,6 @@ pub fn render_dashboard_json(stats: &SessionStats) -> serde_json::Value {
             "total_savings_pct": summary.total_savings_pct,
             "full_compress_count": summary.full_compress_count,
             "delta_count": summary.delta_count,
-            "delta_hit_rate": summary.delta_hit_rate,
         },
         "files": files,
     })
