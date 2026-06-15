@@ -1,0 +1,28 @@
+# Clean-CTX built-in filter: tsc (TypeScript compiler)
+# Compact TypeScript compiler output.
+
+[filters.tsc]
+description = "Compact TypeScript compiler output"
+match_command = "^(?:npx |bunx )?tsc\\b"
+strip_ansi = true
+max_lines = 100
+on_empty = "tsc: ok"
+
+match_output = [
+  { pattern = "(?m)^Found 0 errors", message = "tsc: ok" },
+]
+
+strip_lines_matching = [
+  "^\\s+~+$",
+  "^Version",
+]
+
+[[tests.tsc]]
+name = "clean compile collapses"
+input = "Found 0 errors. Watching for file changes.\n"
+expected = "tsc: ok"
+
+[[tests.tsc]]
+name = "errors preserved"
+input = "src/main.ts(5,1): error TS2322: Type 'string' is not assignable to type 'number'.\nFound 1 error.\n"
+expected = "src/main.ts(5,1): error TS2322: Type 'string' is not assignable to type 'number'.\nFound 1 error.\n"

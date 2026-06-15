@@ -1,12 +1,18 @@
-# Clean-CTX Anthropic Proxy
+# Clean-CTX Proxy
 
-A Rust HTTP proxy that sits between your LLM client and the Anthropic API, automatically injecting prompt-cache breakpoints to achieve ~90% API cost savings on cached turns.
+A Rust HTTP proxy that sits between your LLM client and any AI API (Anthropic, OpenAI, DeepSeek, etc.), automatically injecting prompt-cache breakpoints, compressing verbose tool output, scrubbing secrets, and applying TOML-based filters to reduce token usage by 70-90%.
 
-Works with any client that sends Anthropic-format `POST /v1/messages` requests: Cline, Cursor, Aider, Continue.dev, GitHub Copilot (BYOK), and custom Anthropic clients.
+Works with any client that sends Anthropic-format `POST /v1/messages` or OpenAI-format `POST /v1/chat/completions` requests: Cline, Cursor, Aider, Continue.dev, GitHub Copilot (BYOK), and custom clients.
 
 ## Why?
 
-Claude's prompt caching can reduce costs by 90% on the tools + system prompt portions of your requests, but LLM clients don't send the `cache_control` headers needed to activate it. This proxy intercepts every `/v1/messages` request, injects the headers, and forwards the modified request to Anthropic — no client configuration required.
+LLM clients don't send the `cache_control` headers needed to activate prompt caching, and tool output (cargo builds, npm installs, git diffs) is often verbose and wastes tokens. This proxy:
+
+1. **Injects cache breakpoints** to achieve ~90% API cost savings on cached turns
+2. **Compresses tool output** using TOML-based filters (cargo, npm, pytest, etc.)
+3. **Scrubs secrets** (AWS keys, GitHub tokens, JWTs, PEM keys) before they reach the LLM
+4. **Strips ANSI codes** from terminal output
+5. **Drops unused tools** to reduce token usage
 
 ## Quick Start
 
@@ -18,16 +24,93 @@ cargo run -p clean-ctx-proxy
 cargo run --release -p clean-ctx-proxy
 ```
 
-The proxy binds to `http://127.0.0.1:8787` by default. Point your client at it:
+The proxy binds to `http://127.0.0.1:8787` by default.
 
-### Cline / Cursor / Aider / Continue.dev
+## Multi-Platform Support
+
+The proxy supports **any AI provider** that uses the Anthropic or OpenAI API format:
+
+| Provider | Platform | Intercept Path | Detection |
+|----------|----------|----------------|-----------|
+| Anthropic (Claude) | `anthropic` | `/v1/messages` | `model.contains("claude")` |
+| OpenAI (GPT) | `openai` | `/v1/chat/completions` | `model.contains("gpt")` |
+| DeepSeek | `openai` or `generic` | `/v1/chat/completions` or `/chat` | `model.contains("deepseek")` or fallback |
+| Any other | `generic` | `/chat` | Heuristic fallback |
+
+### Platform Detection
+
+The proxy auto-detects the platform from the request body:
+
+```rust
+// In platform/mod.rs
+pub fn detect_platform(body: &Value) -> Box<dyn PlatformAdapter> {
+    if let Some(model) = body["model"].as_str() {
+        if model.contains("claude") {
+            return Box::new(AnthropicAdapter);
+        }
+        if model.contains("deepseek") || model.contains("gpt") {
+            return Box::new(OpenAIAdapter);
+        }
+    }
+    Box::new(GenericAdapter)  // Fallback
+}
+```
+
+You can also override the platform with the `PLATFORM` environment variable:
 
 ```bash
-# PowerShell
-$env:ANTHROPIC_BASE_URL = "http://127.0.0.1:8787"
+PLATFORM=generic cargo run -p clean-ctx-proxy
+```
 
-# Bash
-export ANTHROPIC_BASE_URL=http://127.0.0.1:8787
+## IDE Integration
+
+### Cline (VS Code Extension)
+
+1. Open **Cline settings** (click the gear icon in Cline panel)
+2. Change **API Provider** from "cline" to one of:
+   - **"OpenAI Compatible"** — for DeepSeek, GPT, or any OpenAI-compatible API
+   - **"Anthropic"** — for Claude models
+3. Configure the endpoint:
+   - **Base URL**: `http://127.0.0.1:8787`
+   - **API Key**: your actual API key
+   - **Model ID**: `deepseek-chat` (or `gpt-4o`, `claude-sonnet-4-20250514`, etc.)
+4. Restart Cline for changes to take effect
+
+### Cursor
+
+1. Open **Settings** → **Models**
+2. Add a custom model with:
+   - **API Base URL**: `http://127.0.0.1:8787`
+   - **API Key**: your actual API key
+   - **Model**: `deepseek-chat` (or your preferred model)
+3. Save and restart Cursor
+
+### Continue.dev
+
+1. Open `~/.continue/config.json`
+2. Add or modify the model configuration:
+   ```json
+   {
+     "models": [
+       {
+         "title": "DeepSeek via Proxy",
+         "provider": "openai",
+         "model": "deepseek-chat",
+         "apiBase": "http://127.0.0.1:8787",
+         "apiKey": "your-api-key"
+       }
+     ]
+   }
+   ```
+3. Restart Continue
+
+### Aider
+
+```bash
+# Set the base URL before starting Aider
+export OPENAI_API_BASE=http://127.0.0.1:8787
+export OPENAI_API_KEY=your-api-key
+aider --model deepseek-chat
 ```
 
 ### GitHub Copilot (BYOK)
@@ -42,6 +125,21 @@ VS Code Copilot supports custom endpoints via Bring Your Own Key:
 For enterprise teams, configure this at the org level:
 **GitHub Organization Settings → AI Controls → Copilot → Custom Models**
 
+### Environment Variables
+
+You can also set the base URL via environment variable before starting VS Code:
+
+```bash
+# For Anthropic
+set ANTHROPIC_BASE_URL=http://127.0.0.1:8787
+
+# For OpenAI-compatible (DeepSeek, GPT, etc.)
+set OPENAI_API_BASE=http://127.0.0.1:8787
+
+# Start VS Code
+code .
+```
+
 ## Configuration
 
 All settings are controlled via environment variables. Defaults are sensible for most use cases.
@@ -49,8 +147,8 @@ All settings are controlled via environment variables. Defaults are sensible for
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8787` | Port to bind on (always `127.0.0.1`) |
-| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Upstream Anthropic API URL |
-| `AUTO_CACHE` | `false` | Enable cache breakpoint injection |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Upstream API URL |
+| `AUTO_CACHE` | `false` | Enable cache breakpoint injection (Anthropic only) |
 | `TAIL_TTL` | `5m` | TTL for the rolling-tail breakpoint |
 | `DROP_TOOLS` | _(none)_ | Comma-separated tool names to remove (e.g. `NotebookEdit,CronCreate`) |
 | `STRIP_ANSI` | `false` | Strip ANSI escape codes from text blocks (opt-in) |
@@ -58,39 +156,86 @@ All settings are controlled via environment variables. Defaults are sensible for
 | `MODEL_OVERRIDE` | _(none)_ | Override model name (e.g. `claude-opus-4-6`) |
 | `LOG_BODIES` | `false` | Log request/response bodies to disk |
 | `LOG_DIR` | `.clean-ctx/proxy-logs` | Directory for log files |
+| `SCRUB_SECRETS` | `false` | Enable secret scrubbing in tool results |
+| `TOOL_FILTERS` | `false` | Enable tool output filtering (TOML-based) |
+| `PLATFORM` | _(auto-detect)_ | Override platform detection (`anthropic`, `openai`, `generic`) |
 
 ### Recommended Setup
 
 ```bash
-AUTO_CACHE=1 DROP_TOOLS=NotebookEdit,CronCreate STRIP_ANSI=1 cargo run -p clean-ctx-proxy
+AUTO_CACHE=1 DROP_TOOLS=NotebookEdit,CronCreate STRIP_ANSI=1 SCRUB_SECRETS=1 TOOL_FILTERS=1 cargo run -p clean-ctx-proxy
 ```
 
 This enables all cost-saving features:
-- **Cache injection** on tools, system prompt, and message tail
+- **Cache injection** on tools, system prompt, and message tail (Anthropic only)
 - **Tool dropping** for tools you never use
 - **ANSI stripping** to remove terminal escape codes from tool results
+- **Secret scrubbing** to redact AWS keys, GitHub tokens, JWTs, etc.
+- **Tool output filtering** to compress verbose cargo/npm/pytest output
 
 ## How It Works
 
 ### Request Flow
 
 ```
-Client (Cline, Copilot, Cursor, etc.) → Proxy (127.0.0.1:8787) → Anthropic API
+Client (Cline, Copilot, Cursor, etc.) → Proxy (127.0.0.1:8787) → AI API (Anthropic, OpenAI, DeepSeek, etc.)
 ```
 
-1. Client sends a normal `/v1/messages` request
+1. Client sends a normal API request (`/v1/messages` or `/v1/chat/completions`)
 2. Proxy intercepts it, parses the JSON body
-3. **Transforms** are applied (tool drop, ANSI strip, Bash trim, model override)
-4. **Cache breakpoints** are injected at 4 slots:
-   - **Slot 1**: Last tool in `body.tools[]`
-   - **Slot 2**: Largest `system` text block (>500 chars)
-   - **Slot 3**: Last cacheable block in `messages[0].content`
-   - **Slot 4**: Rolling tail — last text/tool_result across all messages
-5. The `anthropic-beta: extended-cache-ttl-2025-04-11` header is added
-6. Modified request is forwarded to Anthropic
+3. **Platform detection** determines the API format (Anthropic, OpenAI, or Generic)
+4. **Transforms** are applied (tool drop, ANSI strip, Bash trim, model override, secret scrub, tool filtering)
+5. **Cache breakpoints** are injected (Anthropic only)
+6. Modified request is forwarded to the upstream API
 7. Response is returned to the client unchanged
 
-Non-`/v1/messages` requests pass through untouched.
+Non-intercepted requests pass through untouched.
+
+### Transform Pipeline
+
+The proxy applies transforms in this order:
+
+1. **Tool Drop** — Removes unused tools from `body.tools[]`
+2. **ANSI Strip** — Removes `\x1B[...m` escape sequences from text blocks
+3. **Bash Git Trim** — Truncates Bash description at "Committing changes"
+4. **Model Override** — Rewrites model name in `model` field and system blocks
+5. **Secret Scrub** — Redacts AWS keys, GitHub tokens, JWTs, PEM keys, etc.
+6. **Tool Filtering** — Compresses verbose tool output using TOML-based filters
+
+### Tool Output Filtering
+
+The proxy includes 7 built-in filters that compress verbose tool output:
+
+| Filter | Program | What It Does |
+|--------|---------|--------------|
+| `cargo` | `cargo` | Compact cargo build/test/check/clippy output |
+| `dotnet` | `dotnet` | Compact dotnet build/test/run output |
+| `git-diff` | `git` | Compact git diff/show output |
+| `ng` | `ng` | Compact Angular CLI build/test/lint output |
+| `npm` | `npm` | Compact npm/yarn/pnpm/bun install/build output |
+| `pytest` | `pytest` | Compact pytest output |
+| `tsc` | `tsc` | Compact TypeScript compiler output |
+
+Filters are loaded from TOML files in the `filters/` directory. You can add custom filters by placing TOML files in `.clean-ctx/filters/`.
+
+### Secret Scrubbing
+
+The proxy detects and redacts secrets in tool results:
+
+- AWS access keys (`AKIA...`)
+- GitHub tokens (`ghp_...`, `gho_...`)
+- JWTs (`eyJ...`)
+- PEM private keys
+- Authorization headers
+- Database URLs
+- Stripe keys (`sk_live_...`)
+- Slack tokens (`xoxb-...`)
+- Google API keys (`AIza...`)
+- OpenAI keys (`sk-...`)
+- PyPI tokens (`pypi-...`)
+- Vault tokens (`hvs...`)
+
+Secrets are replaced with `[REDACTED]` before they reach the LLM.
 
 ### Cache Breakpoint Strategy
 
@@ -111,23 +256,47 @@ Any existing `cache_control` headers sent by the client are stripped first to av
 | ANSI Strip | Removes `\x1B[...m` escape sequences from text blocks | Varies |
 | Bash Git Trim | Truncates Bash description at "Committing changes" | ~1,800 tokens |
 | Model Override | Rewrites model name in `model` field and system blocks | — |
+| Secret Scrub | Redacts AWS keys, GitHub tokens, JWTs, etc. | — |
+| Tool Filtering | Compresses verbose tool output (cargo, npm, pytest, etc.) | 70-90% per tool result |
 
 ## Architecture
 
 ```
 proxy/
 ├── src/
-│   ├── main.rs          # Entry point, env-var parsing, Ctrl+C shutdown
-│   ├── lib.rs           # Library root (re-exports for tests)
-│   ├── server.rs        # HTTP server, routing, upstream forwarding
-│   ├── cache.rs         # 4-slot cache breakpoint injection
-│   ├── transform.rs     # Tool drop, ANSI strip, Bash trim, model override
-│   ├── config.rs        # Pino-compatible env-var configuration
-│   ├── logger.rs        # Request/response body logging
-│   └── error.rs         # Error types
+│   ├── main.rs              # Entry point, env-var parsing, Ctrl+C shutdown
+│   ├── lib.rs               # Library root (re-exports for tests)
+│   ├── server.rs            # HTTP server, routing, upstream forwarding
+│   ├── cache.rs             # 4-slot cache breakpoint injection
+│   ├── transform.rs         # Tool drop, ANSI strip, Bash trim, model override, secret scrub, tool filtering
+│   ├── config.rs            # Pino-compatible env-var configuration
+│   ├── logger.rs            # Request/response body logging
+│   ├── error.rs             # Error types
+│   ├── filters.rs           # TOML-based filter engine (7-step pipeline)
+│   ├── filter_rules.rs      # Filter rule compilation (TOML → compiled regex)
+│   ├── filter_registry.rs   # Filter selection (most-specific-match-wins)
+│   ├── filter_loader.rs     # Filter loading (built-in + community)
+│   ├── filter_stats.rs      # Per-program filter savings tracking
+│   ├── community_filters.rs # Community filter loading from .clean-ctx/filters/
+│   ├── scrub.rs             # Secret scrubbing engine
+│   ├── scrub_patterns.rs    # Secret detection patterns
+│   ├── pipeline.rs          # Pluggable transform pipeline (OCP compliance)
+│   └── platform/
+│       ├── mod.rs            # PlatformAdapter trait + detect_platform
+│       ├── anthropic.rs      # Anthropic API adapter
+│       ├── openai.rs         # OpenAI API adapter
+│       └── generic.rs        # Generic fallback adapter
 ├── tests/
-│   ├── integration_test.rs    # End-to-end test with mock upstream
-│   └── audit_regression.rs   # 18 regression tests for all audit findings
+│   ├── integration_test.rs  # End-to-end test with mock upstream
+│   └── audit_regression.rs  # 18 regression tests for all audit findings
+├── filters/                 # Built-in TOML filter files
+│   ├── cargo.toml
+│   ├── dotnet.toml
+│   ├── git-diff.toml
+│   ├── ng.toml
+│   ├── npm.toml
+│   ├── pytest.toml
+│   └── tsc.toml
 └── Cargo.toml
 ```
 
@@ -137,6 +306,9 @@ proxy/
 - **Stateless proxy** — No file-based caching (Anthropic handles that). The proxy only modifies request bodies.
 - **Lock-light** — The shared state mutex is held only briefly for reads, never across async I/O.
 - **Connection-per-request** — Each incoming connection is spawned independently for concurrency.
+- **Platform-agnostic** — Works with Anthropic, OpenAI, DeepSeek, and any OpenAI-compatible API.
+- **Pluggable transforms** — New transforms added via `Pipeline::build()` without modifying existing code.
+- **TOML-based filters** — Easy to add custom filters without modifying code.
 
 ## Testing
 
@@ -154,23 +326,27 @@ cargo test -p clean-ctx-proxy --test audit_regression
 cargo test -p clean-ctx-proxy --test integration_test
 ```
 
-The test suite includes 51 tests: 32 unit tests, 18 audit regression tests (covering all FAANG-principal code review findings), and 1 end-to-end integration test with a mock Anthropic server.
+The test suite includes 243 tests: 112 unit tests, 18 audit regression tests (covering all FAANG-principal code review findings), and 1 end-to-end integration test with a mock upstream server.
 
 ## Limitations
 
-- **Response streaming**: The proxy buffers the full response from Anthropic before returning it to the client. This means Copilot and other IDEs will see responses as a complete block rather than token-by-token streaming. Response content is fully intact and correct — only the progressive rendering timing is affected.
+- **Response streaming**: The proxy buffers the full response from the upstream API before returning it to the client. This means Copilot and other IDEs will see responses as a complete block rather than token-by-token streaming. Response content is fully intact and correct — only the progressive rendering timing is affected.
 - **Copilot requires BYOK**: Default Copilot traffic routes through GitHub's own API gateway and never reaches the proxy. You must configure a custom endpoint as described above.
+- **Cache injection is Anthropic-only**: The `cache_control` breakpoint injection only works with Anthropic's API. Other providers don't support this feature.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
 | `ECONNREFUSED` on port 8787 | Proxy isn't running. Start it with `cargo run -p clean-ctx-proxy` |
-| Proxy returns 502 | Upstream URL is wrong or Anthropic is unreachable. Check `ANTHROPIC_BASE_URL` |
-| Cache savings not showing | Make sure `AUTO_CACHE=1` is set |
+| Proxy returns 502 | Upstream URL is wrong or API is unreachable. Check `ANTHROPIC_BASE_URL` |
+| Cache savings not showing | Make sure `AUTO_CACHE=1` is set (Anthropic only) |
 | Tools still appear in request | Check `DROP_TOOLS` is set correctly (comma-separated, no spaces) |
 | Copilot not using proxy | Make sure you've configured a custom endpoint in VS Code (not using default GitHub routing) |
 | Response appears all at once | Expected — the proxy buffers responses. Content is correct; only streaming timing differs |
+| Secrets not being scrubbed | Make sure `SCRUB_SECRETS=1` is set |
+| Tool output not being filtered | Make sure `TOOL_FILTERS=1` is set |
+| Wrong platform detected | Set `PLATFORM=anthropic` or `PLATFORM=openai` or `PLATFORM=generic` |
 
 ## License
 
