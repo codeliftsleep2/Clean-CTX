@@ -10,7 +10,7 @@
 
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
-| **Now** | v0.2.0 | Real-world ready + CBM integration | 6 |
+| **Now** | v0.2.0 | Real-world ready + CBM integration | 8 |
 | **Next** | v0.3.0 | Advanced capabilities | 9 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 10 |
 | **Architectural** | Continuous | Code health & tooling | 6 |
@@ -47,6 +47,8 @@ These items address the most common user requests and unlock adoption on larger 
 | **F-20** | Rayon parallelization for `compress_workspace` | Per-thread tree-sitter `Parser` pool, shared `DashMap` for the path dictionary, `par_iter().try_for_each`. Expected ~4× speedup on 16-core boxes. Requires F-19. | 3-5 days | 🔴 High |
 | **A-07** | Property-based tests with `proptest` | Fuzz-style input tests for the decompressor, the config glob matcher, and the modifier stripper. Would have caught F-06 (Unicode) and F-12 (substring match) regressions. | 1-2 days | 🔴 High |
 | **R-29** | Intelligence Layer | Three-phase ranked context delivery on top of the existing compression stack. **Phase 1:** PageRank symbol scoring + adaptive per-symbol fidelity. **Phase 2:** Blast radius analysis — delta output includes depth-1 affected file skeletons. **Phase 3:** Token budget knapsack packing. All phases opt-in via `.clean-ctx.json`, zero overhead when disabled. R-35 (CBM integration) provides graph seeds for PageRank scoring. See `docs/INTELLIGENCE_LAYER_PLAN.md`. | 5.5 days | 🔴 High |
+| **R-39** | Secret Scrubbing (R-37 in plan) | Detect and redact secrets in tool results before they reach the LLM. Regex-based scrubbing for AWS keys, GitHub tokens, JWTs, PEM private keys, Bearer tokens, URL userinfo, secret assignments, and more. `ScrubFailClosed` semantics: withhold output on panic. `might_contain_secret` pre-filter for performance. Runs in proxy pipeline before output filtering. See `docs/TOOL_OUTPUT_FILTER_PLAN.md`. | 1.5 days | 🔴 High |
+| **R-40** | Shell Output Filtering (R-38 in plan) | Declarative per-program TOML filter rules that reduce noisy command output to signal. 7 built-in filters (cargo, npm, git, pytest, tsc, dotnet, ng). Filter pipeline: strip_ansi → replace → match_output collapse → strip/keep_lines → group_by → head/tail → max_lines → on_empty → JSON guard → failure handling → §FILTERED marker. Community filter support via `.clean-ctx/filters/`. Inline `[[tests]]` blocks. See `docs/TOOL_OUTPUT_FILTER_PLAN.md`. | 3 days | 🔴 High |
 
 ---
 
@@ -147,6 +149,7 @@ Items explicitly deferred — not forgotten, not prioritized.
 3. **Adoption blockers** — F-20 parallelization is required for any user with >1K files. R-19 tokenizer abstraction unblocks every model-specific feature.
 4. **Regression insurance** — A-07 (proptest) is cheap insurance against input-validation bugs.
 5. **Differentiation** — R-29 Intelligence Layer adds PageRank + blast radius + budget packing, enhanced by CBM's cross-language graph intelligence.
+6. **Token surface coverage** — R-39 (Secret Scrubbing) and R-40 (Shell Output Filtering) close the remaining token waste surface: build/test noise, git diff noise, and secrets in tool output. These run in the existing proxy pipeline with zero overhead when disabled. Inspired by [ctx-wire](https://github.com/pivanov/ctx-wire) patterns. See `docs/TOOL_OUTPUT_FILTER_PLAN.md`.
 
 **Next list** priorities:
 - R-01d Java language layer is 🔴 High priority for pilot stack (Java + Spring + React + Redux). CBM enriches input, we compress.
