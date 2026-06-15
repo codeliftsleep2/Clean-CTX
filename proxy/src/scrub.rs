@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_scrub_slack_token() {
-        let input = "Slack token: xoxb-123456789012-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx";
+        let input = "Slack token: xoxb-FAKE_TOKEN_123456789012345678901234567890";
         let result = scrub_secrets(input);
         assert!(result.content.contains("[REDACTED]"));
         assert!(!result.content.contains("xoxb-"));
