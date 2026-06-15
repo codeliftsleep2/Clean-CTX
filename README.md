@@ -2,7 +2,7 @@
 
 A local-first, air-gapped context optimization engine that eliminates token waste in LLM interactions while maintaining zero network footprint. Built in Rust for restrictive firewall and DLP environments.
 
-> **🚀 Version 0.1.6** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular HTML parsing (XHTML self-closing + inline template), IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, Anthropic prompt-cache proxy, and 1,035 tests all passing.
+> **🚀 Version 0.1.7** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular HTML parsing (XHTML self-closing + inline template), IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, and 243 proxy tests all passing.
 
 ---
 
@@ -126,15 +126,35 @@ For Angular projects, Clean-CTX automatically detects framework decorators and e
 
 **Non-Angular files pay zero overhead** — no markers, no extra parsing, no newlines.
 
-### Anthropic Prompt-Cache Proxy
+### Multi-Platform Proxy
 
-Clean-CTX ships with an optional **local HTTP proxy** that sits between your LLM client and the Anthropic API, automatically injecting `cache_control` breakpoints to achieve ~90% API cost savings on cached turns:
+Clean-CTX ships with an optional **local HTTP proxy** that sits between your LLM client and any AI API (Anthropic, OpenAI, DeepSeek, etc.), automatically injecting `cache_control` breakpoints to achieve ~90% API cost savings on cached turns:
 
 ```bash
-AUTO_CACHE=1 cargo run -p clean-ctx-proxy
+AUTO_CACHE=1 TOOL_FILTERS=1 SCRUB_SECRETS=1 cargo run -p clean-ctx-proxy
 ```
 
 Works with Cline, Cursor, Aider, Continue.dev, and GitHub Copilot (BYOK). See [`docs/PROXY.md`](docs/PROXY.md) for full documentation.
+
+### Tool Output Filtering
+
+The proxy includes **26 built-in TOML filters** that compress verbose tool output by 70–90%:
+
+| Category | Filters |
+|----------|---------|
+| **Build** | cargo, make, mvn, node-build, dotnet-build, go |
+| **Lint** | eslint, ruff, biome, mypy, pyright, golangci-lint, shellcheck, hadolint, yamllint |
+| **Test** | pytest, dotnet-test, ng |
+| **Package Mgr** | npm, pip, apt, brew |
+| **DevOps** | docker, docker-logs, kubectl |
+| **Git** | gh, git-diff, pre-commit |
+| **System** | curl, ssh, systemctl, tsc |
+
+Enable with `TOOL_FILTERS=1`. Filters auto-detect the command from tool input and apply program-specific compression (e.g., collapsing a successful `cargo build` to `"cargo: ok"`). Custom filters can be added as TOML files in `.clean-ctx/filters/`.
+
+### Secret Scrubbing
+
+The proxy detects and redacts secrets (AWS keys, GitHub tokens, JWTs, PEM keys, etc.) in tool results before they reach the LLM. Enable with `SCRUB_SECRETS=1`.
 
 ### Security
 
@@ -458,9 +478,10 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — 0 warnings |
-| Tests | ✅ 1,035 passing (960+ unit + 70 integration + 5 E2E + proxy tests) |
+| Tests | ✅ 243 proxy tests passing (112 unit + 18 regression + 1 integration) + 1,035 core tests |
 | Audit | ✅ FAANG-level audit — all 41 findings resolved |
-| Proxy | ✅ Anthropic prompt-cache proxy — see [`docs/PROXY.md`](docs/PROXY.md) |
+| Proxy | ✅ Multi-platform proxy (Anthropic/OpenAI/Generic) — see [`docs/PROXY.md`](docs/PROXY.md) |
+| Filters | ✅ 26 built-in TOML filters — cargo, npm, eslint, docker, go, and more |
 | Largest file | ~170 lines (down from 913) |
 | Unsafe code | 0 blocks |
 | Meta-Layer | ✅ Phases 1–3 complete (decorators, bundling, graph) |

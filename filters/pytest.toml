@@ -1,0 +1,39 @@
+# Clean-CTX built-in filter: pytest
+# Compact Python test runner output.
+
+[filters.pytest]
+description = "Compact pytest output"
+match_command = "^(?:python -m )?pytest\\b"
+strip_ansi = true
+max_lines = 100
+on_empty = "pytest: ok"
+
+match_output = [
+  { pattern = "(?m)\\d+ passed", message = "pytest: ok", unless = "(?i)(FAILED|ERROR|error)" },
+]
+
+strip_lines_matching = [
+  "^platform ",
+  "^rootdir:",
+  "^plugins:",
+  "^collecting ",
+  "^={3,}\\s+(test session|short test summary)",
+  "^-{3,}",
+  "^\\s*$",
+]
+
+[[tests.pytest]]
+name = "clean run collapses"
+input = "platform linux -- Python 3.11.0, pytest-7.4.0\ncollecting ... collected 47 items\n\n47 passed in 2.34s\n"
+expected = "pytest: ok"
+
+[[tests.pytest]]
+name = "failures preserved"
+input = "FAILED tests/test_auth.py::test_login - AssertionError\n1 failed, 46 passed in 2.34s\n"
+expected = "FAILED tests/test_auth.py::test_login - AssertionError\n1 failed, 46 passed in 2.34s\n"
+
+[[tests.pytest]]
+name = "failed exit not collapsed"
+failed = true
+input = "platform linux -- Python 3.11.0\n47 passed in 2.34s\n"
+expected = "platform linux -- Python 3.11.0\n47 passed in 2.34s\n"

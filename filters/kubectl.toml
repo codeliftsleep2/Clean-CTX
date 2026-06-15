@@ -1,0 +1,22 @@
+# Clean-CTX built-in filter: kubectl
+# Compact kubectl output.
+
+[filters.kubectl]
+description = "Compact kubectl output"
+match_command = "^kubectl\\b"
+strip_ansi = true
+max_lines = 140
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.kubectl]]
+name = "clean output"
+input = "deployment.apps/api configured\nservice/api unchanged\nconfigmap/api-config configured\n"
+expected = "deployment.apps/api configured\nservice/api unchanged\nconfigmap/api-config configured"
+
+[[tests.kubectl]]
+name = "blank lines stripped"
+input = "pod/nginx created\n\npod/busybox running\n"
+expected = "pod/nginx created\npod/busybox running"

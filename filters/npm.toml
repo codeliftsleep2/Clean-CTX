@@ -1,0 +1,37 @@
+# Clean-CTX built-in filter: npm / yarn / pnpm / bun
+# Compact package manager install/build output.
+
+[filters.npm]
+description = "Compact npm/yarn/pnpm/bun install/build output"
+match_command = "^(?:npm|yarn|pnpm|bun)\\s+(install|ci|run|build)\\b"
+strip_ansi = true
+max_lines = 30
+on_empty = "npm: ok"
+
+match_output = [
+  { pattern = "(?m)^added \\d+ packages?", message = "npm: ok", unless = "(?i)(error|ERR|vulnerabilit)" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^npm warn deprecated",
+  "^npm notice",
+  "^npm warn",
+  "^\\s*\\d+ packages? (is|are) looking for funding",
+  "^\\s*run `npm fund`",
+]
+
+[[tests.npm]]
+name = "clean install collapses"
+input = "added 247 packages in 12s\n\n42 packages are looking for funding\n  run `npm fund` for details\n"
+expected = "npm: ok"
+
+[[tests.npm]]
+name = "error preserved"
+input = "npm error code ERESOLVE\nnpm error ERESOLVE unable to resolve dependency tree\n"
+expected = "npm error code ERESOLVE\nnpm error ERESOLVE unable to resolve dependency tree\n"
+
+[[tests.npm]]
+name = "vulnerabilities preserved"
+input = "added 247 packages\nfound 3 vulnerabilities\n  high: 2\n  moderate: 1\n"
+expected = "added 247 packages\nfound 3 vulnerabilities\n  high: 2\n  moderate: 1\n"

@@ -1,0 +1,32 @@
+# Clean-CTX built-in filter: dotnet build
+# Compact dotnet build output.
+
+[filters.dotnet-build]
+description = "Compact dotnet build output"
+match_command = "^dotnet\\s+build\\b"
+strip_ansi = true
+max_lines = 40
+
+match_output = [
+  { pattern = "(?m)^Build succeeded", message = "dotnet: ok", unless = "(?i)(error|warning)" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^Microsoft \\(R\\)",
+  "^Copyright \\(C\\)",
+  "^\\s+Determining",
+  "^\\s+Restoring",
+  "^Build started",
+  "^Time Elapsed",
+]
+
+[[tests.dotnet-build]]
+name = "clean build collapses"
+input = "Microsoft (R) C# Compiler version 4.8.0\nBuild succeeded.\n    0 Error(s)\n    0 Warning(s)\nTime Elapsed 00:00:02.34\n"
+expected = "dotnet: ok"
+
+[[tests.dotnet-build]]
+name = "errors preserved"
+input = "error CS0246: The type or namespace name 'Foo' could not be found\nBuild FAILED.\n    1 Error(s)\n"
+expected = "error CS0246: The type or namespace name 'Foo' could not be found\nBuild FAILED.\n    1 Error(s)"

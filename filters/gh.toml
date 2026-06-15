@@ -1,0 +1,22 @@
+# Clean-CTX built-in filter: GitHub CLI
+# Compact GitHub CLI output.
+
+[filters.gh]
+description = "Compact GitHub CLI output"
+match_command = "^gh\\b"
+strip_ansi = true
+max_lines = 140
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.gh]]
+name = "clean output"
+input = "title\nbody\n"
+expected = "title\nbody"
+
+[[tests.gh]]
+name = "blank lines stripped"
+input = "title\n\nbody"
+expected = "title\nbody"

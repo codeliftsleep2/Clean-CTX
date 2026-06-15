@@ -27,6 +27,16 @@ mod cache;
 mod transform;
 mod logger;
 mod server;
+mod scrub;
+mod scrub_patterns;
+mod filter_rules;
+mod filters;
+mod filter_registry;
+mod community_filters;
+mod filter_stats;
+mod filter_loader;
+mod pipeline;
+mod platform;
 
 use tokio::sync::watch;
 use tracing::info;

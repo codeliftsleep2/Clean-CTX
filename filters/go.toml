@@ -1,0 +1,44 @@
+# Clean-CTX built-in filter: Go (test/build/vet)
+# Compact Go toolchain output.
+
+[filters.go]
+description = "Compact Go test/build/vet output"
+match_command = "^go\\s+(test|build|vet)\\b"
+strip_ansi = true
+max_lines = 140
+on_empty = "go: ok"
+
+match_output = [
+  { pattern = "(?m)^ok\\s+\\S+\\s+\\d+\\.\\d+s$", message = "go: ok" },
+  { pattern = "(?m)^PASS$", message = "go: ok", unless = "(?i)fail" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^\\?\\s+\\S+\\s+\\[no test files\\]$",
+]
+
+[[tests.go]]
+name = "clean test collapses"
+input = """
+ok  github.com/user/app  0.123s
+"""
+expected = "go: ok"
+
+[[tests.go]]
+name = "test failures preserved"
+input = """
+--- FAIL: TestFoo (0.01s)
+    main_test.go:10: expected 1, got 2
+FAIL
+FAIL\tgithub.com/user/app\t0.012s
+"""
+expected = "--- FAIL: TestFoo (0.01s)\n    main_test.go:10: expected 1, got 2\nFAIL\nFAIL\tgithub.com/user/app\t0.012s"
+
+[[tests.go]]
+name = "no test files skipped"
+input = """
+?   github.com/user/pkg    [no test files]
+ok  github.com/user/app    0.045s
+"""
+expected = "ok  github.com/user/app    0.045s"
