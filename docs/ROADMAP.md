@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-14
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -10,7 +10,7 @@
 
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
-| **Now** | v0.2.0 | Real-world ready | 5 |
+| **Now** | v0.2.0 | Real-world ready + CBM integration | 6 |
 | **Next** | v0.3.0 | Advanced capabilities | 9 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 10 |
 | **Architectural** | Continuous | Code health & tooling | 6 |
@@ -41,11 +41,12 @@ These items address the most common user requests and unlock adoption on larger 
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
+| **R-35** | codebase-memory-mcp Integration | Integrate with [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) for graph intelligence. **Phase 0:** Side-by-side MCP servers (config only). **Phase 1:** MCP client in Clean-CTX (`cbm_client.rs`) + graph bridge (`graph_bridge.rs`) for symbol importance, blast radius, dead code detection. **Phase 2:** Feed CBM graph seeds into Intelligence Layer (R-29) PageRank scoring. CBM provides 158-language graph intelligence; Clean-CTX provides compression. Complementary, not competing. | 5-8 days | 🔴 Critical |
 | **R-19** | Pluggable tokenizers | ✅ `Tokenizer` trait with `cl100k` (GPT-4), `o200k` (GPT-4o), `claude`, and `llama3` implementations. Selectable via `tokenizer` tool argument or `.clean-ctx.json` config. Process-global BPE caches, ratio-adjusted approximations for Claude/Llama-3. | 2 days | 🔴 High |
 | **F-19** | Streaming workspace walk | Replace `collect_source_files` collect-then-sort pattern with a `walkdir` streaming visitor. Required before F-20. | 1 day | 🟡 Medium |
 | **F-20** | Rayon parallelization for `compress_workspace` | Per-thread tree-sitter `Parser` pool, shared `DashMap` for the path dictionary, `par_iter().try_for_each`. Expected ~4× speedup on 16-core boxes. Requires F-19. | 3-5 days | 🔴 High |
 | **A-07** | Property-based tests with `proptest` | Fuzz-style input tests for the decompressor, the config glob matcher, and the modifier stripper. Would have caught F-06 (Unicode) and F-12 (substring match) regressions. | 1-2 days | 🔴 High |
-| **R-29** | Intelligence Layer | Three-phase ranked context delivery on top of the existing compression stack. **Phase 1:** PageRank symbol scoring + adaptive per-symbol fidelity. **Phase 2:** Blast radius analysis — delta output includes depth-1 affected file skeletons. **Phase 3:** Token budget knapsack packing. All phases opt-in via `.clean-ctx.json`, zero overhead when disabled. See `docs/INTELLIGENCE_LAYER_PLAN.md`. | 5.5 days | 🔴 High |
+| **R-29** | Intelligence Layer | Three-phase ranked context delivery on top of the existing compression stack. **Phase 1:** PageRank symbol scoring + adaptive per-symbol fidelity. **Phase 2:** Blast radius analysis — delta output includes depth-1 affected file skeletons. **Phase 3:** Token budget knapsack packing. All phases opt-in via `.clean-ctx.json`, zero overhead when disabled. R-35 (CBM integration) provides graph seeds for PageRank scoring. See `docs/INTELLIGENCE_LAYER_PLAN.md`. | 5.5 days | 🔴 High |
 
 ---
 
@@ -139,10 +140,11 @@ Items explicitly deferred — not forgotten, not prioritized.
 ## Prioritization rationale
 
 **Now list** was chosen by:
-1. **Unblocks other work** — F-19 (walkdir) unblocks F-20. R-29 Intelligence Layer builds on the existing IR + Angular graph.
-2. **Adoption blockers** — F-20 parallelization is required for any user with >1K files. R-19 tokenizer abstraction unblocks every model-specific feature.
-3. **Regression insurance** — A-07 (proptest) is cheap insurance against input-validation bugs.
-4. **Differentiation** — R-29 Intelligence Layer adds PageRank + blast radius + budget packing that no competing tool has in a single air-gapped binary.
+1. **CBM integration (R-35) is Critical** — codebase-memory-mcp provides graph intelligence (158 languages, knowledge graph, Cypher queries, dead code detection, blast radius) that complements Clean-CTX's compression. The MCP client approach (JSON-RPC between servers) keeps coupling loose while enabling powerful graph-informed compression. R-35 feeds directly into R-29 (Intelligence Layer) by providing symbol importance seeds.
+2. **Unblocks other work** — F-19 (walkdir) unblocks F-20. R-29 Intelligence Layer builds on the existing IR + Angular graph and now benefits from CBM graph seeds.
+3. **Adoption blockers** — F-20 parallelization is required for any user with >1K files. R-19 tokenizer abstraction unblocks every model-specific feature.
+4. **Regression insurance** — A-07 (proptest) is cheap insurance against input-validation bugs.
+5. **Differentiation** — R-29 Intelligence Layer adds PageRank + blast radius + budget packing, enhanced by CBM's cross-language graph intelligence.
 
 **Next list** priorities:
 - R-23 NgRx Meta-Layer is High priority because it's the highest-value meta-layer given the existing Angular + TS foundation and enterprise NgRx adoption.
@@ -150,6 +152,12 @@ Items explicitly deferred — not forgotten, not prioritized.
 - R-01 Python language layer is the single most-requested language addition.
 
 **Later list** — none of R-25 through R-28 should be started speculatively. Build when contributors or demand signals appear.
+
+**CBM integration architecture decisions (locked):**
+- Communication: MCP JSON-RPC between Clean-CTX and CBM (loose coupling, no direct DB access)
+- Runtime model: Both run as separate MCP servers; optional `--with-cbm` flag for auto-start
+- Graph data flow: CBM provides graph intelligence → Clean-CTX consumes via `search_graph`, `trace_path`, `detect_changes`, `get_architecture`
+- Intelligence Layer synergy: CBM symbol importance seeds → Clean-CTX PageRank → per-symbol adaptive fidelity
 
 ---
 
