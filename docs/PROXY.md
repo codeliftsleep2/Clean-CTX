@@ -204,17 +204,43 @@ The proxy applies transforms in this order:
 
 ### Tool Output Filtering
 
-The proxy includes 7 built-in filters that compress verbose tool output:
+The proxy includes **26 built-in filters** that compress verbose tool output:
 
 | Filter | Program | What It Does |
 |--------|---------|--------------|
 | `cargo` | `cargo` | Compact cargo build/test/check/clippy output |
-| `dotnet` | `dotnet` | Compact dotnet build/test/run output |
+| `npm` | `npm/yarn/pnpm/bun` | Compact package manager install/build output |
 | `git-diff` | `git` | Compact git diff/show output |
-| `ng` | `ng` | Compact Angular CLI build/test/lint output |
-| `npm` | `npm` | Compact npm/yarn/pnpm/bun install/build output |
 | `pytest` | `pytest` | Compact pytest output |
 | `tsc` | `tsc` | Compact TypeScript compiler output |
+| `dotnet` | `dotnet` | Compact dotnet build/test/run output |
+| `ng` | `ng` | Compact Angular CLI build/test/lint output |
+| `eslint` | `eslint` | Compact ESLint linting output |
+| `ruff` | `ruff` | Compact Ruff Python linter output |
+| `biome` | `biome` | Compact Biome lint/format output (filter_stderr) |
+| `go` | `go` | Compact Go test/build/vet output |
+| `make` | `make` | Compact GNU Make output |
+| `pip` | `pip` | Compact pip install/sync output |
+| `docker` | `docker` | Compact Docker build/pull/push/compose output |
+| `docker-logs` | `docker logs` | Cap docker logs output |
+| `gh` | `gh` | Compact GitHub CLI output |
+| `curl` | `curl` | Compact curl output (filter_stderr) |
+| `mvn` | `mvn` | Compact Maven build output |
+| `mypy` | `mypy` | Compact mypy Python type checker output |
+| `pyright` | `pyright` | Compact pyright type checker output |
+| `shellcheck` | `shellcheck` | Compact shellcheck output |
+| `golangci-lint` | `golangci-lint` | Compact golangci-lint output |
+| `kubectl` | `kubectl` | Compact kubectl output |
+| `apt` | `apt/apt-get` | Compact apt/apt-get output |
+| `brew` | `brew` | Compact brew install/upgrade output |
+| `pre-commit` | `pre-commit` | Compact pre-commit output |
+| `ssh` | `ssh` | Compact ssh output |
+| `systemctl` | `systemctl` | Compact systemctl status output |
+| `hadolint` | `hadolint` | Compact hadolint Dockerfile linting output |
+| `yamllint` | `yamllint` | Compact yamllint output |
+| `node-build` | `npm/yarn/pnpm/bun run build` | Compact Node.js build output |
+| `dotnet-build` | `dotnet build` | Compact dotnet build output |
+| `dotnet-test` | `dotnet test` | Compact dotnet test output |
 
 Filters are loaded from TOML files in the `filters/` directory. You can add custom filters by placing TOML files in `.clean-ctx/filters/`.
 
@@ -289,14 +315,40 @@ proxy/
 ├── tests/
 │   ├── integration_test.rs  # End-to-end test with mock upstream
 │   └── audit_regression.rs  # 18 regression tests for all audit findings
-├── filters/                 # Built-in TOML filter files
-│   ├── cargo.toml
-│   ├── dotnet.toml
-│   ├── git-diff.toml
-│   ├── ng.toml
-│   ├── npm.toml
-│   ├── pytest.toml
-│   └── tsc.toml
+├── filters/                 # Built-in TOML filter files (26 filters)
+│   ├── cargo.toml           # cargo build/test/check/clippy
+│   ├── npm.toml             # npm/yarn/pnpm/bun install/build
+│   ├── git-diff.toml        # git diff/show
+│   ├── pytest.toml          # pytest
+│   ├── tsc.toml             # TypeScript compiler
+│   ├── dotnet.toml          # dotnet build/test/run
+│   ├── dotnet-build.toml    # dotnet build (split)
+│   ├── dotnet-test.toml     # dotnet test (split)
+│   ├── ng.toml              # Angular CLI
+│   ├── eslint.toml          # ESLint
+│   ├── ruff.toml            # Ruff Python linter
+│   ├── biome.toml           # Biome lint/format
+│   ├── go.toml              # go test/build/vet
+│   ├── make.toml            # GNU Make
+│   ├── pip.toml             # pip install/sync
+│   ├── docker.toml          # docker build/pull/push
+│   ├── docker-logs.toml     # docker logs
+│   ├── gh.toml              # GitHub CLI
+│   ├── curl.toml            # curl
+│   ├── mvn.toml             # Maven build
+│   ├── mypy.toml            # mypy type checker
+│   ├── pyright.toml         # pyright type checker
+│   ├── shellcheck.toml      # shellcheck
+│   ├── golangci-lint.toml   # golangci-lint
+│   ├── kubectl.toml         # kubectl
+│   ├── apt.toml             # apt/apt-get
+│   ├── brew.toml            # brew install/upgrade
+│   ├── pre-commit.toml      # pre-commit
+│   ├── ssh.toml             # ssh
+│   ├── systemctl.toml       # systemctl status
+│   ├── hadolint.toml        # hadolint
+│   ├── yamllint.toml        # yamllint
+│   └── node-build.toml      # npm/yarn/pnpm/bun run build
 └── Cargo.toml
 ```
 
