@@ -99,6 +99,9 @@ async fn test_proxy_full() {
         model_override: None,
         log_bodies: false,
         log_dir: ".clean-ctx/proxy-logs".to_string(),
+        scrub_secrets: false,
+        tool_filters: false,
+        platform: None,
     };
     let (tx, rx) = watch::channel(false);
     let ph = tokio::spawn(async move {

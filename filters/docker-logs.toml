@@ -1,0 +1,17 @@
+# Clean-CTX built-in filter: docker logs
+# Cap docker logs output.
+
+[filters.docker-logs]
+description = "Cap docker logs output"
+match_command = "^(docker\\s+(logs|compose\\s+logs)|docker-compose\\s+logs)\\b"
+strip_ansi = true
+max_lines = 240
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.docker-logs]]
+name = "blank lines stripped"
+input = "line one\n\nline two\n"
+expected = "line one\nline two"

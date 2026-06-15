@@ -1,0 +1,32 @@
+# Clean-CTX built-in filter: Angular CLI (ng)
+# Compact Angular CLI build/test/lint output.
+
+[filters.ng]
+description = "Compact Angular CLI build/test/lint output"
+match_command = "^ng\\s+(build|test|lint)\\b"
+strip_ansi = true
+max_lines = 80
+on_empty = "ng: ok"
+
+match_output = [
+  { pattern = "(?m)^Build succeeded", message = "ng: ok", unless = "(?i)(error|warning)" },
+  { pattern = "(?m)^Build failed", message = "ng: build failed" },
+]
+
+strip_lines_matching = [
+  "^Browser application bundle",
+  "^Generating browser",
+  "^Processing assets",
+  "^Output location:",
+  "^\\s*$",
+]
+
+[[tests.ng]]
+name = "clean build collapses"
+input = "Browser application bundle generation complete.\nBuild succeeded.\n"
+expected = "ng: ok"
+
+[[tests.ng]]
+name = "errors preserved"
+input = "Error: src/app/app.component.ts:5:1 - error TS1234\nBuild failed.\n"
+expected = "Error: src/app/app.component.ts:5:1 - error TS1234\nBuild failed.\n"

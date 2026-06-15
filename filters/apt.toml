@@ -1,0 +1,64 @@
+# Clean-CTX built-in filter: apt
+# Compact apt/apt-get output.
+
+[filters.apt]
+description = "Compact apt/apt-get output"
+match_command = "^(sudo\\s+)?apt(-get)?\\s+(install|update|upgrade)\\b"
+strip_ansi = true
+max_lines = 100
+on_empty = "apt: ok"
+
+match_output = [
+  { pattern = "(?m)^Setting up\\s+", message = "apt: ok", unless = "(?i)(error|E:|fail|dpkg)" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^Hit:",
+  "^Get:",
+  "^Reading package lists",
+  "^Building dependency tree",
+  "^Reading state information",
+  "^The following NEW packages",
+  "^The following packages will be",
+  "^After this operation",
+  "^Need to get",
+  "^Unpacking",
+  "^Setting up\\s+",
+  "^Processing triggers",
+  "^Manually selected",
+  "^Calculating upgrade",
+]
+
+[[tests.apt]]
+name = "clean install collapses"
+input = """
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  curl
+Need to get 287 kB of archives.
+After this operation, 653 kB of additional disk space will be used.
+Get:1 http://archive.ubuntu.com/ubuntu jammy/main amd64 curl amd64 7.81.0-1ubuntu1.4 [287 kB]
+Fetched 287 kB in 0.5s (573 kB/s)
+Selecting previously unselected package curl.
+(Reading database ... 12345 files and directories currently installed.)
+Preparing to unpack .../curl_7.81.0-1ubuntu1.4_amd64.deb ...
+Unpacking curl (7.81.0-1ubuntu1.4) ...
+Setting up curl (7.81.0-1ubuntu1.4) ...
+Processing triggers for man-db (2.10.2-1) ...
+"""
+expected = "apt: ok"
+
+[[tests.apt]]
+name = "errors preserved"
+input = """
+E: Unable to locate package nonexistent
+dpkg: error processing package curl (--configure):
+ subprocess installed post-installation script returned error exit status 1
+Errors were encountered while processing:
+ curl
+E: Sub-process /usr/bin/dpkg returned an error code (1)
+"""
+expected = "E: Unable to locate package nonexistent\ndpkg: error processing package curl (--configure):\n subprocess installed post-installation script returned error exit status 1\nErrors were encountered while processing:\n curl\nE: Sub-process /usr/bin/dpkg returned an error code (1)"

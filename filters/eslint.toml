@@ -1,0 +1,48 @@
+# Clean-CTX built-in filter: ESLint
+# Compact ESLint linting output for JavaScript/TypeScript.
+
+[filters.eslint]
+description = "Compact ESLint output"
+match_command = "^(?:npx |bunx )?eslint\\b|(?:npm|pnpm|yarn)\\s+(?:run\\s+)?(?:eslint|lint)\\b"
+strip_ansi = true
+max_lines = 140
+on_empty = "eslint: ok"
+
+match_output = [
+  { pattern = "(?m)^\\d+ problems? \\(\\d+ errors?, \\d+ warnings?\\)$", message = "eslint: ok", unless = "(?i)(error)" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.eslint]]
+name = "clean lint collapses"
+input = """
+/home/user/src/app.ts
+  0 problems (0 errors, 0 warnings)
+  0 errors and 0 warnings potentially fixable with the `--fix` option.
+"""
+expected = "eslint: ok"
+
+[[tests.eslint]]
+name = "errors preserved"
+input = """
+/home/user/src/app.ts
+  3:5  error  Unexpected any                    @typescript-eslint/no-explicit-any
+  7:1  error  Missing return type on function   explicit-function-return-type
+
+2 problems (2 errors, 0 warnings)
+  2 errors and 0 warnings potentially fixable with the `--fix` option.
+"""
+expected = "/home/user/src/app.ts\n  3:5  error  Unexpected any                    @typescript-eslint/no-explicit-any\n  7:1  error  Missing return type on function   explicit-function-return-type\n2 problems (2 errors, 0 warnings)\n  2 errors and 0 warnings potentially fixable with the `--fix` option."
+
+[[tests.eslint]]
+name = "warnings only collapsed"
+input = """
+/home/user/src/utils.ts
+  1:1  warning  Unexpected any  @typescript-eslint/no-explicit-any
+
+1 problem (0 errors, 1 warning)
+"""
+expected = "eslint: ok"

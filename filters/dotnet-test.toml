@@ -1,0 +1,32 @@
+# Clean-CTX built-in filter: dotnet test
+# Compact dotnet test output.
+
+[filters.dotnet-test]
+description = "Compact dotnet test output"
+match_command = "^dotnet\\s+test\\b"
+strip_ansi = true
+max_lines = 100
+
+match_output = [
+  { pattern = "(?m)^Test Run Passed", message = "dotnet: ok", unless = "(?i)(Failed|Error)" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^Microsoft \\(R\\)",
+  "^Copyright \\(C\\)",
+  "^\\s+Determining",
+  "^\\s+Restoring",
+  "^Build started",
+  "^Time Elapsed",
+]
+
+[[tests.dotnet-test]]
+name = "clean test collapses"
+input = "Test Run Passed.\nTotal tests: 42\n     Passed: 42\n Total time: 1.234 Seconds\n"
+expected = "dotnet: ok"
+
+[[tests.dotnet-test]]
+name = "failures preserved"
+input = "Test Run Failed.\nTotal tests: 42\n     Passed: 40\n     Failed: 2\n Total time: 1.234 Seconds\n"
+expected = "Test Run Failed.\nTotal tests: 42\n     Passed: 40\n     Failed: 2\n Total time: 1.234 Seconds"

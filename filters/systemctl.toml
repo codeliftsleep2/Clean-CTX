@@ -1,0 +1,17 @@
+# Clean-CTX built-in filter: systemctl
+# Compact systemctl status output.
+
+[filters.systemctl]
+description = "Compact systemctl status output"
+match_command = "^systemctl\\s+status\\b"
+strip_ansi = true
+max_lines = 20
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.systemctl]]
+name = "blank lines stripped"
+input = "active (running)\n\npid 1234\n"
+expected = "active (running)\npid 1234"

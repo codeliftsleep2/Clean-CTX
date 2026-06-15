@@ -1,0 +1,58 @@
+# Clean-CTX built-in filter: Docker
+# Compact docker build/pull/push/compose output.
+
+[filters.docker]
+description = "Compact Docker build/pull/push/compose output"
+match_command = "^(docker\\s+(build|pull|push|compose\\s+(build|up|run|exec))|docker-compose\\s+(build|up|run|exec))\\b"
+strip_ansi = true
+max_lines = 140
+on_empty = "docker: ok"
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^#\\d+\\s+\\[\\s+\\d+\\.\\d+s\\]",
+  "^#\\d+\\s+\\d+\\.\\d+s",
+  "^#\\d+\\s+DONE",
+  "^#\\d+\\s+exporting",
+  "^#\\d+\\s+writing",
+  "^#\\d+\\s+pushing",
+  "^#\\d+\\s+preparing",
+  "^#\\d+\\s+resolving",
+  "^#\\d+\\s+extracting",
+  "^#\\d+\\s+transferring",
+  "^#\\d+\\s+pulling",
+  "^#\\d+\\s+waiting",
+  "^#\\d+\\s+downloading",
+  "^#\\d+\\s+verifying",
+  "^#\\d+\\s+checking",
+]
+
+[[tests.docker]]
+name = "clean build collapses"
+input = """
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 123B done
+#1 DONE 0.0s
+
+#2 [internal] load .dockerignore
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/alpine:latest
+#3 DONE 0.5s
+
+#4 [1/2] FROM docker.io/library/alpine:latest
+#4 DONE 0.3s
+
+#5 exporting to image
+#5 exporting layers DONE 0.1s
+#5 writing image sha256:deadbeef DONE 0.0s
+"""
+expected = "docker: ok"
+
+[[tests.docker]]
+name = "errors preserved"
+input = """
+#1 [internal] load build definition from Dockerfile
+#1 ERROR: failed to solve: dockerfile parse error on line 5
+"""
+expected = "#1 [internal] load build definition from Dockerfile\n#1 ERROR: failed to solve: dockerfile parse error on line 5"

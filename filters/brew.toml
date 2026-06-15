@@ -1,0 +1,31 @@
+# Clean-CTX built-in filter: brew
+# Compact brew install/upgrade output.
+
+[filters.brew]
+description = "Compact brew install/upgrade output"
+match_command = "^brew\\s+(install|upgrade)\\b"
+strip_ansi = true
+max_lines = 20
+
+match_output = [
+  { pattern = "(?m)^Warning:.*already installed", message = "brew: already installed" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^==> Downloading",
+  "^==> Pouring",
+  "^==> Summary",
+  "^\\s+\\d+ files?,",
+  "^\\s+\\d+\\.\\d+\\s+(MB|KB|GB|bytes)",
+]
+
+[[tests.brew]]
+name = "already installed collapses"
+input = "Warning: jq 1.7.1 is already installed and up-to-date.\nTo reinstall 1.7.1, run `brew reinstall jq`.\n"
+expected = "brew: already installed"
+
+[[tests.brew]]
+name = "errors preserved"
+input = "Error: Cannot install jq because conflicting formulae are installed:\n  jq@1.6: because jq 1.6 and jq 1.7 cannot coexist\n"
+expected = "Error: Cannot install jq because conflicting formulae are installed:\n  jq@1.6: because jq 1.6 and jq 1.7 cannot coexist"

@@ -1,14 +1,20 @@
 // proxy/src/transform.rs
 //
 // Request body transforms: tool dropping, ANSI stripping, Bash git trim,
-// and model override.
+// model override, secret scrubbing, and tool output filtering.
 
 use regex::Regex;
 use serde_json::Value;
 use tracing::debug;
 
+use crate::filters::{apply_filter, build_filtered_marker, json_guard};
+use crate::filter_registry::FilterRegistry;
+use crate::filter_stats::FilterStats;
+use crate::platform::PlatformAdapter;
+use crate::scrub;
+
 /// Statistics tracked across transform operations.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TransformStats {
     /// Number of tools dropped.
     pub tools_dropped: u64,
@@ -25,6 +31,30 @@ pub struct TransformStats {
 
     /// Model name overrides applied.
     pub model_overrides: u64,
+
+    /// Number of secrets scrubbed.
+    pub secrets_scrubbed: u64,
+
+    /// Number of tool output filter applications.
+    pub tool_filters_applied: u64,
+
+    /// Per-program filter savings (only populated when TOOL_FILTERS is enabled).
+    pub filter_stats: FilterStats,
+}
+
+impl Default for TransformStats {
+    fn default() -> Self {
+        Self {
+            tools_dropped: 0,
+            ansi_sequences_stripped: 0,
+            ansi_bytes_stripped: 0,
+            bash_git_trims: 0,
+            model_overrides: 0,
+            secrets_scrubbed: 0,
+            tool_filters_applied: 0,
+            filter_stats: FilterStats::new(),
+        }
+    }
 }
 
 /// Lazy-initialized ANSI escape regex.
@@ -39,14 +69,11 @@ fn ansi_regex() -> &'static Regex {
 fn model_regex() -> &'static Regex {
     static MODEL_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     MODEL_RE.get_or_init(|| {
-        // Matches "claude-sonnet-4-20250514", "claude-opus-4-6", etc.
         Regex::new(r"claude-[a-z]+-\d[\d.-]+[a-z\d]").expect("Invalid model regex")
     })
 }
 
 /// Drop tools from body.tools[] that match the provided exclusion set.
-///
-/// Returns the number of tools dropped.
 pub fn drop_tools(body: &mut Value, drop_set: &std::collections::HashSet<String>, stats: &mut TransformStats) -> usize {
     if drop_set.is_empty() {
         return 0;
@@ -78,9 +105,9 @@ pub fn drop_tools(body: &mut Value, drop_set: &std::collections::HashSet<String>
 
 /// Strip ANSI escape codes from all text fields in the request body.
 ///
-/// Scans messages[].content[].text and tool_result blocks (both string and array content).
-/// Returns the number of ANSI sequences stripped.
-pub fn strip_ansi(body: &mut Value, stats: &mut TransformStats) -> usize {
+/// Uses the platform adapter to detect tool result blocks across different
+/// API formats (Anthropic's `type: "tool_result"`, OpenAI's `role: "tool"`, etc.).
+pub fn strip_ansi(body: &mut Value, stats: &mut TransformStats, adapter: &dyn PlatformAdapter) -> usize {
     let re = ansi_regex();
     let mut total_sequences: usize = 0;
 
@@ -88,7 +115,6 @@ pub fn strip_ansi(body: &mut Value, stats: &mut TransformStats) -> usize {
         for msg in messages.iter_mut() {
             if let Some(content) = msg["content"].as_array_mut() {
                 for block in content.iter_mut() {
-                    // Handle direct text blocks
                     if let Some(text) = block["text"].as_str() {
                         let seq_count = re.find_iter(text).count();
                         if seq_count > 0 {
@@ -98,9 +124,7 @@ pub fn strip_ansi(body: &mut Value, stats: &mut TransformStats) -> usize {
                         }
                     }
 
-                    // Handle tool_result blocks — content can be a string or array
-                    if block["type"].as_str() == Some("tool_result") {
-                        // Handle string content
+                    if adapter.is_tool_result(block) {
                         if let Some(text) = block["content"].as_str() {
                             let seq_count = re.find_iter(text).count();
                             if seq_count > 0 {
@@ -109,7 +133,6 @@ pub fn strip_ansi(body: &mut Value, stats: &mut TransformStats) -> usize {
                                 block["content"] = Value::String(cleaned);
                             }
                         }
-                        // Handle array content
                         if let Some(content2) = block["content"].as_array_mut() {
                             for inner in content2.iter_mut() {
                                 if let Some(text) = inner["text"].as_str() {
@@ -133,10 +156,6 @@ pub fn strip_ansi(body: &mut Value, stats: &mut TransformStats) -> usize {
 }
 
 /// Truncate the Bash tool description at the "Committing changes" git section.
-///
-/// Claude Code's Bash tool description includes git-commit and PR-creation
-/// subsections. If you don't use git through Claude Code, this saves ~1,800
-/// tokens per turn.
 pub fn trim_bash_git(body: &mut Value, stats: &mut TransformStats) -> bool {
     let trim_marker = "Committing changes";
 
@@ -164,13 +183,9 @@ pub fn trim_bash_git(body: &mut Value, stats: &mut TransformStats) -> bool {
 }
 
 /// Override the model name in the request body.
-///
-/// Rewrites both the top-level `model` field and any model-name
-/// references inside `system` blocks for consistency.
 pub fn override_model(body: &mut Value, model: &str, stats: &mut TransformStats) -> bool {
     let mut changed = false;
 
-    // Override top-level model
     if let Some(current) = body["model"].as_str() {
         if current != model {
             body["model"] = Value::String(model.to_string());
@@ -178,7 +193,6 @@ pub fn override_model(body: &mut Value, model: &str, stats: &mut TransformStats)
         }
     }
 
-    // Rewrite model references in system blocks (e.g., "You are Claude..." self-descriptions)
     let re = model_regex();
     if let Some(system) = body["system"].as_array_mut() {
         for block in system.iter_mut() {
@@ -200,6 +214,144 @@ pub fn override_model(body: &mut Value, model: &str, stats: &mut TransformStats)
     }
 
     changed
+}
+
+/// Scrub secrets from all text fields in the request body.
+///
+/// Uses the platform adapter to detect tool result blocks across different
+/// API formats (Anthropic's `type: "tool_result"`, OpenAI's `role: "tool"`, etc.).
+pub fn scrub_secrets(body: &mut Value, stats: &mut TransformStats, adapter: &dyn PlatformAdapter) -> u64 {
+    let mut total_hits: u64 = 0;
+
+    if let Some(messages) = body["messages"].as_array_mut() {
+        for msg in messages.iter_mut() {
+            if let Some(content) = msg["content"].as_array_mut() {
+                for block in content.iter_mut() {
+                    if let Some(text) = block["text"].as_str() {
+                        let result = scrub::scrub_secrets(text);
+                        if !result.hits.is_empty() {
+                            total_hits += result.hits.len() as u64;
+                            block["text"] = Value::String(result.content);
+                        }
+                    }
+
+                    if adapter.is_tool_result(block) {
+                        if let Some(text) = block["content"].as_str() {
+                            let result = scrub::scrub_secrets(text);
+                            if !result.hits.is_empty() {
+                                total_hits += result.hits.len() as u64;
+                                block["content"] = Value::String(result.content);
+                            }
+                        }
+                        if let Some(content2) = block["content"].as_array_mut() {
+                            for inner in content2.iter_mut() {
+                                if let Some(text) = inner["text"].as_str() {
+                                    let result = scrub::scrub_secrets(text);
+                                    if !result.hits.is_empty() {
+                                        total_hits += result.hits.len() as u64;
+                                        inner["text"] = Value::String(result.content);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    stats.secrets_scrubbed += total_hits;
+    total_hits
+}
+
+/// Apply tool output filters to all tool result blocks in the request body.
+///
+/// Uses the platform adapter to detect tool results across different API formats
+/// (Anthropic's `type: "tool_result"`, OpenAI's `role: "tool"`, etc.).
+/// We detect commands by examining the first non-empty line of the tool result
+/// content and trying all registered filters against it.
+pub fn apply_tool_filters(
+    body: &mut Value,
+    registry: &FilterRegistry,
+    stats: &mut TransformStats,
+    adapter: &dyn PlatformAdapter,
+) -> usize {
+    let mut total_applied: usize = 0;
+
+    if let Some(messages) = body["messages"].as_array_mut() {
+        for msg in messages.iter_mut() {
+            if let Some(content) = msg["content"].as_array_mut() {
+                for block in content.iter_mut() {
+                    if !adapter.is_tool_result(block) {
+                        continue;
+                    }
+
+                    let original_text = if let Some(text) = block["content"].as_str() {
+                        text.to_string()
+                    } else if let Some(arr) = block["content"].as_array() {
+                        arr.iter()
+                            .filter_map(|item| item["text"].as_str())
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    } else {
+                        continue;
+                    };
+
+                    if original_text.trim().is_empty() {
+                        continue;
+                    }
+
+                    let first_line = original_text
+                        .lines()
+                        .find(|l| !l.trim().is_empty())
+                        .unwrap_or("");
+
+                    let filter = registry.select_for_command(first_line)
+                        .or_else(|| registry.select_for_command(&original_text));
+
+                    if let Some(filter) = filter {
+                        let failed = original_text.contains("exit code")
+                            || original_text.contains("Exit code")
+                            || original_text.contains("error:");
+
+                        let result = apply_filter(filter, &original_text, failed);
+
+                        let (filtered_content, _) = json_guard(
+                            &original_text,
+                            &result.content,
+                            result.truncated,
+                            filter.reduce_json,
+                        );
+
+                        let marker = build_filtered_marker(&result);
+                        let final_content = format!("{}\n{}", filtered_content, marker);
+
+                        if block["content"].is_string() {
+                            block["content"] = Value::String(final_content);
+                        } else if let Some(arr) = block["content"].as_array_mut() {
+                            arr.clear();
+                            arr.push(serde_json::json!({
+                                "type": "text",
+                                "text": final_content
+                            }));
+                        }
+
+                        stats.filter_stats.record_application(
+                            &result.program,
+                            result.original_tokens,
+                            result.filtered_tokens,
+                            result.original_lines,
+                            result.filtered_lines,
+                        );
+                        stats.tool_filters_applied += 1;
+                        total_applied += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    total_applied
 }
 
 #[cfg(test)]
@@ -237,7 +389,6 @@ mod tests {
 
     #[test]
     fn test_strip_ansi() {
-        // Use actual ESC byte (0x1B) directly
         let esc = "\x1B";
         let mut body = json!({
             "messages": [{
@@ -250,7 +401,8 @@ mod tests {
         });
 
         let mut stats = TransformStats::default();
-        strip_ansi(&mut body, &mut stats);
+        let adapter = crate::platform::anthropic::AnthropicAdapter;
+        strip_ansi(&mut body, &mut stats, &adapter);
 
         let text = body["messages"][0]["content"][0]["text"].as_str().unwrap();
         assert_eq!(text, "Hello world!");
@@ -296,5 +448,61 @@ mod tests {
         let sys_text = body["system"][0]["text"].as_str().unwrap();
         assert!(sys_text.contains("claude-opus-4-6"));
         assert!(!sys_text.contains("claude-sonnet-4-20250514"));
+    }
+
+    #[test]
+    fn test_scrub_secrets_in_body() {
+        let mut body = json!({
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "content": "AWS key: AKIAIOSFODNN7EXAMPLE"}
+                ]
+            }]
+        });
+
+        let mut stats = TransformStats::default();
+        let adapter = crate::platform::anthropic::AnthropicAdapter;
+        let hits = scrub_secrets(&mut body, &mut stats, &adapter);
+
+        assert!(hits > 0);
+        assert!(stats.secrets_scrubbed > 0);
+        let content = body["messages"][0]["content"][0]["content"].as_str().unwrap();
+        assert!(content.contains("[REDACTED]"));
+        assert!(!content.contains("AKIAIOSFODNN7EXAMPLE"));
+    }
+
+    #[test]
+    fn test_scrub_secrets_empty_body() {
+        let mut body = json!({
+            "messages": []
+        });
+
+        let mut stats = TransformStats::default();
+        let adapter = crate::platform::anthropic::AnthropicAdapter;
+        let hits = scrub_secrets(&mut body, &mut stats, &adapter);
+
+        assert_eq!(hits, 0);
+        assert_eq!(stats.secrets_scrubbed, 0);
+    }
+
+    #[test]
+    fn test_scrub_secrets_no_secrets() {
+        let mut body = json!({
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "content": "Hello world, no secrets here."}
+                ]
+            }]
+        });
+
+        let mut stats = TransformStats::default();
+        let adapter = crate::platform::anthropic::AnthropicAdapter;
+        let hits = scrub_secrets(&mut body, &mut stats, &adapter);
+
+        assert_eq!(hits, 0);
+        let content = body["messages"][0]["content"][0]["content"].as_str().unwrap();
+        assert_eq!(content, "Hello world, no secrets here.");
     }
 }
