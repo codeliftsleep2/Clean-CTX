@@ -1,0 +1,54 @@
+# Clean-CTX built-in filter: pip
+# Compact pip install/sync output.
+
+[filters.pip]
+description = "Compact pip install output"
+match_command = "^(?:python3?\\s+-m\\s+)?pip\\s+(install|sync)\\b|pip3?\\s+install\\b"
+strip_ansi = true
+max_lines = 100
+on_empty = "pip: ok"
+
+match_output = [
+  { pattern = "(?m)^Successfully installed", message = "pip: ok" },
+  { pattern = "(?m)^Requirement already satisfied", message = "pip: ok" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^Collecting\\s+",
+  "^Downloading\\s+",
+  "^\\s+Downloading\\s+",
+  "^\\s+Preparing\\s+",
+  "^\\s+Installing\\s+",
+  "^\\s+Running\\s+",
+  "^\\s+Building\\s+",
+  "^\\s+Using cached",
+  "^\\s+Saved",
+  "^\\s+Upgrading\\s+",
+  "^\\s+Uninstalling\\s+",
+  "^\\s+Found existing",
+  "^\\s+Removed",
+]
+
+[[tests.pip]]
+name = "clean install collapses"
+input = """
+Collecting requests
+Downloading requests-2.32.0-py3-none-any.whl (64 kB)
+Installing collected packages: requests
+Successfully installed requests-2.32.0
+"""
+expected = "pip: ok"
+
+[[tests.pip]]
+name = "already satisfied collapses"
+input = "Requirement already satisfied: requests in /usr/lib/python3.11/site-packages (2.28.0)\n"
+expected = "pip: ok"
+
+[[tests.pip]]
+name = "errors preserved"
+input = """
+ERROR: Could not find a version that satisfies the requirement nonexistent (from versions: )
+ERROR: No matching distribution found for nonexistent
+"""
+expected = "ERROR: Could not find a version that satisfies the requirement nonexistent (from versions: )\nERROR: No matching distribution found for nonexistent"

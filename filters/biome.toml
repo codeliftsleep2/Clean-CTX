@@ -1,0 +1,54 @@
+# Clean-CTX built-in filter: Biome
+# Compact Biome linter/formatter output for JavaScript/TypeScript.
+# Biome writes diagnostics to STDERR, so filter_stderr is required.
+
+[filters.biome]
+description = "Compact Biome lint/format output"
+match_command = "^(?:npx |bunx |pnpm dlx |yarn dlx )?biome\\b"
+strip_ansi = true
+filter_stderr = true
+max_lines = 50
+on_empty = "biome: ok"
+
+match_output = [
+  { pattern = "(?m)^Checked \\d+ file", message = "biome: ok" },
+  { pattern = "(?m)^Fixed \\d+ file", message = "biome: ok" },
+]
+
+replace = [
+  { pattern = "\\s*[━]+\\s*$", replacement = "" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^The following command",
+  "^Run it with",
+]
+
+[[tests.biome]]
+name = "clean check collapses"
+input = "Checked 42 files in 0.3s\n"
+expected = "biome: ok"
+
+[[tests.biome]]
+name = "lint errors preserved"
+input = """
+src/app.tsx:5:3 lint/suspicious/noExplicitAny  ━━━━━━━━━━━
+  x Unexpected any. Specify a different type.
+   3 | interface Props {
+   4 |   data: any;
+   5 |         ^^^
+
+Found 2 errors.
+"""
+expected = "src/app.tsx:5:3 lint/suspicious/noExplicitAny\n  x Unexpected any. Specify a different type.\n   3 | interface Props {\n   4 |   data: any;\n   5 |         ^^^\nFound 2 errors."
+
+[[tests.biome]]
+name = "format output collapses"
+input = "Checked 10 files in 0.2s\nFixed 3 files in 0.1s\n"
+expected = "biome: ok"
+
+[[tests.biome]]
+name = "empty input returns on_empty"
+input = ""
+expected = "biome: ok"

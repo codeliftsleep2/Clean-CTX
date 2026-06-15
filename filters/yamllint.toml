@@ -1,0 +1,22 @@
+# Clean-CTX built-in filter: yamllint
+# Compact yamllint output.
+
+[filters.yamllint]
+description = "Compact yamllint output"
+match_command = "^yamllint\\b"
+strip_ansi = true
+max_lines = 50
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.yamllint]]
+name = "clean check"
+input = ""
+expected = ""
+
+[[tests.yamllint]]
+name = "errors preserved"
+input = "config.yaml:1:1: wrong indentation: expected 2 but found 4 (indentation)\nconfig.yaml:5:8: truthy value should be true (truthy)\n"
+expected = "config.yaml:1:1: wrong indentation: expected 2 but found 4 (indentation)\nconfig.yaml:5:8: truthy value should be true (truthy)"

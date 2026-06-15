@@ -1,0 +1,22 @@
+# Clean-CTX built-in filter: shellcheck
+# Compact shellcheck output.
+
+[filters.shellcheck]
+description = "Compact shellcheck output"
+match_command = "^shellcheck\\b"
+strip_ansi = true
+max_lines = 50
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.shellcheck]]
+name = "clean check"
+input = ""
+expected = ""
+
+[[tests.shellcheck]]
+name = "errors preserved"
+input = "In script.sh line 5:\n  echo $var\n         ^-- SC2086: Double quote to prevent globbing and word splitting.\n\nIn script.sh line 8:\n  rm -rf $dir\n          ^-- SC2086: Double quote to prevent globbing and word splitting.\n\nFor more information:\n  https://www.shellcheck.net/wiki/SC2086\n"
+expected = "In script.sh line 5:\n  echo $var\n         ^-- SC2086: Double quote to prevent globbing and word splitting.\nIn script.sh line 8:\n  rm -rf $dir\n          ^-- SC2086: Double quote to prevent globbing and word splitting.\nFor more information:\n  https://www.shellcheck.net/wiki/SC2086"

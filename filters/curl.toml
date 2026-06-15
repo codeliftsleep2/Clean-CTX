@@ -1,0 +1,32 @@
+# Clean-CTX built-in filter: curl
+# Compact curl output. Strips progress meter from stderr, keeps response payload.
+
+[filters.curl]
+description = "Compact curl output"
+match_command = "^curl\\b"
+strip_ansi = true
+filter_stderr = true
+max_lines = 240
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^\\s*\\d+\\s+\\d+\\.\\d+",
+  "^\\s*\\d+\\s+\\d+",
+  "^\\s*%\\s+Total",
+  "^\\s*--:--:-- --:--:-- --",
+  "^\\s*\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\d+",
+]
+
+[[tests.curl]]
+name = "progress stripped, payload kept"
+input = '{"ok":true}\n'
+expected = '{"ok":true}'
+
+[[tests.curl]]
+name = "progress lines stripped"
+input = """
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100    12  100    12    0     0    100      0 --:--:-- --:--:-- --:--:--   100
+"""
+expected = ""

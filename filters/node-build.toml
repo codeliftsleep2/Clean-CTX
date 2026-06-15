@@ -1,0 +1,22 @@
+# Clean-CTX built-in filter: Node.js build scripts
+# Compact npm/pnpm/yarn build output.
+
+[filters.node-build]
+description = "Compact Node.js build output"
+match_command = "^(npm|pnpm|yarn|bun)\\s+(run\\s+)?(build|compile|bundle)\\b"
+strip_ansi = true
+max_lines = 120
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.node-build]]
+name = "clean build"
+input = "✓ 123 modules transformed.\ndist/assets/app.js  120.4 kB\n✓ built in 1.23s\n"
+expected = "✓ 123 modules transformed.\ndist/assets/app.js  120.4 kB\n✓ built in 1.23s"
+
+[[tests.node-build]]
+name = "blank lines stripped"
+input = "building...\n\n✓ done\n"
+expected = "building...\n✓ done"

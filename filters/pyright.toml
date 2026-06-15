@@ -1,0 +1,27 @@
+# Clean-CTX built-in filter: pyright
+# Compact pyright Python/TypeScript type checker output.
+
+[filters.pyright]
+description = "Compact pyright output"
+match_command = "^(?:npx |bunx )?pyright\\b"
+strip_ansi = true
+max_lines = 160
+on_empty = "pyright: ok"
+
+match_output = [
+  { pattern = "(?m)^0 errors, 0 warnings, 0 informations", message = "pyright: ok" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.pyright]]
+name = "clean check collapses"
+input = "0 errors, 0 warnings, 0 informations\n"
+expected = "pyright: ok"
+
+[[tests.pyright]]
+name = "errors preserved"
+input = "src/app.py:5:1 - error: Cannot access attribute \"x\" for class \"Foo\"\nsrc/app.py:12:1 - error: Argument of type \"str\" is not assignable to parameter of type \"int\"\n\n2 errors, 0 warnings, 0 informations\n"
+expected = "src/app.py:5:1 - error: Cannot access attribute \"x\" for class \"Foo\"\nsrc/app.py:12:1 - error: Argument of type \"str\" is not assignable to parameter of type \"int\"\n2 errors, 0 warnings, 0 informations"

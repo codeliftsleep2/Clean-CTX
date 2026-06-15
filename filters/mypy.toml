@@ -1,0 +1,27 @@
+# Clean-CTX built-in filter: mypy
+# Compact mypy Python type checker output.
+
+[filters.mypy]
+description = "Compact mypy output"
+match_command = "^(?:python3?\\s+-m\\s+)?mypy\\b"
+strip_ansi = true
+max_lines = 120
+on_empty = "mypy: ok"
+
+match_output = [
+  { pattern = "(?m)^Success: no issues found", message = "mypy: ok" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.mypy]]
+name = "clean check collapses"
+input = "Success: no issues found in 1 source\n"
+expected = "mypy: ok"
+
+[[tests.mypy]]
+name = "errors preserved"
+input = "src/app.py:5: error: Incompatible return value type (got \"str\", expected \"int\")\nsrc/app.py:12: error: Name \"x\" is not defined\n\nFound 2 errors in 1 file\n"
+expected = "src/app.py:5: error: Incompatible return value type (got \"str\", expected \"int\")\nsrc/app.py:12: error: Name \"x\" is not defined\nFound 2 errors in 1 file"

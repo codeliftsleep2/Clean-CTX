@@ -1,0 +1,47 @@
+# Clean-CTX built-in filter: Make
+# Compact GNU Make output.
+
+[filters.make]
+description = "Compact Make output"
+match_command = "^make\\b"
+max_lines = 50
+on_empty = "make: ok"
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^make\\[\\d+\\]: Entering directory",
+  "^make\\[\\d+\\]: Leaving directory",
+  "^make\\s+-C\\s+",
+  "^CC\\s+",
+  "^CXX\\s+",
+  "^LD\\s+",
+  "^AR\\s+",
+  "^GEN\\s+",
+]
+
+[[tests.make]]
+name = "clean build collapses"
+input = """
+make -C src all
+make[1]: Entering directory '/home/user/src'
+make[1]: Leaving directory '/home/user/src'
+"""
+expected = "make: ok"
+
+[[tests.make]]
+name = "errors preserved"
+input = """
+make -C src all
+src/main.cc:5:10: fatal error: missing.h: No such file or directory
+make[1]: *** [Makefile:12: all] Error 1
+make[1]: Leaving directory '/home/user/src'
+"""
+expected = "src/main.cc:5:10: fatal error: missing.h: No such file or directory\nmake[1]: *** [Makefile:12: all] Error 1"
+
+[[tests.make]]
+name = "compilation output stripped"
+input = """
+g++ -o app main.o
+strip app
+"""
+expected = "make: ok"
