@@ -1,0 +1,45 @@
+# Clean-CTX built-in filter: Maven
+# Compact Maven build output.
+
+[filters.mvn]
+description = "Compact Maven build output"
+match_command = "^mvn\\s+(compile|package|clean|install)\\b"
+strip_ansi = true
+max_lines = 50
+on_empty = "mvn: ok"
+
+match_output = [
+  { pattern = "(?m)^\\[INFO\\] BUILD SUCCESS$", message = "mvn: ok" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+  "^\\[INFO\\]\\s+---",
+  "^\\[INFO\\]\\s+Downloading",
+  "^\\[INFO\\]\\s+Downloaded",
+  "^\\[INFO\\]\\s+Progress",
+  "^\\[INFO\\]\\s+\\[\\d+/\\d+\\]",
+  "^\\[INFO\\]\\s+Building\\s+",
+]
+
+[[tests.mvn]]
+name = "clean build collapses"
+input = """
+[INFO] Scanning for projects...
+[INFO] Building app 1.0.0
+[INFO] --- maven-compiler-plugin:3.8.0:compile ---
+[INFO] Downloading https://repo.maven.apache.org/org/apache/maven/plugins/maven-compiler-plugin/3.8.0/maven-compiler-plugin-3.8.0.pom
+[INFO] Downloaded https://repo.maven.apache.org/org/apache/maven/plugins/maven-compiler-plugin/3.8.0/maven-compiler-plugin-3.8.0.pom
+[INFO] BUILD SUCCESS
+[INFO] Total time: 4.123 s
+[INFO] Finished at: 2024-01-15T10:30:00Z
+"""
+expected = "mvn: ok"
+
+[[tests.mvn]]
+name = "errors preserved"
+input = """
+[ERROR] /home/user/src/main/java/com/app/Main.java:[5,1] error: cannot find symbol
+[ERROR] BUILD FAILURE
+"""
+expected = "[ERROR] /home/user/src/main/java/com/app/Main.java:[5,1] error: cannot find symbol\n[ERROR] BUILD FAILURE"

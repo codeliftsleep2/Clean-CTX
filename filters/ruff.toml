@@ -1,0 +1,41 @@
+# Clean-CTX built-in filter: Ruff
+# Compact Ruff Python linter output.
+
+[filters.ruff]
+description = "Compact Ruff output"
+match_command = "^(?:python3?\\s+-m\\s+)?ruff\\b"
+strip_ansi = true
+max_lines = 120
+on_empty = "ruff: ok"
+
+match_output = [
+  { pattern = "(?m)^All checks passed$", message = "ruff: ok" },
+]
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.ruff]]
+name = "clean lint collapses"
+input = """
+All checks passed!
+"""
+expected = "ruff: ok"
+
+[[tests.ruff]]
+name = "errors preserved"
+input = """
+src/app.py:5:1: F401 `os` imported but unused
+src/app.py:12:1: E302 expected 2 blank lines, found 1
+
+Found 2 errors (1 fixed, 1 remaining).
+"""
+expected = "src/app.py:5:1: F401 `os` imported but unused\nsrc/app.py:12:1: E302 expected 2 blank lines, found 1\nFound 2 errors (1 fixed, 1 remaining)."
+
+[[tests.ruff]]
+name = "no issues found collapses"
+input = """
+Checked 47 files. No errors detected.
+"""
+expected = "ruff: ok"

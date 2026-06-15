@@ -1,0 +1,23 @@
+# Clean-CTX built-in filter: golangci-lint
+# Compact golangci-lint output.
+
+[filters.golangci-lint]
+description = "Compact golangci-lint output"
+match_command = "^golangci-lint\\b"
+strip_ansi = true
+max_lines = 180
+on_empty = "golangci-lint: ok"
+
+strip_lines_matching = [
+  "^\\s*$",
+]
+
+[[tests.golangci-lint]]
+name = "clean check"
+input = ""
+expected = "golangci-lint: ok"
+
+[[tests.golangci-lint]]
+name = "errors preserved"
+input = "main.go:5:2: exported variable MyVar should have comment or be unexported (revive)\nmain.go:12:1: unnecessary leading newline (whitespace)\n\n2 issues:\n  main.go:5:2  revive: exported variable MyVar should have comment or be unexported\n  main.go:12:1  whitespace: unnecessary leading newline\n"
+expected = "main.go:5:2: exported variable MyVar should have comment or be unexported (revive)\nmain.go:12:1: unnecessary leading newline (whitespace)\n2 issues:\n  main.go:5:2  revive: exported variable MyVar should have comment or be unexported\n  main.go:12:1  whitespace: unnecessary leading newline"

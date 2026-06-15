@@ -135,7 +135,7 @@ mod tests {
         assert!(re.is_match("ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234"));
         assert!(re.is_match("github_pat_11ABCDEF0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234567890abcdef12"));
         // Slack
-        assert!(re.is_match("xoxb-FAKE_TOKEN_123456789012345678901234567890"));
+        assert!(re.is_match("xoxb-FAKETOKEN123456789012345678901234567890"));
         // Stripe
         assert!(re.is_match("sk_live_abcdefghijklmnop"));
         assert!(re.is_match("rk_test_abcdefghijklmnop"));
