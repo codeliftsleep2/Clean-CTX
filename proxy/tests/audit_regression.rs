@@ -2,6 +2,14 @@
 //
 // Regression tests for all 21 findings from the FAANG-level code audit.
 // Each test is named after the audit finding it guards against.
+//
+// Some tests use constant assertions that clippy flags as "always true"
+// or "always false" — these are intentional documentation of invariants.
+
+#![allow(
+    clippy::assertions_on_constants,
+    clippy::bool_assert_comparison
+)]
 
 use serde_json::json;
 
@@ -123,6 +131,7 @@ fn high_10_connection_limit() {
 #[test]
 fn medium_13_ansi_single_pass() {
     use clean_ctx_proxy::transform::{strip_ansi, TransformStats};
+    use clean_ctx_proxy::platform::anthropic::AnthropicAdapter;
     use serde_json::json;
 
     let esc = "\x1B";
@@ -133,7 +142,8 @@ fn medium_13_ansi_single_pass() {
     });
 
     let mut stats = TransformStats::default();
-    let count = strip_ansi(&mut body, &mut stats);
+    let adapter = AnthropicAdapter;
+    let count = strip_ansi(&mut body, &mut stats, &adapter);
 
     assert_eq!(count, 4, "Should strip 4 ANSI sequences");
     let text = body["messages"][0]["content"][0]["text"].as_str().unwrap();

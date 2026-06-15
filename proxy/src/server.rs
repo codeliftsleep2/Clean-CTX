@@ -3,8 +3,12 @@
 // HTTP server for the Clean-CTX Anthropic proxy.
 //
 // Binds to 127.0.0.1:{PORT} and forwards requests to upstream.
-// /v1/messages requests are intercepted for cache injection + transforms.
+// /v1/messages requests are intercepted for transforms + cache injection.
 // All other paths pass through unchanged.
+//
+// This module handles HTTP concerns ONLY. Transform orchestration is
+// delegated to the Pipeline abstraction (pipeline.rs). Filter loading
+// is delegated to filter_loader.rs.
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -23,8 +27,12 @@ use tracing::{info, warn, error, debug};
 use crate::cache::{self, CacheStats, inject_breakpoints};
 use crate::config::ProxyConfig;
 use crate::error::ProxyError;
+use crate::filter_loader::load_builtin_filters;
+use crate::filter_registry::FilterRegistry;
 use crate::logger::{self, LogStats};
-use crate::transform::{self, TransformStats};
+use crate::pipeline::{Pipeline, PipelineConfig};
+use crate::platform::{self, PlatformAdapter};
+use crate::transform::TransformStats;
 
 /// Maximum request body size (10 MB).
 pub const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
@@ -45,6 +53,8 @@ pub struct ProxyState {
     pub request_counter: AtomicU64,
     /// Shared reqwest client for connection reuse.
     pub http_client: reqwest::Client,
+    /// Shared filter registry (loaded once at startup, Arc for zero-copy sharing).
+    pub filter_registry: Arc<FilterRegistry>,
 }
 
 impl ProxyState {
@@ -55,6 +65,9 @@ impl ProxyState {
             .build()
             .expect("Failed to create HTTP client");
 
+        // Delegate filter loading to filter_loader module (SRP compliance)
+        let filter_registry = Arc::new(load_builtin_filters());
+
         Self {
             config,
             cache_stats: CacheStats::default(),
@@ -62,6 +75,7 @@ impl ProxyState {
             log_stats: LogStats::default(),
             request_counter: AtomicU64::new(0),
             http_client,
+            filter_registry,
         }
     }
 
@@ -111,7 +125,6 @@ pub async fn run_server_with_listener(
                 let io = TokioIo::new(stream);
 
                 tokio::spawn(async move {
-                    // Acquire a permit (connection limit)
                     let _permit = match semaphore.acquire().await {
                         Ok(p) => p,
                         Err(_) => {
@@ -128,7 +141,6 @@ pub async fn run_server_with_listener(
                         .serve_connection(io, svc)
                         .await
                     {
-                        // Use typed error inspection instead of string matching
                         if !is_connection_closed(&e) {
                             warn!("[proxy] Connection error from {peer_addr}: {e}");
                         }
@@ -145,7 +157,6 @@ pub async fn run_server_with_listener(
     Ok(())
 }
 
-/// Check if a hyper error is a normal connection close.
 fn is_connection_closed(e: &hyper::Error) -> bool {
     e.is_incomplete_message() || e.is_closed()
 }
@@ -166,8 +177,15 @@ async fn handle_request(
 
     debug!("[{req_id}] {method} {path}");
 
-    // Only intercept POST /v1/messages
-    if path == "/v1/messages" && method == Method::POST {
+    // Detect platform from path to determine intercept endpoint
+    // Use exact path matching to avoid intercepting non-API endpoints
+    let should_intercept = method == Method::POST && (
+        path == "/v1/messages"            // Anthropic
+        || path == "/v1/chat/completions" // OpenAI
+        || path == "/chat"                // Generic (root-level only)
+    );
+
+    if should_intercept {
         match handle_messages_request(parts, body, &req_id, state).await {
             Ok(resp) => Ok(resp),
             Err(e) => {
@@ -181,7 +199,6 @@ async fn handle_request(
             }
         }
     } else {
-        // Passthrough: forward to upstream unchanged
         forward_request(parts, body, &req_id, state).await
     }
 }
@@ -193,40 +210,40 @@ async fn handle_messages_request(
     req_id: &str,
     state: SharedState,
 ) -> Result<Response<Full<BytesType>>, ProxyError> {
-    // Read the full body with size limit (read_body enforces MAX_BODY_SIZE)
     let body_bytes = read_body(body).await?;
 
     let mut body_value: serde_json::Value = serde_json::from_slice(&body_bytes)
         .map_err(|e| ProxyError::Body(format!("Failed to parse request JSON: {e}")))?;
 
-    // Single lock acquisition: extract config + apply transforms
+    // Single lock acquisition for all transforms
     {
         let mut guard = state.write().await;
 
-        // Extract config values
-        let auto_cache = guard.config.auto_cache;
-        let strip_ansi = guard.config.strip_ansi;
-        let trim_bash_git = guard.config.trim_bash_git;
-        let tail_ttl = guard.config.tail_ttl.clone();
-        let model_override = guard.config.model_override.clone();
-        let drop_tools_set = guard.config.drop_tools_set.clone();
+        // Build pipeline config from current proxy state
+        let pipeline_config = PipelineConfig {
+            drop_tools_set: guard.config.drop_tools_set.clone(),
+            strip_ansi: guard.config.strip_ansi,
+            trim_bash_git: guard.config.trim_bash_git,
+            model_override: guard.config.model_override.clone(),
+            scrub_secrets: guard.config.scrub_secrets,
+            tool_filters: guard.config.tool_filters,
+            filter_registry: Some(guard.filter_registry.clone()),
+        };
 
-        // Apply transforms
-        transform::drop_tools(&mut body_value, &drop_tools_set, &mut guard.transform_stats);
+        // Detect platform from request body or config override
+        let adapter: Box<dyn PlatformAdapter> = if let Some(ref platform_name) = guard.config.platform {
+            platform::get_platform(platform_name)
+        } else {
+            platform::detect_platform(&body_value)
+        };
 
-        if strip_ansi {
-            transform::strip_ansi(&mut body_value, &mut guard.transform_stats);
-        }
+        // Build and run the transform pipeline (OCP: new transforms added in pipeline.rs)
+        let pipeline = Pipeline::build(&pipeline_config);
+        pipeline.run(&mut body_value, &mut guard.transform_stats, &pipeline_config, adapter.as_ref());
 
-        if trim_bash_git {
-            transform::trim_bash_git(&mut body_value, &mut guard.transform_stats);
-        }
-
-        if let Some(ref model) = model_override {
-            transform::override_model(&mut body_value, model, &mut guard.transform_stats);
-        }
-
-        if auto_cache {
+        // Cache breakpoints (Anthropic only — other platforms don't support cache_control)
+        if guard.config.auto_cache && adapter.platform_name() == "anthropic" {
+            let tail_ttl = guard.config.tail_ttl.clone();
             inject_breakpoints(&mut body_value, &tail_ttl, &mut guard.cache_stats);
         }
 
@@ -244,10 +261,7 @@ async fn handle_messages_request(
         }
     }
 
-    // Re-serialize the transformed body
     let modified_body = serde_json::to_vec(&body_value)?;
-
-    // Forward to upstream
     let response = forward_to_upstream(parts, &modified_body, req_id, state).await?;
     Ok(response)
 }
@@ -293,13 +307,16 @@ async fn forward_to_upstream(
     req_id: &str,
     state: SharedState,
 ) -> Result<Response<Full<BytesType>>, ProxyError> {
-    // Read config and client in a single read lock
-    let (upstream_url, auto_cache, http_client) = {
+    let (upstream_url, auto_cache, http_client, platform_name) = {
         let guard = state.read().await;
-        (guard.config.upstream_url.clone(), guard.config.auto_cache, guard.http_client.clone())
+        (
+            guard.config.upstream_url.clone(),
+            guard.config.auto_cache,
+            guard.http_client.clone(),
+            guard.config.platform.clone(),
+        )
     };
 
-    // Validate path to prevent URI injection
     let path_and_query = parts.uri.path_and_query()
         .map(|pq| pq.as_str())
         .unwrap_or(parts.uri.path());
@@ -308,20 +325,17 @@ async fn forward_to_upstream(
         return Err(ProxyError::Body(format!("Invalid path: {path_and_query}")));
     }
 
-    // Build the upstream URI
     let upstream_uri = format!(
         "{}{}",
         upstream_url.trim_end_matches('/'),
         path_and_query
     );
 
-    // Build request using shared client
     let mut req_builder = http_client.request(
         parts.method.clone(),
         &upstream_uri,
     );
 
-    // Forward headers (skip host, connection, and other hop-by-hop headers)
     for (name, value) in parts.headers.iter() {
         let name_lower = name.as_str().to_lowercase();
         if name_lower != "host"
@@ -336,26 +350,20 @@ async fn forward_to_upstream(
         }
     }
 
-    // Add anthropic-beta header for extended cache TTL
-    if auto_cache {
+    // Inject platform-specific headers
+    if auto_cache && platform_name.as_deref() != Some("openai") {
         req_builder = req_builder.header(
             "anthropic-beta",
             cache::anthropic_beta_header(),
         );
     }
 
-    // Add X-Request-ID for distributed tracing
     req_builder = req_builder.header("X-Request-ID", req_id);
-
-    // Set the body
     req_builder = req_builder.body(body_bytes.to_vec());
 
-    // Send the request
     let upstream_response = req_builder.send().await?;
     let status = upstream_response.status();
     let resp_headers = upstream_response.headers().clone();
-
-    // Read the response body
     let resp_bytes = upstream_response.bytes().await?;
 
     debug!("[{req_id}] Upstream returned {status} ({} bytes)", resp_bytes.len());
@@ -376,11 +384,9 @@ async fn forward_to_upstream(
         }
     }
 
-    // Build the response — only forward safe headers
     let mut response = Response::builder()
         .status(status);
 
-    // Whitelist of safe response headers to forward
     let safe_headers = [
         "content-type", "content-length", "x-request-id",
         "anthropic-ratelimit-requests-limit", "anthropic-ratelimit-requests-remaining",
@@ -394,7 +400,6 @@ async fn forward_to_upstream(
         }
     }
 
-    // resp_bytes is already Bytes — avoid needless copy
     Ok(response
         .body(Full::new(resp_bytes))
         .unwrap())

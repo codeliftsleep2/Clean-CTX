@@ -30,6 +30,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Formatted hex for hashes
 hex = "0.4"
+# TOML parsing for filter rules
+toml = "0.8"
 
 [dev-dependencies]
 tempfile = "3"

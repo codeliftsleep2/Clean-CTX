@@ -5,18 +5,72 @@
 //
 // All vars are optional with sensible defaults.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-/// Runtime configuration for the Anthropic prompt-cache proxy.
+/// Per-program filter override configuration.
+#[derive(Debug, Clone, Default)]
+pub struct ToolFilterConfig {
+    /// Global enable/disable for all filters.
+    pub enabled: bool,
+
+    /// Per-program max_lines overrides.
+    pub max_lines_overrides: HashMap<String, usize>,
+
+    /// Per-program enable/disable overrides.
+    pub disabled_programs: HashSet<String>,
+}
+
+impl ToolFilterConfig {
+    /// Parse from a JSON value (for .clean-ctx.json config file).
+    pub fn from_json(value: &serde_json::Value) -> Self {
+        let enabled = value["enabled"].as_bool().unwrap_or(true);
+
+        let mut max_lines_overrides = std::collections::HashMap::new();
+        if let Some(overrides) = value["max_lines_overrides"].as_object() {
+            for (program, lines) in overrides {
+                if let Some(n) = lines.as_u64() {
+                    max_lines_overrides.insert(program.clone(), n as usize);
+                }
+            }
+        }
+
+        let mut disabled_programs = std::collections::HashSet::new();
+        if let Some(disabled) = value["disabled_programs"].as_array() {
+            for program in disabled {
+                if let Some(name) = program.as_str() {
+                    disabled_programs.insert(name.to_string());
+                }
+            }
+        }
+
+        Self {
+            enabled,
+            max_lines_overrides,
+            disabled_programs,
+        }
+    }
+
+    /// Check if a program is disabled.
+    pub fn is_disabled(&self, program: &str) -> bool {
+        self.disabled_programs.contains(program)
+    }
+
+    /// Get max_lines override for a program.
+    pub fn max_lines_for(&self, program: &str) -> Option<usize> {
+        self.max_lines_overrides.get(program).copied()
+    }
+}
+
+/// Runtime configuration for the Clean-CTX proxy.
 #[derive(Debug, Clone)]
 pub struct ProxyConfig {
     /// Port to bind (default: 8787). Always 127.0.0.1.
     pub port: u16,
 
-    /// Upstream Anthropic API base URL.
+    /// Upstream API base URL (works with any platform).
     pub upstream_url: String,
 
-    /// Enable auto-injection of cache_control breakpoints.
+    /// Enable auto-injection of cache_control breakpoints (Anthropic only).
     pub auto_cache: bool,
 
     /// TTL for the rolling-tail breakpoint (default: "5m").
@@ -34,7 +88,7 @@ pub struct ProxyConfig {
     /// Truncate Bash tool description at "Committing changes" section.
     pub trim_bash_git: bool,
 
-    /// Override model name in every request (e.g. "claude-opus-4-6").
+    /// Override model name in every request.
     pub model_override: Option<String>,
 
     /// Enable request/response body logging.
@@ -42,6 +96,15 @@ pub struct ProxyConfig {
 
     /// Directory for log files.
     pub log_dir: String,
+
+    /// Enable secret scrubbing in tool results.
+    pub scrub_secrets: bool,
+
+    /// Enable tool output filtering.
+    pub tool_filters: bool,
+
+    /// Platform override ("anthropic", "openai", "generic", or auto-detect).
+    pub platform: Option<String>,
 }
 
 impl Default for ProxyConfig {
@@ -58,6 +121,9 @@ impl Default for ProxyConfig {
             model_override: None,
             log_bodies: false,
             log_dir: ".clean-ctx/proxy-logs".to_string(),
+            scrub_secrets: false,
+            tool_filters: false,
+            platform: None,
         }
     }
 }
@@ -102,6 +168,14 @@ impl ProxyConfig {
             .map(|v| v == "1" || v.to_lowercase() == "true")
             .unwrap_or(false);
 
+        let scrub_secrets = env_var("SCRUB_SECRETS")
+            .map(|v| v == "1" || v.to_lowercase() == "true")
+            .unwrap_or(false);
+
+        let tool_filters = env_var("TOOL_FILTERS")
+            .map(|v| v == "1" || v.to_lowercase() == "true")
+            .unwrap_or(false);
+
         let log_dir = env_var("LOG_DIR")
             .unwrap_or_else(|| ".clean-ctx/proxy-logs".to_string());
 
@@ -117,6 +191,9 @@ impl ProxyConfig {
             model_override,
             log_bodies,
             log_dir,
+            scrub_secrets,
+            tool_filters,
+            platform: env_var("PLATFORM"),
         }
     }
 
@@ -149,6 +226,7 @@ mod tests {
         assert!(!cfg.auto_cache);
         assert_eq!(cfg.tail_ttl, "5m");
         assert!(!cfg.strip_ansi);
+        assert!(!cfg.tool_filters);
     }
 
     #[test]
