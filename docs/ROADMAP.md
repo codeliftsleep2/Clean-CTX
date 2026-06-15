@@ -54,10 +54,13 @@ These items address the most common user requests and unlock adoption on larger 
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
+| **R-01d** | Java language layer | Enterprise staple. CBM enriches input with type resolution and call chains; our language layer compresses with full micro-opcode stack. Required for pilot stack (Java + Spring). | 2-3 days | 🔴 High |
+| **R-36** | React Meta-Layer | Additive meta-layer on TS/JS. Component/hook/context bundling, prop type compression, React-specific lifecycle markers. Highest-demand frontend framework after Angular. | 3-4 days | 🔴 High |
+| **R-37** | Redux Meta-Layer | Additive meta-layer on TS/JS. Action/reducer/selector compression, thunk/saga patterns, store shape compression. Natural follow-on to React (patterns ≈ NgRx). | 2-3 days | 🔴 High |
+| **R-38** | Spring Boot Meta-Layer | Φ markers for @Service, @Repository, @Controller, @Autowired, @Transactional. DI graph compression. Sits on Java language layer + CBM graph output. | 3-4 days | 🔴 High |
 | **R-01** | Python language layer | Most-requested language. Follows the 4-step guide in `DEVELOPER_DOCUMENTATION.md`. | 1-2 days | 🔴 High |
 | **R-01b** | Go language layer | Second-most requested. | 1-2 days | 🟡 Medium |
 | **R-01c** | Rust language layer | Common in LLM-context scenarios (AI IDEs, code reviewers). | 1-2 days | 🟡 Medium |
-| **R-01d** | Java language layer | Enterprise staple. | 1-2 days | 🟢 Low |
 | **R-02** | Type-aware compression | Inline `type_aliases` from config: `UserId` → `$uid`, `JsonObject` → `$jo`. Currently the type table is loaded but not injected into the capture pipeline. | 2-3 days | 🔴 High |
 | **R-23** | NgRx Meta-Layer | Framework-annotation layer for NgRx state management (sits on top of TS + Angular layers). Φ markers for actions, reducers, effects, selectors. Semantic compression of boilerplate patterns. DI-graph integration for action dispatch → effect → reducer → selector flow. | 3-4 days | 🔴 High |
 | **R-24** | RxJS Meta-Layer | Additive meta-layer on TS for reactive patterns. Operator chain compression, observable graph representation, subscription lifecycle markers. | 2-3 days | 🟡 Medium |
@@ -73,7 +76,6 @@ Items that add value but require demand signal before investing. **YAGNI applies
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **R-25** | React Meta-Layer | Additive meta-layer on TS/JS. Component/hook/context bundling, prop type compression, React-specific lifecycle markers. | 3-4 days | 🟡 Medium |
 | **R-26** | Vue Meta-Layer | Additive meta-layer on TS/JS. Single-file component bundling (`.vue` = script + template + style), Composition API markers. | 3-4 days | 🟡 Medium |
 | **R-27** | ASP.NET Meta-Layer | Additive meta-layer on C# layer. Controller/service/repository bundling, DI registration graph (`services.AddScoped<IFoo, Foo>()`), route markers. Φ markers: `Φctrl:`, `Φrepo:`, `Φiface:`. | 3-4 days | 🟡 Medium |
 | **R-28** | Entity Framework Meta-Layer | Additive meta-layer on C# (sits on top of ASP.NET layer). Entity model compression, DbContext graph, migration markers. | 2-3 days | 🟢 Low |
@@ -147,7 +149,10 @@ Items explicitly deferred — not forgotten, not prioritized.
 5. **Differentiation** — R-29 Intelligence Layer adds PageRank + blast radius + budget packing, enhanced by CBM's cross-language graph intelligence.
 
 **Next list** priorities:
-- R-23 NgRx Meta-Layer is High priority because it's the highest-value meta-layer given the existing Angular + TS foundation and enterprise NgRx adoption.
+- R-01d Java language layer is 🔴 High priority for pilot stack (Java + Spring + React + Redux). CBM enriches input, we compress.
+- R-36 React Meta-Layer is 🔴 High priority — highest-demand frontend after Angular, fastest to build (Φ markers only).
+- R-37 Redux Meta-Layer is 🔴 High priority — natural follow-on to React, patterns ≈ NgRx.
+- R-38 Spring Boot Meta-Layer is 🔴 High priority — DI maps to Angular pattern, CBM provides Java graph.
 - R-12 multi-file git-commit diff is High priority for PR review workflows.
 - R-01 Python language layer is the single most-requested language addition.
 
