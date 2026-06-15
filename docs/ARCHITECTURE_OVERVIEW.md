@@ -321,9 +321,46 @@ src/
 
 ---
 
+## Delta Transport: LLM vs CPU Efficiency
+
+Clean-CTX offers two delta transport mechanisms — text-level and IR-level. Both are designed to reduce **CPU load** and **local compute time** on subsequent calls, rather than reducing LLM token usage.
+
+### How Delta Saves Resources (Not LLM Tokens)
+
+| What delta **does** save | What delta does **not** save |
+|--------------------------|------------------------------|
+| ✅ CPU cycles — avoids re-parsing and re-compressing the full source file | ❌ LLM prompt tokens — the LLM receives the same compressed output either way |
+| ✅ Latency — delta computation is faster than full re-compression (up to 53% faster at High fidelity) | ❌ API costs — delta payload is delivered to the LLM at the same token count |
+| ✅ Session throughput — more edits per minute for the same CPU budget | ❌ Wire overhead — delta metadata adds a small fixed envelope per call |
+
+**LLM token savings come exclusively from compression** (Low/Medium/High fidelity), not from delta transport. Delta transport is a CPU-savings layer on top of compression.
+
+### Two Delta Pipelines
+
+| Pipeline | Granularity | CPU Savings vs Full ReCompress | Best For |
+|----------|-------------|:------------------------------:|----------|
+| Text-level (`delta_text_context`) | Line-level diffs of compressed body | ~70-90% | Rapid edit sessions with small changes |
+| IR-level (`delta_code_context`) | Instruction-level diffs of compiled IR | Field-patch encoding | Structured code analysis, workspace-aware refactoring |
+
+### 50-Edit Session Results
+
+Simulated 50 sequential edits on a ~440-line file across all three fidelity levels:
+
+| Fidelity | Raw | ReComp | Delta | ReSav% | DelSav% | Delta vs ReComp |
+|----------|----:|------:|------:|------:|-------:|:---------------:|
+| **Low** | 227,310 | 7,823 | 8,490 | 96.6% | 96.3% | +8.5% overhead |
+| **Medium** | 227,310 | 37,338 | 18,287 | 83.6% | 92.0% | **−51.0%** cheaper |
+| **High** | 227,310 | 48,556 | 22,955 | 78.6% | 89.9% | **−52.7%** cheaper |
+
+Key insight: at Medium/High fidelity, delta is **51–53% cheaper** than full recompression because larger compressed outputs make line-level deltas significantly smaller than re-parsing.
+
+See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for the full 50-edit breakdown and visualizations.
+
+---
+
 ## IR Subsystem: Delta Transport
 
-The IR subsystem provides an alternative to text-level compression for scenarios where files change incrementally (edit sessions). It has three key components:
+The IR subsystem provides the IR-level delta transport mentioned above. It has three key components:
 
 ### 1. IR Compilation
 
@@ -652,4 +689,4 @@ See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for full per-edit breakdown and the 
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks
-- 945 tests passing (unit + integration + E2E workflow tests)
+- 1,035 tests passing (unit + integration + E2E + proxy regression tests)

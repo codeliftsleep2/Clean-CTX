@@ -2,7 +2,7 @@
 
 A local-first, air-gapped context optimization engine that eliminates token waste in LLM interactions while maintaining zero network footprint. Built in Rust for restrictive firewall and DLP environments.
 
-> **🚀 Version 0.1.6** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular HTML parsing (XHTML self-closing + inline template), IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, and 945 tests all passing.
+> **🚀 Version 0.1.6** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular HTML parsing (XHTML self-closing + inline template), IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, Anthropic prompt-cache proxy, and 1,035 tests all passing.
 
 ---
 
@@ -125,6 +125,16 @@ For Angular projects, Clean-CTX automatically detects framework decorators and e
 | **Tier 3 — Cross-File Graph** | Builds a DI injection graph (`UserService@α12`) and selector linkage (`<app-user-card>` → `UserCardComponent@α9`) across all files | Workspace mode only |
 
 **Non-Angular files pay zero overhead** — no markers, no extra parsing, no newlines.
+
+### Anthropic Prompt-Cache Proxy
+
+Clean-CTX ships with an optional **local HTTP proxy** that sits between your LLM client and the Anthropic API, automatically injecting `cache_control` breakpoints to achieve ~90% API cost savings on cached turns:
+
+```bash
+AUTO_CACHE=1 cargo run -p clean-ctx-proxy
+```
+
+Works with Cline, Cursor, Aider, Continue.dev, and GitHub Copilot (BYOK). See [`docs/PROXY.md`](docs/PROXY.md) for full documentation.
 
 ### Security
 
@@ -448,8 +458,9 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — 0 warnings |
-| Tests | ✅ 945 passing (870 unit + 70 integration + 5 E2E workflow) |
+| Tests | ✅ 1,035 passing (960+ unit + 70 integration + 5 E2E + proxy tests) |
 | Audit | ✅ FAANG-level audit — all 41 findings resolved |
+| Proxy | ✅ Anthropic prompt-cache proxy — see [`docs/PROXY.md`](docs/PROXY.md) |
 | Largest file | ~170 lines (down from 913) |
 | Unsafe code | 0 blocks |
 | Meta-Layer | ✅ Phases 1–3 complete (decorators, bundling, graph) |

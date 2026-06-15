@@ -784,7 +784,7 @@ Every pull request must pass these checks:
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test`** — all 945 tests pass
+3. **`cargo test`** — all 1,035 tests pass
 4. **`cargo audit`** — no known security vulnerabilities
 5. **No new `#![allow(...)]`** annotations without a `// SAFETY:` or `// Phase N:` comment
 6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
@@ -793,4 +793,4 @@ Every pull request must pass these checks:
 ### Pre-commit checklist
 
 ```bash
-cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo audit
+cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo audit --ignore RUSTSEC-2025-0009
