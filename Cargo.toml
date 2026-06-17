@@ -54,6 +54,8 @@ rayon = "1.10"
 rusqlite = { version = "0.32", features = ["bundled"] }
 # Base64 encoding for fallback file serialization
 base64 = "0.22"
+# Concurrent hashmap for TTL-based graph caching (CBM Phase 1)
+dashmap = "6.1"
 # High-resolution timestamps for persistence metadata
 chrono = { version = "0.4", features = ["serde"] }
 

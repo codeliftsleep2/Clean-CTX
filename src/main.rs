@@ -12,8 +12,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return cmd_init();
     }
 
+    if args.len() > 1 && args[1] == "setup" && args.get(2).map(|s| s.as_str()) == Some("--with-cbm") {
+        return cmd_setup_cbm();
+    }
+
     // Default: run the MCP server
+    // Note: --with-cbm is the default behavior now (auto-detect CBM on PATH).
+    // Use CBM_DISABLE=1 env var to explicitly disable CBM integration.
     clean_ctx::mcp::run()
+}
+
+/// Handle `clean-ctx setup --with-cbm` — install helper message.
+fn cmd_setup_cbm() -> Result<(), Box<dyn std::error::Error>> {
+    eprintln!("[clean-ctx] CBM (codebase-memory-mcp) setup");
+    eprintln!();
+    eprintln!("  Clean-CTX integrates with codebase-memory-mcp (CBM) for graph intelligence.");
+    eprintln!("  CBM provides cross-file symbol resolution, call graphs, and dead code detection.");
+    eprintln!();
+    eprintln!("  To install CBM:");
+    eprintln!("    Visit: https://github.com/DeusData/codebase-memory-mcp");
+    eprintln!("    Or install via cargo: cargo install codebase-memory-mcp");
+    eprintln!();
+    eprintln!("  Once installed on PATH, Clean-CTX will automatically detect and use CBM.");
+    eprintln!("  No configuration needed — Clean-CTX handles the integration transparently.");
+    eprintln!();
+    eprintln!("  To verify CBM is detected:");
+    eprintln!("    Use the `get_cbm_status` MCP tool after starting the server.");
+    eprintln!();
+    eprintln!("  To disable CBM integration:");
+    eprintln!("    Set CBM_DISABLE=1 environment variable, or set cbm.enabled=false in .clean-ctx.json");
+    eprintln!();
+
+    Ok(())
 }
 
 /// Handle `clean-ctx init` — create default config and directory.
