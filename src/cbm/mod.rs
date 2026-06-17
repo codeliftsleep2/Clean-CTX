@@ -18,6 +18,8 @@ pub mod client;
 pub mod bridge;
 pub mod tools;
 pub mod handlers;
+pub mod proxy;
+pub mod json_compress;
 
 // Re-export the public API for external consumers.
 pub use config::{CbmConfig, CbmStatus};

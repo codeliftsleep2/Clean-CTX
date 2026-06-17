@@ -61,5 +61,20 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                 "properties": {}
             }
         }),
+        // ── Phase 2: Pipe-Level Interception Proxy ───────────────────
+        serde_json::json!({
+            "name": "cbm_proxy",
+            "description": "**Primary CBM integration point.** Forwards a query to CBM, intercepts the raw ~5000-token structural response at the pipe level, compresses it down to ~1100 tokens, and returns the compressed result. Use this instead of calling CBM directly. Only available when codebase-memory-mcp is installed.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "cbm_tool": { "type": "string", "description": "CBM tool to call: 'graph_search', 'graph_query', 'graph_trace', 'get_architecture', 'get_symbol_importance', 'get_dead_code'. Default: 'graph_search'." },
+                    "parameters": { "type": "object", "description": "Parameters to pass to the CBM tool. For graph_search: { 'query': string, 'project': string }. For graph_trace: { 'from': string, 'to': string, 'project': string }. For others: { 'project': string }." },
+                    "query": { "type": "string", "description": "Shorthand: query to pass to CBM (used when parameters is not set)." },
+                    "project": { "type": "string", "description": "Shorthand: CBM project name (used when parameters is not set)." }
+                },
+                "required": []
+            }
+        }),
     ]
 }

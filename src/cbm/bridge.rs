@@ -355,6 +355,23 @@ impl GraphBridge {
     pub fn invalidate_symbol(&mut self, symbol: &str) { self.cache.retain(|k, _| !k.contains(symbol)); }
     pub fn clear_cache(&mut self) { self.cache.clear(); }
 
+    /// **Pipe-level proxy call:** Forwards a CBM tool request, catches
+    /// the **raw response text** from CBM's stdout pipe, and returns it.
+    /// The caller (proxy handler) is responsible for compressing the raw
+    /// text with Clean-CTX before it reaches the agent.
+    ///
+    /// CBM produces a ~5000-token structural seed → Clean-CTX catches it
+    /// at the pipe level → compresses to ~1100 tokens → returns.
+    pub fn proxy_call(&mut self, tool_name: &str, args: serde_json::Value) -> Result<String, CbmError> {
+        let result = match self.client.as_mut() {
+            Some(c) => c.call_tool_raw(tool_name, args),
+            None => return Err(CbmError::LaunchError("CBM not available".into())),
+        };
+        // M-1: sync status on every query for self-healing
+        self.update_status();
+        result
+    }
+
     /// Update status from the underlying client. Also syncs on every
     /// successful query call for self-healing (M-1).
     pub fn update_status(&mut self) {
