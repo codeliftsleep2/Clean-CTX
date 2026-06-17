@@ -84,6 +84,13 @@ pub struct McpState {
     /// Cache efficiency metrics for the dashboard.
     /// Records hits, misses, tokens_saved, and per-region status.
     pub cache_metrics: CacheMetrics,
+
+    /// CBM (codebase-memory-mcp) graph bridge for graph intelligence.
+    /// `None` if CBM is not installed, disabled, or failed to launch.
+    pub graph_bridge: Option<crate::cbm::GraphBridge>,
+
+    /// CBM integration status, mirrored for quick access.
+    pub cbm_status: crate::cbm::CbmStatus,
 }
 
 impl McpState {
@@ -127,6 +134,12 @@ impl McpState {
             }
         }
 
+        // Initialize CBM graph bridge from config *before* moving config
+        // into Self (avoiding after-move borrow).
+        let cbm_config = config.cbm.clone();
+        let project_root = crate::mcp::server::find_project_root().clone();
+        let (graph_bridge, cbm_status) = Self::init_cbm_bridge(&cbm_config, &project_root);
+
         Self {
             dict: PathDictionary::new(),
             cache: LocalStateCache::new(),
@@ -142,6 +155,27 @@ impl McpState {
             persistence_store,
             emitted_breakpoints: HashSet::new(),
             cache_metrics: CacheMetrics::default(),
+            graph_bridge,
+            cbm_status,
+        }
+    }
+
+    /// Try to initialize the CBM graph bridge.
+    fn init_cbm_bridge(
+        cbm_config: &crate::cbm::CbmConfig,
+        project_root: &std::path::Path,
+    ) -> (Option<crate::cbm::GraphBridge>, crate::cbm::CbmStatus) {
+        let bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
+        if bridge.is_available() {
+            eprintln!("[clean-ctx] CBM graph intelligence: available");
+            let status = bridge.status().clone();
+            (Some(bridge), status)
+        } else {
+            let status = bridge.status().clone();
+            if status.summary() != "unavailable" {
+                eprintln!("[clean-ctx] CBM graph intelligence: {}", status.summary());
+            }
+            (None, status)
         }
     }
 
