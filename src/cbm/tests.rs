@@ -305,7 +305,7 @@ fn test_graph_edge_round_trip() {
 #[test]
 fn test_cbm_tool_list_contains_all_tools() {
     let tools = crate::cbm::cbm_tool_list();
-    assert_eq!(tools.len(), 5, "expected 5 CBM tools");
+    assert_eq!(tools.len(), 6, "expected 6 CBM tools");
 
     let names: Vec<&str> = tools.iter()
         .filter_map(|t| t["name"].as_str())
@@ -315,6 +315,7 @@ fn test_cbm_tool_list_contains_all_tools() {
     assert!(names.contains(&"graph_trace"));
     assert!(names.contains(&"get_architecture"));
     assert!(names.contains(&"get_cbm_status"));
+    assert!(names.contains(&"cbm_proxy"));
 }
 
 #[test]
@@ -327,4 +328,106 @@ fn test_cbm_tool_list_has_input_schemas() {
         assert_eq!(schema["type"].as_str(), Some("object"),
             "tool {name} inputSchema.type should be object");
     }
+}
+
+// ── RC-2: Minimum compression fallback regression ────────────
+
+#[test]
+fn test_minimum_compression_strips_jsonrpc_envelope() {
+    // RC-2 regression: even when JSON compressor fails, minimum compression
+    // should remove the jsonrpc envelope and return only the result.
+    let raw = r#"{"jsonrpc":"2.0","id":1,"result":{"data":"test_value"}}"#;
+    let result = crate::cbm::json_compress::compress_cbm_response(raw);
+    assert!(result.is_some(), "valid JSON should compress correctly");
+    let c = result.unwrap();
+    assert!(c.compressed_text.len() < raw.len(),
+        "compressed text must be shorter than raw: {} vs {}", c.compressed_text.len(), raw.len());
+    // Compressed should not contain "jsonrpc" key name
+    assert!(!c.compressed_text.contains("jsonrpc"),
+        "compressed text should not contain 'jsonrpc' key");
+}
+
+#[test]
+fn test_minimum_compression_never_returns_empty() {
+    // RC-2 regression: minimum compression must produce non-empty output
+    let raw = r#"{"jsonrpc":"2.0","id":1,"result":{"name":"UserService","file":"src/user.rs"}}"#;
+    let result = crate::cbm::json_compress::compress_cbm_response(raw);
+    assert!(result.is_some());
+    let c = result.unwrap();
+    assert!(!c.compressed_text.is_empty(), "compressed text should never be empty");
+}
+
+#[test]
+fn test_minimum_compression_invalid_json_fallback() {
+    // RC-2 regression: when JSON fails, proxy must still not return raw
+    let raw = "not valid json at all but we still need to handle this";
+    let result = crate::cbm::json_compress::compress_cbm_response(raw);
+    // Invalid JSON returns None — the proxy's fallback will handle it
+    assert!(result.is_none(), "invalid JSON should return None");
+}
+
+#[test]
+fn test_minimum_compression_large_payload() {
+    // RC-2 regression: even 1000 items must compress
+    let items: Vec<Value> = (0..1000).map(|i| {
+        serde_json::json!({"name": format!("Symbol_{}", i), "file": "src/test.rs"})
+    }).collect();
+    let json = serde_json::json!({
+        "jsonrpc": "2.0", "id": 1, "result": { "results": items }
+    }).to_string();
+    
+    let result = crate::cbm::json_compress::compress_cbm_response(&json);
+    assert!(result.is_some(), "large payload should compress");
+    let c = result.unwrap();
+    assert!(c.compressed_text.len() < json.len(),
+        "compressed ({}) must be shorter than raw ({})", c.compressed_text.len(), json.len());
+}
+
+// ── RC-1: JSON compressor vs tree-sitter pipeline ─────────
+
+#[test]
+fn test_json_compressor_reduces_size() {
+    // RC-1 regression: the JSON compressor must produce significantly
+    // smaller output than the raw JSON-RPC response.
+    let json = r#"{
+        "jsonrpc":"2.0",
+        "id":1,
+        "result":{
+            "results":[
+                {"name":"UserService","file":"src/user.rs","label":"Class"},
+                {"name":"PaymentGateway","file":"src/payment.rs","label":"Class"}
+            ]
+        }
+    }"#;
+
+    // Using the JSON compressor
+    let compressed = crate::cbm::json_compress::compress_cbm_response(json)
+        .expect("JSON compressor should handle this response");
+
+    assert!(compressed.compressed_text.len() < json.len(),
+        "JSON compressor must produce smaller output ({} vs {})",
+        compressed.compressed_text.len(), json.len());
+    assert!(!compressed.compressed_text.contains("\"jsonrpc\""),
+        "JSON compressor should strip the jsonrpc envelope");
+}
+
+#[test]
+fn test_json_compressor_preserves_data() {
+    // RC-1 regression: the JSON compressor must preserve the actual
+    // data content — symbol names, file paths, etc.
+    let json = r#"{"jsonrpc":"2.0","id":1,"result":{"results":[
+        {"name":"UserService","file":"src/user.rs"},
+        {"name":"PaymentGateway","file":"src/payment.rs"}
+    ]}}"#;
+
+    let compressed = crate::cbm::json_compress::compress_cbm_response(json)
+        .expect("JSON compressor should handle this");
+
+    // Data should still be present
+    assert!(compressed.compressed_text.contains("UserService"),
+        "JSON compressor should preserve 'UserService' symbol name");
+    assert!(compressed.compressed_text.contains("PaymentGateway"),
+        "JSON compressor should preserve 'PaymentGateway' symbol name");
+    assert!(compressed.compressed_text.contains("user.rs"),
+        "JSON compressor should preserve 'user.rs' file path");
 }

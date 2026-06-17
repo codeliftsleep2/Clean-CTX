@@ -23,6 +23,7 @@ pub mod cache;
 pub mod compressor;
 pub mod config;
 pub mod cbm;
+pub mod intelligence;
 pub mod mcp;
 pub mod protocol;
 pub mod queries;

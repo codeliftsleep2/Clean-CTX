@@ -477,6 +477,10 @@ pub(crate) fn dispatch_tools_call(
         "get_cbm_status" => {
             crate::cbm::handlers::handle_get_cbm_status(id, params, state);
         }
+        // ── Phase 2: Pipe-level interception proxy ──────────
+        "cbm_proxy" => {
+            crate::cbm::proxy::handle_cbm_proxy(id, params, state);
+        }
         _ => {
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0",

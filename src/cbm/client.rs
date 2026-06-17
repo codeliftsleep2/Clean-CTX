@@ -103,14 +103,75 @@ impl CbmClient {
 
     pub fn status(&self) -> &CbmStatus { &self.status }
 
-    /// Send a JSON-RPC 2.0 request and read the response.
-    /// Supports multi-line JSON responses by buffering until
-    /// valid JSON is parsed.
+    /// Send a JSON-RPC 2.0 request and read the raw response text.
     ///
-    /// **Deadlock safety:** Each `call_tool` resets its read buffer.
-    /// If a previous call left residual bytes (e.g., from a corrupted
-    /// response), this call fails with `ConnectionLost` rather than
-    /// reading garbage. The caller should recreate the client.
+    /// **Pipe-level interception:** This returns the **raw text** that CBM
+    /// wrote to stdout, NOT a parsed JSON value. The intention is that
+    /// Clean-CTX catches this at the pipe level and compresses it before
+    /// it reaches the agent. CBM's ~5000-token structural seed gets
+    /// compressed down to ~1100 tokens.
+    ///
+    /// Returns the raw response text (the full JSON-RPC response body).
+    /// The caller MUST validate that it starts with `{"jsonrpc":"2.0"...`
+    /// (Callers that need parsed JSON should still use `call_tool`.)
+    pub fn call_tool_raw(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError> {
+        let id = self.request_id.fetch_add(1, Ordering::SeqCst);
+        let request = serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "method": "tools/call",
+            "params": { "name": tool_name, "arguments": args }
+        });
+        let req_line = serde_json::to_string(&request)
+            .map_err(|e| CbmError::ParseError(e.to_string()))?;
+        writeln!(self.stdin, "{req_line}").map_err(|e| {
+            self.status = CbmStatus::Degraded(format!("write: {e}"));
+            CbmError::ConnectionLost(e.to_string())
+        })?;
+        self.stdin.flush().map_err(|e| {
+            self.status = CbmStatus::Degraded(format!("flush: {e}"));
+            CbmError::ConnectionLost(e.to_string())
+        })?;
+
+        // C-1 fix: accumulate lines until we have complete JSON.
+        let mut buf = String::new();
+        let deadline = std::time::Instant::now() + self.timeout;
+        loop {
+            if std::time::Instant::now() > deadline {
+                let _ = self.child.kill();
+                self.status = CbmStatus::Degraded("timeout".into());
+                return Err(CbmError::Timeout(self.timeout));
+            }
+            let mut line = String::new();
+            match self.stdout.read_line(&mut line) {
+                Ok(0) => {
+                    self.status = CbmStatus::Degraded("exited".into());
+                    return Err(CbmError::ConnectionLost("CBM exited".into()));
+                }
+                Ok(_) => {
+                    buf.push_str(&line);
+                    if buf.len() > MAX_RESPONSE_BYTES {
+                        self.status = CbmStatus::Degraded("oversized".into());
+                        return Err(CbmError::ConnectionLost(
+                            format!("response >{}B", MAX_RESPONSE_BYTES)
+                        ));
+                    }
+                    if let Ok(_) = serde_json::from_str::<Value>(buf.trim()) {
+                        // Valid complete JSON — return the raw intercepted text
+                        return Ok(buf);
+                    }
+                }
+                Err(e) => {
+                    self.status = CbmStatus::Degraded(format!("read: {e}"));
+                    return Err(CbmError::ConnectionLost(e.to_string()));
+                }
+            }
+        }
+    }
+
+    /// Send a JSON-RPC 2.0 request and read the parsed response.
+    ///
+    /// For **pipe-level interception** use `call_tool_raw` instead —
+    /// it returns the raw text that gets compressed.
     pub fn call_tool(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
         let id = self.request_id.fetch_add(1, Ordering::SeqCst);
         let request = serde_json::json!({
