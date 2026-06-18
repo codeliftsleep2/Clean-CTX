@@ -163,7 +163,7 @@ fn compress_value(val: &Value) -> String {
 }
 
 /// Shorten common JSON keys to single chars or short codes.
-fn shorten_key(key: &str) -> &str {
+pub(crate) fn shorten_key(key: &str) -> &str {
     match key {
         "results" => "r",
         "symbols" => "s",

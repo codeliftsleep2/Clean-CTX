@@ -63,7 +63,7 @@ pub(super) fn estimate_tokens(text: &str) -> usize {
 ///
 /// When `tokenizer` is `Some`, uses the pluggable tokenizer for accurate
 /// token counting. When `None`, falls back to the rough chars/4 estimate.
-pub(super) fn count_tokens_with_tokenizer(
+pub(crate) fn count_tokens_with_tokenizer(
     text: &str,
     tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
 ) -> usize {

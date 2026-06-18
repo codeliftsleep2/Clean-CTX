@@ -14,6 +14,8 @@
 
 use serde_json::Value;
 use crate::mcp::McpState;
+use crate::mcp::tools::parse_tokenizer_arg;
+use crate::mcp::tool_helpers::count_tokens_with_tokenizer;
 use crate::protocol::send_response;
 use crate::cbm::json_compress::compress_cbm_response;
 
@@ -99,14 +101,21 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
 
     // Step 3: Compress the intercepted response with JSON-aware compressor
     // RC-1 fix: JSON compressor handles key shortening, not tree-sitter
+    // MEDIUM fix: Use pluggable tokenizer for accurate token counts
+    let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
+    let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
+    let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
+
     match compress_cbm_response(&raw_response) {
         Some(compressed) => {
-            // Record the proxy operation in session stats
-            // RH-1 fix: use the estimated tokens from the JSON compressor
+            // Use pluggable tokenizer for accurate counts (not byte-based estimate)
+            let raw_tokens = count_tokens_with_tokenizer(&raw_response, tokenizer_ref);
+            let comp_tokens = count_tokens_with_tokenizer(&compressed.compressed_text, tokenizer_ref);
+
             state.session_stats.record_compression(
                 &format!("cbm://{cbm_tool}"),
-                compressed.raw_tokens_est,
-                compressed.comp_tokens_est,
+                raw_tokens,
+                comp_tokens,
                 "low",
                 false,
                 "cbm_proxy",
@@ -120,10 +129,10 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
                     "_meta": {
                         "cbm_tool": cbm_tool,
                         "raw_bytes": compressed.raw_bytes,
-                        "raw_tokens_est": compressed.raw_tokens_est,
-                        "compressed_tokens_est": compressed.comp_tokens_est,
-                        "savings_pct": if compressed.raw_tokens_est > 0 {
-                            (1.0 - compressed.comp_tokens_est as f64 / compressed.raw_tokens_est as f64) * 100.0
+                        "raw_tokens": raw_tokens,
+                        "compressed_tokens": comp_tokens,
+                        "savings_pct": if raw_tokens > 0 {
+                            (1.0 - comp_tokens as f64 / raw_tokens as f64) * 100.0
                         } else { 0.0 },
                         "cbm_status": state.cbm_status.summary(),
                         "cbm_error": compressed.cbm_error,
@@ -137,8 +146,8 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
             state.push_warning("CBM response compression failed — applying minimum compression");
 
             let min_compressed = apply_minimum_compression(&raw_response);
-            let comp_tokens_est = (min_compressed.len() + 3) / 4;
-            let raw_tokens_est = (raw_response.len() + 3) / 4;
+            let raw_tokens = count_tokens_with_tokenizer(&raw_response, tokenizer_ref);
+            let comp_tokens = count_tokens_with_tokenizer(&min_compressed, tokenizer_ref);
 
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
@@ -147,10 +156,10 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
                     "_meta": {
                         "cbm_tool": cbm_tool,
                         "raw_bytes": raw_response.len(),
-                        "raw_tokens_est": raw_tokens_est,
-                        "compressed_tokens_est": comp_tokens_est,
-                        "savings_pct": if raw_tokens_est > 0 {
-                            (1.0 - comp_tokens_est as f64 / raw_tokens_est as f64) * 100.0
+                        "raw_tokens": raw_tokens,
+                        "compressed_tokens": comp_tokens,
+                        "savings_pct": if raw_tokens > 0 {
+                            (1.0 - comp_tokens as f64 / raw_tokens as f64) * 100.0
                         } else { 0.0 },
                         "cbm_status": state.cbm_status.summary(),
                         "compression_fallback": true,
@@ -163,7 +172,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
 
 /// RC-2 fallback: minimum compression when JSON compressor fails.
 /// Strips all non-essential whitespace and shortens common JSON keys.
-fn apply_minimum_compression(raw: &str) -> String {
+pub(crate) fn apply_minimum_compression(raw: &str) -> String {
     // First attempt: parse as JSON and shorten keys
     if let Ok(val) = serde_json::from_str::<Value>(raw.trim()) {
         if let Some(result) = val.get("result") {

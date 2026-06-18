@@ -62,7 +62,7 @@ pub struct CbmClient {
 /// - `LaunchError` — binary missing, retry won't help
 /// - `ParseError` — malformed response, retry won't help
 /// - `RpcError` with code -32601 (Method not found) — programming error
-fn is_retryable(error: &CbmError) -> bool {
+pub(crate) fn is_retryable(error: &CbmError) -> bool {
     matches!(
         error,
         CbmError::ConnectionLost(_)
@@ -137,7 +137,32 @@ impl CbmClient {
     /// Returns the raw response text (the full JSON-RPC response body).
     /// The caller MUST validate that it starts with `{"jsonrpc":"2.0"...`
     /// (Callers that need parsed JSON should still use `call_tool`.)
+    /// Send a JSON-RPC 2.0 request, read the raw response text, with retry.
+    ///
+    /// Retries transient errors (timeout, connection lost, internal error)
+    /// once with exponential backoff before giving up. Delegates to
+    /// `call_tool_raw_inner` for the actual pipe I/O.
     pub fn call_tool_raw(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError> {
+        let max_retries = 1;
+        let mut retry_count = 0;
+        let mut backoff = Duration::from_millis(100);
+
+        loop {
+            // Value::clone() is cheap — a few ref-count bumps for JSON strings/arrays
+            match self.call_tool_raw_inner(tool_name, args.clone()) {
+                Ok(result) => return Ok(result),
+                Err(e) if retry_count < max_retries && is_retryable(&e) => {
+                    retry_count += 1;
+                    std::thread::sleep(backoff);
+                    backoff *= 2; // Exponential backoff
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
+    /// Inner implementation of call_tool_raw — the actual pipe-level I/O.
+    fn call_tool_raw_inner(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError> {
         let id = self.request_id.fetch_add(1, Ordering::SeqCst);
         let request = serde_json::json!({
             "jsonrpc": "2.0", "id": id,

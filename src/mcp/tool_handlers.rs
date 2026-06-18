@@ -31,6 +31,7 @@ fn debug_log(msg: impl AsRef<str>) {
 }
 use crate::compressor::{compress_file, Fidelity};
 use crate::compression::pipeline::compress_file_with_source;
+use crate::cbm::json_compress::compress_cbm_response;
 use crate::ir::wire::ir_to_wire;
 use crate::ir::delta::{IRDelta, DeltaComputer};
 use crate::ir::replay::DeltaError;
@@ -71,13 +72,15 @@ pub(super) fn handle_compress_code_context(
     encoding: &str,
 ) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let workspace_root = params["arguments"]["workspaceRoot"].as_str();
+    let resolved_path = resolve_file_path(file_path_str, workspace_root);
     let fidelity = match parse_fidelity_arg(id, params) {
         Ok(f) => f,
         Err(()) => return,
     };
 
     // F-05: consult `is_excluded` *before* any file I/O.
-    if state.config.is_excluded(file_path_str) {
+    if state.config.is_excluded(&resolved_path) {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -92,7 +95,7 @@ pub(super) fn handle_compress_code_context(
     // F-05: extension-based fidelity override (only kicks in
     // when the caller didn't pass an explicit `fidelity`).
     let explicit = params["arguments"]["fidelity"].as_str();
-    let path_buf = PathBuf::from(file_path_str);
+    let path_buf = PathBuf::from(&resolved_path);
     let ext = path_buf.extension().and_then(|e| e.to_str());
     let effective_fidelity = if explicit.is_some() {
         fidelity
@@ -101,12 +104,12 @@ pub(super) fn handle_compress_code_context(
     };
 
     // Pre-read source into source_cache so compile_file_ir gets a cache hit
-    let source_arc = state.read_source(file_path_str).ok();
+    let source_arc = state.read_source(&resolved_path).ok();
     let source_ref = source_arc.as_ref().map(|s| s.as_str());
     let source_text = source_ref.unwrap_or("");
 
     // Phase 6: Compile IR first — this is now the primary output
-    let ir_result = compile_file_ir(file_path_str, effective_fidelity, state);
+    let ir_result = compile_file_ir(&resolved_path, effective_fidelity, state);
 
     // R-19: Resolve tokenizer from tool arg + config
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
@@ -129,7 +132,7 @@ pub(super) fn handle_compress_code_context(
         let llm_text_with_footer = format!("{}\n// ── {} ({}) ──\n{}",
             llm_text.trim(),
             ir.file_id,
-            file_path_str,
+            &resolved_path,
             state.dict.format_footer().trim(),
         );
 
@@ -139,9 +142,8 @@ pub(super) fn handle_compress_code_context(
         // Record stats
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
         let compressed_tokens = count_tokens_with_tokenizer(&llm_text_with_footer, tokenizer_ref);
-        let ccc_canonical = resolve_file_path(file_path_str, None);
         state.session_stats.record_compression(
-            &ccc_canonical,
+            &resolved_path,
             raw_tokens,
             compressed_tokens,
             &format!("{:?}", effective_fidelity).to_lowercase(),
@@ -156,9 +158,9 @@ pub(super) fn handle_compress_code_context(
             let source_hash = sha2::Sha256::digest(source_text.as_bytes());
             let hash_hex = format!("{:x}", source_hash);
             let ir_binary = Some(crate::ir::binary_wire::encode(&ir));
-            debug_log(format!("handle_compress: calling save_context for {}", file_path_str));
+            debug_log(format!("handle_compress: calling save_context for {}", &resolved_path));
             match store.save_context(
-                file_path_str,
+                &resolved_path,
                 effective_fidelity,
                 &llm_text_with_footer,
                 ir_binary.as_deref(),
@@ -207,7 +209,7 @@ pub(super) fn handle_compress_code_context(
     } else {
         // IR compilation failed — fall back to text pipeline only
         match compress_file_with_source(
-            PathBuf::from(file_path_str),
+            PathBuf::from(&resolved_path),
             source_ref,
             &mut state.dict,
             &mut state.cache,
@@ -217,9 +219,8 @@ pub(super) fn handle_compress_code_context(
                 compressed_text.push_str(&state.dict.format_footer());
                 let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
                 let compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
-                let ccc_canonical = resolve_file_path(file_path_str, None);
                 state.session_stats.record_compression(
-                    &ccc_canonical,
+                    &resolved_path,
                     raw_tokens,
                     compressed_tokens,
                     &format!("{:?}", effective_fidelity).to_lowercase(),
@@ -1648,14 +1649,18 @@ pub(super) fn handle_replay_history(
 /// Inject CBM graph metadata into the `_meta` field of a `provide_code_context`
 /// response when the graph bridge is available.
 ///
-/// Adds:
+/// Adds (compressed):
 ///   - `cbm_status`: "available" | "degraded" | "unavailable"
-///   - `cbm_symbol_importance`: top symbols for this file (if any)
-///   - `cbm_architecture`: module count + dependency count (if cached)
+///   - `cbm_enrichment`: compressed symbol importance for this file
+///   - `cbm_architecture_summary`: module + dependency counts (already minimal)
 ///
-/// When CBM is unavailable, only `cbm_status: "unavailable"` is added.
+/// CRITICAL FIX: All CBM data is compressed via `compress_cbm_response` before
+/// injection. This prevents raw ~5000-token JSON from bypassing Clean-CTX's
+/// compression pipeline. Timeout guard: if CBM is degraded/unavailable, enrichment
+/// is skipped entirely (non-blocking).
+///
 /// This is a no-op for non-`provide_code_context` handlers.
-pub(super) fn enrich_with_cbm(
+pub(crate) fn enrich_with_cbm(
     response: &mut serde_json::Value,
     file_path: &str,
     state: &mut McpState,
@@ -1665,11 +1670,17 @@ pub(super) fn enrich_with_cbm(
         None => return,
     };
 
-    // Surface CBM status
+    // CRITICAL timeout guard: surface CBM status first, then bail if not healthy.
+    // Sync status from bridge before checking (M-1 self-healing).
+    if let Some(ref mut bridge) = state.graph_bridge {
+        bridge.update_status();
+        state.cbm_status = bridge.status().clone();
+    }
     let status_str = state.cbm_status.summary().to_string();
     meta["cbm_status"] = serde_json::Value::String(status_str.clone());
 
-    // If CBM is unavailable, stop here — no graph data to add
+    // If CBM is degraded or unavailable, skip enrichment entirely.
+    // This prevents blocking the response path when CBM is slow/failing.
     if status_str != "available" {
         return;
     }
@@ -1680,7 +1691,9 @@ pub(super) fn enrich_with_cbm(
         None => return,
     };
 
-    // Symbol importance for this file
+    // Symbol importance — compress before injecting.
+    // get_symbol_importance_mut() returns ALL project symbols (potentially hundreds).
+    // We filter to file-relevant ones, serialize to JSON, and compress.
     let importance = bridge.get_symbol_importance_mut();
     let file_importance: Vec<_> = importance
         .values()
@@ -1689,22 +1702,34 @@ pub(super) fn enrich_with_cbm(
         .collect();
 
     if !file_importance.is_empty() {
-        let symbols: Vec<serde_json::Value> = file_importance
-            .iter()
-            .map(|s| {
-                serde_json::json!({
-                    "symbol": s.symbol,
-                    "score": s.score,
-                    "file": s.file,
-                })
-            })
-            .collect();
-        meta["cbm_symbol_importance"] = serde_json::Value::Array(symbols);
+        let enriched_json = serde_json::json!({
+            "symbols": file_importance.iter().map(|s| serde_json::json!({
+                "sy": s.symbol,
+                "sc": s.score,
+                "f": s.file,
+            })).collect::<Vec<_>>()
+        });
+        let serialized = serde_json::to_string(&enriched_json).unwrap_or_default();
+        // Compress via JSON compressor — same pipeline as proxy path
+        if let Some(compressed) = compress_cbm_response(&serialized) {
+            meta["cbm_enrichment"] = serde_json::json!({
+                "text": compressed.compressed_text,
+                "raw_tokens": compressed.raw_tokens_est,
+                "comp_tokens": compressed.comp_tokens_est,
+            });
+        } else {
+            // Compression failed — inject minimal compressed entry
+            meta["cbm_enrichment"] = serde_json::json!({
+                "text": format!("sy:{} count:{}", file_path, file_importance.len()),
+                "compression_fallback": true,
+            });
+        }
     }
 
-    // Architecture overview (cached, cheap)
+    // Architecture overview — already minimal (two integers), no compression needed.
+    // Wrapped in a failsafe: if the bridge call fails or hangs, skip silently.
     if let Some(arch) = bridge.get_architecture() {
-        meta["cbm_architecture"] = serde_json::json!({
+        meta["cbm_architecture_summary"] = serde_json::json!({
             "modules": arch.modules.len(),
             "dependencies": arch.dependencies.len(),
         });
