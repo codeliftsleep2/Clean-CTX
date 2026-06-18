@@ -176,13 +176,13 @@ impl GraphBridge {
             )
             .unwrap_or_default();
         }
-        let result = self.query(move |c| c.get_symbol_importance(&project));
+        let result = self.query(move |c| c.get_symbol_importance(&project, Some(1)));
         match result {
             Ok(symbols) => {
                 let map: HashMap<_, _> = symbols.iter().filter_map(|e| {
                     Some((e["name"].as_str()?.to_string(), SymbolImportance {
                         symbol: e["name"].as_str()?.to_string(),
-                        score: e["importance"].as_f64()?,
+                        score: e["importance"].as_f64().unwrap_or(0.0),
                         file: e["file"].as_str().unwrap_or("").to_string(),
                     }))
                 }).collect();
@@ -211,7 +211,7 @@ impl GraphBridge {
             )
             .unwrap_or_default();
         }
-        let result = self.query(move |c| c.search_graph(&format!("depends_on:{sym}"), &project));
+        let result = self.query(move |c| c.search_graph(&format!("depends_on:{sym}"), &project, None));
         match result {
             Ok(nodes) => {
                 let files: Vec<_> = nodes.iter().filter_map(|n| n["file"].as_str().map(String::from)).collect();
@@ -310,22 +310,18 @@ impl GraphBridge {
         let result = self.query(move |c| c.query_graph(&q, &project));
         match result {
             Ok(rows) => {
-                let mut nodes = vec![]; let mut edges = vec![];
+                // CBM Cypher returns {columns, rows} — rows are Vec<Vec<Value>>.
+                // We try to interpret each row as either node or edge data.
+                let mut nodes = vec![]; let edges = vec![];
                 for row in &rows {
-                    if let Some(node) = row.get("node") {
+                    // First column is typically a name or label
+                    if let Some(first) = row.first() {
+                        let label = first.as_str().unwrap_or("");
                         nodes.push(GraphNode {
-                            id: node["id"].as_str().unwrap_or("").to_string(),
-                            label: node["label"].as_str().unwrap_or("").to_string(),
-                            name: node["name"].as_str().unwrap_or("").to_string(),
-                            file: node["file"].as_str().unwrap_or("").to_string(),
-                            properties: HashMap::new(),
-                        });
-                    }
-                    if let Some(edge) = row.get("edge") {
-                        edges.push(GraphEdge {
-                            from: edge["from"].as_str().unwrap_or("").into(),
-                            to: edge["to"].as_str().unwrap_or("").into(),
-                            label: edge["label"].as_str().unwrap_or("").into(),
+                            id: label.to_string(),
+                            label: String::new(),
+                            name: label.to_string(),
+                            file: String::new(),
                             properties: HashMap::new(),
                         });
                     }
@@ -353,7 +349,7 @@ impl GraphBridge {
             )
             .unwrap_or_default();
         }
-        let result = self.query(move |c| c.search_graph(&q, &project));
+        let result = self.query(move |c| c.search_graph(&q, &project, None));
         match result {
             Ok(nodes) => {
                 let gn: Vec<GraphNode> = nodes.iter().filter_map(|n| {
@@ -378,7 +374,7 @@ impl GraphBridge {
         }
         let key = format!("trace:{from}:{to}");
         let project = self.project_str();
-        let f = from.to_string(); let t = to.to_string();
+        let f = from.to_string(); let _t = to.to_string();
         if self.check_cache(&key) {
             return serde_json::from_value(
                 self.cache
@@ -390,7 +386,7 @@ impl GraphBridge {
             )
             .unwrap_or_default();
         }
-        let result = self.query(move |c| c.trace_path(&f, &t, &project));
+        let result = self.query(move |c| c.trace_path(&f, "both", &project, Some(3)));
         match result {
             Ok(edges) => {
                 let ge: Vec<GraphEdge> = edges.iter().filter_map(|e| {

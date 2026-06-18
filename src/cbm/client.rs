@@ -303,35 +303,116 @@ impl CbmClient {
         }
     }
 
+    // ── Response parsing ───────────────────────────────────────
+
+    /// CBM wraps all tool responses in MCP content array format.
+    /// The actual data is a JSON string inside `result.content[0].text`.
+    /// This helper extracts and parses that inner JSON string.
+    fn parse_cbm_response(&self, response: &Value) -> Result<Value, CbmError> {
+        let content = response["content"].as_array()
+            .and_then(|a| a.first())
+            .ok_or_else(|| CbmError::ParseError("missing content array".into()))?;
+        let text = content["text"].as_str()
+            .ok_or_else(|| CbmError::ParseError("missing text field in content".into()))?;
+        serde_json::from_str(text)
+            .map_err(|e| CbmError::ParseError(format!("inner JSON parse: {e}")))
+    }
+
     // ── Typed wrappers ──────────────────────────────────────────
 
-    pub fn search_graph(&mut self, query: &str, project: &str) -> Result<Vec<Value>, CbmError> {
-        let r = self.call_tool("search_graph", serde_json::json!({"query": query, "project": project}))?;
-        Ok(r["results"].as_array().cloned().unwrap_or_default())
+    /// Search the CBM knowledge graph by name pattern and optional label filter.
+    ///
+    /// CBM params: `name_pattern`, `label`, `file_pattern`, `project`, `limit`, `offset`
+    pub fn search_graph(&mut self, name_pattern: &str, project: &str, label: Option<&str>) -> Result<Vec<Value>, CbmError> {
+        let mut args = serde_json::json!({"name_pattern": name_pattern, "project": project});
+        if let Some(l) = label {
+            args["label"] = serde_json::Value::String(l.to_string());
+        }
+        let r = self.call_tool("search_graph", args)?;
+        let inner = self.parse_cbm_response(&r)?;
+        Ok(inner["results"].as_array().cloned().unwrap_or_default())
     }
 
-    pub fn trace_path(&mut self, from: &str, to: &str, project: &str) -> Result<Vec<Value>, CbmError> {
-        let r = self.call_tool("trace_path", serde_json::json!({"from": from, "to": to, "project": project}))?;
-        Ok(r["edges"].as_array().cloned().unwrap_or_default())
+    /// Trace call paths in the CBM knowledge graph.
+    ///
+    /// CBM params: `function_name`, `direction` (inbound|outbound|both), `depth`, `project`
+    pub fn trace_path(&mut self, function_name: &str, direction: &str, project: &str, depth: Option<usize>) -> Result<Vec<Value>, CbmError> {
+        let mut args = serde_json::json!({"function_name": function_name, "direction": direction, "project": project});
+        if let Some(d) = depth {
+            args["depth"] = serde_json::Value::Number(serde_json::Number::from(d));
+        }
+        let r = self.call_tool("trace_path", args)?;
+        let inner = self.parse_cbm_response(&r)?;
+        Ok(inner["edges"].as_array().cloned().unwrap_or_default())
     }
 
+    /// Get architecture overview from CBM.
     pub fn get_architecture(&mut self, project: &str) -> Result<Value, CbmError> {
-        self.call_tool("get_architecture", serde_json::json!({"project": project}))
+        let r = self.call_tool("get_architecture", serde_json::json!({"project": project}))?;
+        // get_architecture may or may not wrap in content array — try both
+        if r.get("content").is_some() {
+            self.parse_cbm_response(&r)
+        } else {
+            Ok(r)
+        }
     }
 
-    pub fn query_graph(&mut self, cypher: &str, project: &str) -> Result<Vec<Value>, CbmError> {
+    /// Execute a Cypher-like query against the CBM knowledge graph.
+    ///
+    /// Returns rows as `Vec<Vec<Value>>` where each inner vec is a row of column values.
+    /// CBM wraps results in `{columns, rows}` format.
+    pub fn query_graph(&mut self, cypher: &str, project: &str) -> Result<Vec<Vec<Value>>, CbmError> {
         let r = self.call_tool("query_graph", serde_json::json!({"query": cypher, "project": project}))?;
-        Ok(r["results"].as_array().cloned().unwrap_or_default())
+        let inner = self.parse_cbm_response(&r)?;
+        Ok(inner["rows"].as_array()
+            .map(|rows| {
+                rows.iter().filter_map(|row| {
+                    row.as_array().map(|cols| cols.clone())
+                }).collect()
+            })
+            .unwrap_or_default())
     }
 
-    pub fn get_symbol_importance(&mut self, project: &str) -> Result<Vec<Value>, CbmError> {
-        let r = self.call_tool("get_symbol_importance", serde_json::json!({"project": project}))?;
-        Ok(r["symbols"].as_array().cloned().unwrap_or_default())
+    /// Get symbol importance (caller count) from CBM via Cypher query.
+    ///
+    /// CBM has no dedicated `get_symbol_importance` tool, but `in_degree`
+    /// on function nodes provides the same information.
+    pub fn get_symbol_importance(&mut self, project: &str, min_degree: Option<usize>) -> Result<Vec<Value>, CbmError> {
+        let min = min_degree.unwrap_or(1);
+        let cypher = format!(
+            "MATCH (f:Function) WHERE f.in_degree >= {} RETURN f.name, f.file_path, f.in_degree, f.out_degree ORDER BY f.in_degree DESC",
+            min
+        );
+        let rows = self.query_graph(&cypher, project)?;
+        Ok(rows.into_iter().map(|row| {
+            let name = row.get(0).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let file = row.get(1).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let in_degree = row.get(2).and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+            let out_degree = row.get(3).and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+            serde_json::json!({
+                "name": name,
+                "file": file,
+                "in_degree": in_degree as u64,
+                "out_degree": out_degree as u64,
+                "importance": in_degree / 100.0,  // normalized score for blending
+            })
+        }).collect())
     }
 
+    /// Get dead code candidates from CBM via Cypher query.
+    ///
+    /// CBM has no dedicated `get_dead_code` tool, but functions with
+    /// `in_degree = 0` and `is_entry_point = false` are dead code.
     pub fn get_dead_code(&mut self, project: &str) -> Result<Vec<Value>, CbmError> {
-        let r = self.call_tool("get_dead_code", serde_json::json!({"project": project}))?;
-        Ok(r["dead_code"].as_array().cloned().unwrap_or_default())
+        let cypher = "MATCH (f:Function) WHERE f.in_degree = 0 AND f.is_entry_point = false RETURN f.name, f.file_path".to_string();
+        let rows = self.query_graph(&cypher, project)?;
+        Ok(rows.into_iter().map(|row| {
+            serde_json::json!({
+                "name": row.get(0).and_then(|v| v.as_str()).unwrap_or(""),
+                "file": row.get(1).and_then(|v| v.as_str()).unwrap_or(""),
+                "reason": "no callers",
+            })
+        }).collect())
     }
 }
 
