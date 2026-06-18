@@ -49,7 +49,12 @@ mod tests;
 
 // ── Handler: compress_code_context (upgraded, backward compatible) ──
 
-/// Handle `compress_code_context` — includes `ir` field alongside `pretty`.
+/// Handle `compress_code_context` — IR-first response.
+///
+/// Phase 6 (IR-first architecture): `content[0].text` now contains the
+/// LLM-optimized hierarchical IR text (compact structural markers).
+/// The old text pipeline output moves to `"pretty"`. The structured
+/// hierarchical JSON is in `"ir"`.
 ///
 /// Supports an optional `encoding` parameter:
 ///   - `"named"` (default): standard tuple format with opcode strings
@@ -95,125 +100,152 @@ pub(super) fn handle_compress_code_context(
         resolve_fidelity(explicit, ext, &state.config)
     };
 
-    // Finding F: Pre-read source into source_cache so compile_file_ir
-    // gets a cache hit instead of a redundant disk read.
+    // Pre-read source into source_cache so compile_file_ir gets a cache hit
     let source_arc = state.read_source(file_path_str).ok();
     let source_ref = source_arc.as_ref().map(|s| s.as_str());
-    // Source text for stats recording (empty fallback if read failed)
     let source_text = source_ref.unwrap_or("");
 
-    match compress_file_with_source(
-        PathBuf::from(file_path_str),
-        source_ref,
-        &mut state.dict,
-        &mut state.cache,
-        effective_fidelity,
-    ) {
-        Ok(mut compressed_text) => {
-            compressed_text.push_str(&state.dict.format_footer());
-
-            // Also compile IR and store in context state
-            let ir_result = compile_file_ir(file_path_str, effective_fidelity, state);
+    // Phase 6: Compile IR first — this is now the primary output
+    let ir_result = compile_file_ir(file_path_str, effective_fidelity, state);
 
     // R-19: Resolve tokenizer from tool arg + config
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
-    let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind)
-        .ok();
+    let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
 
-    // Record stats using pluggable tokenizer (R-19)
-    let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
-    let compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
-            let ccc_canonical = resolve_file_path(file_path_str, None);
-            state.session_stats.record_compression(
-                &ccc_canonical,
-                raw_tokens,
-                compressed_tokens,
-                &format!("{:?}", effective_fidelity).to_lowercase(),
-                false,
-                "full",
-                None,
-            );
+    // Phase 6: Build response from IR data
+    let response = if let Ok(ir) = ir_result {
+        // Store the full IR in context state for delta tracking
+        state.ir_context.load_ir(ir.clone());
 
-            // Persistence hook: save baseline context (with or without IR)
-            debug_log(format!("handle_compress: persist_store={}", state.persistence_store.is_some()));
-            if let Some(store) = &mut state.persistence_store {
-                use sha2::Digest;
-                let source_hash = sha2::Sha256::digest(source_text.as_bytes());
-                let hash_hex = format!("{:x}", source_hash);
-                let ir_binary = if let Ok(ref ir) = ir_result {
-                    Some(crate::ir::binary_wire::encode(ir))
-                } else {
-                    None
-                };
-                debug_log(format!("handle_compress: calling save_context for {}", file_path_str));
-                match store.save_context(
-                    file_path_str,
-                    effective_fidelity,
-                    &compressed_text,
-                    ir_binary.as_deref(),
-                    &hash_hex,
-                    raw_tokens as u64,
-                    compressed_tokens as u64,
-                ) {
-                    Ok(ctx_id) => debug_log(format!("handle_compress: save_context OK id={}", ctx_id)),
-                    Err(e) => debug_log(format!("handle_compress: save_context FAILED: {e}")),
-                }
-            } else {
-                debug_log("handle_compress: persist_store is None, skipping");
+        // Convert flat IR → hierarchical via ir_to_hierarchical
+        let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
+
+        // Render hierarchical → compact LLM text via render_hierarchical_for_llm
+        use crate::ir::render_hierarchical_for_llm;
+        let llm_text = render_hierarchical_for_llm(&hir, effective_fidelity);
+
+        // Pathmap footer for LLM text
+        let llm_text_with_footer = format!("{}\n// ── {} ({}) ──\n{}",
+            llm_text.trim(),
+            ir.file_id,
+            file_path_str,
+            state.dict.format_footer().trim(),
+        );
+
+        // Cache the rendered text for delta mode (Fix D)
+        state.llm_text_cache.insert(ir.file_id.clone(), llm_text_with_footer.clone());
+
+        // Record stats
+        let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
+        let compressed_tokens = count_tokens_with_tokenizer(&llm_text_with_footer, tokenizer_ref);
+        let ccc_canonical = resolve_file_path(file_path_str, None);
+        state.session_stats.record_compression(
+            &ccc_canonical,
+            raw_tokens,
+            compressed_tokens,
+            &format!("{:?}", effective_fidelity).to_lowercase(),
+            false,
+            "full",
+            None,
+        );
+
+        // Persistence hook
+        debug_log(format!("handle_compress: persist_store={}", state.persistence_store.is_some()));
+        if let Some(store) = &mut state.persistence_store {
+            let source_hash = sha2::Sha256::digest(source_text.as_bytes());
+            let hash_hex = format!("{:x}", source_hash);
+            let ir_binary = Some(crate::ir::binary_wire::encode(&ir));
+            debug_log(format!("handle_compress: calling save_context for {}", file_path_str));
+            match store.save_context(
+                file_path_str,
+                effective_fidelity,
+                &llm_text_with_footer,
+                ir_binary.as_deref(),
+                &hash_hex,
+                raw_tokens as u64,
+                compressed_tokens as u64,
+            ) {
+                Ok(ctx_id) => debug_log(format!("handle_compress: save_context OK id={}", ctx_id)),
+                Err(e) => debug_log(format!("handle_compress: save_context FAILED: {e}")),
             }
+        } else {
+            debug_log("handle_compress: persist_store is None, skipping");
+        }
 
-            let response = if let Ok(ir) = ir_result {
-                // Store the full IR in context state for delta tracking
-                state.ir_context.load_ir(ir.clone());
+        // F-08: Determine the IR wire format based on the encoding parameter.
+        let ir_value = match encoding {
+            "positional" => {
+                let config = crate::ir::positional::PositionalConfig::stripped();
+                crate::ir::positional::ir_to_positional_wire(
+                    &ir.file_id, ir.version, &ir.instructions, config,
+                )
+            }
+            "tagged" => {
+                let config = crate::ir::positional::PositionalConfig::tagged();
+                crate::ir::positional::ir_to_positional_wire(
+                    &ir.file_id, ir.version, &ir.instructions, config,
+                )
+            }
+            _ => ir_to_wire(&ir),
+        };
 
-                // F-08: Determine the IR wire format based on the encoding parameter.
-                // Positional encoding strips opcode strings for ~30% size reduction.
-                let ir_value = match encoding {
-                    "positional" => {
-                        let config = crate::ir::positional::PositionalConfig::stripped();
-                        crate::ir::positional::ir_to_positional_wire(
-                            &ir.file_id, ir.version, &ir.instructions, config,
-                        )
-                    }
-                    "tagged" => {
-                        let config = crate::ir::positional::PositionalConfig::tagged();
-                        crate::ir::positional::ir_to_positional_wire(
-                            &ir.file_id, ir.version, &ir.instructions, config,
-                        )
-                    }
-                    _ => ir_to_wire(&ir),
-                };
+        // Build hierarchical JSON for the "ir" field
+        let hierarchical_json = crate::ir::hierarchical::ir_to_hierarchical_wire(&ir);
 
+        serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "content": [{ "type": "text", "text": llm_text_with_footer }],
+                "ir": hierarchical_json,
+                "pretty": ir_value,
+                "v": ir.version,
+                "file": ir.file_id
+            }
+        })
+    } else {
+        // IR compilation failed — fall back to text pipeline only
+        match compress_file_with_source(
+            PathBuf::from(file_path_str),
+            source_ref,
+            &mut state.dict,
+            &mut state.cache,
+            effective_fidelity,
+        ) {
+            Ok(mut compressed_text) => {
+                compressed_text.push_str(&state.dict.format_footer());
+                let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
+                let compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
+                let ccc_canonical = resolve_file_path(file_path_str, None);
+                state.session_stats.record_compression(
+                    &ccc_canonical,
+                    raw_tokens,
+                    compressed_tokens,
+                    &format!("{:?}", effective_fidelity).to_lowercase(),
+                    false,
+                    "full",
+                    None,
+                );
                 serde_json::json!({
                     "jsonrpc": "2.0",
                     "id": id,
                     "result": {
-                        "content": [{ "type": "text", "text": compressed_text }],
-                        "ir": ir_value,
-                        "pretty": compressed_text,
-                        "v": ir.version,
-                        "file": ir.file_id
+                        "content": [{ "type": "text", "text": compressed_text }]
                     }
                 })
-            } else {
+            }
+            Err(e) => {
                 serde_json::json!({
                     "jsonrpc": "2.0",
                     "id": id,
-                    "result": { "content": [{ "type": "text", "text": compressed_text }] }
+                    "error": { "code": -32603, "message": e.to_string() }
                 })
-            };
+            }
+        }
+    };
 
-            send_response(&response);
-        }
-        Err(e) => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": { "code": -32603, "message": e.to_string() }
-            }));
-        }
-    }
+    send_response(&response);
 }
 
 // ── Handler: diff_code_context (existing, kept for backward compat) ──

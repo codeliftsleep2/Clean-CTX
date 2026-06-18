@@ -8,6 +8,11 @@
 // existing Core IR output. It only appends meta-instructions that
 // describe Angular-specific class roles (Component, Injectable, etc.)
 // and their metadata (selectors, injects, inputs, outputs).
+//
+// Phase 2: TYPE ops use abbreviated @-prefixed notation instead of
+// verbose NG_COMPONENT_ format. Each TypeAlias alias matches a
+// single-character structural marker (e.g., @cmp, @svc, @mod, @dir,
+// @pipe, @in, @out, @mdl).
 
 use super::MetaLayer;
 use crate::angular_meta;
@@ -76,6 +81,7 @@ impl MetaLayer for AngularMetaLayer {
 }
 
 /// Parse a single Φ marker line and emit corresponding CoreOp instructions.
+/// All TypeAlias aliases use abbreviated @-prefixed notation (e.g., @cmp, @svc).
 fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
     let line = line.trim();
 
@@ -92,14 +98,14 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             let mut ops = Vec::new();
 
             ops.push(CoreOp::TypeAlias(
-                format!("NG_COMPONENT_{}", class_name),
+                "@cmp".to_string(),
                 class_name.to_string(),
             ));
 
             if let Some(sel) = parse_meta_value(metadata, "sel") {
                 ops.push(CoreOp::TypeAlias(
-                    format!("NG_SEL_{}", class_name),
-                    sel.to_string(),
+                    "@sel".to_string(),
+                    format!("{}={}", class_name, sel),
                 ));
             }
 
@@ -117,7 +123,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             // Service: Φsvc:ClassName
             let class_name = rest.trim();
             Some(vec![CoreOp::TypeAlias(
-                format!("NG_SERVICE_{}", class_name),
+                "@svc".to_string(),
                 class_name.to_string(),
             )])
         }
@@ -127,7 +133,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             let mut ops = Vec::new();
 
             ops.push(CoreOp::TypeAlias(
-                format!("NG_MODULE_{}", class_name),
+                "@mod".to_string(),
                 class_name.to_string(),
             ));
 
@@ -138,7 +144,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                         .trim_end_matches(']')
                         .to_string();
                     ops.push(CoreOp::TypeAlias(
-                        format!("NG_MODULE_{}_{}", class_name, kind),
+                        format!("@mod_{}_{}", class_name, kind),
                         items,
                     ));
                 }
@@ -152,14 +158,14 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             let mut ops = Vec::new();
 
             ops.push(CoreOp::TypeAlias(
-                format!("NG_DIRECTIVE_{}", class_name),
+                "@dir".to_string(),
                 class_name.to_string(),
             ));
 
             if let Some(sel) = parse_meta_value(metadata, "sel") {
                 ops.push(CoreOp::TypeAlias(
-                    format!("NG_SEL_{}", class_name),
-                    sel.to_string(),
+                    "@sel".to_string(),
+                    format!("{}={}", class_name, sel),
                 ));
             }
 
@@ -171,14 +177,14 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             let mut ops = Vec::new();
 
             ops.push(CoreOp::TypeAlias(
-                format!("NG_PIPE_{}", class_name),
+                "@pipe".to_string(),
                 class_name.to_string(),
             ));
 
             if let Some(pname) = parse_meta_value(metadata, "name") {
                 ops.push(CoreOp::TypeAlias(
-                    format!("NG_PIPE_NAME_{}", class_name),
-                    pname.to_string(),
+                    "@pipe_name".to_string(),
+                    format!("{}={}", class_name, pname),
                 ));
             }
 
@@ -191,13 +197,15 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                 let class_name = parts[0].trim();
                 let field_name = parts[1].trim();
                 let alias = parts.get(2).map(|s| s.trim()).unwrap_or("");
-                let input_id = format!("NG_INPUT_{}_{}", class_name, field_name);
                 let value = if alias.is_empty() {
                     field_name.to_string()
                 } else {
                     alias.to_string()
                 };
-                Some(vec![CoreOp::TypeAlias(input_id, value)])
+                Some(vec![CoreOp::TypeAlias(
+                    "@in".to_string(),
+                    format!("{}.{}={}", class_name, field_name, value),
+                )])
             } else {
                 None
             }
@@ -209,13 +217,15 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                 let class_name = parts[0].trim();
                 let field_name = parts[1].trim();
                 let alias = parts.get(2).map(|s| s.trim()).unwrap_or("");
-                let output_id = format!("NG_OUTPUT_{}_{}", class_name, field_name);
                 let value = if alias.is_empty() {
                     field_name.to_string()
                 } else {
                     alias.to_string()
                 };
-                Some(vec![CoreOp::TypeAlias(output_id, value)])
+                Some(vec![CoreOp::TypeAlias(
+                    "@out".to_string(),
+                    format!("{}.{}={}", class_name, field_name, value),
+                )])
             } else {
                 None
             }
@@ -240,13 +250,15 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                 let class_name = parts[0].trim();
                 let field_name = parts[1].trim();
                 let alias = parts.get(2).map(|s| s.trim()).unwrap_or("");
-                let model_id = format!("NG_MODEL_{}_{}", class_name, field_name);
                 let value = if alias.is_empty() {
                     field_name.to_string()
                 } else {
                     alias.to_string()
                 };
-                Some(vec![CoreOp::TypeAlias(model_id, value)])
+                Some(vec![CoreOp::TypeAlias(
+                    "@mdl".to_string(),
+                    format!("{}.{}={}", class_name, field_name, value),
+                )])
             } else {
                 None
             }

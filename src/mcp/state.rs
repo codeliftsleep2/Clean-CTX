@@ -91,6 +91,15 @@ pub struct McpState {
 
     /// CBM integration status, mirrored for quick access.
     pub cbm_status: crate::cbm::CbmStatus,
+
+    /// Phase 1 (Fix D): Cache of rendered LLM-optimized hierarchical IR text,
+    /// keyed by path alias (e.g., "α1").
+    ///
+    /// Cached on first render after a compile; invalidated when a delta is
+    /// applied to the file or when `restore_context` is called for the file.
+    /// This avoids re-rendering the full HIR on every delta-mode call,
+    /// saving ~O(n) where n is the file size in HIR nodes.
+    pub llm_text_cache: HashMap<String, String>,
 }
 
 impl McpState {
@@ -153,6 +162,7 @@ impl McpState {
             session_stats,
             context_store: InMemoryContextStore::new(),
             persistence_store,
+            llm_text_cache: HashMap::new(),
             emitted_breakpoints: HashSet::new(),
             cache_metrics: CacheMetrics::default(),
             graph_bridge,

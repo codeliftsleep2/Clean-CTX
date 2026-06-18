@@ -9,6 +9,11 @@
 // describe Spring-specific class roles (@RestController, @Service,
 // @Repository, @Controller, @Configuration, @RequestMapping, etc.)
 // and their metadata.
+//
+// Phase 2: TYPE ops use abbreviated @-prefixed notation instead of
+// verbose SP_REST_ format. Each TypeAlias alias matches a
+// single-character structural marker (e.g., @rest, @svc, @repo,
+// @ctrl, @cfg, @comp, @bean, @wire, @val, @map).
 
 use super::MetaLayer;
 use crate::spring_meta;
@@ -71,6 +76,7 @@ impl MetaLayer for SpringMetaLayer {
 }
 
 /// Parse a single Φ marker line and emit corresponding CoreOp instructions.
+/// All TypeAlias aliases use abbreviated @-prefixed notation (e.g., @rest, @svc).
 fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
     let line = line.trim();
 
@@ -87,7 +93,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             let mut ops = Vec::new();
 
             ops.push(CoreOp::TypeAlias(
-                format!("SP_REST_{}", class_name),
+                "@rest".to_string(),
                 class_name.to_string(),
             ));
 
@@ -101,8 +107,8 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                     .collect();
                 if !mappings.is_empty() {
                     ops.push(CoreOp::TypeAlias(
-                        format!("SP_MAP_{}", class_name),
-                        mappings.join(","),
+                        "@map".to_string(),
+                        format!("{}={}", class_name, mappings.join(",")),
                     ));
                 }
             }
@@ -113,7 +119,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             // @Service: Φsvc:ClassName
             let class_name = rest.trim();
             Some(vec![CoreOp::TypeAlias(
-                format!("SP_SERVICE_{}", class_name),
+                "@svc".to_string(),
                 class_name.to_string(),
             )])
         }
@@ -121,7 +127,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             // @Repository: Φrepo:ClassName
             let class_name = rest.trim();
             Some(vec![CoreOp::TypeAlias(
-                format!("SP_REPO_{}", class_name),
+                "@repo".to_string(),
                 class_name.to_string(),
             )])
         }
@@ -131,7 +137,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             let mut ops = Vec::new();
 
             ops.push(CoreOp::TypeAlias(
-                format!("SP_CTRL_{}", class_name),
+                "@ctrl".to_string(),
                 class_name.to_string(),
             ));
 
@@ -145,8 +151,8 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                     .collect();
                 if !mappings.is_empty() {
                     ops.push(CoreOp::TypeAlias(
-                        format!("SP_MAP_{}", class_name),
-                        mappings.join(","),
+                        "@map".to_string(),
+                        format!("{}={}", class_name, mappings.join(",")),
                     ));
                 }
             }
@@ -157,7 +163,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             // @Configuration: Φcfg:ClassName
             let class_name = rest.trim();
             Some(vec![CoreOp::TypeAlias(
-                format!("SP_CFG_{}", class_name),
+                "@cfg".to_string(),
                 class_name.to_string(),
             )])
         }
@@ -165,7 +171,7 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             // @Component: Φcomp:ClassName
             let class_name = rest.trim();
             Some(vec![CoreOp::TypeAlias(
-                format!("SP_COMP_{}", class_name),
+                "@comp".to_string(),
                 class_name.to_string(),
             )])
         }
@@ -176,8 +182,8 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                 let class_name = parts[0].trim();
                 let method_name = parts[1].trim();
                 Some(vec![CoreOp::TypeAlias(
-                    format!("SP_BEAN_{}_{}", class_name, method_name),
-                    method_name.to_string(),
+                    "@bean".to_string(),
+                    format!("{}.{}", class_name, method_name),
                 )])
             } else {
                 None
@@ -190,8 +196,8 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
                 let class_name = parts[0].trim();
                 let field_name = parts[1].trim();
                 Some(vec![CoreOp::TypeAlias(
-                    format!("SP_AUTOWIRED_{}_{}", class_name, field_name),
-                    field_name.to_string(),
+                    "@wire".to_string(),
+                    format!("{}.{}", class_name, field_name),
                 )])
             } else {
                 None
@@ -203,9 +209,10 @@ fn parse_phi_line(line: &str) -> Option<Vec<CoreOp>> {
             if parts.len() >= 2 {
                 let class_name = parts[0].trim();
                 let field_expr = parts[1].trim();
+                let field_name = field_expr.split('=').next().unwrap_or(field_expr);
                 Some(vec![CoreOp::TypeAlias(
-                    format!("SP_VALUE_{}_{}", class_name, field_expr.split('=').next().unwrap_or(field_expr)),
-                    field_expr.to_string(),
+                    "@val".to_string(),
+                    format!("{}.{}", class_name, field_name),
                 )])
             } else {
                 None
