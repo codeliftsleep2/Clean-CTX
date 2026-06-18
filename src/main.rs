@@ -22,26 +22,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     clean_ctx::mcp::run()
 }
 
-/// Handle `clean-ctx setup --with-cbm` — install helper message.
+/// Handle `clean-ctx setup --with-cbm` — check CBM availability and
+/// optionally generate config.
 fn cmd_setup_cbm() -> Result<(), Box<dyn std::error::Error>> {
-    eprintln!("[clean-ctx] CBM (codebase-memory-mcp) setup");
-    eprintln!();
-    eprintln!("  Clean-CTX integrates with codebase-memory-mcp (CBM) for graph intelligence.");
-    eprintln!("  CBM provides cross-file symbol resolution, call graphs, and dead code detection.");
-    eprintln!();
-    eprintln!("  To install CBM:");
-    eprintln!("    Visit: https://github.com/DeusData/codebase-memory-mcp");
-    eprintln!("    Or install via cargo: cargo install codebase-memory-mcp");
-    eprintln!();
-    eprintln!("  Once installed on PATH, Clean-CTX will automatically detect and use CBM.");
-    eprintln!("  No configuration needed — Clean-CTX handles the integration transparently.");
-    eprintln!();
-    eprintln!("  To verify CBM is detected:");
-    eprintln!("    Use the `get_cbm_status` MCP tool after starting the server.");
-    eprintln!();
-    eprintln!("  To disable CBM integration:");
-    eprintln!("    Set CBM_DISABLE=1 environment variable, or set cbm.enabled=false in .clean-ctx.json");
-    eprintln!();
+    let info = clean_ctx::cbm::setup::cbm_setup_check();
+    let output = clean_ctx::cbm::setup::format_setup_output(&info);
+    eprint!("{}", output);
+
+    // If CBM is found and ready, offer to write binary_path into .clean-ctx.json
+    if info.is_ready {
+        let config_path = std::path::Path::new(".clean-ctx.json");
+        if config_path.exists() {
+            // Read existing config and merge cbm block
+            match std::fs::read_to_string(config_path) {
+                Ok(content) => {
+                    if let Ok(mut config_val) = serde_json::from_str::<serde_json::Value>(&content) {
+                        let cbm_block = clean_ctx::cbm::setup::generate_cbm_config_block(&info);
+                        config_val["cbm"] = cbm_block;
+                        if let Ok(pretty) = serde_json::to_string_pretty(&config_val) {
+                            std::fs::write(config_path, &pretty)?;
+                            eprintln!("[clean-ctx] Updated .clean-ctx.json with CBM configuration.");
+                        }
+                    }
+                }
+                Err(_) => {
+                    eprintln!("[clean-ctx] Could not read .clean-ctx.json to update. Update manually.");
+                }
+            }
+        } else {
+            eprintln!("[clean-ctx] No .clean-ctx.json found. Run `clean-ctx init` first, then rerun setup.");
+        }
+    }
 
     Ok(())
 }

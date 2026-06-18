@@ -20,7 +20,10 @@ use crate::cache::LocalStateCache;
 use crate::compaction::{
     compact_expression, compact_import, extract_class_name, extract_field,
     extract_method_sig, extract_rust_struct_name, format_class_entry,
-    format_rust_type_entry, simple_compact,
+    format_java_type_entry, format_rust_type_entry, simple_compact,
+};
+use crate::compaction::java::{
+    compact_java_package, extract_java_constructor_sig, extract_java_type_name,
 };
 use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::language::language_for_extension;
@@ -32,6 +35,7 @@ use crate::compression::CapEntry;
 use crate::compression::Fidelity;
 use crate::dictionary::PathDictionary;
 use crate::angular_meta::run_meta_layer;
+use crate::spring_meta::run_meta_layer as run_spring_meta_layer;
 
 /// Output of [`build_output_lines`]. F-04 (FAANG audit): previously
 /// the orchestrator counted classes/methods/imports by
@@ -52,6 +56,8 @@ pub struct BuildOutputResult {
     pub import_count: usize,
     /// Angular Meta-Layer block (Phase 1: Tier 1 decorator extraction).
     pub meta_block: Option<crate::angular_meta::MetaBlock>,
+    /// Spring Boot Meta-Layer block (Phase 1: Tier 1 annotation extraction).
+    pub spring_meta_block: Option<crate::spring_meta::MetaBlock>,
 }
 
 /// Reads a target source file and compiles it down into a highly compacted,
@@ -202,13 +208,20 @@ pub fn compress_file_with_source(
             match capture_name {
                 "class.root" => Some(extract_class_name(raw)),
                 // Rust type declarations: struct, enum, trait, impl
-                "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+                "struct.root" | "trait.root" | "impl.root" => {
                     Some(extract_rust_struct_name(raw))
                 }
+                // Java type declarations: interface, enum, record
+                "interface.root" | "record.root" => {
+                    Some(extract_java_type_name(raw, capture_name))
+                }
                 "method.root" => Some(extract_method_sig(raw, f)),
+                "constructor.root" => Some(extract_java_constructor_sig(raw, f)),
                 "field.root" => Some(extract_field(raw, f)),
                 // Rust mod declarations are structural like imports
                 "mod.root" => Some(compact_import(raw, f)),
+                // Java package declarations
+                "package.root" => Some(compact_java_package(raw, f)),
                 // Rust type aliases
                 "type.root" => Some(compact_expression(raw, f)),
                 _ => Some(compact_expression(raw, f)),
@@ -222,6 +235,11 @@ pub fn compress_file_with_source(
     // Angular Meta-Layer (Phase 1): inject the Φ block into the body
     // BEFORE symbol compression so the `Φ` markers stay untouched.
     if let Some(block) = &built.meta_block {
+        body_content.push_str(&block.render());
+    }
+    // Spring Boot Meta-Layer (Phase 1): inject the Φ block into the body
+    // BEFORE symbol compression so the `Φ` markers stay untouched.
+    if let Some(block) = &built.spring_meta_block {
         body_content.push_str(&block.render());
     }
     // Phase III (Idea #11 — Micro-Opcode Table for Text):
@@ -274,13 +292,20 @@ pub fn compress_text(
             match capture_name {
                 "class.root" => Some(extract_class_name(raw)),
                 // Rust type declarations: struct, enum, trait, impl
-                "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+                "struct.root" | "trait.root" | "impl.root" => {
                     Some(extract_rust_struct_name(raw))
                 }
+                // Java type declarations: interface, enum, record
+                "interface.root" | "record.root" => {
+                    Some(extract_java_type_name(raw, capture_name))
+                }
                 "method.root" => Some(extract_method_sig(raw, f)),
+                "constructor.root" => Some(extract_java_constructor_sig(raw, f)),
                 "field.root" => Some(extract_field(raw, f)),
                 // Rust mod declarations are structural like imports
                 "mod.root" => Some(compact_import(raw, f)),
+                // Java package declarations
+                "package.root" => Some(compact_java_package(raw, f)),
                 // Rust type aliases
                 "type.root" => Some(compact_expression(raw, f)),
                 _ => Some(compact_expression(raw, f)),
@@ -291,6 +316,9 @@ pub fn compress_text(
     let built = build_output_lines(&all_captures, source_code, fidelity);
     let mut body_content = assemble_body(&built.output_lines, fidelity);
     if let Some(block) = &built.meta_block {
+        body_content.push_str(&block.render());
+    }
+    if let Some(block) = &built.spring_meta_block {
         body_content.push_str(&block.render());
     }
     body_content = apply_micro_opcodes(&body_content, fidelity);
@@ -339,7 +367,7 @@ pub fn build_output_lines(
 
     for cap in all_captures {
         match cap.name.as_str() {
-            "import.root" | "mod.root" => {
+            "import.root" | "mod.root" | "package.root" => {
                 let compact = compact_import(&cap.text, fidelity);
                 if !compact.is_empty() {
                     imports.push(compact);
@@ -358,7 +386,7 @@ pub fn build_output_lines(
             }
             // Rust type declarations: struct, enum, trait, impl
             // Use Rust-specific formatting (no "class" prefix)
-            "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+            "struct.root" | "trait.root" | "impl.root" => {
                 if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium) {
                     output_lines.push(String::new());
                 }
@@ -368,7 +396,19 @@ pub fn build_output_lines(
                 fields.clear();
                 markers.clear();
             }
-            "method.root" => {
+            // Java type declarations: interface, enum, record
+            // Use Java-specific formatting (preserves type keyword)
+            "interface.root" | "enum.root" | "record.root" => {
+                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium) {
+                    output_lines.push(String::new());
+                }
+                output_lines.push(format_java_type_entry(&cap.text, &cap.name, &fields, fidelity));
+                class_captures.push(cap.text.clone());
+                class_count += 1;
+                fields.clear();
+                markers.clear();
+            }
+            "method.root" | "constructor.root" => {
                 let sig = &cap.text;
                 if !markers.is_empty() {
                     let marker_str = markers.join(" ");
@@ -434,12 +474,18 @@ pub fn build_output_lines(
         &class_captures,
         fidelity,
     );
+    let spring_meta_block = run_spring_meta_layer(
+        source_code,
+        &class_captures,
+        fidelity,
+    );
     BuildOutputResult {
         output_lines: output,
         class_count,
         method_count,
         import_count,
         meta_block,
+        spring_meta_block,
     }
 }
 
@@ -539,18 +585,25 @@ pub fn compress_source(
         fidelity,
         |capture_name, raw, f| {
             match capture_name {
-                "class.root" => Some(crate::compaction::extract_class_name(raw)),
+                "class.root" => Some(extract_class_name(raw)),
                 // Rust type declarations: struct, enum, trait, impl
-                "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
-                    Some(crate::compaction::extract_rust_struct_name(raw))
+                "struct.root" | "trait.root" | "impl.root" => {
+                    Some(extract_rust_struct_name(raw))
                 }
-                "method.root" => Some(crate::compaction::extract_method_sig(raw, f)),
-                "field.root" => Some(crate::compaction::extract_field(raw, f)),
+                // Java type declarations: interface, enum, record
+                "interface.root" | "record.root" => {
+                    Some(extract_java_type_name(raw, capture_name))
+                }
+                "method.root" => Some(extract_method_sig(raw, f)),
+                "constructor.root" => Some(extract_java_constructor_sig(raw, f)),
+                "field.root" => Some(extract_field(raw, f)),
                 // Rust mod declarations are structural like imports
-                "mod.root" => Some(crate::compaction::compact_import(raw, f)),
+                "mod.root" => Some(compact_import(raw, f)),
+                // Java package declarations
+                "package.root" => Some(compact_java_package(raw, f)),
                 // Rust type aliases
-                "type.root" => Some(crate::compaction::compact_expression(raw, f)),
-                _ => Some(crate::compaction::compact_expression(raw, f)),
+                "type.root" => Some(compact_expression(raw, f)),
+                _ => Some(compact_expression(raw, f)),
             }
         },
     )?;
