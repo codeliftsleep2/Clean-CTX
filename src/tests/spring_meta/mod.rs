@@ -9,6 +9,8 @@ mod markers_tests;
 #[cfg(test)]
 mod annotations_tests;
 #[cfg(test)]
+mod e2e;
+#[cfg(test)]
 mod bundler_tests;
 #[cfg(test)]
 mod properties_tests;

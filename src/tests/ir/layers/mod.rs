@@ -3,6 +3,8 @@
 // Tests for the Layered Encoding module (Phase F).
 // Verifies LanguageLayer, MetaLayer, and PatternRecognizer traits.
 
+mod java;
+
 use crate::compression::Fidelity;
 use crate::ir::layers::LayerContext;
 use crate::ir::layers::LanguageLayer;

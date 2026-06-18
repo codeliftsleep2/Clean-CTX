@@ -166,7 +166,15 @@ impl GraphBridge {
         let key = "symbol_importance".to_string();
         let project = self.project_str();
         if self.check_cache(&key) {
-            return serde_json::from_value(self.cache.get(&key).unwrap().value().data.clone()).unwrap_or_default();
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .unwrap_or_default();
         }
         let result = self.query(move |c| c.get_symbol_importance(&project));
         match result {
@@ -193,7 +201,15 @@ impl GraphBridge {
         let project = self.project_str();
         let sym = symbol.to_string();
         if self.check_cache(&key) {
-            return serde_json::from_value(self.cache.get(&key).unwrap().value().data.clone()).unwrap_or_default();
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .unwrap_or_default();
         }
         let result = self.query(move |c| c.search_graph(&format!("depends_on:{sym}"), &project));
         match result {
@@ -210,7 +226,15 @@ impl GraphBridge {
         let key = "dead_code".to_string();
         let project = self.project_str();
         if self.check_cache(&key) {
-            return serde_json::from_value(self.cache.get(&key).unwrap().value().data.clone()).unwrap_or_default();
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .unwrap_or_default();
         }
         let result = self.query(move |c| c.get_dead_code(&project));
         match result {
@@ -233,7 +257,15 @@ impl GraphBridge {
         let key = "architecture".to_string();
         let project = self.project_str();
         if self.check_cache(&key) {
-            return serde_json::from_value(self.cache.get(&key).unwrap().value().data.clone()).ok();
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .ok();
         }
         let result = self.query(move |c| c.get_architecture(&project));
         match result {
@@ -265,7 +297,15 @@ impl GraphBridge {
         let project = self.project_str();
         let q = cypher.to_string();
         if self.check_cache(&key) {
-            return serde_json::from_value(self.cache.get(&key).unwrap().value().data.clone()).unwrap_or(QueryResult { nodes: vec![], edges: vec![] });
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .unwrap_or(QueryResult { nodes: vec![], edges: vec![] });
         }
         let result = self.query(move |c| c.query_graph(&q, &project));
         match result {
@@ -303,7 +343,15 @@ impl GraphBridge {
         let project = self.project_str();
         let q = query.to_string();
         if self.check_cache(&key) {
-            return serde_json::from_value(self.cache.get(&key).unwrap().value().data.clone()).unwrap_or_default();
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .unwrap_or_default();
         }
         let result = self.query(move |c| c.search_graph(&q, &project));
         match result {
@@ -332,7 +380,15 @@ impl GraphBridge {
         let project = self.project_str();
         let f = from.to_string(); let t = to.to_string();
         if self.check_cache(&key) {
-            return serde_json::from_value(self.cache.get(&key).unwrap().value().data.clone()).unwrap_or_default();
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .unwrap_or_default();
         }
         let result = self.query(move |c| c.trace_path(&f, &t, &project));
         match result {
@@ -353,7 +409,28 @@ impl GraphBridge {
     }
 
     pub fn invalidate_symbol(&mut self, symbol: &str) { self.cache.retain(|k, _| !k.contains(symbol)); }
+    pub fn invalidate_cache(&mut self) { self.cache.clear(); }
     pub fn clear_cache(&mut self) { self.cache.clear(); }
+
+    /// Detect whether the CBM graph has changed since the last call.
+    /// Returns the new graph version if changed, or `None` if CBM is unavailable.
+    ///
+    /// Cache invalidation is the caller's responsibility — when a new version
+    /// is detected, the cache should be invalidated and the version updated.
+    pub fn detect_changes(&mut self) -> Result<Option<String>, CbmError> {
+        if self.client.is_none() {
+            return Ok(None);
+        }
+        let project = self.project_str();
+        let result = self.query(|c| {
+            let r = c.call_tool("detect_changes", serde_json::json!({"project": project}))?;
+            Ok(r["graph_version"].as_str().map(|s| s.to_string()))
+        });
+        match result {
+            Ok(version) => Ok(version),
+            Err(_) => Ok(None),
+        }
+    }
 
     /// **Pipe-level proxy call:** Forwards a CBM tool request, catches
     /// the **raw response text** from CBM's stdout pipe, and returns it.

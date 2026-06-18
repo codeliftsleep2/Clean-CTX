@@ -734,6 +734,18 @@ pub(super) fn handle_provide_code_context(
     // so delta baselines stored under the alias key can be found)
     let path_alias = state.dict.get_or_create_alias(resolved_path.clone());
 
+    // Cache invalidation: check if CBM graph has changed since last call.
+    // If the graph version changed, invalidate the CBM bridge cache
+    // to prevent serving stale symbol importance / blast radius data.
+    if let Some(ref mut bridge) = state.graph_bridge {
+        if let Ok(Some(new_version)) = bridge.detect_changes() {
+            if new_version != bridge.graph_version() {
+                bridge.invalidate_cache();
+                bridge.set_graph_version(&new_version);
+            }
+        }
+    }
+
     // Run heuristics engine
     // C-1: pass persisted fidelity from DB for session-aware re-use
     let stored_fidelity = state.context_store.load_latest(&resolved_path)
