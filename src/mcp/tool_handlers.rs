@@ -755,102 +755,151 @@ pub(super) fn handle_provide_code_context(
     // Execute based on strategy
     match decision.strategy {
         crate::mcp::heuristics::ContextStrategy::FullCompress => {
-            // Full compression via existing pipeline
-            match compress_file(
-                PathBuf::from(&resolved_path),
-                &mut state.dict,
-                &mut state.cache,
-                decision.fidelity,
-            ) {
-                Ok(mut compressed_text) => {
-                    compressed_text.push_str(&state.dict.format_footer());
+            // Phase 6: Compile IR first — primary output
+            let ir_result = compile_file_ir(&resolved_path, decision.fidelity, state);
 
-                    // Store text delta baseline
-                    let body_lines: Vec<String> = compressed_text.lines().map(String::from).collect();
-                    state.text_delta.compute_and_store(&path_alias, body_lines);
+            // HIGH-1 fix: Use pluggable tokenizer for accurate token counts.
+            let tok_kind_pcc = parse_tokenizer_arg(params, &state.config);
+            let tok_box_pcc = crate::tokenizer::create_tokenizer(tok_kind_pcc).ok();
+            let tok_ref_pcc: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_pcc.as_deref();
 
-                    // HIGH-1 fix: Use pluggable tokenizer for accurate token counts.
-                    // Parse tokenizer EARLY so persistence uses it instead of
-                    // the old estimate_tokens heuristic.
-                    let tok_kind_pcc = parse_tokenizer_arg(params, &state.config);
-                    let tok_box_pcc = crate::tokenizer::create_tokenizer(tok_kind_pcc).ok();
-                    let tok_ref_pcc: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_pcc.as_deref();
-                    let raw_tokens = count_tokens_with_tokenizer(&source, tok_ref_pcc);
-                    let compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tok_ref_pcc);
+            let response = if let Ok(ir) = ir_result {
+                state.ir_context.load_ir(ir.clone());
 
-                    // Compile IR and store baseline
-                    let ir_result = compile_file_ir(&resolved_path, decision.fidelity, state);
-                    if let Ok(ir) = ir_result {
-                        state.ir_context.load_ir(ir.clone());
+                // Convert flat IR → hierarchical → LLM text
+                let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
+                let llm_text = crate::ir::render_hierarchical_for_llm(&hir, decision.fidelity);
+                let llm_text_with_footer = format!("{}\n// ── {} ({}) ──\n{}",
+                    llm_text.trim(),
+                    ir.file_id,
+                    resolved_path,
+                    state.dict.format_footer().trim(),
+                );
 
-                        // Persistence hook: save baseline context + IR binary.
-                        // Uses pluggable tokenizer counts instead of estimate_tokens.
-                        if let Some(store) = &mut state.persistence_store {
-                            let source_hash = sha2::Sha256::digest(source.as_bytes());
-                            let hash_hex = format!("{:x}", source_hash);
-                            let ir_binary = crate::ir::binary_wire::encode(&ir);
+                // Cache for delta mode
+                state.llm_text_cache.insert(ir.file_id.clone(), llm_text_with_footer.clone());
 
-                            if let Err(e) = store.save_context(
-                                &resolved_path,
-                                decision.fidelity,
-                                &compressed_text,
-                                Some(&ir_binary),
-                                &hash_hex,
-                                raw_tokens as u64,
-                                compressed_tokens as u64,
-                            ) {
-                                eprintln!("[clean-ctx] WARNING: Failed to persist context: {e}");
-                            }
-                        }
-                    }
+                // Store text delta baseline (for backward compat)
+                let body_lines: Vec<String> = llm_text_with_footer.lines().map(String::from).collect();
+                state.text_delta.compute_and_store(&path_alias, body_lines);
 
-                    state.session_stats.record_compression(
+                // Record stats
+                let raw_tokens = count_tokens_with_tokenizer(&source, tok_ref_pcc);
+                let compressed_tokens = count_tokens_with_tokenizer(&llm_text_with_footer, tok_ref_pcc);
+
+                // Persistence hook
+                if let Some(store) = &mut state.persistence_store {
+                    let source_hash = sha2::Sha256::digest(source.as_bytes());
+                    let hash_hex = format!("{:x}", source_hash);
+                    let ir_binary = crate::ir::binary_wire::encode(&ir);
+
+                    if let Err(e) = store.save_context(
                         &resolved_path,
-                        raw_tokens,
-                        compressed_tokens,
-                        &format!("{:?}", decision.fidelity).to_lowercase(),
-                        decision.is_angular,
-                        "full",
-                        None,
-                    );
-
-                    let mut response = serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "result": {
-                            "content": [{ "type": "text", "text": compressed_text }],
-                            "_meta": {
-                                "fidelity": format!("{:?}", decision.fidelity).to_lowercase(),
-                                "strategy": "full_compress",
-                                "angular_detected": decision.is_angular,
-                                "line_count": decision.source_line_count,
-                                "version": state.text_delta.file_version(&path_alias),
-                                "decision_summary": decision.summary(),
-                            }
-                        }
-                    });
-
-                    // Inject CBM enrichment metadata when available
-                    enrich_with_cbm(&mut response, &resolved_path, state);
-
-                    // Inject baseline cache breakpoint for stable content
-                    let cache_enabled = state.config.cache.enabled;
-                    if cache_enabled {
-                        let ttl = state.config.cache.baseline_ttl.clone();
-                        let breaker = compute_baseline_breaker(&compressed_text);
-                        inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref_pcc);
+                        decision.fidelity,
+                        &llm_text_with_footer,
+                        Some(&ir_binary),
+                        &hash_hex,
+                        raw_tokens as u64,
+                        compressed_tokens as u64,
+                    ) {
+                        eprintln!("[clean-ctx] WARNING: Failed to persist context: {e}");
                     }
+                }
 
-                    send_response(&response);
+                state.session_stats.record_compression(
+                    &resolved_path,
+                    raw_tokens,
+                    compressed_tokens,
+                    &format!("{:?}", decision.fidelity).to_lowercase(),
+                    decision.is_angular,
+                    "full",
+                    None,
+                );
+
+                // Build hierarchical JSON for "ir" field
+                let hierarchical_json = crate::ir::hierarchical::ir_to_hierarchical_wire(&ir);
+
+                let mut response = serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": {
+                        "content": [{ "type": "text", "text": llm_text_with_footer }],
+                        "ir": hierarchical_json,
+                        "pretty": llm_text_with_footer,
+                        "v": ir.version,
+                        "file": ir.file_id,
+                        "_meta": {
+                            "fidelity": format!("{:?}", decision.fidelity).to_lowercase(),
+                            "strategy": "full_compress",
+                            "angular_detected": decision.is_angular,
+                            "line_count": decision.source_line_count,
+                            "version": state.text_delta.file_version(&path_alias),
+                            "decision_summary": decision.summary(),
+                        }
+                    }
+                });
+
+                // Inject CBM enrichment metadata when available
+                enrich_with_cbm(&mut response, &resolved_path, state);
+
+                // Inject baseline cache breakpoint for stable content
+                let cache_enabled = state.config.cache.enabled;
+                if cache_enabled {
+                    let ttl = state.config.cache.baseline_ttl.clone();
+                    let breaker = compute_baseline_breaker(&llm_text_with_footer);
+                    inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref_pcc);
                 }
-                Err(e) => {
-                    send_response(&serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "error": { "code": -32603, "message": e.to_string() }
-                    }));
+
+                response
+            } else {
+                // IR compilation failed — fall back to text pipeline
+                match compress_file(
+                    PathBuf::from(&resolved_path),
+                    &mut state.dict,
+                    &mut state.cache,
+                    decision.fidelity,
+                ) {
+                    Ok(mut compressed_text) => {
+                        compressed_text.push_str(&state.dict.format_footer());
+                        let body_lines: Vec<String> = compressed_text.lines().map(String::from).collect();
+                        state.text_delta.compute_and_store(&path_alias, body_lines);
+                        let raw_tokens = count_tokens_with_tokenizer(&source, tok_ref_pcc);
+                        let compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tok_ref_pcc);
+                        state.session_stats.record_compression(
+                            &resolved_path,
+                            raw_tokens,
+                            compressed_tokens,
+                            &format!("{:?}", decision.fidelity).to_lowercase(),
+                            decision.is_angular,
+                            "full",
+                            None,
+                        );
+                        serde_json::json!({
+                            "jsonrpc": "2.0",
+                            "id": id,
+                            "result": {
+                                "content": [{ "type": "text", "text": compressed_text }],
+                                "_meta": {
+                                    "fidelity": format!("{:?}", decision.fidelity).to_lowercase(),
+                                    "strategy": "full_compress_fallback",
+                                    "angular_detected": decision.is_angular,
+                                    "line_count": decision.source_line_count,
+                                    "decision_summary": decision.summary(),
+                                }
+                            }
+                        })
+                    }
+                    Err(e) => {
+                        serde_json::json!({
+                            "jsonrpc": "2.0",
+                            "id": id,
+                            "error": { "code": -32603, "message": e.to_string() }
+                        })
+                    }
                 }
-            }
+            };
+
+            send_response(&response);
         }
         crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
             // Delta transport: delegate to delta_text_context logic
@@ -1031,75 +1080,125 @@ pub(super) fn handle_restore_context(
         store.clear_file(&resolved_path);
     }
 
-    // Full re-compression
-    match compress_file(
-        PathBuf::from(&resolved_path),
-        &mut state.dict,
-        &mut state.cache,
-        fidelity,
-    ) {
-        Ok(mut compressed_text) => {
-            compressed_text.push_str(&state.dict.format_footer());
+    // Phase 6: Re-compile IR first — primary output
+    let ir_result = compile_file_ir(&resolved_path, fidelity, state);
 
-            // Re-store baseline
-            let body_lines: Vec<String> = compressed_text.lines().map(String::from).collect();
-            state.text_delta.compute_and_store(&path_alias, body_lines);
+    // HIGH-1 fix: Use pluggable tokenizer for accurate token counts
+    let tok_kind_rc = parse_tokenizer_arg(params, &state.config);
+    let tok_box_rc = crate::tokenizer::create_tokenizer(tok_kind_rc).ok();
+    let tok_ref_rc: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_rc.as_deref();
 
-            // Re-compile IR (uses resolved_path for consistency — Finding 3)
-            if let Ok(ir) = compile_file_ir(&resolved_path, fidelity, state) {
-                state.ir_context.load_ir(ir);
-            }
+    let response = if let Ok(ir) = ir_result {
+        state.ir_context.load_ir(ir.clone());
 
-            // Record stats (was previously missing — Phase 1 fix)
-            let rc_source = state.read_source(&resolved_path).ok();
-            let rc_source_text = rc_source.as_ref().map(|s| s.as_str()).unwrap_or("");
-            // HIGH-1 fix: Use pluggable tokenizer for accurate token counts
-            let tok_kind_rc = parse_tokenizer_arg(params, &state.config);
-            let tok_box_rc = crate::tokenizer::create_tokenizer(tok_kind_rc).ok();
-            let tok_ref_rc: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_rc.as_deref();
-            let rc_raw_tokens = count_tokens_with_tokenizer(rc_source_text, tok_ref_rc);
-            let rc_compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tok_ref_rc);
-            state.session_stats.record_compression(
-                &resolved_path,
-                rc_raw_tokens,
-                rc_compressed_tokens,
-                &format!("{:?}", fidelity).to_lowercase(),
-                false,
-                "restore",
-                None,
-            );
+        // Convert flat IR → hierarchical → LLM text
+        let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
+        let llm_text = crate::ir::render_hierarchical_for_llm(&hir, fidelity);
+        let llm_text_with_footer = format!("{}\n// ── {} ({}) ──\n{}",
+            llm_text.trim(),
+            ir.file_id,
+            resolved_path,
+            state.dict.format_footer().trim(),
+        );
 
-            let mut response = serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": {
-                    "content": [{ "type": "text", "text": compressed_text }],
-                    "_meta": {
-                        "fidelity": format!("{:?}", fidelity).to_lowercase(),
-                        "strategy": "restore",
-                        "baselines_cleared": true,
-                    }
+        // Store text delta baseline and cache
+        let body_lines: Vec<String> = llm_text_with_footer.lines().map(String::from).collect();
+        state.text_delta.compute_and_store(&path_alias, body_lines);
+        state.llm_text_cache.insert(ir.file_id.clone(), llm_text_with_footer.clone());
+
+        // Record stats
+        let rc_source = state.read_source(&resolved_path).ok();
+        let rc_source_text = rc_source.as_ref().map(|s| s.as_str()).unwrap_or("");
+        let rc_raw_tokens = count_tokens_with_tokenizer(rc_source_text, tok_ref_rc);
+        let rc_compressed_tokens = count_tokens_with_tokenizer(&llm_text_with_footer, tok_ref_rc);
+        state.session_stats.record_compression(
+            &resolved_path,
+            rc_raw_tokens,
+            rc_compressed_tokens,
+            &format!("{:?}", fidelity).to_lowercase(),
+            false,
+            "restore",
+            None,
+        );
+
+        // Build hierarchical JSON for "ir" field
+        let hierarchical_json = crate::ir::hierarchical::ir_to_hierarchical_wire(&ir);
+
+        let mut response = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "content": [{ "type": "text", "text": llm_text_with_footer }],
+                "ir": hierarchical_json,
+                "pretty": llm_text_with_footer,
+                "v": ir.version,
+                "file": ir.file_id,
+                "_meta": {
+                    "fidelity": format!("{:?}", fidelity).to_lowercase(),
+                    "strategy": "restore",
+                    "baselines_cleared": true,
                 }
-            });
-
-            // restore_context returns stable persisted state — emit baseline cache hint
-            let cache_enabled = state.config.cache.enabled;
-            if cache_enabled {
-                let ttl = state.config.cache.baseline_ttl.clone();
-                let breaker = compute_baseline_breaker(&compressed_text);
-                inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref_rc);
             }
+        });
 
-            send_response(&response);
+        // restore_context returns stable persisted state — emit baseline cache hint
+        let cache_enabled = state.config.cache.enabled;
+        if cache_enabled {
+            let ttl = state.config.cache.baseline_ttl.clone();
+            let breaker = compute_baseline_breaker(&llm_text_with_footer);
+            inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref_rc);
         }
-        Err(e) => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": { "code": -32603, "message": e.to_string() }
-            }));
+
+        response
+    } else {
+        // IR failed — fall back to text pipeline
+        match compress_file(
+            PathBuf::from(&resolved_path),
+            &mut state.dict,
+            &mut state.cache,
+            fidelity,
+        ) {
+            Ok(mut compressed_text) => {
+                compressed_text.push_str(&state.dict.format_footer());
+                let body_lines: Vec<String> = compressed_text.lines().map(String::from).collect();
+                state.text_delta.compute_and_store(&path_alias, body_lines);
+                let rc_source = state.read_source(&resolved_path).ok();
+                let rc_source_text = rc_source.as_ref().map(|s| s.as_str()).unwrap_or("");
+                let rc_raw_tokens = count_tokens_with_tokenizer(rc_source_text, tok_ref_rc);
+                let rc_compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tok_ref_rc);
+                state.session_stats.record_compression(
+                    &resolved_path,
+                    rc_raw_tokens,
+                    rc_compressed_tokens,
+                    &format!("{:?}", fidelity).to_lowercase(),
+                    false,
+                    "restore",
+                    None,
+                );
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": {
+                        "content": [{ "type": "text", "text": compressed_text }],
+                        "_meta": {
+                            "fidelity": format!("{:?}", fidelity).to_lowercase(),
+                            "strategy": "restore_fallback",
+                            "baselines_cleared": true,
+                        }
+                    }
+                })
+            }
+            Err(e) => {
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": { "code": -32603, "message": e.to_string() }
+                })
+            }
         }
-    }
+    };
+
+    send_response(&response);
 }
 
 /// Handle `context_history` — shows version/delta history for tracked files.
