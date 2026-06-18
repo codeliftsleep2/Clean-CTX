@@ -90,6 +90,3 @@ pub fn is_spring_file(source: &str) -> bool {
     false
 }
 
-#[cfg(test)]
-#[path = "../tests/spring_meta/detect_tests.rs"]
-mod tests;

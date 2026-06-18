@@ -62,7 +62,7 @@ fn expired_cache_entry_is_evicted() {
     use crate::cbm::config::CbmConfig;
     use std::path::Path;
     use crate::cbm::bridge::CachedGraphData;
-    use dashmap::mapref::entry::Entry;
+    
 
     let config = CbmConfig { enabled: false, ..Default::default() };
     let mut bridge = GraphBridge::try_create(&config, Path::new("."));
@@ -192,8 +192,7 @@ fn min_compression_non_json_strips_whitespace() {
 fn bridge_disabled_is_unavailable() {
     use crate::cbm::GraphBridge;
     use crate::cbm::config::CbmConfig;
-    let mut config = CbmConfig::default();
-    config.enabled = false;
+    let config = CbmConfig { enabled: false, ..Default::default() };
     let bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
     assert!(!bridge.is_available());
 }

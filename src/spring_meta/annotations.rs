@@ -123,8 +123,8 @@ pub fn extract_annotations(raw_class: &str, fidelity: Fidelity) -> Option<Annota
     }
 
     // Method-level markers: scan the class body for @Bean, @GetMapping, etc.
-    if fidelity != Fidelity::Low {
-        if let Some(class_body_start) = find_class_body_open(raw_class)
+    if fidelity != Fidelity::Low
+        && let Some(class_body_start) = find_class_body_open(raw_class)
             && let Some(body_end) = find_matching_brace(&raw_class[class_body_start..], 0)
         {
             let body = &raw_class[class_body_start..];
@@ -152,7 +152,6 @@ pub fn extract_annotations(raw_class: &str, fidelity: Fidelity) -> Option<Annota
                 }
             }
         }
-    }
     
     // Emit class-level lines now that all request_mappings are collected
     if let Some(kind) = class_kind {
@@ -179,8 +178,8 @@ pub fn extract_annotations(raw_class: &str, fidelity: Fidelity) -> Option<Annota
     }
 
     // Field-level markers: scan the class body for @Autowired and @Value
-    if fidelity == Fidelity::High {
-        if let Some(class_body_start) = find_class_body_open(raw_class)
+    if fidelity == Fidelity::High
+        && let Some(class_body_start) = find_class_body_open(raw_class)
             && let Some(body_end) = find_matching_brace(&raw_class[class_body_start..], 0)
         {
             let body = &raw_class[class_body_start..];
@@ -197,7 +196,6 @@ pub fn extract_annotations(raw_class: &str, fidelity: Fidelity) -> Option<Annota
                 }
             }
         }
-    }
 
     // Emit field-level @Autowired markers
     for field in &autowired_fields {
@@ -296,6 +294,7 @@ fn collect_annotations(head: &str) -> Vec<Annotation> {
 
 #[derive(Debug, Clone)]
 struct Annotation {
+    #[allow(dead_code)]
     name: String,
     arg: String,
     kind: AnnotationKind,
@@ -808,6 +807,3 @@ fn unquote(s: &str) -> &str {
     s
 }
 
-#[cfg(test)]
-#[path = "../tests/spring_meta/annotations_tests.rs"]
-mod tests;

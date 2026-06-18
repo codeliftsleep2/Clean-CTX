@@ -59,9 +59,11 @@ fn default_log_dir() -> String { ".clean-ctx/cbm-logs".to_string() }
 
 /// Status of the CBM integration, surfaced via `get_cbm_status` and `context_stats`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default)]
 pub enum CbmStatus {
     Available,
     Degraded(String),
+    #[default]
     Unavailable,
 }
 
@@ -79,8 +81,3 @@ impl CbmStatus {
     }
 }
 
-impl Default for CbmStatus {
-    fn default() -> Self {
-        Self::Unavailable
-    }
-}

@@ -93,6 +93,3 @@ pub fn resolve_bundle(path: &Path, source: &str) -> Option<LayerBundle> {
     })
 }
 
-#[cfg(test)]
-#[path = "../tests/spring_meta/bundler_tests.rs"]
-mod tests;

@@ -43,7 +43,7 @@ pub struct CompressedCbmResponse {
 ///   5. Return compressed text with metadata
 pub fn compress_cbm_response(raw_text: &str) -> Option<CompressedCbmResponse> {
     let raw_bytes = raw_text.len();
-    let raw_tokens_est = (raw_bytes + 3) / 4;
+    let raw_tokens_est = raw_bytes.div_ceil(4);
 
     // Step 1: Parse the JSON-RPC response
     let parsed: Value = match serde_json::from_str(raw_text.trim()) {
@@ -79,7 +79,7 @@ pub fn compress_cbm_response(raw_text: &str) -> Option<CompressedCbmResponse> {
     // Step 4: Compress the body
     let compressed = compress_json_body(&result_body);
 
-    let comp_tokens_est = (compressed.len() + 3) / 4;
+    let comp_tokens_est = compressed.len().div_ceil(4);
 
     Some(CompressedCbmResponse {
         compressed_text: compressed,
@@ -136,7 +136,7 @@ fn compress_value(val: &Value) -> String {
         }
         Value::Array(arr) => {
             let entries: Vec<String> = arr.iter()
-                .map(|v| compress_value(v))
+                .map(compress_value)
                 .filter(|s| !s.is_empty())
                 .collect();
             if entries.len() <= 3 {
@@ -149,12 +149,7 @@ fn compress_value(val: &Value) -> String {
         }
         Value::String(s) => {
             // Short strings: inline. Long strings: keep as-is.
-            let trimmed = s.trim();
-            if trimmed.len() <= 60 && !trimmed.contains('\n') {
-                trimmed.to_string()
-            } else {
-                trimmed.to_string()
-            }
+            s.trim().to_string()
         }
         Value::Number(n) => n.to_string(),
         Value::Bool(b) => b.to_string(),

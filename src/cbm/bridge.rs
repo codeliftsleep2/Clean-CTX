@@ -499,22 +499,6 @@ impl GraphBridge {
     }
 }
 
-/// Resolve CBM binary path with proper fallback chain (C-2 fix):
-///  1. Config `binary_path` (if set)
-///  2. PATH search
-///  3. Common install locations
-// ── Test helpers (exported under `test_helpers` for test access) ──
-#[cfg(test)]
-pub mod test_helpers {
-    use super::*;
-    pub fn resolve_binary(config: &CbmConfig) -> Option<PathBuf> {
-        resolve_cbm_binary(config)
-    }
-    // Intentionally kept simple: test access to bridge internals.
-    #[allow(private_interfaces)]
-    pub fn cache_ttl(bridge: &GraphBridge) -> u64 { bridge.cache_ttl }
-}
-
 fn resolve_cbm_binary(config: &CbmConfig) -> Option<PathBuf> {
     // 1. Config path (explicit user override)
     if let Some(ref path) = config.binary_path {
@@ -578,4 +562,20 @@ fn home_dir() -> PathBuf {
         }
     }
     PathBuf::from(".")
+}
+
+/// Resolve CBM binary path with proper fallback chain (C-2 fix):
+///  1. Config `binary_path` (if set)
+///  2. PATH search
+///  3. Common install locations
+// ── Test helpers (exported under `test_helpers` for test access) ──
+#[cfg(test)]
+pub mod test_helpers {
+    use super::*;
+    pub fn resolve_binary(config: &CbmConfig) -> Option<PathBuf> {
+        resolve_cbm_binary(config)
+    }
+    // Intentionally kept simple: test access to bridge internals.
+    #[allow(private_interfaces)]
+    pub fn cache_ttl(bridge: &GraphBridge) -> u64 { bridge.cache_ttl }
 }
