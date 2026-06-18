@@ -1,8 +1,8 @@
 # Clean-CTX — Token Waste Reducer & Context Compiler
 
-A local-first, air-gapped context optimization engine that eliminates token waste in LLM interactions while maintaining zero network footprint. Built in Rust for restrictive firewall and DLP environments.
+> **🚀 Version 0.1.8** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, CBM (Codebase Memory) integration for graph-based symbol importance + blast radius, Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, and all 1,277 tests passing with **zero clippy warnings**.
 
-> **🚀 Version 0.1.7** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular HTML parsing (XHTML self-closing + inline template), IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, and 243 proxy tests all passing.
+A local-first, air-gapped context optimization engine that eliminates token waste in LLM interactions while maintaining zero network footprint. Built in Rust for restrictive firewall and DLP environments.
 
 ---
 
@@ -38,7 +38,7 @@ Add to your MCP settings (see [IDE Configuration](#ide-configuration) below for 
 }
 ```
 
-Restart your editor. The tools `provide_code_context`, `compress_code_context`, `decompress_code_context`, `compress_workspace`, `diff_code_context`, `delta_code_context`, `delta_text_context`, `context_stats`, `context_history`, and `restore_context` will be available.
+Restart your editor. The tools `provide_code_context`, `compress_code_context`, `decompress_code_context`, `compress_workspace`, `diff_code_context`, `delta_code_context`, `delta_text_context`, `apply_delta`, `context_stats`, `context_history`, `save_context`, `list_sessions`, `replay_history`, `purge_old_deltas`, and `restore_context` will be available.
 
 ---
 
@@ -46,20 +46,60 @@ Restart your editor. The tools `provide_code_context`, `compress_code_context`, 
 
 ### Zero-Touch Workflow
 
-The **recommended entry point** is `provide_code_context` — a single tool that automatically handles compression, delta transport, Angular detection, and fidelity selection:
+The **recommended entry point** is `provide_code_context` — a single tool that automatically handles compression, delta transport, Angular detection, fidelity selection, and CBM enrichment:
 
 | Tool | Purpose |
 |------|---------|
-| `provide_code_context` | **Single entry point** — auto-detects file type, selects optimal fidelity, uses delta transport on subsequent calls |
+| `provide_code_context` | **Single entry point** — auto-detects file type, selects optimal fidelity, uses delta transport on subsequent calls, enriches with CBM symbol importance |
 | `restore_context` | Force full re-compression, clearing all baselines and DB entries |
 | `context_history` | View compression history and delta savings for tracked files |
 | `context_stats` | Dashboard: token savings, compression stats, session metrics |
 
 The workflow automatically:
 - Runs a **heuristics engine** to select the best fidelity and strategy based on file characteristics
-- Detects **Angular files** and enables the Meta-Layer with Φ markers
-- Uses **delta transport** on subsequent calls for minimal token usage
+- Detects **Angular/Spring Boot files** and enables the Meta-Layer with framework-specific markers
+- Uses **delta transport** on subsequent calls for minimal token usage (**51–53% cheaper** than full recompression at Medium/High fidelity)
+- Enriches context with **CBM (Codebase Memory)** symbol importance and blast radius data
 - Records **session stats** for monitoring compression efficiency
+- Persists contexts to **SQLite** for crash recovery and cross-session continuity
+
+### CBM (Codebase Memory) Integration
+
+Clean-CTX integrates with [Codebase Memory MCP](https://github.com/codeliftsleep2/CodebaseMemory-MCP) to provide graph-based code intelligence:
+
+| Feature | Description |
+|---------|-------------|
+| **Symbol Importance** | PageRank scores for every symbol in the codebase — high-importance symbols get higher fidelity |
+| **Blast Radius** | Dependency graph tracing — knows which files are affected by a change |
+| **Dead Code Detection** | Identifies orphaned classes, methods, and fields |
+| **Architecture Awareness** | Understands layering, module boundaries, and dependency direction |
+
+CBM responses are intercepted at the pipe level and compressed via JSON-aware compression (**~5,000 → ~1,100 tokens**, ~78% savings) before reaching the agent.
+
+| Component | Description |
+|-----------|-------------|
+| `client.rs` | JSON-RPC 2.0 subprocess client with retry + exponential backoff |
+| `bridge.rs` | DashMap-based TTL caching with `detect_changes()` cache invalidation |
+| `proxy.rs` | Pipe-level response interception and pluggable tokenizer integration |
+| `json_compress.rs` | JSON-aware compressor: key shortening, envelope stripping, null field removal |
+
+### Spring Boot Meta-Layer
+
+For Spring Boot Java projects, Clean-CTX automatically detects framework annotations and enriches compressed output with structured `Φ` markers:
+
+| Marker | Meaning |
+|--------|---------|
+| `Φrest:` / `Φctrl:` | `@RestController` / `@Controller` with request mappings |
+| `Φsvc:` | `@Service` component |
+| `Φrepo:` | `@Repository` component |
+| `Φconf:` | `@Configuration` component |
+| `Φmap:` | `@RequestMapping` method mappings |
+| `Φaut:` | `@Autowired` field injection |
+| `Φval:` | `@Value` property injection |
+| `Φbean:` | `@Bean` method-level injection |
+| `Φprop:` | `@ConfigurationProperties` class |
+| `Φpropf:` | Properties file structural shape |
+| `Φgraph:` | Cross-file dependency graph (workspace mode) |
 
 ### Three-Fidelity Compression
 
@@ -73,12 +113,13 @@ The workflow automatically:
 
 | Tool | Purpose |
 |------|---------|
-| `compress_code_context` | Source file → compressed skeleton (text or IR) |
+| `compress_code_context` | Source file → compressed skeleton (text or IR with encoding selection) |
 | `decompress_code_context` | Compressed skeleton → human-readable format |
 | `compress_workspace` | Entire directory → single compressed manifest |
 | `diff_code_context` | Source file → AST-level change-set (`+` / `-` / `~` / `=`) |
 | `delta_code_context` | IR-level delta compression — instruction-level deltas between compiled IR states |
 | `delta_text_context` | Text-level delta compression — line-level deltas between compressed body snapshots |
+| `apply_delta` | Client-side state update — applies IR delta to in-session state machine |
 
 ### Persistence Layer (Built-in)
 
@@ -113,18 +154,6 @@ Long file paths are compressed to short aliases:
   α1 = C:\project\src\core\auth\security\Provider.tsx
   α2 = C:\project\src\core\auth\security\TokenVerifier.tsx
 ```
-
-### Angular Meta-Layer
-
-For Angular projects, Clean-CTX automatically detects framework decorators and enriches the compressed output with structured metadata — without modifying existing behavior for non-Angular files.
-
-| Tier | What It Does | When It Runs |
-|------|-------------|--------------|
-| **Tier 1 — Decorators** | Extracts `@Component`, `@Injectable`, `@NgModule`, `@Directive`, `@Pipe`, `@Input`, `@Output` and emits `Φ` markers | Single-file and workspace mode |
-| **Tier 2 — File-Triplet Bundling** | Resolves `*.component.ts` → `.html` + `.scss` siblings; extracts template shape (tags, bindings, control flow) and style shape (selectors, variables) | Workspace mode only |
-| **Tier 3 — Cross-File Graph** | Builds a DI injection graph (`UserService@α12`) and selector linkage (`<app-user-card>` → `UserCardComponent@α9`) across all files | Workspace mode only |
-
-**Non-Angular files pay zero overhead** — no markers, no extra parsing, no newlines.
 
 ### Multi-Platform Proxy
 
@@ -192,9 +221,11 @@ First call performs full compression; subsequent calls automatically use delta t
 }
 ```
 
-**Output:**
+**Output (Phase 6 IR-first):**
 ```
-$c SampleService;$ctor();processComplexData(payload: $s[]): $b;healthCheck(): $s
+// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias
+// ── SampleService ──
+M doWork(payload:$s[]):$b
 ```
 
 ### Decompress back to readable format
@@ -227,6 +258,15 @@ class SampleService;constructor();processComplexData(payload: string[]): boolean
 
 ### AST-level diff (track changes over time)
 
+```json
+{
+  "name": "diff_code_context",
+  "arguments": {
+    "filePath": "/path/to/MyService.ts"
+  }
+}
+```
+
 First call stores the current state as baseline. Subsequent calls return only the changes:
 
 ```
@@ -238,6 +278,23 @@ First call stores the current state as baseline. Subsequent calls return only th
   ~ method process(id:string):boolean
         was: process(id:number):boolean
   = method healthCheck():string (unchanged)
+```
+
+### IR-level delta (edit sessions)
+
+```json
+{
+  "name": "delta_code_context",
+  "arguments": {
+    "filePath": "/path/to/MyService.ts"
+  }
+}
+```
+
+First call stores baseline IR; subsequent calls return only the structural delta:
+
+```
+IR delta: v1 → v2
 ```
 
 ### View compression dashboard
@@ -329,6 +386,22 @@ See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for per-edit breakdowns, cachin
 | `Φgraph:` | Cross-file dependency graph edge |
 | `§ΦGRAPH` | Workspace dependency graph footer section |
 
+### Spring Boot Meta-Layer Markers (Φ)
+
+| Marker | Meaning |
+|--------|---------|
+| `Φrest:` | `@RestController` with request mappings |
+| `Φctrl:` | `@Controller` with request mappings |
+| `Φsvc:` | `@Service` component |
+| `Φrepo:` | `@Repository` component |
+| `Φconf:` | `@Configuration` component |
+| `Φmap:` | `@RequestMapping` / `@GetMapping` / etc. method mappings |
+| `Φaut:` | `@Autowired` field injection |
+| `Φval:` | `@Value` property injection |
+| `Φbean:` | `@Bean` method definition |
+| `Φprop:` | `@ConfigurationProperties` class |
+| `Φpropf:` | Properties file structural shape |
+
 ---
 
 ## IDE Configuration
@@ -416,7 +489,7 @@ File: `settings.json` (Zed settings)
 The `cleanctx-notation` prompt provides system-level instructions to the AI explaining how to read and write Clean-CTX compressed notation. When loaded, the AI learns:
 - How to interpret all opcodes (`$c`, `$ctor`, `$s`, etc.)
 - How to interpret behavior markers (`⊕guard`, `⊕loop`, `⊕!throw`, `⊕⇒`)
-- How to interpret Angular Meta-Layer markers (`Φcmp:`, `Φsvc:`, `Φin:`, `Φgraph:`, etc.)
+- How to interpret Angular and Spring Boot Meta-Layer markers
 - To respond in compressed form when appropriate
 - To never output raw opcode tables or metadata sections
 
@@ -449,12 +522,12 @@ See [`docs/DEVELOPER_DOCUMENTATION.md`](docs/DEVELOPER_DOCUMENTATION.md) for the
 
 | Language | Extension | Status |
 |----------|-----------|--------|
-| TypeScript | `.ts`, `.js` | ✅ Full support |
+| TypeScript | `.ts`, `.js` | ✅ Full support (Angular meta-layer) |
 | C# | `.cs` | ✅ Full support |
+| Rust | `.rs` | ✅ Full support (structs, enums, traits, impls, generics, derives, cfg, unsafe) |
+| Java | `.java` | ✅ Full support (classes, interfaces, records, enums, Spring Boot meta-layer) |
 
-Angular framework detection (decorators, templates, styles) is automatic for TypeScript files containing `@Component`, `@Injectable`, `@NgModule`, `@Directive`, or `@Pipe` decorators.
-
-See [`docs/DEVELOPER_DOCUMENTATION.md`](docs/DEVELOPER_DOCUMENTATION.md) for instructions on adding new languages.
+Angular framework detection is automatic for TypeScript files containing `@Component`, `@Injectable`, `@NgModule`, `@Directive`, or `@Pipe` decorators. Spring Boot detection is automatic for Java files containing `@RestController`, `@Service`, `@Repository`, `@Configuration`, or `@RequestMapping` annotations.
 
 ---
 
@@ -477,16 +550,18 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 | Metric | Value |
 |--------|-------|
 | Build | ✅ `cargo check` clean |
-| Linting | ✅ `cargo clippy --all-targets -- -D warnings` — 0 warnings |
-| Tests | ✅ 243 proxy tests passing (112 unit + 18 regression + 1 integration) + 1,035 core tests |
-| Audit | ✅ FAANG-level audit — all 41 findings resolved |
-| Proxy | ✅ Multi-platform proxy (Anthropic/OpenAI/Generic) — see [`docs/PROXY.md`](docs/PROXY.md) |
+| Linting | ✅ `cargo clippy --all-targets -- -D warnings` — **0 warnings, 0 errors** |
+| Tests | ✅ **1,277 core tests** + 243 proxy tests = **1,520 total, all passing** |
+| Audit | ✅ FAANG-level audit — all 41 findings resolved; CBM audit — all 6 findings resolved; Compiler-IR audit — all findings resolved |
+| Languages | ✅ TypeScript, C#, Rust, Java with Angular/Spring Boot meta-layers |
+| CBM Integration | ✅ Subprocess client with retry + caching, pipe-level JSON compression, session stats |
+| Delta Transport | ✅ IR-level + text-level, field-patch encoding, compact delta format |
+| Persistence | ✅ SQLite cross-session persistence with three-tier reliability |
+| Proxy | ✅ Multi-platform proxy (Anthropic/OpenAI/Generic) with auto-cache + tool filters |
 | Filters | ✅ 26 built-in TOML filters — cargo, npm, eslint, docker, go, and more |
+| IR Subsystem | ✅ 8 phases A–H complete, 530+ IR-specific tests, 6 wire formats, full delta pipeline |
 | Largest file | ~170 lines (down from 913) |
 | Unsafe code | 0 blocks |
-| Meta-Layer | ✅ Phases 1–3 complete (decorators, bundling, graph) |
-| Workflow | ✅ Zero-touch workflow with heuristics engine |
-| Persistence | ✅ SQLite cross-session persistence (built-in, three-tier reliability) |
 
 ---
 
