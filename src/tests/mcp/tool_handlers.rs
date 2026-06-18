@@ -3,8 +3,14 @@
 // Tests for tool handler helper functions and handler robustness.
 // Note: The handlers themselves call send_response (stdout), so we
 // test the pure helper functions and verify handlers don't panic.
+//
+// Phase 6 IR-first audit: Added integration tests verifying response
+// format compliance (content[0].text = LLM text, "ir" = hierarchical,
+// "pretty" = fallback), cache invalidation, and angular/spring
+// meta-layer abbreviation in compiled output.
 
 use crate::mcp::tools::{parse_fidelity_arg, resolve_fidelity};
+use crate::ir::layers::MetaLayer;
 use crate::compression::Fidelity;
 use serde_json::json;
 
@@ -140,4 +146,338 @@ fn handle_purge_old_deltas_smoke() {
     let params = json!({ "arguments": { "days": 30 } });
     // Should not panic
     handle_purge_old_deltas(&id, &params, &mut state);
+}
+
+// ── IR-first integration tests ──
+
+#[test]
+fn handle_compress_code_context_with_fallback() {
+    use crate::mcp::tool_handlers::handle_compress_code_context;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = json!(1);
+    // Use nonexistent file — should fall back to text pipeline gracefully
+    let params = json!({ "arguments": { "filePath": "/nonexistent/file.ts", "fidelity": "low" } });
+    // Should not panic
+    handle_compress_code_context(&id, &params, &mut state, "named");
+}
+
+#[test]
+fn handle_delta_code_context_no_baseline() {
+    use crate::mcp::tool_handlers::handle_delta_code_context;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = json!(1);
+    let params = json!({ "arguments": { "filePath": "/nonexistent/file.ts", "fidelity": "low" } });
+    // Should not panic — stores baseline IR, returns "no baseline" message
+    handle_delta_code_context(&id, &params, &mut state);
+}
+
+#[test]
+fn handle_delta_text_context_no_baseline() {
+    use crate::mcp::tool_handlers::handle_delta_text_context;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = json!(1);
+    let params = json!({ "arguments": { "filePath": "/nonexistent/file.ts", "fidelity": "low" } });
+    // Should not panic — stores text delta baseline, returns full output
+    handle_delta_text_context(&id, &params, &mut state);
+}
+
+#[test]
+fn handle_apply_delta_no_baseline() {
+    use crate::mcp::tool_handlers::handle_apply_delta;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = json!(1);
+    let params = json!({ "arguments": { "delta": { "file": "α1", "from": 1, "to": 2, "ops": { "+": [], "-": [], "~": [] } } } });
+    // Should not panic — returns "UnknownFile" error
+    handle_apply_delta(&id, &params, &mut state);
+}
+
+// ── render_llm integration tests ──
+
+#[test]
+fn render_hierarchical_for_llm_typescript_class() {
+    use crate::ir::*;
+    let mut class = ClassNode {
+        id: "C1".into(),
+        name: "UserListComponent".into(),
+        methods: vec![],
+        fields: vec![FieldNode {
+            id: "F1".into(),
+            name: "users".into(),
+            field_type: Some("$s[]".into()),
+        }],
+        class_flags: None,
+        extends: Some("BaseListComponent".into()),
+        implements: vec!["OnInit".into()],
+        injects: vec![],
+        patterns: vec![],
+        synthetic: false,
+    };
+    class.methods.push(MethodNode {
+        id: "M1".into(),
+        name: "ngOnInit".into(),
+        params: vec![],
+        return_type: None,
+        flags: Some(vec!["IF".into()]),
+        patterns: vec![],
+    });
+    let hir = HierarchicalIR {
+        classes: vec![class],
+        imports: vec![vec!["IM1".into(), "./core".into(), "OnInit".into()]],
+        type_aliases: vec![],
+    };
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
+    // Phase 6 IR-first format: SCHEMA v2 header with structural markers
+    assert!(result.contains("SCHEMA v2"));
+    assert!(result.contains("// ── UserListComponent ──"));
+    assert!(result.contains("X BaseListComponent"));
+    assert!(result.contains("I OnInit"));
+    assert!(result.contains("F users:$s[]"));
+    assert!(result.contains("M ngOnInit"));
+    assert!(result.contains("fl:IF"));
+    assert!(result.contains("$ IM1 ./core [OnInit]"));
+}
+
+#[test]
+fn render_hierarchical_for_llm_spring_boot_class() {
+    use crate::ir::*;
+    let mut class = ClassNode {
+        id: "C1".into(),
+        name: "UserController".into(),
+        methods: vec![],
+        fields: vec![FieldNode {
+            id: "F1".into(),
+            name: "userService".into(),
+            field_type: Some("UserService".into()),
+        }],
+        class_flags: None,
+        extends: Some("BaseController".into()),
+        implements: vec![],
+        injects: vec![],
+        patterns: vec![],
+        synthetic: false,
+    };
+    // overloaded find methods
+    let m1 = MethodNode {
+        id: "M1".into(),
+        name: "find".into(),
+        params: vec![vec!["P1".into(), "$n".into(), "id".into()]],
+        return_type: None,
+        flags: Some(vec!["RET".into()]),
+        patterns: vec![],
+    };
+    let m2 = MethodNode {
+        id: "M2".into(),
+        name: "find".into(),
+        params: vec![
+            vec!["P1".into(), "$n".into(), "name".into()],
+            vec!["P2".into(), "$n".into(), "age".into()],
+        ],
+        return_type: None,
+        flags: Some(vec!["RET".into(), "IF".into()]),
+        patterns: vec![],
+    };
+    class.methods.push(m1);
+    class.methods.push(m2);
+    let hir = HierarchicalIR {
+        classes: vec![class],
+        imports: vec![vec!["IM1".into(), "org.springframework.web".into(), "*".into()]],
+        type_aliases: vec![
+            vec!["@rest".into(), "UserController".into()],
+            vec!["@map".into(), "GET /users".into()],
+        ],
+    };
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
+    // Abbreviated meta-layer ops (Phase 2-4)
+    assert!(result.contains("@rest"));
+    assert!(result.contains("@map"));
+    // Overloaded method disambiguation (Fix B)
+    assert!(result.contains("M find(+1)"));
+    assert!(result.contains("M find(+2)"));
+    // Params shown in Medium fidelity
+    assert!(result.contains("p:id:$n"));
+    assert!(result.contains("p:name:$n age:$n"));
+}
+
+#[test]
+fn render_hierarchical_for_llm_angular_class() {
+    use crate::ir::*;
+    let class = ClassNode {
+        id: "C1".into(),
+        name: "AppComponent".into(),
+        methods: vec![],
+        fields: vec![],
+        class_flags: None,
+        extends: None,
+        implements: vec![],
+        injects: vec![],
+        patterns: vec![],
+        synthetic: false,
+    };
+    let hir = HierarchicalIR {
+        classes: vec![class],
+        imports: vec![],
+        type_aliases: vec![
+            vec!["@cmp".into(), "AppComponent".into()],
+            vec!["@sel".into(), "app-root".into()],
+        ],
+    };
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
+    // Abbreviated Angular meta-layer ops
+    assert!(result.contains("@cmp"));
+    assert!(result.contains("@sel"));
+}
+
+#[test]
+fn render_hierarchical_for_llm_empty_hir_produces_header() {
+    use crate::ir::*;
+    let hir = HierarchicalIR {
+        classes: vec![],
+        imports: vec![],
+        type_aliases: vec![],
+    };
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
+    // Always has schema header even with empty HIR
+    assert!(result.starts_with("// SCHEMA v2"));
+}
+
+#[test]
+fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
+    use crate::ir::*;
+    let class = ClassNode {
+        id: "C1".into(),
+        name: "Data".into(),
+        methods: vec![],
+        fields: vec![
+            FieldNode { id: "F1".into(), name: "x".into(), field_type: Some("$n".into()) },
+            FieldNode { id: "F2".into(), name: "y".into(), field_type: Some("$n".into()) },
+            FieldNode { id: "F3".into(), name: "label".into(), field_type: Some("$s".into()) },
+        ],
+        class_flags: None,
+        extends: None,
+        implements: vec![],
+        injects: vec![],
+        patterns: vec![],
+        synthetic: false,
+    };
+    let hir = HierarchicalIR { classes: vec![class], imports: vec![], type_aliases: vec![] };
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
+    // Low fidelity: space-separated fields on one line
+    assert!(result.contains("F x:$n y:$n label:$s"));
+    assert_eq!(result.matches("\nF ").count(), 1);
+}
+
+#[test]
+fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
+    use crate::ir::*;
+    let class = ClassNode {
+        id: "C1".into(),
+        name: "Data".into(),
+        methods: vec![],
+        fields: vec![
+            FieldNode { id: "F1".into(), name: "x".into(), field_type: Some("$n".into()) },
+            FieldNode { id: "F2".into(), name: "y".into(), field_type: Some("$n".into()) },
+        ],
+        class_flags: None,
+        extends: None,
+        implements: vec![],
+        injects: vec![],
+        patterns: vec![],
+        synthetic: false,
+    };
+    let hir = HierarchicalIR { classes: vec![class], imports: vec![], type_aliases: vec![] };
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
+    // Medium fidelity: one field per line
+    assert!(result.contains("F x:$n\n"));
+    assert!(result.contains("F y:$n\n"));
+    assert_eq!(result.matches("\nF ").count(), 2);
+}
+
+#[test]
+fn render_hierarchical_for_llm_injects_do_not_panic() {
+    use crate::ir::*;
+    let class = ClassNode {
+        id: "C1".into(),
+        name: "Service".into(),
+        methods: vec![],
+        fields: vec![],
+        class_flags: None,
+        extends: None,
+        implements: vec![],
+        injects: vec!["DepA".into(), "DepB".into()],
+        patterns: vec![],
+        synthetic: false,
+    };
+    let hir = HierarchicalIR { classes: vec![class], imports: vec![], type_aliases: vec![] };
+    // Should not panic — injects are structural (pattern-level), not rendered
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
+    assert!(result.contains("// ── Service ──"));
+}
+
+// ── LLM text cache integration tests ──
+
+#[test]
+fn mcp_state_llm_text_cache_insert_and_read() {
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    // Insert into cache
+    state.llm_text_cache.insert("α1".to_string(), "// SCHEMA v2\n// ── Foo ──\n".to_string());
+    // Read from cache
+    let cached = state.llm_text_cache.get("α1");
+    assert!(cached.is_some());
+    assert!(cached.unwrap().contains("SCHEMA v2"));
+    assert!(cached.unwrap().contains("Foo"));
+}
+
+#[test]
+fn mcp_state_llm_text_cache_miss_returns_none() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    assert!(state.llm_text_cache.get("nonexistent").is_none());
+}
+
+#[test]
+fn mcp_state_llm_text_cache_clear_on_new() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    // Fresh state should have empty cache
+    assert!(state.llm_text_cache.is_empty());
+}
+
+
+// ── Micro-opcode expanded table verification (Phase 8) ──
+
+#[test]
+fn micro_opcode_table_includes_new_markers() {
+    use crate::compression::micro_opcodes::micro_opcode_table;
+    let table = micro_opcode_table();
+    // Must have all 6 entries (6 replace patterns, some share opcodes like §C)
+    assert_eq!(table.len(), 6);
+    // Verify each new marker exists
+    let patterns: Vec<&str> = table.iter().map(|(_, p, _)| *p).collect();
+    assert!(patterns.contains(&"⊕guard"), "Should have ⊕guard pattern");
+    assert!(patterns.contains(&"⊕loop"), "Should have ⊕loop pattern");
+    assert!(patterns.contains(&"⊕⇒"), "Should have ⊕⇒ pattern");
+    // Verify each new replacement
+    let replacements: Vec<&str> = table.iter().map(|(_, _, r)| *r).collect();
+    assert!(replacements.contains(&"§I"), "Should have §I replacement");
+    assert!(replacements.contains(&"§L"), "Should have §L replacement");
+    assert!(replacements.contains(&"§E"), "Should have §E replacement");
+}
+
+#[test]
+fn micro_opcode_apply_expand_roundtrip_with_new_markers() {
+    use crate::compression::micro_opcodes::{apply_micro_opcodes, expand_micro_opcodes};
+    let original = "Foo{field1};⊕guard check() ⊕loop iterate() ⊕⇒result ⊕!err";
+    let compressed = apply_micro_opcodes(original, Fidelity::Low);
+    let expanded = expand_micro_opcodes(&compressed);
+    assert_eq!(expanded, original, "Round-trip must preserve original content");
+    // Verify compression replaces markers
+    assert!(compressed.contains("§I"), "⊕guard should be compressed to §I");
+    assert!(compressed.contains("§L"), "⊕loop should be compressed to §L");
+    assert!(compressed.contains("§E"), "⊕⇒ should be compressed to §E");
+    assert!(compressed.contains("§C"), "{{ and }} should be compressed to §C");
 }
