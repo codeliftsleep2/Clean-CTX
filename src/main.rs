@@ -12,8 +12,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return cmd_init();
     }
 
+    if args.len() > 1 && args[1] == "setup" && args.get(2).map(|s| s.as_str()) == Some("--with-cbm") {
+        return cmd_setup_cbm();
+    }
+
     // Default: run the MCP server
+    // Note: --with-cbm is the default behavior now (auto-detect CBM on PATH).
+    // Use CBM_DISABLE=1 env var to explicitly disable CBM integration.
     clean_ctx::mcp::run()
+}
+
+/// Handle `clean-ctx setup --with-cbm` — check CBM availability and
+/// optionally generate config.
+fn cmd_setup_cbm() -> Result<(), Box<dyn std::error::Error>> {
+    let info = clean_ctx::cbm::setup::cbm_setup_check();
+    let output = clean_ctx::cbm::setup::format_setup_output(&info);
+    eprint!("{}", output);
+
+    // If CBM is found and ready, offer to write binary_path into .clean-ctx.json
+    if info.is_ready {
+        let config_path = std::path::Path::new(".clean-ctx.json");
+        if config_path.exists() {
+            // Read existing config and merge cbm block
+            match std::fs::read_to_string(config_path) {
+                Ok(content) => {
+                    if let Ok(mut config_val) = serde_json::from_str::<serde_json::Value>(&content) {
+                        let cbm_block = clean_ctx::cbm::setup::generate_cbm_config_block(&info);
+                        config_val["cbm"] = cbm_block;
+                        if let Ok(pretty) = serde_json::to_string_pretty(&config_val) {
+                            std::fs::write(config_path, &pretty)?;
+                            eprintln!("[clean-ctx] Updated .clean-ctx.json with CBM configuration.");
+                        }
+                    }
+                }
+                Err(_) => {
+                    eprintln!("[clean-ctx] Could not read .clean-ctx.json to update. Update manually.");
+                }
+            }
+        } else {
+            eprintln!("[clean-ctx] No .clean-ctx.json found. Run `clean-ctx init` first, then rerun setup.");
+        }
+    }
+
+    Ok(())
 }
 
 /// Handle `clean-ctx init` — create default config and directory.

@@ -5,12 +5,18 @@
 // Adds single-character micro-opcodes (§-prefixed) for common structural
 // patterns, reducing token count by 15-25% at Low fidelity.
 //
+// Phase 8: Expanded micro-opcode table with §I (⊕guard), §L (⊕loop),
+// and §E (⊕⇒) for additional text pipeline compression.
+//
 // ## Micro-opcode table
 //
 // | Micro-opcode | Meaning                  | Current equivalent    |
 // |--------------|--------------------------|-----------------------|
 // | `§C`         | Class field delimiters   | `ClassName{fields}`   |
 // | `§P`         | Constructor/pattern def  | `$ctor C1 M1 params`  |
+// | `§I`         | Conditional/if marker    | `⊕guard`              |
+// | `§L`         | Loop marker              | `⊕loop`               |
+// | `§E`         | Return marker            | `⊕⇒`                  |
 //
 // ## How it works
 //
@@ -27,6 +33,9 @@
 //   Replaces `{` (1 token) and `}` (1 token) with `§C` (1 token) → saves 1 token/class
 // - `§P` replaces `$ctor C1 M1 params` → `§P C1 M1 params`
 //   `$ctor` is 2 tokens ($ + ctor); `§P` is 1 token → saves 1 token/method
+// - `§I` replaces `⊕guard` (2 tokens: ⊕ + guard) → `§I` (1 token) → saves 1 token/method
+// - `§L` replaces `⊕loop` (2 tokens: ⊕ + loop) → `§L` (1 token) → saves 1 token/loop
+// - `§E` replaces `⊕⇒` (2 tokens: ⊕ + ⇒) → `§E` (1 token) → saves 1 token/return
 //
 // Medium and High fidelities are unaffected.
 
@@ -40,6 +49,12 @@ const MICRO_OPCODE_TABLE: &[(&str, &str, &str)] = &[
     ("§C", "}", "§C"),
     // §P — Constructor / pattern prefix: $ctor → §P
     ("§P", "$ctor", "§P"),
+    // §I — Conditional/if marker: ⊕guard → §I
+    ("§I", "⊕guard", "§I"),
+    // §L — Loop marker: ⊕loop → §L
+    ("§L", "⊕loop", "§L"),
+    // §E — Return marker: ⊕⇒ → §E
+    ("§E", "⊕⇒", "§E"),
 ];
 
 /// Apply micro-opcodes to the compressed body at Low fidelity.
@@ -67,6 +82,12 @@ pub fn apply_micro_opcodes(body: &str, fidelity: Fidelity) -> String {
 pub fn expand_micro_opcodes(body: &str) -> String {
     let mut result = body.to_string();
 
+    // Expand §E → ⊕⇒ (before §C to avoid any overlap)
+    result = result.replace("§E", "⊕⇒");
+    // Expand §L → ⊕loop
+    result = result.replace("§L", "⊕loop");
+    // Expand §I → ⊕guard
+    result = result.replace("§I", "⊕guard");
     // Expand §P → $ctor (before §C to avoid any overlap)
     result = result.replace("§P", "$ctor");
 

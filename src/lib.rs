@@ -22,6 +22,8 @@
 pub mod cache;
 pub mod compressor;
 pub mod config;
+pub mod cbm;
+pub mod intelligence;
 pub mod mcp;
 pub mod protocol;
 pub mod queries;
@@ -35,5 +37,6 @@ pub mod dictionary;
 pub mod diff;
 pub mod angular_meta;
 pub mod ir;
+pub mod spring_meta;
 pub mod tokenizer;
 

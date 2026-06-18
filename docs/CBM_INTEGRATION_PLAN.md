@@ -187,119 +187,93 @@ When `cbm_graph_version` changes between sessions, invalidate baseline for affec
 
 ---
 
-### Phase 1: MCP Client + Graph Bridge (5-8 days)
+### Phase 1: Pipe-Level Interception Proxy (Completed)
 
-#### Module 1: `src/mcp/cbm_client.rs`
+**Actual architecture (as built):** Clean-CTX acts as a **pipe-level proxy** between the agent and the CBM subprocess. The execution sequence is:
+
+```
+Agent → Clean-CTX MCP (cbm_proxy tool)
+  → Clean-CTX forwards request to CBM via stdin pipe
+  → CBM responds on stdout with ~5000-token structural seed
+  → Clean-CTX **intercepts the raw CBM stdout at the pipe level**
+  → Uses Clean-CTX compression pipeline to compress the seed down to ~1100 tokens
+  → Returns compressed result to agent
+```
+
+This is fundamentally different from a "query then compress" model. CBM runs **first** to define semantic scope; Clean-CTX catches the output **at the pipe boundary** and applies its token optimization.
+
+#### Module 1: `src/cbm/client.rs`
 
 **Purpose:** Send JSON-RPC requests to CBM's stdin, read responses from stdout.
 
-**Key structures:**
-```rust
-pub struct CbmClient {
-    child: Child,                    // CBM subprocess
-    stdin: BufWriter<ChildStdin>,   // Send requests
-    stdout: BufReader<ChildStdout>, // Read responses
-    request_id: AtomicU64,          // JSON-RPC request counter
-}
-
-impl CbmClient {
-    pub fn launch(binary_path: &Path) -> Result<Self>;
-    pub fn call_tool(&self, tool_name: &str, args: Value) -> Result<Value>;
-    pub fn search_graph(&self, params: SearchGraphParams) -> Result<Vec<GraphNode>>;
-    pub fn trace_path(&self, params: TracePathParams) -> Result<Vec<GraphEdge>>;
-    pub fn detect_changes(&self, params: DetectChangesParams) -> Result<ChangeSet>;
-    pub fn get_architecture(&self) -> Result<Architecture>;
-    pub fn query_graph(&self, cypher: &str) -> Result<QueryResult>;
-}
-```
+**Key methods:**
+- `call_tool()` — parses JSON-RPC response into `Value` (for structured data like status checks)
+- **`call_tool_raw()`** — returns the **raw response text** from CBM's stdout pipe. This is the interception method used by the proxy. The raw text (~5000 tokens) is what gets compressed.
+- Typed wrappers for `search_graph`, `trace_path`, `query_graph`, `get_architecture`, `get_symbol_importance`, `get_dead_code` — these are used internally by `GraphBridge` for caching and by debug tools.
 
 **Design notes:**
-- Subprocess model (CBM launched by Clean-CTX)
+- Subprocess model (CBM launched by Clean-CTX as a child process)
 - JSON-RPC 2.0 over stdin/stdout
-- Lazy launch: CBM started on first graph query
-- Timeout: 30s default for graph queries
-- One retry with exponential backoff, then degrade
+- Lazy launch: CBM started on session init, not on first graph query
+- Timeout: configurable via `CbmConfig.query_timeout_ms` (default 30s)
+- Stderr: piped to a background drainer thread to prevent pipe-buffer deadlock
 
-#### Module 2: `src/mcp/graph_bridge.rs`
+#### Module 2: `src/cbm/bridge.rs` (GraphBridge)
 
-**Purpose:** Translate CBM graph data into Clean-CTX concepts.
+**Purpose:** Wraps `CbmClient` with TTL caching and graceful degradation. Provides `proxy_call()` for the interception pathway.
 
-**Key structures:**
+**Key method for Phase 2:**
 ```rust
-pub struct GraphBridge {
-    client: CbmClient,
-    cache: DashMap<String, CachedGraphData>,
-    status: CbmStatus,
-}
-
-impl GraphBridge {
-    pub fn get_symbol_importance(&self, project: &str) -> Result<HashMap<String, f64>>;
-    pub fn get_blast_radius(&self, symbol: &str, depth: usize) -> Result<Vec<String>>;
-    pub fn get_dead_code(&self, project: &str) -> Result<Vec<String>>;
-    pub fn get_architecture(&self, project: &str) -> Result<ArchitectureOverview>;
-    pub fn detect_changes(&self, diff: &str) -> Result<Vec<AffectedSymbol>>;
-    pub fn status(&self) -> &CbmStatus;
-}
+/// **Pipe-level proxy call:** Forwards a CBM tool request, catches
+/// the **raw response text** from CBM's stdout pipe, and returns it.
+/// The caller (proxy handler) compresses the raw text before it reaches
+/// the agent — achieving ~5000 → ~1100 token reduction.
+pub fn proxy_call(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError>
 ```
 
 **Caching strategy:**
-- Symbol importance: per session (refresh on `index_repository`)
-- Blast radius: per symbol + depth (invalidated on file change)
+- Symbol importance: per session (refreshed per call)
+- Blast radius: per symbol + depth lazily evicted
 - Dead code: per session
 - Architecture: per session
 
-**Cache invalidation:**
-- Store `cbm_graph_version` in sessions table
-- On `provide_code_context`, compare hashes via `detect_changes`
-- Invalidate affected symbols when version changes
+#### Module 3: `src/cbm/proxy.rs` — **The Interception Proxy**
 
-#### Module 3: `src/mcp/cbm_config.rs`
+**Purpose:** Single MCP tool that implements the pipe-level interception pattern.
 
-**Config schema:**
-```rust
-pub struct CbmConfig {
-    pub binary_path: Option<String>,    // Auto-detected if not set
-    pub auto_launch: bool,              // default: true
-    pub cache_ttl: u64,                 // default: 300 (5 min)
-    pub enabled: bool,                  // default: true
-    pub query_timeout_ms: u64,          // default: 30000 (30s)
-    pub cbm_min_version: Option<String>,// Minimum compatible CBM version
-}
-```
+**Execution flow:**
+1. Extract `cbm_tool` name and `parameters` from the MCP arguments
+2. Build the JSON-RPC parameters for CBM
+3. Call `GraphBridge::proxy_call()` which delegates to `CbmClient::call_tool_raw()`
+4. Receive the **raw response text** from CBM's stdout
+5. Run the intercepted text through Clean-CTX's `compress_file_with_source()` pipeline
+6. Return the compressed result (~1100 tokens) with metadata about savings
 
-**Binary auto-detection:**
-1. Check `cbm_config.binary_path` if set
-2. Check `PATH` for `codebase-memory-mcp`
-3. Check common install locations
-4. If not found, log warning and disable gracefully
-
-#### Module 4: Integration Points
-
-**`src/mcp/state.rs`:**
-```rust
-pub struct McpState {
-    // ... existing ...
-    pub graph_bridge: Option<GraphBridge>,  // None if CBM not available
-}
-```
-
-**`src/mcp/tools.rs`** — New tool `smart_compress`:
+**MCP tool signature:**
 ```json
 {
-  "name": "smart_compress",
-  "description": "Compress code based on a graph query. Finds relevant symbols via CBM, then compresses only those files.",
+  "name": "cbm_proxy",
+  "description": "**Primary CBM integration point.** Forwards a query to CBM, intercepts the raw ~5000-token structural response at the pipe level, compresses it down to ~1100 tokens, and returns the compressed result.",
   "inputSchema": {
-    "query": "Cypher-like query or natural language",
-    "project": "CBM project name",
-    "budget": "optional token budget"
+    "cbm_tool": "CBM tool to call (graph_search|graph_query|graph_trace|get_architecture|...)",
+    "parameters": "JSON object of parameters for the CBM tool",
+    "query": "Shorthand query string",
+    "project": "Shorthand project name"
   }
 }
 ```
 
-**`src/mcp/heuristics.rs`** — Feed CBM scores into fidelity:
-- High importance (>0.8) → force High fidelity
-- Medium (0.4-0.8) → use intent-based selection
-- Low (<0.4) → force Low fidelity
+**Graceful degradation:** If CBM is unavailable, the proxy returns a clear error message guiding installation. Never crashes — Clean-CTX works perfectly without CBM.
+
+#### Module 4: Integration Points
+
+**`src/cbm/mod.rs`** — Module root, re-exports all public types.
+
+**`src/mcp/tools.rs`** — Dispatches `cbm_proxy` to `crate::cbm::proxy::handle_cbm_proxy`. Tool definitions appended via `cbm::cbm_tool_list()` chain.
+
+**`src/mcp/state.rs`** — `McpState` holds `graph_bridge: Option<GraphBridge>` initialized at session start. CBM is auto-detected via PATH + common install locations.
+
+**`README.md`** — Documents the `cbm_proxy` tool as the primary CBM integration point.
 
 ---
 

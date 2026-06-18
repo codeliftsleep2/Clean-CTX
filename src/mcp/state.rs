@@ -84,6 +84,22 @@ pub struct McpState {
     /// Cache efficiency metrics for the dashboard.
     /// Records hits, misses, tokens_saved, and per-region status.
     pub cache_metrics: CacheMetrics,
+
+    /// CBM (codebase-memory-mcp) graph bridge for graph intelligence.
+    /// `None` if CBM is not installed, disabled, or failed to launch.
+    pub graph_bridge: Option<crate::cbm::GraphBridge>,
+
+    /// CBM integration status, mirrored for quick access.
+    pub cbm_status: crate::cbm::CbmStatus,
+
+    /// Phase 1 (Fix D): Cache of rendered LLM-optimized hierarchical IR text,
+    /// keyed by path alias (e.g., "α1").
+    ///
+    /// Cached on first render after a compile; invalidated when a delta is
+    /// applied to the file or when `restore_context` is called for the file.
+    /// This avoids re-rendering the full HIR on every delta-mode call,
+    /// saving ~O(n) where n is the file size in HIR nodes.
+    pub llm_text_cache: HashMap<String, String>,
 }
 
 impl McpState {
@@ -127,6 +143,12 @@ impl McpState {
             }
         }
 
+        // Initialize CBM graph bridge from config *before* moving config
+        // into Self (avoiding after-move borrow).
+        let cbm_config = config.cbm.clone();
+        let project_root = crate::mcp::server::find_project_root().clone();
+        let (graph_bridge, cbm_status) = Self::init_cbm_bridge(&cbm_config, &project_root);
+
         Self {
             dict: PathDictionary::new(),
             cache: LocalStateCache::new(),
@@ -140,8 +162,30 @@ impl McpState {
             session_stats,
             context_store: InMemoryContextStore::new(),
             persistence_store,
+            llm_text_cache: HashMap::new(),
             emitted_breakpoints: HashSet::new(),
             cache_metrics: CacheMetrics::default(),
+            graph_bridge,
+            cbm_status,
+        }
+    }
+
+    /// Try to initialize the CBM graph bridge.
+    fn init_cbm_bridge(
+        cbm_config: &crate::cbm::CbmConfig,
+        project_root: &std::path::Path,
+    ) -> (Option<crate::cbm::GraphBridge>, crate::cbm::CbmStatus) {
+        let bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
+        if bridge.is_available() {
+            eprintln!("[clean-ctx] CBM graph intelligence: available");
+            let status = bridge.status().clone();
+            (Some(bridge), status)
+        } else {
+            let status = bridge.status().clone();
+            if status.summary() != "unavailable" {
+                eprintln!("[clean-ctx] CBM graph intelligence: {}", status.summary());
+            }
+            (None, status)
         }
     }
 

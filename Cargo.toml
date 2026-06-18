@@ -36,6 +36,8 @@ tree-sitter-typescript = "=0.20.5"
 tree-sitter-html = "=0.20.0"
 # SAFETY: Must match tree-sitter 0.20.x ABI.
 tree-sitter-rust = "=0.20.4"
+# SAFETY: Must match tree-sitter 0.20.x ABI.
+tree-sitter-java = "=0.20.0"
 
 # high-speed, zero-copy JSON stream parsing
 serde = { version = "1.0", features = ["derive"] }
@@ -54,6 +56,8 @@ rayon = "1.10"
 rusqlite = { version = "0.32", features = ["bundled"] }
 # Base64 encoding for fallback file serialization
 base64 = "0.22"
+# Concurrent hashmap for TTL-based graph caching (CBM Phase 1)
+dashmap = "6.1"
 # High-resolution timestamps for persistence metadata
 chrono = { version = "0.4", features = ["serde"] }
 
