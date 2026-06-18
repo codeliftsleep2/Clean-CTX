@@ -51,6 +51,29 @@ pub struct CbmClient {
     timeout: Duration,
 }
 
+/// Determines whether a CBM error is transient and should be retried.
+///
+/// Retryable errors:
+/// - `ConnectionLost` — transient pipe failure, CBM may recover
+/// - `Timeout` — CBM was busy, retry may succeed
+/// - `RpcError` with code -32603 (Internal error) — transient server issue
+///
+/// Non-retryable errors:
+/// - `LaunchError` — binary missing, retry won't help
+/// - `ParseError` — malformed response, retry won't help
+/// - `RpcError` with code -32601 (Method not found) — programming error
+fn is_retryable(error: &CbmError) -> bool {
+    matches!(
+        error,
+        CbmError::ConnectionLost(_)
+            | CbmError::Timeout(_)
+            | CbmError::RpcError {
+                code: -32603,
+                ..
+            }
+    )
+}
+
 impl CbmClient {
     /// Launch the CBM subprocess.
     ///
@@ -172,7 +195,30 @@ impl CbmClient {
     ///
     /// For **pipe-level interception** use `call_tool_raw` instead —
     /// it returns the raw text that gets compressed.
+    ///
+    /// Retries transient errors (timeout, connection lost, internal error)
+    /// once with exponential backoff before giving up.
     pub fn call_tool(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
+        let max_retries = 1;
+        let mut retry_count = 0;
+        let mut backoff = Duration::from_millis(100);
+
+        loop {
+            // Value::clone() is cheap (~a few ref-count bumps for JSON strings/arrays)
+            match self.call_tool_inner(tool_name, args.clone()) {
+                Ok(result) => return Ok(result),
+                Err(e) if retry_count < max_retries && is_retryable(&e) => {
+                    retry_count += 1;
+                    std::thread::sleep(backoff);
+                    backoff *= 2; // Exponential backoff
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
+    /// Inner implementation of call_tool — the actual JSON-RPC call.
+    fn call_tool_inner(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
         let id = self.request_id.fetch_add(1, Ordering::SeqCst);
         let request = serde_json::json!({
             "jsonrpc": "2.0", "id": id,
@@ -272,3 +318,4 @@ impl Drop for CbmClient {
         let _ = self.child.wait();
     }
 }
+

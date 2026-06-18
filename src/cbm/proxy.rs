@@ -47,33 +47,38 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
 
     // Step 1: Extract the CBM tool name and its parameters
     let cbm_tool = params["arguments"]["cbm_tool"].as_str().unwrap_or("graph_search");
-    let tool_params = params["arguments"]["parameters"].clone();
 
     // Build the parameters object for CBM
-    let args = if tool_params.is_object() {
-        let mut merged = tool_params.as_object().unwrap().clone();
-        if !merged.contains_key("project") {
-            if let Some(p) = params["arguments"]["project"].as_str() {
-                merged.insert("project".into(), Value::String(p.to_string()));
+    let tool_params = match params["arguments"]["parameters"].as_object() {
+        Some(obj) => {
+            let mut merged = obj.clone();
+            if !merged.contains_key("project") {
+                if let Some(p) = params["arguments"]["project"].as_str() {
+                    merged.insert("project".into(), Value::String(p.to_string()));
+                }
             }
+            Value::Object(merged)
         }
-        Value::Object(merged)
-    } else {
-        let mut default = serde_json::Map::new();
-        if let Some(q) = params["arguments"]["query"].as_str() {
-            default.insert("query".into(), Value::String(q.to_string()));
+        None => {
+            // Handle non-object parameters (string query, etc.)
+            let mut default = serde_json::Map::new();
+            if let Some(q) = params["arguments"]["query"].as_str() {
+                default.insert("query".into(), Value::String(q.to_string()));
+            }
+            if let Some(p) = params["arguments"]["project"].as_str() {
+                default.insert("project".into(), Value::String(p.to_string()));
+            }
+            if let Some(f) = params["arguments"]["from"].as_str() {
+                default.insert("from".into(), Value::String(f.to_string()));
+            }
+            if let Some(t) = params["arguments"]["to"].as_str() {
+                default.insert("to".into(), Value::String(t.to_string()));
+            }
+            Value::Object(default)
         }
-        if let Some(p) = params["arguments"]["project"].as_str() {
-            default.insert("project".into(), Value::String(p.to_string()));
-        }
-        if let Some(f) = params["arguments"]["from"].as_str() {
-            default.insert("from".into(), Value::String(f.to_string()));
-        }
-        if let Some(t) = params["arguments"]["to"].as_str() {
-            default.insert("to".into(), Value::String(t.to_string()));
-        }
-        Value::Object(default)
     };
+
+    let args = tool_params;
 
     // Step 2: Forward to CBM via pipe — intercept the raw response text
     let raw_response = match bridge.proxy_call(cbm_tool, args) {
