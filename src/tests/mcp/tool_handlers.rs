@@ -481,3 +481,103 @@ fn micro_opcode_apply_expand_roundtrip_with_new_markers() {
     assert!(compressed.contains("§E"), "⊕⇒ should be compressed to §E");
     assert!(compressed.contains("§C"), "{{ and }} should be compressed to §C");
 }
+
+// ── Regression: relative path resolution ─────────────────────────
+// FAANG audit follow-up: ensure all handlers resolve relative paths
+// via resolve_file_path() instead of using bare PathBuf::from().
+// This prevents "file not found" errors when clients pass relative
+// paths (e.g., "src/cbm/client.rs") to the MCP pipeline.
+
+#[test]
+fn resolve_file_path_absolute_is_passthrough() {
+    use crate::mcp::tool_helpers::resolve_file_path;
+    let abs = if cfg!(windows) {
+        "C:\\projects\\foo\\bar.rs".to_string()
+    } else {
+        "/projects/foo/bar.rs".to_string()
+    };
+    let result = resolve_file_path(&abs, None);
+    assert_eq!(result, abs);
+}
+
+#[test]
+fn resolve_file_path_relative_joins_cwd() {
+    use crate::mcp::tool_helpers::resolve_file_path;
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let result = resolve_file_path("src/lib.rs", None);
+    let expected = cwd.join("src/lib.rs").to_string_lossy().into_owned();
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn resolve_file_path_with_workspace_root() {
+    use crate::mcp::tool_helpers::resolve_file_path;
+    let abs_root = if cfg!(windows) { "D:\\myproject" } else { "/home/user/myproject" };
+    let result = resolve_file_path("src/main.ts", Some(abs_root));
+    let expected = if cfg!(windows) {
+        "D:\\myproject\\src\\main.ts"
+    } else {
+        "/home/user/myproject/src/main.ts"
+    };
+    assert_eq!(result.replace('\\', "/"), expected.replace('\\', "/"));
+}
+
+#[test]
+fn handle_compress_code_context_accepts_relative_path() {
+    use crate::mcp::tool_handlers::handle_compress_code_context;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    handle_compress_code_context(&id, &params, &mut state, "named");
+}
+
+#[test]
+fn handle_delta_code_context_accepts_relative_path() {
+    use crate::mcp::tool_handlers::handle_delta_code_context;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    handle_delta_code_context(&id, &params, &mut state);
+}
+
+#[test]
+fn handle_delta_text_context_accepts_relative_path() {
+    use crate::mcp::tool_handlers::handle_delta_text_context;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    handle_delta_text_context(&id, &params, &mut state);
+}
+
+#[test]
+fn handle_diff_code_context_accepts_relative_path() {
+    use crate::mcp::tool_handlers::handle_diff_code_context;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    handle_diff_code_context(&id, &params, &mut state);
+}
+
+#[test]
+fn handle_restore_context_accepts_relative_path() {
+    use crate::mcp::tool_handlers::handle_restore_context;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    handle_restore_context(&id, &params, &mut state);
+}
+
+#[test]
+fn handle_provide_code_context_accepts_relative_path() {
+    use crate::mcp::tool_handlers::handle_provide_code_context;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "overview" } });
+    handle_provide_code_context(&id, &params, &mut state);
+}

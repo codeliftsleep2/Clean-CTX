@@ -12,8 +12,8 @@
 //   - state      : per-session state shared by all tool handlers (F-05)
 
 mod handlers;
-mod tool_handlers;
-mod tool_helpers;
+pub(crate) mod tool_handlers;
+pub(crate) mod tool_helpers;
 pub(crate) mod buffered_store;
 pub(crate) mod cache_hints;
 pub(crate) mod context_store;

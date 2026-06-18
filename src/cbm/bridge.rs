@@ -91,14 +91,14 @@ pub struct ChangeSet {
 // ── Internal cache ──────────────────────────────────────────────
 
 pub(crate) struct CachedGraphData {
-    data: Value,
-    expires_at: Instant,
+    pub(crate) data: Value,
+    pub(crate) expires_at: Instant,
 }
 
 /// Graph bridge with TTL caching and graceful degradation.
 pub struct GraphBridge {
     client: Option<CbmClient>,
-    cache: DashMap<String, CachedGraphData>,
+    pub(crate) cache: DashMap<String, CachedGraphData>,
     status: CbmStatus,
     cache_ttl: u64,
     project: Option<String>,
@@ -467,9 +467,10 @@ impl GraphBridge {
             if cached.value().expires_at > Instant::now() {
                 return true;
             }
-            // Expired — drop it (lazy GC eviction, H-3)
+            // Expired — clone key then drop guard before remove (avoids borrow conflict)
+            let owned_key = key.to_string();
             drop(cached);
-            self.cache.remove(key);
+            self.cache.remove(&owned_key);
         }
         false
     }
