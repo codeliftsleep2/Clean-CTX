@@ -37,5 +37,6 @@ pub mod dictionary;
 pub mod diff;
 pub mod angular_meta;
 pub mod ir;
+pub mod spring_meta;
 pub mod tokenizer;
 

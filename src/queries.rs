@@ -67,3 +67,32 @@ pub const RS_QUERY: &str = r#"
     ; Macro captures
     (macro_invocation) @macro.root
 "#;
+
+// Java AST node types: class_declaration, interface_declaration,
+//   method_declaration, constructor_declaration, field_declaration,
+//   enum_declaration, record_declaration, import_declaration,
+//   package_declaration, if_statement, for_statement, while_statement,
+//   do_statement, return_statement, throw_statement, try_statement,
+//   switch_statement
+pub const JAVA_QUERY: &str = r#"
+    ; Core structural captures
+    (class_declaration) @class.root
+    (interface_declaration) @interface.root
+    (enum_declaration) @enum.root
+    (record_declaration) @record.root
+    (method_declaration) @method.root
+    (constructor_declaration) @constructor.root
+    (field_declaration) @field.root
+    ; Import and package
+    (import_declaration) @import.root
+    (package_declaration) @package.root
+    ; Control flow captures
+    (if_statement) @if.root
+    (for_statement) @for.root
+    (while_statement) @while.root
+    (do_statement) @do.root
+    (return_statement) @return.root
+    (throw_statement) @throw.root
+    (try_statement) @try.root
+    (switch_statement) @switch.root
+"#;

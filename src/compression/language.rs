@@ -61,19 +61,55 @@ pub fn looks_like_rust(source: &str) -> bool {
     strong || signals >= 2
 }
 
+/// Returns `true` if the source text looks like Java. The heuristic
+/// requires multiple Java-specific signals to reduce false positives.
+/// Single keywords like `class` or `public` appear in other languages,
+/// so we require at least two signals or one strong signal
+/// (`package`, `import java`, `@Override`, `interface`).
+pub fn looks_like_java(source: &str) -> bool {
+    let has_package = source.contains("package ");
+    let has_import_java = source.contains("import java.");
+    let has_override = source.contains("@Override");
+    let has_interface = source.contains("interface ");
+    let has_class = source.contains("class ");
+    let has_public = source.contains("public ");
+    let has_private = source.contains("private ");
+    let has_protected = source.contains("protected ");
+    let has_extends = source.contains("extends ");
+    let has_implements = source.contains("implements ");
+
+    // Strong signals: package and import java are very Java-specific
+    let strong = has_package || has_import_java || has_override;
+
+    // Count all signals
+    let signals = [
+        has_package, has_import_java, has_override, has_interface,
+        has_class, has_public, has_private, has_protected,
+        has_extends, has_implements,
+    ]
+    .iter()
+    .filter(|&&x| x)
+    .count();
+
+    // Require either a strong signal or at least 2 signals
+    strong || signals >= 2
+}
+
 /// Pick the tree-sitter `Language` and query string for the given source
 /// content. When `extension` is supplied it is used as a hint to break
 /// ties; otherwise the content heuristic alone decides.
 ///
 /// The returned tuple is `(Language, &'static str query)` — the static
 /// query reference is safe because `crate::queries::TS_QUERY`,
-/// `crate::queries::CS_QUERY`, and `crate::queries::RS_QUERY` are all
-/// `'static` `&str` constants.
+/// `crate::queries::CS_QUERY`, `crate::queries::RS_QUERY`, and
+/// `crate::queries::JAVA_QUERY` are all `'static` `&str` constants.
 pub fn detect_language(source: &str) -> (Language, &'static str) {
     if looks_like_csharp(source) {
         (tree_sitter_c_sharp::language(), queries::CS_QUERY)
     } else if looks_like_rust(source) {
         (tree_sitter_rust::language(), queries::RS_QUERY)
+    } else if looks_like_java(source) {
+        (tree_sitter_java::language(), queries::JAVA_QUERY)
     } else {
         (tree_sitter_typescript::language_typescript(), queries::TS_QUERY)
     }
@@ -93,6 +129,7 @@ pub fn language_for_extension(extension: &str) -> Option<(Language, &'static str
         "ts" => Some((tree_sitter_typescript::language_typescript(), queries::TS_QUERY)),
         "cs" => Some((tree_sitter_c_sharp::language(), queries::CS_QUERY)),
         "rs" => Some((tree_sitter_rust::language(), queries::RS_QUERY)),
+        "java" => Some((tree_sitter_java::language(), queries::JAVA_QUERY)),
         _ => None,
     }
 }

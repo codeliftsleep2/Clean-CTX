@@ -798,6 +798,9 @@ pub(super) fn handle_provide_code_context(
                         }
                     });
 
+                    // Inject CBM enrichment metadata when available
+                    enrich_with_cbm(&mut response, &resolved_path, state);
+
                     // Inject baseline cache breakpoint for stable content
                     let cache_enabled = state.config.cache.enabled;
                     if cache_enabled {
@@ -920,6 +923,9 @@ pub(super) fn handle_provide_code_context(
                     }
                 }
             });
+
+            // Inject CBM enrichment metadata when available
+            enrich_with_cbm(&mut response, &resolved_path, state);
 
             // Inject tail cache breakpoint for dynamic content (5m TTL, never cached across turns)
             let cache_enabled = state.config.cache.enabled;
@@ -1491,6 +1497,74 @@ pub(super) fn handle_replay_history(
             "id": id,
             "error": { "code": -32603, "message": "Persistence DB not enabled." }
         }));
+    }
+}
+
+// ── CBM Enrichment ────────────────────────────────────────────────
+
+/// Inject CBM graph metadata into the `_meta` field of a `provide_code_context`
+/// response when the graph bridge is available.
+///
+/// Adds:
+///   - `cbm_status`: "available" | "degraded" | "unavailable"
+///   - `cbm_symbol_importance`: top symbols for this file (if any)
+///   - `cbm_architecture`: module count + dependency count (if cached)
+///
+/// When CBM is unavailable, only `cbm_status: "unavailable"` is added.
+/// This is a no-op for non-`provide_code_context` handlers.
+pub(super) fn enrich_with_cbm(
+    response: &mut serde_json::Value,
+    file_path: &str,
+    state: &mut McpState,
+) {
+    let meta = match response.get_mut("result").and_then(|r| r.get_mut("_meta")) {
+        Some(m) => m,
+        None => return,
+    };
+
+    // Surface CBM status
+    let status_str = state.cbm_status.summary().to_string();
+    meta["cbm_status"] = serde_json::Value::String(status_str.clone());
+
+    // If CBM is unavailable, stop here — no graph data to add
+    if status_str != "available" {
+        return;
+    }
+
+    // Query graph bridge for this file's metadata
+    let bridge = match state.graph_bridge.as_mut() {
+        Some(b) => b,
+        None => return,
+    };
+
+    // Symbol importance for this file
+    let importance = bridge.get_symbol_importance_mut();
+    let file_importance: Vec<_> = importance
+        .values()
+        .filter(|s| s.file.contains(file_path) || file_path.contains(&s.file))
+        .take(5)
+        .collect();
+
+    if !file_importance.is_empty() {
+        let symbols: Vec<serde_json::Value> = file_importance
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "symbol": s.symbol,
+                    "score": s.score,
+                    "file": s.file,
+                })
+            })
+            .collect();
+        meta["cbm_symbol_importance"] = serde_json::Value::Array(symbols);
+    }
+
+    // Architecture overview (cached, cheap)
+    if let Some(arch) = bridge.get_architecture() {
+        meta["cbm_architecture"] = serde_json::json!({
+            "modules": arch.modules.len(),
+            "dependencies": arch.dependencies.len(),
+        });
     }
 }
 
