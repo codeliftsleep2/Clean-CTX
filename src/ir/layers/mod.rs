@@ -17,7 +17,9 @@ use crate::compression::Fidelity;
 pub mod typescript;
 pub mod csharp;
 pub mod rust;
+pub mod java;
 pub mod angular;
+pub mod spring;
 pub mod patterns;
 
 /// Context passed to layer processing functions.

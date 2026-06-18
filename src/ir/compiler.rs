@@ -170,52 +170,35 @@ impl IRCompiler {
 
         let mut instructions = Vec::new();
 
-        // ── Layer 1: Core IR emission ──────────────────────────────────
+                // ── Layer 1: Core IR emission ──────────────────────────────────
         // Also invokes Layer 2 (LanguageLayer::process_capture) for each capture.
         for cap in &captures {
             match cap.name.as_str() {
-                "class.root" => {
-                    let class_id = self.next_id("C");
-                    instructions.push(CoreOp::DefClass(
-                        class_id.clone(),
-                        cap.text.clone(),
-                    ));
-                    self.current_class = Some(class_id.clone());
-                    layer_context.current_class = Some(class_id.clone());
-                    // F-FULL-14: Use cap.raw_text for current_class_name so the
-                    // class name includes any `extends`/`implements` suffixes
-                    // that language layers may need. Previously used cap.text
-                    // which is the *extracted* name (modifiers stripped).
-                    // For the Angular layer's phi-line parsing, store the
-                    // bare class name too (derived from cap.text).
-                    layer_context.current_class_name = Some(cap.raw_text.clone());
-                    layer_context.current_class_bare_name = Some(cap.text.clone());
+                // ── Type/capture-based actions ───────────────────────
+                // Each arm either:
+                //   A) Emits DefClass and sets up class context (for type-like captures)
+                //   B) Emits DefMethod (for method/constructor captures)
+                //   C) Emits DefField (for field captures)
+                //   D) Emits Import/TypeAlias (for import/type captures)
+                //   E) Accumulates flags (for control flow captures)
+                //   F) Passes through to language layers (for other captures)
+                //
+                // Type-like captures (emit DefClass):
+                //   class.root        - TS/C#/Java classes
+                //   interface.root    - TS/C#/Java interfaces
+                //   struct.root       - Rust structs, C# structs
+                //   enum.root         - TS/Rust/Java/C# enums
+                //   trait.root        - Rust traits
+                //   record.root       - Java/C# records
+                //
+                // Method-like captures (emit DefMethod):
+                //   method.root       - methods in all languages
+                //   constructor.root  - Java/C# constructors
+                //   func.root         - TS/JS standalone functions
+                //   arrow.root        - TS/JS arrow functions
 
-                    // NF-05: Register the class alias in the symbol table so
-                    // language layers (TypeScript, C#) can resolve aliases for
-                    // EXT/IMPL ops via `symbol_table.alias_for(&base_id)`.
-                    layer_context.symbol_table_mut().register(
-                        class_id.clone(),
-                        cap.text.clone(),
-                        SymbolKind::Class,
-                        file_id,
-                    );
-
-                    // Invoke language layers for class captures.
-                    // Pass raw_text so layers can parse extends/implements
-                    // from the full class head declaration.
-                    for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.raw_text,
-                            &mut layer_context,
-                        );
-                        instructions.extend(layer_ops);
-                    }
-                }
-                // Rust type declarations: struct, enum, trait
-                // These are treated as class definitions in the IR.
-                "struct.root" | "enum.root" | "trait.root" => {
+                // ── Type-like: DefClass + class context setup ────────
+                "class.root" | "interface.root" | "struct.root" | "enum.root" | "trait.root" | "record.root" => {
                     let class_id = self.next_id("C");
                     instructions.push(CoreOp::DefClass(
                         class_id.clone(),
@@ -233,7 +216,7 @@ impl IRCompiler {
                         file_id,
                     );
 
-                    // Invoke language layers for Rust type captures.
+                    // Invoke language layers for type-like captures.
                     for ll in self.language_layers.iter_mut() {
                         let layer_ops = ll.process_capture(
                             &cap.name,
@@ -244,22 +227,9 @@ impl IRCompiler {
                     }
                 }
                 // Rust impl blocks: emit trait impls with a class context.
-                // If no current class exists (standalone impl block without
-                // a preceding struct/enum/trait), emit a DefClass for the
-                // self-type so methods inside the impl are not silently lost.
-                // This mirrors the text pipeline's behavior where impl.root
-                // creates a structural entry via format_rust_type_entry.
-                //
-                // Phase C: The extracted cap.text for impl.root has the form
-                // "Type:Trait" (trait impl) or "Type" (inherent impl) after
-                // extract_rust_struct_name processing. We use only the type
-                // part (before ':') for the class name.
+                // If no current class exists, emit a DefClass for the self-type.
                 "impl.root" => {
                     if self.current_class.is_none() {
-                        // Extract the self-type name from the impl head.
-                        // cap.text is already processed through extract_rust_struct_name:
-                        //   "impl Trait for Type" → "Type:Trait"
-                        //   "impl Type" → "Type"
                         let self_type = cap.text.split(':').next()
                             .unwrap_or(&cap.text)
                             .to_string();
@@ -285,13 +255,29 @@ impl IRCompiler {
                         instructions.extend(layer_ops);
                     }
                 }
-                "method.root" => {
+                // ── Method-like: DefMethod + method context setup ────
+                "method.root" | "constructor.root" | "func.root" | "arrow.root" => {
                     let class_id = match &self.current_class {
                         Some(cid) => cid.clone(),
                         None => {
-                            // F-29: Skip method captures outside a class
-                            // instead of silently emitting with empty class id
-                            continue;
+                            // No class context: for standalone functions (func.root),
+                            // emit as a standalone method with a synthetic class.
+                            if cap.name == "func.root" || cap.name == "arrow.root" {
+                                // Create a synthetic class for the file
+                                let synt_id = self.next_id("C");
+                                instructions.push(CoreOp::DefClass(
+                                    synt_id.clone(),
+                                    format!("__file_{}", file_id),
+                                ));
+                                self.current_class = Some(synt_id.clone());
+                                layer_context.current_class = Some(synt_id.clone());
+                                layer_context.current_class_name = Some(format!("__file_{}", file_id));
+                                layer_context.current_class_bare_name = Some(format!("__file_{}", file_id));
+                                synt_id
+                            } else {
+                                // F-29: Skip method captures outside a class
+                                continue;
+                            }
                         }
                     };
 
@@ -310,8 +296,7 @@ impl IRCompiler {
                         &cap.text,
                     );
 
-                    // Invoke language layers for method captures.
-                    // Pass raw_text so layers can parse modifiers (async, static, etc.)
+                    // Invoke language layers for method-like captures.
                     for ll in self.language_layers.iter_mut() {
                         let layer_ops = ll.process_capture(
                             &cap.name,
@@ -321,6 +306,7 @@ impl IRCompiler {
                         instructions.extend(layer_ops);
                     }
                 }
+                // ── Field captures ───────────────────────────────────
                 "field.root" => {
                     let class_id = match &self.current_class {
                         Some(cid) => cid.clone(),
@@ -336,7 +322,6 @@ impl IRCompiler {
                         cap.text.clone(),
                     ));
 
-                    // Invoke language layers for field captures
                     for ll in self.language_layers.iter_mut() {
                         let layer_ops = ll.process_capture(
                             &cap.name,
@@ -346,10 +331,10 @@ impl IRCompiler {
                         instructions.extend(layer_ops);
                     }
                 }
-                "import.root" => {
+                // ── Import and package captures ──────────────────────
+                "import.root" | "package.root" => {
                     self.emit_import_ir(&mut instructions, &cap.text);
 
-                    // Invoke language layers for import captures
                     for ll in self.language_layers.iter_mut() {
                         let layer_ops = ll.process_capture(
                             &cap.name,
@@ -359,16 +344,14 @@ impl IRCompiler {
                         instructions.extend(layer_ops);
                     }
                 }
-                // Rust type aliases: type Foo = Bar; → TypeAlias
+                // ── Type alias captures (Rust `type Foo = Bar` and TS `type Foo = ...`) ──
                 "type.root" => {
                     let alias_id = self.next_id("T");
-                    // The extracted text is the alias name (e.g., "UserId")
                     instructions.push(CoreOp::TypeAlias(
                         alias_id,
                         cap.text.clone(),
                     ));
 
-                    // Invoke language layers for type alias captures
                     for ll in self.language_layers.iter_mut() {
                         let layer_ops = ll.process_capture(
                             &cap.name,
@@ -378,9 +361,8 @@ impl IRCompiler {
                         instructions.extend(layer_ops);
                     }
                 }
-                // Rust mod declarations: treated as structural imports
+                // ── Rust mod declarations: structural pass-through ──
                 "mod.root" => {
-                    // Invoke language layers for mod captures
                     for ll in self.language_layers.iter_mut() {
                         let layer_ops = ll.process_capture(
                             &cap.name,
@@ -390,16 +372,15 @@ impl IRCompiler {
                         instructions.extend(layer_ops);
                     }
                 }
-                // Control flow captures → FLAGS on the most recent method
+                // ── Control flow captures → FLAGS accumulation ──────
                 "if.root" => {
-                    // F-28: Accumulate in current_method_flags (O(1))
                     if self.current_method.is_some()
                         && !self.current_method_flags.contains(&FLAG_IF.to_string())
                     {
                         self.current_method_flags.push(FLAG_IF.to_string());
                     }
                 }
-                "for.root" | "while.root" => {
+                "for.root" | "while.root" | "loop.root" => {
                     if self.current_method.is_some()
                         && !self.current_method_flags.contains(&FLAG_LOOP.to_string())
                     {
@@ -420,8 +401,18 @@ impl IRCompiler {
                         self.current_method_flags.push(FLAG_THROW.to_string());
                     }
                 }
+                "do.root" | "try.root" | "switch.root" | "match.root" => {
+                    // Additional control flow: do-while, try-catch, switch,
+                    // Rust match expressions. Accumulate IF flag as a general
+                    // branching marker.
+                    if self.current_method.is_some()
+                        && !self.current_method_flags.contains(&FLAG_IF.to_string())
+                    {
+                        self.current_method_flags.push(FLAG_IF.to_string());
+                    }
+                }
+                // ── Pass-through to language layers for any other capture ──
                 _ => {
-                    // Invoke language layers for any other captures
                     for ll in self.language_layers.iter_mut() {
                         let layer_ops = ll.process_capture(
                             &cap.name,

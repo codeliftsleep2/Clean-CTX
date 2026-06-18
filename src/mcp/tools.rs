@@ -50,7 +50,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
+                    "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, .rs, or .java file." },
                     "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%). Default: 'low'." },
                     "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." },
                     "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." }
