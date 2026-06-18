@@ -33,6 +33,7 @@ use crate::mcp::workspace;
 use crate::mcp::cache_hints::{inject_cache_breakpoints, compute_workspace_breaker};
 use crate::protocol::send_response;
 use crate::tokenizer::{TokenizerKind, resolve_tokenizer_kind};
+use crate::cbm;
 
 // Re-import handlers from sibling modules
 use super::tool_handlers::*;
@@ -49,7 +50,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
+                    "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, .rs, or .java file." },
                     "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%). Default: 'low'." },
                     "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." },
                     "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." }
@@ -244,6 +245,9 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             }
         }),
     ]
+    .into_iter()
+    .chain(cbm::cbm_tool_list())
+    .collect()
 }
 
 /// Parse the `fidelity` arg from a `tools/call` params object. On
@@ -455,6 +459,27 @@ pub(crate) fn dispatch_tools_call(
         }
         "purge_old_deltas" => {
             handle_purge_old_deltas(id, params, state);
+        }
+        // ── CBM Integration tool dispatch (Phase 1) ──────────────
+        // Handlers live in crate::cbm::handlers — self-contained module.
+        "graph_search" => {
+            crate::cbm::handlers::handle_graph_search(id, params, state);
+        }
+        "graph_query" => {
+            crate::cbm::handlers::handle_graph_query(id, params, state);
+        }
+        "graph_trace" => {
+            crate::cbm::handlers::handle_graph_trace(id, params, state);
+        }
+        "get_architecture" => {
+            crate::cbm::handlers::handle_get_architecture(id, params, state);
+        }
+        "get_cbm_status" => {
+            crate::cbm::handlers::handle_get_cbm_status(id, params, state);
+        }
+        // ── Phase 2: Pipe-level interception proxy ──────────
+        "cbm_proxy" => {
+            crate::cbm::proxy::handle_cbm_proxy(id, params, state);
         }
         _ => {
             send_response(&serde_json::json!({

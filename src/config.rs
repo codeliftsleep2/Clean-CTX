@@ -320,6 +320,12 @@ pub struct CleanCtxConfig {
     /// stable content regions (vocabulary, tools, baselines).
     #[serde(default)]
     pub cache: CacheConfig,
+
+    /// CBM (codebase-memory-mcp) integration configuration.
+    /// Controls how Clean-CTX discovers, launches, and communicates
+    /// with the CBM server for graph intelligence.
+    #[serde(default)]
+    pub cbm: crate::cbm::CbmConfig,
 }
 
 /// Per-framework Meta-Layer configuration.
@@ -371,6 +377,7 @@ impl Default for CleanCtxConfig {
             auto_delta: default_true(),
             tokenizer: TokenizerKind::default(),
             cache: CacheConfig::default(),
+            cbm: crate::cbm::CbmConfig::default(),
         }
     }
 }

@@ -31,6 +31,7 @@ pub mod patterns;
 pub mod string_table;
 pub mod hierarchical;
 pub mod binary_wire;
+pub mod render_llm;
 
 // Re-export public types for downstream consumers.
 pub use opcodes::CoreOp;
@@ -61,6 +62,7 @@ pub use hierarchical::{
     ir_to_hierarchical_wire, wire_to_ir as hierarchical_wire_to_ir,
     estimate_savings as hierarchical_savings,
 };
+pub use render_llm::render_hierarchical_for_llm;
 pub use binary_wire::{
     BinaryDecodeError, encode, decode, estimate_savings as binary_savings,
     is_binary_wire, ir_to_binary_wire_json, binary_wire_json_to_ir,

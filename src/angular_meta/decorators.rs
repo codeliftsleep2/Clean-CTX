@@ -310,7 +310,12 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                     "output" => SignalKind::Output,
                     "model" => SignalKind::Model,
                     "inject" => SignalKind::Inject,
-                    _ => unreachable!(),
+                    // This match is exhaustive — the if/else above only matches these four.
+                    // Fallback to `Input` with a debug_assert for development safety.
+                    _ => {
+                        debug_assert!(false, "Unhandled signal kind: {}", func_name);
+                        SignalKind::Input
+                    }
                 };
 
                 // F-ANG-09: if the call is unterminated, treat as no alias.

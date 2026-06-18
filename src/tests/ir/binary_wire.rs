@@ -75,8 +75,8 @@ fn test_varint_small_values() {
     // Magic(2) + version(1) = 3 bytes header
     assert!(bytes.len() > 3, "binary output should have header");
     assert_eq!(bytes[0], 0xCC, "magic byte 1");
-    assert_eq!(bytes[1], 0x01, "magic byte 2");
-    assert_eq!(bytes[2], 0x01, "version byte");
+    assert_eq!(bytes[1], 0x02, "magic byte 2");
+    assert_eq!(bytes[2], 0x02, "version byte");
 }
 
 // ── Round-trip Tests ───────────────────────────────────────────────
@@ -224,14 +224,14 @@ fn test_decode_invalid_magic() {
 
 #[test]
 fn test_decode_unsupported_version() {
-    let data = vec![0xCC, 0x01, 0xFF];
+    let data = vec![0xCC, 0x02, 0xFF];
     let result = decode(&data);
     assert!(matches!(result, Err(BinaryDecodeError::UnsupportedVersion(0xFF))));
 }
 
 #[test]
 fn test_decode_truncated_header() {
-    let data = vec![0xCC, 0x01]; // missing version byte
+    let data = vec![0xCC, 0x02]; // missing version byte
     let result = decode(&data);
     assert!(matches!(result, Err(BinaryDecodeError::TruncatedData(_))));
 }
@@ -245,7 +245,8 @@ fn test_decode_empty() {
 #[test]
 fn test_decode_truncated_string_table() {
     // Valid header but no string table
-    let data = vec![0xCC, 0x01, 0x01];
+    // Legacy magic would be 0xCC,0x01,0x01 but current is 0xCC,0x02,0x02
+    let data = vec![0xCC, 0x02, 0x02];
     let result = decode(&data);
     assert!(matches!(result, Err(BinaryDecodeError::TruncatedData(_))));
 }

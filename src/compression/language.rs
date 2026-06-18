@@ -61,19 +61,87 @@ pub fn looks_like_rust(source: &str) -> bool {
     strong || signals >= 2
 }
 
+/// Returns `true` if the source text looks like Java. The heuristic
+/// requires multiple Java-specific signals to reduce false positives.
+/// Single keywords like `class` or `public` appear in other languages
+/// (especially TypeScript), so we require at least three signals or
+/// one strong signal (`package`, `import java`, `@Override`, etc.).
+///
+/// FAANG audit: Added `javax.`, `jakarta.`, and `org.springframework`
+/// as additional strong signals so Spring Boot / Jakarta EE files
+/// are correctly detected as Java even without `import java.`.
+/// Also added a TypeScript anti-signal check: files containing `=>`
+/// (arrow functions), `: boolean`, `: string` (TypeScript type
+/// annotations in method signatures), or TypeScript-style `import {`
+/// are unlikely to be Java.
+pub fn looks_like_java(source: &str) -> bool {
+    // Anti-signal: TypeScript/JavaScript constructs that should NEVER appear in Java.
+    if source.contains("=>") && !source.contains("->") {
+        return false; // Arrow functions → TypeScript, not Java
+    }
+    if source.contains("export ") || source.contains("export default") {
+        return false; // `export` keyword → TypeScript module, not Java
+    }
+    if let Some(import_line) = source.lines().find(|l| l.trim().starts_with("import ")) {
+        if import_line.contains('{') && !import_line.contains("static ") {
+            return false; // "import { Foo }" is TypeScript, not Java
+        }
+    }
+
+    let has_package = source.contains("package ");
+    let has_import_java = source.contains("import java.");
+    let has_import_javax = source.contains("import javax.");
+    let has_import_jakarta = source.contains("import jakarta.");
+    let has_import_spring = source.contains("import org.springframework");
+    let has_override = source.contains("@Override");
+    let has_interface = source.contains("interface ");
+    let has_class = source.contains("class ");
+    let has_public = source.contains("public ");
+    let has_private = source.contains("private ");
+    let has_protected = source.contains("protected ");
+    let has_extends = source.contains("extends ");
+    let has_implements = source.contains("implements ");
+
+    // Strong signals: Java-specific constructs
+    let strong = has_package
+        || has_import_java
+        || has_import_javax
+        || has_import_jakarta
+        || has_import_spring
+        || has_override;
+
+    // Count all signals
+    let signals = [
+        has_package, has_import_java, has_import_javax, has_import_jakarta,
+        has_import_spring, has_override, has_interface,
+        has_class, has_public, has_private, has_protected,
+        has_extends, has_implements,
+    ]
+    .iter()
+    .filter(|&&x| x)
+    .count();
+
+    // Require either a strong signal or at least 3 weak signals
+    // (increased from 2 to avoid false-positive on TypeScript files
+    //  that use `class` + `public` + `private`)
+    strong || signals >= 3
+}
+
 /// Pick the tree-sitter `Language` and query string for the given source
 /// content. When `extension` is supplied it is used as a hint to break
 /// ties; otherwise the content heuristic alone decides.
 ///
 /// The returned tuple is `(Language, &'static str query)` — the static
 /// query reference is safe because `crate::queries::TS_QUERY`,
-/// `crate::queries::CS_QUERY`, and `crate::queries::RS_QUERY` are all
-/// `'static` `&str` constants.
+/// `crate::queries::CS_QUERY`, `crate::queries::RS_QUERY`, and
+/// `crate::queries::JAVA_QUERY` are all `'static` `&str` constants.
 pub fn detect_language(source: &str) -> (Language, &'static str) {
     if looks_like_csharp(source) {
         (tree_sitter_c_sharp::language(), queries::CS_QUERY)
     } else if looks_like_rust(source) {
         (tree_sitter_rust::language(), queries::RS_QUERY)
+    } else if looks_like_java(source) {
+        (tree_sitter_java::language(), queries::JAVA_QUERY)
     } else {
         (tree_sitter_typescript::language_typescript(), queries::TS_QUERY)
     }
@@ -93,6 +161,7 @@ pub fn language_for_extension(extension: &str) -> Option<(Language, &'static str
         "ts" => Some((tree_sitter_typescript::language_typescript(), queries::TS_QUERY)),
         "cs" => Some((tree_sitter_c_sharp::language(), queries::CS_QUERY)),
         "rs" => Some((tree_sitter_rust::language(), queries::RS_QUERY)),
+        "java" => Some((tree_sitter_java::language(), queries::JAVA_QUERY)),
         _ => None,
     }
 }
