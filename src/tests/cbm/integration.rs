@@ -34,8 +34,11 @@ fn enrich_with_cbm_compresses_symbol_importance() {
 #[test]
 fn enrich_with_cbm_degraded_status_skips_enrichment() {
     use crate::mcp::tool_handlers::enrich_with_cbm;
-    let config = crate::config::CleanCtxConfig::default();
+    // Disable CBM in config so GraphBridge::try_create sets Unavailable
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.cbm.enabled = false;
     let mut state = crate::mcp::McpState::new(config);
+    // Set degraded status to simulate a previously-degraded CBM
     state.cbm_status = crate::cbm::config::CbmStatus::Degraded("slow".into());
 
     let mut response = json!({
@@ -48,9 +51,13 @@ fn enrich_with_cbm_degraded_status_skips_enrichment() {
 
     enrich_with_cbm(&mut response, "src/test.rs", &mut state);
     let meta = response.pointer("/result/_meta").unwrap();
-    assert_eq!(meta["cbm_status"].as_str().unwrap(), "degraded");
-    // Should bail early — no bridge queries when degraded
-    assert!(meta.get("cbm_enrichment").is_none());
+    // When CBM is disabled, the bridge is None, so update_status() won't
+    // overwrite our manual status. The status should still be "degraded".
+    assert_eq!(meta["cbm_status"].as_str().unwrap(), "degraded",
+        "CBM status should remain degraded when bridge is disabled");
+    // Should bail early — no enrichment when status is not "available"
+    assert!(meta.get("cbm_enrichment").is_none(),
+        "should not inject enrichment when CBM is not available");
 }
 
 #[test]
