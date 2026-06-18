@@ -7,39 +7,56 @@
 //   interface_declaration, field_declaration, throw_statement,
 //   for_statement, if_statement, while_statement,
 //   return_statement, using_directive
+//
+// FAANG audit: expanded all queries to capture the full set of
+// structural, control-flow, and Java/Rust-specific constructs.
+// Every language now captures: class/enum/interface/record types,
+// methods, fields, constructors, control flow, imports, and
+// language-specific items (package, mod, macro, type alias, etc.).
 
 pub const TS_QUERY: &str = r#"
+    ; --- TypeScript/JavaScript structural captures ---
     (class_declaration) @class.root
     (method_definition) @method.root
     (function_declaration) @func.root
+    (property_signature) @field.root
+    ; --- TypeScript-specific type declarations ---
+    (interface_declaration) @interface.root
+    (enum_declaration) @enum.root
+    (type_alias_declaration) @type.root
+    ; --- Control flow captures ---
     (throw_statement) @throw.root
     (for_statement) @for.root
     (if_statement) @if.root
     (while_statement) @while.root
     (return_statement) @return.root
+    ; --- Import captures ---
     (import_statement) @import.root
-    ; --- Angular Meta-Layer Phase 1 forward-compat captures ---
-    ; These captures expose decorator/object AST nodes for downstream
-    ; consumers. In Phase 1 the string-based Tier 1 extractor does
-    ; not need them, but they are available via the standard capture
-    ; pipeline. The default per-capture closure runs them through
-    ; `compact_expression`, which is a safe no-op for these nodes.
-    ; NOTE: `decorator_call_expression` is NOT a valid
-    ; tree-sitter-typescript node type and must not be added here.
+    ; --- Angular Meta-Layer forward-compat captures ---
     (decorator) @decorator.root
     (object) @object.root
 "#;
 
 pub const CS_QUERY: &str = r#"
+    ; --- C# structural captures ---
     (class_declaration) @class.root
     (method_declaration) @method.root
     (interface_declaration) @interface.root
+    (struct_declaration) @struct.root
+    (enum_declaration) @enum.root
+    (record_declaration) @record.root
     (field_declaration) @field.root
+    (constructor_declaration) @constructor.root
+    ; --- Control flow captures ---
     (throw_statement) @throw.root
     (for_statement) @for.root
     (if_statement) @if.root
     (while_statement) @while.root
+    (do_statement) @do.root
     (return_statement) @return.root
+    (switch_statement) @switch.root
+    (try_statement) @try.root
+    ; --- Import captures ---
     (using_directive) @import.root
 "#;
 
@@ -56,6 +73,7 @@ pub const RS_QUERY: &str = r#"
     (function_item) @method.root
     (type_item) @type.root
     (field_declaration) @field.root
+    ; Import and module captures
     (use_declaration) @import.root
     (mod_item) @mod.root
     ; Control flow captures
@@ -64,6 +82,12 @@ pub const RS_QUERY: &str = r#"
     (for_expression) @for.root
     (while_expression) @while.root
     (match_expression) @match.root
+    (loop_expression) @loop.root
+    ; Exception / panic captures
+    (macro_invocation
+        macro: (identifier) @_panic_macro
+        (#match? @_panic_macro "panic|unreachable|unimplemented|todo|assert")
+    ) @throw.root
     ; Macro captures
     (macro_invocation) @macro.root
 "#;

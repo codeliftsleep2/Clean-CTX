@@ -33,10 +33,14 @@ use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
 use super::string_table::StringTable;
 
-/// Magic bytes for the binary wire format: "CC" + version 01
-const MAGIC: [u8; 2] = [0xCC, 0x01];
-/// Current schema version
-const VERSION: u8 = 0x01;
+/// Magic bytes for the binary wire format: "CC" + version marker
+const MAGIC: [u8; 2] = [0xCC, 0x02];
+/// Binary wire format version:
+/// 0x01 = Original (long TYPE op names like "NG_COMPONENT_Foo")
+/// 0x02 = Abbreviated (@-prefixed TYPE ops like "@cmp")
+const VERSION: u8 = 0x02;
+/// Legacy version 0x01 (long TYPE op names) — still supported for decode.
+const VERSION_LEGACY: u8 = 0x01;
 
 /// Opcode index assignment (0-14)
 const OP_DEF_C: u8 = 0;
@@ -177,7 +181,10 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
     buf.extend_from_slice(&MAGIC);
     buf.push(VERSION);
 
-    // 2. String table
+    // 2. IR version (edit sequence number)
+    write_varint(&mut buf, ir.version);
+
+    // 3. String table
     write_varint(&mut buf, strings.len() as u64);
     for s in &strings {
         write_string(&mut buf, s);
@@ -336,12 +343,23 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
     if data[0] != MAGIC[0] || data[1] != MAGIC[1] {
         return Err(BinaryDecodeError::InvalidMagic);
     }
-    if data[2] != VERSION {
+    if data[2] != VERSION && data[2] != VERSION_LEGACY {
         return Err(BinaryDecodeError::UnsupportedVersion(data[2]));
     }
     let mut pos = 3;
 
-    // 2. String table
+    // 2. IR version (edit sequence number) — only in VERSION (0x02)
+    let ir_version = if data[2] == VERSION {
+        let (ver, consumed) = read_varint(&data[pos..])
+            .ok_or_else(|| BinaryDecodeError::TruncatedData("IR version".into()))?;
+        pos += consumed;
+        ver
+    } else {
+        // VERSION_LEGACY (0x01) — no IR version stored
+        0
+    };
+
+    // 3. String table
     let (table_len, consumed) = read_varint(&data[pos..])
         .ok_or_else(|| BinaryDecodeError::TruncatedData("string table count".into()))?;
     pos += consumed;
@@ -507,12 +525,13 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
         instructions.push(op);
     }
 
-    // Note: The binary format doesn't encode file_id or version in the
-    // same way as JSON. We extract what we can from the header.
+    // Note: The binary format doesn't encode file_id or the IR version
+    // (edit sequence count). The caller (e.g. sqlite_store) is responsible
+    // for setting file_id and version from the DB columns.
     Ok(CompiledIR {
         file_id: "bin".to_string(),
         instructions,
-        version: VERSION as u64,
+        version: ir_version,
     })
 }
 

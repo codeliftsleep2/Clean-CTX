@@ -98,7 +98,10 @@ pub(super) fn compile_file_ir(
     use crate::ir::compiler::IRCompiler;
     use crate::ir::layers::typescript::TypeScriptLayer;
     use crate::ir::layers::csharp::CSharpLayer;
+    use crate::ir::layers::rust::RustLayer;
+    use crate::ir::layers::java::JavaLayer;
     use crate::ir::layers::angular::AngularMetaLayer;
+    use crate::ir::layers::spring::SpringMetaLayer;
     use crate::compression::language::language_for_extension;
 
     // Use source_cache via state.read_source() — Finding 1
@@ -131,16 +134,23 @@ pub(super) fn compile_file_ir(
             compiler.add_language_layer(Box::new(CSharpLayer::new()));
         }
         "rs" => {
-            compiler.add_language_layer(Box::new(
-                crate::ir::layers::rust::RustLayer::new()
-            ));
+            compiler.add_language_layer(Box::new(RustLayer::new()));
+        }
+        "java" => {
+            compiler.add_language_layer(Box::new(JavaLayer::new()));
         }
         _ => {}
     }
 
-    // Add Angular meta layer (Layer 3) for TypeScript files
-    if extension == "ts" || extension == "js" {
-        compiler.add_meta_layer(Box::new(AngularMetaLayer::new()));
+    // Add framework meta layers (Layer 3)
+    match extension {
+        "ts" | "js" => {
+            compiler.add_meta_layer(Box::new(AngularMetaLayer::new()));
+        }
+        "java" => {
+            compiler.add_meta_layer(Box::new(SpringMetaLayer::new()));
+        }
+        _ => {}
     }
 
     // F-07 (FAANG audit): Wire the additive CodePatternRecognizer into
