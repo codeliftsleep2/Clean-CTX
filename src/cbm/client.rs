@@ -105,10 +105,8 @@ impl CbmClient {
             .name("cbm-stderr-drain".into())
             .spawn(move || {
                 let reader = BufReader::new(stderr);
-                for line in reader.lines() {
-                    if let Ok(l) = line {
-                        eprintln!("[cbm-stderr] {l}");
-                    }
+                for l in reader.lines().map_while(Result::ok) {
+                    eprintln!("[cbm-stderr] {l}");
                 }
             })
             .ok();
@@ -203,7 +201,7 @@ impl CbmClient {
                             format!("response >{}B", MAX_RESPONSE_BYTES)
                         ));
                     }
-                    if let Ok(_) = serde_json::from_str::<Value>(buf.trim()) {
+                    if serde_json::from_str::<Value>(buf.trim()).is_ok() {
                         // Valid complete JSON — return the raw intercepted text
                         return Ok(buf);
                     }

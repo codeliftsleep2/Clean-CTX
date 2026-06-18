@@ -10,7 +10,6 @@
 // meta-layer abbreviation in compiled output.
 
 use crate::mcp::tools::{parse_fidelity_arg, resolve_fidelity};
-use crate::ir::layers::MetaLayer;
 use crate::compression::Fidelity;
 use serde_json::json;
 
@@ -436,7 +435,7 @@ fn mcp_state_llm_text_cache_insert_and_read() {
 fn mcp_state_llm_text_cache_miss_returns_none() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
-    assert!(state.llm_text_cache.get("nonexistent").is_none());
+    assert!(!state.llm_text_cache.contains_key("nonexistent"));
 }
 
 #[test]

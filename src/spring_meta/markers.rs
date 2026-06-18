@@ -65,6 +65,7 @@ pub enum PhiLineKind {
 impl PhiLineKind {
     /// The `Φ` marker prefix for this kind (e.g. `"Φrest:"`).
     /// For prefix-less tokens (`ΦBUNDLE`, `ΦMAP`) the colon is omitted.
+    #[allow(dead_code)]
     pub fn marker_prefix(self) -> &'static str {
         match self {
             Self::RestController => "Φrest:",
@@ -109,6 +110,7 @@ impl PhiLineKind {
     /// before shorter ones to prevent partial-match issues in string
     /// replacement (defensive — the current vocabulary has no overlaps,
     /// but this ordering is cheap insurance).
+    #[allow(dead_code)]
     pub fn all_in_expand_order() -> &'static [PhiLineKind] {
         &[
             Self::RestController, // Φrest:   (6 chars)
@@ -373,17 +375,15 @@ pub struct RequestMappingMapping {
     pub path: String,
 }
 
-impl RequestMappingMapping {
-    /// Format as `METHOD /path` or just `/path` if no method.
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for RequestMappingMapping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(ref m) = self.method {
-            format!("{} {}", m, self.path)
+            write!(f, "{} {}", m, self.path)
         } else {
-            self.path.clone()
+            write!(f, "{}", self.path)
         }
     }
 }
-
 // ---------------------------------------------------------------------------
 // build_* free functions — thin wrappers preserving the public API
 // ---------------------------------------------------------------------------
@@ -456,6 +456,7 @@ pub fn build_configuration_properties_line(class_name: &str) -> String {
 ///
 /// Adding a new marker to the vocabulary only requires updating
 /// [`PhiLineKind`] — this function is generic and needs no edits.
+#[allow(dead_code)]
 pub fn expand_phi_in_line(line: &str) -> String {
     let mut s = line.to_string();
     for &kind in PhiLineKind::all_in_expand_order() {
@@ -480,6 +481,3 @@ pub fn expand_phi(token: &str) -> Option<&'static str> {
     PhiLineKind::from_token(token).map(|k| k.expansion())
 }
 
-#[cfg(test)]
-#[path = "../tests/spring_meta/markers_tests.rs"]
-mod tests;

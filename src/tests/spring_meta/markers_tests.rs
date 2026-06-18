@@ -3,8 +3,7 @@
 
 use crate::spring_meta::markers::{
     build_autowired_line, build_bean_line, build_configuration_line,
-    build_configuration_properties_line, build_controller_line, build_repository_line,
-    build_request_mapping_line, build_rest_controller_line, build_service_line, build_value_line,
+    build_configuration_properties_line, build_controller_line, build_repository_line, build_rest_controller_line, build_service_line, build_value_line,
     expand_phi_in_line, PhiLineKind, RequestMappingMapping,
 };
 

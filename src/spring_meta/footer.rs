@@ -141,6 +141,3 @@ fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     }
 }
 
-#[cfg(test)]
-#[path = "../tests/spring_meta/footer_tests.rs"]
-mod tests;

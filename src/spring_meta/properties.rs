@@ -112,8 +112,8 @@ fn extract_properties_shape_impl(content: &str, shape: &mut PropertiesShape) {
             shape.keys.push(key.to_string());
 
             // Check for active profiles.
-            if key == "spring.profiles.active" || key == "spring.profiles.include" {
-                if i < len && (bytes[i] == b'=' || bytes[i] == b':') {
+            if (key == "spring.profiles.active" || key == "spring.profiles.include")
+                && i < len && (bytes[i] == b'=' || bytes[i] == b':') {
                     i += 1;
                     let value_start = i;
                     while i < len && bytes[i] != b'\n' && bytes[i] != b'\r' {
@@ -127,7 +127,6 @@ fn extract_properties_shape_impl(content: &str, shape: &mut PropertiesShape) {
                         }
                     }
                 }
-            }
         }
 
         // Skip to next line.
@@ -166,7 +165,7 @@ fn extract_yaml_shape(content: &str, shape: &mut PropertiesShape) {
         }
 
         // Calculate indentation level.
-        let line_start = i;
+        let _line_start = i;
         let mut indent = 0;
         while i < len && (bytes[i] == b' ' || bytes[i] == b'\t') {
             if bytes[i] == b' ' {
@@ -197,8 +196,8 @@ fn extract_yaml_shape(content: &str, shape: &mut PropertiesShape) {
             shape.keys.push(full_key.clone());
 
             // Check for active profiles using full path.
-            if full_key == "spring.profiles.active" || full_key == "spring.profiles.include" {
-                if i < len && (bytes[i] == b':' || bytes[i] == b'=') {
+            if (full_key == "spring.profiles.active" || full_key == "spring.profiles.include")
+                && i < len && (bytes[i] == b':' || bytes[i] == b'=') {
                     i += 1;
                     // Skip whitespace.
                     while i < len && (bytes[i] == b' ' || bytes[i] == b'\t') {
@@ -217,7 +216,6 @@ fn extract_yaml_shape(content: &str, shape: &mut PropertiesShape) {
                         }
                     }
                 }
-            }
 
             // If this is a leaf value (line ends after value), pop from path.
             if i < len && (bytes[i] == b':' || bytes[i] == b'=') {
@@ -240,6 +238,3 @@ fn extract_yaml_shape(content: &str, shape: &mut PropertiesShape) {
     shape.profiles.dedup();
 }
 
-#[cfg(test)]
-#[path = "../tests/spring_meta/properties_tests.rs"]
-mod tests;

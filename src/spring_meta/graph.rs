@@ -60,6 +60,7 @@ pub struct SpringGraphBuilder {
     endpoints: HashMap<String, String>,
     /// className → set of classNames that inject this class.
     /// Built by [`SpringGraphBuilder::build`].
+    #[allow(dead_code)]
     injected_by: HashMap<String, BTreeSet<String>>,
 }
 
@@ -396,6 +397,3 @@ impl GraphCollector {
     }
 }
 
-#[cfg(test)]
-#[path = "../tests/spring_meta/graph_tests.rs"]
-mod tests;

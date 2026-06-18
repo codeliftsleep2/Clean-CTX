@@ -67,7 +67,7 @@ pub fn compute_pagerank(
     }
 
     // Add IR-only symbols (not in CBM)
-    for (sym, _) in &ir_scores {
+    for sym in ir_scores.keys() {
         if !result.contains_key(sym) {
             let ir = normalized_ir.get(sym.as_str()).copied().unwrap_or(0.0);
             let combined = ir * ir_w; // cbm = 0.0

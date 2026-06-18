@@ -189,7 +189,7 @@ fn render_methods(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
         // Method body (params, return type, flags)
         let has_params = !method.params.is_empty();
         let has_return = method.return_type.is_some();
-        let has_flags = method.flags.as_ref().map_or(false, |f| !f.is_empty());
+        let has_flags = method.flags.as_ref().is_some_and(|f| !f.is_empty());
 
         if has_params || has_return || has_flags {
             output.push_str("  →");

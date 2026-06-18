@@ -2,7 +2,6 @@
 // Tests for Spring Boot annotation extraction.
 
 use crate::spring_meta::annotations::extract_annotations;
-use crate::spring_meta::markers::PhiLineKind;
 
 #[test]
 fn test_rest_controller_extraction() {

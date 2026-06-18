@@ -46,7 +46,7 @@ pub fn cbm_informed_fidelity(
     let mut max_score = 0.0_f64;
     let mut any_match = false;
 
-    for (_, info) in symbol_importance {
+    for info in symbol_importance.values() {
         // Check if this symbol's file path matches our target
         if !file_path.contains(&info.file) && !info.file.contains(file_path) {
             continue;
