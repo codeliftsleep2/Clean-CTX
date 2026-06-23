@@ -7,7 +7,6 @@
 // response via `send_response`. Handlers are called from
 // `dispatch_tools_call` in `tools.rs`.
 
-use std::collections::HashSet;
 use std::path::PathBuf;
 use serde_json::Value;
 use crate::compressor::{compress_file, Fidelity};
@@ -792,7 +791,7 @@ pub(super) fn handle_provide_code_context(
 
     // Ensure a (possibly empty) entry exists for this file so the
     // capture pipeline always has a clear answer even when CBM is off.
-    state.cbm_filter.skip_sets.entry(resolved_path.clone()).or_insert_with(HashSet::new);
+    state.cbm_filter.skip_sets.entry(resolved_path.clone()).or_default();
 
     // Execute based on strategy
     match decision.strategy {

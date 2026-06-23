@@ -374,8 +374,8 @@ pub fn build_output_lines(
 
     for cap in all_captures {
         // CBM filter-first: skip low-importance symbols
-        if let Some(ref skip) = skip_set {
-            if !skip.is_empty() && should_skip_capture(&cap, skip) {
+        if let Some(skip) = skip_set {
+            if !skip.is_empty() && should_skip_capture(cap, skip) {
                 continue;
             }
         }
