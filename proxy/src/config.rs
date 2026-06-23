@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 /// Per-program filter override configuration.
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct ToolFilterConfig {
     /// Global enable/disable for all filters.
     pub enabled: bool,
@@ -20,8 +21,10 @@ pub struct ToolFilterConfig {
     pub disabled_programs: HashSet<String>,
 }
 
+#[allow(dead_code)]
 impl ToolFilterConfig {
     /// Parse from a JSON value (for .clean-ctx.json config file).
+    #[allow(dead_code)]
     pub fn from_json(value: &serde_json::Value) -> Self {
         let enabled = value["enabled"].as_bool().unwrap_or(true);
 
@@ -51,11 +54,13 @@ impl ToolFilterConfig {
     }
 
     /// Check if a program is disabled.
+    #[allow(dead_code)]
     pub fn is_disabled(&self, program: &str) -> bool {
         self.disabled_programs.contains(program)
     }
 
     /// Get max_lines override for a program.
+    #[allow(dead_code)]
     pub fn max_lines_for(&self, program: &str) -> Option<usize> {
         self.max_lines_overrides.get(program).copied()
     }

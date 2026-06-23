@@ -13,6 +13,7 @@ use crate::filter_rules::{FilterFile, compile_filter_file};
 /// Error loading filters.
 #[derive(Debug)]
 pub enum FilterLoaderError {
+    #[allow(dead_code)]
     NoFilterDirectory,
     IoError(std::io::Error),
     ParseError(String),
@@ -97,6 +98,7 @@ pub fn load_builtin_filters() -> FilterRegistry {
 ///
 /// This executes the `[[tests]]` blocks in TOML files and validates
 /// that filters produce expected output. Returns (passed, failed, errors).
+#[allow(dead_code)]
 pub fn validate_filters(registry: &FilterRegistry) -> (usize, usize, Vec<String>) {
     let mut passed = 0;
     let mut failed = 0;
@@ -122,6 +124,7 @@ pub fn validate_filters(registry: &FilterRegistry) -> (usize, usize, Vec<String>
 }
 
 /// Validate a single filter's tests.
+#[allow(dead_code)]
 fn validate_single_filter(_filter: &crate::filter_rules::CompiledFilter) -> (usize, usize, Vec<String>) {
     let passed = 0;
     let failed = 0;
