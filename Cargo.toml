@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "clean-ctx"
-version = "0.1.6"
+version = "0.2.0-rc1"
 edition = "2024"
 rust-version = "1.85"
 license = "CC0-1.0"
@@ -60,6 +60,12 @@ base64 = "0.22"
 dashmap = "6.1"
 # High-resolution timestamps for persistence metadata
 chrono = { version = "0.4", features = ["serde"] }
+
+# Derive macro for structured error types
+thiserror = "2"
+
+# Synchronous HTTP client for proxy stats endpoint (Phase 2)
+ureq = { version = "3", features = ["json"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"

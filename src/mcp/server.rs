@@ -199,11 +199,16 @@ fn read_request_line<R: BufRead>(handle: &mut R) -> Option<Result<String, Oversi
 /// request, corrupting it.
 fn drain_line<R: BufRead>(handle: &mut R) {
     let mut sink = String::new();
+    let mut drained: usize = 0;
     while let Ok(n) = handle.read_line(&mut sink) {
         if n == 0 || sink.ends_with('\n') {
             break;
         }
+        drained = drained.saturating_add(n);
         sink.clear();
+    }
+    if drained > 0 {
+        eprintln!("[clean-ctx] WARNING: Drained {} oversize bytes from stdin", drained);
     }
 }
 

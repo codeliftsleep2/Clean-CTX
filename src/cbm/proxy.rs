@@ -120,6 +120,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
                 false,
                 "cbm_proxy",
                 None,
+                "cbm_filter",
             );
 
             send_response(&serde_json::json!({

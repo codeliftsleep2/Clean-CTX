@@ -66,6 +66,8 @@ pub struct ContextDecision {
     pub source_line_count: usize,
     /// V2: the file classification that was used (or General if none).
     pub file_class: FileClass,
+    /// Whether the CBM Intelligence Layer influenced this decision.
+    pub cbm_informed: bool,
 }
 
 impl ContextDecision {
@@ -84,9 +86,10 @@ impl ContextDecision {
             FileClass::Implementation => "implementation",
             FileClass::General => "general",
         };
+        let cbm_str = if self.cbm_informed { "cbm_informed" } else { "no_cbm" };
         format!(
-            "fidelity={:?}, strategy={}, class={}, angular={}, lines={}",
-            self.fidelity, strategy_str, class_str, angular_str, self.source_line_count
+            "fidelity={:?}, strategy={}, class={}, angular={}, lines={}, cbm={}",
+            self.fidelity, strategy_str, class_str, angular_str, self.source_line_count, cbm_str
         )
     }
 }
@@ -527,6 +530,7 @@ pub fn decide(
         is_angular,
         source_line_count: line_count,
         file_class,
+        cbm_informed: false,
     }
 }
 

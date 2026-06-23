@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use serde_json::Value;
 
 use crate::cbm::config::CbmStatus;
@@ -49,7 +49,15 @@ pub struct CbmClient {
     request_id: AtomicU64,
     status: CbmStatus,
     timeout: Duration,
+    /// Circuit breaker: consecutive transient failures.
+    consecutive_failures: u32,
+    /// When the circuit opened (set to Degraded). None when circuit is closed.
+    degraded_since: Option<Instant>,
 }
+
+/// Circuit breaker settings.
+const MAX_CONSECUTIVE_FAILURES: u32 = 3;
+const CIRCUIT_COOLDOWN_SECS: u64 = 30;
 
 /// Determines whether a CBM error is transient and should be retried.
 ///
@@ -119,10 +127,58 @@ impl CbmClient {
             request_id: AtomicU64::new(1),
             status: CbmStatus::Available,
             timeout,
+            consecutive_failures: 0,
+            degraded_since: None,
         }))
     }
 
     pub fn status(&self) -> &CbmStatus { &self.status }
+
+    // ── Circuit breaker ─────────────────────────────────────────
+
+    /// Check if the circuit is open (too many recent failures).
+    /// Returns true if the circuit allows the call, false if it's tripped.
+    ///
+    /// If the circuit is open but the cooldown has elapsed, it resets
+    /// automatically and allows the next call through (half-open state).
+    pub(crate) fn circuit_allows(&mut self) -> bool {
+        if self.consecutive_failures < MAX_CONSECUTIVE_FAILURES {
+            return true;
+        }
+        // Circuit is open — check if cooldown has elapsed
+        if let Some(since) = self.degraded_since {
+            if since.elapsed() >= Duration::from_secs(CIRCUIT_COOLDOWN_SECS) {
+                // Cooldown elapsed — reset to half-open, allow one try
+                self.consecutive_failures = 0;
+                self.degraded_since = None;
+                self.status = CbmStatus::Available;
+                eprintln!("[clean-ctx-cbm] Circuit cooldown elapsed, trying again…");
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Record a successful query — resets the failure counter.
+    pub(crate) fn record_success(&mut self) {
+        self.consecutive_failures = 0;
+        self.degraded_since = None;
+        // Don't overwrite status if it was explicitly set to Available
+        if matches!(self.status, CbmStatus::Degraded(_)) {
+            self.status = CbmStatus::Available;
+        }
+    }
+
+    /// Record a transient failure — increments the counter, degrades if threshold reached.
+    pub(crate) fn record_failure(&mut self) {
+        self.consecutive_failures += 1;
+        if self.consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
+            self.status = CbmStatus::Degraded(format!("circuit_open_after_{}_failures", MAX_CONSECUTIVE_FAILURES));
+            self.degraded_since = Some(Instant::now());
+            eprintln!("[clean-ctx-cbm] Circuit opened after {} consecutive failures",
+                MAX_CONSECUTIVE_FAILURES);
+        }
+    }
 
     /// Send a JSON-RPC 2.0 request and read the raw response text.
     ///
@@ -141,6 +197,9 @@ impl CbmClient {
     /// once with exponential backoff before giving up. Delegates to
     /// `call_tool_raw_inner` for the actual pipe I/O.
     pub fn call_tool_raw(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError> {
+        if !self.circuit_allows() {
+            return Err(CbmError::ConnectionLost("circuit breaker open".into()));
+        }
         let max_retries = 1;
         let mut retry_count = 0;
         let mut backoff = Duration::from_millis(100);
@@ -148,13 +207,20 @@ impl CbmClient {
         loop {
             // Value::clone() is cheap — a few ref-count bumps for JSON strings/arrays
             match self.call_tool_raw_inner(tool_name, args.clone()) {
-                Ok(result) => return Ok(result),
+                Ok(result) => {
+                    self.record_success();
+                    return Ok(result);
+                }
                 Err(e) if retry_count < max_retries && is_retryable(&e) => {
                     retry_count += 1;
+                    self.record_failure();
                     std::thread::sleep(backoff);
                     backoff *= 2; // Exponential backoff
                 }
-                Err(e) => return Err(e),
+                Err(e) => {
+                    self.record_failure();
+                    return Err(e);
+                }
             }
         }
     }
@@ -222,6 +288,9 @@ impl CbmClient {
     /// Retries transient errors (timeout, connection lost, internal error)
     /// once with exponential backoff before giving up.
     pub fn call_tool(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
+        if !self.circuit_allows() {
+            return Err(CbmError::ConnectionLost("circuit breaker open".into()));
+        }
         let max_retries = 1;
         let mut retry_count = 0;
         let mut backoff = Duration::from_millis(100);
@@ -229,13 +298,20 @@ impl CbmClient {
         loop {
             // Value::clone() is cheap (~a few ref-count bumps for JSON strings/arrays)
             match self.call_tool_inner(tool_name, args.clone()) {
-                Ok(result) => return Ok(result),
+                Ok(result) => {
+                    self.record_success();
+                    return Ok(result);
+                }
                 Err(e) if retry_count < max_retries && is_retryable(&e) => {
                     retry_count += 1;
+                    self.record_failure();
                     std::thread::sleep(backoff);
                     backoff *= 2; // Exponential backoff
                 }
-                Err(e) => return Err(e),
+                Err(e) => {
+                    self.record_failure();
+                    return Err(e);
+                }
             }
         }
     }
@@ -262,7 +338,6 @@ impl CbmClient {
         // C-1 fix: accumulate lines until we have complete JSON.
         let mut buf = String::new();
         let deadline = std::time::Instant::now() + self.timeout;
-        const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024; // 4 MB safety bound
         loop {
             if std::time::Instant::now() > deadline {
                 let _ = self.child.kill();
@@ -367,7 +442,7 @@ impl CbmClient {
         Ok(inner["rows"].as_array()
             .map(|rows| {
                 rows.iter().filter_map(|row| {
-                    row.as_array().map(|cols| cols.clone())
+                    row.as_array().cloned()
                 }).collect()
             })
             .unwrap_or_default())
@@ -385,7 +460,7 @@ impl CbmClient {
         );
         let rows = self.query_graph(&cypher, project)?;
         Ok(rows.into_iter().map(|row| {
-            let name = row.get(0).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let name = row.first().and_then(|v| v.as_str()).unwrap_or("").to_string();
             let file = row.get(1).and_then(|v| v.as_str()).unwrap_or("").to_string();
             let in_degree = row.get(2).and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
             let out_degree = row.get(3).and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
@@ -408,7 +483,7 @@ impl CbmClient {
         let rows = self.query_graph(&cypher, project)?;
         Ok(rows.into_iter().map(|row| {
             serde_json::json!({
-                "name": row.get(0).and_then(|v| v.as_str()).unwrap_or(""),
+                "name": row.first().and_then(|v| v.as_str()).unwrap_or(""),
                 "file": row.get(1).and_then(|v| v.as_str()).unwrap_or(""),
                 "reason": "no callers",
             })
@@ -419,7 +494,16 @@ impl CbmClient {
 impl Drop for CbmClient {
     fn drop(&mut self) {
         let _ = self.child.kill();
-        let _ = self.child.wait();
+        // L-02 fix: don't hang indefinitely on unresponsive child.
+        // Poll try_wait with a deadline instead of blocking forever.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match self.child.try_wait() {
+                Ok(Some(_)) | Err(_) => break,
+                Ok(None) if Instant::now() > deadline => break,
+                Ok(None) => std::thread::sleep(Duration::from_millis(50)),
+            }
+        }
     }
 }
 

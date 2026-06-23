@@ -19,6 +19,7 @@ pub(crate) mod cache_hints;
 pub(crate) mod context_store;
 pub(crate) mod heuristics;
 pub(crate) mod prompts;
+pub(crate) mod proxy_stats;
 mod router;
 mod server;
 pub(crate) mod session_stats;

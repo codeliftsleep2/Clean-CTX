@@ -172,12 +172,16 @@ pub(super) fn compile_file_ir(
         crate::ir::patterns::CompressingPatternRecognizer::new(),
     ));
 
+    // CBM filter-first: pass the skip set so low-importance symbols
+    // are excluded from IR output entirely.
+    let skip_set = state.cbm_filter.skip_sets.get(file_path);
     let mut compiled = compiler.compile(
         source,
         &path_alias,
         language,
         query_string,
         fidelity,
+        skip_set,
     )?;
 
     // NF-02: Override the version with the next monotonic value.

@@ -8,9 +8,26 @@ use serde_json::Value;
 use crate::mcp::McpState;
 use crate::protocol::send_response;
 
+/// Circuit breaker guard: check if CBM is healthy before proceeding.
+/// Returns `true` if CBM is available, otherwise sends error response.
+fn check_cbm_healthy(id: &Value, state: &McpState) -> bool {
+    if state.cbm_status.summary() != "available" {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": { "code": -32603, "message": format!("CBM unavailable: {}", state.cbm_status.summary()) }
+        }));
+        return false;
+    }
+    true
+}
+
 /// M-3 fix: Factor out bridge extraction boilerplate.
 /// Returns `Some(&mut GraphBridge)` or sends "not available" error and returns `None`.
 fn with_bridge<'a>(id: &Value, state: &'a mut McpState) -> Option<&'a mut crate::cbm::GraphBridge> {
+    // Circuit breaker: reject early if CBM is degraded/unavailable
+    if !check_cbm_healthy(id, state) {
+        return None;
+    }
     match state.graph_bridge.as_mut() {
         Some(b) => Some(b),
         None => {
@@ -31,16 +48,22 @@ fn set_project_from_params(bridge: &mut crate::cbm::GraphBridge, params: &Value)
 }
 
 /// Handle `graph_search` — search the CBM knowledge graph.
+///
+/// M-02 fix: Accepts `name_pattern` (regex) or `query` (plain text substring) 
+/// parameters matching CBM's actual search_graph tool interface.
 pub fn handle_graph_search(id: &Value, params: &Value, state: &mut McpState) {
     let bridge = match with_bridge(id, state) {
         Some(b) => b,
         None => return,
     };
-    let query = params["arguments"]["query"].as_str().unwrap_or("");
+    // M-02: support both `name_pattern` (regex) and `query` (plain text)
+    let query = params["arguments"]["name_pattern"].as_str()
+        .or_else(|| params["arguments"]["query"].as_str())
+        .unwrap_or("");
     if query.is_empty() {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0", "id": id,
-            "error": { "code": -32602, "message": "Missing required: query" }
+            "error": { "code": -32602, "message": "Missing required: name_pattern or query" }
         }));
         return;
     }
