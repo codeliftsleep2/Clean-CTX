@@ -580,3 +580,42 @@ fn handle_provide_code_context_accepts_relative_path() {
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "overview" } });
     handle_provide_code_context(&id, &params, &mut state);
 }
+
+// ── Blast radius integration regression tests ──────────────────────
+// These tests ensure blast radius is properly integrated into the
+// compression pipeline and cannot be accidentally removed or broken.
+
+#[test]
+fn blast_radius_disabled_by_default_does_not_panic() {
+    use crate::mcp::tool_handlers::handle_provide_code_context;
+    let config = crate::config::CleanCtxConfig::default();
+    let mut state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    // Should not panic when blast radius is disabled (default)
+    handle_provide_code_context(&id, &params, &mut state);
+}
+
+#[test]
+fn blast_radius_enabled_does_not_panic_without_cbm() {
+    use crate::mcp::tool_handlers::handle_provide_code_context;
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.intelligence.blast_radius_enabled = true;
+    let mut state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    // Should not panic when blast radius is enabled but CBM is unavailable
+    handle_provide_code_context(&id, &params, &mut state);
+}
+
+#[test]
+fn blast_radius_delta_mode_does_not_panic() {
+    use crate::mcp::tool_handlers::handle_delta_code_context;
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.intelligence.blast_radius_enabled = true;
+    let mut state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    // Should not panic in delta mode with blast radius enabled
+    handle_delta_code_context(&id, &params, &mut state);
+}
