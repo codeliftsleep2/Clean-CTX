@@ -1,7 +1,7 @@
 # Clean-CTX — Architecture Overview
 
-**Version:** 0.1.6
-**Last updated:** 2026-06-10 (added zero-touch workflow, SQLite persistence, heuristics engine, session stats dashboard)
+**Version:** 0.2.0-rc1
+**Last updated:** 2026-06-22 (added CBM filter-first architecture, per-domain stats, prompt cache breakpoints)
 
 ---
 
@@ -479,6 +479,94 @@ The Meta-Layer walks raw text of existing `class.root` tree-sitter captures rath
 Angular 17+ template control-flow (`@if`, `@for`, `@switch`, `@defer`) is not valid HTML, so tree-sitter-html parses these tokens as opaque `text` nodes. The extractor uses word-boundary heuristics instead of regex to detect `@`-prefixed keywords, avoiding the `regex` crate dependency entirely. This keeps the binary size small and the attack surface minimal.
 
 ---
+
+## CBM Filter-First Architecture (v0.2.0)
+
+Clean-CTX integrates with **codebase-memory-mcp (CBM)** via a pipe-level proxy. Rather than adding enrichment data after compression (which wastes tokens), the filter-first architecture uses CBM symbol importance scores to **skip low-importance symbols before compression runs**.
+
+```
+     provide_code_context(file)
+          │
+          ▼
+┌─────────────────────┐
+│  CBM Intelligence   │  Query CBM graph for symbol importance scores
+│  Layer (optional)   │  → get_symbol_importance(project)
+└─────────┬───────────┘  → Returns HashMap<symbol, score>
+          │
+          ▼
+┌─────────────────────┐
+│  build_cbm_skip_set │  Symbols with score < 0.4 → skip_set
+│  (fidelity.rs)      │  Stored in McpState.cbm_filter.skip_sets[file]
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  Compression        │  For each class/method/field capture:
+│  Pipeline           │  if should_skip_capture(name, skip_set) → drop
+│  (pipeline.rs)      │  Low-importance symbols never enter output
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  IR Compiler        │  Same skip check before DefClass/DefMethod/DefField
+│  (compiler.rs)      │  Consistent behavior across text + IR pipelines
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  Session Stats      │  Domain-tagged: "cbm_filter" records tokens removed
+│  (session_stats.rs) │  Dashboard shows per-domain breakdown
+└─────────────────────┘
+```
+
+**Result:** CBM reduces token output by 30-50% for noisy files. The post-compression enrichment step is removed entirely.
+
+### CBM Proxy (Pipe-Level Interception)
+
+For CBM tools that return structural data (graph queries, architecture, dead code), Clean-CTX acts as a **proxy**:
+
+```
+Agent → cbm_proxy tool
+  → Clean-CTX forwards to CBM via stdin pipe
+  → CBM responds with ~5000-token structural seed
+  → Clean-CTX intercepts raw stdout at pipe level
+  → Compresses through compress_file_with_source() → ~1100 tokens
+  → Returns compressed result to agent
+```
+
+**Key insight:** CBM runs first to define semantic scope; Clean-CTX catches the output at the pipe boundary and applies token optimization. This is fundamentally different from "query then compress" — it's "intercept and compress."
+
+### Domain-Tagged Stats
+
+Each compression event is tagged with a `SavingsDomain` for the dashboard:
+
+| Domain | Input | Output | Source |
+|--------|-------|--------|--------|
+| `ir_compression` | raw source | compressed IR | `session_stats.record_compression()` |
+| `cbm_filter` | dropped symbols | 0 (excluded) | Skip set build time |
+| `prompt_cache` | N/A (hit-based) | N/A | `CacheMetrics.tokens_saved` |
+| `tool_filter` | raw CLI stdout | filtered stdout | Proxy `FilterStats` |
+
+**No duplication:** each `record_compression()` call uses exactly one domain. The dashboard sums across domains without double-counting.
+
+### Configuration
+
+```json
+{
+  "cbm": {
+    "enabled": true,
+    "cache_ttl_secs": 300,
+    "query_timeout_ms": 30000
+  },
+  "intelligence": {
+    "enabled": true,
+    "cbm_weight": 0.4,
+    "ir_weight": 0.6
+  }
+}
+```
+
+**Graceful degradation:** If CBM is unavailable, the intelligence layer falls back to IR-only PageRank. Compression never fails due to CBM issues.
 
 ## Angular Meta-Layer (Phase 1 + 2 + 3)
 

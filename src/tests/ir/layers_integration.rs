@@ -31,7 +31,7 @@ fn compile_ts(source: &str) -> CompiledIR {
     let (language, query) = detect_language(source);
     let mut compiler = ts_compiler();
     compiler
-        .compile(source, "test_file", language, query, Fidelity::Low)
+        .compile(source, "test_file", language, query, Fidelity::Low, None)
         .expect("TS compilation should succeed")
 }
 
@@ -258,11 +258,11 @@ fn ir_without_layers_produces_deterministic_output() {
 
     // Compile without layers
     let mut c1 = IRCompiler::new();
-    let ir1 = c1.compile(source, "test", language, query, Fidelity::Low).unwrap();
+    let ir1 = c1.compile(source, "test", language, query, Fidelity::Low, None).unwrap();
 
     // Compile again without layers
     let mut c2 = IRCompiler::new();
-    let ir2 = c2.compile(source, "test", language, query, Fidelity::Low).unwrap();
+    let ir2 = c2.compile(source, "test", language, query, Fidelity::Low, None).unwrap();
 
     assert_eq!(ir1.instructions.len(), ir2.instructions.len());
     for (a, b) in ir1.instructions.iter().zip(ir2.instructions.iter()) {
@@ -313,8 +313,8 @@ fn compiler_resets_state_between_compilations() {
     let (lang, query) = detect_language(source1);
 
     let mut compiler = ts_compiler();
-    compiler.compile(source1, "f1", lang, query, Fidelity::Low).unwrap();
-    let ir2 = compiler.compile(source2, "f2", lang, query, Fidelity::Low).unwrap();
+    compiler.compile(source1, "f1", lang, query, Fidelity::Low, None).unwrap();
+    let ir2 = compiler.compile(source2, "f2", lang, query, Fidelity::Low, None).unwrap();
 
     // Verify the second compilation is clean (no flags left over from first)
     let class_ids: Vec<_> = ir2.instructions.iter()

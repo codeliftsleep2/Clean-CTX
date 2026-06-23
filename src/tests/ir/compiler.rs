@@ -9,7 +9,7 @@ fn compile_sample() -> CompiledIR {
 
     let mut compiler = IRCompiler::new();
     compiler
-        .compile(source, "test_sample", language, query, Fidelity::Low)
+        .compile(source, "test_sample", language, query, Fidelity::Low, None)
         .expect("compilation should succeed")
 }
 
@@ -126,7 +126,7 @@ fn compile_empty_source_produces_no_instructions() {
     let (language, query) = detect_language(source);
     let mut compiler = IRCompiler::new();
     let ir = compiler
-        .compile(source, "empty", language, query, Fidelity::Low)
+        .compile(source, "empty", language, query, Fidelity::Low, None)
         .expect("compilation should succeed");
     assert!(
         ir.instructions.is_empty(),
@@ -140,7 +140,7 @@ fn compile_with_medium_fidelity() {
     let (language, query) = detect_language(source);
     let mut compiler = IRCompiler::new();
     let ir = compiler
-        .compile(source, "test_medium", language, query, Fidelity::Medium)
+        .compile(source, "test_medium", language, query, Fidelity::Medium, None)
         .expect("compilation should succeed");
     assert!(
         !ir.instructions.is_empty(),
@@ -154,10 +154,10 @@ fn compiler_counter_is_deterministic() {
     let (language, query) = detect_language(source);
 
     let mut c1 = IRCompiler::new();
-    let ir1 = c1.compile(source, "f", language, query, Fidelity::Low).unwrap();
+    let ir1 = c1.compile(source, "f", language, query, Fidelity::Low, None).unwrap();
 
     let mut c2 = IRCompiler::new();
-    let ir2 = c2.compile(source, "f", language, query, Fidelity::Low).unwrap();
+    let ir2 = c2.compile(source, "f", language, query, Fidelity::Low, None).unwrap();
 
     assert_eq!(ir1.instructions.len(), ir2.instructions.len());
     for (a, b) in ir1.instructions.iter().zip(ir2.instructions.iter()) {
@@ -177,7 +177,7 @@ fn parse_method_sig_simple() {
     let (language, query) = detect_language(source);
     let mut compiler = IRCompiler::new();
     let ir = compiler
-        .compile(source, "test", language, query, Fidelity::Low)
+        .compile(source, "test", language, query, Fidelity::Low, None)
         .expect("compilation should succeed");
 
     let params: Vec<_> = ir

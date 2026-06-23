@@ -57,7 +57,7 @@ fn compile_file_ir(file: &PathBuf, fidelity: Fidelity) -> Result<clean_ctx::ir::
     compiler.add_pattern_recognizer(Box::new(CodePatternRecognizer::new()));
     compiler.add_pattern_recognizer(Box::new(CompressingPatternRecognizer::new()));
 
-    let ir = compiler.compile(&source, &file_id, language, query_string, fidelity)?;
+    let ir = compiler.compile(&source, &file_id, language, query_string, fidelity, None)?;
     Ok(ir)
 }
 

@@ -57,52 +57,6 @@ fn e2e_proxy_search_graph_compresses_response() {
     }
 }
 
-/// Test that CBM enrichment pipeline produces compressed metadata.
-/// Requires CBM installed and project indexed.
-#[test]
-fn e2e_enrichment_injects_cbm_metadata() {
-    let cbm_available = crate::cbm::bridge::GraphBridge::try_create(
-        &crate::cbm::config::CbmConfig { enabled: true, ..Default::default() },
-        std::path::Path::new("."),
-    ).is_available();
-
-    if !cbm_available {
-        eprintln!("Skipping e2e_enrichment_injects_cbm_metadata — CBM not installed");
-        return;
-    }
-
-    let mut config = crate::config::CleanCtxConfig::default();
-    config.cbm.enabled = true;
-    let mut state = crate::mcp::McpState::new(config);
-
-    // Simulate the provide_code_context response injection
-    let mut response = json!({
-        "jsonrpc": "2.0",
-        "id": 999,
-        "result": {
-            "content": [{"type": "text", "text": "compressed content here"}],
-            "_meta": {}
-        }
-    });
-
-    use crate::mcp::tool_handlers::enrich_with_cbm;
-    enrich_with_cbm(&mut response, "src/cbm/client.rs", &mut state);
-
-    let meta = response.pointer("/result/_meta").unwrap();
-    // Should always have cbm_status
-    assert!(meta.get("cbm_status").is_some(), "E2E: _meta should contain cbm_status");
-
-    let status = meta["cbm_status"].as_str().unwrap();
-    eprintln!("E2E CBM status: {status}");
-
-    if status == "available" {
-        // If CBM is available, we should get either enrichment or architecture summary
-        let has_enrichment = meta.get("cbm_enrichment").is_some();
-        let has_architecture = meta.get("cbm_architecture_summary").is_some();
-        assert!(has_enrichment || has_architecture,
-            "E2E: available CBM should produce enrichment or architecture summary");
-    }
-}
 
 /// Test that the full proxy compression pipeline works end-to-end.
 /// Uses cbm_proxy handler directly.
@@ -275,34 +229,3 @@ fn e2e_intelligence_layer_full_pipeline() {
     }
 }
 
-/// Test the enrichment pipeline end-to-end (no CBM required).
-#[test]
-fn e2e_enrichment_pipeline_no_cbm() {
-    let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
-
-    let mut response = json!({
-        "jsonrpc": "2.0", "id": 1,
-        "result": {
-            "content": [{"type": "text", "text": "test"}],
-            "_meta": {}
-        }
-    });
-
-    use crate::mcp::tool_handlers::enrich_with_cbm;
-    enrich_with_cbm(&mut response, "src/test.rs", &mut state);
-
-    let meta = response.pointer("/result/_meta").unwrap();
-
-    // Should inject cbm_status even when CBM unavailable
-    assert!(meta.get("cbm_status").is_some(), "Should always inject cbm_status");
-    let status = meta["cbm_status"].as_str().unwrap();
-
-    if status == "available" {
-        // Available — enrichment may or may not be present (depends on CBM data)
-    } else {
-        // Unavailable/degraded — enrichment should NOT be present
-        assert!(meta.get("cbm_enrichment").is_none(),
-            "Should not inject enrichment when CBM is {status}");
-    }
-}
