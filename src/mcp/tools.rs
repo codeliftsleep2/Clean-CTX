@@ -400,7 +400,7 @@ pub(crate) fn dispatch_tools_call(
                         }
                     });
 
-                    // Inject workspace baseline cache breakpoint via manifest hash
+                    // Inject workspace baseline cache breakpoint into result._meta, NOT the response root
                     if state.config.cache.enabled {
                         let ttl = state.config.cache.baseline_ttl.clone();
                         let breaker = compute_workspace_breaker(std::slice::from_ref(&result.manifest));
@@ -408,7 +408,9 @@ pub(crate) fn dispatch_tools_call(
                             crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
                         ).ok();
                         let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
-                        inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref);
+                        if let Some(result_obj) = response.get_mut("result") {
+                            inject_cache_breakpoints(result_obj, state, "baseline", &ttl, &breaker, tok_ref);
+                        }
                     }
 
                     send_response(&response);

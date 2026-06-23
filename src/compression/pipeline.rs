@@ -5,6 +5,7 @@
 // were historically private to `compressor.rs`. These are `pub(crate)` so
 // the streaming variant can also call them.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
@@ -230,7 +231,7 @@ pub fn compress_file_with_source(
     )?;
 
     // F-04: `build_output_lines` now returns real counts.
-    let built = build_output_lines(&all_captures, &source_code, fidelity);
+    let built = build_output_lines(&all_captures, &source_code, fidelity, None);
     let mut body_content = assemble_body(&built.output_lines, fidelity);
     // Angular Meta-Layer (Phase 1): inject the Φ block into the body
     // BEFORE symbol compression so the `Φ` markers stay untouched.
@@ -313,7 +314,7 @@ pub fn compress_text(
         },
     )?;
 
-    let built = build_output_lines(&all_captures, source_code, fidelity);
+    let built = build_output_lines(&all_captures, source_code, fidelity, None);
     let mut body_content = assemble_body(&built.output_lines, fidelity);
     if let Some(block) = &built.meta_block {
         body_content.push_str(&block.render());
@@ -351,10 +352,16 @@ pub fn compress_text(
 ///
 /// F-04: the return type is now `BuildOutputResult` (with the real
 /// counts) instead of a `(Vec<String>, Vec<String>)` tuple.
+///
+/// `skip_set`: optional set of symbol names to exclude from the output.
+/// When a class, method, or field name matches an entry in this set,
+/// the capture is dropped entirely. Used by the CBM filter-first
+/// architecture to exclude low-importance symbols.
 pub fn build_output_lines(
     all_captures: &[CapEntry],
     source_code: &str,
     fidelity: Fidelity,
+    skip_set: Option<&HashSet<String>>,
 ) -> BuildOutputResult {
     let mut output_lines: Vec<String> = Vec::new();
     let mut fields: Vec<String> = Vec::new();
@@ -366,6 +373,12 @@ pub fn build_output_lines(
     let mut class_captures: Vec<String> = Vec::new();
 
     for cap in all_captures {
+        // CBM filter-first: skip low-importance symbols
+        if let Some(skip) = skip_set {
+            if !skip.is_empty() && should_skip_capture(cap, skip) {
+                continue;
+            }
+        }
         match cap.name.as_str() {
             "import.root" | "mod.root" | "package.root" => {
                 let compact = compact_import(&cap.text, fidelity);
@@ -608,7 +621,7 @@ pub fn compress_source(
         },
     )?;
 
-    let built = build_output_lines(&all_captures, source_code, fidelity);
+    let built = build_output_lines(&all_captures, source_code, fidelity, None);
     let mut body_content = assemble_body(&built.output_lines, fidelity);
     if let Some(block) = &built.meta_block {
         body_content.push_str(&block.render());
@@ -638,6 +651,48 @@ pub fn compress_source(
         built.import_count,
     );
     Ok(final_output)
+}
+
+/// Check if a capture should be skipped due to CBM filter-first rules.
+///
+/// Returns `true` if the capture's symbol name matches an entry in the
+/// `skip_set`. Class, struct, enum, trait, impl, and interface captures
+/// are checked by their `text` field (the extracted name). Method and
+/// field captures are checked by their `text` field (the signature/name
+/// which typically starts with the symbol name).
+///
+/// `cap.name` is the capture type (e.g. "class.root", "method.root")
+/// and `cap.text` is the processed text (e.g. the class name or method
+/// signature).
+pub(crate) fn should_skip_capture(cap: &crate::compression::CapEntry, skip_set: &HashSet<String>) -> bool {
+    // Type-like captures (class, struct, enum, trait, impl, interface, record):
+    // check the full text against the skip set
+    if matches!(
+        cap.name.as_str(),
+        "class.root" | "struct.root" | "enum.root" | "trait.root"
+            | "impl.root" | "interface.root" | "record.root"
+    ) {
+        return skip_set.contains(cap.text.trim());
+    }
+
+    // Method captures: check the signature (first word is usually the method name)
+    if matches!(cap.name.as_str(), "method.root" | "constructor.root" | "func.root" | "arrow.root") {
+        if let Some(first_word) = cap.text.split_whitespace().next() {
+            return skip_set.contains(first_word);
+        }
+        return skip_set.contains(cap.text.trim());
+    }
+
+    // Field captures: check the field name
+    if cap.name == "field.root" {
+        // Fields are typically "name: type" — take part before ":"
+        if let Some(field_name) = cap.text.split(':').next() {
+            return skip_set.contains(field_name.trim());
+        }
+        return skip_set.contains(cap.text.trim());
+    }
+
+    false
 }
 
 /// Join the body lines using the per-fidelity separator.

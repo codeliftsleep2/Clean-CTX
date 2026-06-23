@@ -217,7 +217,7 @@ where
     // F-04: `build_output_lines` now returns `BuildOutputResult` with
     // real counts; we destructure only what we need here.
     let total_captures = all_captures.len();
-    let built = build_output_lines(&all_captures, &source_code, fidelity);
+    let built = build_output_lines(&all_captures, &source_code, fidelity, None);
     for idx in 0..total_captures {
         let p = 0.4 + (idx as f64 / total_captures.max(1) as f64) * 0.5;
         on_progress(CompressionProgress {

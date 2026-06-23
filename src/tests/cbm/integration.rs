@@ -1,74 +1,8 @@
 ﻿// src/tests/cbm/integration.rs
 //
-// Integration tests for CBM enrichment compression pipeline.
-// Tests that enrich_with_cbm compresses data before injecting into _meta.
-
-use serde_json::json;
-
-#[test]
-fn enrich_with_cbm_compresses_symbol_importance() {
-    use crate::mcp::tool_handlers::enrich_with_cbm;
-    let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
-    let mut response = json!({
-        "jsonrpc": "2.0", "id": 1,
-        "result": {
-            "content": [{"type": "text", "text": "compressed"}],
-            "_meta": {}
-        }
-    });
-
-    // CBM is disabled by default (no binary), so enrichment should
-    // inject cbm_status but skip symbol data (not available).
-    enrich_with_cbm(&mut response, "src/test.rs", &mut state);
-
-    let meta = response.pointer("/result/_meta").unwrap();
-    assert!(meta.get("cbm_status").is_some(),
-        "enrich_with_cbm should inject cbm_status");
-    // Since CBM is unavailable, cbm_enrichment should NOT be present
-    // (status check guard prevents querying unavailable CBM)
-    assert!(meta.get("cbm_enrichment").is_none(),
-        "should not inject enrichment when CBM unavailable");
-}
-
-#[test]
-fn enrich_with_cbm_degraded_status_skips_enrichment() {
-    use crate::mcp::tool_handlers::enrich_with_cbm;
-    let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
-    state.cbm_status = crate::cbm::config::CbmStatus::Degraded("slow".into());
-
-    let mut response = json!({
-        "jsonrpc": "2.0", "id": 1,
-        "result": {
-            "content": [{"type": "text", "text": "compressed"}],
-            "_meta": {}
-        }
-    });
-
-    enrich_with_cbm(&mut response, "src/test.rs", &mut state);
-    let meta = response.pointer("/result/_meta").unwrap();
-    assert_eq!(meta["cbm_status"].as_str().unwrap(), "degraded");
-    // Should bail early — no bridge queries when degraded
-    assert!(meta.get("cbm_enrichment").is_none());
-}
-
-#[test]
-fn enrich_with_cbm_missing_meta_does_not_panic() {
-    use crate::mcp::tool_handlers::enrich_with_cbm;
-    let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
-
-    // Response without _meta field — should be a no-op
-    let mut response = json!({
-        "jsonrpc": "2.0", "id": 1,
-        "result": { "content": [{"type": "text", "text": "ok"}] }
-    });
-
-    enrich_with_cbm(&mut response, "src/test.rs", &mut state);
-    assert!(response.pointer("/result/_meta").is_none(),
-        "should not add _meta if it doesn't exist");
-}
+// Integration tests for CBM compression pipeline and intelligence layer.
+// Tests that compress_cbm_response properly handles various JSON inputs,
+// and that the intelligence layer integrates correctly.
 
 #[test]
 fn compress_cbm_response_envelope_stripping() {
@@ -98,4 +32,103 @@ fn proxy_stats_use_pluggable_tokenizer_format() {
     assert!(comp.comp_tokens_est > 0, "Should have compressed tokens");
     // With key shortening + envelope stripping, compressed should be smaller
     assert!(comp.compressed_text.len() < raw.len());
+}
+
+// ── H-03: Intelligence Layer integration tests ───────────────────
+
+#[test]
+fn provide_code_context_cbm_skipped_when_intelligence_disabled() {
+    // Test that the intelligence layer doesn't influence decisions when
+    // intelligence.enabled = false (regardless of CBM availability).
+    use crate::mcp::heuristics;
+
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.intelligence.enabled = false;
+
+    // Verify the config default: intelligence is enabled by default,
+    // and our manual disable took effect.
+    assert!(!config.intelligence.enabled,
+        "intelligence should be disabled for this test");
+
+    // Run the heuristics engine with a typical file
+    let source = "pub struct User { name: String }\npub fn get_user() -> User { unimplemented!() }";
+    let decision = heuristics::decide(
+        "/project/src/user.rs",
+        None,           // explicit_fidelity
+        None,           // explicit_intent
+        &config,
+        &crate::compression::text_delta::TextDeltaComputer::new(),
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,           // path_alias
+        None,           // stored_fidelity
+    );
+
+    // When intelligence is disabled, cbm_informed should stay false
+    assert!(!decision.cbm_informed,
+        "cbm_informed should be false when intelligence is disabled");
+
+    // The decision summary should reflect no_cbm
+    assert!(decision.summary().contains("no_cbm"),
+        "summary should contain no_cbm when intelligence is disabled");
+}
+
+#[test]
+fn provide_code_context_cbm_informed_false_when_no_bridge() {
+    // Test that cbm_informed stays false when there's no graph bridge
+    // (even if intelligence is enabled).
+    use crate::mcp::heuristics;
+
+    let config = crate::config::CleanCtxConfig::default();
+    assert!(config.intelligence.enabled,
+        "intelligence should be enabled by default");
+
+    // Run heuristics without any bridge — cbm_informed stays false
+    let source = "pub struct Config { port: u16 }";
+    let decision = heuristics::decide(
+        "/project/src/config.rs",
+        None, None, &config,
+        &crate::compression::text_delta::TextDeltaComputer::new(),
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None, None,
+    );
+
+    assert!(!decision.cbm_informed,
+        "cbm_informed should be false when no bridge available");
+    assert!(decision.summary().contains("no_cbm"),
+        "summary should contain no_cbm when no bridge");
+}
+
+#[test]
+fn provide_code_context_cbm_informed_false_on_explicit_fidelity() {
+    // When the user passes an explicit fidelity, the intelligence layer
+    // should NOT override it — explicit parameters take priority.
+    use crate::mcp::heuristics;
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub fn main() { println!(\"hello\"); }";
+    let decision = heuristics::decide(
+        "/project/src/main.rs",
+        Some("high"),   // explicit_fidelity
+        None,           // explicit_intent
+        &config,
+        &crate::compression::text_delta::TextDeltaComputer::new(),
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None, None,
+    );
+
+    // explicit fidelity should be honored, cbm_informed stays false
+    assert!(!decision.cbm_informed,
+        "cbm_informed should be false when explicit fidelity provided");
+    assert_eq!(format!("{:?}", decision.fidelity), "High",
+        "explicit fidelity High should be honored");
+}
+
+#[test]
+fn intelligence_config_defaults_to_enabled() {
+    let config = crate::config::CleanCtxConfig::default();
+    assert!(config.intelligence.enabled,
+        "IntelligenceConfig::enabled should default to true");
 }

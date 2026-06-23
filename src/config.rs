@@ -197,11 +197,10 @@ fn default_tool_version() -> String { "v1".to_string() }
 
 // ── Persistence configuration (placeholder) ────────────────────────
 
-/// Persistence configuration (placeholder for future SQLite layer).
+/// Persistence configuration for SQLite-backed cross-session storage.
 ///
-/// Currently parsed but not acted upon. The fields define where and
-/// how the SQLite-backed `ContextStore` will persist compression
-/// baselines, deltas, and session history across IDE restarts.
+/// Controls where and how the `ContextStore` (via `SqliteStore`) persists
+/// compression baselines, deltas, and session history across IDE restarts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistenceConfig {
     /// Master switch for persistence. When `false`, all operations
@@ -326,6 +325,41 @@ pub struct CleanCtxConfig {
     /// with the CBM server for graph intelligence.
     #[serde(default)]
     pub cbm: crate::cbm::CbmConfig,
+
+    /// Intelligence Layer configuration (CBM-informed fidelity,
+    /// PageRank, blast radius). When enabled, the heuristics engine
+    /// consults CBM symbol importance scores to adjust compression
+    /// fidelity for high- or low-importance files.
+    #[serde(default)]
+    pub intelligence: IntelligenceConfig,
+}
+
+/// Intelligence Layer configuration.
+///
+/// Controls whether the CBM-informed fidelity pipeline runs inside
+/// the heuristics engine. When enabled and the CBM graph bridge is
+/// available, per-file symbol importance scores from CBM can
+/// override the standard fidelity decision:
+///
+///   - High importance (>0.8) → force High fidelity
+///   - Low importance (<0.4) → force Low fidelity
+///   - Medium (0.4-0.8) → defer to standard heuristics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntelligenceConfig {
+    /// Master switch. When `true` (default), CBM-informed fidelity
+    /// recommendations are consulted in the heuristics engine.
+    /// When `false`, the intelligence layer is entirely skipped
+    /// (zero overhead).
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for IntelligenceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+        }
+    }
 }
 
 /// Per-framework Meta-Layer configuration.
@@ -378,6 +412,7 @@ impl Default for CleanCtxConfig {
             tokenizer: TokenizerKind::default(),
             cache: CacheConfig::default(),
             cbm: crate::cbm::CbmConfig::default(),
+            intelligence: IntelligenceConfig::default(),
         }
     }
 }

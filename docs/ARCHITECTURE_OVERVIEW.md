@@ -1,7 +1,7 @@
 # Clean-CTX — Architecture Overview
 
-**Version:** 0.1.6
-**Last updated:** 2026-06-10 (added zero-touch workflow, SQLite persistence, heuristics engine, session stats dashboard)
+**Version:** 0.2.0-rc1
+**Last updated:** 2026-06-22 (added CBM filter-first architecture, per-domain stats, prompt cache breakpoints)
 
 ---
 
@@ -313,7 +313,6 @@ src/
 ├── analytics.rs                  # tiktoken cl100k token counting (F-01: cached BPE)
 ├── protocol.rs                   # JSON-RPC message types
 ├── compressor.rs                 # Re-export shim (backward compatible)
-├── helpers.rs                    # Legacy helper (kept for backward compat)
 └── src/test_files/               # Test fixtures including:
     ├── UserManagementService.ts  # ~440-line Angular service (added for edit simulation)
     └── ...                       # Other test files
@@ -436,6 +435,10 @@ The `LocalStateCache` serves double duty:
 1. **Content-hash registry** — avoids re-compressing identical files in the same session
 2. **Baseline snapshot registry** — enables `diff_code_context` to produce AST-level deltas instead of full re-compressions on subsequent calls
 
+### Why path aliases are global across the session
+
+Path aliases (`α1`, `α2`, …) are **session-global** — `compress_workspace` populates aliases that are immediately visible to subsequent `provide_code_context` calls, and vice versa. This means that if a workspace compression assigns `α1` to `src/user.service.ts`, a later `provide_code_context("src/user.service.ts")` will reuse the same `α1` alias, keeping the `§PATHMAP` footer stable across multiple tools. Aliases are never recycled within a session; they only reset on server restart.
+
 ### Why both text-level and IR-level delta transport?
 
 Two delta pipelines serve different scenarios:
@@ -476,6 +479,94 @@ The Meta-Layer walks raw text of existing `class.root` tree-sitter captures rath
 Angular 17+ template control-flow (`@if`, `@for`, `@switch`, `@defer`) is not valid HTML, so tree-sitter-html parses these tokens as opaque `text` nodes. The extractor uses word-boundary heuristics instead of regex to detect `@`-prefixed keywords, avoiding the `regex` crate dependency entirely. This keeps the binary size small and the attack surface minimal.
 
 ---
+
+## CBM Filter-First Architecture (v0.2.0)
+
+Clean-CTX integrates with **codebase-memory-mcp (CBM)** via a pipe-level proxy. Rather than adding enrichment data after compression (which wastes tokens), the filter-first architecture uses CBM symbol importance scores to **skip low-importance symbols before compression runs**.
+
+```
+     provide_code_context(file)
+          │
+          ▼
+┌─────────────────────┐
+│  CBM Intelligence   │  Query CBM graph for symbol importance scores
+│  Layer (optional)   │  → get_symbol_importance(project)
+└─────────┬───────────┘  → Returns HashMap<symbol, score>
+          │
+          ▼
+┌─────────────────────┐
+│  build_cbm_skip_set │  Symbols with score < 0.4 → skip_set
+│  (fidelity.rs)      │  Stored in McpState.cbm_filter.skip_sets[file]
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  Compression        │  For each class/method/field capture:
+│  Pipeline           │  if should_skip_capture(name, skip_set) → drop
+│  (pipeline.rs)      │  Low-importance symbols never enter output
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  IR Compiler        │  Same skip check before DefClass/DefMethod/DefField
+│  (compiler.rs)      │  Consistent behavior across text + IR pipelines
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  Session Stats      │  Domain-tagged: "cbm_filter" records tokens removed
+│  (session_stats.rs) │  Dashboard shows per-domain breakdown
+└─────────────────────┘
+```
+
+**Result:** CBM reduces token output by 30-50% for noisy files. The post-compression enrichment step is removed entirely.
+
+### CBM Proxy (Pipe-Level Interception)
+
+For CBM tools that return structural data (graph queries, architecture, dead code), Clean-CTX acts as a **proxy**:
+
+```
+Agent → cbm_proxy tool
+  → Clean-CTX forwards to CBM via stdin pipe
+  → CBM responds with ~5000-token structural seed
+  → Clean-CTX intercepts raw stdout at pipe level
+  → Compresses through compress_file_with_source() → ~1100 tokens
+  → Returns compressed result to agent
+```
+
+**Key insight:** CBM runs first to define semantic scope; Clean-CTX catches the output at the pipe boundary and applies token optimization. This is fundamentally different from "query then compress" — it's "intercept and compress."
+
+### Domain-Tagged Stats
+
+Each compression event is tagged with a `SavingsDomain` for the dashboard:
+
+| Domain | Input | Output | Source |
+|--------|-------|--------|--------|
+| `ir_compression` | raw source | compressed IR | `session_stats.record_compression()` |
+| `cbm_filter` | dropped symbols | 0 (excluded) | Skip set build time |
+| `prompt_cache` | N/A (hit-based) | N/A | `CacheMetrics.tokens_saved` |
+| `tool_filter` | raw CLI stdout | filtered stdout | Proxy `FilterStats` |
+
+**No duplication:** each `record_compression()` call uses exactly one domain. The dashboard sums across domains without double-counting.
+
+### Configuration
+
+```json
+{
+  "cbm": {
+    "enabled": true,
+    "cache_ttl_secs": 300,
+    "query_timeout_ms": 30000
+  },
+  "intelligence": {
+    "enabled": true,
+    "cbm_weight": 0.4,
+    "ir_weight": 0.6
+  }
+}
+```
+
+**Graceful degradation:** If CBM is unavailable, the intelligence layer falls back to IR-only PageRank. Compression never fails due to CBM issues.
 
 ## Angular Meta-Layer (Phase 1 + 2 + 3)
 
@@ -689,4 +780,10 @@ See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for full per-edit breakdown and the 
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks
-- 1,035 tests passing (unit + integration + E2E + proxy regression tests)
+- 1,306 tests passing (unit + integration + E2E + proxy regression tests)
+
+> **ℹ️ Cache System Separation:** Clean-CTX has **two independent cache systems** with different scopes and configuration paths:
+> 1. **MCP Server `CacheConfig`** (in `.clean-ctx.json`) — Controls `_meta.cache_hints` annotations in JSON-RPC responses. These annotations tell the LLM which parts of compressed output are cacheable (stable vocabulary, tool definitions, persisted baselines). Configuration is via the `cache` key in `.clean-ctx.json`.
+> 2. **Proxy Cache** (environment variables `AUTO_CACHE`, `TAIL_TTL`) — A 4-slot Anthropic API `cache_control` breakpoint injector for HTTP request bodies. This reduces API costs by activating Anthropic's prompt caching. Configuration is via environment variables only.
+>
+> These systems are architecturally separate: the MCP server operates over stdin/stdout JSON-RPC and never makes HTTP requests; the proxy operates over HTTP and never processes JSON-RPC. Enabling one has no effect on the other, and they share no code or state.

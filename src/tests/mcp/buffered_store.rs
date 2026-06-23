@@ -446,20 +446,17 @@ fn test_integration_compress_and_check_db() {
         }
     });
 
-    // compress_code_context writes to BufferedStore (queued, not flushed yet)
+    // compress_code_context now flushes persistence immediately (FAANG audit fix)
     crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
 
-    // Data should be queued in BufferedStore
+    // Data should be flushed to SQLite immediately (no pending ops)
     if let Some(ref store) = state.persistence_store {
-        assert!(store.pending_count() > 0, "Expected pending ops after compress");
+        assert_eq!(store.pending_count(), 0, "Expected zero pending ops after compress (immediate flush)");
     } else {
         panic!("Persistence store should be Some");
     }
 
-    // 2. Flush persistence — data goes to SQLite
-    state.flush_persistence();
-
-    // 3. Verify DB has the data via rebuild_stats
+    // 2. Verify DB has the data via rebuild_stats (no explicit flush needed)
     if let Some(ref store) = state.persistence_store {
         if let Some(guard) = store.sqlite() {
             let db_stats = guard.rebuild_stats().expect("rebuild_stats should succeed");

@@ -19,7 +19,7 @@ use tracing::debug;
 const SMALL_BLOCK_THRESHOLD: usize = 500;
 
 /// Statistics tracked across cache injections.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct CacheStats {
     /// Number of requests where breakpoints were injected.
     pub total_injected: u64,

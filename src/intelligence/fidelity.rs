@@ -11,8 +11,12 @@
 //
 // When CBM is unavailable, the recommendation is `NoRecommendation` and
 // the existing heuristics pipeline runs unmodified.
+//
+// Phase 2 (Filter-First Architecture): `build_cbm_skip_set` identifies
+// low-importance symbols that should be EXCLUDED from compression
+// entirely. This replaces the post-compression enrichment pattern.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::compressor::Fidelity;
 
 /// A fidelity recommendation from the intelligence layer.
@@ -76,6 +80,31 @@ pub fn cbm_informed_fidelity(
     }
 }
 
+/// Build a skip set of low-importance symbols for a file.
+///
+/// Returns symbol names with score < 0.4 that match the given file path.
+/// The compression pipeline uses this set to drop low-importance symbols
+/// entirely, so CBM reduces token output instead of adding enrichment.
+///
+/// Returns an empty set if CBM is unavailable or no low-importance symbols
+/// are found for this file.
+pub fn build_cbm_skip_set(
+    file_path: &str,
+    symbol_importance: &HashMap<String, crate::cbm::SymbolImportance>,
+) -> HashSet<String> {
+    let mut skip = HashSet::new();
+    for info in symbol_importance.values() {
+        if info.score < 0.4 {
+            // Check if this symbol's file matches our target
+            let path_match = file_path.contains(&info.file) || info.file.contains(file_path);
+            if path_match {
+                skip.insert(info.symbol.clone());
+            }
+        }
+    }
+    skip
+}
+
 /// Apply the fidelity recommendation to get a concrete Fidelity.
 /// Returns `Some(fidelity)` if the recommendation overrides, `None` if
 /// the existing pipeline should decide.
@@ -101,6 +130,8 @@ mod tests {
         });
         map
     }
+
+    // ── cbm_informed_fidelity tests ──────────────────────────────────
 
     #[test]
     fn test_empty_map_returns_fallback() {
@@ -156,5 +187,67 @@ mod tests {
     #[test]
     fn test_apply_no_recommendation() {
         assert_eq!(apply_recommendation(&FidelityRecommendation::NoRecommendation), None);
+    }
+
+    // ── build_cbm_skip_set tests ────────────────────────────────────
+
+    #[test]
+    fn test_build_skip_set_low() {
+        let importances = make_importance("UtilityHelper", 0.2, "utils.rs");
+        let skip = build_cbm_skip_set("src/utils.rs", &importances);
+        assert!(skip.contains("UtilityHelper"), "Low-importance symbol should be in skip set");
+        assert_eq!(skip.len(), 1);
+    }
+
+    #[test]
+    fn test_build_skip_set_medium() {
+        let importances = make_importance("NormalService", 0.6, "service.rs");
+        let skip = build_cbm_skip_set("src/service.rs", &importances);
+        assert!(!skip.contains("NormalService"), "Medium-importance symbol should NOT be in skip set");
+    }
+
+    #[test]
+    fn test_build_skip_set_high() {
+        let importances = make_importance("CriticalAPI", 0.95, "api.rs");
+        let skip = build_cbm_skip_set("src/api.rs", &importances);
+        assert!(!skip.contains("CriticalAPI"), "High-importance symbol should NOT be in skip set");
+    }
+
+    #[test]
+    fn test_build_skip_set_empty() {
+        let skip = build_cbm_skip_set("src/file.rs", &HashMap::new());
+        assert!(skip.is_empty(), "Empty importance map should produce empty skip set");
+    }
+
+    #[test]
+    fn test_build_skip_set_unrelated_file() {
+        let importances = make_importance("LowSymbol", 0.1, "other.rs");
+        let skip = build_cbm_skip_set("src/user.rs", &importances);
+        assert!(!skip.contains("LowSymbol"), "Symbol in unrelated file should NOT be in skip set");
+    }
+
+    #[test]
+    fn test_build_skip_set_multiple() {
+        let mut map = HashMap::new();
+        map.insert("SymA".to_string(), SymbolImportance {
+            symbol: "SymA".to_string(),
+            score: 0.15,
+            file: "file.rs".to_string(),
+        });
+        map.insert("SymB".to_string(), SymbolImportance {
+            symbol: "SymB".to_string(),
+            score: 0.9,
+            file: "file.rs".to_string(),
+        });
+        map.insert("SymC".to_string(), SymbolImportance {
+            symbol: "SymC".to_string(),
+            score: 0.3,
+            file: "file.rs".to_string(),
+        });
+        let skip = build_cbm_skip_set("file.rs", &map);
+        assert!(skip.contains("SymA"), "SymA (0.15) should be skipped");
+        assert!(!skip.contains("SymB"), "SymB (0.9) should NOT be skipped");
+        assert!(skip.contains("SymC"), "SymC (0.3) should be skipped");
+        assert_eq!(skip.len(), 2);
     }
 }

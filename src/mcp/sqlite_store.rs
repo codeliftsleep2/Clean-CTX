@@ -234,7 +234,7 @@ impl SqliteStore {
                 _ => "low",
             };
             stats.record_compression(
-                &path, raw, compressed, fidelity_str, false, strategy, None
+                &path, raw, compressed, fidelity_str, false, strategy, None, "ir_compression"
             );
         }
 
