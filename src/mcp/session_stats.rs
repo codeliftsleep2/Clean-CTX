@@ -12,6 +12,7 @@
 
 use std::collections::HashMap;
 use std::time::SystemTime;
+use crate::mcp::cache_hints::CacheMetrics;
 
 /// Per-domain aggregate stats (used in `SessionSummary` for the
 /// per-domain breakdown section of the dashboard).
@@ -173,8 +174,11 @@ impl SessionStats {
         let prev_domain = self.files.get(file_path).map(|f| f.domain.clone());
 
         // Deduct previous per-file counters if this file was already tracked
-        // (to avoid double-counting across calls)
-        if let Some(existing) = self.files.get(file_path) {
+        // (to avoid double-counting across calls). Also keep a handle to the
+        // old `FileStats` so the domain-transition block below can subtract
+        // the exact previously-counted values.
+        let prev_file_stats: Option<FileStats> = self.files.get(file_path).cloned();
+        if let Some(ref existing) = prev_file_stats {
             self.total_raw_tokens = self.total_raw_tokens.saturating_sub(existing.raw_tokens);
             self.total_compressed_tokens = self
                 .total_compressed_tokens
@@ -196,12 +200,18 @@ impl SessionStats {
         if let Some(ref pd) = prev_domain {
             if pd != domain {
                 if let Some(existing_domain) = self.domain_stats.get_mut(pd) {
-                    existing_domain.total_raw_tokens = existing_domain
-                        .total_raw_tokens
-                        .saturating_sub(existing_domain.total_raw_tokens.min(raw_tokens));
-                    existing_domain.total_compressed_tokens = existing_domain
-                        .total_compressed_tokens
-                        .saturating_sub(existing_domain.total_compressed_tokens.min(compressed_tokens));
+                    // Subtract the OLD file values from the old domain, not the new ones.
+                    // Using `prev_file_stats` (the previous FileStats) ensures we remove exactly
+                    // what was previously counted, regardless of whether the file's
+                    // token counts changed between recordings.
+                    if let Some(ref prev) = prev_file_stats {
+                        existing_domain.total_raw_tokens = existing_domain
+                            .total_raw_tokens
+                            .saturating_sub(prev.raw_tokens);
+                        existing_domain.total_compressed_tokens = existing_domain
+                            .total_compressed_tokens
+                            .saturating_sub(prev.compressed_tokens);
+                    }
                     existing_domain.file_count = existing_domain.file_count.saturating_sub(1);
                     // Recompute savings pct
                     if existing_domain.total_raw_tokens > 0 {
@@ -358,6 +368,33 @@ impl SessionStats {
         );
     }
 
+    /// Sync MCP-level `CacheMetrics` into the `prompt_cache` domain entry.
+    ///
+    /// This bridges the per-breakpoint cache tracking in `McpState.cache_metrics`
+    /// into the per-domain dashboard breakdown. After this call, the
+    /// `prompt_cache` domain will show hits, misses, and tokens saved.
+    pub fn sync_cache_metrics(&mut self, metrics: &CacheMetrics) {
+        let domain = "prompt_cache";
+        let entry = self.domain_stats.entry(domain.to_string()).or_insert_with(|| {
+            DomainStats {
+                domain: domain.to_string(),
+                total_raw_tokens: 0,
+                total_compressed_tokens: 0,
+                savings_pct: 0.0,
+                file_count: 0,
+                tokens_removed: None,
+                cache_hits: Some(0),
+                cache_misses: Some(0),
+            }
+        });
+        entry.cache_hits = Some(metrics.hits);
+        entry.cache_misses = Some(metrics.misses);
+        // tokens_saved is tracked as total_raw_tokens in the prompt_cache domain
+        // (compressed_tokens stays 0 because cached tokens were never sent)
+        entry.total_raw_tokens = metrics.tokens_saved;
+        entry.savings_pct = if metrics.tokens_saved > 0 { 100.0 } else { 0.0 };
+    }
+
     /// Merge another `SessionStats` into this one.
     ///
     /// **In-memory data always wins for freshness.**  DB-recovered stats
@@ -404,7 +441,20 @@ impl SessionStats {
     }
 
     /// Rebuild domain-level stats from current file entries.
+    ///
+    /// **Important:** preserves cache-specific metadata (`cache_hits`,
+    /// `cache_misses`, `tokens_removed`) for domains that carry it, because
+    /// those fields are populated by `sync_cache_metrics()` and `record_tool_filter()`
+    /// rather than by file-level compression events.
     fn rebuild_domain_stats(&mut self) {
+        // Preserve cache-specific metadata before rebuild
+        let preserved_prompt_cache: Option<DomainStats> = self.domain_stats
+            .get("prompt_cache")
+            .cloned();
+        let preserved_cbm_filter: Option<DomainStats> = self.domain_stats
+            .get("cbm_filter")
+            .cloned();
+
         let mut domain_raw: HashMap<String, usize> = HashMap::new();
         let mut domain_compressed: HashMap<String, usize> = HashMap::new();
         let mut domain_files: HashMap<String, usize> = HashMap::new();
@@ -431,7 +481,7 @@ impl SessionStats {
                 } else {
                     0.0
                 };
-                (d.clone(), DomainStats {
+                let mut stats = DomainStats {
                     domain: d.clone(),
                     total_raw_tokens: raw,
                     total_compressed_tokens: compressed,
@@ -440,7 +490,21 @@ impl SessionStats {
                     tokens_removed: None,
                     cache_hits: None,
                     cache_misses: None,
-                })
+                };
+                // Restore preserved cache-specific metadata
+                if d == "prompt_cache" {
+                    if let Some(ref preserved) = preserved_prompt_cache {
+                        stats.cache_hits = preserved.cache_hits;
+                        stats.cache_misses = preserved.cache_misses;
+                        // tokens_removed is not used for prompt_cache, but preserve if set
+                        stats.tokens_removed = preserved.tokens_removed;
+                    }
+                } else if d == "cbm_filter" {
+                    if let Some(ref preserved) = preserved_cbm_filter {
+                        stats.tokens_removed = preserved.tokens_removed;
+                    }
+                }
+                (d.clone(), stats)
             })
             .collect();
     }

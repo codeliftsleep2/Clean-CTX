@@ -180,7 +180,7 @@ fn round_trip_compile_and_render_low() {
 
     let mut compiler = IRCompiler::new();
     let ir = compiler
-        .compile(source, "roundtrip", language, query, Fidelity::Low)
+        .compile(source, "roundtrip", language, query, Fidelity::Low, None)
         .expect("compilation should succeed");
 
     // Render back to text
@@ -224,7 +224,7 @@ fn round_trip_compile_and_render_medium() {
 
     let mut compiler = IRCompiler::new();
     let ir = compiler
-        .compile(source, "roundtrip", language, query, Fidelity::Medium)
+        .compile(source, "roundtrip", language, query, Fidelity::Medium, None)
         .expect("compilation should succeed");
 
     let tuples: Vec<Vec<String>> = ir.instructions.iter().map(op_to_tuple).collect();
@@ -252,7 +252,7 @@ fn round_trip_compile_and_render_high() {
 
     let mut compiler = IRCompiler::new();
     let ir = compiler
-        .compile(source, "roundtrip", language, query, Fidelity::High)
+        .compile(source, "roundtrip", language, query, Fidelity::High, None)
         .expect("compilation should succeed");
 
     let tuples: Vec<Vec<String>> = ir.instructions.iter().map(op_to_tuple).collect();
@@ -281,7 +281,7 @@ fn fidelity_comparison_shows_progressive_detail() {
     // Compile once with Low fidelity (the IR is the same regardless)
     let mut compiler = IRCompiler::new();
     let ir = compiler
-        .compile(source, "fidelity_test", language, query, Fidelity::Low)
+        .compile(source, "fidelity_test", language, query, Fidelity::Low, None)
         .expect("compilation should succeed");
 
     let tuples: Vec<Vec<String>> = ir.instructions.iter().map(op_to_tuple).collect();
@@ -347,12 +347,12 @@ fn compilation_fidelity_produces_comparable_ir() {
 
     let mut c_low = IRCompiler::new();
     let ir_low = c_low
-        .compile(source, "test", language, query, Fidelity::Low)
+        .compile(source, "test", language, query, Fidelity::Low, None)
         .expect("low fidelity compilation should succeed");
 
     let mut c_high = IRCompiler::new();
     let ir_high = c_high
-        .compile(source, "test", language, query, Fidelity::High)
+        .compile(source, "test", language, query, Fidelity::High, None)
         .expect("high fidelity compilation should succeed");
 
     // Both should produce at least some DefClass, DefMethod instructions

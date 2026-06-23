@@ -34,15 +34,16 @@ pub(crate) fn handle_tools_list(id: &Value, state: &mut McpState) {
         }
     });
 
-    // Inject tools cache breakpoint when caching is enabled
-    // Extract values before mutable borrow to satisfy borrow checker
+    // Inject tools cache breakpoint into result._meta, NOT the response root
     let cache_enabled = state.config.cache.enabled;
     let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
     let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
     if cache_enabled {
         let ttl = state.config.cache.tools_ttl.clone();
         let breaker = format!("tools-{}", state.config.cache.tool_defs_version);
-        inject_cache_breakpoints(&mut response, state, "tools", &ttl, &breaker, tok_ref);
+        if let Some(result_obj) = response.get_mut("result") {
+            inject_cache_breakpoints(result_obj, state, "tools", &ttl, &breaker, tok_ref);
+        }
     }
 
     send_response(&response);
@@ -58,14 +59,16 @@ pub(crate) fn handle_prompts_list(id: &Value, state: &mut McpState) {
         }
     });
 
-    // Inject system prompt cache breakpoint when caching is enabled
+    // Inject system prompt cache breakpoint into result._meta, NOT the response root
     let cache_enabled = state.config.cache.enabled;
     let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
     let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
     if cache_enabled {
         let ttl = state.config.cache.system_prompt_ttl.clone();
         let breaker = format!("vocab-{}", state.config.cache.vocab_version);
-        inject_cache_breakpoints(&mut response, state, "system_prompt", &ttl, &breaker, tok_ref);
+        if let Some(result_obj) = response.get_mut("result") {
+            inject_cache_breakpoints(result_obj, state, "system_prompt", &ttl, &breaker, tok_ref);
+        }
     }
 
     send_response(&response);
@@ -91,14 +94,16 @@ pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str, state: &mut McpS
             }
         });
 
-        // Inject system prompt cache breakpoint
+        // Inject system prompt cache breakpoint into result._meta, NOT the response root
         let cache_enabled = state.config.cache.enabled;
         let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
         let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
         if cache_enabled {
             let ttl = state.config.cache.system_prompt_ttl.clone();
             let breaker = format!("vocab-{}", state.config.cache.vocab_version);
-            inject_cache_breakpoints(&mut response, state, "system_prompt", &ttl, &breaker, tok_ref);
+            if let Some(result_obj) = response.get_mut("result") {
+                inject_cache_breakpoints(result_obj, state, "system_prompt", &ttl, &breaker, tok_ref);
+            }
         }
 
         send_response(&response);
@@ -148,14 +153,16 @@ pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str, state: &mut McpS
             }
         });
 
-        // Inject system prompt cache breakpoint
+        // Inject system prompt cache breakpoint into result._meta, NOT the response root
         let cache_enabled = state.config.cache.enabled;
         let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
         let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
         if cache_enabled {
             let ttl = state.config.cache.system_prompt_ttl.clone();
             let breaker = format!("vocab-{}", state.config.cache.vocab_version);
-            inject_cache_breakpoints(&mut response, state, "system_prompt", &ttl, &breaker, tok_ref);
+            if let Some(result_obj) = response.get_mut("result") {
+                inject_cache_breakpoints(result_obj, state, "system_prompt", &ttl, &breaker, tok_ref);
+            }
         }
 
         send_response(&response);

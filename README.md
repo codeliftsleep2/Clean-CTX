@@ -1,6 +1,6 @@
 # Clean-CTX — Token Waste Reducer & Context Compiler
 
-> **🚀 Version 0.1.8** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, CBM (Codebase Memory) integration for graph-based symbol importance + blast radius, Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, and all 1,277 tests passing with **zero clippy warnings**.
+> **🚀 Version 0.2.0-rc1** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, **CBM filter-first architecture** (symbol importance filtering before compression), Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, and all **1,320 tests passing** with **zero clippy warnings**.
 
 A local-first, air-gapped code context optimizer that reduces local compute cost and latency by eliminating redundant re-compilation. Instead of re-compressing the same file from scratch on every interaction, Clean-CTX compiles source code to a structured IR once, then computes instruction-level deltas on subsequent calls — saving CPU cycles without reducing LLM context quality.
 
@@ -70,11 +70,11 @@ Restart your editor. The tools `provide_code_context`, `compress_code_context`, 
 
 ### Zero-Touch Workflow
 
-The **recommended entry point** is `provide_code_context` — a single tool that automatically handles compression, delta transport, Angular detection, fidelity selection, and CBM enrichment:
+The **recommended entry point** is `provide_code_context` — a single tool that automatically handles compression, delta transport, Angular detection, fidelity selection, and CBM symbol filtering:
 
 | Tool | Purpose |
 |------|---------|
-| `provide_code_context` | **Single entry point** — auto-detects file type, selects optimal fidelity, uses delta transport on subsequent calls, enriches with CBM symbol importance |
+| `provide_code_context` | **Single entry point** — auto-detects file type, selects optimal fidelity, uses delta transport on subsequent calls, filters low-importance symbols via CBM |
 | `restore_context` | Force full re-compression, clearing all baselines and DB entries |
 | `context_history` | View compression history and delta savings for tracked files |
 | `context_stats` | Dashboard: token savings, compression stats, session metrics |
@@ -89,25 +89,25 @@ The workflow automatically:
 ### How the Transport Protocol Works
 
 ```
-                  ┌──────────────────┐
-                  │  Source Code     │
-                  │  (file on disk)  │
-                  └────────┬─────────┘
-                           │
-                           ▼
-                  ┌──────────────────┐
-                  │  IRCompiler      │  Translates source → Vec<CoreOp>
-                  │  (4 layers)      │  Language + Meta + Pattern layers
-                  └────────┬─────────┘
-                           │
-                           ▼
-              ┌────────────────────────┐
-              │  CompiledIR { v: N }   │  Canonical instruction stream
-              └────────┬───────────────┘
-                       │
-          ┌────────────┴────────────┐
-          │                         │
-          ▼                         ▼
+                   ┌──────────────────┐
+                   │  Source Code     │
+                   │  (file on disk)  │
+                   └────────┬─────────┘
+                            │
+                            ▼
+                   ┌──────────────────┐
+                   │  IRCompiler      │  Translates source → Vec<CoreOp>
+                   │  (4 layers)      │  Language + Meta + Pattern layers
+                   └────────┬─────────┘
+                            │
+                            ▼
+               ┌────────────────────────┐
+               │  CompiledIR { v: N }   │  Canonical instruction stream
+               └────────┬───────────────┘
+                        │
+           ┌────────────┴────────────┐
+           │                         │
+           ▼                         ▼
 ┌──────────────────┐    ┌──────────────────┐
 │  1st call:       │    │  N+1th call:     │
 │  send full IR    │    │  compute delta   │
@@ -128,22 +128,29 @@ The workflow automatically:
 
 ### CBM (Codebase Memory) Integration
 
-Clean-CTX integrates with [Codebase Memory MCP](https://github.com/codeliftsleep2/CodebaseMemory-MCP) to provide graph-based code intelligence:
+Clean-CTX integrates with [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) (CBM) using a **filter-first architecture**: CBM symbol importance scores determine which symbols are excluded from compression entirely, reducing token output instead of adding post-compression metadata.
 
 | Feature | Description |
 |---------|-------------|
-| **Symbol Importance** | PageRank scores for every symbol in the codebase — high-importance symbols get higher fidelity |
+| **Symbol Importance Filtering** | Symbols with importance score < 0.4 are dropped before compression runs, reducing token output by 30-50% for noisy files |
 | **Blast Radius** | Dependency graph tracing — knows which files are affected by a change |
 | **Dead Code Detection** | Identifies orphaned classes, methods, and fields |
 | **Architecture Awareness** | Understands layering, module boundaries, and dependency direction |
 
-CBM responses are intercepted at the pipe level and compressed via JSON-aware compression (**~5,000 → ~1,100 tokens**, ~78% savings) before reaching the agent.
+**How it works:**
+1. `provide_code_context` queries CBM for symbol importance scores via `get_symbol_importance(project)`
+2. `build_cbm_skip_set()` identifies symbols with score < 0.4 for the current file
+3. The compression pipeline checks `should_skip_capture()` for each class/method/field — low-importance symbols are dropped entirely
+4. The IR compiler applies the same skip check before emitting `DefClass`/`DefMethod`/`DefField`
+5. Session stats record tokens removed under the `cbm_filter` domain
+
+**Result:** CBM reduces token output instead of increasing it. The post-compression enrichment step is removed.
 
 | Component | Description |
 |-----------|-------------|
 | `client.rs` | JSON-RPC 2.0 subprocess client with retry + exponential backoff |
 | `bridge.rs` | DashMap-based TTL caching with `detect_changes()` cache invalidation |
-| `proxy.rs` | Pipe-level response interception and pluggable tokenizer integration |
+| `proxy.rs` | Pipe-level response interception and JSON-aware compression (~5,000 → ~1,100 tokens, ~78% savings) |
 | `json_compress.rs` | JSON-aware compressor: key shortening, envelope stripping, null field removal |
 
 ### Spring Boot Meta-Layer
@@ -208,15 +215,9 @@ Disable in `.clean-ctx.json` with: `"persistence": { "enabled": false }`
 - **Baseline snapshots** — `diff_code_context` remembers the previous state, producing small deltas instead of full re-compressions
 - **Raw-token count cache** — skip the BPE encode on cache hits (sub-millisecond responses)
 
-### Path Alias Mapping
+### Path Aliases
 
-Long file paths are compressed to short aliases:
-
-```
-§MAP
-  α1 = C:\project\src\core\auth\security\Provider.tsx
-  α2 = C:\project\src\core\auth\security\TokenVerifier.tsx
-```
+Path aliases (`α1`, `α2`, …) are session-global — `compress_workspace` populates aliases that are immediately visible to subsequent `provide_code_context` calls, keeping the `§PATHMAP` footer stable across multiple tools.
 
 ### Multi-Platform Proxy
 
@@ -614,11 +615,11 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — **0 warnings, 0 errors** |
-| Tests | ✅ **1,277 core tests** + 243 proxy tests = **1,520 total, all passing** |
-| Audit | ✅ FAANG-level audit — all 41 findings resolved; CBM audit — all 6 findings resolved; Compiler-IR audit — all findings resolved |
+| Tests | ✅ **1,320 tests, all passing** |
+| Audit | ✅ FAANG-level audit — all findings resolved; CBM audit — all findings resolved; Compiler-IR audit — all findings resolved |
 | Languages | ✅ TypeScript, C#, Rust, Java with Angular/Spring Boot meta-layers |
 | IR Transport Protocol | ✅ Stateful instruction-level delta transport — compile once, send deltas thereafter |
-| CBM Integration | ✅ Subprocess client with retry + caching, pipe-level JSON compression, session stats |
+| CBM Integration | ✅ Filter-first architecture — symbol importance scores drop low-importance symbols before compression |
 | Delta Transport | ✅ IR-level + text-level, field-patch encoding, compact delta format |
 | Persistence | ✅ SQLite cross-session persistence with three-tier reliability |
 | Proxy | ✅ Multi-platform proxy (Anthropic/OpenAI/Generic) with auto-cache + tool filters |
@@ -644,6 +645,8 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Administrators | Compliance checklist, hardening, SBOM, air-gap deployment |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | All | Version history with all additions, fixes, and deferrals |
 | [`docs/INTELLIGENCE_LAYER_PLAN.md`](docs/INTELLIGENCE_LAYER_PLAN.md) | Architects | Intelligence Layer: PageRank scoring, blast radius, token budget packing |
+| [`docs/CBM_INTEGRATION_PLAN.md`](docs/CBM_INTEGRATION_PLAN.md) | Architects | CBM filter-first architecture, pipe-level proxy, domain-tagged stats |
+| [`docs/CBM_FAANG_AUDIT.md`](docs/CBM_FAANG_AUDIT.md) | Architects | CBM integration audit findings and remediation |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Contributors | Future plans, prioritized items, carry-over from audit |
 
 ---
