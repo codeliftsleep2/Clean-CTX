@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 /// Per-program filter statistics.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct FilterStats {
     /// Per-program stats.
     pub programs: HashMap<String, ProgramFilterStats>,
@@ -22,7 +22,7 @@ pub struct FilterStats {
 }
 
 /// Statistics for a single program filter.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ProgramFilterStats {
     /// Program name (e.g., "cargo", "npm").
     pub program: String,

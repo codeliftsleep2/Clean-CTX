@@ -144,6 +144,8 @@ code .
 
 All settings are controlled via environment variables. Defaults are sensible for most use cases.
 
+> **⚠️ Cache System Separation:** The proxy's cache system (controlled by `AUTO_CACHE`, `TAIL_TTL`) is **entirely separate** from the MCP server's `CacheConfig` in `.clean-ctx.json`. The proxy injects Anthropic API `cache_control` breakpoints into HTTP request bodies for API cost savings. The MCP server's `CacheConfig` controls `_meta.cache_hints` annotations in JSON-RPC responses for LLM context window optimization. These are independent systems — enabling one does not affect the other, and they have separate configuration paths (environment variables vs `.clean-ctx.json`).
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8787` | Port to bind on (always `127.0.0.1`) |

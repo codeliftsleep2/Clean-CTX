@@ -99,7 +99,7 @@ pub(crate) struct CachedGraphData {
 pub struct GraphBridge {
     client: Option<CbmClient>,
     pub(crate) cache: DashMap<String, CachedGraphData>,
-    status: CbmStatus,
+    pub(crate) status: CbmStatus,
     cache_ttl: u64,
     project: Option<String>,
     graph_version: String,
@@ -193,9 +193,11 @@ impl GraphBridge {
         }
     }
 
-    /// Blast radius query at depth 1. Multi-hop depth expansion is a future
-    /// enhancement — the `depth` parameter is accepted for API compatibility
-    /// but currently ignored.
+    /// Blast radius query at depth 1. Uses CBM Cypher to find callers of a symbol.
+    ///
+    /// H-01/M-04 fix: Replaced invalid `search_graph` name_pattern with valid Cypher
+    /// query_graph call. Previous code passed `"depends_on:{sym}"` as a name_pattern
+    /// regex, which CBM treated literally and returned zero matches.
     pub fn get_blast_radius(&mut self, symbol: &str, _depth: usize) -> Vec<String> {
         let key = format!("blast:{symbol}");
         let project = self.project_str();
@@ -211,10 +213,16 @@ impl GraphBridge {
             )
             .unwrap_or_default();
         }
-        let result = self.query(move |c| c.search_graph(&format!("depends_on:{sym}"), &project, None));
+        let escaped = sym.replace('\'', "\\'");
+        let cypher = format!(
+            "MATCH (caller:Function)-[:CALLS]->(f:Function) WHERE f.name = '{escaped}' RETURN caller.name, caller.file_path"
+        );
+        let result = self.query(move |c| c.query_graph(&cypher, &project));
         match result {
-            Ok(nodes) => {
-                let files: Vec<_> = nodes.iter().filter_map(|n| n["file"].as_str().map(String::from)).collect();
+            Ok(rows) => {
+                let files: Vec<_> = rows.iter().filter_map(|r| {
+                    r.get(1).and_then(|v| v.as_str().map(String::from))
+                }).collect();
                 self.cache_insert(&key, &files);
                 files
             }
@@ -349,7 +357,12 @@ impl GraphBridge {
             )
             .unwrap_or_default();
         }
-        let result = self.query(move |c| c.search_graph(&q, &project, None));
+        // H-01 fix: build a proper regex name_pattern from the query string.
+        // If the query already contains regex metacharacters (., *, +, [, etc.)
+        // use it as-is; otherwise wrap in .*...* for substring matching.
+        let has_regex = q.chars().any(|c| matches!(c, '.' | '*' | '+' | '[' | '(' | '\\' | '^' | '$' | '{' | '|'));
+        let name_pattern = if has_regex { q } else { format!(".*{q}.*") };
+        let result = self.query(move |c| c.search_graph(&name_pattern, &project, Some("Function")));
         match result {
             Ok(nodes) => {
                 let gn: Vec<GraphNode> = nodes.iter().filter_map(|n| {
@@ -368,13 +381,24 @@ impl GraphBridge {
         }
     }
 
+    /// Trace a call path between two symbols. If `to` is empty, traces all edges
+    /// from `from`. Otherwise post-filters to only include edges reaching `to`.
+    ///
+    /// M-01 fix: Previously ignored the `to` parameter — now properly filters
+    /// results to only include edges reaching the target symbol.
     pub fn trace_path(&mut self, from: &str, to: &str) -> Vec<GraphEdge> {
         if from == to {
             return vec![];
         }
+        // Determine direction: if we have a target, trace outbound; otherwise both
+        let (direction, filter_target) = if to.is_empty() {
+            ("both", None)
+        } else {
+            ("outbound", Some(to.to_string()))
+        };
         let key = format!("trace:{from}:{to}");
         let project = self.project_str();
-        let f = from.to_string(); let _t = to.to_string();
+        let f = from.to_string();
         if self.check_cache(&key) {
             return serde_json::from_value(
                 self.cache
@@ -386,16 +410,22 @@ impl GraphBridge {
             )
             .unwrap_or_default();
         }
-        let result = self.query(move |c| c.trace_path(&f, "both", &project, Some(3)));
+        let result = self.query(move |c| c.trace_path(&f, direction, &project, Some(3)));
         match result {
             Ok(edges) => {
                 let ge: Vec<GraphEdge> = edges.iter().filter_map(|e| {
-                    Some(GraphEdge {
+                    let ge = GraphEdge {
                         from: e["from"].as_str()?.to_string(),
                         to: e["to"].as_str()?.to_string(),
                         label: e["label"].as_str().unwrap_or("").into(),
                         properties: HashMap::new(),
-                    })
+                    };
+                    // M-01: post-filter if target is specified
+                    if let Some(ref target) = filter_target {
+                        if ge.to == *target || ge.from == *target { Some(ge) } else { None }
+                    } else {
+                        Some(ge)
+                    }
                 }).collect();
                 self.cache_insert(&key, &ge);
                 ge
@@ -447,11 +477,19 @@ impl GraphBridge {
 
     /// Update status from the underlying client. Also syncs on every
     /// successful query call for self-healing (M-1).
+    ///
+    /// If the status transitions from Degraded to Available (circuit cooldown
+    /// elapsed), we log the recovery.
     pub fn update_status(&mut self) {
+        let previous = self.status.clone();
         self.status = match self.client.as_ref() {
             Some(c) => c.status().clone(),
             None => CbmStatus::Unavailable,
         };
+        // Log recovery transitions
+        if matches!(previous, CbmStatus::Degraded(_)) && self.status.is_available() {
+            eprintln!("[clean-ctx-cbm] Recovered — circuit breaker reset, CBM available again");
+        }
     }
 
     // ── Internal helpers ──────────────────────────────────────────
@@ -568,10 +606,39 @@ fn home_dir() -> PathBuf {
 #[cfg(test)]
 pub mod test_helpers {
     use super::*;
+    use std::collections::HashMap;
     pub fn resolve_binary(config: &CbmConfig) -> Option<PathBuf> {
         resolve_cbm_binary(config)
     }
     // Intentionally kept simple: test access to bridge internals.
     #[allow(private_interfaces)]
     pub fn cache_ttl(bridge: &GraphBridge) -> u64 { bridge.cache_ttl }
+
+    /// Create a mock GraphBridge with canned symbol importance data.
+    /// The bridge appears "available" but has no real CBM client — it
+    /// returns pre-seeded data from its cache.
+    pub fn new_mock(symbol_importance: HashMap<String, SymbolImportance>) -> GraphBridge {
+        let bridge = GraphBridge {
+            client: None,
+            cache: DashMap::new(),
+            status: CbmStatus::Available,
+            cache_ttl: 3600,
+            project: Some("test-project".to_string()),
+            graph_version: String::new(),
+        };
+        // Pre-seed the symbol_importance cache entry
+        let key = "symbol_importance".to_string();
+        let json = serde_json::to_value(&symbol_importance).unwrap_or_default();
+        bridge.cache.insert(key, CachedGraphData {
+            data: json,
+            expires_at: Instant::now() + Duration::from_secs(3600),
+        });
+        bridge
+    }
+
+    /// Create a mock GraphBridge with no canned data (available, but
+    /// symbol_importance cache returns empty).
+    pub fn new_mock_empty() -> GraphBridge {
+        new_mock(HashMap::new())
+    }
 }

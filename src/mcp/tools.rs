@@ -411,6 +411,9 @@ pub(crate) fn dispatch_tools_call(
                         inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref);
                     }
 
+                    // Inject CBM enrichment metadata when available
+                    crate::mcp::tool_handlers::enrich_workspace_with_cbm(&mut response, state);
+
                     send_response(&response);
                 }
                 Err(e) => {

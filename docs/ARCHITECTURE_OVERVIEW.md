@@ -313,7 +313,6 @@ src/
 ├── analytics.rs                  # tiktoken cl100k token counting (F-01: cached BPE)
 ├── protocol.rs                   # JSON-RPC message types
 ├── compressor.rs                 # Re-export shim (backward compatible)
-├── helpers.rs                    # Legacy helper (kept for backward compat)
 └── src/test_files/               # Test fixtures including:
     ├── UserManagementService.ts  # ~440-line Angular service (added for edit simulation)
     └── ...                       # Other test files
@@ -435,6 +434,10 @@ See [Measured Compression Performance](#measured-compression-performance) for th
 The `LocalStateCache` serves double duty:
 1. **Content-hash registry** — avoids re-compressing identical files in the same session
 2. **Baseline snapshot registry** — enables `diff_code_context` to produce AST-level deltas instead of full re-compressions on subsequent calls
+
+### Why path aliases are global across the session
+
+Path aliases (`α1`, `α2`, …) are **session-global** — `compress_workspace` populates aliases that are immediately visible to subsequent `provide_code_context` calls, and vice versa. This means that if a workspace compression assigns `α1` to `src/user.service.ts`, a later `provide_code_context("src/user.service.ts")` will reuse the same `α1` alias, keeping the `§PATHMAP` footer stable across multiple tools. Aliases are never recycled within a session; they only reset on server restart.
 
 ### Why both text-level and IR-level delta transport?
 
@@ -689,4 +692,10 @@ See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for full per-edit breakdown and the 
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks
-- 1,035 tests passing (unit + integration + E2E + proxy regression tests)
+- 1,306 tests passing (unit + integration + E2E + proxy regression tests)
+
+> **ℹ️ Cache System Separation:** Clean-CTX has **two independent cache systems** with different scopes and configuration paths:
+> 1. **MCP Server `CacheConfig`** (in `.clean-ctx.json`) — Controls `_meta.cache_hints` annotations in JSON-RPC responses. These annotations tell the LLM which parts of compressed output are cacheable (stable vocabulary, tool definitions, persisted baselines). Configuration is via the `cache` key in `.clean-ctx.json`.
+> 2. **Proxy Cache** (environment variables `AUTO_CACHE`, `TAIL_TTL`) — A 4-slot Anthropic API `cache_control` breakpoint injector for HTTP request bodies. This reduces API costs by activating Anthropic's prompt caching. Configuration is via environment variables only.
+>
+> These systems are architecturally separate: the MCP server operates over stdin/stdout JSON-RPC and never makes HTTP requests; the proxy operates over HTTP and never processes JSON-RPC. Enabling one has no effect on the other, and they share no code or state.

@@ -17,5 +17,18 @@ When you need to understand a TypeScript, JavaScript, or C# file, use the `provi
 ## Token Savings Dashboard
 To view compression savings stats, call `context_stats` with no arguments. This shows session-level metrics including raw vs compressed tokens, delta hit rate, and per-file breakdowns.
 
+## Test File Convention
+Clean-CTX uses Rust's `#[path = "..."]` attribute to keep test files in a dedicated `src/tests/` directory rather than inline in source files. Each source module declares its tests with:
+```rust
+#[cfg(test)]
+#[path = "../tests/mcp/heuristics.rs"]
+mod tests;
+```
+This means:
+- Test files live in `src/tests/` mirroring the source module structure
+- Source files remain focused on production logic
+- Tests are compiled only in `#[cfg(test)]` builds (zero overhead in release)
+- The `#[path]` reference must match the actual file location — broken paths cause compile errors
+
 ## Fallback to read_file
 Only use `read_file` directly when `provide_code_context` fails or when you need exact line-by-line content (e.g., for regex search or byte-level analysis).
