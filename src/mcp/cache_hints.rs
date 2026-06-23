@@ -180,7 +180,7 @@ pub fn inject_cache_breakpoints(
     //   `response["_meta"]["cache_hints"]`.
     let target = if response.get("jsonrpc").is_some() {
         // Full JSON-RPC response — _meta MUST live inside `result`
-        if !response.get("result").map_or(false, |v| v.is_object()) {
+        if !response.get("result").is_some_and(|v| v.is_object()) {
             // No result object yet — create one (shouldn't happen in practice)
             response["result"] = serde_json::json!({});
         }

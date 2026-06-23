@@ -173,7 +173,7 @@ impl IRCompiler {
             // CBM filter-first: skip low-importance symbols before emitting
             // any IR ops. Uses the same should_skip_capture logic as the
             // text compression pipeline for consistent behavior.
-            if let Some(ref skip) = skip_set {
+            if let Some(skip) = skip_set {
                 if !skip.is_empty() && crate::compression::pipeline::should_skip_capture(cap, skip) {
                     continue;
                 }
