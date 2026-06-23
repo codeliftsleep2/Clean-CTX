@@ -142,6 +142,7 @@ pub struct CompiledFilter {
     pub match_command: Regex,
     pub priority: i32,
     pub strip_ansi: bool,
+    #[allow(dead_code)]
     pub filter_stderr: bool,
     pub reduce_json: bool,
     pub replace: Vec<CompiledReplace>,
@@ -153,6 +154,7 @@ pub struct CompiledFilter {
     pub tail_lines: Option<usize>,
     pub max_lines: Option<usize>,
     pub on_empty: Option<String>,
+    #[allow(dead_code)]
     pub user_config_key: Option<String>,
 }
 
@@ -182,6 +184,7 @@ pub struct CompiledGroupBy {
 
 /// Inline conformance test (compiled).
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CompiledFilterTest {
     pub name: String,
     pub input: Option<String>,

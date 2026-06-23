@@ -22,6 +22,7 @@ pub struct FilterRegistry {
 
 /// Wrapper for a compiled filter with config overrides.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CompiledFilterWrapper {
     pub filter: CompiledFilter,
     pub enabled: bool,
@@ -77,6 +78,7 @@ impl FilterRegistry {
     }
 
     /// Get a filter by name, checking overrides first, then builtin, then community.
+    #[allow(dead_code)]
     pub fn get(&self, name: &str) -> Option<&CompiledFilter> {
         // Check overrides first
         if let Some(wrapper) = self.overrides.get(name) {
@@ -107,6 +109,7 @@ impl FilterRegistry {
     }
 
     /// Set a configuration override.
+    #[allow(dead_code)]
     pub fn set_override(
         &mut self,
         name: String,
@@ -125,6 +128,7 @@ impl FilterRegistry {
     }
 
     /// Check if any filters are available for a command.
+    #[allow(dead_code)]
     pub fn has_filter_for(&self, command: &str) -> bool {
         self.select_for_command(command).is_some()
     }

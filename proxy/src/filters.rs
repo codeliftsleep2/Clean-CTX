@@ -16,6 +16,7 @@ pub struct FilterResult {
     pub program: String,
     pub reduction_pct: f32,
     pub truncated: bool,
+    #[allow(dead_code)]
     pub collapsed: bool,
 }
 

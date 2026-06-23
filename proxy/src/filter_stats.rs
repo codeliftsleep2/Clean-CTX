@@ -110,11 +110,13 @@ impl FilterStats {
     }
 
     /// Get stats for a specific program.
+    #[allow(dead_code)]
     pub fn for_program(&self, program: &str) -> Option<&ProgramFilterStats> {
         self.programs.get(program)
     }
 
     /// Get a summary string for the dashboard.
+    #[allow(dead_code)]
     pub fn summary(&self) -> String {
         if self.total_applications == 0 {
             return "  No filter applications recorded.".to_string();
