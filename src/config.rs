@@ -352,14 +352,30 @@ pub struct IntelligenceConfig {
     /// (zero overhead).
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Enable blast radius analysis (depth-1 affected files).
+    /// When enabled, the compression output includes depth-1 affected
+    /// files from CBM with context-aware fidelity selection.
+    #[serde(default)]
+    pub blast_radius_enabled: bool,
+    /// Maximum number of blast radius files to include per request.
+    /// Prevents token explosion from highly-connected symbols.
+    /// Default: 10 files.
+    #[serde(default = "default_max_blast_radius")]
+    pub max_blast_radius_files: usize,
 }
 
 impl Default for IntelligenceConfig {
     fn default() -> Self {
         Self {
             enabled: true,
+            blast_radius_enabled: false,
+            max_blast_radius_files: 10,
         }
     }
+}
+
+fn default_max_blast_radius() -> usize {
+    10
 }
 
 /// Per-framework Meta-Layer configuration.

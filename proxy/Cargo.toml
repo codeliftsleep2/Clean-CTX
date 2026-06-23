@@ -5,6 +5,11 @@ edition = "2021"
 description = "Anthropic prompt-cache breakpoint proxy for Clean-CTX. Sits between Cline and api.anthropic.com, injecting cache_control on tools/system/messages for ~90% API cost savings."
 license = "CC0-1.0"
 
+[[bin]]
+name = "clean-ctx-proxy"
+path = "src/main.rs"
+test = false
+
 [dependencies]
 # HTTP server
 hyper = { version = "1", features = ["server", "http1", "http2"] }

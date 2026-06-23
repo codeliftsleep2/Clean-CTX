@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-06-18
+**Last updated:** 2026-06-23
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -13,7 +13,7 @@
 | **Now** | v0.2.0 | Real-world ready | 5 |
 | **Next** | v0.3.0 | Advanced capabilities | 10 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 10 |
-| **Architectural** | Continuous | Code health & tooling | 6 |
+| **Architectural** | Continuous | Code health & tooling | 7 |
 | **Community** | Continuous | Docs & marketing | 5 |
 
 ---
@@ -54,8 +54,8 @@ These items address the most common user requests and unlock adoption on larger 
 | **F-19** | Streaming workspace walk | Replace `collect_source_files` collect-then-sort pattern with a `walkdir` streaming visitor. Required before F-20. | 1 day | 🟡 Medium |
 | **F-20** | Rayon parallelization for `compress_workspace` | Per-thread tree-sitter `Parser` pool, shared `DashMap` for the path dictionary, `par_iter().try_for_each`. Expected ~4× speedup on 16-core boxes. Requires F-19. | 3-5 days | 🔴 High |
 | **A-07** | Property-based tests with `proptest` | Fuzz-style input tests for the decompressor, the config glob matcher, and the modifier stripper. Would have caught F-06 (Unicode) and F-12 (substring match) regressions. | 1-2 days | 🔴 High |
-| **R-29** | Intelligence Layer | Three-phase ranked context delivery on top of the existing compression stack. **Phase 1:** PageRank symbol scoring + adaptive per-symbol fidelity. **Phase 2:** Blast radius analysis — delta output includes depth-1 affected file skeletons. **Phase 3:** Token budget knapsack packing. All phases opt-in via `.clean-ctx.json`, zero overhead when disabled. R-35 (CBM Phase 2) provides graph seeds for PageRank scoring. See `docs/INTELLIGENCE_LAYER_PLAN.md`. | 5.5 days | 🔴 High |
-| **A-08** | TOKEN_EFFICIENCY_AUDIT findings | 4 open findings: underutilized `source_cache` (High), double IR compile in delta path (Medium), path resolution inconsistency (Medium), fragile source ownership (Low). | 1-2 days | � Medium |
+| **R-29** | Intelligence Layer | Ranked context delivery on top of the existing compression stack. **Phase 1 (complete):** PageRank symbol scoring + CBM-informed adaptive per-symbol fidelity (60% IR + 40% CBM blend). **Phase 2 (complete):** Blast radius integrated into `handle_provide_code_context` and `handle_delta_code_context` — depth-1 affected files compressed at Low fidelity and appended with `§IMPACT` markers. Regression tests added. **Phase 3 (not started):** Token budget knapsack packing. All phases opt-in via `.clean-ctx.json`, zero overhead when disabled. See `docs/INTELLIGENCE_LAYER_PLAN.md`. | 5.5 days | 🔴 High |
+| **A-08** | TOKEN_EFFICIENCY_AUDIT findings | 4 open findings: underutilized `source_cache` (High), double IR compile in delta path (Medium), path resolution inconsistency (Medium), fragile source ownership (Low). | 1-2 days | 🟡 Medium |
 
 ---
 
@@ -63,13 +63,10 @@ These items address the most common user requests and unlock adoption on larger 
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **R-01d** | Java language layer | Enterprise staple. CBM enriches input with type resolution and call chains; our language layer compresses with full micro-opcode stack. Required for pilot stack (Java + Spring). | 2-3 days | 🔴 High |
 | **R-36** | React Meta-Layer | Additive meta-layer on TS/JS. Component/hook/context bundling, prop type compression, React-specific lifecycle markers. Highest-demand frontend framework after Angular. | 3-4 days | 🔴 High |
 | **R-37** | Redux Meta-Layer | Additive meta-layer on TS/JS. Action/reducer/selector compression, thunk/saga patterns, store shape compression. Natural follow-on to React (patterns ≈ NgRx). | 2-3 days | 🔴 High |
-| **R-38** | Spring Boot Meta-Layer | Φ markers for @Service, @Repository, @Controller, @Autowired, @Transactional. DI graph compression. Sits on Java language layer + CBM graph output. | 3-4 days | 🔴 High |
 | **R-01** | Python language layer | Most-requested language. Follows the 4-step guide in `DEVELOPER_DOCUMENTATION.md`. | 1-2 days | 🔴 High |
 | **R-01b** | Go language layer | Second-most requested. | 1-2 days | 🟡 Medium |
-| **R-01c** | Rust language layer | Common in LLM-context scenarios (AI IDEs, code reviewers). | 1-2 days | 🟡 Medium |
 | **R-02** | Type-aware compression | Inline `type_aliases` from config: `UserId` → `$uid`, `JsonObject` → `$jo`. Currently the type table is loaded but not injected into the capture pipeline. | 2-3 days | 🔴 High |
 | **R-23** | NgRx Meta-Layer | Framework-annotation layer for NgRx state management (sits on top of TS + Angular layers). Φ markers for actions, reducers, effects, selectors. Semantic compression of boilerplate patterns. DI-graph integration for action dispatch → effect → reducer → selector flow. | 3-4 days | 🔴 High |
 | **R-24** | RxJS Meta-Layer | Additive meta-layer on TS for reactive patterns. Operator chain compression, observable graph representation, subscription lifecycle markers. | 2-3 days | 🟡 Medium |
@@ -155,16 +152,16 @@ Items explicitly deferred — not forgotten, not prioritized.
 2. **Unblocks other work** — F-19 (walkdir) unblocks F-20. R-29 Intelligence Layer builds on the existing IR + Angular graph and now benefits from CBM graph seeds.
 3. **Adoption blockers** — F-20 parallelization is required for any user with >1K files. R-19 tokenizer abstraction unblocks every model-specific feature.
 4. **Regression insurance** — A-07 (proptest) is cheap insurance against input-validation bugs.
-5. **Differentiation** — R-29 Intelligence Layer adds PageRank + blast radius + budget packing, enhanced by CBM's cross-language graph intelligence.
+5. **Differentiation** — R-29 Intelligence Layer adds PageRank (complete) + blast radius (complete) + budget packing (not started), enhanced by CBM's cross-language graph intelligence.
 6. **Token surface coverage** — R-39 (Secret Scrubbing) and R-40 (Shell Output Filtering) close the remaining token waste surface: build/test noise, git diff noise, and secrets in tool output. These run in the existing proxy pipeline with zero overhead when disabled. Inspired by [ctx-wire](https://github.com/pivanov/ctx-wire) patterns. See `docs/TOOL_OUTPUT_FILTER_PLAN.md`.
 
 **Next list** priorities:
-- R-01d Java language layer is 🔴 High priority for pilot stack (Java + Spring + React + Redux). CBM enriches input, we compress.
 - R-36 React Meta-Layer is 🔴 High priority — highest-demand frontend after Angular, fastest to build (Φ markers only).
 - R-37 Redux Meta-Layer is 🔴 High priority — natural follow-on to React, patterns ≈ NgRx.
-- R-38 Spring Boot Meta-Layer is 🔴 High priority — DI maps to Angular pattern, CBM provides Java graph.
 - R-12 multi-file git-commit diff is High priority for PR review workflows.
 - R-01 Python language layer is the single most-requested language addition.
+
+**Completed pilot stack:** The Java + Spring + CBM pilot stack (R-01d Java language layer, R-38 Spring Boot Meta-Layer, R-35 CBM Integration) is complete and shipped in v0.1.7–v0.1.9. These items have been removed from the "Next" list as they're already delivered.
 
 **Later list** — none of R-25 through R-28 should be started speculatively. Build when contributors or demand signals appear.
 
