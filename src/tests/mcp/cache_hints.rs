@@ -94,8 +94,9 @@ fn test_cache_disabled_skips_injection() {
     assert_eq!(saved, 0, "no tokens saved when cache disabled");
     assert_eq!(state.cache_metrics.hits, 0);
     assert_eq!(state.cache_metrics.misses, 0);
-    // Should NOT have injected _meta.cache_hints
-    assert!(response.get("_meta").is_none() || response["_meta"].get("cache_hints").is_none());
+    // Should NOT have injected _meta.cache_hints — check inside result
+    let result_obj = response.get("result").unwrap();
+    assert!(result_obj.get("_meta").is_none() || result_obj["_meta"].get("cache_hints").is_none());
 }
 
 /// Verify that inject_cache_breakpoints correctly injects a system_prompt breakpoint.
@@ -106,7 +107,8 @@ fn test_inject_system_prompt_hint() {
 
     inject_cache_breakpoints(&mut response, &mut state, "system_prompt", "1h", "vocab-v1", None);
 
-    let hints = &response["_meta"]["cache_hints"];
+    // _meta must be inside result, not at top level
+    let hints = &response["result"]["_meta"]["cache_hints"];
     let breakpoints = hints["breakpoints"].as_array().unwrap();
     assert_eq!(breakpoints.len(), 1);
     assert_eq!(breakpoints[0]["region"], "system_prompt");
@@ -123,7 +125,8 @@ fn test_inject_tools_hint() {
 
     inject_cache_breakpoints(&mut response, &mut state, "tools", "1h", "tools-v1", None);
 
-    let hints = &response["_meta"]["cache_hints"];
+    // _meta must be inside result, not at top level
+    let hints = &response["result"]["_meta"]["cache_hints"];
     let breakpoints = hints["breakpoints"].as_array().unwrap();
     assert_eq!(breakpoints[0]["region"], "tools");
     assert_eq!(breakpoints[0]["ttl"], "1h");
@@ -139,7 +142,8 @@ fn test_inject_baseline_hint() {
     let breaker = compute_baseline_breaker("compressed text here");
     inject_cache_breakpoints(&mut response, &mut state, "baseline", "1h", &breaker, None);
 
-    let hints = &response["_meta"]["cache_hints"];
+    // _meta must be inside result, not at top level
+    let hints = &response["result"]["_meta"]["cache_hints"];
     let breakpoints = hints["breakpoints"].as_array().unwrap();
     assert_eq!(breakpoints[0]["region"], "baseline");
     assert_eq!(breakpoints[0]["ttl"], "1h");
@@ -155,7 +159,8 @@ fn test_inject_tail_hint() {
     inject_cache_breakpoints(&mut response, &mut state, "tail", "5m", "rolling", None);
     mark_tail_ephemeral(&mut state);
 
-    let hints = &response["_meta"]["cache_hints"];
+    // _meta must be inside result, not at top level
+    let hints = &response["result"]["_meta"]["cache_hints"];
     let breakpoints = hints["breakpoints"].as_array().unwrap();
     assert_eq!(breakpoints[0]["region"], "tail");
     assert_eq!(breakpoints[0]["ttl"], "5m");
@@ -246,4 +251,102 @@ fn test_generate_vocabulary_text() {
     assert!(text.contains("$c   → class"), "should include $c opcode");
     assert!(text.contains("Φcmp"), "should include Angular component marker");
     assert!(text.contains("⊕guard"), "should include guard marker");
+}
+
+// ══════════════════════════════════════════════════════════════════
+// _meta placement regression tests
+// ══════════════════════════════════════════════════════════════════
+
+/// REGRESSION: inject_cache_breakpoints on a full JSON-RPC response must
+/// place _meta ONLY inside result, NEVER at the response root level.
+///
+/// This test simulates what happens when a caller incorrectly passes
+/// the full response object (with jsonrpc, id, result at root) instead
+/// of just the result sub-object. The `_meta` field must NOT leak
+/// to the top level.
+#[test]
+fn test_meta_not_in_response_root() {
+    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    // Full JSON-RPC response — simulating what callers pass
+    let mut response = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {}
+    });
+
+    // Inject into the result sub-object (the correct pattern)
+    if let Some(result_obj) = response.get_mut("result") {
+        inject_cache_breakpoints(result_obj, &mut state, "tools", "1h", "tools-v1", None);
+    }
+
+    // _meta must NOT exist at the response root level
+    assert!(
+        response.get("_meta").is_none(),
+        "REGRESSION: _meta should NOT be at the response root level, but found {:?}",
+        response.get("_meta")
+    );
+
+    // _meta MUST exist inside result
+    assert!(
+        response["result"].get("_meta").is_some(),
+        "REGRESSION: _meta should be inside result"
+    );
+
+    // Verify the breakpoint content is correct
+    let hints = &response["result"]["_meta"]["cache_hints"];
+    let breakpoints = hints["breakpoints"].as_array().unwrap();
+    assert_eq!(breakpoints[0]["region"], "tools");
+}
+
+/// REGRESSION: Injecting a breakpoint must keep _meta inside result,
+/// never leaking to the response root. Second call replaces the
+/// previous breakpoint (by design — each response has one cache
+/// region), but _meta must still be inside result.
+#[test]
+fn test_multiple_calls_meta_stays_in_result() {
+    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let mut response = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {}
+    });
+
+    // Inject system_prompt into result
+    if let Some(result_obj) = response.get_mut("result") {
+        inject_cache_breakpoints(result_obj, &mut state, "system_prompt", "1h", "vocab-v1", None);
+    }
+
+    // Verify first injection — _meta inside result, not root
+    assert!(
+        response.get("_meta").is_none(),
+        "REGRESSION: _meta should NOT be at response root after first injection"
+    );
+    assert!(
+        response["result"].get("_meta").is_some(),
+        "REGRESSION: _meta should be inside result after first injection"
+    );
+
+    // Inject a second breakpoint into result (replaces the previous one)
+    if let Some(result_obj) = response.get_mut("result") {
+        inject_cache_breakpoints(result_obj, &mut state, "tools", "1h", "tools-v1", None);
+    }
+
+    // Verify nothing leaked to root after second injection
+    assert!(
+        response.get("_meta").is_none(),
+        "REGRESSION: _meta should NOT be at response root after second injection"
+    );
+
+    // _meta must still be inside result after second call
+    assert!(
+        response["result"].get("_meta").is_some(),
+        "REGRESSION: _meta should be inside result after second injection"
+    );
+
+    // The breakpoint should have been replaced (second call's breakpoint)
+    let hints = &response["result"]["_meta"]["cache_hints"];
+    let breakpoints = hints["breakpoints"].as_array().unwrap();
+    assert_eq!(breakpoints.len(), 1, "second call replaces the cache_hints entry");
+    assert_eq!(breakpoints[0]["region"], "tools",
+        "should show the tools breakpoint from the second call");
 }

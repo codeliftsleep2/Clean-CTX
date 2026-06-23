@@ -27,7 +27,7 @@ fn compile_rust(source: &str) -> CompiledIR {
     let (language, query) = detect_language(source);
     let mut compiler = rust_compiler();
     compiler
-        .compile(source, "test_rust", language, query, Fidelity::Low)
+        .compile(source, "test_rust", language, query, Fidelity::Low, None)
         .expect("Rust compilation should succeed")
 }
 
@@ -398,7 +398,7 @@ fn rust_compilation_with_medium_fidelity() {
     let (language, query) = detect_language(source);
     let mut compiler = rust_compiler();
     let ir = compiler
-        .compile(source, "test_medium", language, query, Fidelity::Medium)
+        .compile(source, "test_medium", language, query, Fidelity::Medium, None)
         .expect("Rust medium fidelity compilation should succeed");
     assert!(
         !ir.instructions.is_empty(),
@@ -412,7 +412,7 @@ fn rust_compilation_with_high_fidelity() {
     let (language, query) = detect_language(source);
     let mut compiler = rust_compiler();
     let ir = compiler
-        .compile(source, "test_high", language, query, Fidelity::High)
+        .compile(source, "test_high", language, query, Fidelity::High, None)
         .expect("Rust high fidelity compilation should succeed");
     assert!(
         !ir.instructions.is_empty(),
@@ -428,7 +428,7 @@ fn rust_empty_source_produces_no_instructions() {
     let (language, query) = detect_language(source);
     let mut compiler = rust_compiler();
     let ir = compiler
-        .compile(source, "empty", language, query, Fidelity::Low)
+        .compile(source, "empty", language, query, Fidelity::Low, None)
         .expect("compilation should succeed");
     assert!(
         ir.instructions.is_empty(),
@@ -443,12 +443,12 @@ fn rust_compiler_counter_is_deterministic() {
 
     let mut c1 = rust_compiler();
     let ir1 = c1
-        .compile(source, "f", language, query, Fidelity::Low)
+        .compile(source, "f", language, query, Fidelity::Low, None)
         .unwrap();
 
     let mut c2 = rust_compiler();
     let ir2 = c2
-        .compile(source, "f", language, query, Fidelity::Low)
+        .compile(source, "f", language, query, Fidelity::Low, None)
         .unwrap();
 
     assert_eq!(ir1.instructions.len(), ir2.instructions.len());
@@ -629,7 +629,7 @@ fn rust_standalone_inherent_impl_produces_def_class() {
     let (language, query) = detect_language(source);
     let mut compiler = rust_compiler();
     let ir = compiler
-        .compile(source, "test_standalone", language, query, Fidelity::Low)
+        .compile(source, "test_standalone", language, query, Fidelity::Low, None)
         .expect("compilation should succeed");
 
     let class_names: Vec<&str> = ir
@@ -674,7 +674,7 @@ fn rust_standalone_trait_impl_produces_def_class_and_implements() {
     let (language, query) = detect_language(source);
     let mut compiler = rust_compiler();
     let ir = compiler
-        .compile(source, "test_standalone_trait", language, query, Fidelity::Low)
+        .compile(source, "test_standalone_trait", language, query, Fidelity::Low, None)
         .expect("compilation should succeed");
 
     let class_names: Vec<&str> = ir
@@ -788,7 +788,7 @@ fn rust_generic_struct_medium_produces_gp_flag() {
     let mut compiler = crate::ir::compiler::IRCompiler::new();
     compiler.add_language_layer(Box::new(crate::ir::layers::rust::RustLayer::new()));
     let ir = compiler
-        .compile(source, "test_gp", language, query, Fidelity::Medium)
+        .compile(source, "test_gp", language, query, Fidelity::Medium, None)
         .expect("compilation should succeed");
 
     let has_gp_flag = ir.instructions.iter().any(|op| {
@@ -837,7 +837,7 @@ fn rust_cfg_generic_struct_medium_has_both_flags() {
     let mut compiler = crate::ir::compiler::IRCompiler::new();
     compiler.add_language_layer(Box::new(crate::ir::layers::rust::RustLayer::new()));
     let ir = compiler
-        .compile(source, "test_both", language, query, Fidelity::Medium)
+        .compile(source, "test_both", language, query, Fidelity::Medium, None)
         .expect("compilation should succeed");
 
     let has_cfg = ir.instructions.iter().any(|op| {

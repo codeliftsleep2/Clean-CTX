@@ -91,6 +91,18 @@ pub fn compute_workspace_breaker(file_hashes: &[String]) -> String {
 
 /// Inject cache breakpoints into a JSON-RPC response's `_meta` field.
 ///
+/// **IMPORTANT**: The MCP spec requires `_meta` to live *inside* the `result`
+/// object, NOT at the top level of the JSON-RPC response. This function
+/// auto-detects whether it was called with a full JSON-RPC envelope (has
+/// `"jsonrpc"` field) or with a bare `result` sub-object, and routes the
+/// `_meta` field accordingly.
+///
+/// In practice:
+/// - `handlers.rs` / `tools.rs`: pass the full response → `_meta` goes into
+///   `response["result"]["_meta"]`.
+/// - `tool_handlers.rs`: pass `response.get_mut("result")` directly →
+///   `_meta` goes into `response["_meta"]` (which IS the result).
+///
 /// # Rules
 ///
 /// * SKIPS injection when `state.config.cache.enabled == false`.
@@ -161,8 +173,25 @@ pub fn inject_cache_breakpoints(
         }],
     };
 
-    // Inject into _meta.cache_hints
-    if let Some(meta) = response.get_mut("_meta") {
+    // Route to the correct sub-object:
+    // - If `response` is a full JSON-RPC envelope (has "jsonrpc"), inject into
+    //   `response["result"]["_meta"]["cache_hints"]`.
+    // - If `response` IS already the result sub-object, inject into
+    //   `response["_meta"]["cache_hints"]`.
+    let target = if response.get("jsonrpc").is_some() {
+        // Full JSON-RPC response — _meta MUST live inside `result`
+        if !response.get("result").is_some_and(|v| v.is_object()) {
+            // No result object yet — create one (shouldn't happen in practice)
+            response["result"] = serde_json::json!({});
+        }
+        response.get_mut("result").unwrap()
+    } else {
+        // Bare result sub-object — operate directly
+        response
+    };
+
+    // Inject into target._meta.cache_hints
+    if let Some(meta) = target.get_mut("_meta") {
         if let Some(obj) = meta.as_object_mut() {
             obj.insert(
                 "cache_hints".to_string(),
@@ -171,7 +200,7 @@ pub fn inject_cache_breakpoints(
         }
     } else {
         // Create _meta if not present
-        response["_meta"] = serde_json::json!({ "cache_hints": hints });
+        target["_meta"] = serde_json::json!({ "cache_hints": hints });
     }
 
     // Record as miss (first emission)

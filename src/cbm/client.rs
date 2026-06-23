@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use serde_json::Value;
 
 use crate::cbm::config::CbmStatus;
@@ -49,7 +49,15 @@ pub struct CbmClient {
     request_id: AtomicU64,
     status: CbmStatus,
     timeout: Duration,
+    /// Circuit breaker: consecutive transient failures.
+    consecutive_failures: u32,
+    /// When the circuit opened (set to Degraded). None when circuit is closed.
+    degraded_since: Option<Instant>,
 }
+
+/// Circuit breaker settings.
+const MAX_CONSECUTIVE_FAILURES: u32 = 3;
+const CIRCUIT_COOLDOWN_SECS: u64 = 30;
 
 /// Determines whether a CBM error is transient and should be retried.
 ///
@@ -119,10 +127,58 @@ impl CbmClient {
             request_id: AtomicU64::new(1),
             status: CbmStatus::Available,
             timeout,
+            consecutive_failures: 0,
+            degraded_since: None,
         }))
     }
 
     pub fn status(&self) -> &CbmStatus { &self.status }
+
+    // ── Circuit breaker ─────────────────────────────────────────
+
+    /// Check if the circuit is open (too many recent failures).
+    /// Returns true if the circuit allows the call, false if it's tripped.
+    ///
+    /// If the circuit is open but the cooldown has elapsed, it resets
+    /// automatically and allows the next call through (half-open state).
+    pub(crate) fn circuit_allows(&mut self) -> bool {
+        if self.consecutive_failures < MAX_CONSECUTIVE_FAILURES {
+            return true;
+        }
+        // Circuit is open — check if cooldown has elapsed
+        if let Some(since) = self.degraded_since {
+            if since.elapsed() >= Duration::from_secs(CIRCUIT_COOLDOWN_SECS) {
+                // Cooldown elapsed — reset to half-open, allow one try
+                self.consecutive_failures = 0;
+                self.degraded_since = None;
+                self.status = CbmStatus::Available;
+                eprintln!("[clean-ctx-cbm] Circuit cooldown elapsed, trying again…");
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Record a successful query — resets the failure counter.
+    pub(crate) fn record_success(&mut self) {
+        self.consecutive_failures = 0;
+        self.degraded_since = None;
+        // Don't overwrite status if it was explicitly set to Available
+        if matches!(self.status, CbmStatus::Degraded(_)) {
+            self.status = CbmStatus::Available;
+        }
+    }
+
+    /// Record a transient failure — increments the counter, degrades if threshold reached.
+    pub(crate) fn record_failure(&mut self) {
+        self.consecutive_failures += 1;
+        if self.consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
+            self.status = CbmStatus::Degraded(format!("circuit_open_after_{}_failures", MAX_CONSECUTIVE_FAILURES));
+            self.degraded_since = Some(Instant::now());
+            eprintln!("[clean-ctx-cbm] Circuit opened after {} consecutive failures",
+                MAX_CONSECUTIVE_FAILURES);
+        }
+    }
 
     /// Send a JSON-RPC 2.0 request and read the raw response text.
     ///
@@ -141,6 +197,9 @@ impl CbmClient {
     /// once with exponential backoff before giving up. Delegates to
     /// `call_tool_raw_inner` for the actual pipe I/O.
     pub fn call_tool_raw(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError> {
+        if !self.circuit_allows() {
+            return Err(CbmError::ConnectionLost("circuit breaker open".into()));
+        }
         let max_retries = 1;
         let mut retry_count = 0;
         let mut backoff = Duration::from_millis(100);
@@ -148,13 +207,20 @@ impl CbmClient {
         loop {
             // Value::clone() is cheap — a few ref-count bumps for JSON strings/arrays
             match self.call_tool_raw_inner(tool_name, args.clone()) {
-                Ok(result) => return Ok(result),
+                Ok(result) => {
+                    self.record_success();
+                    return Ok(result);
+                }
                 Err(e) if retry_count < max_retries && is_retryable(&e) => {
                     retry_count += 1;
+                    self.record_failure();
                     std::thread::sleep(backoff);
                     backoff *= 2; // Exponential backoff
                 }
-                Err(e) => return Err(e),
+                Err(e) => {
+                    self.record_failure();
+                    return Err(e);
+                }
             }
         }
     }
@@ -222,6 +288,9 @@ impl CbmClient {
     /// Retries transient errors (timeout, connection lost, internal error)
     /// once with exponential backoff before giving up.
     pub fn call_tool(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
+        if !self.circuit_allows() {
+            return Err(CbmError::ConnectionLost("circuit breaker open".into()));
+        }
         let max_retries = 1;
         let mut retry_count = 0;
         let mut backoff = Duration::from_millis(100);
@@ -229,13 +298,20 @@ impl CbmClient {
         loop {
             // Value::clone() is cheap (~a few ref-count bumps for JSON strings/arrays)
             match self.call_tool_inner(tool_name, args.clone()) {
-                Ok(result) => return Ok(result),
+                Ok(result) => {
+                    self.record_success();
+                    return Ok(result);
+                }
                 Err(e) if retry_count < max_retries && is_retryable(&e) => {
                     retry_count += 1;
+                    self.record_failure();
                     std::thread::sleep(backoff);
                     backoff *= 2; // Exponential backoff
                 }
-                Err(e) => return Err(e),
+                Err(e) => {
+                    self.record_failure();
+                    return Err(e);
+                }
             }
         }
     }
@@ -262,7 +338,6 @@ impl CbmClient {
         // C-1 fix: accumulate lines until we have complete JSON.
         let mut buf = String::new();
         let deadline = std::time::Instant::now() + self.timeout;
-        const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024; // 4 MB safety bound
         loop {
             if std::time::Instant::now() > deadline {
                 let _ = self.child.kill();
@@ -303,42 +378,132 @@ impl CbmClient {
         }
     }
 
+    // ── Response parsing ───────────────────────────────────────
+
+    /// CBM wraps all tool responses in MCP content array format.
+    /// The actual data is a JSON string inside `result.content[0].text`.
+    /// This helper extracts and parses that inner JSON string.
+    fn parse_cbm_response(&self, response: &Value) -> Result<Value, CbmError> {
+        let content = response["content"].as_array()
+            .and_then(|a| a.first())
+            .ok_or_else(|| CbmError::ParseError("missing content array".into()))?;
+        let text = content["text"].as_str()
+            .ok_or_else(|| CbmError::ParseError("missing text field in content".into()))?;
+        serde_json::from_str(text)
+            .map_err(|e| CbmError::ParseError(format!("inner JSON parse: {e}")))
+    }
+
     // ── Typed wrappers ──────────────────────────────────────────
 
-    pub fn search_graph(&mut self, query: &str, project: &str) -> Result<Vec<Value>, CbmError> {
-        let r = self.call_tool("search_graph", serde_json::json!({"query": query, "project": project}))?;
-        Ok(r["results"].as_array().cloned().unwrap_or_default())
+    /// Search the CBM knowledge graph by name pattern and optional label filter.
+    ///
+    /// CBM params: `name_pattern`, `label`, `file_pattern`, `project`, `limit`, `offset`
+    pub fn search_graph(&mut self, name_pattern: &str, project: &str, label: Option<&str>) -> Result<Vec<Value>, CbmError> {
+        let mut args = serde_json::json!({"name_pattern": name_pattern, "project": project});
+        if let Some(l) = label {
+            args["label"] = serde_json::Value::String(l.to_string());
+        }
+        let r = self.call_tool("search_graph", args)?;
+        let inner = self.parse_cbm_response(&r)?;
+        Ok(inner["results"].as_array().cloned().unwrap_or_default())
     }
 
-    pub fn trace_path(&mut self, from: &str, to: &str, project: &str) -> Result<Vec<Value>, CbmError> {
-        let r = self.call_tool("trace_path", serde_json::json!({"from": from, "to": to, "project": project}))?;
-        Ok(r["edges"].as_array().cloned().unwrap_or_default())
+    /// Trace call paths in the CBM knowledge graph.
+    ///
+    /// CBM params: `function_name`, `direction` (inbound|outbound|both), `depth`, `project`
+    pub fn trace_path(&mut self, function_name: &str, direction: &str, project: &str, depth: Option<usize>) -> Result<Vec<Value>, CbmError> {
+        let mut args = serde_json::json!({"function_name": function_name, "direction": direction, "project": project});
+        if let Some(d) = depth {
+            args["depth"] = serde_json::Value::Number(serde_json::Number::from(d));
+        }
+        let r = self.call_tool("trace_path", args)?;
+        let inner = self.parse_cbm_response(&r)?;
+        Ok(inner["edges"].as_array().cloned().unwrap_or_default())
     }
 
+    /// Get architecture overview from CBM.
     pub fn get_architecture(&mut self, project: &str) -> Result<Value, CbmError> {
-        self.call_tool("get_architecture", serde_json::json!({"project": project}))
+        let r = self.call_tool("get_architecture", serde_json::json!({"project": project}))?;
+        // get_architecture may or may not wrap in content array — try both
+        if r.get("content").is_some() {
+            self.parse_cbm_response(&r)
+        } else {
+            Ok(r)
+        }
     }
 
-    pub fn query_graph(&mut self, cypher: &str, project: &str) -> Result<Vec<Value>, CbmError> {
+    /// Execute a Cypher-like query against the CBM knowledge graph.
+    ///
+    /// Returns rows as `Vec<Vec<Value>>` where each inner vec is a row of column values.
+    /// CBM wraps results in `{columns, rows}` format.
+    pub fn query_graph(&mut self, cypher: &str, project: &str) -> Result<Vec<Vec<Value>>, CbmError> {
         let r = self.call_tool("query_graph", serde_json::json!({"query": cypher, "project": project}))?;
-        Ok(r["results"].as_array().cloned().unwrap_or_default())
+        let inner = self.parse_cbm_response(&r)?;
+        Ok(inner["rows"].as_array()
+            .map(|rows| {
+                rows.iter().filter_map(|row| {
+                    row.as_array().cloned()
+                }).collect()
+            })
+            .unwrap_or_default())
     }
 
-    pub fn get_symbol_importance(&mut self, project: &str) -> Result<Vec<Value>, CbmError> {
-        let r = self.call_tool("get_symbol_importance", serde_json::json!({"project": project}))?;
-        Ok(r["symbols"].as_array().cloned().unwrap_or_default())
+    /// Get symbol importance (caller count) from CBM via Cypher query.
+    ///
+    /// CBM has no dedicated `get_symbol_importance` tool, but `in_degree`
+    /// on function nodes provides the same information.
+    pub fn get_symbol_importance(&mut self, project: &str, min_degree: Option<usize>) -> Result<Vec<Value>, CbmError> {
+        let min = min_degree.unwrap_or(1);
+        let cypher = format!(
+            "MATCH (f:Function) WHERE f.in_degree >= {} RETURN f.name, f.file_path, f.in_degree, f.out_degree ORDER BY f.in_degree DESC",
+            min
+        );
+        let rows = self.query_graph(&cypher, project)?;
+        Ok(rows.into_iter().map(|row| {
+            let name = row.first().and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let file = row.get(1).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let in_degree = row.get(2).and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+            let out_degree = row.get(3).and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+            serde_json::json!({
+                "name": name,
+                "file": file,
+                "in_degree": in_degree as u64,
+                "out_degree": out_degree as u64,
+                "importance": in_degree / 100.0,  // normalized score for blending
+            })
+        }).collect())
     }
 
+    /// Get dead code candidates from CBM via Cypher query.
+    ///
+    /// CBM has no dedicated `get_dead_code` tool, but functions with
+    /// `in_degree = 0` and `is_entry_point = false` are dead code.
     pub fn get_dead_code(&mut self, project: &str) -> Result<Vec<Value>, CbmError> {
-        let r = self.call_tool("get_dead_code", serde_json::json!({"project": project}))?;
-        Ok(r["dead_code"].as_array().cloned().unwrap_or_default())
+        let cypher = "MATCH (f:Function) WHERE f.in_degree = 0 AND f.is_entry_point = false RETURN f.name, f.file_path".to_string();
+        let rows = self.query_graph(&cypher, project)?;
+        Ok(rows.into_iter().map(|row| {
+            serde_json::json!({
+                "name": row.first().and_then(|v| v.as_str()).unwrap_or(""),
+                "file": row.get(1).and_then(|v| v.as_str()).unwrap_or(""),
+                "reason": "no callers",
+            })
+        }).collect())
     }
 }
 
 impl Drop for CbmClient {
     fn drop(&mut self) {
         let _ = self.child.kill();
-        let _ = self.child.wait();
+        // L-02 fix: don't hang indefinitely on unresponsive child.
+        // Poll try_wait with a deadline instead of blocking forever.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match self.child.try_wait() {
+                Ok(Some(_)) | Err(_) => break,
+                Ok(None) if Instant::now() > deadline => break,
+                Ok(None) => std::thread::sleep(Duration::from_millis(50)),
+            }
+        }
     }
 }
 

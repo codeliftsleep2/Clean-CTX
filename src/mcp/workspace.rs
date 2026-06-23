@@ -223,6 +223,7 @@ fn compress_pass(
                     false,
                     "workspace",
                     None,
+                    "ir_compression",
                 );
             }
             Err(e) => {
@@ -309,6 +310,7 @@ fn compress_pass_with_global_symbols(
                     false,
                     "workspace_gsym",
                     None,
+                    "ir_compression",
                 );
 
                 entries.push(CompressedEntry {

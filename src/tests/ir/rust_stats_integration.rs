@@ -95,6 +95,7 @@ fn rust_session_stats_reports_token_savings() {
         false, // is_angular
         "full",
         None,
+        "ir_compression",
     );
 
     let summary = stats.summary();
@@ -146,6 +147,7 @@ fn rust_json_dashboard_includes_rust_files() {
         false,
         "full",
         None,
+        "ir_compression",
     );
 
     let json = crate::mcp::session_stats::render_dashboard_json(&stats);

@@ -1,8 +1,8 @@
 # Clean-CTX × codebase-memory-mcp Integration Plan
 
-**Status:** 📋 Planning
+**Status:** ✅ Implementation Complete (Filter-First Architecture)
 **Created:** 2026-06-14
-**Last updated:** 2026-06-14
+**Last updated:** 2026-06-22
 **Roadmap ID:** R-35
 **Target Release:** v0.2.0
 

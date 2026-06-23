@@ -117,15 +117,11 @@ impl IRCompiler {
         self.pattern_recognizers.push(layer);
     }
 
-    /// Compile source code into IR.
-    /// Reuses the existing capture pipeline but emits CoreOp instructions
-    /// instead of formatted text strings.
-    ///
-    /// The compile pipeline runs in four layers (F-01, F-02, F-03):
-    ///   1. Core IR emission (always runs)
-    ///   2. Language layer translation (TS/C# specific ops)
-    ///   3. Meta-layer pass (framework-specific extraction)
-    ///   4. Pattern recognition (instruction stream compression)
+    /// `skip_set`: optional set of symbol names to exclude from IR output.
+    /// When a class, method, or field name matches an entry in this set,
+    /// the capture is dropped entirely (no `DefClass`, `DefMethod`, or
+    /// `DefField` emitted). Used by the CBM filter-first architecture to
+    /// exclude low-importance symbols.
     ///
     /// Returns a typed `CompileError` (F-30) — callers can pattern-match
     /// on `CompileError::Capture`, `Layer`, or `NoCaptures`. The
@@ -137,6 +133,7 @@ impl IRCompiler {
         language: tree_sitter::Language,
         query_string: &str,
         fidelity: Fidelity,
+        skip_set: Option<&std::collections::HashSet<String>>,
     ) -> Result<CompiledIR, CompileError> {
         // Reset per-compilation state
         self.current_method = None;
@@ -170,9 +167,17 @@ impl IRCompiler {
 
         let mut instructions = Vec::new();
 
-                // ── Layer 1: Core IR emission ──────────────────────────────────
+        // ── Layer 1: Core IR emission ──────────────────────────────────
         // Also invokes Layer 2 (LanguageLayer::process_capture) for each capture.
         for cap in &captures {
+            // CBM filter-first: skip low-importance symbols before emitting
+            // any IR ops. Uses the same should_skip_capture logic as the
+            // text compression pipeline for consistent behavior.
+            if let Some(skip) = skip_set {
+                if !skip.is_empty() && crate::compression::pipeline::should_skip_capture(cap, skip) {
+                    continue;
+                }
+            }
             match cap.name.as_str() {
                 // ── Type/capture-based actions ───────────────────────
                 // Each arm either:

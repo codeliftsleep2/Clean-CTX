@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-06-14
+**Last updated:** 2026-06-18
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -10,15 +10,15 @@
 
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
-| **Now** | v0.2.0 | Real-world ready + CBM integration | 8 |
-| **Next** | v0.3.0 | Advanced capabilities | 9 |
+| **Now** | v0.2.0 | Real-world ready | 5 |
+| **Next** | v0.3.0 | Advanced capabilities | 10 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 10 |
 | **Architectural** | Continuous | Code health & tooling | 6 |
 | **Community** | Continuous | Docs & marketing | 5 |
 
 ---
 
-## Completed (v0.1.x) — shipped ✅
+## Completed (v0.1.x – v0.1.8) — shipped ✅
 
 These items are complete and documented. Listed for historical context.
 
@@ -32,6 +32,16 @@ These items are complete and documented. Listed for historical context.
 | **R-20** | Persisted Baseline Cache | v0.1.x | Full SQLite persistence via `SqliteStore` with cross-session delta replay — supersedes original in-memory-only scope |
 | **R-03** | Compression Ratio Statistics | v0.1.x | `context_stats` tool + `session_stats.rs` dashboard with per-file/session token savings metrics |
 | **R-13** | Compress-to-Compress Diff | v0.1.x | Text delta + IR field-level delta transport + `§GSYM` global dictionary + path alias framework — supersedes original scope |
+| **R-35** | CBM Integration (Phase 0 + 1) | v0.1.8 | `CbmClient` (JSON-RPC 2.0 subprocess with retry + exponential backoff) ✅ · `GraphBridge` (DashMap TTL caching + `detect_changes` cache invalidation) ✅ · `CbmProxy` (pipe-level response interception + pluggable tokenizer) ✅ · `json_compress.rs` (key shortening, envelope stripping, ~78% compression of CBM responses) ✅ · 36 regression/integration/e2e tests ✅ |
+| **R-19** | Pluggable tokenizers | v0.1.7 | ✅ `Tokenizer` trait with `cl100k` (GPT-4), `o200k` (GPT-4o), `claude`, and `llama3` implementations. Selectable via `tokenizer` tool argument or `.clean-ctx.json` config. Process-global BPE caches, ratio-adjusted approximations for Claude/Llama-3. |
+| **R-01d** | Java language layer | v0.1.7 | ✅ `JavaLayer` in `ir/layers/java.rs` — extends/implements with generics stripping, constructor detection, abstract/static/private/protected flags, Jakarta/Spring annotation patterns. 25 tests. |
+| **R-01c** | Rust language layer | v0.1.7 | ✅ `RustLayer` in `ir/layers/rust.rs` — derives, generics, cfg attributes, impl relationships, self kind, unsafe. 30 tests + 30 rust_integration tests. |
+| **R-38** | Spring Boot Meta-Layer | v0.1.8 | ✅ `SpringMetaLayer` in `ir/layers/spring.rs` — Φ markers for @RestController, @Controller, @Service, @Repository, @Configuration, @RequestMapping, @Autowired, @Value, @Bean, @ConfigurationProperties. `SpringGraph` for cross-file DI resolution. 45+ tests. |
+| **R-39** | Secret Scrubbing | v0.1.7 | ✅ Regex-based scrubbing for AWS keys, GitHub tokens, JWTs, PEM keys, Bearer tokens. `ScrubFailClosed` semantics. Runs in proxy pipeline. |
+| **R-40** | Shell Output Filtering | v0.1.7 | ✅ 26 built-in TOML filters (cargo, npm, git, pytest, tsc, dotnet, ng, eslint, docker, go, kubectl, and more). Filter pipeline: strip_ansi → replace → match_output collapse → grouping → §FILTERED marker. Community filter support via `.clean-ctx/filters/`. |
+| **CBM Audit** | CBM integration audit fixes | v0.1.8 | 6 findings resolved: CRITICAL (CBM enrichment data compression), HIGH (call_tool_raw retry, enrich_with_cbm timeout guard), MEDIUM (pluggable tokenizer in proxy), LOW (cache eviction pattern, visibility). 1,331 tests passing. |
+| **R-35 (P2)** | CBM Phase 2 — Intelligence Layer seeding | v0.1.9 | Fixed CBM client API mismatches (`search_graph`/`trace_path` param names, replaced non-existent `get_symbol_importance`/`get_dead_code` with Cypher queries). Intelligence Layer (pagerank.rs, fidelity.rs) now correctly blends CBM cross-file `in_degree` scores (60% IR + 40% CBM) for adaptive per-symbol fidelity. `enrich_with_cbm` in tool_handlers injects compressed CBM metadata into responses. See `docs/CBM_API_AUDIT_AND_PHASE2_PLAN.md`. |
+| **Compiler-IR Audit** | Compiler-IR audit + clippy cleanup | v0.1.8 | Verified all 8 phases (A–H). Resolved 29 clippy warnings across entire build. Rewrote COMPILER_IR.md from spec to implementation docs. All 1,277 tests pass with 0 clippy warnings. |
 
 ---
 
@@ -41,14 +51,11 @@ These items address the most common user requests and unlock adoption on larger 
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **R-35** | codebase-memory-mcp Integration | Integrate with [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) for graph intelligence. **Phase 0:** Side-by-side MCP servers (config only). **Phase 1:** MCP client in Clean-CTX (`cbm_client.rs`) + graph bridge (`graph_bridge.rs`) for symbol importance, blast radius, dead code detection. **Phase 2:** Feed CBM graph seeds into Intelligence Layer (R-29) PageRank scoring. CBM provides 158-language graph intelligence; Clean-CTX provides compression. Complementary, not competing. | 5-8 days | 🔴 Critical |
-| **R-19** | Pluggable tokenizers | ✅ `Tokenizer` trait with `cl100k` (GPT-4), `o200k` (GPT-4o), `claude`, and `llama3` implementations. Selectable via `tokenizer` tool argument or `.clean-ctx.json` config. Process-global BPE caches, ratio-adjusted approximations for Claude/Llama-3. | 2 days | 🔴 High |
 | **F-19** | Streaming workspace walk | Replace `collect_source_files` collect-then-sort pattern with a `walkdir` streaming visitor. Required before F-20. | 1 day | 🟡 Medium |
 | **F-20** | Rayon parallelization for `compress_workspace` | Per-thread tree-sitter `Parser` pool, shared `DashMap` for the path dictionary, `par_iter().try_for_each`. Expected ~4× speedup on 16-core boxes. Requires F-19. | 3-5 days | 🔴 High |
 | **A-07** | Property-based tests with `proptest` | Fuzz-style input tests for the decompressor, the config glob matcher, and the modifier stripper. Would have caught F-06 (Unicode) and F-12 (substring match) regressions. | 1-2 days | 🔴 High |
-| **R-29** | Intelligence Layer | Three-phase ranked context delivery on top of the existing compression stack. **Phase 1:** PageRank symbol scoring + adaptive per-symbol fidelity. **Phase 2:** Blast radius analysis — delta output includes depth-1 affected file skeletons. **Phase 3:** Token budget knapsack packing. All phases opt-in via `.clean-ctx.json`, zero overhead when disabled. R-35 (CBM integration) provides graph seeds for PageRank scoring. See `docs/INTELLIGENCE_LAYER_PLAN.md`. | 5.5 days | 🔴 High |
-| **R-39** | Secret Scrubbing (R-37 in plan) | Detect and redact secrets in tool results before they reach the LLM. Regex-based scrubbing for AWS keys, GitHub tokens, JWTs, PEM private keys, Bearer tokens, URL userinfo, secret assignments, and more. `ScrubFailClosed` semantics: withhold output on panic. `might_contain_secret` pre-filter for performance. Runs in proxy pipeline before output filtering. See `docs/TOOL_OUTPUT_FILTER_PLAN.md`. | 1.5 days | 🔴 High |
-| **R-40** | Shell Output Filtering (R-38 in plan) | Declarative per-program TOML filter rules that reduce noisy command output to signal. 7 built-in filters (cargo, npm, git, pytest, tsc, dotnet, ng). Filter pipeline: strip_ansi → replace → match_output collapse → strip/keep_lines → group_by → head/tail → max_lines → on_empty → JSON guard → failure handling → §FILTERED marker. Community filter support via `.clean-ctx/filters/`. Inline `[[tests]]` blocks. See `docs/TOOL_OUTPUT_FILTER_PLAN.md`. | 3 days | 🔴 High |
+| **R-29** | Intelligence Layer | Three-phase ranked context delivery on top of the existing compression stack. **Phase 1:** PageRank symbol scoring + adaptive per-symbol fidelity. **Phase 2:** Blast radius analysis — delta output includes depth-1 affected file skeletons. **Phase 3:** Token budget knapsack packing. All phases opt-in via `.clean-ctx.json`, zero overhead when disabled. R-35 (CBM Phase 2) provides graph seeds for PageRank scoring. See `docs/INTELLIGENCE_LAYER_PLAN.md`. | 5.5 days | 🔴 High |
+| **A-08** | TOKEN_EFFICIENCY_AUDIT findings | 4 open findings: underutilized `source_cache` (High), double IR compile in delta path (Medium), path resolution inconsistency (Medium), fragile source ownership (Low). | 1-2 days | � Medium |
 
 ---
 

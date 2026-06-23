@@ -31,6 +31,21 @@ use crate::mcp::context_store::InMemoryContextStore;
 use crate::mcp::session_stats::SessionStats;
 use crate::mcp::sqlite_store::SqliteStore;
 
+/// Per-file CBM filter state: symbols to skip during compression.
+///
+/// Populated by the CBM Intelligence Layer **before** compression runs.
+/// The compression pipeline checks this set for each capture and drops
+/// low-importance symbols (score < 0.4) entirely, so CBM reduces token
+/// output instead of adding enrichment data after the fact.
+///
+/// Keyed by absolute file path; value is the set of low-importance
+/// symbol names to exclude from the compressed output.
+#[derive(Debug, Clone, Default)]
+pub struct CbmFilterState {
+    /// Symbol names to skip, keyed by file path.
+    pub skip_sets: HashMap<String, HashSet<String>>,
+}
+
 /// Per-session state shared by all MCP tool handlers.
 pub struct McpState {
     /// Path-alias dictionary (`α1`, `α2`, …). Mutated in place by
@@ -92,6 +107,11 @@ pub struct McpState {
     /// CBM integration status, mirrored for quick access.
     pub cbm_status: crate::cbm::CbmStatus,
 
+    /// CBM filter state: per-file skip sets populated by the Intelligence
+    /// Layer before compression. When a symbol has low importance (< 0.4),
+    /// it is added here and the capture pipeline drops it during compression.
+    pub cbm_filter: CbmFilterState,
+
     /// Phase 1 (Fix D): Cache of rendered LLM-optimized hierarchical IR text,
     /// keyed by path alias (e.g., "α1").
     ///
@@ -100,6 +120,10 @@ pub struct McpState {
     /// This avoids re-rendering the full HIR on every delta-mode call,
     /// saving ~O(n) where n is the file size in HIR nodes.
     pub llm_text_cache: HashMap<String, String>,
+
+    /// Phase 2: Proxy port for fetching tool-filtering and cache stats.
+    /// Defaults to 8787 (the proxy's default port).
+    pub proxy_port: u16,
 }
 
 impl McpState {
@@ -165,8 +189,10 @@ impl McpState {
             llm_text_cache: HashMap::new(),
             emitted_breakpoints: HashSet::new(),
             cache_metrics: CacheMetrics::default(),
+            cbm_filter: CbmFilterState::default(),
             graph_bridge,
             cbm_status,
+            proxy_port: 8787,
         }
     }
 
@@ -236,6 +262,16 @@ impl McpState {
     /// F-FULL-01/F-FULL-05: Read file content, using the shared source cache.
     /// Returns `Arc<String>` so the cache can be shared across passes
     /// without cloning the underlying string data.
+    ///
+    /// **Canonicalization note:** The path is canonicalized via
+    /// `std::fs::canonicalize` before being used as a cache key. This means
+    /// symlink-equivalent paths (e.g., `/real/path/file.rs` and
+    /// `/link/to/file.rs` pointing to the same file) share a single cache
+    /// entry. The first call to `read_source` with either path populates
+    /// the cache; subsequent calls with either path return the same `Arc`
+    /// allocation. This also applies to relative-vs-absolute variants:
+    /// `"./src/lib.rs"` and `/abs/path/src/lib.rs` resolve to the same
+    /// canonical path and share the cache.
     pub fn read_source(&mut self, path: &str) -> Result<Arc<String>, std::io::Error> {
         use std::path::Path;
         let cache_key = Path::new(path)

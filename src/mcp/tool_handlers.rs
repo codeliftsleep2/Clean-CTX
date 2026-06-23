@@ -8,30 +8,9 @@
 // `dispatch_tools_call` in `tools.rs`.
 
 use std::path::PathBuf;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::time::SystemTime;
 use serde_json::Value;
-
-/// Write debug log to .clean-ctx/debug.log (anchored to project root).
-fn debug_log(msg: impl AsRef<str>) {
-    let log_path = crate::mcp::server::find_project_root()
-        .join(".clean-ctx")
-        .join("debug.log");
-    if let Some(parent) = log_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if let Ok(mut f) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-    {
-        let _ = writeln!(f, "[{:?}] {}", SystemTime::now(), msg.as_ref());
-    }
-}
 use crate::compressor::{compress_file, Fidelity};
 use crate::compression::pipeline::compress_file_with_source;
-use crate::cbm::json_compress::compress_cbm_response;
 use crate::ir::wire::ir_to_wire;
 use crate::ir::delta::{IRDelta, DeltaComputer};
 use crate::ir::replay::DeltaError;
@@ -150,30 +129,30 @@ pub(super) fn handle_compress_code_context(
             false,
             "full",
             None,
+            "ir_compression",
         );
 
-        // Persistence hook
-        debug_log(format!("handle_compress: persist_store={}", state.persistence_store.is_some()));
-        if let Some(store) = &mut state.persistence_store {
-            let source_hash = sha2::Sha256::digest(source_text.as_bytes());
-            let hash_hex = format!("{:x}", source_hash);
-            let ir_binary = Some(crate::ir::binary_wire::encode(&ir));
-            debug_log(format!("handle_compress: calling save_context for {}", &resolved_path));
-            match store.save_context(
-                &resolved_path,
-                effective_fidelity,
-                &llm_text_with_footer,
-                ir_binary.as_deref(),
-                &hash_hex,
-                raw_tokens as u64,
-                compressed_tokens as u64,
-            ) {
-                Ok(ctx_id) => debug_log(format!("handle_compress: save_context OK id={}", ctx_id)),
-                Err(e) => debug_log(format!("handle_compress: save_context FAILED: {e}")),
-            }
-        } else {
-            debug_log("handle_compress: persist_store is None, skipping");
-        }
+                // Persistence hook — non-fatal, log to stderr on failure
+                if let Some(store) = &mut state.persistence_store {
+                    let source_hash = sha2::Sha256::digest(source_text.as_bytes());
+                    let hash_hex = format!("{:x}", source_hash);
+                    let ir_binary = Some(crate::ir::binary_wire::encode(&ir));
+                    match store.save_context(
+                        &resolved_path,
+                        effective_fidelity,
+                        &llm_text_with_footer,
+                        ir_binary.as_deref(),
+                        &hash_hex,
+                        raw_tokens as u64,
+                        compressed_tokens as u64,
+                    ) {
+                        Ok(ctx_id) => eprintln!("[clean-ctx] Persisted context id={}", ctx_id),
+                        Err(e) => eprintln!("[clean-ctx] WARNING: Failed to persist context: {e}"),
+                    }
+                    // Ensure buffered writes reach SQLite immediately rather than
+                    // waiting for the batch threshold or a context_stats call.
+                    state.flush_persistence();
+                }
 
         // F-08: Determine the IR wire format based on the encoding parameter.
         let ir_value = match encoding {
@@ -227,6 +206,7 @@ pub(super) fn handle_compress_code_context(
                     false,
                     "full",
                     None,
+                    "ir_compression",
                 );
                 serde_json::json!({
                     "jsonrpc": "2.0",
@@ -302,6 +282,7 @@ pub(super) fn handle_diff_code_context(
                 false,
                 "diff",
                 None,
+                "ir_compression",
             );
 
             send_response(&serde_json::json!({
@@ -463,6 +444,7 @@ pub(super) fn handle_delta_code_context(
         false,
         "delta",
         None,
+        "ir_compression",
     );
 
     send_response(&result);
@@ -547,6 +529,7 @@ pub(super) fn handle_delta_text_context(
                 false,
                 "delta",
                 Some(dt_full_compressed),
+                "ir_compression",
             );
             serde_json::json!({
                 "jsonrpc": "2.0",
@@ -580,6 +563,7 @@ pub(super) fn handle_delta_text_context(
                 false,
                 "full",
                 None,
+                "ir_compression",
             );
             serde_json::json!({
                 "jsonrpc": "2.0",
@@ -765,6 +749,50 @@ pub(super) fn handle_provide_code_context(
         stored_fidelity,
     );
 
+    // ── CBM Intelligence Layer + Filter-First Skip Set ─────────────
+    // If the intelligence layer is enabled and the CBM graph bridge is
+    // available, consult cbm_informed_fidelity for per-symbol fidelity
+    // adjustment AND build a skip set of low-importance symbols (< 0.4)
+    // that will be EXCLUDED from compression entirely.
+    //
+    // The skip set replaces the old post-compression enrichment pattern.
+    // CBM now REDUCES token output instead of adding more.
+    let mut decision = decision; // make mutable for CBM override
+    if state.config.intelligence.enabled {
+        if let Some(ref mut bridge) = state.graph_bridge {
+            if bridge.is_available() {
+                let symbol_importance = bridge.get_symbol_importance_mut();
+
+                // 1. Fidelity override (existing behavior)
+                let recommendation = crate::intelligence::fidelity::cbm_informed_fidelity(
+                    &resolved_path,
+                    &symbol_importance,
+                    crate::intelligence::fidelity::FidelityRecommendation::NoRecommendation,
+                );
+                if let Some(override_fidelity) =
+                    crate::intelligence::fidelity::apply_recommendation(&recommendation)
+                {
+                    decision.fidelity = override_fidelity;
+                    decision.cbm_informed = true;
+                }
+
+                // 2. Filter-first: build skip set of low-importance symbols
+                //    that the capture pipeline will drop during compression.
+                let skip_set = crate::intelligence::fidelity::build_cbm_skip_set(
+                    &resolved_path,
+                    &symbol_importance,
+                );
+                if !skip_set.is_empty() {
+                    state.cbm_filter.skip_sets.insert(resolved_path.clone(), skip_set);
+                }
+            }
+        }
+    }
+
+    // Ensure a (possibly empty) entry exists for this file so the
+    // capture pipeline always has a clear answer even when CBM is off.
+    state.cbm_filter.skip_sets.entry(resolved_path.clone()).or_default();
+
     // Execute based on strategy
     match decision.strategy {
         crate::mcp::heuristics::ContextStrategy::FullCompress => {
@@ -817,6 +845,8 @@ pub(super) fn handle_provide_code_context(
                     ) {
                         eprintln!("[clean-ctx] WARNING: Failed to persist context: {e}");
                     }
+                    // Flush immediately so stats are visible in dashboard
+                    state.flush_persistence();
                 }
 
                 state.session_stats.record_compression(
@@ -827,6 +857,7 @@ pub(super) fn handle_provide_code_context(
                     decision.is_angular,
                     "full",
                     None,
+                    "ir_compression",
                 );
 
                 // Build hierarchical JSON for "ir" field
@@ -852,15 +883,16 @@ pub(super) fn handle_provide_code_context(
                     }
                 });
 
-                // Inject CBM enrichment metadata when available
-                enrich_with_cbm(&mut response, &resolved_path, state);
-
                 // Inject baseline cache breakpoint for stable content
+                // NOTE: inject into response["result"], not response root,
+                // because _meta must be inside the MCP result object.
                 let cache_enabled = state.config.cache.enabled;
                 if cache_enabled {
                     let ttl = state.config.cache.baseline_ttl.clone();
                     let breaker = compute_baseline_breaker(&llm_text_with_footer);
-                    inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref_pcc);
+                    if let Some(result_obj) = response.get_mut("result") {
+                        inject_cache_breakpoints(result_obj, state, "baseline", &ttl, &breaker, tok_ref_pcc);
+                    }
                 }
 
                 response
@@ -886,6 +918,7 @@ pub(super) fn handle_provide_code_context(
                             decision.is_angular,
                             "full",
                             None,
+                            "ir_compression",
                         );
                         serde_json::json!({
                             "jsonrpc": "2.0",
@@ -988,6 +1021,8 @@ pub(super) fn handle_provide_code_context(
                         eprintln!("[clean-ctx] WARNING: Failed to persist delta: {e}");
                     }
                 }
+                // Flush immediately so stats are visible in dashboard
+                state.flush_persistence();
             }
 
             let strategy_label = if is_delta { "delta" } else { "full" };
@@ -999,6 +1034,7 @@ pub(super) fn handle_provide_code_context(
                 decision.is_angular,
                 strategy_label,
                 if is_delta { Some(dt2_full_compressed) } else { None },
+                "ir_compression",
             );
 
             let mut response = serde_json::json!({
@@ -1018,14 +1054,14 @@ pub(super) fn handle_provide_code_context(
                 }
             });
 
-            // Inject CBM enrichment metadata when available
-            enrich_with_cbm(&mut response, &resolved_path, state);
-
             // Inject tail cache breakpoint for dynamic content (5m TTL, never cached across turns)
+            // NOTE: inject into response["result"], not response root
             let cache_enabled = state.config.cache.enabled;
             if cache_enabled {
                 let ttl = state.config.cache.tail_ttl.clone();
-                inject_cache_breakpoints(&mut response, state, "tail", &ttl, "rolling", tok_ref_dt2);
+                if let Some(result_obj) = response.get_mut("result") {
+                    inject_cache_breakpoints(result_obj, state, "tail", &ttl, "rolling", tok_ref_dt2);
+                }
                 mark_tail_ephemeral(state);
             }
 
@@ -1101,6 +1137,11 @@ pub(super) fn handle_restore_context(
     let tok_box_rc = crate::tokenizer::create_tokenizer(tok_kind_rc).ok();
     let tok_ref_rc: Option<&dyn crate::tokenizer::Tokenizer> = tok_box_rc.as_deref();
 
+    // Flush any pending persistence writes from clear_file above
+    if let Some(store) = &mut state.persistence_store {
+        store.flush();
+    }
+
     let response = if let Ok(ir) = ir_result {
         state.ir_context.load_ir(ir.clone());
 
@@ -1132,6 +1173,7 @@ pub(super) fn handle_restore_context(
             false,
             "restore",
             None,
+            "ir_compression",
         );
 
         // Build hierarchical JSON for "ir" field
@@ -1155,11 +1197,14 @@ pub(super) fn handle_restore_context(
         });
 
         // restore_context returns stable persisted state — emit baseline cache hint
+        // NOTE: inject into response["result"], not response root
         let cache_enabled = state.config.cache.enabled;
         if cache_enabled {
             let ttl = state.config.cache.baseline_ttl.clone();
             let breaker = compute_baseline_breaker(&llm_text_with_footer);
-            inject_cache_breakpoints(&mut response, state, "baseline", &ttl, &breaker, tok_ref_rc);
+            if let Some(result_obj) = response.get_mut("result") {
+                inject_cache_breakpoints(result_obj, state, "baseline", &ttl, &breaker, tok_ref_rc);
+            }
         }
 
         response
@@ -1187,6 +1232,7 @@ pub(super) fn handle_restore_context(
                     false,
                     "restore",
                     None,
+                    "ir_compression",
                 );
                 serde_json::json!({
                     "jsonrpc": "2.0",
@@ -1329,6 +1375,18 @@ pub(super) fn handle_context_stats(
     if let Some(ref db) = db_stats {
         merged.merge(db);
     }
+
+    // Phase 2: Fetch proxy stats (tool-filtering + cache) from the
+    // Clean-CTX proxy, if it's running. This is non-fatal — if the
+    // proxy is unreachable, we simply skip the proxy domain entries.
+    let proxy_stats = crate::mcp::proxy_stats::fetch_proxy_stats(state.proxy_port);
+    if let Some(ref ps) = proxy_stats {
+        crate::mcp::proxy_stats::record_proxy_filter_stats(&mut merged, ps);
+    }
+
+    // Phase 4: Sync MCP-level CacheMetrics into the prompt_cache domain
+    // so the per-domain breakdown reflects actual breakpoint hit/miss activity.
+    merged.sync_cache_metrics(&state.cache_metrics);
 
     let file_path = params["arguments"]["filePath"].as_str();
     let format = params["arguments"]["format"].as_str().unwrap_or("text");
@@ -1644,105 +1702,13 @@ pub(super) fn handle_replay_history(
     }
 }
 
-// ── CBM Enrichment ────────────────────────────────────────────────
-
-/// Inject CBM graph metadata into the `_meta` field of a `provide_code_context`
-/// response when the graph bridge is available.
-///
-/// Adds (compressed):
-///   - `cbm_status`: "available" | "degraded" | "unavailable"
-///   - `cbm_enrichment`: compressed symbol importance for this file
-///   - `cbm_architecture_summary`: module + dependency counts (already minimal)
-///
-/// CRITICAL FIX: All CBM data is compressed via `compress_cbm_response` before
-/// injection. This prevents raw ~5000-token JSON from bypassing Clean-CTX's
-/// compression pipeline. Timeout guard: if CBM is degraded/unavailable, enrichment
-/// is skipped entirely (non-blocking).
-///
-/// This is a no-op for non-`provide_code_context` handlers.
-pub(crate) fn enrich_with_cbm(
-    response: &mut serde_json::Value,
-    file_path: &str,
-    state: &mut McpState,
-) {
-    let meta = match response.get_mut("result").and_then(|r| r.get_mut("_meta")) {
-        Some(m) => m,
-        None => return,
-    };
-
-    // CRITICAL timeout guard: surface CBM status first, then bail if not healthy.
-    // Sync status from bridge before checking (M-1 self-healing).
-    if let Some(ref mut bridge) = state.graph_bridge {
-        bridge.update_status();
-        state.cbm_status = bridge.status().clone();
-    }
-    let status_str = state.cbm_status.summary().to_string();
-    meta["cbm_status"] = serde_json::Value::String(status_str.clone());
-
-    // If CBM is degraded or unavailable, skip enrichment entirely.
-    // This prevents blocking the response path when CBM is slow/failing.
-    if status_str != "available" {
-        return;
-    }
-
-    // Query graph bridge for this file's metadata
-    let bridge = match state.graph_bridge.as_mut() {
-        Some(b) => b,
-        None => return,
-    };
-
-    // Symbol importance — compress before injecting.
-    // get_symbol_importance_mut() returns ALL project symbols (potentially hundreds).
-    // We filter to file-relevant ones, serialize to JSON, and compress.
-    let importance = bridge.get_symbol_importance_mut();
-    let file_importance: Vec<_> = importance
-        .values()
-        .filter(|s| s.file.contains(file_path) || file_path.contains(&s.file))
-        .take(5)
-        .collect();
-
-    if !file_importance.is_empty() {
-        let enriched_json = serde_json::json!({
-            "symbols": file_importance.iter().map(|s| serde_json::json!({
-                "sy": s.symbol,
-                "sc": s.score,
-                "f": s.file,
-            })).collect::<Vec<_>>()
-        });
-        let serialized = serde_json::to_string(&enriched_json).unwrap_or_default();
-        // Compress via JSON compressor — same pipeline as proxy path
-        if let Some(compressed) = compress_cbm_response(&serialized) {
-            meta["cbm_enrichment"] = serde_json::json!({
-                "text": compressed.compressed_text,
-                "raw_tokens": compressed.raw_tokens_est,
-                "comp_tokens": compressed.comp_tokens_est,
-            });
-        } else {
-            // Compression failed — inject minimal compressed entry
-            meta["cbm_enrichment"] = serde_json::json!({
-                "text": format!("sy:{} count:{}", file_path, file_importance.len()),
-                "compression_fallback": true,
-            });
-        }
-    }
-
-    // Architecture overview — already minimal (two integers), no compression needed.
-    // Wrapped in a failsafe: if the bridge call fails or hangs, skip silently.
-    if let Some(arch) = bridge.get_architecture() {
-        meta["cbm_architecture_summary"] = serde_json::json!({
-            "modules": arch.modules.len(),
-            "dependencies": arch.dependencies.len(),
-        });
-    }
-}
-
 /// Handle `purge_old_deltas` — clean up old deltas from DB.
 pub(super) fn handle_purge_old_deltas(
     id: &Value,
     params: &Value,
     state: &mut McpState,
 ) {
-    let days = params["arguments"]["days"].as_i64().unwrap_or(30);
+    let days = params["arguments"]["days"].as_i64().unwrap_or(30).max(1);
 
     if let Some(store) = &mut state.persistence_store {
         // Delete deltas older than N days
