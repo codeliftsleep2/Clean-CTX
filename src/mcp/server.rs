@@ -1,7 +1,13 @@
 // src/mcp/server.rs
 //
 // MCP server main loop: reads JSON-RPC requests from stdin, dispatches
-// them via the router, and writes responses to stdout.
+// them via the thread-pool dispatcher, and writes responses to stdout.
+//
+// A-09 (FAANG architectural review): The original loop dispatched each
+// request synchronously on the reader thread. A slow CBM query or large
+// file compression would block ALL subsequent requests. The loop now
+// enqueues each request to a thread-pool dispatcher, so the reader
+// thread never blocks.
 //
 // Phase 1 (FAANG audit F-02): the previous loop used `BufRead::read_line`
 // with no upper bound. A 4 GB line on stdin would OOM the process. The
@@ -19,6 +25,7 @@ use std::path::PathBuf;
 
 use crate::config::CleanCtxConfig;
 use crate::mcp::McpState;
+use crate::mcp::dispatcher::Dispatcher;
 use crate::protocol::send_response;
 use crate::protocol::JsonRpcRequest;
 
@@ -61,6 +68,10 @@ pub(crate) const MAX_LINE_BYTES: usize = 16 * 1024 * 1024;
 
 /// Run the MCP server loop, processing incoming JSON-RPC requests until
 /// stdin is exhausted.
+///
+/// A-09: Uses a thread-pool Dispatcher so the stdin reader never blocks
+/// on slow requests. Each parsed request is enqueued to a worker thread;
+/// the reader immediately returns to reading the next line.
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Eagerly initialise the BPE engine. A failure here (e.g. the BPE
     // data file is missing or unreadable) used to take the server
@@ -77,7 +88,10 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     let project_root = find_project_root();
     eprintln!("[clean-ctx] Project root: {}", project_root.display());
     let config = CleanCtxConfig::load(project_root);
-    let mut state = McpState::new(config);
+    let state = McpState::new(config);
+
+    // A-PRODUCTION: Wrap state in the production-grade dispatcher.
+    let dispatcher = Dispatcher::new(state);
 
     let stdin = io::stdin();
     let mut handle = stdin.lock();
@@ -105,10 +119,30 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
             continue;
         }
 
+        // A-PRODUCTION: Parse the request and enqueue it to the dispatcher.
+        // The closure captures the parsed request data and dispatches
+        // it on a worker thread. The reader thread returns immediately.
         if let Ok(req) = serde_json::from_str::<JsonRpcRequest>(&line) {
-            crate::mcp::router::dispatch(&req, &mut state);
+            let req_for_handler = req.clone();
+            if let Err(e) = dispatcher.spawn(&req, move |state| {
+                crate::mcp::router::dispatch(req_for_handler, state);
+            }) {
+                eprintln!("[clean-ctx] ERROR: Failed to enqueue request: {}", e);
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": serde_json::Value::Null,
+                    "error": { "code": -32603, "message": "Internal error: queue full" }
+                }));
+            }
         }
     }
+
+    // A-09: Wait for all queued work to complete before exiting.
+    // The Dispatcher's drop impl (via rayon) will block until all
+    // spawned tasks finish.
+    eprintln!("[clean-ctx] Stdin exhausted, waiting for pending work...");
+    drop(dispatcher);
+
     Ok(())
 }
 

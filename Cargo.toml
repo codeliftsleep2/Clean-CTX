@@ -52,6 +52,13 @@ tiktoken-rs = "0.11"
 # Parallel iteration for workspace compression passes (F-FULL-15)
 rayon = "1.10"
 
+# Lock-free work queue for A-PRODUCTION dispatcher
+crossbeam-channel = "0.5"
+
+# Structured logging for observability (A-PRODUCTION)
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
 # SQLite persistence layer for cross-session context survival
 rusqlite = { version = "0.32", features = ["bundled"] }
 # Base64 encoding for fallback file serialization

@@ -14,8 +14,11 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 
 /// Dispatch an incoming JSON-RPC request to the appropriate handler.
+///
+/// A-09: Takes an owned `JsonRpcRequest` so the caller can move it
+/// into a closure (required for thread-pool dispatch).
 pub(crate) fn dispatch(
-    req: &crate::protocol::JsonRpcRequest,
+    req: crate::protocol::JsonRpcRequest,
     state: &mut McpState,
 ) {
     match req.method.as_str() {

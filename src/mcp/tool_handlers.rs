@@ -10,7 +10,6 @@
 use std::path::PathBuf;
 use serde_json::Value;
 use crate::compressor::{compress_file, Fidelity};
-use crate::compression::pipeline::compress_file_with_source;
 use crate::ir::wire::ir_to_wire;
 use crate::ir::delta::{IRDelta, DeltaComputer};
 use crate::ir::replay::DeltaError;
@@ -61,7 +60,7 @@ fn append_blast_radius_files(
         }
 
         // Determine fidelity based on CBM symbol importance
-        let affected_fidelity = if let Some(ref mut bridge) = state.graph_bridge {
+        let affected_fidelity = if let Some(bridge) = state.graph_bridge.as_mut() {
             if bridge.is_available() {
                 let symbol_importance = bridge.get_symbol_importance_mut();
                 let max_importance = symbol_importance.values()
@@ -153,7 +152,7 @@ pub(super) fn handle_compress_code_context(
     let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
 
     let response = if let Ok(ir) = ir_result {
-        state.ir_context.load_ir(ir.clone());
+        state.ir_context_mut().load_ir(ir.clone());
         let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
         use crate::ir::render_hierarchical_for_llm;
         let llm_text = render_hierarchical_for_llm(&hir, effective_fidelity);
@@ -161,7 +160,7 @@ pub(super) fn handle_compress_code_context(
             llm_text.trim(),
             ir.file_id,
             &resolved_path,
-            state.dict.format_footer().trim(),
+            state.dict_mut().format_footer().trim(),
         );
         state.llm_text_cache.insert(ir.file_id.clone(), llm_text_with_footer.clone());
 
@@ -227,7 +226,7 @@ pub(super) fn handle_compress_code_context(
             }
         })
     } else {
-        match compress_file_with_source(
+        match crate::compression::pipeline::compress_file_with_source(
             PathBuf::from(&resolved_path),
             source_ref,
             &mut state.dict,
@@ -918,12 +917,12 @@ pub(super) fn handle_provide_code_context(
                     decision.fidelity,
                 ) {
                     Ok(mut compressed_text) => {
-                        compressed_text.push_str(&state.dict.format_footer());
-                        let body_lines: Vec<String> = compressed_text.lines().map(String::from).collect();
-                        state.text_delta.compute_and_store(&path_alias, body_lines);
-                        let raw_tokens = count_tokens_with_tokenizer(&source, tok_ref_pcc);
-                        let compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tok_ref_pcc);
-                        state.session_stats.record_compression(
+                compressed_text.push_str(&state.dict.format_footer());
+                let body_lines: Vec<String> = compressed_text.lines().map(String::from).collect();
+                state.text_delta.compute_and_store(&path_alias, body_lines);
+                let raw_tokens = count_tokens_with_tokenizer(&source, tok_ref_pcc);
+                let compressed_tokens = count_tokens_with_tokenizer(&compressed_text, tok_ref_pcc);
+                state.session_stats.record_compression(
                             &resolved_path,
                             raw_tokens,
                             compressed_tokens,

@@ -11,6 +11,7 @@
 //   - workspace  : workspace-level operations (compress_workspace_dir, collect_source_files)
 //   - state      : per-session state shared by all tool handlers (F-05)
 
+pub mod dispatcher;
 mod handlers;
 pub(crate) mod tool_handlers;
 pub(crate) mod tool_helpers;

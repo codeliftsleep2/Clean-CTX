@@ -32,6 +32,7 @@ pub(super) fn compress_text_body(
     )
 }
 
+
 /// Resolve a file path, handling relative paths with optional workspace root.
 pub(super) fn resolve_file_path(path: &str, workspace_root: Option<&str>) -> String {
     let path_obj = std::path::Path::new(path);

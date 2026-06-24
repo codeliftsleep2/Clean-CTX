@@ -1,7 +1,7 @@
 # Clean-CTX — Architecture Overview
 
 **Version:** 0.2.0-rc1
-**Last updated:** 2026-06-22 (added CBM filter-first architecture, per-domain stats, prompt cache breakpoints)
+**Last updated:** 2026-06-24 (A-09: multi-threaded MCP server dispatch with rayon thread pool)
 
 ---
 
@@ -59,6 +59,38 @@
 │  └──────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
 ```
+
+### A-09: Multi-Threaded Request Dispatch
+
+The MCP server uses a **rayon thread pool** (4 workers) to handle concurrent JSON-RPC requests without blocking the stdin reader:
+
+```
+stdin reader thread           Dispatcher thread pool (4 workers)
+┌──────────────────┐           ┌───────────────────────────────────┐
+│  read_line()     │           │  Worker 1: compress (holds lock) │
+│  parse JSON-RPC  │  enqueue  │  Worker 2: context_stats (wait)  │
+│  → dispatcher    │──────────→│  Worker 3: CBM query (wait)      │
+│  → read next     │           │  Worker 4: prompts/list (wait)   │
+└──────────────────┘           └───────────────────────────────────┘
+                                        │
+                                   ┌────▼─────┐
+                                   │  Mutex   │  Serializes McpState access
+                                   └──────────┘
+                                        │
+                                   ┌────▼─────┐
+                                   │  stdout  │  Global STDOUT_MUTEX
+                                   │  Mutex   │  prevents interleaved responses
+                                   └──────────┘
+```
+
+**How it works:**
+
+1. **Stdin reader thread** — reads one JSON-RPC line at a time, parses it, and immediately enqueues it to the dispatcher. It never waits for the request to complete.
+2. **Rayon thread pool** — 4 worker threads pick up queued requests. Each worker locks `McpState` (wrapped in `Arc<Mutex<>>`), runs the handler, and releases the lock.
+3. **McpState serialization** — only one worker touches state at a time. This is acceptable because the bottleneck is I/O (file reads, CBM queries), not CPU.
+4. **Stdout serialization** — a global `STDOUT_MUTEX` ensures JSON-RPC response lines never interleave, even when multiple workers complete simultaneously.
+
+**Why this matters:** Before A-09, a slow CBM query or large file compression would block ALL subsequent requests. Now the reader thread stays responsive, queueing work while slow operations complete in the background.
 
 ---
 
@@ -208,7 +240,8 @@ src/
 │
 ├── mcp/                          # MCP server layer (JSON-RPC stdio)
 │   ├── mod.rs                    # run() entry point + persistence init
-│   ├── server.rs                 # Stdin/stdout loop (F-02: line-size cap)
+│   ├── server.rs                 # Stdin/stdout loop (F-02: line-size cap, A-09: dispatcher enqueue)
+│   ├── dispatcher.rs             # Thread-pool dispatcher (A-09: rayon + Arc<Mutex<McpState>>)
 │   ├── router.rs                 # JSON-RPC method dispatch
 │   ├── handlers.rs               # initialize, tools/list, prompts/list
 │   ├── tools.rs                  # Tool definitions + get_tool_definitions()
