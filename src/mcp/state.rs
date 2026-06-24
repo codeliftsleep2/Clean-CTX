@@ -201,9 +201,13 @@ impl McpState {
         cbm_config: &crate::cbm::CbmConfig,
         project_root: &std::path::Path,
     ) -> (Option<crate::cbm::GraphBridge>, crate::cbm::CbmStatus) {
-        let bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
+        let mut bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
         if bridge.is_available() {
             eprintln!("[clean-ctx] CBM graph intelligence: available");
+            // Auto-index the project on startup so CBM is ready for queries
+            if let Err(e) = bridge.index_project() {
+                eprintln!("[clean-ctx] CBM auto-index failed: {e}");
+            }
             let status = bridge.status().clone();
             (Some(bridge), status)
         } else {
