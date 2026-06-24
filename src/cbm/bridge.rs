@@ -157,6 +157,21 @@ impl GraphBridge {
     pub fn graph_version(&self) -> &str { &self.graph_version }
     pub fn set_graph_version(&mut self, v: &str) { self.graph_version = v.to_string(); }
 
+    /// Trigger indexing of the current project in CBM.
+    /// Called automatically on startup when CBM is available.
+    /// Returns Ok(()) if indexing was triggered successfully, or Err if CBM is unavailable.
+    pub fn index_project(&mut self) -> Result<(), CbmError> {
+        if !self.is_available() {
+            return Err(CbmError::LaunchError("CBM not available".into()));
+        }
+        let project = self.project_str();
+        eprintln!("[clean-ctx-cbm] Indexing project: {project}");
+        // Call CBM's index_project tool to trigger indexing
+        let _result = self.query(|c| c.call_tool("index_project", serde_json::json!({"project": project})))?;
+        eprintln!("[clean-ctx-cbm] Project indexed successfully");
+        Ok(())
+    }
+
     /// Resolve project name, using explicit if set, else auto-detected.
     fn project_str(&self) -> String {
         self.project.clone().unwrap_or_else(|| "default".to_string())
