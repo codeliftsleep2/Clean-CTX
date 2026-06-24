@@ -1,4 +1,4 @@
-# Clean-CTX — Token Waste Reducer & Context Compiler
+# Clean-CTX — Token Waste Reducer & Structured Transport Protocol
 
 > **🚀 Version 0.2.0-rc1** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, **CBM filter-first architecture** (symbol importance filtering before compression), Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, and all **1,454 tests passing** with **zero clippy warnings**.
 
