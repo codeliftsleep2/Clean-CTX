@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-06-23
+**Last updated:** 2026-06-24
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -10,10 +10,11 @@
 
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
-| **Now** | v0.2.0 | Real-world ready | 5 |
-| **Next** | v0.3.0 | Advanced capabilities | 10 |
-| **Later** | v1.0.0+ | Ecosystem & integrations | 10 |
-| **Architectural** | Continuous | Code health & tooling | 7 |
+| **Now** | v0.2.0 | Real-world ready | 6 |
+| **Foundation** | v0.2.0 | Architectural hardening (blocking) | 5 |
+| **Next** | v0.3.0 | Advanced capabilities | 8 |
+| **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
+| **Architectural** | Continuous | Code health & tooling | 15 |
 | **Community** | Continuous | Docs & marketing | 5 |
 
 ---
@@ -45,9 +46,26 @@ These items are complete and documented. Listed for historical context.
 
 ---
 
+## Foundation (v0.2.0) — "Architectural hardening (BLOCKING)"
+
+These items are **prerequisites** for enterprise adoption. They address findings from a FAANG-level architectural review. All Foundation items must be complete before v0.2.0 ships. Do NOT begin new feature work (Next list) until these are resolved.
+
+| ID | Title | Description | Effort | Priority |
+|----|-------|-------------|-------:|---------:|
+| **A-09** | Multi-threaded MCP server dispatch | Convert the single-threaded stdin/stdout loop to a thread-pool model. Each tool call (compress, delta, CBM query) runs on its own thread. A slow CBM query must not block other tools. Use `std::thread::pool` or `rayon` for the dispatch layer. **This is the #1 adoption blocker.** | 2-3 days | 🔴 **P0 Critical** |
+| **A-10** | Proxy hardening: auth + rate limiting | Add optional API key header check (`X-Api-Key`) to the proxy. Add per-client rate limiting with configurable RPS and burst windows. Document nginx sidecar pattern for corporate TLS termination. Open HTTP proxy on localhost with no auth is a security finding. | 1 day | 🔴 **P0 Critical** |
+| **A-11** | Meta-layer detection hardening | Migrate from `source.contains()` string scanning to proper AST-node matching for Angular/Spring Boot detection. False positives from comments (`// TODO: remove @Component`) or string literals trigger the full meta-layer pipeline incorrectly. This pattern must be fixed BEFORE adding React, Vue, or ASP.NET meta-layers. | 1 day | 🔴 **P0 Critical** |
+| **A-12** | Tree-sitter version strategy | Document and implement a migration path for tree-sitter version bumps. Currently all tree-sitter crates are pinned with `=0.20.x` exact versions. This creates a dependency island incompatible with other Rust tools. Add a CI check that alerts on new tree-sitter releases. | 1 day | 🔴 High |
+| **A-13** | Resource limits and memory guardrails | Add explicit configuration for: max file size (default: 10 MB), max workspace file count (default: 10,000), max memory usage. Return graceful error messages instead of OOM crashes. Implement in the compression entry points and proxy body buffers. | 1 day | 🔴 High |
+| **A-14** | CI/CD awareness | Auto-disable persistence when `CI=true` or `TF_BUILD=true` env vars are detected. Default `.clean-ctx.json` should document this. Prevent stale `persistence.db` from leaking between CI builds. | 0.5 day | 🔴 High |
+| **A-15** | Configuration precedence documentation | Two parallel config systems (`.clean-ctx.json` + 12+ env vars for proxy). Document explicit precedence rules: tool arg > env var > config file > default. Add a `--config-dump` flag that prints the resolved configuration. | 0.5 day | 🟡 Medium |
+
+---
+
 ## Now (v0.2.0) — "Real-world ready"
 
 These items address the most common user requests and unlock adoption on larger codebases.
+**NOTE:** These items may proceed in parallel with Foundation items, but v0.2.0 must NOT ship until all Foundation items are complete.
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
@@ -56,23 +74,25 @@ These items address the most common user requests and unlock adoption on larger 
 | **A-07** | Property-based tests with `proptest` | Fuzz-style input tests for the decompressor, the config glob matcher, and the modifier stripper. Would have caught F-06 (Unicode) and F-12 (substring match) regressions. | 1-2 days | 🔴 High |
 | **R-29** | Intelligence Layer | Ranked context delivery on top of the existing compression stack. **Phase 1 (complete):** PageRank symbol scoring + CBM-informed adaptive per-symbol fidelity (60% IR + 40% CBM blend). **Phase 2 (complete):** Blast radius integrated into `handle_provide_code_context` and `handle_delta_code_context` — depth-1 affected files compressed at Low fidelity and appended with `§IMPACT` markers. Regression tests added. **Phase 3 (not started):** Token budget knapsack packing. All phases opt-in via `.clean-ctx.json`, zero overhead when disabled. See `docs/INTELLIGENCE_LAYER_PLAN.md`. | 5.5 days | 🔴 High |
 | **A-08** | TOKEN_EFFICIENCY_AUDIT findings | 4 open findings: underutilized `source_cache` (High), double IR compile in delta path (Medium), path resolution inconsistency (Medium), fragile source ownership (Low). | 1-2 days | 🟡 Medium |
+| **A-04** | Observability upgrade (was Low) | **Upgraded from Low to Medium priority.** Add OpenTelemetry-compatible structured logging (`tracing` + `metrics`) with OTLP export. Export key metrics: compression latency, delta hit rate, cache efficiency, CBM query latency, error rates by category. This is required before any production deployment. | 2-3 days | 🟡 Medium |
 
 ---
 
 ## Next (v0.3.0) — "Advanced capabilities"
 
+**GATE:** All Foundation items (A-09 through A-14) must be complete before v0.3.0 work begins. Meta-layer items (R-36, R-37, R-23, R-24) additionally depend on A-11 (detection hardening).
+
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **R-36** | React Meta-Layer | Additive meta-layer on TS/JS. Component/hook/context bundling, prop type compression, React-specific lifecycle markers. Highest-demand frontend framework after Angular. | 3-4 days | 🔴 High |
-| **R-37** | Redux Meta-Layer | Additive meta-layer on TS/JS. Action/reducer/selector compression, thunk/saga patterns, store shape compression. Natural follow-on to React (patterns ≈ NgRx). | 2-3 days | 🔴 High |
 | **R-01** | Python language layer | Most-requested language. Follows the 4-step guide in `DEVELOPER_DOCUMENTATION.md`. | 1-2 days | 🔴 High |
-| **R-01b** | Go language layer | Second-most requested. | 1-2 days | 🟡 Medium |
 | **R-02** | Type-aware compression | Inline `type_aliases` from config: `UserId` → `$uid`, `JsonObject` → `$jo`. Currently the type table is loaded but not injected into the capture pipeline. | 2-3 days | 🔴 High |
-| **R-23** | NgRx Meta-Layer | Framework-annotation layer for NgRx state management (sits on top of TS + Angular layers). Φ markers for actions, reducers, effects, selectors. Semantic compression of boilerplate patterns. DI-graph integration for action dispatch → effect → reducer → selector flow. | 3-4 days | 🔴 High |
-| **R-24** | RxJS Meta-Layer | Additive meta-layer on TS for reactive patterns. Operator chain compression, observable graph representation, subscription lifecycle markers. | 2-3 days | 🟡 Medium |
+| **R-12** | Multi-file / git-commit diff | Diff an entire workspace between two git commits; emit per-file deltas in one tool call. Powers "what changed in this PR?" workflows. | 3-5 days | 🔴 High |
+| **R-36** | React Meta-Layer | Additive meta-layer on TS/JS. Component/hook/context bundling, prop type compression, React-specific lifecycle markers. **BLOCKED by A-11.** | 3-4 days | 🔴 High |
+| **R-37** | Redux Meta-Layer | Additive meta-layer on TS/JS. Action/reducer/selector compression, thunk/saga patterns, store shape compression. **BLOCKED by A-11.** | 2-3 days | 🔴 High |
+| **R-23** | NgRx Meta-Layer | Framework-annotation layer for NgRx state management (sits on top of TS + Angular layers). **BLOCKED by A-11.** | 3-4 days | 🔴 High |
+| **R-01b** | Go language layer | Second-most requested. | 1-2 days | 🟡 Medium |
 | **R-07** | MCP `resources` support | Expose compressed snapshots as MCP resources in addition to tools, enabling LLM clients to read prior state without re-invoking tools. | 1-2 days | 🟡 Medium |
 | **R-08** | Improved diff: rename detection | Detect class/method renames (same signature, different name) and emit as `~` with a `renamed from X` hint instead of a delete+add pair. | 1 day | 🟡 Medium |
-| **R-12** | Multi-file / git-commit diff | Diff an entire workspace between two git commits; emit per-file deltas in one tool call. Powers "what changed in this PR?" workflows. | 3-5 days | 🔴 High |
 
 ---
 
@@ -82,15 +102,11 @@ Items that add value but require demand signal before investing. **YAGNI applies
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **R-26** | Vue Meta-Layer | Additive meta-layer on TS/JS. Single-file component bundling (`.vue` = script + template + style), Composition API markers. | 3-4 days | 🟡 Medium |
-| **R-27** | ASP.NET Meta-Layer | Additive meta-layer on C# layer. Controller/service/repository bundling, DI registration graph (`services.AddScoped<IFoo, Foo>()`), route markers. Φ markers: `Φctrl:`, `Φrepo:`, `Φiface:`. | 3-4 days | 🟡 Medium |
-| **R-28** | Entity Framework Meta-Layer | Additive meta-layer on C# (sits on top of ASP.NET layer). Entity model compression, DbContext graph, migration markers. | 2-3 days | 🟢 Low |
+| **R-26** | Vue Meta-Layer | Additive meta-layer on TS/JS. Single-file component bundling (`.vue` = script + template + style), Composition API markers. **BLOCKED by A-11.** | 3-4 days | 🟡 Medium |
+| **R-27** | ASP.NET Meta-Layer | Additive meta-layer on C# layer. Controller/service/repository bundling, DI registration graph (`services.AddScoped<IFoo, Foo>()`), route markers. **BLOCKED by A-11.** | 3-4 days | 🟡 Medium |
+| **R-28** | Entity Framework Meta-Layer | Additive meta-layer on C# (sits on top of ASP.NET layer). Entity model compression, DbContext graph, migration markers. **BLOCKED by A-11.** | 2-3 days | 🟢 Low |
 | **R-06** | Config hot-reload | File-watcher on `.clean-ctx.json`; debounce + atomic reload of `McpState.config` without restart. | 1 day | 🟡 Medium |
-| **R-09** | Custom query strings | Allow users to override the tree-sitter query via `.clean-ctx.json` for project-specific AST extraction. | 1 day | 🟢 Low |
 | **R-10** | Tool input validation via `schemars` | Replace hand-rolled `args.get("foo")` chains with `schemars`-derived JSON Schema; tool schemas in `tools.rs` auto-generate from Rust types. | 1-2 days | 🟡 Medium |
-| **R-15** | Python bindings via PyO3 | Expose the compression engine to Python for integration with non-Rust tooling. | 2-3 days | 🟢 Low |
-| **R-16** | WebAssembly build target | Browser-based compression for in-IDE previews (no server needed). | 3-5 days | 🟢 Low |
-| **R-17** | VS Code extension (native) | First-party VS Code extension that wraps the binary; sidebar with live savings stats. | 1-2 weeks | 🟢 Low |
 | **R-18** | Markdown / JSON / YAML compression | Extend compression to data formats using the same opcode framework with format-specific markers. | 1-2 days | 🟡 Medium |
 
 ---
@@ -104,10 +120,17 @@ Code health work that has no user-facing feature but improves long-term maintain
 | **A-01** | Remove `src/helpers.rs` shim | The 18-line re-export shim should be removed once all internal callers are confirmed to use `crate::compaction::*`. | 1 hour | 🟢 Low |
 | **A-02** | Migrate to `walkdir` (precondition for F-20) | Required before parallelism can be added — streaming input is a prerequisite for `par_iter`. | 1 day | 🟡 Medium |
 | **A-03** | `schemars` for tool schemas | Replaces hand-written JSON Schema in `src/mcp/tools.rs`; less drift between Rust types and advertised schema. | 1-2 days | 🟡 Medium |
-| **A-04** | `tracing` + `metrics` | Structured logging + OpenTelemetry-compatible spans; useful for diagnosing slow compressions in production. | 1-2 days | 🟢 Low |
+| **A-04** | `tracing` + `metrics` | Structured logging + OpenTelemetry-compatible spans; useful for diagnosing slow compressions in production. **Upgraded to Medium priority — see Now list.** | 2-3 days | 🟡 Medium |
 | **A-05** | Workspace-aware language detection | When `compress_workspace` runs, cache language detection results across files. TS file next to another TS file is, predictably, TS. | 1 day | 🟢 Low |
 | **A-07** | Property-based tests with `proptest` | See Now list. Fuzz-style input tests for decompressor, config glob matcher, modifier stripper. | 1-2 days | 🔴 High |
 | **A-08** | TOKEN_EFFICIENCY_AUDIT findings | 4 open findings: underutilized `source_cache` (High), double IR compile in delta path (Medium), path resolution inconsistency (Medium), fragile source ownership (Low). See `docs/TOKEN_EFFICIENCY_AUDIT.md`. | 1-2 days | 🟡 Medium |
+| **A-09** | Multi-threaded MCP server dispatch | See Foundation list. **P0 Critical — #1 adoption blocker.** | 2-3 days | 🔴 **P0 Critical** |
+| **A-10** | Proxy hardening: auth + rate limiting | See Foundation list. **P0 Critical — security finding.** | 1 day | 🔴 **P0 Critical** |
+| **A-11** | Meta-layer detection hardening | See Foundation list. **P0 Critical — blocks all new meta-layers.** | 1 day | 🔴 **P0 Critical** |
+| **A-12** | Tree-sitter version strategy | See Foundation list. Document migration path, add CI alert on new releases. | 1 day | 🔴 High |
+| **A-13** | Resource limits and memory guardrails | See Foundation list. Max file size, workspace count, memory limits with graceful errors. | 1 day | 🔴 High |
+| **A-14** | CI/CD awareness | See Foundation list. Auto-disable persistence in CI environments. | 0.5 day | 🔴 High |
+| **A-15** | Configuration precedence documentation | See Foundation list. Precedence rules + `--config-dump` flag. | 0.5 day | 🟡 Medium |
 
 ---
 
@@ -147,29 +170,69 @@ Items explicitly deferred — not forgotten, not prioritized.
 
 ## Prioritization rationale
 
-**Now list** was chosen by:
-1. **CBM integration (R-35) is Critical** — codebase-memory-mcp provides graph intelligence (158 languages, knowledge graph, Cypher queries, dead code detection, blast radius) that complements Clean-CTX's compression. The MCP client approach (JSON-RPC between servers) keeps coupling loose while enabling powerful graph-informed compression. R-35 feeds directly into R-29 (Intelligence Layer) by providing symbol importance seeds.
-2. **Unblocks other work** — F-19 (walkdir) unblocks F-20. R-29 Intelligence Layer builds on the existing IR + Angular graph and now benefits from CBM graph seeds.
-3. **Adoption blockers** — F-20 parallelization is required for any user with >1K files. R-19 tokenizer abstraction unblocks every model-specific feature.
-4. **Regression insurance** — A-07 (proptest) is cheap insurance against input-validation bugs.
-5. **Differentiation** — R-29 Intelligence Layer adds PageRank (complete) + blast radius (complete) + budget packing (not started), enhanced by CBM's cross-language graph intelligence.
-6. **Token surface coverage** — R-39 (Secret Scrubbing) and R-40 (Shell Output Filtering) close the remaining token waste surface: build/test noise, git diff noise, and secrets in tool output. These run in the existing proxy pipeline with zero overhead when disabled. Inspired by [ctx-wire](https://github.com/pivanov/ctx-wire) patterns. See `docs/TOOL_OUTPUT_FILTER_PLAN.md`.
+### Foundation-first ordering (v0.2.0)
 
-**Next list** priorities:
-- R-36 React Meta-Layer is 🔴 High priority — highest-demand frontend after Angular, fastest to build (Φ markers only).
-- R-37 Redux Meta-Layer is 🔴 High priority — natural follow-on to React, patterns ≈ NgRx.
-- R-12 multi-file git-commit diff is High priority for PR review workflows.
-- R-01 Python language layer is the single most-requested language addition.
+The Foundation items must ship FIRST because they are **blocking prerequisites** for enterprise adoption. They were identified by a FAANG-level architectural review and directly address:
 
-**Completed pilot stack:** The Java + Spring + CBM pilot stack (R-01d Java language layer, R-38 Spring Boot Meta-Layer, R-35 CBM Integration) is complete and shipped in v0.1.7–v0.1.9. These items have been removed from the "Next" list as they're already delivered.
+1. **A-09 (Multi-threaded MCP server)** — #1 adoption blocker. A single slow CBM query currently blocks ALL tools. Until this is fixed, the server cannot be used in production with CBM enabled, and even without CBM, a large file compression blocks all other concurrent requests.
 
-**Later list** — none of R-25 through R-28 should be started speculatively. Build when contributors or demand signals appear.
+2. **A-10 (Proxy auth + rate limiting)** — #2 adoption blocker. Security teams will flag an open HTTP proxy on localhost that forwards to Anthropic/OpenAI. Any process on the machine can use it. Adding `X-Api-Key` auth and rate limiting closes this finding.
 
-**CBM integration architecture decisions (locked):**
+3. **A-11 (Meta-layer detection hardening)** — #3 adoption blocker. The current `source.contains()` pattern produces false positives (comments, string literals). This must be hardened BEFORE adding React, Redux, NgRx, Vue, or ASP.NET meta-layers — otherwise every new meta-layer inherits the same fragile detection.
+
+4. **A-12 (Tree-sitter version strategy)** — Supply-chain risk. Pinned `=0.20.x` versions create a dependency island. Must document a migration path before v1.0.0.
+
+5. **A-13 (Resource limits)** — Production safety. Without documented max file size or memory limits, a single large file can OOM the server.
+
+6. **A-14 (CI/CD awareness)** — CI adoption blocker. Default persistence writes `.clean-ctx/persistence.db` to project root, which leaks stale state between CI builds.
+
+7. **A-15 (Configuration precedence)** — Operational sanity. Two parallel config systems with no documented precedence creates user confusion and debugging difficulty.
+
+### Now list priorities (v0.2.0)
+
+These items may proceed in parallel with Foundation items, but v0.2.0 must NOT ship until Foundation is complete:
+
+1. **F-19 → F-20 (walkdir + Rayon)** — Streamlined workspace handling and parallel compilation. Builds on the multi-threaded dispatch from A-09.
+2. **A-07 (proptest)** — Regression insurance against input-validation bugs. Cheap to implement, prevents regressions.
+3. **R-29 (Intelligence Layer)** — Phase 1 (PageRank) + Phase 2 (blast radius) complete. Phase 3 (token budget packing) not started.
+4. **A-08 (Token Efficiency Audit)** — 4 open findings to resolve before claiming production-readiness.
+5. **A-04 (Observability)** — **Upgraded from Low to Medium priority.** OpenTelemetry-compatible tracing/metrics required before any production deployment.
+
+### Next list priorities (v0.3.0)
+
+GATED by Foundation completion. Meta-layer items additionally gated by A-11:
+
+| Priority | Item | Dependency |
+|----------|------|------------|
+| 🔴 High | R-01 Python language layer | None |
+| 🔴 High | R-02 Type-aware compression | None |
+| 🔴 High | R-12 Multi-file git-commit diff | A-09 (multi-threaded server) |
+| 🔴 High | R-36 React Meta-Layer | **A-11 (detection hardening)** |
+| 🔴 High | R-37 Redux Meta-Layer | **A-11 (detection hardening)** |
+| 🔴 High | R-23 NgRx Meta-Layer | **A-11 (detection hardening)** |
+| 🟡 Medium | R-01b Go language layer | None |
+| 🟡 Medium | R-07 MCP resources support | None |
+| 🟡 Medium | R-08 Improved diff: rename detection | None |
+
+### Items explicitly deferred from Next list
+
+The following items that were previously in the Next list have been deferred to Later (v1.0.0+) to focus on Foundation + critical features:
+
+- **R-24 (RxJS Meta-Layer)** — Deferred. No demand signal, blocked by A-11.
+- **R-07 (MCP resources)** — Moved to Next. Moderate demand signal.
+- **R-08 (Rename detection)** — Moved to Next. Low effort, moderate value.
+
+### Completed pilot stack
+
+The Java + Spring + CBM pilot stack (R-01d Java language layer, R-38 Spring Boot Meta-Layer, R-35 CBM Integration) is complete and shipped in v0.1.7–v0.1.9.
+
+### CBM integration architecture decisions (locked)
+
 - Communication: MCP JSON-RPC between Clean-CTX and CBM (loose coupling, no direct DB access)
 - Runtime model: Both run as separate MCP servers; optional `--with-cbm` flag for auto-start
 - Graph data flow: CBM provides graph intelligence → Clean-CTX consumes via `search_graph`, `trace_path`, `detect_changes`, `get_architecture`
 - Intelligence Layer synergy: CBM symbol importance seeds → Clean-CTX PageRank → per-symbol adaptive fidelity
+- **FAANG review note:** CBM integration quality is high (circuit breaker, retry, stderr drain). The `in_degree / 100.0` importance heuristic needs validation before claiming 30-50% token savings.
 
 ---
 
