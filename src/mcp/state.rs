@@ -47,6 +47,9 @@ pub struct CbmFilterState {
 }
 
 /// Per-session state shared by all MCP tool handlers.
+///
+/// v0.2.0: Uses top-level RwLock for parallel reads (see dispatcher).
+/// v0.3.0: Will migrate to interior mutability for fine-grained parallelism.
 pub struct McpState {
     /// Path-alias dictionary (`α1`, `α2`, …). Mutated in place by
     /// `compress_code_context` and `compress_workspace`.
