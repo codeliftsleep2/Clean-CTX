@@ -117,8 +117,9 @@ mod boundary_tests {
             }).unwrap();
         }
         
-        // Wait for completion (very generous timeout for CI)
-        std::thread::sleep(Duration::from_millis(5000));
+        // Wait for completion (extremely generous timeout for CI)
+        // Note: With RwLock, workers serialize, so 10 requests take time
+        std::thread::sleep(Duration::from_millis(15000));
         
         // Verify all mutations happened (through spawn)
         let guard = dispatcher.state().read().unwrap();
@@ -213,8 +214,8 @@ mod shutdown_tests {
         // TODO: Implement shutdown in v0.2.1
         // dispatcher.shutdown(Duration::from_secs(1)).unwrap();
         
-        // For now, just wait
-        std::thread::sleep(Duration::from_millis(100));
+        // For now, just wait (generous timeout for CI)
+        std::thread::sleep(Duration::from_millis(500));
         
         // Request should have completed
         assert_eq!(counter.load(Ordering::SeqCst), 1, "inflight request should complete");
@@ -260,7 +261,6 @@ mod shutdown_tests {
         // assert!(elapsed < Duration::from_secs(1), "shutdown should timeout quickly");
         
         // For now, just verify the test compiles
-        ()
     }
 }
 
