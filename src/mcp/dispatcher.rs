@@ -85,7 +85,7 @@ impl TracedRequest {
 
     pub fn latency(&self) -> Duration {
         self.completed_at
-            .unwrap_or_else(|| Instant::now())
+            .unwrap_or_else(Instant::now)
             .duration_since(self.enqueued_at)
     }
 
@@ -176,7 +176,7 @@ impl Dispatcher {
                         handler(&mut guard);
                     }));
 
-                    if let Err(_) = result {
+                    if result.is_err() {
                         eprintln!("[clean-ctx] ERROR: Handler panicked");
                     }
                 }
