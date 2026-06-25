@@ -71,6 +71,5 @@ fn main() {
         println!("⚠️  WARNING: Speedup less than expected");
     }
     
-    println!("\nQueue depth: {}", dispatcher.queue_depth());
     println!("Recent traces: {}", dispatcher.recent_traces(5).len());
 }
