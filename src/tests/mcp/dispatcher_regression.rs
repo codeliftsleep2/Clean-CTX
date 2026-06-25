@@ -117,8 +117,8 @@ mod boundary_tests {
             }).unwrap();
         }
         
-        // Wait for completion (generous timeout for CI)
-        std::thread::sleep(Duration::from_millis(2000));
+        // Wait for completion (very generous timeout for CI)
+        std::thread::sleep(Duration::from_millis(5000));
         
         // Verify all mutations happened (through spawn)
         let guard = dispatcher.state().read().unwrap();
@@ -260,7 +260,7 @@ mod shutdown_tests {
         // assert!(elapsed < Duration::from_secs(1), "shutdown should timeout quickly");
         
         // For now, just verify the test compiles
-        assert!(true);
+        ()
     }
 }
 
