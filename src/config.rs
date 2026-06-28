@@ -221,7 +221,11 @@ pub struct PersistenceConfig {
 impl Default for PersistenceConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
+            // RAM-first: persistence is opt-in, not on by default.
+            // Every test calling McpState::new() with default config
+            // opened the same .clean-ctx/persistence.db and contended
+            // on SQLite file locks, causing 60s+ hangs in parallel runs.
+            enabled: false,
             auto_save: default_true(),
             max_history_days: default_max_history_days(),
             db_path: default_db_path(),
