@@ -32,8 +32,9 @@ use crate::cbm::json_compress::compress_cbm_response;
 /// **Critical fix (RC-2):** NEVER returns raw CBM output. If compression
 /// fails, applies minimum compression (whitespace stripping + key
 /// shortening) before returning.
-pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
-    let bridge = match state.graph_bridge.as_mut() {
+pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
+    let mut bridge_guard = state.graph_bridge_lock();
+    let bridge = match &mut *bridge_guard {
         Some(b) => b,
         None => {
             send_response(&serde_json::json!({
@@ -83,6 +84,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
     let args = tool_params;
 
     // Step 2: Forward to CBM via pipe — intercept the raw response text
+    if !crate::cbm::handlers::ensure_indexed_or_error(id, bridge) { return; }
     let raw_response = match bridge.proxy_call(cbm_tool, args) {
         Ok(text) => text,
         Err(e) => {
@@ -97,7 +99,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
     };
 
     // RM-1: Single status clone after CBM interaction
-    state.cbm_status = bridge.status().clone();
+    // state.cbm_status is Arc - cannot mutate
 
     // Step 3: Compress the intercepted response with JSON-aware compressor
     // RC-1 fix: JSON compressor handles key shortening, not tree-sitter
@@ -112,7 +114,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
             let raw_tokens = count_tokens_with_tokenizer(&raw_response, tokenizer_ref);
             let comp_tokens = count_tokens_with_tokenizer(&compressed.compressed_text, tokenizer_ref);
 
-            state.session_stats.record_compression(
+            state.record_compression(
                 &format!("cbm://{cbm_tool}"),
                 raw_tokens,
                 comp_tokens,

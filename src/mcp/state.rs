@@ -13,11 +13,12 @@
 //   - `cache`   : content-hash + baseline-snapshot cache
 //   - `config`  : the user's `CleanCtxConfig`
 //
-// Tool handlers take `&mut McpState` rather than three separate
-// arguments; the dict and cache stay single-threaded (the MCP server
+// Tool handlers take `&McpState` (interior mutability) — all mutable fields
+// use `Mutex`/`RwLock` internally, so `&mut` is never required.
 // is single-threaded by design) and the config is shared immutably.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, RwLock};
 use std::sync::Arc;
 use crate::angular_meta::graph_state::AngularGraphHandle;
 use crate::cache::LocalStateCache;
@@ -53,10 +54,10 @@ pub struct CbmFilterState {
 pub struct McpState {
     /// Path-alias dictionary (`α1`, `α2`, …). Mutated in place by
     /// `compress_code_context` and `compress_workspace`.
-    pub dict: PathDictionary,
+    pub dict: Mutex<PathDictionary>,
     /// Content-hash + baseline-snapshot cache. Mutated in place by
     /// `diff_code_context` and the orchestrators.
-    pub cache: LocalStateCache,
+    pub cache: RwLock<LocalStateCache>,
     /// Project-level configuration loaded from `.clean-ctx.json`.
     /// Treated as immutable for the session — the operator must
     /// restart the server to pick up edits.
@@ -64,48 +65,49 @@ pub struct McpState {
     /// Angular cross-file dependency graph (Phase 3, Tier 3).
     /// Built once per `compress_workspace` call; `None` when no
     /// workspace has been compressed yet.
-    pub angular_graph: AngularGraphHandle,
+    pub angular_graph: Mutex<AngularGraphHandle>,
     /// Compiler IR context state — tracks all files and their IR state.
     /// Enables delta-based state transport: load full IR on first
     /// compress, then apply deltas on subsequent edits.
-    pub ir_context: ContextState,
+    pub ir_context: RwLock<ContextState>,
     /// Phase IV (Idea #12): Text-level delta compressor.
     /// Stores compressed body snapshots per file and computes
     /// line-level deltas for delta-based text transport.
-    pub text_delta: TextDeltaComputer,
+    /// Wrapped in Mutex for interior mutability (v0.2.0+).
+    pub text_delta: Mutex<TextDeltaComputer>,
     /// F-FULL-01/F-FULL-05: Shared file-content cache keyed by raw path.
     /// All I/O paths check this cache first, populating it on first read.
     /// Subsequent reads (from IR compiler, bundle_pass, graph_pass) are
     /// O(1) lookups. Files are stored as `Arc<String>` to avoid clones.
-    pub source_cache: HashMap<String, Arc<String>>,
+    pub source_cache: Mutex<HashMap<String, Arc<String>>>,
     /// F-FINAL-06: Accumulated warnings surfaced via the JSON-RPC
     /// `_warnings` field. Sub-systems that previously used `eprintln!`
     /// (e.g. duplicate class name in the Angular graph) now push
     /// here. Drained by tool handlers before each response.
-    pub warnings: Vec<String>,
+    pub warnings: Mutex<Vec<String>>,
     /// Session-level stats accumulator for the dashboard.
     /// Every `provide_code_context` call records token savings here.
-    pub session_stats: SessionStats,
+    pub session_stats: Mutex<SessionStats>,
     /// In-memory context store for persistence-ready baselines.
     pub context_store: InMemoryContextStore,
     /// Optional buffered SQLite persistence store for cross-session survival.
     /// Writes are queued in memory and flushed in batch transactions.
     /// Initialized from `config.persistence` — `None` if disabled or
     /// if DB open fails.
-    pub persistence_store: Option<BufferedStore>,
+    pub persistence_store: Mutex<Option<BufferedStore>>,
 
     /// Tracks which cache breakpoints have already been emitted this session.
     /// Key format: "{region}::{breaker}" — e.g., "tools::tools-v1".
     /// Deduplication prevents paying the 2.0× write multiplier on re-emission.
-    pub emitted_breakpoints: HashSet<String>,
+    pub emitted_breakpoints: Mutex<HashSet<String>>,
 
     /// Cache efficiency metrics for the dashboard.
     /// Records hits, misses, tokens_saved, and per-region status.
-    pub cache_metrics: CacheMetrics,
+    pub cache_metrics: Mutex<CacheMetrics>,
 
     /// CBM (codebase-memory-mcp) graph bridge for graph intelligence.
     /// `None` if CBM is not installed, disabled, or failed to launch.
-    pub graph_bridge: Option<crate::cbm::GraphBridge>,
+    pub graph_bridge: Mutex<Option<crate::cbm::GraphBridge>>,
 
     /// CBM integration status, mirrored for quick access.
     pub cbm_status: crate::cbm::CbmStatus,
@@ -113,7 +115,7 @@ pub struct McpState {
     /// CBM filter state: per-file skip sets populated by the Intelligence
     /// Layer before compression. When a symbol has low importance (< 0.4),
     /// it is added here and the capture pipeline drops it during compression.
-    pub cbm_filter: CbmFilterState,
+    pub cbm_filter: Mutex<CbmFilterState>,
 
     /// Phase 1 (Fix D): Cache of rendered LLM-optimized hierarchical IR text,
     /// keyed by path alias (e.g., "α1").
@@ -122,7 +124,7 @@ pub struct McpState {
     /// applied to the file or when `restore_context` is called for the file.
     /// This avoids re-rendering the full HIR on every delta-mode call,
     /// saving ~O(n) where n is the file size in HIR nodes.
-    pub llm_text_cache: HashMap<String, String>,
+    pub llm_text_cache: Mutex<HashMap<String, String>>,
 
     /// Phase 2: Proxy port for fetching tool-filtering and cache stats.
     /// Defaults to 8787 (the proxy's default port).
@@ -177,23 +179,23 @@ impl McpState {
         let (graph_bridge, cbm_status) = Self::init_cbm_bridge(&cbm_config, &project_root);
 
         Self {
-            dict: PathDictionary::new(),
-            cache: LocalStateCache::new(),
+            dict: Mutex::new(PathDictionary::new()),
+            cache: RwLock::new(LocalStateCache::new()),
             config,
-            angular_graph: AngularGraphHandle::new(),
-            ir_context: ContextState::new(),
-            text_delta: TextDeltaComputer::new(),
-            source_cache: HashMap::new(),
+            angular_graph: Mutex::new(AngularGraphHandle::new()),
+            ir_context: RwLock::new(ContextState::new()),
+            text_delta: Mutex::new(TextDeltaComputer::new()),
+            source_cache: Mutex::new(HashMap::new()),
             // F-FINAL-06: empty warning buffer at session start.
-            warnings: Vec::new(),
-            session_stats,
+            warnings: Mutex::new(Vec::new()),
+            session_stats: Mutex::new(session_stats),
             context_store: InMemoryContextStore::new(),
-            persistence_store,
-            llm_text_cache: HashMap::new(),
-            emitted_breakpoints: HashSet::new(),
-            cache_metrics: CacheMetrics::default(),
-            cbm_filter: CbmFilterState::default(),
-            graph_bridge,
+            persistence_store: Mutex::new(persistence_store),
+            llm_text_cache: Mutex::new(HashMap::new()),
+            emitted_breakpoints: Mutex::new(HashSet::new()),
+            cache_metrics: Mutex::new(CacheMetrics::default()),
+            cbm_filter: Mutex::new(CbmFilterState::default()),
+            graph_bridge: Mutex::new(graph_bridge),
             cbm_status,
             proxy_port: 8787,
         }
@@ -204,13 +206,11 @@ impl McpState {
         cbm_config: &crate::cbm::CbmConfig,
         project_root: &std::path::Path,
     ) -> (Option<crate::cbm::GraphBridge>, crate::cbm::CbmStatus) {
-        let mut bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
+        let bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
         if bridge.is_available() {
             eprintln!("[clean-ctx] CBM graph intelligence: available");
-            // Auto-index the project on startup so CBM is ready for queries
-            if let Err(e) = bridge.index_project() {
-                eprintln!("[clean-ctx] CBM auto-index failed: {e}");
-            }
+            // Indexing is deferred — `ensure_indexed()` will be called on
+            // first actual query, avoiding blocking `McpState::new()`.
             let status = bridge.status().clone();
             (Some(bridge), status)
         } else {
@@ -222,10 +222,159 @@ impl McpState {
         }
     }
 
-    /// Flush any pending persistence writes to SQLite.
-    /// Returns the number of operations flushed.
+    /// Lock the path dictionary for mutation.
+    pub fn dict_lock(&self) -> std::sync::MutexGuard<'_, PathDictionary> {
+        match self.dict.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (dict)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the cache for reading.
+    pub fn cache_read(&self) -> std::sync::RwLockReadGuard<'_, LocalStateCache> {
+        match self.cache.read() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned read lock (cache)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the cache for writing.
+    pub fn cache_write(&self) -> std::sync::RwLockWriteGuard<'_, LocalStateCache> {
+        match self.cache.write() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned write lock (cache)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the IR context for reading.
+    pub fn ir_context_read(&self) -> std::sync::RwLockReadGuard<'_, ContextState> {
+        match self.ir_context.read() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned read lock (ir_context)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the IR context for writing.
+    pub fn ir_context_lock(&self) -> std::sync::RwLockWriteGuard<'_, ContextState> {
+        match self.ir_context.write() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                eprintln!("[clean-ctx] WARNING: Recovering from poisoned write lock (ir_context)");
+                poisoned.into_inner()
+            }
+        }
+    }
+
+
+    /// Lock the session stats for writing.
+    pub fn session_stats_lock(&self) -> std::sync::MutexGuard<'_, SessionStats> {
+        match self.session_stats.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (session_stats)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the source cache for writing.
+    pub fn source_cache_lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, Arc<String>>> {
+        match self.source_cache.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (source_cache)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the CBM filter state for writing.
+    pub fn cbm_filter_lock(&self) -> std::sync::MutexGuard<'_, CbmFilterState> {
+        match self.cbm_filter.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (cbm_filter)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the LLM text cache for writing.
+    pub fn llm_text_cache_lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, String>> {
+        match self.llm_text_cache.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (llm_text_cache)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the graph bridge for mutation.
+    pub fn graph_bridge_lock(&self) -> std::sync::MutexGuard<'_, Option<crate::cbm::GraphBridge>> {
+        match self.graph_bridge.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (graph_bridge)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the angular graph for mutation.
+    pub fn angular_graph_lock(&self) -> std::sync::MutexGuard<'_, AngularGraphHandle> {
+        match self.angular_graph.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (angular_graph)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the persistence store for writing.
+    pub fn persistence_store_lock(&self) -> std::sync::MutexGuard<'_, Option<BufferedStore>> {
+        match self.persistence_store.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (persistence_store)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the emitted breakpoints for writing.
+    pub fn emitted_breakpoints_lock(&self) -> std::sync::MutexGuard<'_, HashSet<String>> {
+        match self.emitted_breakpoints.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (emitted_breakpoints)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Lock the cache metrics for writing.
+    pub fn cache_metrics_lock(&self) -> std::sync::MutexGuard<'_, CacheMetrics> {
+        match self.cache_metrics.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (cache_metrics)"); poisoned.into_inner() }
+        }
+    }
+
+    /// Get or create a path alias (thread-safe convenience method).
+    pub fn get_or_create_alias(&self, path: String) -> String {
+        self.dict_lock().get_or_create_alias(path)
+    }
+
+    /// Get or create a bundle alias (thread-safe convenience method).
+    pub fn get_or_create_bundle_alias(&self, component_name: String) -> String {
+        self.dict_lock().get_or_create_bundle_alias(component_name)
+    }
+
+    /// Format the dictionary footer (thread-safe convenience method).
+    pub fn format_dict_footer(&self) -> String {
+        self.dict_lock().format_footer()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    /// Record compression stats (thread-safe convenience method).
+    pub fn record_compression(&self, file_path: &str, raw_tokens: usize, compressed_tokens: usize, fidelity: &str, is_angular: bool, source: &str, full_compressed_tokens: Option<usize>, domain: &str) {
+        self.session_stats_lock().record_compression(file_path, raw_tokens, compressed_tokens, fidelity, is_angular, source, full_compressed_tokens, domain);
+    }
+
+    /// Get file version from IR context (thread-safe convenience method).
+    pub fn file_version(&self, path_alias: &str) -> Option<u64> {
+        match self.ir_context.read() {
+            Ok(g) => g.file_version(path_alias),
+            Err(p) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned read lock (ir_context)"); p.into_inner().file_version(path_alias) }
+        }
+    }
+
+    /// Access CBM filter skip set for a file (thread-safe convenience method).
+    pub fn get_skip_set(&self, file_path: &str) -> Option<HashSet<String>> {
+        self.cbm_filter_lock().skip_sets.get(file_path).cloned()
+    }
+
     pub fn flush_persistence(&self) -> usize {
-        if let Some(ref store) = self.persistence_store {
+        let guard = self.persistence_store_lock();
+        if let Some(ref store) = *guard {
             store.flush()
         } else {
             0
@@ -236,34 +385,34 @@ impl McpState {
     /// `tools/call` response will surface it in the `_warnings` field
     /// and then clear the buffer. The single-threaded MCP dispatch
     /// chain guarantees no concurrent access.
-    pub fn push_warning(&mut self, msg: impl Into<String>) {
-        self.warnings.push(msg.into());
+    pub fn push_warning(&self, msg: impl Into<String>) {
+        match self.warnings.lock() {
+            Ok(mut guard) => guard.push(msg.into()),
+            Err(poisoned) => {
+                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (warnings)");
+                poisoned.into_inner().push(msg.into());
+            }
+        }
     }
 
     /// F-FINAL-06: Drain all accumulated warnings. Returns a `Vec`
     /// that the caller embeds in the response's `_warnings` field.
-    pub fn drain_warnings(&mut self) -> Vec<String> {
-        std::mem::take(&mut self.warnings)
+    pub fn drain_warnings(&self) -> Vec<String> {
+        match self.warnings.lock() {
+            Ok(mut guard) => std::mem::take(&mut *guard),
+            Err(poisoned) => {
+                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (warnings)");
+                std::mem::take(&mut *poisoned.into_inner())
+            }
+        }
     }
 
-    /// Borrow the path dictionary mutably.
-    pub fn dict_mut(&mut self) -> &mut PathDictionary {
-        &mut self.dict
-    }
-
-    /// Borrow the cache mutably.
-    pub fn cache_mut(&mut self) -> &mut LocalStateCache {
-        &mut self.cache
-    }
-
-    /// Borrow the IR context mutably.
-    pub fn ir_context_mut(&mut self) -> &mut ContextState {
-        &mut self.ir_context
-    }
-
-    /// Borrow the text delta computer mutably.
-    pub fn text_delta_mut(&mut self) -> &mut TextDeltaComputer {
-        &mut self.text_delta
+    /// Lock the text delta computer for mutation.
+    pub fn text_delta_lock(&self) -> std::sync::MutexGuard<'_, TextDeltaComputer> {
+        match self.text_delta.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (text_delta)"); poisoned.into_inner() }
+        }
     }
 
     /// F-FULL-01/F-FULL-05: Read file content, using the shared source cache.
@@ -279,17 +428,24 @@ impl McpState {
     /// allocation. This also applies to relative-vs-absolute variants:
     /// `"./src/lib.rs"` and `/abs/path/src/lib.rs` resolve to the same
     /// canonical path and share the cache.
-    pub fn read_source(&mut self, path: &str) -> Result<Arc<String>, std::io::Error> {
+    pub fn read_source(&self, path: &str) -> Result<Arc<String>, std::io::Error> {
         use std::path::Path;
         let cache_key = Path::new(path)
             .canonicalize()
             .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_else(|_| path.to_string());
-        if let Some(cached) = self.source_cache.get(&cache_key) {
+        let mut cache = match self.source_cache.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (source_cache)");
+                poisoned.into_inner()
+            }
+        };
+        if let Some(cached) = cache.get(&cache_key) {
             return Ok(Arc::clone(cached));
         }
         let content = Arc::new(std::fs::read_to_string(path)?);
-        self.source_cache.insert(cache_key, Arc::clone(&content));
+        cache.insert(cache_key, Arc::clone(&content));
         Ok(content)
     }
 }

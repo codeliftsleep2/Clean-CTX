@@ -15,8 +15,8 @@ pub mod dispatcher;
 mod handlers;
 pub(crate) mod tool_handlers;
 pub(crate) mod tool_helpers;
-pub(crate) mod buffered_store;
 pub(crate) mod cache_hints;
+pub(crate) mod buffered_store;
 pub(crate) mod context_store;
 pub(crate) mod heuristics;
 pub(crate) mod prompts;
@@ -40,3 +40,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 #[path = "../tests/mcp/regression.rs"]
 mod regression;
+
+#[cfg(test)]
+#[path = "../tests/mcp/audit_fixes.rs"]
+mod audit_fixes;

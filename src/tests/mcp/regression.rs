@@ -31,7 +31,7 @@ fn regression_crit1_replay_loads_ir_into_context() {
     // After replay_history, ir_context should have the file loaded.
     // This test verifies the fix: replay_history now calls
     // state.ir_context.load_ir(ir.clone()) instead of just returning.
-    let (mut state, _tmp) = make_state("crit1_test.db");
+    let (state, _tmp) = make_state("crit1_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -46,7 +46,7 @@ fn regression_crit1_replay_loads_ir_into_context() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
     state.flush_persistence();
 
     // Now replay from DB
@@ -56,11 +56,11 @@ fn regression_crit1_replay_loads_ir_into_context() {
             "filePath": rs_path
         }
     });
-    crate::mcp::tool_handlers::handle_replay_history(&replay_id, &replay_params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&replay_id, "replay_history", &replay_params, &state);
 
     // Verify that ir_context has the file loaded
-    let path_alias = state.dict.get_or_create_alias(rs_path.clone());
-    assert!(state.ir_context.has_file(&path_alias),
+    let path_alias = state.get_or_create_alias(rs_path.clone());
+    assert!(state.ir_context_read().has_file(&path_alias),
         "CRIT-1 regression: replay_history should load IR into ir_context");
 }
 
@@ -71,7 +71,7 @@ fn regression_crit1_replay_loads_ir_into_context() {
 #[test]
 fn regression_crit2_save_context_uses_session_stats_tokens() {
     // After compress + save_context, the DB should have non-zero token counts.
-    let (mut state, _tmp) = make_state("crit2_test.db");
+    let (state, _tmp) = make_state("crit2_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -86,11 +86,11 @@ fn regression_crit2_save_context_uses_session_stats_tokens() {
             "fidelity": "high"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
     state.flush_persistence();
 
     // Verify DB has non-zero token counts
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store_lock().as_ref() {
         if let Some(guard) = store.sqlite() {
             let meta = guard.load_latest(&rs_path)
                 .expect("load_latest should succeed")
@@ -111,7 +111,7 @@ fn regression_crit2_save_context_uses_session_stats_tokens() {
 fn regression_crit3_delta_counts_tokens_on_wire_output() {
     // After delta_code_context, session_stats should show compressed_tokens > 0
     // (not the raw source text token count).
-    let (mut state, _tmp) = make_state("crit3_test.db");
+    let (state, _tmp) = make_state("crit3_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -126,7 +126,7 @@ fn regression_crit3_delta_counts_tokens_on_wire_output() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
     // Now call delta_code_context
     let delta_id = serde_json::json!(2);
@@ -136,11 +136,12 @@ fn regression_crit3_delta_counts_tokens_on_wire_output() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_delta_code_context(&delta_id, &delta_params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&delta_id, "delta_code_context", &delta_params, &state);
 
     // Check that the delta stats show compressed_tokens > 0
     // (the delta wire output should have some tokens, not 0)
-    let file_stats = state.session_stats.file_stats(&rs_path);
+    let binding = state.session_stats_lock();
+    let file_stats = binding.file_stats(&rs_path);
     assert!(file_stats.is_some(), "CRIT-3 regression: file should be tracked");
     let fs = file_stats.unwrap();
     assert!(fs.compressed_tokens > 0,
@@ -155,7 +156,7 @@ fn regression_crit3_delta_counts_tokens_on_wire_output() {
 fn regression_high1_compress_uses_pluggable_tokenizer() {
     // Verify that compress_code_context records stats using the
     // pluggable tokenizer (not estimate_tokens).
-    let (mut state, _tmp) = make_state("high1_test.db");
+    let (state, _tmp) = make_state("high1_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -169,10 +170,11 @@ fn regression_high1_compress_uses_pluggable_tokenizer() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
     // The stats should be recorded with the pluggable tokenizer
-    let fs = state.session_stats.file_stats(&rs_path).unwrap();
+    let guard = state.session_stats_lock();
+    let fs = guard.file_stats(&rs_path).unwrap();
     assert!(fs.raw_tokens > 0, "HIGH-1 regression: raw_tokens should be > 0");
     assert!(fs.compressed_tokens > 0, "HIGH-1 regression: compressed_tokens should be > 0");
     // Savings should be positive (compressed < raw)
@@ -182,7 +184,7 @@ fn regression_high1_compress_uses_pluggable_tokenizer() {
 #[test]
 fn regression_high1_restore_uses_pluggable_tokenizer() {
     // Verify that restore_context records stats using the pluggable tokenizer.
-    let (mut state, _tmp) = make_state("high1_restore.db");
+    let (state, _tmp) = make_state("high1_restore.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -197,7 +199,7 @@ fn regression_high1_restore_uses_pluggable_tokenizer() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
     // Now restore
     let restore_id = serde_json::json!(2);
@@ -207,10 +209,11 @@ fn regression_high1_restore_uses_pluggable_tokenizer() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_restore_context(&restore_id, &restore_params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&restore_id, "restore_context", &restore_params, &state);
 
     // Stats should be recorded
-    let fs = state.session_stats.file_stats(&rs_path).unwrap();
+    let guard = state.session_stats_lock();
+    let fs = guard.file_stats(&rs_path).unwrap();
     assert!(fs.raw_tokens > 0, "HIGH-1 regression: restore raw_tokens should be > 0");
     assert!(fs.compressed_tokens > 0, "HIGH-1 regression: restore compressed_tokens should be > 0");
 }
@@ -323,7 +326,7 @@ fn regression_high3_merge_operation_counts_accurate() {
 fn regression_med3_save_context_uses_actual_fidelity() {
     // After compress with "high" fidelity, save_context should store
     // the actual fidelity, not hardcoded "low".
-    let (mut state, _tmp) = make_state("med3_test.db");
+    let (state, _tmp) = make_state("med3_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -338,11 +341,11 @@ fn regression_med3_save_context_uses_actual_fidelity() {
             "fidelity": "high"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
     state.flush_persistence();
 
     // Verify DB has the correct fidelity
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let meta = guard.load_latest(&rs_path)
                 .expect("load_latest should succeed")
@@ -360,7 +363,7 @@ fn regression_med3_save_context_uses_actual_fidelity() {
 #[test]
 fn regression_e2e_compress_flush_db_verify() {
     // Full E2E: compress a file, flush to DB, verify all stats are correct.
-    let (mut state, _tmp) = make_state("e2e_test.db");
+    let (state, _tmp) = make_state("e2e_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -375,10 +378,11 @@ fn regression_e2e_compress_flush_db_verify() {
             "fidelity": "medium"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
     // Verify in-memory stats
-    let fs = state.session_stats.file_stats(&rs_path).unwrap();
+    let guard = state.session_stats_lock();
+    let fs = guard.file_stats(&rs_path).unwrap();
     assert!(fs.raw_tokens > 0, "E2E: raw_tokens should be > 0");
     assert!(fs.compressed_tokens > 0, "E2E: compressed_tokens should be > 0");
     assert!(fs.savings_pct > 0.0, "E2E: savings_pct should be > 0");
@@ -389,7 +393,7 @@ fn regression_e2e_compress_flush_db_verify() {
     state.flush_persistence();
 
     // Verify DB
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let db_stats = guard.rebuild_stats().expect("rebuild_stats should succeed");
             let summary = db_stats.summary();
@@ -406,7 +410,7 @@ fn regression_e2e_compress_flush_db_verify() {
 #[test]
 fn regression_e2e_compress_delta_flush_verify() {
     // E2E: compress → delta → flush → verify delta stats.
-    let (mut state, _tmp) = make_state("e2e_delta.db");
+    let (state, _tmp) = make_state("e2e_delta.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -421,7 +425,7 @@ fn regression_e2e_compress_delta_flush_verify() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
     // Then delta
     let delta_id = serde_json::json!(2);
@@ -431,16 +435,17 @@ fn regression_e2e_compress_delta_flush_verify() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_delta_code_context(&delta_id, &delta_params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&delta_id, "delta_code_context", &delta_params, &state);
 
     // Verify in-memory stats
-    let fs = state.session_stats.file_stats(&rs_path).unwrap();
+    let guard = state.session_stats_lock();
+    let fs = guard.file_stats(&rs_path).unwrap();
     assert!(fs.raw_tokens > 0, "E2E delta: raw_tokens should be > 0");
     assert!(fs.compressed_tokens > 0, "E2E delta: compressed_tokens should be > 0");
 
     // Flush and verify
     state.flush_persistence();
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let db_stats = guard.rebuild_stats().expect("rebuild_stats");
             assert!(db_stats.summary().total_files >= 1,
@@ -452,7 +457,7 @@ fn regression_e2e_compress_delta_flush_verify() {
 #[test]
 fn regression_e2e_provide_code_context_full_workflow() {
     // E2E: provide_code_context → context_stats → verify dashboard.
-    let (mut state, _tmp) = make_state("e2e_provide.db");
+    let (state, _tmp) = make_state("e2e_provide.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -467,15 +472,16 @@ fn regression_e2e_provide_code_context_full_workflow() {
             "intent": "overview"
         }
     });
-    crate::mcp::tool_handlers::handle_provide_code_context(&id, &params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&id, "provide_code_context", &params, &state);
 
     // context_stats
     let stats_id = serde_json::json!(2);
     let stats_params = serde_json::json!({ "arguments": {} });
-    crate::mcp::tool_handlers::handle_context_stats(&stats_id, &stats_params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&stats_id, "context_stats", &stats_params, &state);
 
     // Verify session stats
-    let summary = state.session_stats.summary();
+    let binding = state.session_stats_lock();
+    let summary = binding.summary();
     assert!(summary.total_files >= 1, "E2E provide: should have at least 1 file");
     assert!(summary.total_raw_tokens > 0, "E2E provide: raw_tokens should be > 0");
     assert!(summary.total_compressed_tokens > 0, "E2E provide: compressed_tokens should be > 0");
@@ -625,12 +631,12 @@ fn regression_c1_workspace_tokenizer_created_once() {
 
     let mut config = crate::config::CleanCtxConfig::default();
     config.persistence.enabled = false;
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
 
     let result = crate::mcp::workspace::compress_workspace_dir(
         &dir_path.to_string_lossy(),
         crate::compression::Fidelity::Low,
-        &mut state,
+        &state,
     );
 
     assert!(result.is_ok(), "workspace compression should succeed: {:?}", result.err());
@@ -641,7 +647,8 @@ fn regression_c1_workspace_tokenizer_created_once() {
     assert!(workspace_result.manifest.contains("b.ts"), "manifest should contain b.ts");
 
     // Both files should have recorded stats (proving tokenizer was available)
-    let summary = state.session_stats.summary();
+    let binding = state.session_stats_lock();
+    let summary = binding.summary();
     assert!(summary.total_files >= 2, "should have stats for at least 2 files, got {}", summary.total_files);
     assert!(summary.total_raw_tokens > 0, "raw tokens should be > 0");
     assert!(summary.total_compressed_tokens > 0, "compressed tokens should be > 0");
@@ -656,7 +663,7 @@ fn regression_c2_context_history_shows_session_cache_metrics() {
     // C-2 fix: context_history per-file view must not show broken "none"
     // from the region-keyed breakpoints HashMap. It should show session-level
     // cache hit rate and tokens saved.
-    let (mut state, _tmp) = make_state("c2_test.db");
+    let (state, _tmp) = make_state("c2_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -668,12 +675,12 @@ fn regression_c2_context_history_shows_session_cache_metrics() {
     let params = serde_json::json!({
         "arguments": { "filePath": rs_path, "fidelity": "low" }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
     // Simulate some cache activity
-    state.cache_metrics.hits = 5;
-    state.cache_metrics.misses = 3;
-    state.cache_metrics.tokens_saved = 420;
+    state.cache_metrics_lock().hits = 5;
+    state.cache_metrics_lock().misses = 3;
+    state.cache_metrics_lock().tokens_saved = 420;
 
     // Call context_history for the specific file
     let hist_id = serde_json::json!(2);
@@ -682,12 +689,12 @@ fn regression_c2_context_history_shows_session_cache_metrics() {
     });
     // context_history sends response via send_response, so we just verify
     // the function doesn't panic and the cache_metrics are accessible
-    crate::mcp::tool_handlers::handle_context_history(&hist_id, &hist_params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&hist_id, "context_history", &hist_params, &state);
 
     // Verify that cache_metrics are still intact (not corrupted by the lookup)
-    assert_eq!(state.cache_metrics.hits, 5, "cache hits should be preserved");
-    assert_eq!(state.cache_metrics.misses, 3, "cache misses should be preserved");
-    assert_eq!(state.cache_metrics.tokens_saved, 420, "tokens_saved should be preserved");
+    assert_eq!(state.cache_metrics_lock().hits, 5, "cache hits should be preserved");
+    assert_eq!(state.cache_metrics_lock().misses, 3, "cache misses should be preserved");
+    assert_eq!(state.cache_metrics_lock().tokens_saved, 420, "tokens_saved should be preserved");
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -701,7 +708,7 @@ fn regression_h1_token_savings_estimates_breakpoint_only() {
     // We verify this by checking that the returned savings is small
     // (proportional to the breakpoint) rather than large (proportional
     // to the full response).
-    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
 
     // Create a large response to make the difference obvious
     let large_content = "x".repeat(10000);
@@ -715,13 +722,13 @@ fn regression_h1_token_savings_estimates_breakpoint_only() {
 
     // First call — miss (saves 0)
     let saved1 = crate::mcp::cache_hints::inject_cache_breakpoints(
-        &mut response, &mut state, "baseline", "1h", "test-breaker-123", None,
+        &mut response, &state, "baseline", "1h", "test-breaker-123", None,
     );
     assert_eq!(saved1, 0, "first call should be a miss");
 
     // Second call — hit (should return small savings, not full response size)
     let saved2 = crate::mcp::cache_hints::inject_cache_breakpoints(
-        &mut response, &mut state, "baseline", "1h", "test-breaker-123", None,
+        &mut response, &state, "baseline", "1h", "test-breaker-123", None,
     );
     assert!(saved2 > 0, "second call should be a hit with savings > 0");
 
@@ -741,14 +748,14 @@ fn regression_m1_cache_section_shown_when_disabled() {
     // section, with "Status: disabled" when cache is off.
     let mut config = crate::config::CleanCtxConfig::default();
     config.cache.enabled = false;
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
 
     // Call context_stats (text format, no file path = full dashboard)
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": {} });
     // handle_context_stats sends response via send_response, so we verify
     // the function doesn't panic when cache is disabled
-    crate::mcp::tool_handlers::handle_context_stats(&id, &params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&id, "context_stats", &params, &state);
 
     // Also verify the render functions directly
     // When cache is disabled and never active, render_cache_text returns None
@@ -799,7 +806,7 @@ fn regression_m2_compute_workspace_breaker_used() {
 fn regression_e2e_cache_metrics_through_full_workflow() {
     // E2E: provide_code_context → context_stats → verify cache metrics
     // are surfaced correctly in the dashboard.
-    let (mut state, _tmp) = make_state("e2e_cache.db");
+    let (state, _tmp) = make_state("e2e_cache.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -811,27 +818,28 @@ fn regression_e2e_cache_metrics_through_full_workflow() {
     let params = serde_json::json!({
         "arguments": { "filePath": rs_path, "intent": "overview" }
     });
-    crate::mcp::tool_handlers::handle_provide_code_context(&id, &params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&id, "provide_code_context", &params, &state);
 
     // Simulate cache activity for metrics
-    state.cache_metrics.hits = 3;
-    state.cache_metrics.misses = 2;
-    state.cache_metrics.tokens_saved = 150;
+    state.cache_metrics_lock().hits = 3;
+    state.cache_metrics_lock().misses = 2;
+    state.cache_metrics_lock().tokens_saved = 150;
 
     // context_stats (full dashboard)
     let stats_id = serde_json::json!(2);
     let stats_params = serde_json::json!({ "arguments": {} });
-    crate::mcp::tool_handlers::handle_context_stats(&stats_id, &stats_params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&stats_id, "context_stats", &stats_params, &state);
 
     // Verify session stats are populated
-    let summary = state.session_stats.summary();
+    let binding = state.session_stats_lock();
+    let summary = binding.summary();
     assert!(summary.total_files >= 1, "should have at least 1 file");
     assert!(summary.total_raw_tokens > 0, "raw tokens should be > 0");
 
     // Verify cache metrics are intact after the full workflow
-    assert_eq!(state.cache_metrics.hits, 3, "cache hits should be preserved");
-    assert_eq!(state.cache_metrics.misses, 2, "cache misses should be preserved");
-    assert_eq!(state.cache_metrics.tokens_saved, 150, "tokens_saved should be preserved");
+    assert_eq!(state.cache_metrics_lock().hits, 3, "cache hits should be preserved");
+    assert_eq!(state.cache_metrics_lock().misses, 2, "cache misses should be preserved");
+    assert_eq!(state.cache_metrics_lock().tokens_saved, 150, "tokens_saved should be preserved");
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -844,19 +852,19 @@ fn regression_e2e_cache_metrics_through_full_workflow() {
 fn regression_meta_not_in_tools_list_root() {
     let mut config = crate::config::CleanCtxConfig::default();
     config.cache.enabled = true;
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
 
     // Capture responses by redirecting stdout
     let id = serde_json::json!(1);
-    crate::mcp::handlers::handle_tools_list(&id, &mut state);
+    crate::mcp::handlers::handle_tools_list(&id, &state);
 
     // We can't capture send_response output (stdout), but we can verify
     // that the cache metrics recorded activity, proving the injection
     // ran without panicking.
     assert!(
-        state.cache_metrics.misses >= 1,
+        state.cache_metrics_lock().misses >= 1,
         "tools/list should have recorded a cache miss, got misses={} hits={}",
-        state.cache_metrics.misses, state.cache_metrics.hits
+        state.cache_metrics_lock().misses, state.cache_metrics_lock().hits
     );
 }
 
@@ -866,15 +874,15 @@ fn regression_meta_not_in_tools_list_root() {
 fn regression_meta_not_in_prompts_list_root() {
     let mut config = crate::config::CleanCtxConfig::default();
     config.cache.enabled = true;
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
 
     let id = serde_json::json!(1);
-    crate::mcp::handlers::handle_prompts_list(&id, &mut state);
+    crate::mcp::handlers::handle_prompts_list(&id, &state);
 
     assert!(
-        state.cache_metrics.misses >= 1,
+        state.cache_metrics_lock().misses >= 1,
         "prompts/list should have recorded a cache miss, got misses={} hits={}",
-        state.cache_metrics.misses, state.cache_metrics.hits
+        state.cache_metrics_lock().misses, state.cache_metrics_lock().hits
     );
 }
 
@@ -884,15 +892,15 @@ fn regression_meta_not_in_prompts_list_root() {
 fn regression_meta_not_in_cleanctx_prompt_root() {
     let mut config = crate::config::CleanCtxConfig::default();
     config.cache.enabled = true;
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
 
     let id = serde_json::json!(1);
-    crate::mcp::handlers::handle_prompts_get(&id, "cleanctx-notation", &mut state);
+    crate::mcp::handlers::handle_prompts_get(&id, "cleanctx-notation", &state);
 
     assert!(
-        state.cache_metrics.misses >= 1,
+        state.cache_metrics_lock().misses >= 1,
         "prompts/get cleanctx-notation should have recorded a cache miss, got misses={} hits={}",
-        state.cache_metrics.misses, state.cache_metrics.hits
+        state.cache_metrics_lock().misses, state.cache_metrics_lock().hits
     );
 }
 
@@ -902,15 +910,15 @@ fn regression_meta_not_in_cleanctx_prompt_root() {
 fn regression_meta_not_in_vocabulary_prompt_root() {
     let mut config = crate::config::CleanCtxConfig::default();
     config.cache.enabled = true;
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
 
     let id = serde_json::json!(1);
-    crate::mcp::handlers::handle_prompts_get(&id, "clean-ctx-vocabulary", &mut state);
+    crate::mcp::handlers::handle_prompts_get(&id, "clean-ctx-vocabulary", &state);
 
     assert!(
-        state.cache_metrics.misses >= 1,
+        state.cache_metrics_lock().misses >= 1,
         "prompts/get clean-ctx-vocabulary should have recorded a cache miss, got misses={} hits={}",
-        state.cache_metrics.misses, state.cache_metrics.hits
+        state.cache_metrics_lock().misses, state.cache_metrics_lock().hits
     );
 }
 
@@ -924,7 +932,7 @@ fn regression_meta_not_in_vocabulary_prompt_root() {
 #[test]
 fn regression_meta_placement_json_structure_valid() {
     // Build a realistic response tree like the handlers produce
-    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
     let mut response = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -935,7 +943,7 @@ fn regression_meta_placement_json_structure_valid() {
 
     // Simulate the injection pattern used by all handlers
     if let Some(result_obj) = response.get_mut("result") {
-        inject_cache_breakpoints(result_obj, &mut state, "baseline", "1h", "bl_somehash", None);
+        inject_cache_breakpoints(result_obj, &state, "baseline", "1h", "bl_somehash", None);
     }
 
     // Assert the JSON structure has _meta ONLY in result
@@ -980,7 +988,7 @@ fn regression_cbm_proxy_meta_in_result() {
             "path": "/graph/status"
         }
     });
-    crate::cbm::proxy::handle_cbm_proxy(&id, &params, &mut state);
+    crate::cbm::proxy::handle_cbm_proxy(&id, &params, &state);
     // If we get here without panicking, the handler works.
     // The _meta placement is tested via unit tests above.
 }

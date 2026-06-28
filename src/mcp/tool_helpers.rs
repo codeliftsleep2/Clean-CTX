@@ -15,14 +15,14 @@ use crate::mcp::McpState;
 pub(super) fn compress_text_body(
     file_path: &str,
     fidelity: Fidelity,
-    state: &mut McpState,
+    state: &McpState,
 ) -> Result<(Vec<String>, String), Box<dyn std::error::Error>> {
     // Use source_cache via state.read_source() — Finding 1
     let source_code_arc = state.read_source(file_path)?;
     let source_code = source_code_arc.as_ref().clone();
     let path_buf = std::path::PathBuf::from(file_path);
     let extension = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
-    let path_alias = state.dict.get_or_create_alias(file_path.to_string());
+    let path_alias = state.get_or_create_alias(file_path.to_string());
 
     crate::compression::pipeline::compress_text(
         &source_code,
@@ -94,7 +94,7 @@ pub(crate) fn count_tokens_with_tokenizer(
 pub(super) fn compile_file_ir(
     file_path: &str,
     fidelity: Fidelity,
-    state: &mut McpState,
+    state: &McpState,
 ) -> Result<crate::ir::compiler::CompiledIR, Box<dyn std::error::Error>> {
     use crate::ir::compiler::IRCompiler;
     use crate::ir::layers::typescript::TypeScriptLayer;
@@ -119,10 +119,10 @@ pub(super) fn compile_file_ir(
     // F-FULL-10: Use raw path for alias key for deterministic results.
     // Canonicalize is still performed for the `α alias: <path>` footer
     // display, but the alias key itself uses the raw path.
-    let path_alias = state.dict.get_or_create_alias(file_path.to_string());
+    let path_alias = state.get_or_create_alias(file_path.to_string());
 
     // NF-02: Determine the next version based on the previous context state
-    let prev_version = state.ir_context.file_version(&path_alias).unwrap_or(0);
+    let prev_version = state.file_version(&path_alias).unwrap_or(0);
 
     let mut compiler = IRCompiler::new();
 
@@ -175,14 +175,14 @@ pub(super) fn compile_file_ir(
 
     // CBM filter-first: pass the skip set so low-importance symbols
     // are excluded from IR output entirely.
-    let skip_set = state.cbm_filter.skip_sets.get(file_path);
+    let skip_set = state.get_skip_set(file_path);
     let mut compiled = compiler.compile(
         source,
         &path_alias,
         language,
         query_string,
         fidelity,
-        skip_set,
+        skip_set.as_ref(),
     )?;
 
     // NF-02: Override the version with the next monotonic value.

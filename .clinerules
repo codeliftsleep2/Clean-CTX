@@ -1,5 +1,14 @@
 # Clean-CTX Integration Rules
 
+## Zero-Warning Policy
+**ALL files must compile with zero warnings.** This includes:
+- `src/` — production code
+- `src/tests/` — test code
+- `proxy/` — proxy subcrate
+- `examples/` — example code
+
+A single warning constitutes a build failure. Before declaring any task complete, run `cargo check --all-targets` and verify zero warnings. If warnings exist, fix them — do not suppress them unless they are pre-existing dead code that is structurally necessary (e.g., a function kept for API compatibility that cannot be called yet). In those rare cases, use `#[allow(dead_code)]` with a comment explaining why.
+
 ## Default File Context
 When you need to understand a TypeScript, JavaScript, or C# file, use the `provide_code_context` MCP tool FIRST before using `read_file`. This gives you a compressed but semantically complete view of the file structure, classes, methods, and types.
 

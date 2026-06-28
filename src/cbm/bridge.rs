@@ -103,6 +103,7 @@ pub struct GraphBridge {
     cache_ttl: u64,
     project: Option<String>,
     graph_version: String,
+    indexed: bool,
 }
 
 impl GraphBridge {
@@ -148,6 +149,7 @@ impl GraphBridge {
             cache_ttl: config.cache_ttl,
             project: Some(project_name),
             graph_version: String::new(),
+            indexed: false,
         }
     }
 
@@ -169,6 +171,18 @@ impl GraphBridge {
         // Call CBM's index_project tool to trigger indexing
         let _result = self.query(|c| c.call_tool("index_project", serde_json::json!({"project": project})))?;
         eprintln!("[clean-ctx-cbm] Project indexed successfully");
+        Ok(())
+    }
+
+    /// Ensure the project is indexed before issuing queries.
+    /// This is a no-op if index_project() has already been called.
+    /// Call this at the start of every handler that needs CBM data.
+    pub fn ensure_indexed(&mut self) -> Result<(), CbmError> {
+        if self.indexed {
+            return Ok(());
+        }
+        self.index_project()?;
+        self.indexed = true;
         Ok(())
     }
 
@@ -640,6 +654,7 @@ pub mod test_helpers {
             cache_ttl: 3600,
             project: Some("test-project".to_string()),
             graph_version: String::new(),
+            indexed: false,
         };
         // Pre-seed the symbol_importance cache entry
         let key = "symbol_importance".to_string();

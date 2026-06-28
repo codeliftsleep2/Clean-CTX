@@ -87,7 +87,7 @@ fn dispatcher_concurrent_no_data_race() {
         dispatcher.spawn(&test_request(&i.to_string(), "test"), move |state| {
             let _ = state.proxy_port;
             let _ = state.config.default_fidelity.clone();
-            state.dict_mut().get_or_create_alias("test.ts".to_string());
+            state.get_or_create_alias("test.ts".to_string());
             counter.fetch_add(1, Ordering::SeqCst);
         }).expect("spawn should succeed");
     }
@@ -97,7 +97,7 @@ fn dispatcher_concurrent_no_data_race() {
 
     assert_eq!(counter.load(Ordering::SeqCst), 20, "all 20 rapid-fire spawns should complete");
     let guard = dispatcher.state().read().expect("lock should succeed");
-    assert!(guard.dict.format_footer().contains("test.ts"),
+    assert!(guard.dict_lock().format_footer().contains("test.ts"),
         "path alias should be registered in footer");
 }
 

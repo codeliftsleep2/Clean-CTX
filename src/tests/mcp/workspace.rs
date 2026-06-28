@@ -32,12 +32,12 @@ fn compress_workspace_dir_respects_exclude_patterns() {
     // prefix. The new segment-based matcher no longer does bare
     // substring matching, so `"skip-me"` would not match `"skip-me.ts"`.
     config.exclude_patterns.push("skip-me*".to_string());
-    let mut state = McpState::new(config);
+    let state = McpState::new(config);
 
     let result = compress_workspace_dir(
         dir_path.to_str().unwrap(),
         Fidelity::Low,
-        &mut state,
+        &state,
     )
     .expect("workspace compress should succeed");
 
@@ -85,12 +85,12 @@ fn workspace_emits_alias_cross_reference() {
     );
 
     let config = CleanCtxConfig::default();
-    let mut state = McpState::new(config);
+    let state = McpState::new(config);
 
     let result = compress_workspace_dir(
         dir_path.to_str().unwrap(),
         Fidelity::Low,
-        &mut state,
+        &state,
     )
     .expect("workspace compress should succeed");
 
@@ -122,14 +122,14 @@ fn workspace_shares_aliases_with_per_file_tool() {
     );
 
     let config = CleanCtxConfig::default();
-    let mut state = McpState::new(config);
+    let state = McpState::new(config);
 
     // First, compress via the per-file tool path (simulated inline).
     let file_path = dir_path.join("shared.ts");
     let compressed = crate::compressor::compress_file(
         file_path.clone(),
-        &mut state.dict,
-        &mut state.cache,
+        &mut state.dict_lock(),
+        &mut state.cache_write(),
         Fidelity::Low,
     )
     .expect("per-file compress should succeed");
@@ -141,7 +141,7 @@ fn workspace_shares_aliases_with_per_file_tool() {
     let result = compress_workspace_dir(
         dir_path.to_str().unwrap(),
         Fidelity::Low,
-        &mut state,
+        &state,
     )
     .expect("workspace compress should succeed");
 
@@ -252,12 +252,12 @@ fn compress_pass_emits_per_file_section() {
     );
 
     let config = CleanCtxConfig::default();
-    let mut state = McpState::new(config);
+    let state = McpState::new(config);
 
     let result = compress_workspace_dir(
         dir.path().to_str().unwrap(),
         Fidelity::Low,
-        &mut state,
+        &state,
     )
     .expect("workspace compress should succeed");
 
@@ -288,12 +288,12 @@ fn bundle_pass_emits_phi_bundle_and_footer() {
     create_ts_file(dir.path(), "my-comp.component.scss", ".root { color: red; }");
 
     let config = CleanCtxConfig::default();
-    let mut state = McpState::new(config);
+    let state = McpState::new(config);
 
     let result = compress_workspace_dir(
         dir.path().to_str().unwrap(),
         Fidelity::Low,
-        &mut state,
+        &state,
     )
     .expect("workspace compress should succeed");
 
@@ -320,12 +320,12 @@ fn graph_pass_emits_phi_graph_section() {
     );
 
     let config = CleanCtxConfig::default();
-    let mut state = McpState::new(config);
+    let state = McpState::new(config);
 
     let result = compress_workspace_dir(
         dir.path().to_str().unwrap(),
         Fidelity::Low,
-        &mut state,
+        &state,
     )
     .expect("workspace compress should succeed");
 

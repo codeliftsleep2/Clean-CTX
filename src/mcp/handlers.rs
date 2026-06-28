@@ -25,7 +25,7 @@ pub(crate) fn handle_initialize(id: &Value) {
 }
 
 /// Handle `tools/list` — returns the list of available tools with cache hints.
-pub(crate) fn handle_tools_list(id: &Value, state: &mut McpState) {
+pub(crate) fn handle_tools_list(id: &Value, state: &McpState) {
     let mut response = serde_json::json!({
         "jsonrpc": "2.0",
         "id": id,
@@ -50,7 +50,7 @@ pub(crate) fn handle_tools_list(id: &Value, state: &mut McpState) {
 }
 
 /// Handle `prompts/list` — returns the list of available prompts with cache hints.
-pub(crate) fn handle_prompts_list(id: &Value, state: &mut McpState) {
+pub(crate) fn handle_prompts_list(id: &Value, state: &McpState) {
     let mut response = serde_json::json!({
         "jsonrpc": "2.0",
         "id": id,
@@ -75,7 +75,7 @@ pub(crate) fn handle_prompts_list(id: &Value, state: &mut McpState) {
 }
 
 /// Handle `prompts/get` — returns the content of a specific prompt.
-pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str, state: &mut McpState) {
+pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str, state: &McpState) {
     if prompt_name == "cleanctx-notation" {
         let mut response = serde_json::json!({
             "jsonrpc": "2.0",
