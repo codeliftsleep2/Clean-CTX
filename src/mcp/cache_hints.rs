@@ -67,6 +67,7 @@ pub struct CacheBreakpoint {
 /// Returns a short stable hash string prefixed with "bl_" that changes
 /// when the compressed output changes. Used as the cache breaker for
 /// persisted workspace baselines.
+#[allow(dead_code)]
 pub fn compute_baseline_breaker(compressed_text: &str) -> String {
     let hash = sha2::Sha256::digest(compressed_text.as_bytes());
     format!("bl_{:x}", hash)
@@ -120,7 +121,7 @@ pub fn compute_workspace_breaker(file_hashes: &[String]) -> String {
 /// An estimated token savings count if this was a cache hit, or 0.
 pub fn inject_cache_breakpoints(
     response: &mut serde_json::Value,
-    state: &mut crate::mcp::McpState,
+    state: &crate::mcp::McpState,
     region: &str,
     ttl: &str,
     breaker: &str,
@@ -132,13 +133,10 @@ pub fn inject_cache_breakpoints(
 
     // Dedup: skip if this exact region+breaker combo was already emitted
     let dedup_key = format!("{}::{}", region, breaker);
-    if state.emitted_breakpoints.contains(&dedup_key) {
+    if state.emitted_breakpoints_lock().contains(&dedup_key) {
         // Cache hit — count it
-        state.cache_metrics.hits += 1;
-        state
-            .cache_metrics
-            .breakpoints
-            .insert(region.to_string(), "hit".to_string());
+        state.cache_metrics_lock().hits += 1;
+        state.cache_metrics_lock().breakpoints.insert(region.to_string(), "hit".to_string());
 
         // Token savings estimate when a cache hit occurs.
         // We tokenize just the breakpoint metadata (not the full response)
@@ -157,12 +155,12 @@ pub fn inject_cache_breakpoints(
             let hint_len = region.len() + ttl.len() + breaker.len() + 16; // overhead for JSON structure
             hint_len / 4
         };
-        state.cache_metrics.tokens_saved += saved;
+        state.cache_metrics_lock().tokens_saved += saved;
         return saved;
     }
 
     // Mark as emitted
-    state.emitted_breakpoints.insert(dedup_key);
+    state.emitted_breakpoints_lock().insert(dedup_key);
 
     // Build the cache hints payload
     let hints = CacheHints {
@@ -204,20 +202,15 @@ pub fn inject_cache_breakpoints(
     }
 
     // Record as miss (first emission)
-    state.cache_metrics.misses += 1;
-    state
-        .cache_metrics
-        .breakpoints
-        .insert(region.to_string(), "miss".to_string());
+    state.cache_metrics_lock().misses += 1;
+    state.cache_metrics_lock().breakpoints.insert(region.to_string(), "miss".to_string());
     0
 }
 
 /// Update cache metrics for the rolling tail (always ephemeral).
-pub fn mark_tail_ephemeral(state: &mut crate::mcp::McpState) {
-    state
-        .cache_metrics
-        .breakpoints
-        .insert("tail".to_string(), "ephemeral".to_string());
+#[allow(dead_code)]
+pub fn mark_tail_ephemeral(state: &crate::mcp::McpState) {
+    state.cache_metrics_lock().breakpoints.insert("tail".to_string(), "ephemeral".to_string());
 }
 
 /// Render the cache metrics section for the text dashboard.

@@ -3,10 +3,11 @@
 // JSON-RPC method dispatcher. Routes incoming requests to the appropriate
 // handler based on the method name.
 //
-// F-05 (FAANG audit): the dispatcher now takes a single `&mut McpState`
+// F-05 (FAANG audit): the dispatcher now takes a single `&McpState`
 // argument that bundles the path dict, cache, and config. The previous
 // design had the dispatcher (and tools handler) take the dict and cache
 // as separate arguments, with the config never reaching them at all.
+// v0.2.1: Uses &McpState (interior mutability) - no &mut needed.
 
 use crate::mcp::handlers;
 use crate::mcp::tools;
@@ -17,9 +18,10 @@ use crate::protocol::send_response;
 ///
 /// A-09: Takes an owned `JsonRpcRequest` so the caller can move it
 /// into a closure (required for thread-pool dispatch).
+/// v0.2.1: Takes &McpState (interior mutability).
 pub(crate) fn dispatch(
     req: crate::protocol::JsonRpcRequest,
-    state: &mut McpState,
+    state: &McpState,
 ) {
     match req.method.as_str() {
         "initialize" => {

@@ -9,6 +9,17 @@
 
 use serde_json::json;
 
+/// Check if CBM binary exists on PATH without launching it.
+/// This avoids double-launching CBM when `McpState::new()` also launches it.
+fn cbm_binary_exists() -> bool {
+    let name = if cfg!(windows) { "codebase-memory-mcp.exe" } else { "codebase-memory-mcp" };
+    std::env::var_os("PATH")
+        .map(|path| {
+            std::env::split_paths(&path).any(|dir| dir.join(name).is_file())
+        })
+        .unwrap_or(false)
+}
+
 // ── E2E: Full pipeline with live CBM (if available) ─────────────
 
 /// Test that the proxy tool forwards to CBM and compresses the response.
@@ -17,10 +28,7 @@ use serde_json::json;
 #[test]
 fn e2e_proxy_search_graph_compresses_response() {
     // Check if CBM binary is available
-    let cbm_available = crate::cbm::bridge::GraphBridge::try_create(
-        &crate::cbm::config::CbmConfig { enabled: true, ..Default::default() },
-        std::path::Path::new("."),
-    ).is_available();
+    let cbm_available = cbm_binary_exists();
 
     if !cbm_available {
         eprintln!("Skipping e2e_proxy_search_graph_compresses_response — CBM not installed");
@@ -30,15 +38,16 @@ fn e2e_proxy_search_graph_compresses_response() {
     // Build a full MCP state with CBM enabled
     let mut config = crate::config::CleanCtxConfig::default();
     config.cbm.enabled = true;
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
 
     // Verify bridge is available
-    assert!(state.graph_bridge.as_ref().is_some_and(|b| b.is_available()),
+    assert!(state.graph_bridge.lock().unwrap().as_ref().is_some_and(|b| b.is_available()),
         "Bridge should be available when CBM is installed and enabled");
 
     // Call the proxy with a real search_graph query
     // Test proxy response format
-    let bridge = state.graph_bridge.as_mut().unwrap();
+    let mut binding = state.graph_bridge.lock().unwrap();
+    let bridge = binding.as_mut().unwrap();
     let raw = bridge.proxy_call("search_graph", json!({
         "name_pattern": ".*compress.*",
         "label": "Function",
@@ -62,10 +71,7 @@ fn e2e_proxy_search_graph_compresses_response() {
 /// Uses cbm_proxy handler directly.
 #[test]
 fn e2e_proxy_handler_returns_compressed_result() {
-    let cbm_available = crate::cbm::bridge::GraphBridge::try_create(
-        &crate::cbm::config::CbmConfig { enabled: true, ..Default::default() },
-        std::path::Path::new("."),
-    ).is_available();
+    let cbm_available = cbm_binary_exists();
 
     if !cbm_available {
         eprintln!("Skipping e2e_proxy_handler_returns_compressed_result — CBM not installed");
@@ -74,12 +80,13 @@ fn e2e_proxy_handler_returns_compressed_result() {
 
     let mut config = crate::config::CleanCtxConfig::default();
     config.cbm.enabled = true;
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
 
     // Test that the proxy can handle a get_architecture call
     // handle_cbm_proxy sends responses directly via send_response,
     // so we test the bridge's proxy_call directly instead
-    let bridge = state.graph_bridge.as_mut().unwrap();
+    let mut binding = state.graph_bridge.lock().unwrap();
+    let bridge = binding.as_mut().unwrap();
     let result = bridge.proxy_call("get_architecture", json!({}));
 
     match result {

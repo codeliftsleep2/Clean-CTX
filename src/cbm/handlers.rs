@@ -23,20 +23,20 @@ fn check_cbm_healthy(id: &Value, state: &McpState) -> bool {
 
 /// M-3 fix: Factor out bridge extraction boilerplate.
 /// Returns `Some(&mut GraphBridge)` or sends "not available" error and returns `None`.
-fn with_bridge<'a>(id: &Value, state: &'a mut McpState) -> Option<&'a mut crate::cbm::GraphBridge> {
+fn with_bridge<'a>(id: &Value, state: &'a McpState) -> Option<std::sync::MutexGuard<'a, Option<crate::cbm::GraphBridge>>> {
     // Circuit breaker: reject early if CBM is degraded/unavailable
     if !check_cbm_healthy(id, state) {
         return None;
     }
-    match state.graph_bridge.as_mut() {
-        Some(b) => Some(b),
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": { "code": -32603, "message": "CBM not available. Install codebase-memory-mcp on PATH." }
-            }));
-            None
-        }
+    let bridge_opt = state.graph_bridge_lock();
+    if bridge_opt.is_some() {
+        Some(bridge_opt)
+    } else {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": { "code": -32603, "message": "CBM not available. Install codebase-memory-mcp on PATH." }
+        }));
+        None
     }
 }
 
@@ -47,15 +47,31 @@ fn set_project_from_params(bridge: &mut crate::cbm::GraphBridge, params: &Value)
     }
 }
 
+/// Ensure the project is indexed before issuing a CBM query.
+/// Sends an error response and returns `false` if indexing fails.
+pub(crate) fn ensure_indexed_or_error(id: &Value, bridge: &mut crate::cbm::GraphBridge) -> bool {
+    if let Err(e) = bridge.ensure_indexed() {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": { "code": -32603, "message": format!("CBM indexing failed: {}", e) }
+        }));
+        false
+    } else {
+        true
+    }
+}
+
+
 /// Handle `graph_search` — search the CBM knowledge graph.
 ///
 /// M-02 fix: Accepts `name_pattern` (regex) or `query` (plain text substring) 
 /// parameters matching CBM's actual search_graph tool interface.
-pub fn handle_graph_search(id: &Value, params: &Value, state: &mut McpState) {
-    let bridge = match with_bridge(id, state) {
+pub fn handle_graph_search(id: &Value, params: &Value, state: &McpState) {
+    let mut bridge_guard = match with_bridge(id, state) {
         Some(b) => b,
         None => return,
     };
+    let bridge = bridge_guard.as_mut().unwrap();
     // M-02: support both `name_pattern` (regex) and `query` (plain text)
     let query = params["arguments"]["name_pattern"].as_str()
         .or_else(|| params["arguments"]["query"].as_str())
@@ -69,24 +85,26 @@ pub fn handle_graph_search(id: &Value, params: &Value, state: &mut McpState) {
     }
     set_project_from_params(bridge, params);
 
+    if !ensure_indexed_or_error(id, bridge) { return; }
     let nodes = bridge.search(query);
-    state.cbm_status = bridge.status().clone();
+    let status = bridge.status().clone();
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": format!("Found {} symbol(s).", nodes.len()) }],
             "nodes": nodes, "count": nodes.len(),
-            "cbm_status": state.cbm_status.summary()
+            "cbm_status": status.summary()
         }
     }));
 }
 
 /// Handle `graph_query` — execute a Cypher-like graph query.
-pub fn handle_graph_query(id: &Value, params: &Value, state: &mut McpState) {
-    let bridge = match with_bridge(id, state) {
+pub fn handle_graph_query(id: &Value, params: &Value, state: &McpState) {
+    let mut bridge_guard = match with_bridge(id, state) {
         Some(b) => b,
         None => return,
     };
+    let bridge = bridge_guard.as_mut().unwrap();
     let query = params["arguments"]["query"].as_str().unwrap_or("");
     if query.is_empty() {
         send_response(&serde_json::json!({
@@ -97,24 +115,26 @@ pub fn handle_graph_query(id: &Value, params: &Value, state: &mut McpState) {
     }
     set_project_from_params(bridge, params);
 
+    if !ensure_indexed_or_error(id, bridge) { return; }
     let result = bridge.query_graph(query);
-    state.cbm_status = bridge.status().clone();
+    let status = bridge.status().clone();
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": format!("{} node(s), {} edge(s).", result.nodes.len(), result.edges.len()) }],
             "nodes": result.nodes, "edges": result.edges,
-            "cbm_status": state.cbm_status.summary()
+            "cbm_status": status.summary()
         }
     }));
 }
 
 /// Handle `graph_trace` — trace a path between two symbols.
-pub fn handle_graph_trace(id: &Value, params: &Value, state: &mut McpState) {
-    let bridge = match with_bridge(id, state) {
+pub fn handle_graph_trace(id: &Value, params: &Value, state: &McpState) {
+    let mut bridge_guard = match with_bridge(id, state) {
         Some(b) => b,
         None => return,
     };
+    let bridge = bridge_guard.as_mut().unwrap();
     let from = params["arguments"]["from"].as_str().unwrap_or("");
     let to = params["arguments"]["to"].as_str().unwrap_or("");
     if from.is_empty() || to.is_empty() {
@@ -126,46 +146,48 @@ pub fn handle_graph_trace(id: &Value, params: &Value, state: &mut McpState) {
     }
     set_project_from_params(bridge, params);
 
+    if !ensure_indexed_or_error(id, bridge) { return; }
     let edges = bridge.trace_path(from, to);
-    state.cbm_status = bridge.status().clone();
+    let status = bridge.status().clone();
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": format!("'{from}' → '{to}': {} edge(s).", edges.len()) }],
             "edges": edges, "count": edges.len(),
-            "cbm_status": state.cbm_status.summary()
+            "cbm_status": status.summary()
         }
     }));
 }
 
 /// Handle `get_architecture` — get project architecture overview.
-pub fn handle_get_architecture(id: &Value, params: &Value, state: &mut McpState) {
-    let bridge = match with_bridge(id, state) {
+pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
+    let mut bridge_guard = match with_bridge(id, state) {
         Some(b) => b,
         None => return,
     };
+    let bridge = bridge_guard.as_mut().unwrap();
     set_project_from_params(bridge, params);
 
+    let status = bridge.status().clone();
+    if !ensure_indexed_or_error(id, bridge) { return; }
     match bridge.get_architecture() {
         Some(arch) => {
-            state.cbm_status = bridge.status().clone();
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": format!("{} module(s), {} deps.", arch.modules.len(), arch.dependencies.len()) }],
                     "modules": arch.modules, "dependencies": arch.dependencies,
-                    "cbm_status": state.cbm_status.summary()
+                    "cbm_status": status.summary()
                 }
             }));
         }
         None => {
-            state.cbm_status = bridge.status().clone();
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": "Architecture overview not available." }],
                     "modules": [], "dependencies": [],
-                    "cbm_status": state.cbm_status.summary()
+                    "cbm_status": status.summary()
                 }
             }));
         }
@@ -173,10 +195,11 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &mut McpState)
 }
 
 /// Handle `get_cbm_status` — check CBM availability.
-pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &mut McpState) {
-    let (status, details, version) = match state.graph_bridge.as_mut() {
+pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
+    let (status, details, version) = match state.graph_bridge_lock().as_mut() {
         Some(bridge) => {
             bridge.update_status();
+            let _ = bridge.ensure_indexed();
             let s = bridge.status().clone();
             let d = match &s {
                 crate::cbm::CbmStatus::Available => "CBM is running and ready.".into(),

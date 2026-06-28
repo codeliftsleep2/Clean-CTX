@@ -87,13 +87,13 @@ fn test_compute_workspace_breaker() {
 fn test_cache_disabled_skips_injection() {
     let mut config = CleanCtxConfig::default();
     config.cache.enabled = false; // disable cache
-    let mut state = McpState::new(config);
+    let state = McpState::new(config);
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
-    let saved = inject_cache_breakpoints(&mut response, &mut state, "baseline", "1h", "test-breaker", None);
+    let saved = inject_cache_breakpoints(&mut response, &state, "baseline", "1h", "test-breaker", None);
     assert_eq!(saved, 0, "no tokens saved when cache disabled");
-    assert_eq!(state.cache_metrics.hits, 0);
-    assert_eq!(state.cache_metrics.misses, 0);
+    assert_eq!(state.cache_metrics_lock().hits, 0);
+    assert_eq!(state.cache_metrics_lock().misses, 0);
     // Should NOT have injected _meta.cache_hints — check inside result
     let result_obj = response.get("result").unwrap();
     assert!(result_obj.get("_meta").is_none() || result_obj["_meta"].get("cache_hints").is_none());
@@ -102,10 +102,10 @@ fn test_cache_disabled_skips_injection() {
 /// Verify that inject_cache_breakpoints correctly injects a system_prompt breakpoint.
 #[test]
 fn test_inject_system_prompt_hint() {
-    let mut state = McpState::new(CleanCtxConfig::default());
+    let state = McpState::new(CleanCtxConfig::default());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
-    inject_cache_breakpoints(&mut response, &mut state, "system_prompt", "1h", "vocab-v1", None);
+    inject_cache_breakpoints(&mut response, &state, "system_prompt", "1h", "vocab-v1", None);
 
     // _meta must be inside result, not at top level
     let hints = &response["result"]["_meta"]["cache_hints"];
@@ -114,16 +114,16 @@ fn test_inject_system_prompt_hint() {
     assert_eq!(breakpoints[0]["region"], "system_prompt");
     assert_eq!(breakpoints[0]["ttl"], "1h");
     assert_eq!(breakpoints[0]["breaker"], "vocab-v1");
-    assert_eq!(state.cache_metrics.misses, 1, "first emission = miss");
+    assert_eq!(state.cache_metrics_lock().misses, 1, "first emission = miss");
 }
 
 /// Verify that inject_cache_breakpoints correctly injects a tools breakpoint.
 #[test]
 fn test_inject_tools_hint() {
-    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
-    inject_cache_breakpoints(&mut response, &mut state, "tools", "1h", "tools-v1", None);
+    inject_cache_breakpoints(&mut response, &state, "tools", "1h", "tools-v1", None);
 
     // _meta must be inside result, not at top level
     let hints = &response["result"]["_meta"]["cache_hints"];
@@ -136,11 +136,11 @@ fn test_inject_tools_hint() {
 /// Verify that inject_cache_breakpoints correctly injects a baseline breakpoint.
 #[test]
 fn test_inject_baseline_hint() {
-    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
     let breaker = compute_baseline_breaker("compressed text here");
-    inject_cache_breakpoints(&mut response, &mut state, "baseline", "1h", &breaker, None);
+    inject_cache_breakpoints(&mut response, &state, "baseline", "1h", &breaker, None);
 
     // _meta must be inside result, not at top level
     let hints = &response["result"]["_meta"]["cache_hints"];
@@ -153,11 +153,11 @@ fn test_inject_baseline_hint() {
 /// Verify that inject_cache_breakpoints correctly injects a tail breakpoint with "rolling" breaker.
 #[test]
 fn test_inject_tail_hint() {
-    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
-    inject_cache_breakpoints(&mut response, &mut state, "tail", "5m", "rolling", None);
-    mark_tail_ephemeral(&mut state);
+    inject_cache_breakpoints(&mut response, &state, "tail", "5m", "rolling", None);
+    mark_tail_ephemeral(&state);
 
     // _meta must be inside result, not at top level
     let hints = &response["result"]["_meta"]["cache_hints"];
@@ -167,7 +167,7 @@ fn test_inject_tail_hint() {
     assert_eq!(breakpoints[0]["breaker"], "rolling");
     // Verify tail is marked ephemeral
     assert_eq!(
-        state.cache_metrics.breakpoints.get("tail").unwrap(),
+        state.cache_metrics_lock().breakpoints.get("tail").unwrap(),
         "ephemeral"
     );
 }
@@ -175,34 +175,34 @@ fn test_inject_tail_hint() {
 /// Verify that the same region+breaker combo is not injected twice (dedup).
 #[test]
 fn test_emitted_dedup() {
-    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
     // First call — should be a miss
-    let saved1 = inject_cache_breakpoints(&mut response, &mut state, "tools", "1h", "tools-v1", None);
+    let saved1 = inject_cache_breakpoints(&mut response, &state, "tools", "1h", "tools-v1", None);
     assert_eq!(saved1, 0, "first call = miss, no tokens saved");
-    assert_eq!(state.cache_metrics.misses, 1);
-    assert_eq!(state.cache_metrics.hits, 0);
+    assert_eq!(state.cache_metrics_lock().misses, 1);
+    assert_eq!(state.cache_metrics_lock().hits, 0);
 
     // Same region+breaker combination — should be a hit (deduped)
-    let saved2 = inject_cache_breakpoints(&mut response, &mut state, "tools", "1h", "tools-v1", None);
+    let saved2 = inject_cache_breakpoints(&mut response, &state, "tools", "1h", "tools-v1", None);
     assert!(saved2 > 0, "second call = hit, tokens should be saved");
-    assert_eq!(state.cache_metrics.hits, 1);
-    assert_eq!(state.cache_metrics.misses, 1);
+    assert_eq!(state.cache_metrics_lock().hits, 1);
+    assert_eq!(state.cache_metrics_lock().misses, 1);
 }
 
 /// Verify that cache metrics accumulate correctly across multiple calls.
 #[test]
 fn test_cache_metrics_accumulate() {
-    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
     // Two different breakpoints
-    inject_cache_breakpoints(&mut response, &mut state, "system_prompt", "1h", "vocab-v1", None);
-    inject_cache_breakpoints(&mut response, &mut state, "tools", "1h", "tools-v1", None);
+    inject_cache_breakpoints(&mut response, &state, "system_prompt", "1h", "vocab-v1", None);
+    inject_cache_breakpoints(&mut response, &state, "tools", "1h", "tools-v1", None);
 
-    assert_eq!(state.cache_metrics.misses, 2);
-    assert_eq!(state.cache_metrics.hits, 0);
+    assert_eq!(state.cache_metrics_lock().misses, 2);
+    assert_eq!(state.cache_metrics_lock().hits, 0);
 }
 
 /// Verify that render_cache_text returns the expected format.
@@ -266,7 +266,7 @@ fn test_generate_vocabulary_text() {
 /// to the top level.
 #[test]
 fn test_meta_not_in_response_root() {
-    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
     // Full JSON-RPC response — simulating what callers pass
     let mut response = serde_json::json!({
         "jsonrpc": "2.0",
@@ -276,7 +276,7 @@ fn test_meta_not_in_response_root() {
 
     // Inject into the result sub-object (the correct pattern)
     if let Some(result_obj) = response.get_mut("result") {
-        inject_cache_breakpoints(result_obj, &mut state, "tools", "1h", "tools-v1", None);
+        inject_cache_breakpoints(result_obj, &state, "tools", "1h", "tools-v1", None);
     }
 
     // _meta must NOT exist at the response root level
@@ -304,7 +304,7 @@ fn test_meta_not_in_response_root() {
 /// region), but _meta must still be inside result.
 #[test]
 fn test_multiple_calls_meta_stays_in_result() {
-    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
     let mut response = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -313,7 +313,7 @@ fn test_multiple_calls_meta_stays_in_result() {
 
     // Inject system_prompt into result
     if let Some(result_obj) = response.get_mut("result") {
-        inject_cache_breakpoints(result_obj, &mut state, "system_prompt", "1h", "vocab-v1", None);
+        inject_cache_breakpoints(result_obj, &state, "system_prompt", "1h", "vocab-v1", None);
     }
 
     // Verify first injection — _meta inside result, not root
@@ -328,7 +328,7 @@ fn test_multiple_calls_meta_stays_in_result() {
 
     // Inject a second breakpoint into result (replaces the previous one)
     if let Some(result_obj) = response.get_mut("result") {
-        inject_cache_breakpoints(result_obj, &mut state, "tools", "1h", "tools-v1", None);
+        inject_cache_breakpoints(result_obj, &state, "tools", "1h", "tools-v1", None);
     }
 
     // Verify nothing leaked to root after second injection

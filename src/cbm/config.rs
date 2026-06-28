@@ -53,7 +53,7 @@ impl Default for CbmConfig {
 
 fn default_auto_launch() -> bool { true }
 fn default_cache_ttl() -> u64 { 300 }
-fn default_enabled() -> bool { true }
+fn default_enabled() -> bool { false }
 fn default_query_timeout_ms() -> u64 { 30000 }
 fn default_log_dir() -> String { ".clean-ctx/cbm-logs".to_string() }
 

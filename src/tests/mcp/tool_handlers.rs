@@ -9,7 +9,8 @@
 // "pretty" = fallback), cache invalidation, and angular/spring
 // meta-layer abbreviation in compiled output.
 
-use crate::mcp::tools::{parse_fidelity_arg, resolve_fidelity};
+use crate::mcp::tools::{parse_fidelity_arg, resolve_fidelity, dispatch_tools_call};
+use crate::mcp::tool_handlers::core::handle_compress_code_context;
 use crate::compression::Fidelity;
 use serde_json::json;
 
@@ -83,115 +84,105 @@ fn parse_fidelity_arg_invalid_returns_error() {
 
 #[test]
 fn handle_context_stats_smoke() {
-    use crate::mcp::tool_handlers::handle_context_stats;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = json!(1);
     let params = json!({ "arguments": {} });
     // Should not panic
-    handle_context_stats(&id, &params, &mut state);
+    dispatch_tools_call(&id, "context_stats", &params, &state);
 }
 
 #[test]
 fn handle_list_sessions_smoke() {
-    use crate::mcp::tool_handlers::handle_list_sessions;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = json!(1);
     let params = json!({ "arguments": {} });
     // Should not panic
-    handle_list_sessions(&id, &params, &mut state);
+    dispatch_tools_call(&id, "list_sessions", &params, &state);
 }
 
 #[test]
 fn handle_context_history_smoke() {
-    use crate::mcp::tool_handlers::handle_context_history;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = json!(1);
     let params = json!({ "arguments": {} });
     // Should not panic
-    handle_context_history(&id, &params, &mut state);
+    dispatch_tools_call(&id, "context_history", &params, &state);
 }
 
 #[test]
 fn handle_save_context_smoke() {
-    use crate::mcp::tool_handlers::handle_save_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = json!(1);
     let params = json!({ "arguments": { "filePath": "/nonexistent.ts" } });
     // Should not panic (returns error for nonexistent file, but doesn't panic)
-    handle_save_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "save_context", &params, &state);
 }
 
 #[test]
 fn handle_restore_context_smoke() {
-    use crate::mcp::tool_handlers::handle_restore_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = json!(1);
     let params = json!({ "arguments": { "filePath": "/nonexistent.ts" } });
     // Should not panic
-    handle_restore_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "restore_context", &params, &state);
 }
 
 #[test]
 fn handle_purge_old_deltas_smoke() {
-    use crate::mcp::tool_handlers::handle_purge_old_deltas;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = json!(1);
     let params = json!({ "arguments": { "days": 30 } });
     // Should not panic
-    handle_purge_old_deltas(&id, &params, &mut state);
+    dispatch_tools_call(&id, "purge_old_deltas", &params, &state);
 }
 
 // ── IR-first integration tests ──
 
 #[test]
 fn handle_compress_code_context_with_fallback() {
-    use crate::mcp::tool_handlers::handle_compress_code_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = json!(1);
     // Use nonexistent file — should fall back to text pipeline gracefully
     let params = json!({ "arguments": { "filePath": "/nonexistent/file.ts", "fidelity": "low" } });
     // Should not panic
-    handle_compress_code_context(&id, &params, &mut state, "named");
+    dispatch_tools_call(&id, "compress_code_context", &params, &state);
 }
 
 #[test]
 fn handle_delta_code_context_no_baseline() {
-    use crate::mcp::tool_handlers::handle_delta_code_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = json!(1);
     let params = json!({ "arguments": { "filePath": "/nonexistent/file.ts", "fidelity": "low" } });
     // Should not panic — stores baseline IR, returns "no baseline" message
-    handle_delta_code_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }
 
 #[test]
 fn handle_delta_text_context_no_baseline() {
-    use crate::mcp::tool_handlers::handle_delta_text_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = json!(1);
     let params = json!({ "arguments": { "filePath": "/nonexistent/file.ts", "fidelity": "low" } });
     // Should not panic — stores text delta baseline, returns full output
-    handle_delta_text_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "delta_text_context", &params, &state);
 }
 
 #[test]
 fn handle_apply_delta_no_baseline() {
-    use crate::mcp::tool_handlers::handle_apply_delta;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = json!(1);
     let params = json!({ "arguments": { "delta": { "file": "α1", "from": 1, "to": 2, "ops": { "+": [], "-": [], "~": [] } } } });
     // Should not panic — returns "UnknownFile" error
-    handle_apply_delta(&id, &params, &mut state);
+    dispatch_tools_call(&id, "apply_delta", &params, &state);
 }
 
 // ── render_llm integration tests ──
@@ -421,11 +412,12 @@ fn render_hierarchical_for_llm_injects_do_not_panic() {
 #[test]
 fn mcp_state_llm_text_cache_insert_and_read() {
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     // Insert into cache
-    state.llm_text_cache.insert("α1".to_string(), "// SCHEMA v2\n// ── Foo ──\n".to_string());
+    state.llm_text_cache_lock().insert("α1".to_string(), "// SCHEMA v2\n// ── Foo ──\n".to_string());
     // Read from cache
-    let cached = state.llm_text_cache.get("α1");
+    let cache_guard = state.llm_text_cache_lock();
+    let cached = cache_guard.get("α1");
     assert!(cached.is_some());
     assert!(cached.unwrap().contains("SCHEMA v2"));
     assert!(cached.unwrap().contains("Foo"));
@@ -435,7 +427,7 @@ fn mcp_state_llm_text_cache_insert_and_read() {
 fn mcp_state_llm_text_cache_miss_returns_none() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
-    assert!(!state.llm_text_cache.contains_key("nonexistent"));
+    assert!(!state.llm_text_cache_lock().contains_key("nonexistent"));
 }
 
 #[test]
@@ -443,7 +435,7 @@ fn mcp_state_llm_text_cache_clear_on_new() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     // Fresh state should have empty cache
-    assert!(state.llm_text_cache.is_empty());
+    assert!(state.llm_text_cache_lock().is_empty());
 }
 
 
@@ -523,62 +515,56 @@ fn resolve_file_path_with_workspace_root() {
 
 #[test]
 fn handle_compress_code_context_accepts_relative_path() {
-    use crate::mcp::tool_handlers::handle_compress_code_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
-    handle_compress_code_context(&id, &params, &mut state, "named");
+    handle_compress_code_context(&id, &params, &state);
 }
 
 #[test]
 fn handle_delta_code_context_accepts_relative_path() {
-    use crate::mcp::tool_handlers::handle_delta_code_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
-    handle_delta_code_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }
 
 #[test]
 fn handle_delta_text_context_accepts_relative_path() {
-    use crate::mcp::tool_handlers::handle_delta_text_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
-    handle_delta_text_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "delta_text_context", &params, &state);
 }
 
 #[test]
 fn handle_diff_code_context_accepts_relative_path() {
-    use crate::mcp::tool_handlers::handle_diff_code_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
-    handle_diff_code_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "diff_code_context", &params, &state);
 }
 
 #[test]
 fn handle_restore_context_accepts_relative_path() {
-    use crate::mcp::tool_handlers::handle_restore_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
-    handle_restore_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "restore_context", &params, &state);
 }
 
 #[test]
 fn handle_provide_code_context_accepts_relative_path() {
-    use crate::mcp::tool_handlers::handle_provide_code_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "overview" } });
-    handle_provide_code_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
 // ── Blast radius integration regression tests ──────────────────────
@@ -587,35 +573,32 @@ fn handle_provide_code_context_accepts_relative_path() {
 
 #[test]
 fn blast_radius_disabled_by_default_does_not_panic() {
-    use crate::mcp::tool_handlers::handle_provide_code_context;
     let config = crate::config::CleanCtxConfig::default();
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     // Should not panic when blast radius is disabled (default)
-    handle_provide_code_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
 #[test]
 fn blast_radius_enabled_does_not_panic_without_cbm() {
-    use crate::mcp::tool_handlers::handle_provide_code_context;
     let mut config = crate::config::CleanCtxConfig::default();
     config.intelligence.blast_radius_enabled = true;
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     // Should not panic when blast radius is enabled but CBM is unavailable
-    handle_provide_code_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
 #[test]
 fn blast_radius_delta_mode_does_not_panic() {
-    use crate::mcp::tool_handlers::handle_delta_code_context;
     let mut config = crate::config::CleanCtxConfig::default();
     config.intelligence.blast_radius_enabled = true;
-    let mut state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     // Should not panic in delta mode with blast radius enabled
-    handle_delta_code_context(&id, &params, &mut state);
+    dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }

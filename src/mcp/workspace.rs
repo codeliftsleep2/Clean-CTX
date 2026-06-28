@@ -88,7 +88,7 @@ struct PassContext {
 pub(crate) fn compress_workspace_dir(
     dir_path: &str,
     fidelity: Fidelity,
-    state: &mut McpState,
+    state: &McpState,
 ) -> Result<WorkspaceResult, Box<dyn std::error::Error>> {
     let mut manifest = format_manifest_header(dir_path, fidelity, state);
 
@@ -165,7 +165,7 @@ pub(crate) fn compress_workspace_dir(
 /// eliminates the redundant I/O that was the bottleneck.
 fn compress_pass(
     fidelity: Fidelity,
-    state: &mut McpState,
+    state: &McpState,
     ctx: &mut PassContext,
     manifest: &mut String,
 ) {
@@ -198,12 +198,12 @@ fn compress_pass(
         match compress_file_with_source(
             PathBuf::from(&entry),
             source_ref,
-            &mut state.dict,
-            &mut state.cache,
+            &mut state.dict_lock(),
+            &mut state.cache_write(),
             fidelity,
         ) {
             Ok(compressed) => {
-                let alias = state.dict.get_or_create_alias(entry.clone());
+                let alias = state.get_or_create_alias(entry.clone());
                 manifest.push_str(&format!(
                     "// ===== FILE: {} =====\n// α alias: {}\n",
                     entry, alias
@@ -215,7 +215,7 @@ fn compress_pass(
                 let ws_source = source_ref.unwrap_or("");
                 let ws_raw = super::tool_helpers::count_tokens_with_tokenizer(ws_source, ws_tok_ref);
                 let ws_compressed = super::tool_helpers::count_tokens_with_tokenizer(&compressed, ws_tok_ref);
-                state.session_stats.record_compression(
+                state.record_compression(
                     entry,
                     ws_raw,
                     ws_compressed,
@@ -241,7 +241,7 @@ fn compress_pass(
 ///         dictionary, emit global §GSYM dictionary in manifest header.
 fn compress_pass_with_global_symbols(
     fidelity: Fidelity,
-    state: &mut McpState,
+    state: &McpState,
     ctx: &mut PassContext,
     manifest: &mut String,
 ) {
@@ -291,9 +291,9 @@ fn compress_pass_with_global_symbols(
         };
 
         // Compress without per-file symbol compression.
-        match compress_source(&source_code, entry, &mut state.dict, &mut state.cache, fidelity) {
+        match compress_source(&source_code, entry, &mut state.dict_lock(), &mut state.cache_write(), fidelity) {
             Ok(compressed) => {
-                let alias = state.dict.get_or_create_alias(entry.clone());
+                let alias = state.get_or_create_alias(entry.clone());
                 // Extract the body from the compressed output.
                 // The compressed output has the report header + body.
                 // We need the body for global symbol encoding.
@@ -302,7 +302,7 @@ fn compress_pass_with_global_symbols(
                 // Record per-file stats for global-symbol workspace compression (MED-2 fix: use pluggable tokenizer)
                 let gs_raw = super::tool_helpers::count_tokens_with_tokenizer(&source_code, gs_tok_ref);
                 let gs_compressed = super::tool_helpers::count_tokens_with_tokenizer(&compressed, gs_tok_ref);
-                state.session_stats.record_compression(
+                state.record_compression(
                     entry,
                     gs_raw,
                     gs_compressed,
@@ -429,7 +429,7 @@ fn extract_header_from_compressed(compressed: &str) -> String {
 /// .html + .scss), extracts template/style shape summaries, and
 /// emits `ΦBUNDLE` groups with a `§ΦMAP` footer.
 fn bundle_pass(
-    state: &mut McpState,
+    state: &McpState,
     ctx: &PassContext,
     manifest: &mut String,
 ) -> FooterBuilder {
@@ -457,13 +457,13 @@ fn bundle_pass(
         };
 
         // F-FULL-10: Use raw paths for alias keys for deterministic results.
-        let component_alias = state.dict.get_or_create_alias(entry.to_string());
+        let component_alias = state.get_or_create_alias(entry.to_string());
         let mut file_aliases = vec![component_alias];
         let mut tpl_summary = None;
         let mut sty_summary = None;
 
         if let Some(ref tpl_path) = triplet.template {
-            let a = state.dict.get_or_create_alias(tpl_path.to_string_lossy().to_string());
+            let a = state.get_or_create_alias(tpl_path.to_string_lossy().to_string());
             file_aliases.push(a);
             // F-FINAL-01: Use the shared source cache so files already
             // read in compress_pass / graph_pass are not re-read here.
@@ -473,7 +473,7 @@ fn bundle_pass(
             }
         }
         if let Some(ref sty_path) = triplet.style {
-            let a = state.dict.get_or_create_alias(sty_path.to_string_lossy().to_string());
+            let a = state.get_or_create_alias(sty_path.to_string_lossy().to_string());
             file_aliases.push(a);
             // F-FINAL-01: Same shared-cache fix as the template branch.
             if let Ok(content) = state.read_source(&sty_path.to_string_lossy()) {
@@ -482,7 +482,7 @@ fn bundle_pass(
             }
         }
 
-        let _bundle_alias = state.dict.get_or_create_bundle_alias(triplet_name(path));
+        let _bundle_alias = state.get_or_create_bundle_alias(triplet_name(path));
         bundle_count += 1;
         manifest.push_str(&format!(
             "// ===== Φ{}: {} =====\n",
@@ -517,7 +517,7 @@ fn bundle_pass(
 /// push non-fatal warnings (currently: duplicate Angular class
 /// names from `AngularGraphBuilder`) into `ctx.warnings` for the
 /// orchestrator to merge into the JSON-RPC response.
-fn graph_pass(state: &mut McpState, ctx: &mut PassContext, manifest: &mut String) {
+fn graph_pass(state: &McpState, ctx: &mut PassContext, manifest: &mut String) {
     let compressible: Vec<&String> = ctx
         .kept
         .iter()
@@ -549,7 +549,7 @@ fn graph_pass(state: &mut McpState, ctx: &mut PassContext, manifest: &mut String
             continue;
         }
         // F-FULL-10: Use raw path for alias key for deterministic alias.
-        let file_alias = state.dict.get_or_create_alias((*entry).clone());
+        let file_alias = state.get_or_create_alias((*entry).clone());
 
         let class_captures: Vec<String> = extract_class_blocks(&source_code);
         for raw_class in &class_captures {
@@ -577,7 +577,7 @@ fn graph_pass(state: &mut McpState, ctx: &mut PassContext, manifest: &mut String
     // field. This replaces the previous `eprintln!` in the builder.
     ctx.warnings.extend(angular_graph.take_warnings());
 
-    state.angular_graph.set(angular_graph.clone());
+    state.angular_graph_lock().set(angular_graph.clone());
 
     // Emit graph lines using cached file content (F-ANG-04).
     for source_code in file_contents.values() {

@@ -78,7 +78,7 @@ pub(crate) fn format_manifest_footer(
         }
     }
 
-    manifest.push_str(&state.dict.format_footer());
+    manifest.push_str(&state.format_dict_footer());
     manifest.push_str(&footer_builder.build());
 }
 

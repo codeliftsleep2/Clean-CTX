@@ -431,7 +431,7 @@ fn make_state(db_name: &str) -> (crate::mcp::McpState, TempDir) {
 #[test]
 fn test_integration_compress_and_check_db() {
     // 1. Compress a real .rs file from the project
-    let (mut state, _tmp) = make_state("integ_test.db");
+    let (state, _tmp) = make_state("integ_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -447,17 +447,17 @@ fn test_integration_compress_and_check_db() {
     });
 
     // compress_code_context now flushes persistence immediately (FAANG audit fix)
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
     // Data should be flushed to SQLite immediately (no pending ops)
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         assert_eq!(store.pending_count(), 0, "Expected zero pending ops after compress (immediate flush)");
     } else {
         panic!("Persistence store should be Some");
     }
 
     // 2. Verify DB has the data via rebuild_stats (no explicit flush needed)
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let db_stats = guard.rebuild_stats().expect("rebuild_stats should succeed");
             let summary = db_stats.summary();
@@ -488,7 +488,7 @@ fn test_integration_simulate_restart_stats_recovery() {
         let mut config = crate::config::CleanCtxConfig::default();
         config.persistence.enabled = true;
         config.persistence.db_path = db_path.to_string_lossy().to_string();
-        let mut state = crate::mcp::McpState::new(config);
+        let state = crate::mcp::McpState::new(config);
 
         let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("src")
@@ -502,13 +502,13 @@ fn test_integration_simulate_restart_stats_recovery() {
                 "fidelity": "medium"
             }
         });
-        crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+        crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
         // Flush before dropping
         state.flush_persistence();
 
         // Verify data in DB during session 1
-        if let Some(ref store) = state.persistence_store {
+        if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
             if let Some(guard) = store.sqlite() {
                 let db_stats = guard.rebuild_stats().expect("rebuild_stats");
                 assert_eq!(db_stats.summary().total_files, 1, "Session 1: should have 1 file");
@@ -522,11 +522,11 @@ fn test_integration_simulate_restart_stats_recovery() {
         let mut config = crate::config::CleanCtxConfig::default();
         config.persistence.enabled = true;
         config.persistence.db_path = db_path.to_string_lossy().to_string();
-        let mut state = crate::mcp::McpState::new(config);
+        let state = crate::mcp::McpState::new(config);
 
         // McpState::new() should have called rebuild_stats and loaded the stats
         // from the DB created in session 1.
-        let summary = state.session_stats.summary();
+        let summary = state.session_stats_lock().summary();
         assert_eq!(summary.total_files, 1,
             "Session 2: should recover 1 file from DB, got {}", summary.total_files);
         assert_eq!(summary.full_compress_count, 1,
@@ -535,13 +535,13 @@ fn test_integration_simulate_restart_stats_recovery() {
         // Also verify via context_stats handler
         let stats_id = serde_json::json!(2);
         let stats_params = serde_json::json!({ "arguments": {} });
-        crate::mcp::tool_handlers::handle_context_stats(&stats_id, &stats_params, &mut state);
+        crate::mcp::tools::dispatch_tools_call(&stats_id, "context_stats", &stats_params, &state);
     }
 }
 
 #[test]
 fn test_integration_compress_multiple_files_then_clear() {
-    let (mut state, _tmp) = make_state("multi_test.db");
+    let (state, _tmp) = make_state("multi_test.db");
 
     // Resolve paths properly since handlers convert to absolute paths
     let rs1 = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -561,7 +561,7 @@ fn test_integration_compress_multiple_files_then_clear() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
     let id2 = serde_json::json!(2);
     let params2 = serde_json::json!({
@@ -570,12 +570,12 @@ fn test_integration_compress_multiple_files_then_clear() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id2, &params2, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id2, "compress_code_context", &params2, &state);
 
     state.flush_persistence();
 
     // Verify both in DB
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let db_stats = guard.rebuild_stats().expect("rebuild_stats");
             assert_eq!(db_stats.summary().total_files, 2,
@@ -593,14 +593,14 @@ fn test_integration_compress_multiple_files_then_clear() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_restore_context(&clear_id, &clear_params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&clear_id, "restore_context", &clear_params, &state);
 
     state.flush_persistence();
 
     // After clear, the file should be removed from DB.
     // restore_context calls persistence_store.clear_file() which uses the
     // resolved path (absolute), so we check with the .rs2 path too.
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             assert!(!guard.has_context(&path1),
                 "First file should be cleared from DB: {}", path1);
@@ -614,7 +614,7 @@ fn test_integration_compress_multiple_files_then_clear() {
 #[test]
 fn test_integration_db_stats_via_provide_code_context() {
     // Test that provide_code_context (the unified handler) also persists
-    let (mut state, _tmp) = make_state("provide_test.db");
+    let (state, _tmp) = make_state("provide_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -629,12 +629,12 @@ fn test_integration_db_stats_via_provide_code_context() {
         }
     });
 
-    crate::mcp::tool_handlers::handle_provide_code_context(&id, &params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&id, "provide_code_context", &params, &state);
 
     state.flush_persistence();
 
     // Verify DB has data
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let db_stats = guard.rebuild_stats().expect("rebuild_stats");
             assert!(db_stats.summary().total_files >= 1,
@@ -648,7 +648,7 @@ fn test_integration_created_at_parsing() {
     // Verify that the chrono_parse_or_now fix actually works with
     // real SQLite datetime('now') format strings.
     // Query the SQLite store directly (InMemoryContextStore doesn't query SQLite).
-    let (mut state, _tmp) = make_state("created_at_test.db");
+    let (state, _tmp) = make_state("created_at_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -663,11 +663,11 @@ fn test_integration_created_at_parsing() {
         }
     });
 
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
     state.flush_persistence();
 
     // Check created_at via SQLite store's load_latest directly
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let meta = guard.load_latest(&rs_path)
                 .expect("load_latest should succeed")
