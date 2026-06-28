@@ -284,6 +284,7 @@ fn audit10_tool_handlers_wired_and_compiles() {
     // FAANG audit P0: The tool_handlers.rs test was orphaned (never referenced).
     // Verify it compiles by importing the test module. This test fails to compile
     // if the #[path] reference is removed from tool_handlers/mod.rs.
+    #[allow(unused_imports)]
     use crate::mcp::tool_handlers::tool_handlers_tests;
     // Merely importing the module proves the #[path] wiring is intact.
 }
