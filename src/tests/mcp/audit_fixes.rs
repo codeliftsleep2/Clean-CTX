@@ -299,11 +299,11 @@ fn audit11_helper_methods_compile() {
     let _alias = state.get_or_create_alias("test.rs".to_string());
     let _footer = state.format_dict_footer();
     let _dict = state.dict_lock();
-    let _unused = state.cache_read();
-    let _unused = state.cache_write();
+    drop(state.cache_read());
+    drop(state.cache_write());
     let _sess = state.session_stats_lock();
-    let _unused = state.ir_context_read();
-    let _unused = state.ir_context_lock();
+    drop(state.ir_context_read());
+    drop(state.ir_context_lock());
     let _gb = state.graph_bridge_lock();
     let _ag = state.angular_graph_lock();
     let _td = state.text_delta_lock();
