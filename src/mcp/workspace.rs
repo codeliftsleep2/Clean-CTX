@@ -192,7 +192,7 @@ fn compress_pass(
     ).ok();
     let ws_tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = ws_tok.as_deref();
 
-    for (_idx, entry) in compressible.iter().enumerate() {
+    for entry in compressible.iter() {
         // Pre-read via source_cache so bundle_pass/graph_pass
         // get cache hits instead of re-reading from disk.
         let source_arc = state.read_source(entry).ok();

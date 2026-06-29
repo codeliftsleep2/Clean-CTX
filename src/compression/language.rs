@@ -24,25 +24,25 @@ use crate::queries;
 /// initialize tree-sitter's internal `OnceLock` simultaneously.
 pub fn safe_typescript_language() -> Language {
     static LANG: OnceLock<Language> = OnceLock::new();
-    *LANG.get_or_init(|| tree_sitter_typescript::language_typescript())
+    *LANG.get_or_init(tree_sitter_typescript::language_typescript)
 }
 
 /// Thread-safe wrapper around `tree_sitter_c_sharp::language()`.
 pub fn safe_csharp_language() -> Language {
     static LANG: OnceLock<Language> = OnceLock::new();
-    *LANG.get_or_init(|| tree_sitter_c_sharp::language())
+    *LANG.get_or_init(tree_sitter_c_sharp::language)
 }
 
 /// Thread-safe wrapper around `tree_sitter_rust::language()`.
 pub fn safe_rust_language() -> Language {
     static LANG: OnceLock<Language> = OnceLock::new();
-    *LANG.get_or_init(|| tree_sitter_rust::language())
+    *LANG.get_or_init(tree_sitter_rust::language)
 }
 
 /// Thread-safe wrapper around `tree_sitter_java::language()`.
 pub fn safe_java_language() -> Language {
     static LANG: OnceLock<Language> = OnceLock::new();
-    *LANG.get_or_init(|| tree_sitter_java::language())
+    *LANG.get_or_init(tree_sitter_java::language)
 }
 
 /// Returns `true` if the source text looks like C#. The heuristic is
