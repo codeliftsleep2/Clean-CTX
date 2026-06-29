@@ -258,6 +258,11 @@ impl BufferedStore {
             Err(_) => return,
         };
 
+        // Disable foreign key constraints during reimport to allow
+        // append_delta operations to be processed before their
+        // corresponding save_context (fallback files may be out of order).
+        let _ = conn.conn.execute_batch("PRAGMA foreign_keys=OFF;");
+
         let mut reimported = 0;
         for entry in entries {
             let path = entry.path();
@@ -321,6 +326,9 @@ impl BufferedStore {
             // Delete the fallback file after successful reimport
             let _ = std::fs::remove_file(&path);
         }
+
+        // Re-enable foreign key constraints
+        let _ = conn.conn.execute_batch("PRAGMA foreign_keys=ON;");
 
         if reimported > 0 {
             eprintln!("[clean-ctx] Reimported {reimported} ops from fallback files.");

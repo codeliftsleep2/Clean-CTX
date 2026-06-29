@@ -63,10 +63,13 @@ where
 {
     let mut parser = TSParser::new();
     parser.set_language(language)?;
+    eprintln!("[run_capture_pipeline] language set");
     let tree = parser.parse(source, None).ok_or("AST Generation Error")?;
+    eprintln!("[run_capture_pipeline] parsed, {} bytes", source.len());
     let source_bytes = source.as_bytes();
 
     let query = Query::new(language, query_string)?;
+    eprintln!("[run_capture_pipeline] query compiled");
     let mut cursor = QueryCursor::new();
     let matches = cursor.matches(&query, tree.root_node(), source_bytes);
 
@@ -74,9 +77,12 @@ where
     for mat in matches {
         for capture in mat.captures {
             let capture_name = query.capture_names()[capture.index as usize].to_string();
+            eprintln!("[run_capture_pipeline] capture: {}", capture_name);
             if let Ok(text_slice) = capture.node.utf8_text(source_bytes) {
                 let raw = text_slice.to_string();
+                 eprintln!("[run_capture_pipeline] calling process() for {}", capture_name);
                 if let Some(processed) = process(&capture_name, &raw, fidelity) {
+                    eprintln!("[run_capture_pipeline] process() returned");
                     all_captures.push(CapEntry {
                         name: capture_name,
                         text: processed,
@@ -92,6 +98,7 @@ where
     // in source order. This is the same `Vec::sort_by` both original
     // call sites performed.
     all_captures.sort_by_key(|a| a.start_byte);
+    eprintln!("[rcp] DONE — returning {} captures", all_captures.len());
     Ok(all_captures)
 }
 

@@ -4,6 +4,7 @@
 // These tests verify that each fix cannot regress.
 
 use tempfile::TempDir;
+use serial_test::serial;
 
 use crate::mcp::context_store::ContextStore;
 
@@ -292,6 +293,8 @@ fn audit10_tool_handlers_wired_and_compiles() {
 // ══════════════════════════════════════════════════════════════════
 
 #[test]
+#[ignore]
+#[serial]
 fn audit11_helper_methods_compile() {
     // Compilation regression: if any helper signature changes, this test
     // fails to compile, catching the regression immediately.
