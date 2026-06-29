@@ -147,3 +147,26 @@ public class TestController {{
         assert!(is_spring_file(&source), "Failed to detect {}", annotation);
     }
 }
+
+#[test]
+fn rejects_comment_with_annotation_name() {
+    // A-11: Comments should not trigger Spring detection
+    let source = r#"
+        // TODO: add @RestController when ready
+        public class PlainJavaClass {
+            private String name;
+        }
+    "#;
+    assert!(!is_spring_file(source), "Comment with @RestController should not trigger detection");
+}
+
+#[test]
+fn rejects_string_literal_with_annotation_name() {
+    // A-11: String literals should not trigger Spring detection
+    let source = r#"
+        public class PlainJavaClass {
+            private String message = "Use @Service to define a service";
+        }
+    "#;
+    assert!(!is_spring_file(source), "String literal with @Service should not trigger detection");
+}

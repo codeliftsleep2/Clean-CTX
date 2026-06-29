@@ -26,7 +26,7 @@ const DEFAULT_DEPTH: usize = 4;
 /// are not `Sync`), but the `Language` is immutable and thread-safe.
 fn html_language() -> &'static Language {
     static LANG: OnceLock<Language> = OnceLock::new();
-    LANG.get_or_init(tree_sitter_html::language)
+    LANG.get_or_init(|| tree_sitter_html::LANGUAGE.into())
 }
 
 /// Structural shape of an Angular template, suitable for a one-line
@@ -153,7 +153,7 @@ pub fn extract_template_shape_with_depth(html: &str, depth: usize) -> TemplateSh
     }
 
     let mut parser = Parser::new();
-    parser.set_language(*html_language()).ok();
+    parser.set_language(html_language()).ok();
     let tree = match parser.parse(html.as_bytes(), None) {
         Some(t) => t,
         None => {

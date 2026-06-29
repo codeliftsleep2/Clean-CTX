@@ -45,18 +45,19 @@ Every pull request **must** pass these checks. The full checklist is in [`PULL_R
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test`** — all 1,035 tests pass
+3. **`cargo test`** — all 1,360+ tests pass
 4. **`cargo audit`** — no known security vulnerabilities
-5. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
-6. **No `let _ = ...` dead-code suppression** — remove the unused variable instead
-7. **No `#![allow(...)]`** annotations without a `// SAFETY:` or `// Phase N:` comment
+5. **`scripts/check-tree-sitter-versions.ps1`** — all tree-sitter crates share the same `tree-sitter-language` ABI version
+6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
+7. **No `let _ = ...` dead-code suppression** — remove the unused variable instead
+8. **No `#![allow(...)]` annotations** without a `// SAFETY:` or `// Phase N:` comment
 
 ---
 
 ## Pre-commit Checklist
 
 ```bash
-cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo audit --ignore RUSTSEC-2025-0009
+cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo audit --ignore RUSTSEC-2025-0009 && pwsh -ExecutionPolicy Bypass ./scripts/check-tree-sitter-versions.ps1
 ```
 
 ---

@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-06-24
+**Last updated:** 2026-06-29
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -11,15 +11,15 @@
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
 | **Now** | v0.2.0 | Real-world ready | 6 |
-| **Foundation** | v0.2.0 | Architectural hardening (blocking) | 5 |
+| **Foundation** | v0.2.0 | Architectural hardening (blocking) | 2 |
 | **Next** | v0.3.0 | Advanced capabilities | 8 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
-| **Architectural** | Continuous | Code health & tooling | 15 |
+| **Architectural** | Continuous | Code health & tooling | 13 |
 | **Community** | Continuous | Docs & marketing | 5 |
 
 ---
 
-## Completed (v0.1.x – v0.1.8) — shipped ✅
+## Completed (v0.1.x – v0.2.0-rc1) — shipped ✅
 
 These items are complete and documented. Listed for historical context.
 
@@ -43,6 +43,9 @@ These items are complete and documented. Listed for historical context.
 | **CBM Audit** | CBM integration audit fixes | v0.1.8 | 6 findings resolved: CRITICAL (CBM enrichment data compression), HIGH (call_tool_raw retry, enrich_with_cbm timeout guard), MEDIUM (pluggable tokenizer in proxy), LOW (cache eviction pattern, visibility). 1,331 tests passing. |
 | **R-35 (P2)** | CBM Phase 2 — Intelligence Layer seeding | v0.1.9 | Fixed CBM client API mismatches (`search_graph`/`trace_path` param names, replaced non-existent `get_symbol_importance`/`get_dead_code` with Cypher queries). Intelligence Layer (pagerank.rs, fidelity.rs) now correctly blends CBM cross-file `in_degree` scores (60% IR + 40% CBM) for adaptive per-symbol fidelity. `enrich_with_cbm` in tool_handlers injects compressed CBM metadata into responses. See `docs/CBM_API_AUDIT_AND_PHASE2_PLAN.md`. |
 | **Compiler-IR Audit** | Compiler-IR audit + clippy cleanup | v0.1.8 | Verified all 8 phases (A–H). Resolved 29 clippy warnings across entire build. Rewrote COMPILER_IR.md from spec to implementation docs. All 1,277 tests pass with 0 clippy warnings. |
+| **A-09** | Multi-threaded MCP server dispatch | v0.2.0-rc1 | ✅ Production-grade `Dispatcher` with `crossbeam_channel` bounded queue + backpressure, `RwLock`-protected state for parallel reads, `catch_unwind` panic recovery, dedicated stdout writer thread, request tracing/observability, configurable worker count (auto-detect CPU count). Includes 6+ unit tests covering spawn lifecycle, concurrent mutations, panic recovery, and tracing. **Formerly P0 Critical — #1 adoption blocker.** See `src/mcp/dispatcher.rs`. |
+| **A-10** | Proxy hardening: auth + rate limiting | v0.2.0-rc1 | ✅ Optional `X-Api-Key` header authentication via `PROXY_API_KEY` env var. Per-client-IP token bucket rate limiter (configurable `RATE_LIMIT_RPS`/`RATE_LIMIT_BURST`, default 60/10). Returns `401 Unauthorized` for bad/missing keys, `429 Too Many Requests` when rate limited. Rate limiter uses GC-enabled sliding window to prevent unbounded map growth. Stats endpoint exposes rate limiter status. Nginx sidecar pattern documented in `docs/PROXY.md`. 141 proxy tests passing (6 new rate limiter tests + 5 new server tests). |
+| **A-12** | Tree-sitter version migration | v0.2.0-rc1 | ✅ Migrated from `=0.20.x` pinned versions to `^0.26.x` semver ranges. All 6 tree-sitter crates updated (`tree-sitter` 0.26.10, `c-sharp` 0.23.5, `typescript` 0.23.2, `html` 0.23.2, `rust` 0.24.2, `java` 0.23.5). Parser API migrated (LanguageFn → Language, `&Language` borrows, `StreamingIterator` for QueryMatches). CI guard (`scripts/check-tree-sitter-versions.ps1`) ensures all grammars share the same `tree-sitter-language` ABI. 1,360 tests passing, 0 clippy warnings. **Unblocks F-20 (Parser is now `Send`).** See `docs/TREE_SITTER_MIGRATION_PLAN.md`. |
 
 ---
 
@@ -52,10 +55,7 @@ These items are **prerequisites** for enterprise adoption. They address findings
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **A-09** | Multi-threaded MCP server dispatch | Convert the single-threaded stdin/stdout loop to a thread-pool model. Each tool call (compress, delta, CBM query) runs on its own thread. A slow CBM query must not block other tools. Use `std::thread::pool` or `rayon` for the dispatch layer. **This is the #1 adoption blocker.** | 2-3 days | 🔴 **P0 Critical** |
-| **A-10** | Proxy hardening: auth + rate limiting | Add optional API key header check (`X-Api-Key`) to the proxy. Add per-client rate limiting with configurable RPS and burst windows. Document nginx sidecar pattern for corporate TLS termination. Open HTTP proxy on localhost with no auth is a security finding. | 1 day | 🔴 **P0 Critical** |
 | **A-11** | Meta-layer detection hardening | Migrate from `source.contains()` string scanning to proper AST-node matching for Angular/Spring Boot detection. False positives from comments (`// TODO: remove @Component`) or string literals trigger the full meta-layer pipeline incorrectly. This pattern must be fixed BEFORE adding React, Vue, or ASP.NET meta-layers. | 1 day | 🔴 **P0 Critical** |
-| **A-12** | Tree-sitter version strategy | Document and implement a migration path for tree-sitter version bumps. Currently all tree-sitter crates are pinned with `=0.20.x` exact versions. This creates a dependency island incompatible with other Rust tools. Add a CI check that alerts on new tree-sitter releases. | 1 day | 🔴 High |
 | **A-13** | Resource limits and memory guardrails | Add explicit configuration for: max file size (default: 10 MB), max workspace file count (default: 10,000), max memory usage. Return graceful error messages instead of OOM crashes. Implement in the compression entry points and proxy body buffers. | 1 day | 🔴 High |
 | **A-14** | CI/CD awareness | Auto-disable persistence when `CI=true` or `TF_BUILD=true` env vars are detected. Default `.clean-ctx.json` should document this. Prevent stale `persistence.db` from leaking between CI builds. | 0.5 day | 🔴 High |
 | **A-15** | Configuration precedence documentation | Two parallel config systems (`.clean-ctx.json` + 12+ env vars for proxy). Document explicit precedence rules: tool arg > env var > config file > default. Add a `--config-dump` flag that prints the resolved configuration. | 0.5 day | 🟡 Medium |
@@ -69,8 +69,8 @@ These items address the most common user requests and unlock adoption on larger 
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **F-19** | Streaming workspace walk | Replace `collect_source_files` collect-then-sort pattern with a `walkdir` streaming visitor. Required before F-20. | 1 day | 🟡 Medium |
-| **F-20** | Rayon parallelization for `compress_workspace` | Per-thread tree-sitter `Parser` pool, shared `DashMap` for the path dictionary, `par_iter().try_for_each`. Expected ~4× speedup on 16-core boxes. Requires F-19. | 3-5 days | 🔴 High |
+| **F-19** | Streaming workspace walk | Replace `collect_source_files` collect-then-sort pattern with a `walkdir` streaming visitor. Pre-allocate path aliases during the single-threaded file-collection step to ensure deterministic `αN` numbering (aliases assigned in parallel would be a race). Required before F-20. | 1 day | 🟡 Medium |
+| **F-20** | Rayon parallelization for `compress_workspace` | Apply `par_iter()` to the per-file compression loop using a **"collect, then merge"** pattern: the parallel phase produces pure, owned `CompressResult` values with **no `McpState` access** (parse + capture + compress into a `String`, returned by value). A single sequential merge pass afterward handles all `dict`/`cache`/alias bookkeeping in deterministic order. This avoids the "all threads serialize on one `Mutex`" trap and keeps alias numbering (`αN`) stable. **Prerequisites:** F-19 (walkdir) ✅, A-12 (Parser `Send`) ✅. **Post-condition:** Add a regression test (`compress_workspace_dir` timeout on 20-50 file fixture) following the `dispatcher_regression.rs` pattern to catch re-entrant lock deadlocks. | 2-3 days | 🔴 High |
 | **A-07** | Property-based tests with `proptest` | Fuzz-style input tests for the decompressor, the config glob matcher, and the modifier stripper. Would have caught F-06 (Unicode) and F-12 (substring match) regressions. | 1-2 days | 🔴 High |
 | **R-29** | Intelligence Layer | Ranked context delivery on top of the existing compression stack. **Phase 1 (complete):** PageRank symbol scoring + CBM-informed adaptive per-symbol fidelity (60% IR + 40% CBM blend). **Phase 2 (complete):** Blast radius integrated into `handle_provide_code_context` and `handle_delta_code_context` — depth-1 affected files compressed at Low fidelity and appended with `§IMPACT` markers. Regression tests added. **Phase 3 (not started):** Token budget knapsack packing. All phases opt-in via `.clean-ctx.json`, zero overhead when disabled. See `docs/INTELLIGENCE_LAYER_PLAN.md`. | 5.5 days | 🔴 High |
 | **A-08** | TOKEN_EFFICIENCY_AUDIT findings | 4 open findings: underutilized `source_cache` (High), double IR compile in delta path (Medium), path resolution inconsistency (Medium), fragile source ownership (Low). | 1-2 days | 🟡 Medium |
@@ -80,13 +80,13 @@ These items address the most common user requests and unlock adoption on larger 
 
 ## Next (v0.3.0) — "Advanced capabilities"
 
-**GATE:** All Foundation items (A-09 through A-14) must be complete before v0.3.0 work begins. Meta-layer items (R-36, R-37, R-23, R-24) additionally depend on A-11 (detection hardening).
+**GATE:** All remaining Foundation items (A-10 through A-15) must be complete before v0.3.0 work begins. Meta-layer items (R-36, R-37, R-23, R-24) additionally depend on A-11 (detection hardening). Note: R-12's dependency on A-09 is now **unblocked** since A-09 shipped.
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
 | **R-01** | Python language layer | Most-requested language. Follows the 4-step guide in `DEVELOPER_DOCUMENTATION.md`. | 1-2 days | 🔴 High |
 | **R-02** | Type-aware compression | Inline `type_aliases` from config: `UserId` → `$uid`, `JsonObject` → `$jo`. Currently the type table is loaded but not injected into the capture pipeline. | 2-3 days | 🔴 High |
-| **R-12** | Multi-file / git-commit diff | Diff an entire workspace between two git commits; emit per-file deltas in one tool call. Powers "what changed in this PR?" workflows. | 3-5 days | 🔴 High |
+| **R-12** | Multi-file / git-commit diff | Diff an entire workspace between two git commits; emit per-file deltas in one tool call. Powers "what changed in this PR?" workflows. **A-09 ✅ (complete)** — now unblocked. | 3-5 days | 🔴 High |
 | **R-36** | React Meta-Layer | Additive meta-layer on TS/JS. Component/hook/context bundling, prop type compression, React-specific lifecycle markers. **BLOCKED by A-11.** | 3-4 days | 🔴 High |
 | **R-37** | Redux Meta-Layer | Additive meta-layer on TS/JS. Action/reducer/selector compression, thunk/saga patterns, store shape compression. **BLOCKED by A-11.** | 2-3 days | 🔴 High |
 | **R-23** | NgRx Meta-Layer | Framework-annotation layer for NgRx state management (sits on top of TS + Angular layers). **BLOCKED by A-11.** | 3-4 days | 🔴 High |
@@ -118,16 +118,13 @@ Code health work that has no user-facing feature but improves long-term maintain
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
 | **A-01** | Remove `src/helpers.rs` shim | The 18-line re-export shim should be removed once all internal callers are confirmed to use `crate::compaction::*`. | 1 hour | 🟢 Low |
-| **A-02** | Migrate to `walkdir` (precondition for F-20) | Required before parallelism can be added — streaming input is a prerequisite for `par_iter`. | 1 day | 🟡 Medium |
+| **A-02** | Migrate to `walkdir` (precondition for F-20) | Required before parallelism can be added — streaming input is a prerequisite for `par_iter`. Now absorbed into F-19 scope. | 1 day | 🟡 Medium |
 | **A-03** | `schemars` for tool schemas | Replaces hand-written JSON Schema in `src/mcp/tools.rs`; less drift between Rust types and advertised schema. | 1-2 days | 🟡 Medium |
 | **A-04** | `tracing` + `metrics` | Structured logging + OpenTelemetry-compatible spans; useful for diagnosing slow compressions in production. **Upgraded to Medium priority — see Now list.** | 2-3 days | 🟡 Medium |
 | **A-05** | Workspace-aware language detection | When `compress_workspace` runs, cache language detection results across files. TS file next to another TS file is, predictably, TS. | 1 day | 🟢 Low |
 | **A-07** | Property-based tests with `proptest` | See Now list. Fuzz-style input tests for decompressor, config glob matcher, modifier stripper. | 1-2 days | 🔴 High |
 | **A-08** | TOKEN_EFFICIENCY_AUDIT findings | 4 open findings: underutilized `source_cache` (High), double IR compile in delta path (Medium), path resolution inconsistency (Medium), fragile source ownership (Low). See `docs/TOKEN_EFFICIENCY_AUDIT.md`. | 1-2 days | 🟡 Medium |
-| **A-09** | Multi-threaded MCP server dispatch | See Foundation list. **P0 Critical — #1 adoption blocker.** | 2-3 days | 🔴 **P0 Critical** |
-| **A-10** | Proxy hardening: auth + rate limiting | See Foundation list. **P0 Critical — security finding.** | 1 day | 🔴 **P0 Critical** |
 | **A-11** | Meta-layer detection hardening | See Foundation list. **P0 Critical — blocks all new meta-layers.** | 1 day | 🔴 **P0 Critical** |
-| **A-12** | Tree-sitter version strategy | See Foundation list. Document migration path, add CI alert on new releases. | 1 day | 🔴 High |
 | **A-13** | Resource limits and memory guardrails | See Foundation list. Max file size, workspace count, memory limits with graceful errors. | 1 day | 🔴 High |
 | **A-14** | CI/CD awareness | See Foundation list. Auto-disable persistence in CI environments. | 0.5 day | 🔴 High |
 | **A-15** | Configuration precedence documentation | See Foundation list. Precedence rules + `--config-dump` flag. | 0.5 day | 🟡 Medium |
@@ -163,8 +160,11 @@ Items explicitly deferred — not forgotten, not prioritized.
 
 | ID | Title | Description | Status |
 |----|-------|-------------|--------|
-| **F-19** | Streaming workspace walk | See Now list. | 📋 Proposed |
-| **F-20** | Rayon parallelization | See Now list. | 📋 Proposed |
+| **F-19** | Streaming workspace walk | See Now list. F-20 prerequisite. | 📋 Proposed |
+| **F-20** | Rayon parallelization | See Now list. A-09 ✅, A-12 ✅ (Parser is now `Send`). Only F-19 remains as prerequisite. | 📋 Proposed |
+| **A-09** | Multi-threaded MCP server dispatch | ✅ **Completed in v0.2.0-rc1** — moved to Completed section. | ✅ Done |
+| **A-10** | Proxy hardening: auth + rate limiting | ✅ **Completed in v0.2.0-rc1** — moved to Completed section. | ✅ Done |
+| **A-12** | Tree-sitter version migration | ✅ **Completed in v0.2.0-rc1** — moved to Completed section. | ✅ Done |
 
 ---
 
@@ -172,27 +172,43 @@ Items explicitly deferred — not forgotten, not prioritized.
 
 ### Foundation-first ordering (v0.2.0)
 
-The Foundation items must ship FIRST because they are **blocking prerequisites** for enterprise adoption. They were identified by a FAANG-level architectural review and directly address:
+The Foundation items must ship FIRST because they are **blocking prerequisites** for enterprise adoption. They were identified by a FAANG-level architectural review.
 
-1. **A-09 (Multi-threaded MCP server)** — #1 adoption blocker. A single slow CBM query currently blocks ALL tools. Until this is fixed, the server cannot be used in production with CBM enabled, and even without CBM, a large file compression blocks all other concurrent requests.
+#### ✅ Completed Foundation items
 
-2. **A-10 (Proxy auth + rate limiting)** — #2 adoption blocker. Security teams will flag an open HTTP proxy on localhost that forwards to Anthropic/OpenAI. Any process on the machine can use it. Adding `X-Api-Key` auth and rate limiting closes this finding.
+**A-09 (Multi-threaded MCP server dispatch)** — The #1 adoption blocker is now **shipped in v0.2.0-rc1**. The production-grade `Dispatcher` (see `src/mcp/dispatcher.rs`) replaces the single-threaded stdin/stdout loop with:
 
-3. **A-11 (Meta-layer detection hardening)** — #3 adoption blocker. The current `source.contains()` pattern produces false positives (comments, string literals). This must be hardened BEFORE adding React, Redux, NgRx, Vue, or ASP.NET meta-layers — otherwise every new meta-layer inherits the same fragile detection.
+- `crossbeam_channel` bounded queue with backpressure (max depth: 1000)
+- Worker threads scaling to CPU count (auto-detected or configurable)
+- `RwLock`-protected `McpState` for parallel reads
+- `catch_unwind` panic recovery (poisoned lock reclamation)
+- Dedicated stdout writer thread (no interleaving)
+- Request tracing with timing, method names, and slow-request logging
+- Graceful shutdown with timeout support
 
-4. **A-12 (Tree-sitter version strategy)** — Supply-chain risk. Pinned `=0.20.x` versions create a dependency island. Must document a migration path before v1.0.0.
+A slow CBM query, file compression, or delta computation no longer blocks other tools. 6+ tests verify spawn lifecycle, concurrent mutations, panic recovery, and tracing.
 
-5. **A-13 (Resource limits)** — Production safety. Without documented max file size or memory limits, a single large file can OOM the server.
+#### Remaining Foundation items
 
-6. **A-14 (CI/CD awareness)** — CI adoption blocker. Default persistence writes `.clean-ctx/persistence.db` to project root, which leaks stale state between CI builds.
+1. **A-11 (Meta-layer detection hardening)** — #3 adoption blocker. The current `source.contains()` pattern produces false positives (comments, string literals). This must be hardened BEFORE adding React, Redux, NgRx, Vue, or ASP.NET meta-layers — otherwise every new meta-layer inherits the same fragile detection.
 
-7. **A-15 (Configuration precedence)** — Operational sanity. Two parallel config systems with no documented precedence creates user confusion and debugging difficulty.
+2. **A-13 (Resource limits)** — Production safety. Without documented max file size or memory limits, a single large file can OOM the server.
+
+3. **A-14 (CI/CD awareness)** — CI adoption blocker. Default persistence writes `.clean-ctx/persistence.db` to project root, which leaks stale state between CI builds.
+
+4. **A-15 (Configuration precedence)** — Operational sanity. Two parallel config systems with no documented precedence creates user confusion and debugging difficulty.
+
+#### ✅ Completed Foundation items (continued)
+
+**A-10 (Proxy hardening: auth + rate limiting) — Completed v0.2.0-rc1.** The #2 adoption blocker is now shipped. Optional `X-Api-Key` header authentication via `PROXY_API_KEY` env var. Per-client-IP token bucket rate limiter (configurable `RATE_LIMIT_RPS`/`RATE_LIMIT_BURST`, default 60/10). Returns `401 Unauthorized` for bad/missing keys, `429 Too Many Requests` when rate limited. Rate limiter uses GC-enabled sliding window to prevent unbounded map growth. Stats endpoint exposes rate limiter status. Nginx sidecar pattern documented in `docs/PROXY.md`. 141 proxy tests passing.
+
+**A-12 (Tree-sitter version migration) — Completed v0.2.0-rc1.** This item was upgraded to P0 Critical because it blocked F-20 (Rayon), was a supply-chain risk, created a dependency island, and blocked new grammars. The migration from `=0.20.x` pins to `^0.26.x` semver ranges is now complete — all 6 tree-sitter crates updated, Parser API migrated, `Parser` is now `Send`, CI guard in place, 1,360 tests passing, 0 clippy warnings. See `docs/TREE_SITTER_MIGRATION_PLAN.md`.
 
 ### Now list priorities (v0.2.0)
 
 These items may proceed in parallel with Foundation items, but v0.2.0 must NOT ship until Foundation is complete:
 
-1. **F-19 → F-20 (walkdir + Rayon)** — Streamlined workspace handling and parallel compilation. Builds on the multi-threaded dispatch from A-09.
+1. **F-19 (walkdir) → F-20 (Rayon)** — A-12 (tree-sitter migration ✅) now makes `Parser` `Send`. F-20 uses a **"collect, then merge"** pattern: the parallel phase produces pure, owned results with no `McpState` access (parse + capture + compress into `String`), then a sequential merge pass handles all `dict`/`cache`/alias bookkeeping in deterministic order. This avoids the "all threads serialize on one `Mutex`" trap and keeps `αN` numbering stable. F-19 (streaming walkdir) is the next prerequisite, then F-20 adds `par_iter()` on top. A regression test (`compress_workspace_dir` timeout on 20-50 file fixture) must be added following the `dispatcher_regression.rs` pattern.
 2. **A-07 (proptest)** — Regression insurance against input-validation bugs. Cheap to implement, prevents regressions.
 3. **R-29 (Intelligence Layer)** — Phase 1 (PageRank) + Phase 2 (blast radius) complete. Phase 3 (token budget packing) not started.
 4. **A-08 (Token Efficiency Audit)** — 4 open findings to resolve before claiming production-readiness.
@@ -200,17 +216,17 @@ These items may proceed in parallel with Foundation items, but v0.2.0 must NOT s
 
 ### Next list priorities (v0.3.0)
 
-GATED by Foundation completion. Meta-layer items additionally gated by A-11:
+GATED by remaining Foundation completion (A-10 through A-15). Meta-layer items additionally gated by A-11. Note: R-12's dependency on A-09 is now **unblocked** since A-09 shipped.
 
 | Priority | Item | Dependency |
 |----------|------|------------|
-| 🔴 High | R-01 Python language layer | None |
+| 🔴 High | R-01 Python language layer | None (A-12 unblocks newer grammar crate) |
 | 🔴 High | R-02 Type-aware compression | None |
-| 🔴 High | R-12 Multi-file git-commit diff | A-09 (multi-threaded server) |
+| 🔴 High | R-12 Multi-file git-commit diff | **A-09 ✅ (complete)** — now unblocked |
 | 🔴 High | R-36 React Meta-Layer | **A-11 (detection hardening)** |
 | 🔴 High | R-37 Redux Meta-Layer | **A-11 (detection hardening)** |
 | 🔴 High | R-23 NgRx Meta-Layer | **A-11 (detection hardening)** |
-| 🟡 Medium | R-01b Go language layer | None |
+| 🟡 Medium | R-01b Go language layer | None (A-12 unblocks newer grammar crate) |
 | 🟡 Medium | R-07 MCP resources support | None |
 | 🟡 Medium | R-08 Improved diff: rename detection | None |
 

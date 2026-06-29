@@ -18,31 +18,31 @@ use tree_sitter::Language;
 
 use crate::queries;
 
-/// Thread-safe wrapper around `tree_sitter_typescript::language_typescript()`.
+/// Thread-safe wrapper around `tree_sitter_typescript::LANGUAGE_TYPESCRIPT`.
 /// Uses `OnceLock` to ensure only one thread ever initializes the WASM parser,
 /// preventing the Windows deadlock that occurs when multiple threads race to
 /// initialize tree-sitter's internal `OnceLock` simultaneously.
 pub fn safe_typescript_language() -> Language {
     static LANG: OnceLock<Language> = OnceLock::new();
-    *LANG.get_or_init(tree_sitter_typescript::language_typescript)
+    LANG.get_or_init(|| tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()).clone()
 }
 
-/// Thread-safe wrapper around `tree_sitter_c_sharp::language()`.
+/// Thread-safe wrapper around `tree_sitter_c_sharp::LANGUAGE`.
 pub fn safe_csharp_language() -> Language {
     static LANG: OnceLock<Language> = OnceLock::new();
-    *LANG.get_or_init(tree_sitter_c_sharp::language)
+    LANG.get_or_init(|| tree_sitter_c_sharp::LANGUAGE.into()).clone()
 }
 
-/// Thread-safe wrapper around `tree_sitter_rust::language()`.
+/// Thread-safe wrapper around `tree_sitter_rust::LANGUAGE`.
 pub fn safe_rust_language() -> Language {
     static LANG: OnceLock<Language> = OnceLock::new();
-    *LANG.get_or_init(tree_sitter_rust::language)
+    LANG.get_or_init(|| tree_sitter_rust::LANGUAGE.into()).clone()
 }
 
-/// Thread-safe wrapper around `tree_sitter_java::language()`.
+/// Thread-safe wrapper around `tree_sitter_java::LANGUAGE`.
 pub fn safe_java_language() -> Language {
     static LANG: OnceLock<Language> = OnceLock::new();
-    *LANG.get_or_init(tree_sitter_java::language)
+    LANG.get_or_init(|| tree_sitter_java::LANGUAGE.into()).clone()
 }
 
 /// Returns `true` if the source text looks like C#. The heuristic is

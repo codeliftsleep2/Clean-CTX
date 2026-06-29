@@ -32,10 +32,11 @@ use crate::filter_registry::FilterRegistry;
 use crate::logger::{self, LogStats};
 use crate::pipeline::{Pipeline, PipelineConfig};
 use crate::platform::{self, PlatformAdapter};
+use crate::rate_limiter::RateLimiter;
 use crate::transform::TransformStats;
 
-/// Maximum request body size (10 MB).
-pub const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
+/// Default maximum request body size (10 MB).
+pub const DEFAULT_MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
 
 /// Upstream request timeout (connect + read).
 pub const UPSTREAM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
@@ -55,6 +56,8 @@ pub struct ProxyState {
     pub http_client: reqwest::Client,
     /// Shared filter registry (loaded once at startup, Arc for zero-copy sharing).
     pub filter_registry: Arc<FilterRegistry>,
+    /// Per-client-IP rate limiter (only used when api_key is set).
+    pub rate_limiter: RateLimiter,
 }
 
 impl ProxyState {
@@ -68,6 +71,9 @@ impl ProxyState {
         // Delegate filter loading to filter_loader module (SRP compliance)
         let filter_registry = Arc::new(load_builtin_filters());
 
+        // Create rate limiter with configured limits
+        let rate_limiter = RateLimiter::new(config.rate_limit_rps, config.rate_limit_burst);
+
         Self {
             config,
             cache_stats: CacheStats::default(),
@@ -76,6 +82,7 @@ impl ProxyState {
             request_counter: AtomicU64::new(0),
             http_client,
             filter_registry,
+            rate_limiter,
         }
     }
 
@@ -161,6 +168,63 @@ fn is_connection_closed(e: &hyper::Error) -> bool {
     e.is_incomplete_message() || e.is_closed()
 }
 
+/// Extract the client IP from the request (X-Forwarded-For or peer addr).
+fn extract_client_ip(parts: &hyper::http::request::Parts) -> String {
+    if let Some(forwarded) = parts.headers.get("x-forwarded-for") {
+        if let Ok(val) = forwarded.to_str() {
+            if let Some(ip) = val.split(',').next() {
+                return ip.trim().to_string();
+            }
+        }
+    }
+    // Fallback: use a placeholder since we don't have direct access to peer addr here.
+    // The peer_addr is available at the connection level but not passed to handle_request.
+    "unknown".to_string()
+}
+
+/// Build a 401 Unauthorized response.
+fn unauthorized_response(msg: &str) -> Response<Full<BytesType>> {
+    let body = serde_json::json!({
+        "error": msg
+    });
+    Response::builder()
+        .status(StatusCode::UNAUTHORIZED)
+        .header("content-type", "application/json")
+        .body(Full::new(BytesType::from(
+            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string())
+        )))
+        .unwrap()
+}
+
+/// Build a 429 Too Many Requests response.
+fn rate_limited_response() -> Response<Full<BytesType>> {
+    let body = serde_json::json!({
+        "error": "Rate limit exceeded. Try again later."
+    });
+    Response::builder()
+        .status(StatusCode::TOO_MANY_REQUESTS)
+        .header("content-type", "application/json")
+        .header("retry-after", "1")
+        .body(Full::new(BytesType::from(
+            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string())
+        )))
+        .unwrap()
+}
+
+/// Build a 502 Bad Gateway response.
+fn bad_gateway_response(msg: &str) -> Response<Full<BytesType>> {
+    let body = serde_json::json!({
+        "error": msg
+    });
+    Response::builder()
+        .status(StatusCode::BAD_GATEWAY)
+        .header("content-type", "application/json")
+        .body(Full::new(BytesType::from(
+            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string())
+        )))
+        .unwrap()
+}
+
 /// Handle an incoming HTTP request.
 async fn handle_request(
     req: Request<Incoming>,
@@ -176,6 +240,28 @@ async fn handle_request(
     let method = parts.method.clone();
 
     debug!("[{req_id}] {method} {path}");
+
+    // ── Authentication check (if api_key is configured) ──────────
+    {
+        let guard = state.read().await;
+        if let Some(ref expected_key) = guard.config.api_key {
+            let provided_key = parts.headers
+                .get("x-api-key")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            if provided_key != expected_key {
+                warn!("[{req_id}] Unauthorized request (bad or missing API key)");
+                return Ok(unauthorized_response("Missing or invalid API key. Provide via X-Api-Key header."));
+            }
+
+            // Rate limit check (only when auth is active)
+            let client_ip = extract_client_ip(&parts);
+            if !guard.rate_limiter.check(&client_ip).await {
+                warn!("[{req_id}] Rate limit exceeded for {client_ip}");
+                return Ok(rate_limited_response());
+            }
+        }
+    }
 
     // ── GET /stats: return proxy stats as JSON ────────────────
     if path == "/stats" && method == Method::GET {
@@ -195,12 +281,7 @@ async fn handle_request(
             Ok(resp) => Ok(resp),
             Err(e) => {
                 error!("[{req_id}] Error handling /v1/messages: {e}");
-                Ok(Response::builder()
-                    .status(StatusCode::BAD_GATEWAY)
-                    .body(Full::new(BytesType::from(
-                        "{\"error\": \"Proxy error\"}".to_string()
-                    )))
-                    .unwrap())
+                Ok(bad_gateway_response("Proxy error"))
             }
         }
     } else {
@@ -215,7 +296,11 @@ async fn handle_messages_request(
     req_id: &str,
     state: SharedState,
 ) -> Result<Response<Full<BytesType>>, ProxyError> {
-    let body_bytes = read_body(body).await?;
+    let max_body_size = {
+        let guard = state.read().await;
+        guard.config.max_request_body_size
+    };
+    let body_bytes = read_body(body, max_body_size).await?;
 
     let mut body_value: serde_json::Value = serde_json::from_slice(&body_bytes)
         .map_err(|e| ProxyError::Body(format!("Failed to parse request JSON: {e}")))?;
@@ -278,16 +363,15 @@ async fn forward_request(
     req_id: &str,
     state: SharedState,
 ) -> Result<Response<Full<BytesType>>, std::convert::Infallible> {
-    let body_bytes = match read_body(body).await {
+    let max_body_size = {
+        let guard = state.read().await;
+        guard.config.max_request_body_size
+    };
+    let body_bytes = match read_body(body, max_body_size).await {
         Ok(b) => b,
         Err(e) => {
             error!("[{req_id}] Failed to read body: {e}");
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_GATEWAY)
-                .body(Full::new(BytesType::from(
-                    "{\"error\": \"Proxy error\"}".to_string()
-                )))
-                .unwrap());
+            return Ok(bad_gateway_response("Proxy error"));
         }
     };
 
@@ -295,12 +379,7 @@ async fn forward_request(
         Ok(resp) => Ok(resp),
         Err(e) => {
             error!("[{req_id}] Upstream error: {e}");
-            Ok(Response::builder()
-                .status(StatusCode::BAD_GATEWAY)
-                .body(Full::new(BytesType::from(
-                    "{\"error\": \"Upstream error\"}".to_string()
-                )))
-                .unwrap())
+            Ok(bad_gateway_response("Upstream error"))
         }
     }
 }
@@ -342,16 +421,16 @@ async fn forward_to_upstream(
     );
 
     for (name, value) in parts.headers.iter() {
-        let name_lower = name.as_str().to_lowercase();
-        if name_lower != "host"
-            && name_lower != "connection"
-            && name_lower != "keep-alive"
-            && name_lower != "transfer-encoding"
-            && name_lower != "te"
-            && name_lower != "trailer"
-            && name_lower != "upgrade"
+        let name_str = name.as_str();
+        if !name_str.eq_ignore_ascii_case("host")
+            && !name_str.eq_ignore_ascii_case("connection")
+            && !name_str.eq_ignore_ascii_case("keep-alive")
+            && !name_str.eq_ignore_ascii_case("transfer-encoding")
+            && !name_str.eq_ignore_ascii_case("te")
+            && !name_str.eq_ignore_ascii_case("trailer")
+            && !name_str.eq_ignore_ascii_case("upgrade")
         {
-            req_builder = req_builder.header(name.as_str(), value.as_bytes());
+            req_builder = req_builder.header(name_str, value.as_bytes());
         }
     }
 
@@ -411,15 +490,15 @@ async fn forward_to_upstream(
 }
 
 /// Read the full body from an incoming hyper request with size limit.
-async fn read_body(body: Incoming) -> Result<Bytes, ProxyError> {
+async fn read_body(body: Incoming, max_size: usize) -> Result<Bytes, ProxyError> {
     use http_body_util::BodyExt;
     let collected = body.collect().await?;
     let bytes = collected.to_bytes();
-    if bytes.len() > MAX_BODY_SIZE {
+    if bytes.len() > max_size {
         return Err(ProxyError::Body(format!(
             "Request body too large: {} bytes (max {})",
             bytes.len(),
-            MAX_BODY_SIZE
+            max_size
         )));
     }
     Ok(bytes)
@@ -429,13 +508,11 @@ async fn read_body(body: Incoming) -> Result<Bytes, ProxyError> {
 async fn handle_stats_endpoint(state: SharedState) -> Response<Full<BytesType>> {
     let guard = state.read().await;
     let filter_stats = crate::filter_stats::FilterStats::new();
-    // Note: filter_stats is a placeholder — the proxy accumulates
-    // filter stats in transform_stats, not in a FilterStats struct.
-    // We return the cache_stats directly and a placeholder filter_stats
-    // that the MCP server can use to verify the endpoint is alive.
     let json = serde_json::json!({
         "filter_stats": filter_stats,
         "cache_stats": guard.cache_stats,
+        "rate_limiter": guard.rate_limiter.stats_summary().await,
+        "api_key_configured": guard.config.api_key.is_some(),
     });
     let body = serde_json::to_string(&json).unwrap_or_else(|_| "{}".to_string());
     Response::builder()
@@ -458,5 +535,43 @@ mod tests {
         assert_ne!(id1, id2);
         assert_eq!(id1, "000000");
         assert_eq!(id2, "000001");
+    }
+
+    #[test]
+    fn test_unauthorized_response_format() {
+        let resp = unauthorized_response("Missing or invalid API key");
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        let content_type = resp.headers().get("content-type").unwrap().to_str().unwrap();
+        assert_eq!(content_type, "application/json");
+    }
+
+    #[test]
+    fn test_rate_limited_response_format() {
+        let resp = rate_limited_response();
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert!(resp.headers().get("retry-after").is_some());
+    }
+
+    #[test]
+    fn test_extract_client_ip_from_forwarded() {
+        let req = Request::builder()
+            .uri("/v1/messages")
+            .method(Method::POST)
+            .header("x-forwarded-for", "10.0.0.1, 10.0.0.2")
+            .body(http_body_util::Full::new(bytes::Bytes::new()))
+            .unwrap();
+        let (parts, _) = req.into_parts();
+        assert_eq!(extract_client_ip(&parts), "10.0.0.1");
+    }
+
+    #[test]
+    fn test_extract_client_ip_fallback() {
+        let req = Request::builder()
+            .uri("/v1/messages")
+            .method(Method::POST)
+            .body(http_body_util::Full::new(bytes::Bytes::new()))
+            .unwrap();
+        let (parts, _) = req.into_parts();
+        assert_eq!(extract_client_ip(&parts), "unknown");
     }
 }

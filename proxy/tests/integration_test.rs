@@ -102,6 +102,10 @@ async fn test_proxy_full() {
         scrub_secrets: false,
         tool_filters: false,
         platform: None,
+        api_key: None,
+        rate_limit_rps: 60.0,
+        rate_limit_burst: 10.0,
+        max_request_body_size: 10 * 1024 * 1024,
     };
     let (tx, rx) = watch::channel(false);
     let ph = tokio::spawn(async move {

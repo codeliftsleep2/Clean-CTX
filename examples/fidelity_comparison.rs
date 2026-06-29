@@ -304,7 +304,7 @@ fn run_simulation(fidelity: Fidelity) -> FidelityRun {
         let edit_num = i + 1;
         std::fs::write(&temp_path, source).unwrap();
         let raw_tokens = bpe.encode_with_special_tokens(source).len();
-        let compressed_output = compress_file(file_path.clone(), &mut dict, &mut cache, fidelity)
+        let compressed_output = compress_file(file_path.clone(), &mut dict, &mut cache, fidelity, None)
             .unwrap_or_else(|e| format!("// Failed: {}", e));
         let compressed_tokens = bpe.encode_with_special_tokens(&compressed_output).len();
 

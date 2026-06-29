@@ -109,6 +109,7 @@ pub(crate) fn handle_compress_code_context(
         match crate::compression::pipeline::compress_file_with_source(
             PathBuf::from(&resolved_path), source_ref,
             &mut state.dict_lock(), &mut state.cache_write(), effective_fidelity,
+            Some(&state.config),
         ) {
             Ok(mut compressed_text) => {
                 compressed_text.push_str(&state.format_dict_footer());
@@ -451,6 +452,7 @@ pub(crate) fn handle_provide_code_context(
                 match crate::compression::pipeline::compress_file_with_source(
                     PathBuf::from(&resolved_path), Some(source),
                     &mut state.dict_lock(), &mut state.cache_write(), effective_fidelity,
+                    Some(&state.config),
                 ) {
                     Ok(mut compressed_text) => {
                         compressed_text.push_str(&state.format_dict_footer());
@@ -517,6 +519,7 @@ pub(crate) fn handle_restore_context(
             match crate::compression::pipeline::compress_file_with_source(
                 PathBuf::from(&resolved_path), Some(source_text),
                 &mut state.dict_lock(), &mut state.cache_write(), fidelity,
+                Some(&state.config),
             ) {
                 Ok(mut compressed_text) => {
                     compressed_text.push_str(&state.format_dict_footer());

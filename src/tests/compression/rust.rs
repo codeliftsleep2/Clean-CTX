@@ -132,6 +132,7 @@ mod rust_compression_tests {
             &mut dict,
             &mut cache,
             Fidelity::Low,
+            None,
         );
 
         assert!(result.is_ok(), "compress_file_with_source should succeed for .rs: {:?}", result.err());
@@ -172,6 +173,7 @@ mod rust_compression_tests {
             &mut dict,
             &mut cache,
             Fidelity::Medium,
+            None,
         );
 
         assert!(result.is_ok(), "Medium fidelity for .rs should succeed: {:?}", result.err());
