@@ -1,10 +1,9 @@
 use super::*;
 use crate::queries;
-
 #[test]
 fn empty_source_yields_no_captures() {
     let captures = run_capture_pipeline(
-        tree_sitter_typescript::language_typescript(),
+        crate::compression::language::safe_typescript_language(),
         queries::TS_QUERY,
         "",
         Fidelity::Low,
@@ -22,7 +21,7 @@ fn captures_are_sorted_by_position() {
     "#;
     let mut names: Vec<String> = Vec::new();
     let captures = run_capture_pipeline(
-        tree_sitter_typescript::language_typescript(),
+        crate::compression::language::safe_typescript_language(),
         queries::TS_QUERY,
         src,
         Fidelity::Low,
@@ -42,7 +41,7 @@ fn captures_are_sorted_by_position() {
 fn process_can_drop_captures() {
     let src = "class A {}";
     let captures = run_capture_pipeline(
-        tree_sitter_typescript::language_typescript(),
+        crate::compression::language::safe_typescript_language(),
         queries::TS_QUERY,
         src,
         Fidelity::Low,
@@ -68,7 +67,7 @@ fn fidelity_is_passed_through_to_closure() {
     let src = "class A {}";
     let mut seen: Option<Fidelity> = None;
     let _ = run_capture_pipeline(
-        tree_sitter_typescript::language_typescript(),
+        crate::compression::language::safe_typescript_language(),
         queries::TS_QUERY,
         src,
         Fidelity::High,
@@ -87,7 +86,7 @@ fn fidelity_medium_is_passed_through_to_closure() {
     let src = "class A {}";
     let mut seen: Option<Fidelity> = None;
     let _ = run_capture_pipeline(
-        tree_sitter_typescript::language_typescript(),
+        crate::compression::language::safe_typescript_language(),
         queries::TS_QUERY,
         src,
         Fidelity::Medium,

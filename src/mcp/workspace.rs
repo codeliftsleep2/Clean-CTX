@@ -183,27 +183,34 @@ fn compress_pass(
         .cloned()
         .collect();
 
+    #[cfg(debug_assertions)]
+    eprintln!("[compress_pass] Starting compression of {} files", compressible.len());
+
     // C-1 fix: Create tokenizer once before the loop instead of per-file.
     let ws_tok = crate::tokenizer::create_tokenizer(
         crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
     ).ok();
     let ws_tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = ws_tok.as_deref();
 
-    for entry in &compressible {
+    for (_idx, entry) in compressible.iter().enumerate() {
         // Pre-read via source_cache so bundle_pass/graph_pass
         // get cache hits instead of re-reading from disk.
         let source_arc = state.read_source(entry).ok();
         let source_ref = source_arc.as_ref().map(|s| s.as_str());
 
+        let mut dict_guard = state.dict_lock();
+        let mut cache_guard = state.cache_write();
+
         match compress_file_with_source(
             PathBuf::from(&entry),
             source_ref,
-            &mut state.dict_lock(),
-            &mut state.cache_write(),
+            &mut dict_guard,
+            &mut cache_guard,
             fidelity,
         ) {
             Ok(compressed) => {
-                let alias = state.get_or_create_alias(entry.clone());
+                // Use the already-held dict_guard instead of re-locking through state
+                let alias = dict_guard.get_or_create_alias(entry.clone());
                 manifest.push_str(&format!(
                     "// ===== FILE: {} =====\n// α alias: {}\n",
                     entry, alias
@@ -290,10 +297,13 @@ fn compress_pass_with_global_symbols(
             }
         };
 
-        // Compress without per-file symbol compression.
-        match compress_source(&source_code, entry, &mut state.dict_lock(), &mut state.cache_write(), fidelity) {
+        let mut dict_guard = state.dict_lock();
+        let mut cache_guard = state.cache_write();
+
+        match compress_source(&source_code, entry, &mut dict_guard, &mut cache_guard, fidelity) {
             Ok(compressed) => {
-                let alias = state.get_or_create_alias(entry.clone());
+                // Use the already-held dict_guard instead of re-locking through state
+                let alias = dict_guard.get_or_create_alias(entry.clone());
                 // Extract the body from the compressed output.
                 // The compressed output has the report header + body.
                 // We need the body for global symbol encoding.

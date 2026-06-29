@@ -115,9 +115,17 @@ fn collect_source_files_inner(
 
     let dir_path = Path::new(dir);
 
-    let canonical = match std::fs::canonicalize(dir_path) {
-        Ok(p) => p,
-        Err(_) => return,
+    // F-FULL-01/F-FULL-05: Fast-path canonicalize skip for absolute paths.
+    // On Windows, canonicalize on TempDir paths triggers Defender deep-scan
+    // hooks (10-30s per call). Skip canonicalize when the path is already
+    // absolute and contains no relative components.
+    let canonical = if dir_path.is_absolute() && !dir.contains("..") && !dir.contains("./") && !dir.contains(".\\") {
+        dir_path.to_path_buf()
+    } else {
+        match std::fs::canonicalize(dir_path) {
+            Ok(p) => p,
+            Err(_) => return,
+        }
     };
     if !visited.insert(canonical) {
         return;
@@ -137,9 +145,16 @@ fn collect_source_files_inner(
             }
 
             if path.is_dir() {
-                if let Ok(child_canonical) = std::fs::canonicalize(&path)
-                    && visited.contains(&child_canonical)
-                {
+                // F-FULL-01/F-FULL-05: Fast-path canonicalize skip for child dirs too.
+                let child_canonical = if path.is_absolute() && !path.to_string_lossy().contains("..") && !path.to_string_lossy().contains("./") && !path.to_string_lossy().contains(".\\") {
+                    path.clone()
+                } else {
+                    match std::fs::canonicalize(&path) {
+                        Ok(p) => p,
+                        Err(_) => continue,
+                    }
+                };
+                if visited.contains(&child_canonical) {
                     continue;
                 }
                 collect_source_files_inner(

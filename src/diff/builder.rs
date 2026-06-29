@@ -27,9 +27,9 @@ type ParserConfig = (fn() -> tree_sitter::Language, &'static str, &'static str);
 
 /// All supported parser configurations, in the order they should be tried.
 const ALL_PARSERS: &[ParserConfig] = &[
-    (tree_sitter_rust::language, queries::RS_QUERY, "rust"),
-    (tree_sitter_c_sharp::language, queries::CS_QUERY, "csharp"),
-    (tree_sitter_typescript::language_typescript, queries::TS_QUERY, "typescript"),
+    (crate::compression::language::safe_rust_language, queries::RS_QUERY, "rust"),
+    (crate::compression::language::safe_csharp_language, queries::CS_QUERY, "csharp"),
+    (crate::compression::language::safe_typescript_language, queries::TS_QUERY, "typescript"),
 ];
 
 /// Build a structural snapshot by parsing the source with tree-sitter and

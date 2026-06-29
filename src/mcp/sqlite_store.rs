@@ -24,7 +24,7 @@ use crate::ir::compiler::CompiledIR;
 
 /// SQLite-backed implementation of [`ContextStore`].
 pub struct SqliteStore {
-    conn: Connection,
+    pub conn: Connection,
 }
 
 impl SqliteStore {

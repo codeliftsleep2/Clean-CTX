@@ -517,6 +517,7 @@ pub fn compress_source(
     let source_bytes = source_code.as_bytes();
     let current_hash = cache.compute_hash(source_bytes);
     let path_alias = dict.get_or_create_alias(absolute_path.to_string());
+    eprintln!("[compress_source] got alias {} for {}", path_alias, absolute_path);
 
     let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
     let is_modified = cache.update_and_verify(&cache_key, &current_hash);
@@ -620,15 +621,21 @@ pub fn compress_source(
             }
         },
     )?;
+     eprintln!("[compress_source] run_capture_pipeline returned {} captures", all_captures.len());
+
 
     let built = build_output_lines(&all_captures, source_code, fidelity, None);
+    eprintln!("[compress_source] build_output_lines done");
     let mut body_content = assemble_body(&built.output_lines, fidelity);
+     eprintln!("[compress_source] assemble_body done");
     if let Some(block) = &built.meta_block {
         body_content.push_str(&block.render());
     }
+     eprintln!("[compress_source] meta_block rendered");
     // Phase III (Idea #11 — Micro-Opcode Table for Text):
     // Apply micro-opcodes (§C, §P) for workspace-level compression too.
     body_content = apply_micro_opcodes(&body_content, fidelity);
+    eprintln!("[compress_source] apply_micro_opcodes done");
     // NOTE: Symbol compression is NOT applied here — it will be applied
     // by the workspace-level global symbol table instead.
     let compacted_body = crate::compression::report::format_compacted_body(
@@ -637,11 +644,14 @@ pub fn compress_source(
         &path_alias,
         fidelity,
     );
+        eprintln!("[compress_source] format_compacted_body done");
     let raw_tokens = crate::analytics::bpe()
         .encode_with_special_tokens(source_code)
         .len();
+    eprintln!("[compress_source] bpe encode done, {} tokens", raw_tokens);
     cache.store_raw_token_count(&current_hash, raw_tokens);
 
+    eprintln!("[compress_source] store_raw_token_count done");
     let final_output = crate::compression::report::format_final_output(
         source_code,
         &compacted_body,
@@ -650,6 +660,7 @@ pub fn compress_source(
         built.method_count,
         built.import_count,
     );
+    eprintln!("[compress_source] format_final_output done");
     Ok(final_output)
 }
 

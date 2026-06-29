@@ -3,6 +3,7 @@
 // Core MCP tool handlers: compression, IR, delta, and unified entry point.
 use std::path::PathBuf;
 use serde_json::Value;
+use sha2::{Sha256, Digest};
 use crate::ir::wire::ir_to_wire;
 use crate::ir::wire::tuple_to_op;
 use crate::ir::delta::{IRDelta, DeltaComputer};
@@ -69,12 +70,20 @@ pub(crate) fn handle_compress_code_context(
             &format!("{:?}", effective_fidelity).to_lowercase(), false, "full", None, "ir_compression");
 
         // Persist to DB
-        if let Some(ref store) = *state.persistence_store_lock() {
-            store.queue_save_context(
-                &resolved_path, effective_fidelity, &llm_text_with_footer,
-                &[], "", raw_tokens as u64, compressed_tokens as u64,
-            );
+        {
+            if let Some(ref store) = *state.persistence_store_lock() {
+                // Compute content hash from source text for deterministic ID
+                let mut hasher = Sha256::new();
+                hasher.update(source_text.as_bytes());
+                let source_hash = format!("{:x}", hasher.finalize());
+                
+                store.queue_save_context(
+                    &resolved_path, effective_fidelity, &llm_text_with_footer,
+                    &[], &source_hash, raw_tokens as u64, compressed_tokens as u64,
+                );
+            }
         }
+        state.flush_persistence();
 
         let ir_value = match encoding {
             "positional" => {
@@ -109,12 +118,20 @@ pub(crate) fn handle_compress_code_context(
                     &format!("{:?}", effective_fidelity).to_lowercase(), false, "full", None, "ir_compression");
 
                 // Persist to DB
-                if let Some(ref store) = *state.persistence_store_lock() {
-                    store.queue_save_context(
-                        &resolved_path, effective_fidelity, &compressed_text,
-                        &[], "", raw_tokens as u64, comp_tokens as u64,
-                    );
+                {
+                    if let Some(ref store) = *state.persistence_store_lock() {
+                        // Compute content hash from source text for deterministic ID
+                        let mut hasher = Sha256::new();
+                        hasher.update(source_text.as_bytes());
+                        let source_hash = format!("{:x}", hasher.finalize());
+                        
+                        store.queue_save_context(
+                            &resolved_path, effective_fidelity, &compressed_text,
+                            &[], &source_hash, raw_tokens as u64, comp_tokens as u64,
+                        );
+                    }
                 }
+                state.flush_persistence();
 
                 serde_json::json!({
                     "jsonrpc": "2.0", "id": id,

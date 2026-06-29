@@ -415,25 +415,74 @@ impl McpState {
         }
     }
 
+    /// Resolve a cache key for `source_cache`. On Windows, `canonicalize`
+    /// on TempDir paths can trigger Defender deep-scan hooks (10-30s per
+    /// call). We skip canonicalize when the path is already absolute and
+    /// contains no relative components (`..`), falling back to the raw
+    /// string as the key.
+    fn resolve_cache_key(path: &str) -> String {
+        use std::path::Path;
+        let p = Path::new(path);
+        if p.is_absolute() && !path.contains("..") && !path.contains("./") && !path.contains(".\\") {
+            #[cfg(debug_assertions)]
+            eprintln!("[resolve_cache_key] FAST PATH: {}", path);
+            return path.to_string();
+        }
+        #[cfg(debug_assertions)]
+        eprintln!("[resolve_cache_key] SLOW PATH (canonicalize): {}", path);
+        let canon_start = std::time::Instant::now();
+        let result = p.canonicalize()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| path.to_string());
+        #[cfg(debug_assertions)]
+        eprintln!("[resolve_cache_key] canonicalize took {:?} for {}", canon_start.elapsed(), path);
+        result
+    }
+
     /// F-FULL-01/F-FULL-05: Read file content, using the shared source cache.
     /// Returns `Arc<String>` so the cache can be shared across passes
     /// without cloning the underlying string data.
     ///
-    /// **Canonicalization note:** The path is canonicalized via
-    /// `std::fs::canonicalize` before being used as a cache key. This means
-    /// symlink-equivalent paths (e.g., `/real/path/file.rs` and
-    /// `/link/to/file.rs` pointing to the same file) share a single cache
-    /// entry. The first call to `read_source` with either path populates
-    /// the cache; subsequent calls with either path return the same `Arc`
-    /// allocation. This also applies to relative-vs-absolute variants:
-    /// `"./src/lib.rs"` and `/abs/path/src/lib.rs` resolve to the same
-    /// canonical path and share the cache.
+    /// **Two-phase locking:** The Mutex is held only during cache lookup
+    /// and update, NOT during `read_to_string`. This prevents I/O from
+    /// blocking concurrent readers.
     pub fn read_source(&self, path: &str) -> Result<Arc<String>, std::io::Error> {
-        use std::path::Path;
-        let cache_key = Path::new(path)
-            .canonicalize()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| path.to_string());
+        let cache_key = Self::resolve_cache_key(path);
+        #[cfg(debug_assertions)]
+        let overall_start = std::time::Instant::now();
+
+        // Phase 1: Check cache (brief lock, release before I/O)
+        {
+            #[cfg(debug_assertions)]
+            let lock_start = std::time::Instant::now();
+            let cache = match self.source_cache.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (source_cache)");
+                    poisoned.into_inner()
+                }
+            };
+            #[cfg(debug_assertions)]
+            eprintln!("[read_source] Phase 1 lock acquire took {:?} for {}", lock_start.elapsed(), path);
+            if let Some(cached) = cache.get(&cache_key) {
+                #[cfg(debug_assertions)]
+                eprintln!("[read_source] CACHE HIT for {} (total: {:?})", path, overall_start.elapsed());
+                return Ok(Arc::clone(cached));
+            }
+            #[cfg(debug_assertions)]
+            eprintln!("[read_source] CACHE MISS for {}", path);
+        }
+
+        // Phase 2: Read file WITHOUT holding the lock
+        #[cfg(debug_assertions)]
+        let io_start = std::time::Instant::now();
+        let content = Arc::new(std::fs::read_to_string(path)?);
+        #[cfg(debug_assertions)]
+        eprintln!("[read_source] Phase 2 read_to_string took {:?} for {} ({} bytes)", io_start.elapsed(), path, content.len());
+
+        // Phase 3: Update cache (brief lock, with double-check)
+        #[cfg(debug_assertions)]
+        let lock2_start = std::time::Instant::now();
         let mut cache = match self.source_cache.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -441,11 +490,12 @@ impl McpState {
                 poisoned.into_inner()
             }
         };
-        if let Some(cached) = cache.get(&cache_key) {
-            return Ok(Arc::clone(cached));
-        }
-        let content = Arc::new(std::fs::read_to_string(path)?);
-        cache.insert(cache_key, Arc::clone(&content));
+        #[cfg(debug_assertions)]
+        eprintln!("[read_source] Phase 3 lock acquire took {:?} for {}", lock2_start.elapsed(), path);
+        cache.entry(cache_key).or_insert(content.clone());
+        #[cfg(debug_assertions)]
+        eprintln!("[read_source] TOTAL for {}: {:?}", path, overall_start.elapsed());
+
         Ok(content)
     }
 }

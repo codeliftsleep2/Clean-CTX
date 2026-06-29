@@ -248,6 +248,16 @@ fn get_registry() -> &'static tool_handlers::registry::HandlerRegistry {
     })
 }
 
+// Eagerly initialize the handler registry at load time to avoid
+// OnceLock contention during parallel test execution. Without this,
+// the first call to get_registry() from any test triggers tree-sitter
+// WASM initialization inside the OnceLock closure, blocking all other
+// parallel threads for 10-30 seconds on Windows.
+#[ctor::ctor]
+fn _preinit_handler_registry() {
+    let _ = get_registry();
+}
+
 /// Dispatch a tools/call request.
 /// v0.3.0: Uses registry-based dispatch for modular handlers, fallback to legacy.
 pub(crate) fn dispatch_tools_call(

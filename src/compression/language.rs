@@ -13,9 +13,37 @@
 // orchestrators map the result to a tree-sitter `Language` + query
 // string.
 
+use std::sync::OnceLock;
 use tree_sitter::Language;
 
 use crate::queries;
+
+/// Thread-safe wrapper around `tree_sitter_typescript::language_typescript()`.
+/// Uses `OnceLock` to ensure only one thread ever initializes the WASM parser,
+/// preventing the Windows deadlock that occurs when multiple threads race to
+/// initialize tree-sitter's internal `OnceLock` simultaneously.
+pub fn safe_typescript_language() -> Language {
+    static LANG: OnceLock<Language> = OnceLock::new();
+    *LANG.get_or_init(|| tree_sitter_typescript::language_typescript())
+}
+
+/// Thread-safe wrapper around `tree_sitter_c_sharp::language()`.
+pub fn safe_csharp_language() -> Language {
+    static LANG: OnceLock<Language> = OnceLock::new();
+    *LANG.get_or_init(|| tree_sitter_c_sharp::language())
+}
+
+/// Thread-safe wrapper around `tree_sitter_rust::language()`.
+pub fn safe_rust_language() -> Language {
+    static LANG: OnceLock<Language> = OnceLock::new();
+    *LANG.get_or_init(|| tree_sitter_rust::language())
+}
+
+/// Thread-safe wrapper around `tree_sitter_java::language()`.
+pub fn safe_java_language() -> Language {
+    static LANG: OnceLock<Language> = OnceLock::new();
+    *LANG.get_or_init(|| tree_sitter_java::language())
+}
 
 /// Returns `true` if the source text looks like C#. The heuristic is
 /// deliberately narrow: C# has very distinctive keywords (`namespace`,
@@ -137,13 +165,13 @@ pub fn looks_like_java(source: &str) -> bool {
 /// `crate::queries::JAVA_QUERY` are all `'static` `&str` constants.
 pub fn detect_language(source: &str) -> (Language, &'static str) {
     if looks_like_csharp(source) {
-        (tree_sitter_c_sharp::language(), queries::CS_QUERY)
+        (safe_csharp_language(), queries::CS_QUERY)
     } else if looks_like_rust(source) {
-        (tree_sitter_rust::language(), queries::RS_QUERY)
+        (safe_rust_language(), queries::RS_QUERY)
     } else if looks_like_java(source) {
-        (tree_sitter_java::language(), queries::JAVA_QUERY)
+        (safe_java_language(), queries::JAVA_QUERY)
     } else {
-        (tree_sitter_typescript::language_typescript(), queries::TS_QUERY)
+        (safe_typescript_language(), queries::TS_QUERY)
     }
 }
 
@@ -158,10 +186,10 @@ pub fn detect_language(source: &str) -> (Language, &'static str) {
 /// an issue requesting JavaScript grammar integration.
 pub fn language_for_extension(extension: &str) -> Option<(Language, &'static str)> {
     match extension {
-        "ts" => Some((tree_sitter_typescript::language_typescript(), queries::TS_QUERY)),
-        "cs" => Some((tree_sitter_c_sharp::language(), queries::CS_QUERY)),
-        "rs" => Some((tree_sitter_rust::language(), queries::RS_QUERY)),
-        "java" => Some((tree_sitter_java::language(), queries::JAVA_QUERY)),
+        "ts" => Some((safe_typescript_language(), queries::TS_QUERY)),
+        "cs" => Some((safe_csharp_language(), queries::CS_QUERY)),
+        "rs" => Some((safe_rust_language(), queries::RS_QUERY)),
+        "java" => Some((safe_java_language(), queries::JAVA_QUERY)),
         _ => None,
     }
 }
