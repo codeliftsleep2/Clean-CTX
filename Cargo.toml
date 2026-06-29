@@ -26,18 +26,22 @@ codegen-units = 1
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
-# SAFETY: tree-sitter 0.20.x is pinned in lockstep with the language crates.
-tree-sitter = "=0.20.10"
-# SAFETY: Must match tree-sitter 0.20.x ABI.
-tree-sitter-c-sharp = "=0.20.0"
-# SAFETY: Must match tree-sitter 0.20.x ABI.
-tree-sitter-typescript = "=0.20.5"
-# SAFETY: Must match tree-sitter 0.20.x ABI.
-tree-sitter-html = "=0.20.0"
-# SAFETY: Must match tree-sitter 0.20.x ABI.
-tree-sitter-rust = "=0.20.4"
-# SAFETY: Must match tree-sitter 0.20.x ABI.
-tree-sitter-java = "=0.20.0"
+# SAFETY: tree-sitter versions must be kept in lockstep with the language
+# crates' tree-sitter-sys dependency. Run `scripts/check-tree-sitter-versions.ps1`
+# in CI to verify ABI alignment. Use `cargo update -p tree-sitter` to bump.
+tree-sitter = "0.26"
+# SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
+tree-sitter-c-sharp = "0.23"
+# SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
+tree-sitter-typescript = "0.23"
+# SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
+tree-sitter-html = "0.23"
+# SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
+tree-sitter-rust = "0.24"
+# SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
+tree-sitter-java = "0.23"
+# Streaming iterator trait used by tree-sitter QueryMatches API
+streaming-iterator = "0.1"
 
 # high-speed, zero-copy JSON stream parsing
 serde = { version = "1.0", features = ["derive"] }

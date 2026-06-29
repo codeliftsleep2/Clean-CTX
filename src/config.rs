@@ -121,6 +121,45 @@ fn default_complex_fn_threshold() -> usize { 10 }
 fn default_medium_lines() -> usize { 300 }
 fn default_high_lines() -> usize { 500 }
 
+// ── Resource limits ───────────────────────────────────────────────
+
+/// Resource limits and memory guardrails.
+///
+/// Controls maximum file sizes, workspace file counts, and memory
+/// usage to prevent OOM crashes on large codebases. When limits are
+/// exceeded, graceful error messages are returned instead of crashes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceLimits {
+    /// Maximum file size in bytes. Files larger than this are skipped
+    /// with a warning. Default: 10 MB.
+    #[serde(default = "default_max_file_size")]
+    pub max_file_size_bytes: usize,
+
+    /// Maximum number of files in a workspace. Workspaces with more
+    /// files are rejected with an error. Default: 10,000.
+    #[serde(default = "default_max_workspace_files")]
+    pub max_workspace_files: usize,
+
+    /// Maximum memory usage in bytes for compression operations.
+    /// When exceeded, compression is aborted gracefully. Default: 512 MB.
+    #[serde(default = "default_max_memory_bytes")]
+    pub max_memory_bytes: usize,
+}
+
+impl Default for ResourceLimits {
+    fn default() -> Self {
+        Self {
+            max_file_size_bytes: default_max_file_size(),
+            max_workspace_files: default_max_workspace_files(),
+            max_memory_bytes: default_max_memory_bytes(),
+        }
+    }
+}
+
+fn default_max_file_size() -> usize { 10 * 1024 * 1024 } // 10 MB
+fn default_max_workspace_files() -> usize { 10_000 }
+fn default_max_memory_bytes() -> usize { 512 * 1024 * 1024 } // 512 MB
+
 // ── Cache configuration ──────────────────────────────────────────
 
 /// Prompt cache configuration for Anthropic API breakpoint optimization.
@@ -324,6 +363,10 @@ pub struct CleanCtxConfig {
     #[serde(default)]
     pub cache: CacheConfig,
 
+    /// Resource limits and memory guardrails.
+    #[serde(default)]
+    pub resource_limits: ResourceLimits,
+
     /// CBM (codebase-memory-mcp) integration configuration.
     /// Controls how Clean-CTX discovers, launches, and communicates
     /// with the CBM server for graph intelligence.
@@ -431,6 +474,7 @@ impl Default for CleanCtxConfig {
             auto_delta: default_true(),
             tokenizer: TokenizerKind::default(),
             cache: CacheConfig::default(),
+            resource_limits: ResourceLimits::default(),
             cbm: crate::cbm::CbmConfig::default(),
             intelligence: IntelligenceConfig::default(),
         }
@@ -441,6 +485,59 @@ impl Default for CleanCtxConfig {
 /// process lifetime. Edits to the config require a server restart to take
 /// effect (the config is treated as immutable for the session).
 static CONFIG_PATH: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+
+impl ResourceLimits {
+    /// Validate a file size against the configured limit.
+    /// Returns `Ok(())` if the file is within limits, or an error message
+    /// if it exceeds the maximum allowed size.
+    pub fn check_file_size(&self, size: u64) -> Result<(), String> {
+        if size > self.max_file_size_bytes as u64 {
+            Err(format!(
+                "File size {} bytes exceeds maximum allowed size of {} bytes ({} MB). \
+                 Consider using compress_workspace or the streaming variant for large files.",
+                size,
+                self.max_file_size_bytes,
+                self.max_file_size_bytes / (1024 * 1024)
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate a workspace file count against the configured limit.
+    /// Returns `Ok(())` if the workspace is within limits, or an error
+    /// message if it exceeds the maximum allowed file count.
+    pub fn check_workspace_file_count(&self, count: usize) -> Result<(), String> {
+        if count > self.max_workspace_files {
+            Err(format!(
+                "Workspace contains {} files, which exceeds the maximum allowed count of {} files. \
+                 Please reduce the workspace size or adjust the `resource_limits.max_workspace_files` \
+                 setting in `.clean-ctx.json`.",
+                count, self.max_workspace_files
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate memory usage against the configured limit.
+    /// Returns `Ok(())` if the estimated memory usage is within limits,
+    /// or an error message if it exceeds the maximum allowed memory.
+    pub fn check_memory_usage(&self, estimated_bytes: usize) -> Result<(), String> {
+        if estimated_bytes > self.max_memory_bytes {
+            Err(format!(
+                "Estimated memory usage {} bytes exceeds maximum allowed memory of {} bytes ({} MB). \
+                 Consider processing files in smaller batches or adjusting the \
+                 `resource_limits.max_memory_bytes` setting in `.clean-ctx.json`.",
+                estimated_bytes,
+                self.max_memory_bytes,
+                self.max_memory_bytes / (1024 * 1024)
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
 
 impl CleanCtxConfig {
     /// Load configuration from the project directory, walking up to find `.clean-ctx.json`

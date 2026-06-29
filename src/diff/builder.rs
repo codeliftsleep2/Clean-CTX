@@ -60,7 +60,7 @@ pub fn build_snapshot(
     // Collect parsers to try: first choice first, then the others.
     let mut candidates: Vec<(&str, tree_sitter::Language, &str)> = Vec::with_capacity(3);
     // Push the detected parser first
-    candidates.push((first_label, first_lang, first_query));
+    candidates.push((first_label, first_lang.clone(), first_query));
     // Push the remaining two in ALL_PARSERS order, skipping the detected one
     for (lang_fn, query, label) in ALL_PARSERS {
         if *label != first_label {
@@ -72,7 +72,7 @@ pub fn build_snapshot(
     // or the last result (even if empty).
     let mut last_result: Option<Result<CapturedStructure, Box<dyn std::error::Error>>> = None;
     for (_label, lang, query) in &candidates {
-        let result = try_build_with(*lang, query, source, fidelity);
+        let result = try_build_with(lang.clone(), query, source, fidelity);
         match &result {
             Ok(snap) if !snap.classes.is_empty() || !snap.imports.is_empty() => {
                 return result;

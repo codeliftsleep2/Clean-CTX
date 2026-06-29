@@ -108,12 +108,35 @@ pub(crate) fn compress_workspace_dir(
         })
         .collect();
 
+    // A-13: Check workspace file count against configured limit
+    let file_count = kept.len() + excluded.len();
+    if let Err(e) = state.config.resource_limits.check_workspace_file_count(file_count) {
+        return Err(e.into());
+    }
+
     let mut ctx = PassContext {
         kept,
         errors: Vec::new(),
         excluded,
         warnings: Vec::new(),
     };
+
+    // A-13: Estimate memory usage and check against limit
+    // Rough estimate: each file will need ~2x its size in memory during compression
+    // (source + compressed output + AST structures)
+    let estimated_memory: usize = ctx
+        .kept
+        .iter()
+        .filter_map(|path| {
+            std::fs::metadata(path)
+                .ok()
+                .map(|meta| (meta.len() * 2) as usize)
+        })
+        .sum();
+    
+    if let Err(e) = state.config.resource_limits.check_memory_usage(estimated_memory) {
+        return Err(e.into());
+    }
 
     // Phase III (Idea #9): At Low fidelity, use the two-pass approach
     // with global symbol deduplication. This builds a workspace-level
@@ -207,6 +230,7 @@ fn compress_pass(
             &mut dict_guard,
             &mut cache_guard,
             fidelity,
+            Some(&state.config),
         ) {
             Ok(compressed) => {
                 // Use the already-held dict_guard instead of re-locking through state

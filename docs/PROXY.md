@@ -161,6 +161,9 @@ All settings are controlled via environment variables. Defaults are sensible for
 | `SCRUB_SECRETS` | `false` | Enable secret scrubbing in tool results |
 | `TOOL_FILTERS` | `false` | Enable tool output filtering (TOML-based) |
 | `PLATFORM` | _(auto-detect)_ | Override platform detection (`anthropic`, `openai`, `generic`) |
+| `PROXY_API_KEY` | _(none)_ | Optional API key for `X-Api-Key` header authentication. When set, all requests must include a matching `X-Api-Key` header. Requests with missing/wrong key return `401 Unauthorized`. |
+| `RATE_LIMIT_RPS` | `60` | Per-client requests per second (only enforced when `PROXY_API_KEY` is set). |
+| `RATE_LIMIT_BURST` | `10` | Per-client burst window size — how many requests a client can make in a sudden burst before rate limiting kicks in. |
 
 ### Recommended Setup
 

@@ -47,12 +47,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for (fi, fidelity) in fidelities.iter().enumerate() {
             let mut dict = PathDictionary::new();
             let mut cache = LocalStateCache::new();
-            let compressed_text = compress_file(
-                file_path.clone(),
-                &mut dict,
-                &mut cache,
-                *fidelity,
-            )?;
+              let compressed_text = compress_file(
+                  file_path.clone(),
+                  &mut dict,
+                  &mut cache,
+                  *fidelity,
+                  None,
+              )?;
             let compressed_tokens = bpe.encode_with_special_tokens(&compressed_text).len();
             let saved = raw_tokens.saturating_sub(compressed_tokens);
             let reduction_pct = if raw_tokens > 0 {

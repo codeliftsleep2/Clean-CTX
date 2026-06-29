@@ -26,6 +26,7 @@ mod error;
 mod cache;
 mod transform;
 mod logger;
+mod rate_limiter;
 mod server;
 mod scrub;
 mod scrub_patterns;

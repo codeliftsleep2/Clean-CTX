@@ -8,8 +8,12 @@
 use std::collections::{HashMap, HashSet};
 
 /// Per-program filter override configuration.
-#[derive(Debug, Clone, Default)]
+///
+/// This is part of the public configuration API for tool output filtering.
+/// It is not currently used in the proxy code path but is available for
+/// future use and for API completeness.
 #[allow(dead_code)]
+#[derive(Debug, Clone, Default)]
 pub struct ToolFilterConfig {
     /// Global enable/disable for all filters.
     pub enabled: bool,
@@ -110,6 +114,19 @@ pub struct ProxyConfig {
 
     /// Platform override ("anthropic", "openai", "generic", or auto-detect).
     pub platform: Option<String>,
+
+    /// Optional API key for X-Api-Key header authentication.
+    /// When set, all requests must include a matching X-Api-Key header.
+    pub api_key: Option<String>,
+
+    /// Per-client rate limit: requests per second (default: 60).
+    pub rate_limit_rps: f64,
+
+    /// Per-client rate limit: burst window size (default: 10).
+    pub rate_limit_burst: f64,
+
+    /// Maximum request body size in bytes (default: 10 MB).
+    pub max_request_body_size: usize,
 }
 
 impl Default for ProxyConfig {
@@ -129,6 +146,10 @@ impl Default for ProxyConfig {
             scrub_secrets: false,
             tool_filters: false,
             platform: None,
+            api_key: None,
+            rate_limit_rps: 60.0,
+            rate_limit_burst: 10.0,
+            max_request_body_size: 10 * 1024 * 1024, // 10 MB
         }
     }
 }
@@ -199,7 +220,17 @@ impl ProxyConfig {
             scrub_secrets,
             tool_filters,
             platform: env_var("PLATFORM"),
-        }
+            api_key: env_var("PROXY_API_KEY"),
+            rate_limit_rps: env_var("RATE_LIMIT_RPS")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(60.0),
+            rate_limit_burst: env_var("RATE_LIMIT_BURST")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(10.0),
+            max_request_body_size: env_var("MAX_REQUEST_BODY_SIZE")
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(10 * 1024 * 1024),
+    }
     }
 
     /// Check if a tool should be dropped.

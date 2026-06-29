@@ -18,7 +18,9 @@ use crate::protocol::JsonRpcRequest;
 // ═══════════════════════════════════════════════════════════════════
 
 fn make_dispatcher() -> Dispatcher {
-    let config = CleanCtxConfig::default();
+    let mut config = CleanCtxConfig::default();
+    // Disable CBM to avoid subprocess launch latency skewing timing tests
+    config.cbm.enabled = false;
     let state = crate::mcp::McpState::new(config);
     Dispatcher::new(state)
 }
