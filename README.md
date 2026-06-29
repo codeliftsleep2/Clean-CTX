@@ -2,19 +2,21 @@
 
 > **🚀 Version 0.2.0-rc1** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, **CBM filter-first architecture** (symbol importance filtering before compression), Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, and all **1,454 tests passing** with **zero clippy warnings**.
 
-A local-first, air-gapped code context optimizer that reduces local compute cost and latency by eliminating redundant re-compilation. Instead of re-compressing the same file from scratch on every interaction, Clean-CTX compiles source code to a structured IR once, then computes instruction-level deltas on subsequent calls — saving CPU cycles without reducing LLM context quality.
+A local-first, air-gapped code context optimizer that reduces LLM token waste through four independent mechanisms: CBM symbol filtering (drops low-importance symbols before compression), compression (75–97% token savings), tool output filtering (70–90% savings), and intelligent prompt caching (~90% API cost savings).
 
 ### How It Works
 
 Clean-CTX uses **four independent mechanisms** to reduce token waste:
 
-1. **Compression** — tree-sitter AST extraction + opcode encoding at 3 fidelity levels (Low/Medium/High) delivers **75–97% token savings** vs raw source. This is what reduces LLM prompt tokens.
+1. **CBM symbol filtering** — integrates with codebase-memory-mcp (CBM) to query symbol importance scores **before** compression runs. Low-importance symbols (score < 0.4) are dropped entirely, reducing token output by 30–50% for noisy files. This is the only mechanism that reduces tokens *before* compression.
 
-2. **Delta transport** — instruction-level diffing between successive IR states avoids full re-compilation on subsequent calls. This saves **CPU cycles and latency** (up to 53% faster), NOT LLM tokens. The LLM receives the same full compressed output either way; the difference is how much local compute is required to produce it.
+2. **Compression** — tree-sitter AST extraction + opcode encoding at 3 fidelity levels (Low/Medium/High) delivers **75–97% token savings** vs raw source. This is what reduces LLM prompt tokens.
 
 3. **Tool filtering** — 26 built-in TOML filters compress verbose tool output (build logs, lint results, test output, etc.) by **70–90%** before it reaches the LLM. Filters auto-detect the command from tool input and apply program-specific compression (e.g., collapsing a successful `cargo build` to `"cargo: ok"`).
 
 4. **Intelligent prompt caching** — the optional multi-platform proxy injects `cache_control` breakpoints into API requests, achieving **~90% API cost savings** on cached turns by leveraging provider-side prompt caching (Anthropic, OpenAI, etc.).
+
+**Delta transport** is a CPU-savings layer that avoids full re-compilation on subsequent calls, saving **CPU cycles and latency** (up to 53% faster). It does NOT reduce LLM tokens — the LLM receives the same full compressed output either way.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -30,7 +32,7 @@ Clean-CTX uses **four independent mechanisms** to reduce token waste:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**LLM token savings come from compression and tool filtering.** Delta transport is a CPU-savings layer on top of compression — it makes the compiler itself faster, not the output smaller. Prompt caching reduces API costs on repeated turns without changing token counts.
+**LLM token savings come from CBM filtering, compression, and tool filtering.** Delta transport is a CPU-savings layer on top of compression — it makes the compiler itself faster, not the output smaller. Prompt caching reduces API costs on repeated turns without changing token counts.
 
 ---
 
