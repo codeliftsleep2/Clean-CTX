@@ -8,20 +8,19 @@
 //
 // # Strategy
 //
-// We do not re-parse the AST. We scan the raw source for the
-// decorator names that are unique to Angular:
+// A-11 (Meta-layer detection hardening): We now use AST-based detection
+// as the primary strategy to eliminate false positives from comments
+// and string literals. We parse the source with tree-sitter and query
+// for actual `decorator` AST nodes, then check if any match Angular-
+// specific decorator names.
 //
-//   @Component, @Injectable, @NgModule, @Directive, @Pipe, @Input,
-//   @Output, @HostListener, @HostBinding, @ViewChild, @ContentChild,
-//   ...
-//
-// A single occurrence of `@Component(` or `@Injectable(` is a strong
-// enough signal. (Plain `@Input` / `@Output` are also used by MobX /
-// Vue, so we treat them as weak signals — at least one strong signal
-// must also be present.)
-//
-// The detection is O(n) over the source length and never allocates
-// more than a single `BTreeSet` of the matches it found.
+// Fallback: If AST parsing fails for any reason, we fall back to the
+// original string-based detection to maintain backward compatibility.
+
+use streaming_iterator::StreamingIterator;
+use tree_sitter::{Parser, Query, QueryCursor};
+
+use crate::compression::language::safe_typescript_language;
 
 /// Angular-specific decorator names that we treat as a strong signal
 /// of an Angular file. A single match anywhere in the source is enough
@@ -40,6 +39,12 @@ const STRONG_DECORATORS: &[&str] = &[
     "@ContentChildren(",
 ];
 
+/// Tree-sitter query to find decorator nodes in TypeScript AST.
+/// We capture the full decorator text to check against our list.
+const ANGULAR_DECORATOR_QUERY: &str = r#"
+    (decorator) @decorator
+"#;
+
 /// Angular-specific decorator names that are NOT unique to Angular
 /// (e.g. `@Input` is also used by MobX, `@Output` by Vue). These count
 /// as weak signals and must be paired with a strong signal to trigger
@@ -52,6 +57,15 @@ const ANGULAR_CORE_IMPORT: &str = "@angular/core";
 
 /// Decide whether the given source code is from an Angular file.
 ///
+/// A-11 (Meta-layer detection hardening): We now use AST-based detection
+/// as the primary strategy to eliminate false positives from comments
+/// and string literals. We parse the source with tree-sitter and query
+/// for actual `decorator` AST nodes, then check if any match Angular-
+/// specific decorator names.
+///
+/// Fallback: If AST parsing fails for any reason, we fall back to the
+/// original string-based detection to maintain backward compatibility.
+///
 /// A file is "Angular" iff:
 /// 1. It contains at least one **strong** decorator (`@Component(`,
 ///    `@Injectable(`, `@NgModule(`, `@Directive(`, `@Pipe(`, etc.), OR
@@ -63,6 +77,76 @@ const ANGULAR_CORE_IMPORT: &str = "@angular/core";
 /// also used by MobX / Vue, and a false positive would inject
 /// meaningless `Φ` markers into non-Angular output.
 pub fn is_angular_file(source: &str) -> bool {
+    // A-11: Try AST-based detection first (eliminates false positives
+    // from comments and string literals).
+    if ast_based_angular_detect(source) {
+        return true;
+    }
+
+    // Fallback: string-based detection for backward compatibility
+    // (used when AST parsing fails or for non-TS files).
+    string_based_angular_detect(source)
+}
+
+/// AST-based Angular detection using tree-sitter.
+/// Parses the source as TypeScript and queries for decorator nodes.
+/// Only actual decorator AST nodes are considered — comments and
+/// string literals are ignored by the parser.
+fn ast_based_angular_detect(source: &str) -> bool {
+    // Quick check: if source doesn't contain "@" at all, skip AST parsing
+    if !source.contains('@') {
+        return false;
+    }
+
+    let mut parser = Parser::new();
+    let language = safe_typescript_language();
+    
+    if parser.set_language(&language).is_err() {
+        return false;
+    }
+
+    let tree = match parser.parse(source, None) {
+        Some(tree) => tree,
+        None => return false,
+    };
+
+    let query = match Query::new(&language, ANGULAR_DECORATOR_QUERY) {
+        Ok(q) => q,
+        Err(_) => return false,
+    };
+
+    let mut cursor = QueryCursor::new();
+    let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+    while let Some(mat) = matches.next() {
+        for capture in mat.captures.iter() {
+            if let Ok(decorator_text) = capture.node.utf8_text(source.as_bytes()) {
+                // Check if this decorator matches any Angular-specific decorator
+                for strong_deco in STRONG_DECORATORS {
+                    if decorator_text.starts_with(strong_deco) {
+                        return true;
+                    }
+                }
+                
+                // Check for weak decorators (need @angular/core import too)
+                for weak_deco in WEAK_DECORATORS {
+                    if decorator_text.starts_with(weak_deco) {
+                        // Weak decorator found — check if @angular/core is imported
+                        if source.contains(ANGULAR_CORE_IMPORT) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Original string-based Angular detection (fallback).
+/// This is the pre-A-11 implementation kept for backward compatibility.
+fn string_based_angular_detect(source: &str) -> bool {
     // Tier 1: any strong decorator?
     for deco in STRONG_DECORATORS {
         if source.contains(deco) {

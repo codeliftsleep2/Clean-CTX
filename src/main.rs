@@ -16,6 +16,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return cmd_setup_cbm();
     }
 
+    // A-15: --config-dump flag to print resolved configuration
+    if args.len() > 1 && args[1] == "--config-dump" {
+        return cmd_config_dump();
+    }
+
     // Default: run the MCP server
     // Note: --with-cbm is the default behavior now (auto-detect CBM on PATH).
     // Use CBM_DISABLE=1 env var to explicitly disable CBM integration.
@@ -88,6 +93,62 @@ fn cmd_init() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("    3. Use `provide_code_context` as the unified entry point.");
     eprintln!();
 
+    Ok(())
+}
+
+/// Handle `clean-ctx --config-dump` — print the resolved configuration.
+///
+/// A-15: Shows the final configuration after all precedence rules
+/// (tool args > env vars > config file > defaults) have been applied.
+/// Useful for debugging configuration issues.
+fn cmd_config_dump() -> Result<(), Box<dyn std::error::Error>> {
+    let config = clean_ctx::config::CleanCtxConfig::load(std::path::Path::new("."));
+    
+    eprintln!("═══════════════════════════════════════════════════════════════════════════════════════");
+    eprintln!("  Clean-CTX Resolved Configuration");
+    eprintln!("═══════════════════════════════════════════════════════════════════════════════════════");
+    eprintln!();
+    
+    // Print config file location if found
+    if let Some(config_path) = clean_ctx::config::CleanCtxConfig::find_config(std::path::Path::new(".")) {
+        eprintln!("  Config file: {}", config_path.display());
+    } else {
+        eprintln!("  Config file: (none found — using defaults)");
+    }
+    eprintln!();
+    
+    // Print CI environment detection
+    let is_ci = clean_ctx::config::CleanCtxConfig::is_ci_environment();
+    eprintln!("  CI environment detected: {}", is_ci);
+    if is_ci {
+        eprintln!("  ⚠️  Persistence auto-disabled in CI");
+    }
+    eprintln!();
+    
+    // Print effective persistence setting
+    eprintln!("  Persistence enabled: {}", config.persistence.enabled);
+    eprintln!();
+    
+    // Print full config as pretty JSON
+    eprintln!("  Full configuration:");
+    eprintln!("  ────────────────────────────────────────────────────────────────────────────────────");
+    
+    // Convert to JSON and print with indentation
+    let config_json = serde_json::to_string_pretty(&config)?;
+    for line in config_json.lines() {
+        eprintln!("  {}", line);
+    }
+    
+    eprintln!("  ────────────────────────────────────────────────────────────────────────────────────");
+    eprintln!();
+    eprintln!("  Configuration precedence (highest to lowest):");
+    eprintln!("    1. Tool argument (per-call overrides)");
+    eprintln!("    2. Environment variable (proxy settings, CI detection)");
+    eprintln!("    3. Config file (.clean-ctx.json)");
+    eprintln!("    4. Default (built-in defaults)");
+    eprintln!();
+    eprintln!("  For more information, see: docs/CONFIGURATION.md");
+    
     Ok(())
 }
 

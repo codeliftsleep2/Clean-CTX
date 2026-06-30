@@ -258,7 +258,7 @@ fn ir_without_layers_produces_deterministic_output() {
 
     // Compile without layers
     let mut c1 = IRCompiler::new();
-    let ir1 = c1.compile(source, "test", language, query, Fidelity::Low, None).unwrap();
+    let ir1 = c1.compile(source, "test", language.clone(), query, Fidelity::Low, None).unwrap();
 
     // Compile again without layers
     let mut c2 = IRCompiler::new();
@@ -313,7 +313,7 @@ fn compiler_resets_state_between_compilations() {
     let (lang, query) = detect_language(source1);
 
     let mut compiler = ts_compiler();
-    compiler.compile(source1, "f1", lang, query, Fidelity::Low, None).unwrap();
+    compiler.compile(source1, "f1", lang.clone(), query, Fidelity::Low, None).unwrap();
     let ir2 = compiler.compile(source2, "f2", lang, query, Fidelity::Low, None).unwrap();
 
     // Verify the second compilation is clean (no flags left over from first)

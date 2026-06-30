@@ -443,7 +443,7 @@ fn rust_compiler_counter_is_deterministic() {
 
     let mut c1 = rust_compiler();
     let ir1 = c1
-        .compile(source, "f", language, query, Fidelity::Low, None)
+        .compile(source, "f", language.clone(), query, Fidelity::Low, None)
         .unwrap();
 
     let mut c2 = rust_compiler();

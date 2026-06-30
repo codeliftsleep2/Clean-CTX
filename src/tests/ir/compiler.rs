@@ -154,7 +154,7 @@ fn compiler_counter_is_deterministic() {
     let (language, query) = detect_language(source);
 
     let mut c1 = IRCompiler::new();
-    let ir1 = c1.compile(source, "f", language, query, Fidelity::Low, None).unwrap();
+    let ir1 = c1.compile(source, "f", language.clone(), query, Fidelity::Low, None).unwrap();
 
     let mut c2 = IRCompiler::new();
     let ir2 = c2.compile(source, "f", language, query, Fidelity::Low, None).unwrap();

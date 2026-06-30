@@ -37,10 +37,10 @@ fn compress_file_cache_hit_returns_notice() {
     let mut cache = LocalStateCache::new();
     let fidelity = Fidelity::Low;
 
-    let result1 = compress_file(path.clone(), &mut dict, &mut cache, fidelity);
+    let result1 = compress_file(path.clone(), &mut dict, &mut cache, fidelity, None);
     assert!(result1.is_ok(), "compress_file (miss) should succeed, got: {:?}", result1);
 
-    let result2 = compress_file(path.clone(), &mut dict, &mut cache, fidelity);
+    let result2 = compress_file(path.clone(), &mut dict, &mut cache, fidelity, None);
     assert!(result2.is_ok(), "compress_file (hit) should succeed");
     let output2 = result2.unwrap();
 
@@ -51,7 +51,7 @@ fn compress_file_cache_hit_returns_notice() {
     );
 
     create_ts_file(&dir, "test.ts", "export class Bar {}");
-    let result3 = compress_file(path, &mut dict, &mut cache, fidelity);
+    let result3 = compress_file(path, &mut dict, &mut cache, fidelity, None);
     assert!(result3.is_ok(), "compress_file (modified) should succeed");
     let output3 = result3.unwrap();
     assert!(
@@ -76,10 +76,10 @@ fn compress_file_cache_hit_vs_miss_output_differ() {
     let mut cache = LocalStateCache::new();
     let fidelity = Fidelity::Medium;
 
-    let result1 = compress_file(path.clone(), &mut dict, &mut cache, fidelity);
+    let result1 = compress_file(path.clone(), &mut dict, &mut cache, fidelity, None);
     assert!(result1.is_ok(), "compress_file (first call) should succeed");
 
-    let result2 = compress_file(path.clone(), &mut dict, &mut cache, fidelity);
+    let result2 = compress_file(path.clone(), &mut dict, &mut cache, fidelity, None);
     assert!(result2.is_ok());
     let second = result2.unwrap();
 
@@ -109,7 +109,7 @@ fn compress_file_rejects_file_larger_than_max() {
     let mut dict = crate::dictionary::PathDictionary::new();
     let mut cache = LocalStateCache::new();
 
-    let result = compress_file(path, &mut dict, &mut cache, Fidelity::Low);
+    let result = compress_file(path, &mut dict, &mut cache, Fidelity::Low, None);
     assert!(result.is_err(), "should reject oversized file");
     let err_msg = result.unwrap_err().to_string();
     assert!(
