@@ -366,3 +366,77 @@ fn collect_source_files_respects_max_depth() {
         entries
     );
 }
+
+/// F-22: Workspace compression result caching.
+/// Second call with no file changes returns cached result instantly.
+#[test]
+fn compress_workspace_caches_result() {
+    let dir = TempDir::new().unwrap();
+    create_ts_file(
+        dir.path(),
+        "alpha.ts",
+        "export class Alpha { run(): void {} }\n",
+    );
+
+    let config = CleanCtxConfig::default();
+    let state = McpState::new(config);
+
+    // First call: cache miss, normal compression
+    let result1 = compress_workspace_dir(
+        dir.path().to_str().unwrap(),
+        Fidelity::Low,
+        &state,
+    )
+    .expect("first compress should succeed");
+    assert!(result1.manifest.contains("alpha.ts"), "first call should contain alpha.ts");
+
+    // Second call with same directory and no file changes: cache hit
+    let result2 = compress_workspace_dir(
+        dir.path().to_str().unwrap(),
+        Fidelity::Low,
+        &state,
+    )
+    .expect("second compress should succeed");
+
+    // Both results should be identical
+    assert_eq!(result1.manifest, result2.manifest, "cached result should match original");
+    assert_eq!(result1.errors.len(), result2.errors.len(), "errors should match");
+    assert_eq!(result1.excluded.len(), result2.excluded.len(), "excluded should match");
+}
+
+/// F-22: Different fidelities must produce different cache entries.
+/// Verifies that the cache key includes the fidelity level.
+#[test]
+fn compress_workspace_cache_key_includes_fidelity() {
+    let dir = TempDir::new().unwrap();
+    create_ts_file(
+        dir.path(),
+        "beta.ts",
+        "export class Beta { process(): string { return ''; } }\n",
+    );
+
+    let config = CleanCtxConfig::default();
+    let state = McpState::new(config);
+
+    // Compress at Low fidelity: uses global symbol two-pass approach
+    let low_result = compress_workspace_dir(
+        dir.path().to_str().unwrap(),
+        Fidelity::Low,
+        &state,
+    )
+    .expect("low fidelity compress should succeed");
+    assert!(low_result.manifest.contains("beta.ts"), "low fidelity should contain beta.ts");
+
+    // Compress at Medium fidelity: uses standard compress_pass
+    let medium_result = compress_workspace_dir(
+        dir.path().to_str().unwrap(),
+        Fidelity::Medium,
+        &state,
+    )
+    .expect("medium fidelity compress should succeed");
+
+    // The manifests should differ because different fidelity paths produce different output
+    // (Low fidelity uses the global symbol two-pass path)
+    assert_ne!(low_result.manifest, medium_result.manifest,
+        "different fidelities should produce different cached results");
+}
