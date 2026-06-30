@@ -1,6 +1,6 @@
 # Clean-CTX — Token Waste Reducer & Structured Transport Protocol
 
-> **🚀 Version 0.2.0-rc1** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, **CBM filter-first architecture** (symbol importance filtering before compression), Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, and all **1,454 tests passing** with **zero clippy warnings**.
+> **🚀 Version 0.2.1-rc1** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, **CBM filter-first architecture** (symbol importance filtering before compression), Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, **streaming workspace walk (walkdir)**, **Rayon-parallelized workspace compression**, **deterministic alias assignment**, **workspace compression result caching**, and all **1,512 tests passing** with **zero clippy warnings**.
 
 A local-first, air-gapped code context optimizer that reduces LLM token waste through four independent mechanisms: CBM symbol filtering (drops low-importance symbols before compression), compression (75–97% token savings), tool output filtering (70–90% savings), and intelligent prompt caching (~90% API cost savings).
 
@@ -220,10 +220,11 @@ Disable in `.clean-ctx.json` with: `"persistence": { "enabled": false }`
 - **Content-hash cache** — identical files compress instantly on repeat calls
 - **Baseline snapshots** — `diff_code_context` remembers the previous state, producing small deltas instead of full re-compressions
 - **Raw-token count cache** — skip the BPE encode on cache hits (sub-millisecond responses)
+- **Workspace result cache** — `compress_workspace` caches the complete manifest keyed by file paths + mtimes + fidelity. Subsequent calls with no file changes return instantly (saves 5-15s per redundant call)
 
 ### Path Aliases
 
-Path aliases (`α1`, `α2`, …) are session-global — `compress_workspace` populates aliases that are immediately visible to subsequent `provide_code_context` calls, keeping the `§PATHMAP` footer stable across multiple tools.
+Path aliases (`α1`, `α2`, …) are session-global — `compress_workspace` populates aliases that are immediately visible to subsequent `provide_code_context` calls, keeping the `§PATHMAP` footer stable across multiple tools. Aliases are pre-assigned deterministically before parallel compression to ensure `αN` numbering is stable across runs.
 
 ### Multi-Platform Proxy
 
@@ -621,8 +622,8 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — **0 warnings, 0 errors** |
-| Tests | ✅ **1,454 tests, all passing, including 78 integration and 25 E2E tests** |
-| Audit | ✅ FAANG-level audit — all findings resolved; CBM audit — all findings resolved; Compiler-IR audit — all findings resolved |
+| Tests | ✅ **1,512 tests, all passing, including 18 audit regression and 1 integration test** |
+| Audit | ✅ FAANG-level audit — all 11 findings resolved (A-09 through A-15, F-19 through F-22); CBM audit — all findings resolved; Compiler-IR audit — all findings resolved |
 | Languages | ✅ TypeScript, C#, Rust, Java with Angular/Spring Boot meta-layers |
 | IR Transport Protocol | ✅ Stateful instruction-level delta transport — compile once, send deltas thereafter |
 | CBM Integration | ✅ Filter-first architecture — symbol importance scores drop low-importance symbols before compression |

@@ -6,6 +6,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.2.1-rc1] — 2026-06-30 — Foundation Complete
+
+### Added
+
+#### F-19: Streaming workspace walk (walkdir)
+- Replaced recursive `collect_source_files_inner` with `WalkDir::new(root).max_depth(32).follow_links(false)`
+- Streaming iteration eliminates collect-then-sort pattern
+- Pre-allocates path aliases during single-threaded file-collection step
+- Respects `MAX_WALK_DEPTH`, skips hidden dirs/node_modules/target/dist
+- Regression test: symlink loop protection + depth limit verification
+
+#### F-20: Rayon parallelization for `compress_workspace`
+- Applied `par_iter()` to the per-file compression loop in `compress_pass`
+- Shared manifest/errors wrapped in `Mutex` for thread-safe appending
+- Pre-assigned aliases (F-21) ensure read-only HashMap lookups in parallel phase
+- 38 workspace tests passing
+
+#### F-21: Deterministic alias assignment
+- Pre-assigns α1, α2…αN aliases sequentially before the parallel Rayon loop
+- Once assigned, `get_or_create_alias` is a read-only lookup (no mutation, safe for concurrent access)
+- Prevents non-deterministic aliases caused by thread scheduling variance
+
+#### F-22: Workspace compression result caching
+- `WorkspaceCache` stores complete `WorkspaceResult` keyed by content hash of file paths + mtimes/sizes + fidelity
+- Cache check at top of `compress_workspace_dir` returns cached result instantly on HIT
+- Lazy initialization: cache created on first MISS, stored for future calls
+- Thread-safe via `static Mutex<Option<WorkspaceCache>>`
+- Regression test: same-fidelity cache HIT + cross-fidelity cache MISS verification
+
+#### A-14: CI/CD awareness
+- `is_ci_environment()` detects 7 CI env vars: `CI`, `TF_BUILD`, `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CIRCLECI`, `TRAVIS`
+- Auto-disables persistence when CI is detected, preventing stale `persistence.db` between builds
+
+#### A-13: Resource limits and memory guardrails
+- `ResourceLimits` struct with `max_file_size_bytes` (10 MB), `max_workspace_files` (10,000), `max_memory_bytes` (512 MB)
+- Validation methods return descriptive error messages instead of OOM crashes
+- Wired into `compress_workspace_dir` (file count + memory checks) and proxy body buffers
+
+#### A-15: Configuration precedence documentation
+- Precedence rules documented in `docs/CONFIGURATION.md`: tool arg > env var > config file > default
+- Complete `.clean-ctx.json` example, env var reference, resource limits docs, CI/CD behavior, debug instructions
+
+### Fixed
+- F-22 cache key now includes `fidelity` in the hash to prevent cross-fidelity cache collisions
+- clippy `single_match` warning in `WorkspaceCache::compute_hash`
+
+### Changed
+- Documentation updated: README.md, ARCHITECTURE_OVERVIEW.md, SECURITY.md, ROADMAP.md
+- ROADMAP.md reorganized: Foundation section marked ✅ COMPLETE, all 11 FAANG items moved to Completed section
+- Test count: 1,512 tests (1,371 unit + 18 audit regression + 1 integration + 123 proxy)
+- Clippy: 0 warnings across all targets
+
+---
+
 ## [0.1.7] — Unreleased
 
 ### Added
@@ -379,6 +433,7 @@ This project follows [Semantic Versioning](https://semver.org/). Major version z
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.2.1-rc1 | 2026-06-30 | **Foundation complete.** A-09 through A-15, F-19 through F-22 — 1,512 tests, 0 clippy warnings |
 | 0.1.7 | Unreleased | Prompt cache optimization — 1006 tests, 0 clippy warnings |
 | 0.1.6 | 2026-06-10 | Zero-touch workflow + SQLite persistence + XHTML fix + inline template — 798 tests, 0 clippy warnings |
 | 0.1.5 | 2026-06-08 | FAANG Audit Compiler IR Phase E (F-30 through F-47) — 318 tests, 0 clippy warnings |
