@@ -30,6 +30,9 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::time::SystemTime;
 use crate::compression::Fidelity;
 use crate::compression::pipeline::compress_source;
 use crate::compression::workspace_symbols::build_global_symbol_table;
@@ -50,6 +53,67 @@ use super::workspace_util::{
     triplet_name,
     PassContextRef,
 };
+
+/// F-22: Workspace compression result cache.
+///
+/// Computes a content hash from file paths + mtimes/sizes. If the hash
+/// matches a previous call, returns the cached `WorkspaceResult` instantly
+/// without re-compressing.
+///
+/// Invalidation: any file change (new, modified, deleted) produces a
+/// different hash → cache miss.
+struct WorkspaceCache {
+    /// Maps content hash → serialized WorkspaceResult
+    cache: std::collections::HashMap<u64, WorkspaceResult>,
+}
+
+impl WorkspaceCache {
+    fn new() -> Self {
+        Self {
+            cache: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Compute a content hash from directory path, fidelity, file paths and their metadata.
+    /// This is used as the cache key — any file change or fidelity switch produces a different hash.
+    fn compute_hash(dir_path: &str, fidelity: &Fidelity, entries: &[String]) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        dir_path.hash(&mut hasher);
+        // Include fidelity in the hash so different fidelity levels don't collide
+        format!("{:?}", fidelity).hash(&mut hasher);
+        
+        // Sort for determinism
+        let mut sorted = entries.to_vec();
+        sorted.sort();
+        
+        for entry in &sorted {
+            entry.hash(&mut hasher);
+            // Add mtime and size to the hash so file modifications invalidate the cache
+            if let Ok(meta) = std::fs::metadata(entry) {
+                if let Ok(mtime) = meta.modified() {
+                    if let Ok(d) = mtime.duration_since(SystemTime::UNIX_EPOCH) {
+                        d.as_secs().hash(&mut hasher);
+                        d.subsec_nanos().hash(&mut hasher);
+                    }
+                }
+                meta.len().hash(&mut hasher);
+            }
+        }
+        
+        hasher.finish()
+    }
+
+    fn get(&self, hash: u64) -> Option<&WorkspaceResult> {
+        self.cache.get(&hash)
+    }
+
+    fn set(&mut self, hash: u64, result: WorkspaceResult) {
+        self.cache.insert(hash, result);
+    }
+}
+
+/// Thread-safe holder for the workspace cache.
+static WORKSPACE_CACHE: std::sync::Mutex<Option<WorkspaceCache>> = std::sync::Mutex::new(None);
 
 /// Structured result of a workspace compression pass.
 #[derive(Debug, Clone)]
@@ -90,11 +154,29 @@ pub(crate) fn compress_workspace_dir(
     fidelity: Fidelity,
     state: &McpState,
 ) -> Result<WorkspaceResult, Box<dyn std::error::Error>> {
+    // F-22: Check workspace result cache before doing any work.
+    // We collect entries first to compute the cache key, but if we get
+    // a cache hit, we skip the entire compression pipeline.
+    let mut all_entries: Vec<String> = Vec::new();
+    collect_source_files(dir_path, &mut all_entries);
+    let cache_hash = WorkspaceCache::compute_hash(dir_path, &fidelity, &all_entries);
+    
+    if let Ok(guard) = WORKSPACE_CACHE.lock() {
+        if let Some(ref cache) = *guard {
+            if let Some(cached) = cache.get(cache_hash) {
+                #[cfg(debug_assertions)]
+                eprintln!("[compress_workspace_dir] Cache HIT for {} ({} files)", dir_path, all_entries.len());
+                return Ok(cached.clone());
+            }
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    eprintln!("[compress_workspace_dir] Cache MISS for {} ({} files)", dir_path, all_entries.len());
+
     let mut manifest = format_manifest_header(dir_path, fidelity, state);
 
     // File collection + exclusion.
-    let mut all_entries: Vec<String> = Vec::new();
-    collect_source_files(dir_path, &mut all_entries);
     let mut excluded: Vec<(String, Vec<String>)> = Vec::new();
     let kept: Vec<String> = all_entries
         .into_iter()
@@ -168,12 +250,24 @@ pub(crate) fn compress_workspace_dir(
     let mut warnings = ctx.warnings;
     warnings.extend(state.drain_warnings());
 
-    Ok(WorkspaceResult {
+    let result = WorkspaceResult {
         manifest,
         errors: ctx.errors,
         excluded: ctx.excluded,
         warnings,
-    })
+    };
+
+    // F-22: Store result in cache for future calls
+    if let Ok(mut guard) = WORKSPACE_CACHE.lock() {
+        if guard.is_none() {
+            *guard = Some(WorkspaceCache::new());
+        }
+        if let Some(ref mut cache) = *guard {
+            cache.set(cache_hash, result.clone());
+        }
+    }
+
+    Ok(result)
 }
 
 /// Per-file compression pass. Compresses ts/js/cs files and emits
@@ -215,7 +309,25 @@ fn compress_pass(
     ).ok();
     let ws_tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = ws_tok.as_deref();
 
-    for entry in compressible.iter() {
+    // F-21: Pre-assign aliases deterministically.
+    // Before parallel work, iterate all files sequentially to assign α1, α2…αN
+    // in a stable order. Once assigned, `get_or_create_alias` is a read-only
+    // HashMap lookup (no mutation), safe for parallel calls.
+    {
+        let mut dict_guard = state.dict_lock();
+        for entry in &compressible {
+            dict_guard.get_or_create_alias(entry.clone());
+        }
+    }
+
+    // F-20: Parallelize per-file compression with Rayon.
+    // Alias lookups are now deterministic (pre-assigned above).
+    use std::sync::Mutex;
+    use rayon::prelude::*;
+    let manifest_mutex = Mutex::new(manifest);
+    let errors_mutex = Mutex::new(&mut ctx.errors);
+
+    compressible.par_iter().for_each(|entry| {
         // Pre-read via source_cache so bundle_pass/graph_pass
         // get cache hits instead of re-reading from disk.
         let source_arc = state.read_source(entry).ok();
@@ -233,14 +345,15 @@ fn compress_pass(
             Some(&state.config),
         ) {
             Ok(compressed) => {
-                // Use the already-held dict_guard instead of re-locking through state
+                // Alias already pre-assigned — this is a read-only lookup.
                 let alias = dict_guard.get_or_create_alias(entry.clone());
-                manifest.push_str(&format!(
+                let mut manifest_guard = manifest_mutex.lock().unwrap();
+                manifest_guard.push_str(&format!(
                     "// ===== FILE: {} =====\n// α alias: {}\n",
                     entry, alias
                 ));
-                manifest.push_str(&compressed);
-                manifest.push('\n');
+                manifest_guard.push_str(&compressed);
+                manifest_guard.push('\n');
 
                 // Record per-file stats for workspace compression (MED-2 fix: use pluggable tokenizer)
                 let ws_source = source_ref.unwrap_or("");
@@ -258,11 +371,13 @@ fn compress_pass(
                 );
             }
             Err(e) => {
-                ctx.errors.push((entry.clone(), e.to_string()));
-                manifest.push_str(&format!("// ERROR compressing {}: {}\n\n", entry, e));
+                let mut errors_guard = errors_mutex.lock().unwrap();
+                errors_guard.push((entry.clone(), e.to_string()));
+                let mut manifest_guard = manifest_mutex.lock().unwrap();
+                manifest_guard.push_str(&format!("// ERROR compressing {}: {}\n\n", entry, e));
             }
         }
-    }
+    });
 }
 
 /// Two-pass compression with global symbol deduplication (Phase III, Idea #9).
