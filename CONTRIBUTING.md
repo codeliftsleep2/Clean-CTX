@@ -13,6 +13,7 @@ Thank you for your interest in contributing! Clean-CTX is an open-source project
 - [Performance Guide](docs/PERFORMANCE.md) — benchmarks and optimization
 - [Security Guide](docs/SECURITY.md) — compliance and hardening
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) — common issues
+- [Configuration Guide](docs/CONFIGURATION.md) — config precedence, env vars, resource limits
 - [Changelog](docs/CHANGELOG.md) — version history
 - [Roadmap](docs/ROADMAP.md) — future plans and priorities
 
