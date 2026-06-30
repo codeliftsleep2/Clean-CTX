@@ -35,8 +35,10 @@ use crate::platform::{self, PlatformAdapter};
 use crate::rate_limiter::RateLimiter;
 use crate::transform::TransformStats;
 
-/// Default maximum request body size (10 MB).
-pub const DEFAULT_MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
+/// Maximum request body size (10 MB).
+/// Used in tests to verify body size limits.
+#[allow(dead_code)]
+pub const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
 
 /// Upstream request timeout (connect + read).
 pub const UPSTREAM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);

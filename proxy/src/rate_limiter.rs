@@ -193,11 +193,11 @@ mod tests {
         // Whitespace-only should be treated as "invalid"
         assert!(limiter.check("   ").await);
         // Both should share the same bucket (rate limited together)
-        for _ in 0..5 {
-            assert!(limiter.check("").await);
-            assert!(limiter.check("   ").await);
-        }
-        // 6th request should be denied (shared bucket exhausted)
+        // Bucket has 5 tokens total, 2 already used, so 3 more requests will succeed
+        assert!(limiter.check("").await);  // 3rd token
+        assert!(limiter.check("").await);  // 4th token
+        assert!(limiter.check("").await);  // 5th token (exhausted)
+        // Bucket is now exhausted (5 tokens used)
         assert!(!limiter.check("").await);
         assert!(!limiter.check("   ").await);
     }
