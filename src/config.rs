@@ -542,7 +542,7 @@ impl ResourceLimits {
 impl CleanCtxConfig {
     /// Load configuration from the project directory, walking up to find `.clean-ctx.json`
     pub fn load(start_dir: &Path) -> Self {
-        if let Some(config_path) = Self::find_config(start_dir) {
+        let mut config = if let Some(config_path) = Self::find_config(start_dir) {
             match std::fs::read_to_string(&config_path) {
                 Ok(content) => {
                     match serde_json::from_str(&content) {
@@ -563,16 +563,41 @@ impl CleanCtxConfig {
             }
         } else {
             Self::default()
+        };
+
+        // A-14: Auto-disable persistence in CI environments to prevent
+        // stale persistence.db from leaking between CI builds.
+        // Checks common CI environment variables: CI, TF_BUILD, GITHUB_ACTIONS, GITLAB_CI
+        if config.persistence.enabled && Self::is_ci_environment() {
+            eprintln!("[clean-ctx] CI environment detected — disabling persistence to prevent stale database issues");
+            config.persistence.enabled = false;
         }
+
+        config
     }
 
     /// Walk up from start_dir looking for `.clean-ctx.json`.
     /// Result is cached in a process-global `OnceLock` so subsequent calls
     /// do not touch the filesystem.
-    pub(crate) fn find_config(start_dir: &Path) -> Option<PathBuf> {
+    pub fn find_config(start_dir: &Path) -> Option<PathBuf> {
         CONFIG_PATH
             .get_or_init(|| Self::find_config_uncached(start_dir))
             .clone()
+    }
+
+    /// Check if running in a CI/CD environment by detecting common CI env vars.
+    ///
+    /// A-14: Used to auto-disable persistence in CI to prevent stale
+    /// `persistence.db` from leaking between builds and causing SQLite
+    /// file lock contention in parallel test runs.
+    pub fn is_ci_environment() -> bool {
+        std::env::var("CI").is_ok_and(|v| v == "true")
+            || std::env::var("TF_BUILD").is_ok()
+            || std::env::var("GITHUB_ACTIONS").is_ok()
+            || std::env::var("GITLAB_CI").is_ok()
+            || std::env::var("JENKINS_URL").is_ok()
+            || std::env::var("CIRCLECI").is_ok()
+            || std::env::var("TRAVIS").is_ok()
     }
 
     /// Uncached directory walk — called exactly once via [`find_config`].
