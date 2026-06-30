@@ -492,7 +492,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let raw_tokens = bpe.encode_with_special_tokens(source).len();
 
         // Compressed output via compress_file (full recompression)
-        let compressed_output = compress_file(file_path.clone(), &mut dict, &mut cache, Fidelity::Low)
+        let compressed_output = compress_file(file_path.clone(), &mut dict, &mut cache, Fidelity::Low, None)
             .unwrap_or_else(|e| format!("// Failed to compress edit {}: {}", edit_num, e));
         let compressed_tokens = bpe.encode_with_special_tokens(&compressed_output).len();
         

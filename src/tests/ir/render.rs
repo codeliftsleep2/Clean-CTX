@@ -347,7 +347,7 @@ fn compilation_fidelity_produces_comparable_ir() {
 
     let mut c_low = IRCompiler::new();
     let ir_low = c_low
-        .compile(source, "test", language, query, Fidelity::Low, None)
+        .compile(source, "test", language.clone(), query, Fidelity::Low, None)
         .expect("low fidelity compilation should succeed");
 
     let mut c_high = IRCompiler::new();

@@ -131,6 +131,7 @@ fn workspace_shares_aliases_with_per_file_tool() {
         &mut state.dict_lock(),
         &mut state.cache_write(),
         Fidelity::Low,
+        None,
     )
     .expect("per-file compress should succeed");
 

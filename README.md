@@ -260,7 +260,7 @@ The proxy detects and redacts secrets (AWS keys, GitHub tokens, JWTs, PEM keys, 
 - **Zero network transport** — stdio-only via MCP, no HTTP/WS/RPC servers
 - **No external runtimes** — single statically linked binary
 - **No AI models** — fully deterministic, rule-based AST processing
-- **Zero unsafe code** — entire codebase is safe Rust
+- **Minimal unsafe code** — only in test utilities for environment variable manipulation (required by Rust's stdlib)
 
 ---
 
@@ -631,7 +631,7 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 | Proxy | ✅ Multi-platform proxy (Anthropic/OpenAI/Generic) with auto-cache + tool filters |
 | Filters | ✅ 26 built-in TOML filters — cargo, npm, eslint, docker, go, and more |
 | Largest file | ~170 lines (down from 913) |
-| Unsafe code | 0 blocks |
+| Unsafe code | Test-only (env var manipulation) |
 
 ---
 

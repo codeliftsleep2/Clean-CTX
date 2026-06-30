@@ -9,9 +9,9 @@ use crate::angular_meta::template::{extract_template_shape, extract_template_sha
 #[test]
 fn dump_html_ast() {
     let html = r#"<div><span>Hello</span></div>"#;
-    let language = tree_sitter_html::language();
+    let language = tree_sitter_html::LANGUAGE.into();
     let mut parser = tree_sitter::Parser::new();
-    parser.set_language(language).unwrap();
+    parser.set_language(&language).unwrap();
     let tree = parser.parse(html.as_bytes(), None).unwrap();
     let root = tree.root_node();
     fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
@@ -42,9 +42,9 @@ fn dump_html_ast() {
 #[test]
 fn dump_angular_template_ast() {
     let html = r#"<div *ngIf="show"><app-card [title]="name" (click)="handler()"></app-card></div>"#;
-    let language = tree_sitter_html::language();
+    let language = tree_sitter_html::LANGUAGE.into();
     let mut parser = tree_sitter::Parser::new();
-    parser.set_language(language).unwrap();
+    parser.set_language(&language).unwrap();
     let tree = parser.parse(html.as_bytes(), None).unwrap();
     let root = tree.root_node();
     fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {

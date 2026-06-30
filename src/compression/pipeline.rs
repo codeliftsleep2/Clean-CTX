@@ -72,8 +72,9 @@ pub fn compress_file(
     dict: &mut PathDictionary,
     cache: &mut LocalStateCache,
     fidelity: Fidelity,
+    config: Option<&crate::config::CleanCtxConfig>,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    compress_file_with_source(file, None, dict, cache, fidelity)
+    compress_file_with_source(file, None, dict, cache, fidelity, config)
 }
 
 /// Like [`compress_file`], but accepts an optional pre-read source string
@@ -90,22 +91,29 @@ pub fn compress_file_with_source(
     dict: &mut PathDictionary,
     cache: &mut LocalStateCache,
     fidelity: Fidelity,
+    config: Option<&crate::config::CleanCtxConfig>,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let source_code;
     if let Some(src) = source_override {
         source_code = src.to_string();
     } else {
-        // F-18: guard against reading an unbounded file into memory.
+        // A-13: guard against reading an unbounded file into memory.
+        // Use centralized validation from ResourceLimits (SRP compliance).
         let meta = fs::metadata(&file)?;
-        if meta.len() > MAX_FILE_BYTES {
+        let file_size = meta.len();
+        
+        // Delegate to config validation method if available
+        if let Some(cfg) = config {
+            cfg.resource_limits.check_file_size(file_size)?;
+        } else if file_size > MAX_FILE_BYTES {
             return Err(format!(
                 "File too large ({} bytes; max {} bytes). \
                  Use compress_workspace or the streaming variant for large files.",
-                meta.len(),
-                MAX_FILE_BYTES,
+                file_size, MAX_FILE_BYTES,
             )
             .into());
         }
+        
         source_code = fs::read_to_string(&file)?;
     }
     let source_bytes = source_code.as_bytes();
