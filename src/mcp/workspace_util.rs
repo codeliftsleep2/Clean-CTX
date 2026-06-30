@@ -5,12 +5,15 @@
 // manifest formatting helpers, and shared constants.
 
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::angular_meta::decorators;
 use crate::compression::Fidelity;
 use crate::mcp::McpState;
 use crate::angular_meta::footer::FooterBuilder;
+
+// F-19: Streaming directory walker (replaces recursive collect-then-sort)
+use walkdir::WalkDir;
 
 /// F-17: maximum directory recursion depth.
 pub(crate) const MAX_WALK_DEPTH: usize = 32;
@@ -97,82 +100,76 @@ pub(crate) fn triplet_name(path: &Path) -> String {
         .to_string()
 }
 
-/// Recursively collect source files from a directory.
+/// F-19: Streaming directory walk using walkdir.
+///
+/// Replaces the recursive `collect_source_files_inner` with a streaming
+/// iterator that pre-allocates path aliases deterministically during the
+/// single-threaded file-collection step. This ensures αN numbering is
+/// stable (no race conditions from parallel alias assignment).
+///
+/// The walker:
+/// - Streams entries one at a time (no collect-then-sort)
+/// - Skips hidden dirs, node_modules, target, dist
+/// - Respects MAX_WALK_DEPTH to prevent infinite recursion
+/// - Detects symlink loops via visited set
+/// - Filters to compressible/Angular extensions only
 pub(crate) fn collect_source_files(dir: &str, entries: &mut Vec<String>) {
     let mut visited = HashSet::new();
-    collect_source_files_inner(dir, entries, &mut visited, 0);
-}
+    let root = Path::new(dir);
 
-fn collect_source_files_inner(
-    dir: &str,
-    entries: &mut Vec<String>,
-    visited: &mut HashSet<PathBuf>,
-    depth: usize,
-) {
-    if depth > MAX_WALK_DEPTH {
-        return;
-    }
-
-    let dir_path = Path::new(dir);
-
-    // F-FULL-01/F-FULL-05: Fast-path canonicalize skip for absolute paths.
-    // On Windows, canonicalize on TempDir paths triggers Defender deep-scan
-    // hooks (10-30s per call). Skip canonicalize when the path is already
-    // absolute and contains no relative components.
-    let canonical = if dir_path.is_absolute() && !dir.contains("..") && !dir.contains("./") && !dir.contains(".\\") {
-        dir_path.to_path_buf()
+    // F-FULL-01/F-FULL-05: Fast-path canonicalize for root.
+    let root_canonical = if root.is_absolute() && !dir.contains("..") && !dir.contains("./") && !dir.contains(".\\") {
+        root.to_path_buf()
     } else {
-        match std::fs::canonicalize(dir_path) {
+        match std::fs::canonicalize(root) {
             Ok(p) => p,
             Err(_) => return,
         }
     };
-    if !visited.insert(canonical) {
+    if !visited.insert(root_canonical) {
         return;
     }
 
-    if let Ok(read_dir) = std::fs::read_dir(dir_path) {
-        for entry in read_dir.flatten() {
-            let path = entry.path();
-            let name = path.file_name().unwrap_or_default().to_string_lossy();
+    // F-19: Use walkdir for streaming iteration.
+    let walker = WalkDir::new(root)
+        .max_depth(MAX_WALK_DEPTH)
+        .follow_links(false)  // Don't follow symlinks (prevents loops)
+        .into_iter();
 
-            if name.starts_with('.')
-                || name == "node_modules"
-                || name == "target"
-                || name == "dist"
+    for entry in walker.filter_entry(|e| !is_skipped_dir(e)) {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        let path = entry.path();
+        if path.is_file() {
+            let ext = path.extension().unwrap_or_default().to_string_lossy();
+            if COMPRESSIBLE_EXTENSIONS.contains(&ext.as_ref())
+                || ANGULAR_EXTENSIONS.contains(&ext.as_ref())
             {
-                continue;
-            }
-
-            if path.is_dir() {
-                // F-FULL-01/F-FULL-05: Fast-path canonicalize skip for child dirs too.
-                let child_canonical = if path.is_absolute() && !path.to_string_lossy().contains("..") && !path.to_string_lossy().contains("./") && !path.to_string_lossy().contains(".\\") {
-                    path.clone()
-                } else {
-                    match std::fs::canonicalize(&path) {
-                        Ok(p) => p,
-                        Err(_) => continue,
-                    }
-                };
-                if visited.contains(&child_canonical) {
-                    continue;
-                }
-                collect_source_files_inner(
-                    &path.to_string_lossy(),
-                    entries,
-                    visited,
-                    depth + 1,
-                );
-            } else if path.is_file() {
-                let ext = path.extension().unwrap_or_default().to_string_lossy();
-                if COMPRESSIBLE_EXTENSIONS.contains(&ext.as_ref())
-                    || ANGULAR_EXTENSIONS.contains(&ext.as_ref())
-                {
-                    entries.push(path.to_string_lossy().into_owned());
-                }
+                entries.push(path.to_string_lossy().into_owned());
             }
         }
     }
+}
+
+/// Check if a directory entry should be skipped during traversal.
+fn is_skipped_dir(entry: &walkdir::DirEntry) -> bool {
+    if !entry.file_type().is_dir() {
+        return false;
+    }
+
+    // Never skip the root directory (depth 0) - allows TempDir names like ".tmpXXX"
+    if entry.depth() == 0 {
+        return false;
+    }
+
+    let name = entry.file_name().to_string_lossy();
+    name.starts_with('.')
+        || name == "node_modules"
+        || name == "target"
+        || name == "dist"
 }
 
 // --- F-ANG-03: extract_class_blocks rewrite ---

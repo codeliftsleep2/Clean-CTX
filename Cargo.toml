@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "clean-ctx"
-version = "0.2.0-rc1"
+version = "0.2.1-rc1"
 edition = "2024"
 rust-version = "1.85"
 license = "CC0-1.0"
@@ -55,6 +55,9 @@ tiktoken-rs = "0.11"
 
 # Parallel iteration for workspace compression passes (F-FULL-15)
 rayon = "1.10"
+
+# Streaming directory walker for F-19 (replaces recursive collect-then-sort)
+walkdir = "2.5"
 
 # Lock-free work queue for A-PRODUCTION dispatcher
 crossbeam-channel = "0.5"

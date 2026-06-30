@@ -44,6 +44,20 @@ pub(crate) fn handle_compress_code_context(
         return;
     }
 
+    // A-13: Check resource limits before processing
+    let limits = &state.config.resource_limits;
+    
+    // Check file size if we can read it
+    if let Ok(metadata) = std::fs::metadata(&resolved_path) {
+        if let Err(e) = limits.check_file_size(metadata.len()) {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32603, "message": e }
+            }));
+            return;
+        }
+    }
+
     let effective_fidelity = fidelity;
     let source_arc = state.read_source(&resolved_path).ok();
     let source_ref = source_arc.as_ref().map(|s| s.as_str());
@@ -351,6 +365,20 @@ pub(crate) fn handle_provide_code_context(
         return;
     }
 
+    // A-13: Check resource limits before processing
+    let limits = &state.config.resource_limits;
+    
+    // Check file size if we can read it
+    if let Ok(metadata) = std::fs::metadata(&resolved_path) {
+        if let Err(e) = limits.check_file_size(metadata.len()) {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32603, "message": e }
+            }));
+            return;
+        }
+    }
+
     let source_arc = match state.read_source(&resolved_path) {
         Ok(s) => s,
         Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } })); return; }
@@ -492,6 +520,21 @@ pub(crate) fn handle_restore_context(
         Ok(f) => f,
         Err(()) => return,
     };
+
+    // A-13: Check resource limits before processing
+    let limits = &state.config.resource_limits;
+    
+    // Check file size if we can read it
+    if let Ok(metadata) = std::fs::metadata(&resolved_path) {
+        if let Err(e) = limits.check_file_size(metadata.len()) {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32603, "message": e }
+            }));
+            return;
+        }
+    }
+
     let path_alias = state.get_or_create_alias(resolved_path.clone());
     state.ir_context_lock().remove_file(&path_alias);
     state.llm_text_cache_lock().remove(&path_alias);

@@ -1,7 +1,7 @@
 # Clean-CTX — Architecture Overview
 
-**Version:** 0.2.0-rc1
-**Last updated:** 2026-06-24 (A-09: multi-threaded MCP server dispatch with rayon thread pool)
+**Version:** 0.2.1-rc1
+**Last updated:** 2026-06-30 (A-09 through A-15, F-19 through F-22: all Foundation and priority Now items complete)
 
 ---
 
@@ -60,37 +60,45 @@
 └─────────────────────────────────────────────────────────┘
 ```
 
-### A-09: Multi-Threaded Request Dispatch
+### A-09: Production-Grade Multi-Threaded Request Dispatch
 
-The MCP server uses a **rayon thread pool** (4 workers) to handle concurrent JSON-RPC requests without blocking the stdin reader:
+The MCP server uses a **crossbeam_channel thread pool** with configurable worker count (default: auto-detect CPU count) to handle concurrent JSON-RPC requests without blocking the stdin reader:
 
 ```
-stdin reader thread           Dispatcher thread pool (4 workers)
+stdin reader thread           Dispatcher thread pool (N workers)
 ┌──────────────────┐           ┌───────────────────────────────────┐
-│  read_line()     │           │  Worker 1: compress (holds lock) │
-│  parse JSON-RPC  │  enqueue  │  Worker 2: context_stats (wait)  │
+│  read_line()     │           │  Worker 1: compress file          │
+│  parse JSON-RPC  │  enqueue  │  Worker 2: context_stats (read)   │
 │  → dispatcher    │──────────→│  Worker 3: CBM query (wait)      │
-│  → read next     │           │  Worker 4: prompts/list (wait)   │
+│  → read next     │           │  Worker 4: workspace compress    │
 └──────────────────┘           └───────────────────────────────────┘
                                         │
-                                   ┌────▼─────┐
-                                   │  Mutex   │  Serializes McpState access
-                                   └──────────┘
+                                   ┌────▼──────────┐
+                                   │  RwLock<McpState>  │  Parallel reads, serial writes
+                                   └────┬──────────┘
                                         │
-                                   ┌────▼─────┐
-                                   │  stdout  │  Global STDOUT_MUTEX
-                                   │  Mutex   │  prevents interleaved responses
-                                   └──────────┘
+                                   ┌────▼──────────┐
+                                   │  Stdout writer │  Dedicated thread, no interleaving
+                                   └────────────────┘
 ```
 
 **How it works:**
 
-1. **Stdin reader thread** — reads one JSON-RPC line at a time, parses it, and immediately enqueues it to the dispatcher. It never waits for the request to complete.
-2. **Rayon thread pool** — 4 worker threads pick up queued requests. Each worker locks `McpState` (wrapped in `Arc<Mutex<>>`), runs the handler, and releases the lock.
-3. **McpState serialization** — only one worker touches state at a time. This is acceptable because the bottleneck is I/O (file reads, CBM queries), not CPU.
-4. **Stdout serialization** — a global `STDOUT_MUTEX` ensures JSON-RPC response lines never interleave, even when multiple workers complete simultaneously.
+1. **Stdin reader thread** — reads one JSON-RPC line at a time, parses it, and enqueues via `dispatcher.spawn()`. Never waits for completion.
+2. **Worker threads** — bounded crossbeam_channel queue with configurable depth (default: 1000). Workers acquire `RwLock` write access for compression, read access for stats/queries.
+3. **Panic recovery** — `catch_unwind` wraps every handler. Poisoned RwLock locks are reclaimed via `poisoned.into_inner()`.
+4. **Dedicated stdout writer** — a separate thread serializes JSON responses, preventing interleaving.
 
-**Why this matters:** Before A-09, a slow CBM query or large file compression would block ALL subsequent requests. Now the reader thread stays responsive, queueing work while slow operations complete in the background.
+**Configuration:**
+```json
+{
+  "dispatcher": { "worker_count": 8, "max_queue_depth": 2000 }
+}
+```
+
+**Why this matters:** Before A-09, a slow CBM query or large file compression blocked ALL subsequent requests. The dispatcher also includes request tracing with IDs, timestamps, slow-request logging (5s threshold), and graceful shutdown with configurable timeout.
+
+**See:** `src/mcp/dispatcher.rs` (312 lines, 6+ unit tests)
 
 ---
 
