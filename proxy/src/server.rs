@@ -320,6 +320,9 @@ async fn handle_messages_request(
             scrub_secrets: guard.config.scrub_secrets,
             tool_filters: guard.config.tool_filters,
             filter_registry: Some(guard.filter_registry.clone()),
+            sliding_window_enabled: guard.config.sliding_window_enabled,
+            sliding_window_max_age_turns: guard.config.sliding_window_max_age_turns,
+            sliding_window_force_preserve_floor: guard.config.sliding_window_force_preserve_floor,
         };
 
         // Detect platform from request body or config override
@@ -332,6 +335,9 @@ async fn handle_messages_request(
         // Build and run the transform pipeline (OCP: new transforms added in pipeline.rs)
         let pipeline = Pipeline::build(&pipeline_config);
         pipeline.run(&mut body_value, &mut guard.transform_stats, &pipeline_config, adapter.as_ref());
+
+        // Reset per-request sliding window counters after this request
+        guard.transform_stats.sliding_window.reset_request();
 
         // Cache breakpoints (Anthropic only — other platforms don't support cache_control)
         if guard.config.auto_cache && adapter.platform_name() == "anthropic" {
@@ -506,7 +512,7 @@ async fn read_body(body: Incoming, max_size: usize) -> Result<Bytes, ProxyError>
     Ok(bytes)
 }
 
-/// Handle `GET /stats` — return proxy filter + cache stats as JSON.
+/// Handle `GET /stats` — return proxy filter + cache + sliding window stats as JSON.
 async fn handle_stats_endpoint(state: SharedState) -> Response<Full<BytesType>> {
     let guard = state.read().await;
     let filter_stats = crate::filter_stats::FilterStats::new();
@@ -515,6 +521,7 @@ async fn handle_stats_endpoint(state: SharedState) -> Response<Full<BytesType>> 
         "cache_stats": guard.cache_stats,
         "rate_limiter": guard.rate_limiter.stats_summary().await,
         "api_key_configured": guard.config.api_key.is_some(),
+        "sliding_window": guard.transform_stats.sliding_window,
     });
     let body = serde_json::to_string(&json).unwrap_or_else(|_| "{}".to_string());
     Response::builder()

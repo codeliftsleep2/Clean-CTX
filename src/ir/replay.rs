@@ -181,6 +181,10 @@ pub struct ContextState {
     files: HashMap<String, FileState>,
     /// Current global version (monotonic, across all files)
     version: u64,
+    /// A-08: Source hashes for detecting unchanged files and avoiding
+    /// unnecessary recompilation. Key is path alias, value is SHA-256
+    /// hash of the source content at the time of last compilation.
+    source_hashes: HashMap<String, String>,
 }
 
 impl ContextState {
@@ -189,6 +193,7 @@ impl ContextState {
         Self {
             files: HashMap::new(),
             version: 0,
+            source_hashes: HashMap::new(),
         }
     }
 
@@ -199,11 +204,19 @@ impl ContextState {
     /// it is overwritten with the new IR.
     ///
     /// The global version is updated to max(current, ir.version).
-    pub fn load_ir(&mut self, ir: CompiledIR) {
+    ///
+    /// A-08: Accepts an optional source hash to track whether the file
+    /// has changed since last compilation.
+    pub fn load_ir(&mut self, ir: CompiledIR, source_hash: Option<String>) {
         let file_id = ir.file_id.clone();
         let version = ir.version;
         self.files.insert(file_id, FileState::from_compiled(&ir));
         self.version = self.version.max(version);
+        
+        // A-08: Store source hash if provided
+        if let Some(hash) = source_hash {
+            self.source_hashes.insert(ir.file_id, hash);
+        }
     }
 
     /// Apply a delta to update state for a specific file.
@@ -321,6 +334,25 @@ impl ContextState {
     /// Check if a file is tracked in state.
     pub fn has_file(&self, file_id: &str) -> bool {
         self.files.contains_key(file_id)
+    }
+
+    /// A-08: Check if the source for a file has changed since last compilation.
+    ///
+    /// Returns `true` if the file is not tracked (no baseline to compare against),
+    /// or if the provided source hash matches the stored hash (file unchanged).
+    /// Returns `false` if the file is tracked but the hash doesn't match (file changed).
+    pub fn is_source_unchanged(&self, file_id: &str, source_hash: &str) -> bool {
+        match self.source_hashes.get(file_id) {
+            None => true,  // No baseline hash - treat as unchanged (first compile)
+            Some(stored_hash) => stored_hash == source_hash,  // Compare hashes
+        }
+    }
+
+    /// A-08: Get the stored source hash for a file.
+    ///
+    /// Returns `None` if the file is not tracked or no hash was stored.
+    pub fn get_source_hash(&self, file_id: &str) -> Option<&String> {
+        self.source_hashes.get(file_id)
     }
 
     /// Get the version of a specific file.

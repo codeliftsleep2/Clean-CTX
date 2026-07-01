@@ -210,7 +210,7 @@ fn audit6_ir_context_read_helper_works() {
         version: 1,
         instructions: Vec::new(),
     };
-    write.load_ir(mock_ir);
+    write.load_ir(mock_ir, None);
     drop(write);
 
     let read = state.ir_context_read();

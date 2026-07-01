@@ -354,7 +354,7 @@ fn context_state_new() {
 fn context_state_load_ir() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     assert!(cs.has_file("a1"));
     assert_eq!(cs.version(), 1);
@@ -368,8 +368,8 @@ fn context_state_load_multiple_files() {
     let ir2 = multi_class_ir("b2", 1);
 
     let mut cs = ContextState::new();
-    cs.load_ir(ir1);
-    cs.load_ir(ir2);
+    cs.load_ir(ir1, None);
+    cs.load_ir(ir2, None);
 
     assert!(cs.has_file("a1"));
     assert!(cs.has_file("b2"));
@@ -383,10 +383,10 @@ fn context_state_load_ir_updates_version() {
     let ir_v2 = multi_class_ir("b2", 3);
 
     let mut cs = ContextState::new();
-    cs.load_ir(ir_v1);
+    cs.load_ir(ir_v1, None);
     assert_eq!(cs.version(), 1);
 
-    cs.load_ir(ir_v2);
+    cs.load_ir(ir_v2, None);
     assert_eq!(cs.version(), 3, "global version should be max of all loaded IRs");
 }
 
@@ -402,10 +402,10 @@ fn context_state_load_overwrites_existing() {
     };
 
     let mut cs = ContextState::new();
-    cs.load_ir(ir_v1);
+    cs.load_ir(ir_v1, None);
     assert_eq!(cs.instruction_count("a1").unwrap(), 6);
 
-    cs.load_ir(ir_v2);
+    cs.load_ir(ir_v2, None);
     assert_eq!(cs.instruction_count("a1").unwrap(), 1);
     assert_eq!(cs.version(), 2);
 }
@@ -416,7 +416,7 @@ fn context_state_load_overwrites_existing() {
 fn context_state_apply_add() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     let delta = add_method_delta(1, 2);
     let result = cs.apply(delta).expect("apply should succeed");
@@ -436,7 +436,7 @@ fn context_state_apply_add() {
 fn context_state_apply_remove() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     let delta = remove_method_delta(1, 2);
     let result = cs.apply(delta).expect("apply should succeed");
@@ -456,7 +456,7 @@ fn context_state_apply_remove() {
 fn context_state_apply_modify() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     let delta = modify_method_delta(1, 2);
     let result = cs.apply(delta).expect("apply should succeed");
@@ -474,7 +474,7 @@ fn context_state_apply_modify() {
 fn context_state_apply_combined_delta() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Combined: add, remove, modify in one delta
     let delta = IRDelta {
@@ -526,7 +526,7 @@ fn context_state_apply_unknown_file() {
 fn context_state_apply_version_mismatch() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Delta targeting version 0 when file is at version 1
     let delta = IRDelta {
@@ -550,7 +550,7 @@ fn context_state_apply_version_mismatch() {
 fn context_state_apply_symbol_not_found_on_remove() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Try to remove an instruction that doesn't exist
     let delta = IRDelta {
@@ -579,7 +579,7 @@ fn context_state_apply_symbol_not_found_on_remove() {
 fn context_state_apply_symbol_not_found_on_modify() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Try to modify an instruction that doesn't exist
     let delta = IRDelta {
@@ -609,7 +609,7 @@ fn context_state_apply_symbol_not_found_on_modify() {
 fn context_state_apply_duplicate_symbol() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Try to add an instruction with a key that already exists
     let delta = IRDelta {
@@ -640,7 +640,7 @@ fn context_state_apply_duplicate_symbol() {
 fn context_state_sequential_deltas() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // v1 → v2: add method M2
     let delta_1_2 = add_method_delta(1, 2);
@@ -695,7 +695,7 @@ fn context_state_sequential_deltas() {
 fn context_state_render_pretty() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     let rendered = cs.render_pretty("a1", Fidelity::Low);
     assert!(rendered.is_some(), "should render existing file");
@@ -717,7 +717,7 @@ fn context_state_render_pretty_nonexistent_file() {
 fn context_state_render_after_apply() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Add a method
     let delta = add_method_delta(1, 2);
@@ -736,8 +736,8 @@ fn context_state_multi_file_operations() {
     let ir2 = multi_class_ir("file2", 1);
 
     let mut cs = ContextState::new();
-    cs.load_ir(ir1);
-    cs.load_ir(ir2);
+    cs.load_ir(ir1, None);
+    cs.load_ir(ir2, None);
 
     // Both files loaded
     assert!(cs.has_file("file1"));
@@ -774,7 +774,7 @@ fn context_state_empty_ir() {
         version: 1,
     };
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     assert!(cs.has_file("empty"));
     assert_eq!(cs.instruction_count("empty").unwrap(), 0);
@@ -798,11 +798,11 @@ fn context_state_version_tracking() {
     assert_eq!(cs.version(), 0);
 
     let ir1 = baseline_ir("a1", 5);
-    cs.load_ir(ir1);
+    cs.load_ir(ir1, None);
     assert_eq!(cs.version(), 5);
 
     let ir2 = multi_class_ir("b2", 3);
-    cs.load_ir(ir2);
+    cs.load_ir(ir2, None);
     assert_eq!(cs.version(), 5, "should stay at max version (5)");
 
     let ir3 = CompiledIR {
@@ -810,7 +810,7 @@ fn context_state_version_tracking() {
         instructions: vec![],
         version: 10,
     };
-    cs.load_ir(ir3);
+    cs.load_ir(ir3, None);
     assert_eq!(cs.version(), 10, "should update to 10");
 }
 
@@ -818,7 +818,7 @@ fn context_state_version_tracking() {
 fn context_state_remove_file() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     assert!(cs.has_file("a1"));
     let removed = cs.remove_file("a1");
@@ -833,7 +833,7 @@ fn context_state_remove_file() {
 fn context_state_file_version() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     assert_eq!(cs.file_version("a1").unwrap(), 1);
     assert!(cs.file_version("nonexistent").is_none());
@@ -848,7 +848,7 @@ fn context_state_file_version() {
 fn context_state_get_ir() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     let ir_ref = cs.get_ir("a1");
     assert!(ir_ref.is_some());
@@ -904,7 +904,7 @@ fn full_replay_cycle() {
 
     // Step 2: Load v1 into state
     let mut cs = ContextState::new();
-    cs.load_ir(v1.clone());
+    cs.load_ir(v1.clone(), None);
     assert_eq!(cs.instruction_count("main.ts").unwrap(), 6);
 
     // Step 3-4: Create v2 (modified) and compute delta
@@ -961,7 +961,7 @@ fn full_replay_cycle() {
 fn context_state_apply_no_op_mod_then_add() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Manually construct a delta with a mod that is a no-op
     // (replace equals the original key) plus a real add.
