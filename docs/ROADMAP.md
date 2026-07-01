@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-07-01 (A-08 complete ✅ — all Foundation + Now items done)
+**Last updated:** 2026-07-01 (R-41/R-42 complete ✅ — all v0.2.0 items done)
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -11,7 +11,7 @@
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
 | **Now** | v0.2.0 | Real-world ready | ✅ 0 (all complete) |
-| **Next** | v0.3.0 | Advanced capabilities | 10 |
+| **Next** | v0.3.0 | Advanced capabilities | 8 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
 | **Architectural** | Continuous | Code health & tooling | 3 (A-01, A-03, A-05) |
 | **Community** | Continuous | Docs & marketing | 5 |
@@ -52,6 +52,8 @@ These items are complete and documented. Listed for historical context.
 | **A-08** | Token Efficiency Audit | v0.2.0 | ✅ All 4 findings resolved: source_cache integration (Finding 1 High ✅), source hash tracking in delta path (Finding 2 Medium ✅), path resolution consistency confirmed (Finding 3 Medium ✅), source ownership verified sound (Finding 4 Low ✅). See `docs/TOKEN_EFFICIENCY_AUDIT.md`. |
 | **A-04** | `tracing` + `metrics` | v0.2.0 | ✅ Structured logging with `tracing` crate, OpenTelemetry-compatible spans, `MetricsRegistry` with counters/histograms/gauges, OTLP-exportable design. `init_tracing()` at server startup. See `src/observability/`. |
 | **A-07** | Property-based tests with `proptest` | v0.2.0 | ✅ Fuzz-style input tests for decompressor (`word_boundary_replace`), config glob matcher (`is_excluded`), modifier stripper (`strip_modifiers`). 3 proptest modules in `src/tests/proptest/`. |
+| **R-41** | Sliding Context Window (Tier 1) | v0.2.0 | ✅ Age-based tool-result truncation in the proxy pipeline, with force-preserve rules (floor + path cross-reference). Opt-in via `SLIDING_WINDOW=1`. `age_tool_results()` in `proxy/src/transform.rs`. |
+| **R-42** | Sliding Context Window (Tier 2 — scored pruning) | v0.2.0 | ✅ Relevance-scored pruning beyond simple age. Dry-run mode support. Integrated with proxy dashboard stats. |
 | **F-19** | Streaming workspace walk | v0.2.0 | ✅ Replaced recursive `collect_source_files_inner` with `walkdir` streaming visitor. Pre-allocates path aliases during single-threaded file-collection step for deterministic `αN` numbering. Required before F-20. |
 | **F-20** | Rayon parallelization for `compress_workspace` | v0.2.0 | ✅ Applied `par_iter()` to the per-file compression loop with Mutex-wrapped manifest/errors collectors. Pre-assigns aliases deterministically (F-21) before parallel work. **Prerequisites:** F-19 (walkdir) ✅, A-12 (Parser `Send`) ✅. |
 | **F-21** | Deterministic alias assignment | v0.2.0 | ✅ Pre-assigns α1, α2…αN aliases sequentially before the parallel Rayon loop. Once assigned, `get_or_create_alias` is a read-only HashMap lookup safe for concurrent access. |
@@ -63,13 +65,13 @@ These items are complete and documented. Listed for historical context.
 
 **ALL ITEMS COMPLETE.** v0.2.0 is fully ready for release.
 
-All Foundation items (A-09 through A-15) and all Now items (F-19 through F-22, A-08) are resolved. No remaining blockers.
+All Foundation items (A-09 through A-15), all Now items (F-19 through F-22, A-08), and all Next items implemented in this cycle (R-41, R-42) are resolved. No remaining blockers.
 
 ---
 
 ## Next (v0.3.0) — "Advanced capabilities"
 
-**GATE:** All Foundation (A-09 through A-15) and Now items (A-08, F-19 through F-22) are complete. v0.3.0 work can begin. Meta-layer items (R-36, R-37, R-23) depend on A-11 (detection hardening) which is also complete.
+**GATE:** All Foundation (A-09 through A-15), Now (A-08, F-19 through F-22), and Sliding Context Window (R-41, R-42) items are complete. v0.3.0 work can begin. Meta-layer items (R-36, R-37, R-23) depend on A-11 (detection hardening) which is also complete.
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
@@ -82,8 +84,6 @@ All Foundation items (A-09 through A-15) and all Now items (F-19 through F-22, A
 | **R-01b** | Go language layer | Second-most requested. | 1-2 days | 🟡 Medium |
 | **R-07** | MCP `resources` support | Expose compressed snapshots as MCP resources in addition to tools, enabling LLM clients to read prior state without re-invoking tools. | 1-2 days | 🟡 Medium |
 | **R-08** | Improved diff: rename detection | Detect class/method renames (same signature, different name) and emit as `~` with a `renamed from X` hint instead of a delete+add pair. | 1 day | 🟡 Medium |
-| **R-41** | Sliding Context Window (Tier 1) | Age-based tool-result truncation in the proxy pipeline, with force-preserve rules (floor + path cross-reference). Opt-in via `SLIDING_WINDOW=1`. See `docs/SLIDING_CONTEXT_WINDOW_PLAN.md`. | 3-5 days | 🟡 Medium |
-| **R-42** | Sliding Context Window (Tier 2 — scored pruning) | Relevance-scored pruning beyond simple age. Dry-run mode required before default-on. | 4-6 days | 🟢 Low |
 
 ---
 
@@ -160,10 +160,12 @@ All items identified by the FAANG-level architectural review plus the Token Effi
 | **A-08** | Token Efficiency Audit | v0.2.0 | All 4 findings resolved. Source hash tracking eliminates recompilation for unchanged files (30-50% savings on repeated delta calls). |
 | **A-04** | `tracing` + `metrics` | v0.2.0 | Structured logging with `tracing` crate, `MetricsRegistry` with counters/histograms/gauges, OTLP-exportable design. |
 | **A-07** | Property-based tests with `proptest` | v0.2.0 | Fuzz-style input tests for decompressor, config glob matcher, modifier stripper. 3 proptest modules. |
+| **R-41** | Sliding Context Window (Tier 1) | v0.2.0 | Age-based tool-result truncation with force-preserve rules. Opt-in via `SLIDING_WINDOW=1`. |
+| **R-42** | Sliding Context Window (Tier 2) | v0.2.0 | Relevance-scored pruning with dry-run mode. Integrated with proxy dashboard. |
 
 ### Next list priorities (v0.3.0)
 
-All gates clear. Meta-layer items are now unblocked (A-11 ✅).
+All gates clear. Meta-layer items are now unblocked (A-11 ✅). Sliding Context Window (R-41, R-42) completed in v0.2.0.
 
 | Priority | Item | Dependency |
 |----------|------|------------|
@@ -176,8 +178,6 @@ All gates clear. Meta-layer items are now unblocked (A-11 ✅).
 | 🟡 Medium | R-01b Go language layer | None |
 | 🟡 Medium | R-07 MCP resources support | None |
 | 🟡 Medium | R-08 Improved diff: rename detection | None |
-| 🟡 Medium | R-41 Sliding Context Window (Tier 1) | A-04 (observability, for pruning audit trail) |
-| 🟢 Low | R-42 Sliding Context Window (Tier 2) | R-41, A-07 (proptest for force-preserve invariants) |
 
 ### Items explicitly deferred from Next list
 
