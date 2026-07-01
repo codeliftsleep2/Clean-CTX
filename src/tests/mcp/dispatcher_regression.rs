@@ -139,8 +139,11 @@ mod boundary_tests {
         }
         
         // Verify the final state was set correctly
+        // Note: Due to concurrent execution, we can't guarantee which handler
+        // finished last. We can only verify that the value is in the expected range.
         let guard = dispatcher.state().read().unwrap();
-        assert_eq!(guard.proxy_port, 1009);
+        assert!(guard.proxy_port >= 1000 && guard.proxy_port <= 1009,
+            "proxy_port should be set by one of the handlers, got {}", guard.proxy_port);
     }
 
     /// REGRESSION TEST: Backpressure cannot be bypassed
