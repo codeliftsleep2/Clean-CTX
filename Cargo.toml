@@ -10,6 +10,26 @@ rust-version = "1.85"
 license = "CC0-1.0"
 description = "Token Waste Reducer & Context Compiler - Local-first AST compression engine for LLM token optimization"
 
+[features]
+# rust is included in default features for backward compatibility
+default = ["typescript", "csharp", "rust", "angular", "spring_boot"]
+
+# Language layers (each enables a tree-sitter grammar)
+typescript = ["dep:tree-sitter-typescript"]
+csharp     = ["dep:tree-sitter-c-sharp"]
+rust       = ["dep:tree-sitter-rust"]
+java       = ["dep:tree-sitter-java"]
+
+# Meta layers (imply their base language)
+angular     = ["typescript", "dep:tree-sitter-html"]
+spring_boot = ["java"]
+
+# Future meta layers (placeholders)
+# react      = ["typescript"]
+# vue        = ["typescript"]
+# ngrx       = ["angular"]
+# redux      = ["react"]
+
 [lib]
 name = "clean_ctx"
 path = "src/lib.rs"
@@ -31,15 +51,17 @@ clap = { version = "4.6.1", features = ["derive"] }
 # in CI to verify ABI alignment. Use `cargo update -p tree-sitter` to bump.
 tree-sitter = "0.26"
 # SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
-tree-sitter-c-sharp = "0.23"
+# Each grammar is gated by its Cargo feature (typescript, csharp, rust, java, html).
+# Building with --no-default-features excludes all grammars.
+tree-sitter-c-sharp = { version = "0.23", optional = true }
 # SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
-tree-sitter-typescript = "0.23"
+tree-sitter-typescript = { version = "0.23", optional = true }
 # SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
-tree-sitter-html = "0.23"
+tree-sitter-html = { version = "0.23", optional = true }
 # SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
-tree-sitter-rust = "0.24"
+tree-sitter-rust = { version = "0.24", optional = true }
 # SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
-tree-sitter-java = "0.23"
+tree-sitter-java = { version = "0.23", optional = true }
 # Streaming iterator trait used by tree-sitter QueryMatches API
 streaming-iterator = "0.1"
 

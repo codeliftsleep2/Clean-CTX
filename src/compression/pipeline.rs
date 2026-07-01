@@ -35,8 +35,6 @@ use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
 use crate::dictionary::PathDictionary;
-use crate::angular_meta::run_meta_layer;
-use crate::spring_meta::run_meta_layer as run_spring_meta_layer;
 
 /// Output of [`build_output_lines`]. F-04 (FAANG audit): previously
 /// the orchestrator counted classes/methods/imports by
@@ -490,16 +488,39 @@ pub fn build_output_lines(
         };
         output.insert(0, import_block);
     }
-    let meta_block = run_meta_layer(
-        source_code,
-        &class_captures,
-        fidelity,
-    );
-    let spring_meta_block = run_spring_meta_layer(
-        source_code,
-        &class_captures,
-        fidelity,
-    );
+    // Phase 4: Dispatch meta-layers through the registry.
+    // When a feature is disabled, the corresponding meta-layer is not
+    // registered and the tree-sitter grammar is not linked.
+    let registry = crate::layers::LayerRegistry::global();
+    let meta_results = registry.run_meta_layers_pipeline(source_code, &class_captures, fidelity);
+    
+    let meta_block = meta_results.iter()
+        .find(|(name, _)| name == "angular")
+        .map(|(_, text)| {
+            // Parse the rendered text back into a MetaBlock-like structure
+            // For now, we keep using the existing angular_meta::MetaBlock
+            // but we could simplify this in a future refactor
+            let mut lines = Vec::new();
+            for line in text.lines() {
+                if line.starts_with("Φ") {
+                    lines.push(line.to_string());
+                }
+            }
+            crate::angular_meta::MetaBlock { lines }
+        });
+    
+    let spring_meta_block = meta_results.iter()
+        .find(|(name, _)| name == "spring_boot")
+        .map(|(_, text)| {
+            let mut lines = Vec::new();
+            for line in text.lines() {
+                if line.starts_with("Φ") {
+                    lines.push(line.to_string());
+                }
+            }
+            crate::spring_meta::MetaBlock { lines }
+        });
+    
     BuildOutputResult {
         output_lines: output,
         class_count,
@@ -600,76 +621,85 @@ pub fn compress_source(
     let (language, query_string) = crate::compression::language::language_for_extension(extension)
         .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
 
-    let all_captures: Vec<CapEntry> = run_capture_pipeline(
-        language,
-        query_string,
-        source_code,
-        fidelity,
-        |capture_name, raw, f| {
-            match capture_name {
-                "class.root" => Some(extract_class_name(raw)),
-                // Rust type declarations: struct, enum, trait, impl
-                "struct.root" | "trait.root" | "impl.root" => {
-                    Some(extract_rust_struct_name(raw))
-                }
-                // Java type declarations: interface, enum, record
-                "interface.root" | "record.root" => {
-                    Some(extract_java_type_name(raw, capture_name))
-                }
-                "method.root" => Some(extract_method_sig(raw, f)),
-                "constructor.root" => Some(extract_java_constructor_sig(raw, f)),
-                "field.root" => Some(extract_field(raw, f)),
-                // Rust mod declarations are structural like imports
-                "mod.root" => Some(compact_import(raw, f)),
-                // Java package declarations
-                "package.root" => Some(compact_java_package(raw, f)),
-                // Rust type aliases
-                "type.root" => Some(compact_expression(raw, f)),
-                _ => Some(compact_expression(raw, f)),
-            }
-        },
-    )?;
+     let all_captures: Vec<CapEntry> = run_capture_pipeline(
+         language,
+         query_string,
+         source_code,
+         fidelity,
+         |capture_name, raw, f| {
+             match capture_name {
+                 "class.root" => Some(extract_class_name(raw)),
+                 // Rust type declarations: struct, enum, trait, impl
+                 "struct.root" | "trait.root" | "impl.root" => {
+                     Some(extract_rust_struct_name(raw))
+                 }
+                 // Java type declarations: interface, enum, record
+                 "interface.root" | "record.root" => {
+                     Some(extract_java_type_name(raw, capture_name))
+                 }
+                 "method.root" => Some(extract_method_sig(raw, f)),
+                 "constructor.root" => Some(extract_java_constructor_sig(raw, f)),
+                 "field.root" => Some(extract_field(raw, f)),
+                 // Rust mod declarations are structural like imports
+                 "mod.root" => Some(compact_import(raw, f)),
+                 // Java package declarations
+                 "package.root" => Some(compact_java_package(raw, f)),
+                 // Rust type aliases
+                 "type.root" => Some(compact_expression(raw, f)),
+                 _ => Some(compact_expression(raw, f)),
+             }
+         },
+     )?;
+
+     #[cfg(debug_assertions)]
      eprintln!("[compress_source] run_capture_pipeline returned {} captures", all_captures.len());
 
-
-    let built = build_output_lines(&all_captures, source_code, fidelity, None);
-    eprintln!("[compress_source] build_output_lines done");
-    let mut body_content = assemble_body(&built.output_lines, fidelity);
+     let built = build_output_lines(&all_captures, source_code, fidelity, None);
+     #[cfg(debug_assertions)]
+     eprintln!("[compress_source] build_output_lines done");
+     let mut body_content = assemble_body(&built.output_lines, fidelity);
+     #[cfg(debug_assertions)]
      eprintln!("[compress_source] assemble_body done");
-    if let Some(block) = &built.meta_block {
-        body_content.push_str(&block.render());
-    }
+     if let Some(block) = &built.meta_block {
+         body_content.push_str(&block.render());
+     }
+     #[cfg(debug_assertions)]
      eprintln!("[compress_source] meta_block rendered");
-    // Phase III (Idea #11 — Micro-Opcode Table for Text):
-    // Apply micro-opcodes (§C, §P) for workspace-level compression too.
-    body_content = apply_micro_opcodes(&body_content, fidelity);
-    eprintln!("[compress_source] apply_micro_opcodes done");
-    // NOTE: Symbol compression is NOT applied here — it will be applied
-    // by the workspace-level global symbol table instead.
-    let compacted_body = crate::compression::report::format_compacted_body(
-        &body_content,
-        "",
-        &path_alias,
-        fidelity,
-    );
-        eprintln!("[compress_source] format_compacted_body done");
-    let raw_tokens = crate::analytics::bpe()
-        .encode_with_special_tokens(source_code)
-        .len();
-    eprintln!("[compress_source] bpe encode done, {} tokens", raw_tokens);
-    cache.store_raw_token_count(&current_hash, raw_tokens);
+     // Phase III (Idea #11 — Micro-Opcode Table for Text):
+     // Apply micro-opcodes (§C, §P) for workspace-level compression too.
+     body_content = apply_micro_opcodes(&body_content, fidelity);
+     #[cfg(debug_assertions)]
+     eprintln!("[compress_source] apply_micro_opcodes done");
+     // NOTE: Symbol compression is NOT applied here — it will be applied
+     // by the workspace-level global symbol table instead.
+     let compacted_body = crate::compression::report::format_compacted_body(
+         &body_content,
+         "",
+         &path_alias,
+         fidelity,
+     );
+     #[cfg(debug_assertions)]
+     eprintln!("[compress_source] format_compacted_body done");
+     let raw_tokens = crate::analytics::bpe()
+         .encode_with_special_tokens(source_code)
+         .len();
+     #[cfg(debug_assertions)]
+     eprintln!("[compress_source] bpe encode done, {} tokens", raw_tokens);
+     cache.store_raw_token_count(&current_hash, raw_tokens);
 
-    eprintln!("[compress_source] store_raw_token_count done");
-    let final_output = crate::compression::report::format_final_output(
-        source_code,
-        &compacted_body,
-        fidelity,
-        built.class_count,
-        built.method_count,
-        built.import_count,
-    );
-    eprintln!("[compress_source] format_final_output done");
-    Ok(final_output)
+     #[cfg(debug_assertions)]
+     eprintln!("[compress_source] store_raw_token_count done");
+     let final_output = crate::compression::report::format_final_output(
+         source_code,
+         &compacted_body,
+         fidelity,
+         built.class_count,
+         built.method_count,
+         built.import_count,
+     );
+     #[cfg(debug_assertions)]
+     eprintln!("[compress_source] format_final_output done");
+     Ok(final_output)
 }
 
 /// Check if a capture should be skipped due to CBM filter-first rules.

@@ -123,6 +123,8 @@ pub fn run_meta_layer(
             // Only for components with `template:` (not `templateUrl:`)
             // since external .html files are handled by the workspace
             // bundle pass.
+            // This is only available when the `angular` feature is enabled.
+            #[cfg(feature = "angular")]
             if let Some(tpl) = &result.inline_template {
                 if !tpl.trim().is_empty() {
                     let shape = template::extract_template_shape(tpl);

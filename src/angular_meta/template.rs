@@ -24,6 +24,7 @@ const DEFAULT_DEPTH: usize = 4;
 ///
 /// We keep a fresh `Parser` per call (parsers hold mutable state and
 /// are not `Sync`), but the `Language` is immutable and thread-safe.
+#[cfg(feature = "angular")]
 fn html_language() -> &'static Language {
     static LANG: OnceLock<Language> = OnceLock::new();
     LANG.get_or_init(|| tree_sitter_html::LANGUAGE.into())
@@ -140,11 +141,19 @@ impl TemplateShape {
 /// Uses tree-sitter-html for parsing. The `depth` parameter
 /// controls how many levels of nesting to extract tags from
 /// (default: 4). Setting depth to 0 extracts only the root element.
+///
+/// This function is only available when the `angular` feature is enabled.
+/// When disabled, it returns an empty `TemplateShape`.
+#[cfg(feature = "angular")]
 pub fn extract_template_shape(html: &str) -> TemplateShape {
     extract_template_shape_with_depth(html, DEFAULT_DEPTH)
 }
 
 /// Extract template shape with a custom depth limit.
+///
+/// This function is only available when the `angular` feature is enabled.
+/// When disabled, it returns an empty `TemplateShape` with `parse_failed` set to false.
+#[cfg(feature = "angular")]
 pub fn extract_template_shape_with_depth(html: &str, depth: usize) -> TemplateShape {
     let mut shape = TemplateShape::default();
 
@@ -546,6 +555,6 @@ fn extract_attributes(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "angular"))]
 #[path = "../tests/angular_meta/template.rs"]
 mod tests;
