@@ -35,7 +35,7 @@ fn state_replay_full_cycle() {
     // Build IR, load into state, render pretty, verify state.
     let ir1 = make_simple_ir("file1", "C1", "M1");
     let mut state = ContextState::new();
-    state.load_ir(ir1.clone());
+    state.load_ir(ir1.clone(), None);
 
     assert_eq!(state.file_version("file1"), Some(1));
     assert!(state.has_file("file1"));
@@ -108,7 +108,7 @@ fn delta_computer_with_state() {
 
     // Now apply the delta to a state machine
     let mut state = ContextState::new();
-    state.load_ir(ir1);
+    state.load_ir(ir1, None);
     let result = state.apply(delta);
     assert!(result.is_ok(), "delta should apply cleanly");
     assert_eq!(result.unwrap(), 2);

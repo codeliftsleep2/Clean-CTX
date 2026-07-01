@@ -168,7 +168,7 @@ impl SqliteStore {
 
         // 4. Build a ContextState and replay deltas
         let mut context_state = crate::ir::replay::ContextState::new();
-        context_state.load_ir(ir);
+        context_state.load_ir(ir, None);
 
         for delta_result in delta_rows {
             let (_seq, payload) = delta_result?;

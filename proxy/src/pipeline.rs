@@ -14,7 +14,7 @@ use serde_json::Value;
 
 use crate::filter_registry::FilterRegistry;
 use crate::platform::PlatformAdapter;
-use crate::transform::{TransformStats, self};
+use crate::transform::{TransformStats, self as transform};
 
 /// Pipeline configuration extracted from ProxyConfig at request time.
 #[derive(Clone, Default)]
@@ -26,6 +26,12 @@ pub struct PipelineConfig {
     pub scrub_secrets: bool,
     pub tool_filters: bool,
     pub filter_registry: Option<Arc<FilterRegistry>>,
+    /// Enable sliding context window (age-based tool-result truncation).
+    pub sliding_window_enabled: bool,
+    /// Maximum age in turns before a tool result is aged (stubbed).
+    pub sliding_window_max_age_turns: usize,
+    /// Number of most recent turns to always preserve (force-preserve floor).
+    pub sliding_window_force_preserve_floor: usize,
 }
 
 /// A callable transform step. Each step receives the body, stats, config,
@@ -82,6 +88,15 @@ impl Pipeline {
             }
         }
 
+        // Sliding window transform (added after tool filtering, before cache)
+        if config.sliding_window_enabled {
+            let max_age = config.sliding_window_max_age_turns;
+            let floor = config.sliding_window_force_preserve_floor;
+            transforms.push(Box::new(move |body, stats, _, adapter| {
+                transform::age_tool_results(body, stats, max_age, floor, adapter);
+            }));
+        }
+
         Self { transforms }
     }
 
@@ -124,6 +139,9 @@ mod tests {
         drop_set.insert("Read".to_string());
         let config = PipelineConfig {
             drop_tools_set: drop_set.into_iter().collect(),
+            sliding_window_enabled: false,
+            sliding_window_max_age_turns: 20,
+            sliding_window_force_preserve_floor: 15,
             ..PipelineConfig::default()
         };
         let pipeline = Pipeline::build(&config);
@@ -140,6 +158,9 @@ mod tests {
             scrub_secrets: true,
             tool_filters: false,
             filter_registry: None,
+            sliding_window_enabled: false,
+            sliding_window_max_age_turns: 20,
+            sliding_window_force_preserve_floor: 15,
         };
         let pipeline = Pipeline::build(&config);
         assert_eq!(pipeline.len(), 4);
@@ -151,6 +172,9 @@ mod tests {
         drop_set.insert("Read".to_string());
         let config = PipelineConfig {
             drop_tools_set: drop_set.into_iter().collect(),
+            sliding_window_enabled: false,
+            sliding_window_max_age_turns: 20,
+            sliding_window_force_preserve_floor: 15,
             ..PipelineConfig::default()
         };
         let pipeline = Pipeline::build(&config);

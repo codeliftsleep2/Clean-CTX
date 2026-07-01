@@ -69,8 +69,8 @@ pub(crate) fn handle_compress_code_context(
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
 
-    let response = if let Ok(ir) = ir_result {
-        state.ir_context_lock().load_ir(ir.clone());
+    let response = if let Ok((ir, _source_hash)) = ir_result {
+        state.ir_context_lock().load_ir(ir.clone(), None);
         let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
         let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
         let footer = state.format_dict_footer();
@@ -207,13 +207,46 @@ pub(crate) fn handle_delta_code_context(
         Ok(f) => f,
         Err(()) => return,
     };
-    let compiled = match compile_file_ir(&resolved_path, fidelity, state) {
+    
+    // A-08: Check if source has changed before compiling
+    let path_alias = state.get_or_create_alias(resolved_path.clone());
+    let prev_version = state.file_version(&path_alias).unwrap_or(0);
+    
+    // Try to skip compilation if source is unchanged
+    let ir_ctx = state.ir_context_lock();
+    if prev_version > 0 && ir_ctx.has_file(&path_alias) {
+        if let Ok(source_arc) = state.read_source(&resolved_path) {
+            let source_hash = {
+                let cache = state.cache_read();
+                cache.compute_hash(source_arc.as_bytes())
+            };
+            
+            if ir_ctx.is_source_unchanged(&path_alias, &source_hash) {
+                // Source unchanged - return cached IR without recompiling
+                let cached_ir = ir_ctx.get_ir(&path_alias).unwrap().clone();
+                let instruction_count = cached_ir.len();
+                drop(ir_ctx);
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0", "id": id,
+                    "result": {
+                        "content": [{ "type": "text", "text": format!("Cached IR for {} (v{})", path_alias, prev_version) }],
+                        "version": prev_version,
+                        "instruction_count": instruction_count,
+                        "cached": true
+                    }
+                }));
+                return;
+            }
+        }
+    }
+    drop(ir_ctx);  // Release lock before expensive compile
+    
+    // Source changed or no baseline - compile
+    let (compiled, source_hash) = match compile_file_ir(&resolved_path, fidelity, state) {
         Ok(c) => c,
         Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } })); return; }
     };
-    let path_alias = state.get_or_create_alias(resolved_path.clone());
-    let prev_version = state.file_version(&path_alias).unwrap_or(0);
-
+    
     let mut ir_ctx = state.ir_context_lock();
     let delta = if prev_version > 0 && ir_ctx.has_file(&path_alias) {
         ir_ctx.get_ir(&path_alias).cloned().and_then(|prev_instructions| {
@@ -225,7 +258,7 @@ pub(crate) fn handle_delta_code_context(
             DeltaComputer::new().compute(&prev_compiled, &compiled)
         })
     } else {
-        ir_ctx.load_ir(compiled.clone());
+        ir_ctx.load_ir(compiled.clone(), Some(source_hash));
         None
     };
     drop(ir_ctx);
@@ -431,7 +464,7 @@ pub(crate) fn handle_provide_code_context(
     match strategy {
         crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
             let compile_start = Instant::now();
-            let compiled = match compile_file_ir(&resolved_path, effective_fidelity, state) {
+            let (compiled, _source_hash) = match compile_file_ir(&resolved_path, effective_fidelity, state) {
                 Ok(c) => c,
                 Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } })); return; }
             };
@@ -449,7 +482,7 @@ pub(crate) fn handle_provide_code_context(
                     DeltaComputer::new().compute(&prev_compiled, &compiled)
                 })
             } else {
-                ir_ctx.load_ir(compiled.clone());
+                ir_ctx.load_ir(compiled.clone(), None);
                 None
             };
             drop(ir_ctx);
@@ -508,9 +541,9 @@ pub(crate) fn handle_provide_code_context(
             let ir_result = compile_file_ir(&resolved_path, effective_fidelity, state);
             let compile_ms = compile_start.elapsed().as_millis() as u64;
 
-            if let Ok(ir) = ir_result {
+            if let Ok((ir, _source_hash)) = ir_result {
                 let render_start = Instant::now();
-                state.ir_context_lock().load_ir(ir.clone());
+                state.ir_context_lock().load_ir(ir.clone(), None);
                 let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
                 let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
                 let full = format!("{}\n// ── {} ({}) ──\n{}", llm_text.trim(), ir.file_id, resolved_path, state.format_dict_footer().trim());
@@ -623,7 +656,7 @@ pub(crate) fn handle_restore_context(
     let source_text = source_arc.as_str();
 
     match compile_file_ir(&resolved_path, fidelity, state) {
-        Ok(ir) => {
+        Ok((ir, _source_hash)) => {
             let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
             let llm_text = crate::ir::render_hierarchical_for_llm(&hir, fidelity);
             let full = format!("{}\n// ── {} ({}) ──\n{}", llm_text.trim(), ir.file_id, resolved_path, state.format_dict_footer().trim());

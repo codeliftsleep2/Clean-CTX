@@ -91,11 +91,14 @@ pub(crate) fn count_tokens_with_tokenizer(
 /// into the compile path *after* the additive `CodePatternRecognizer`,
 /// so flags are emitted first, then patterns are consumed for wire-size
 /// reduction. This enables the Phase H 30% compression on edits.
+///
+/// A-08: Returns the source hash along with the compiled IR to enable
+/// source change detection in the delta path.
 pub(super) fn compile_file_ir(
     file_path: &str,
     fidelity: Fidelity,
     state: &McpState,
-) -> Result<crate::ir::compiler::CompiledIR, Box<dyn std::error::Error>> {
+) -> Result<(crate::ir::compiler::CompiledIR, String), Box<dyn std::error::Error>> {
     use crate::ir::compiler::IRCompiler;
     use crate::ir::layers::typescript::TypeScriptLayer;
     use crate::ir::layers::csharp::CSharpLayer;
@@ -123,6 +126,12 @@ pub(super) fn compile_file_ir(
 
     // NF-02: Determine the next version based on the previous context state
     let prev_version = state.file_version(&path_alias).unwrap_or(0);
+
+    // A-08: Compute source hash for change detection
+    let source_hash = {
+        let cache = state.cache_read();
+        cache.compute_hash(source.as_bytes())
+    };
 
     let mut compiler = IRCompiler::new();
 
@@ -189,7 +198,8 @@ pub(super) fn compile_file_ir(
     // The compiler always sets version=1; we fix it here.
     compiled.version = prev_version.saturating_add(1);
 
-    Ok(compiled)
+    // A-08: Return source hash along with compiled IR
+    Ok((compiled, source_hash))
 }
 
 /// Compute an AST-level diff between the file's in-session baseline and

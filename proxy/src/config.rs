@@ -127,6 +127,15 @@ pub struct ProxyConfig {
 
     /// Maximum request body size in bytes (default: 10 MB).
     pub max_request_body_size: usize,
+
+    /// Enable sliding context window (age-based tool-result truncation).
+    pub sliding_window_enabled: bool,
+
+    /// Maximum age in turns before a tool result is aged (stubbed).
+    pub sliding_window_max_age_turns: usize,
+
+    /// Number of most recent turns to always preserve (force-preserve floor).
+    pub sliding_window_force_preserve_floor: usize,
 }
 
 impl Default for ProxyConfig {
@@ -150,6 +159,9 @@ impl Default for ProxyConfig {
             rate_limit_rps: 60.0,
             rate_limit_burst: 10.0,
             max_request_body_size: 10 * 1024 * 1024, // 10 MB
+            sliding_window_enabled: false,
+            sliding_window_max_age_turns: 20,
+            sliding_window_force_preserve_floor: 15,
         }
     }
 }
@@ -230,7 +242,16 @@ impl ProxyConfig {
             max_request_body_size: env_var("MAX_REQUEST_BODY_SIZE")
                 .and_then(|v| v.parse::<usize>().ok())
                 .unwrap_or(10 * 1024 * 1024),
-    }
+            sliding_window_enabled: env_var("SLIDING_WINDOW")
+                .map(|v| v == "1" || v.to_lowercase() == "true")
+                .unwrap_or(false),
+            sliding_window_max_age_turns: env_var("SLIDING_WINDOW_MAX_AGE")
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(20),
+            sliding_window_force_preserve_floor: env_var("SLIDING_WINDOW_FLOOR")
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(15),
+        }
     }
 
     /// Check if a tool should be dropped.

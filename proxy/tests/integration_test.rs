@@ -106,6 +106,9 @@ async fn test_proxy_full() {
         rate_limit_rps: 60.0,
         rate_limit_burst: 10.0,
         max_request_body_size: 10 * 1024 * 1024,
+        sliding_window_enabled: false,
+        sliding_window_max_age_turns: 20,
+        sliding_window_force_preserve_floor: 15,
     };
     let (tx, rx) = watch::channel(false);
     let ph = tokio::spawn(async move {
