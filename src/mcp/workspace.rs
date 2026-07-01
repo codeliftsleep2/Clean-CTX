@@ -37,11 +37,21 @@ use crate::compression::Fidelity;
 use crate::compression::pipeline::compress_source;
 use crate::compression::workspace_symbols::build_global_symbol_table;
 use crate::mcp::McpState;
+
+// Phase 5: Angular meta-layer imports are gated by the `angular` feature.
+// When disabled, these modules are not compiled and the bundling/graph
+// passes become no-ops.
+#[cfg(feature = "angular")]
 use crate::angular_meta::bundler;
+#[cfg(feature = "angular")]
 use crate::angular_meta::decorators;
+#[cfg(feature = "angular")]
 use crate::angular_meta::footer::FooterBuilder;
+#[cfg(feature = "angular")]
 use crate::angular_meta::graph::GraphCollector;
+#[cfg(feature = "angular")]
 use crate::angular_meta::template;
+#[cfg(feature = "angular")]
 use crate::angular_meta::style;
 
 use super::workspace_util::{
@@ -49,10 +59,13 @@ use super::workspace_util::{
     collect_source_files,
     extract_class_blocks,
     format_manifest_header,
-    format_manifest_footer,
     triplet_name,
     PassContextRef,
 };
+
+// format_manifest_footer is only available when angular is enabled
+#[cfg(feature = "angular")]
+use super::workspace_util::format_manifest_footer;
 
 /// F-22: Workspace compression result cache.
 ///
@@ -240,15 +253,19 @@ pub(crate) fn compress_workspace_dir(
         compress_pass(fidelity, state, &mut ctx, &mut manifest);
     }
 
-    let footer_builder = bundle_pass(state, &ctx, &mut manifest);
-    graph_pass(state, &mut ctx, &mut manifest);
+    // Angular-specific passes are only available when the feature is enabled
+    #[cfg(feature = "angular")]
+    {
+        let footer_builder = bundle_pass(state, &ctx, &mut manifest);
+        graph_pass(state, &mut ctx, &mut manifest);
 
-    // Build a PassContextRef for format_manifest_footer
-    let ctx_ref = PassContextRef {
-        excluded: &ctx.excluded,
-        errors: &ctx.errors,
-    };
-    format_manifest_footer(state, &ctx_ref, footer_builder, &mut manifest);
+        // Build a PassContextRef for format_manifest_footer
+        let ctx_ref = PassContextRef {
+            excluded: &ctx.excluded,
+            errors: &ctx.errors,
+        };
+        format_manifest_footer(state, &ctx_ref, footer_builder, &mut manifest);
+    }
 
     // F-FINAL-06: Merge the per-pass warnings collected in
     // `ctx.warnings` into the session-level buffer so the
@@ -596,6 +613,10 @@ fn extract_header_from_compressed(compressed: &str) -> String {
 /// Bundling pass. Resolves Angular file triplets (*.component.ts →
 /// .html + .scss), extracts template/style shape summaries, and
 /// emits `ΦBUNDLE` groups with a `§ΦMAP` footer.
+///
+/// This function is only available when the `angular` feature is enabled.
+/// When disabled, it returns an empty `FooterBuilder` stub.
+#[cfg(feature = "angular")]
 fn bundle_pass(
     state: &McpState,
     ctx: &PassContext,
@@ -685,6 +706,10 @@ fn bundle_pass(
 /// push non-fatal warnings (currently: duplicate Angular class
 /// names from `AngularGraphBuilder`) into `ctx.warnings` for the
 /// orchestrator to merge into the JSON-RPC response.
+///
+/// This function is only available when the `angular` feature is enabled.
+/// When disabled, it is a no-op.
+#[cfg(feature = "angular")]
 fn graph_pass(state: &McpState, ctx: &mut PassContext, manifest: &mut String) {
     let compressible: Vec<&String> = ctx
         .kept
@@ -762,6 +787,57 @@ fn graph_pass(state: &McpState, ctx: &mut PassContext, manifest: &mut String) {
     }
 
     manifest.push_str(&angular_graph.format_graph_footer());
+}
+
+// Stub implementations when `angular` feature is disabled.
+// These return empty/no-op results so the orchestrator doesn't need
+// to change its call sites.
+
+/// Stub FooterBuilder for when Angular is disabled.
+/// Provides the same API but all methods are no-ops.
+#[cfg(not(feature = "angular"))]
+#[derive(Debug, Clone, Default)]
+pub struct FooterBuilder {
+    _private: (),
+}
+
+#[cfg(not(feature = "angular"))]
+impl FooterBuilder {
+    pub fn new() -> Self {
+        Self { _private: () }
+    }
+    
+    pub fn register_bundle(
+        &mut self,
+        _name: String,
+        _aliases: Vec<String>,
+        _template: Option<String>,
+        _style: Option<String>,
+    ) {
+        // no-op
+    }
+    
+    pub fn is_empty(&self) -> bool {
+        true
+    }
+    
+    pub fn format_footer(&self) -> String {
+        String::new()
+    }
+}
+
+#[cfg(not(feature = "angular"))]
+fn bundle_pass(
+    _state: &McpState,
+    _ctx: &PassContext,
+    _manifest: &mut String,
+) -> FooterBuilder {
+    FooterBuilder::new()
+}
+
+#[cfg(not(feature = "angular"))]
+fn graph_pass(_state: &McpState, _ctx: &mut PassContext, _manifest: &mut String) {
+    // no-op
 }
 
 #[cfg(test)]

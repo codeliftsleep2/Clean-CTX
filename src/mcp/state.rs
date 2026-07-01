@@ -26,6 +26,7 @@ use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
 use crate::compression::text_delta::TextDeltaComputer;
 use crate::ir::replay::ContextState;
+use crate::layers::LayerRegistry;
 use crate::mcp::buffered_store::BufferedStore;
 use crate::mcp::cache_hints::CacheMetrics;
 use crate::mcp::context_store::InMemoryContextStore;
@@ -129,6 +130,10 @@ pub struct McpState {
     /// Phase 2: Proxy port for fetching tool-filtering and cache stats.
     /// Defaults to 8787 (the proxy's default port).
     pub proxy_port: u16,
+
+    /// Layer registry for language/meta-layer dispatch.
+    /// Initialized once at startup from the enabled Cargo features.
+    pub registry: LayerRegistry,
 }
 
 impl McpState {
@@ -198,6 +203,7 @@ impl McpState {
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,
             proxy_port: 8787,
+            registry: LayerRegistry::new(),
         }
     }
 

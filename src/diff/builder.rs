@@ -23,7 +23,7 @@ use crate::queries;
 use super::snapshot::{CapturedClass, CapturedMethod, CapturedStructure};
 
 /// A parser configuration: language factory, query string, and label.
-type ParserConfig = (fn() -> tree_sitter::Language, &'static str, &'static str);
+type ParserConfig = (fn() -> Option<tree_sitter::Language>, &'static str, &'static str);
 
 /// All supported parser configurations, in the order they should be tried.
 const ALL_PARSERS: &[ParserConfig] = &[
@@ -58,9 +58,9 @@ pub fn build_snapshot(
     };
 
     // Collect parsers to try: first choice first, then the others.
-    let mut candidates: Vec<(&str, tree_sitter::Language, &str)> = Vec::with_capacity(3);
+    let mut candidates: Vec<(&str, Option<tree_sitter::Language>, &str)> = Vec::with_capacity(3);
     // Push the detected parser first
-    candidates.push((first_label, first_lang.clone(), first_query));
+    candidates.push((first_label, Some(first_lang.clone()), first_query));
     // Push the remaining two in ALL_PARSERS order, skipping the detected one
     for (lang_fn, query, label) in ALL_PARSERS {
         if *label != first_label {
@@ -87,12 +87,12 @@ pub fn build_snapshot(
     // (even if empty, so callers get a valid CapturedStructure).
     last_result.unwrap_or_else(|| {
         // Safety net: should never reach here since we always push 3 candidates
-        try_build_with(first_lang, first_query, source, fidelity)
+        try_build_with(Some(first_lang), first_query, source, fidelity)
     })
 }
 
 fn try_build_with(
-    language: tree_sitter::Language,
+    language: Option<tree_sitter::Language>,
     query_string: &str,
     source: &str,
     fidelity: Fidelity,
@@ -102,7 +102,7 @@ fn try_build_with(
     // path wants stored in the resulting CapEntry. F-08: pass the
     // real `fidelity` through so the per-capture closures honour it.
     let all_captures = run_capture_pipeline(
-        language,
+        language.expect("Language must be Some - check feature flags"),
         query_string,
         source,
         fidelity,

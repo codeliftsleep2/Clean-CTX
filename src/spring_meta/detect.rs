@@ -127,7 +127,10 @@ fn ast_based_spring_detect_with_status(source: &str) -> AstResult {
     }
 
     let mut parser = Parser::new();
-    let language = safe_java_language();
+    let language = match safe_java_language() {
+        Some(lang) => lang,
+        None => return AstResult::ParseFailed, // Java feature not enabled
+    };
     
     if parser.set_language(&language).is_err() {
         return AstResult::ParseFailed;

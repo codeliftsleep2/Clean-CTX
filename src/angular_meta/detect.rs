@@ -99,7 +99,10 @@ fn ast_based_angular_detect(source: &str) -> bool {
     }
 
     let mut parser = Parser::new();
-    let language = safe_typescript_language();
+    let language = match safe_typescript_language() {
+        Some(lang) => lang,
+        None => return false, // TypeScript feature not enabled
+    };
     
     if parser.set_language(&language).is_err() {
         return false;
