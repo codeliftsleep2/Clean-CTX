@@ -62,9 +62,9 @@ walkdir = "2.5"
 # Lock-free work queue for A-PRODUCTION dispatcher
 crossbeam-channel = "0.5"
 
-# Structured logging for observability (A-PRODUCTION)
+# Structured logging for observability (A-PRODUCTION, A-04)
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # SQLite persistence layer for cross-session context survival
 rusqlite = { version = "0.32", features = ["bundled"] }
@@ -87,3 +87,4 @@ ctor = "0.2"
 [dev-dependencies]
 tempfile = "3.27.0"
 serial_test = "3.2"
+proptest = "1.6"

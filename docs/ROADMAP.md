@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-06-29
+**Last updated:** 2026-07-01 (A-07 complete)
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -11,7 +11,7 @@
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
 | **Now** | v0.2.0 | Real-world ready | 4 |
-| **Next** | v0.3.0 | Advanced capabilities | 8 |
+| **Next** | v0.3.0 | Advanced capabilities | 10 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
 | **Architectural** | Continuous | Code health & tooling | 13 |
 | **Community** | Continuous | Docs & marketing | 5 |
@@ -114,6 +114,8 @@ These items address the most common user requests and unlock adoption on larger 
 | **R-01b** | Go language layer | Second-most requested. | 1-2 days | 🟡 Medium |
 | **R-07** | MCP `resources` support | Expose compressed snapshots as MCP resources in addition to tools, enabling LLM clients to read prior state without re-invoking tools. | 1-2 days | 🟡 Medium |
 | **R-08** | Improved diff: rename detection | Detect class/method renames (same signature, different name) and emit as `~` with a `renamed from X` hint instead of a delete+add pair. | 1 day | 🟡 Medium |
+| **R-41** | Sliding Context Window (Tier 1) | Age-based tool-result truncation in the proxy pipeline, with force-preserve rules (floor + path cross-reference). Opt-in via `SLIDING_WINDOW=1`. See `docs/SLIDING_CONTEXT_WINDOW_PLAN.md`. | 3-5 days | 🟡 Medium |
+| **R-42** | Sliding Context Window (Tier 2 — scored pruning) | Relevance-scored pruning beyond simple age. Dry-run mode required before default-on. | 4-6 days | 🟢 Low |
 
 ---
 
@@ -237,6 +239,8 @@ GATED by remaining Foundation completion (A-10 through A-15). Meta-layer items a
 | 🟡 Medium | R-01b Go language layer | None (A-12 unblocks newer grammar crate) |
 | 🟡 Medium | R-07 MCP resources support | None |
 | 🟡 Medium | R-08 Improved diff: rename detection | None |
+| 🟡 Medium | R-41 Sliding Context Window (Tier 1) | A-04 (observability, for pruning audit trail) |
+| 🟢 Low | R-42 Sliding Context Window (Tier 2) | R-41, A-07 (proptest for force-preserve invariants) |
 
 ### Items explicitly deferred from Next list
 

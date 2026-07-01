@@ -73,6 +73,14 @@ pub(crate) const MAX_LINE_BYTES: usize = 16 * 1024 * 1024;
 /// on slow requests. Each parsed request is enqueued to a worker thread;
 /// the reader immediately returns to reading the next line.
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
+    // A-04: Initialize structured tracing. Configures the tracing
+    // subscriber from environment variables:
+    //   CLEAN_CTX_LOG       — log level (default: info)
+    //   CLEAN_CTX_LOG_FORMAT — output format (json or text, default: text)
+    //   CLEAN_CTX_LOG_FILTER — fine-grained filter (e.g., warn,clean_ctx=debug)
+    // This is a no-op if the subscriber is already set (e.g., in tests).
+    crate::observability::init_tracing();
+
     // Eagerly initialise the BPE engine. A failure here (e.g. the BPE
     // data file is missing or unreadable) used to take the server
     // down on the *first* compression call. We now surface it at

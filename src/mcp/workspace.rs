@@ -154,11 +154,19 @@ pub(crate) fn compress_workspace_dir(
     fidelity: Fidelity,
     state: &McpState,
 ) -> Result<WorkspaceResult, Box<dyn std::error::Error>> {
+    let _span = tracing::info_span!(
+        "compress_workspace",
+        dir_path = %dir_path,
+        fidelity = %format!("{:?}", fidelity),
+    ).entered();
+    let overall_start = std::time::Instant::now();
+
     // F-22: Check workspace result cache before doing any work.
     // We collect entries first to compute the cache key, but if we get
     // a cache hit, we skip the entire compression pipeline.
     let mut all_entries: Vec<String> = Vec::new();
     collect_source_files(dir_path, &mut all_entries);
+    let file_count = all_entries.len();
     let cache_hash = WorkspaceCache::compute_hash(dir_path, &fidelity, &all_entries);
     
     if let Ok(guard) = WORKSPACE_CACHE.lock() {
@@ -166,6 +174,7 @@ pub(crate) fn compress_workspace_dir(
             if let Some(cached) = cache.get(cache_hash) {
                 #[cfg(debug_assertions)]
                 eprintln!("[compress_workspace_dir] Cache HIT for {} ({} files)", dir_path, all_entries.len());
+                tracing::info!(file_count = file_count, cached = true, "compress_workspace cache hit");
                 return Ok(cached.clone());
             }
         }
@@ -256,6 +265,16 @@ pub(crate) fn compress_workspace_dir(
         excluded: ctx.excluded,
         warnings,
     };
+
+    let total_ms = overall_start.elapsed().as_millis() as u64;
+    tracing::info!(
+        dir_path = %dir_path,
+        file_count = file_count,
+        total_ms = total_ms,
+        errors = result.errors.len(),
+        excluded = result.excluded.len(),
+        "compress_workspace complete"
+    );
 
     // F-22: Store result in cache for future calls
     if let Ok(mut guard) = WORKSPACE_CACHE.lock() {

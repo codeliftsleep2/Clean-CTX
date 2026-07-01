@@ -109,23 +109,38 @@ mod boundary_tests {
     #[test]
     fn all_mutations_go_through_dispatcher() {
         let dispatcher = make_dispatcher();
+        // Use an atomic counter to avoid RwLock reader-writer starvation
+        // on Windows. The polling loop in the old version acquired read locks
+        // in a tight loop, which could starve worker threads trying to write.
+        let counter = Arc::new(AtomicUsize::new(0));
         
         // Spawn multiple requests
         for i in 0..10 {
             let req = test_request(&i.to_string(), "test");
-            let port = 1000 + i as u16;
+            let c = Arc::clone(&counter);
             dispatcher.spawn(&req, move |state| {
-                state.proxy_port = port;
+                state.proxy_port = 1000 + i as u16;
+                c.fetch_add(1, Ordering::SeqCst);
             }).unwrap();
         }
         
-        // Wait for completion (extremely generous timeout for CI)
-        // Note: With RwLock, workers serialize, so 10 requests take time
-        std::thread::sleep(Duration::from_millis(15000));
+        // Wait for all 10 handlers to complete (avoids RwLock read polling).
+        // Each handler acquires an exclusive write lock, so 10 handlers serialize.
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            let done = counter.load(Ordering::SeqCst);
+            if done == 10 {
+                break;
+            }
+            if std::time::Instant::now() > deadline {
+                panic!("Timeout waiting for last mutation (done={}, expected=10)", done);
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
         
-        // Verify all mutations happened (through spawn)
+        // Verify the final state was set correctly
         let guard = dispatcher.state().read().unwrap();
-        assert_eq!(guard.proxy_port, 1009, "last mutation should be visible");
+        assert_eq!(guard.proxy_port, 1009);
     }
 
     /// REGRESSION TEST: Backpressure cannot be bypassed

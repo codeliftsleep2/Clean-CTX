@@ -495,12 +495,26 @@ impl GraphBridge {
     /// CBM produces a ~5000-token structural seed → Clean-CTX catches it
     /// at the pipe level → compresses to ~1100 tokens → returns.
     pub fn proxy_call(&mut self, tool_name: &str, args: serde_json::Value) -> Result<String, CbmError> {
+        let _span = tracing::info_span!(
+            "cbm_proxy_call",
+            tool_name = %tool_name,
+        ).entered();
+        let start = std::time::Instant::now();
         let result = match self.client.as_mut() {
             Some(c) => c.call_tool_raw(tool_name, args),
             None => return Err(CbmError::LaunchError("CBM not available".into())),
         };
+        let latency_ms = start.elapsed().as_millis() as u64;
         // M-1: sync status on every query for self-healing
         self.update_status();
+        let _output_len = result.as_ref().map(|s| s.len()).unwrap_or(0);
+        tracing::info!(
+            tool_name = %tool_name,
+            latency_ms = latency_ms,
+            output_len = _output_len,
+            is_ok = result.is_ok(),
+            "cbm_proxy_call complete"
+        );
         result
     }
 
