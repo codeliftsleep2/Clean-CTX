@@ -102,3 +102,7 @@ pub(crate) fn strip_modifiers(s: &str, modifiers: &[&str]) -> String {
 #[cfg(test)]
 #[path = "../tests/compaction/modifiers.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/proptest/modifier_stripper.rs"]
+mod proptest_tests;

@@ -119,13 +119,21 @@ mod boundary_tests {
             }).unwrap();
         }
         
-        // Wait for completion (extremely generous timeout for CI)
-        // Note: With RwLock, workers serialize, so 10 requests take time
-        std::thread::sleep(Duration::from_millis(15000));
-        
-        // Verify all mutations happened (through spawn)
-        let guard = dispatcher.state().read().unwrap();
-        assert_eq!(guard.proxy_port, 1009, "last mutation should be visible");
+        // Poll for the state mutation (avoids fixed timeouts that fail on slow CI).
+        // Each handler acquires an exclusive write lock, so 10 handlers serialize.
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            let guard = dispatcher.state().read().unwrap();
+            let port = guard.proxy_port;
+            drop(guard);
+            if port == 1009 {
+                break;
+            }
+            if std::time::Instant::now() > deadline {
+                panic!("Timeout waiting for last mutation (port={}, expected=1009)", port);
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
     }
 
     /// REGRESSION TEST: Backpressure cannot be bypassed

@@ -38,12 +38,14 @@ pub(crate) fn handle_context_stats(
         stats.clone()
     };
 
-    // Fetch proxy stats if available
+    // Fetch proxy stats if available and apply to BOTH live stats and merged clone
     if state.proxy_port > 0 {
         let proxy_stats = crate::mcp::proxy_stats::fetch_proxy_stats(state.proxy_port);
         if let Some(ref ps) = proxy_stats {
             let mut stats_guard = state.session_stats_lock();
             crate::mcp::proxy_stats::record_proxy_filter_stats(&mut stats_guard, ps);
+            // Also apply to the merged clone so the current dashboard call shows them
+            crate::mcp::proxy_stats::record_proxy_filter_stats(&mut merged, ps);
         }
     }
 

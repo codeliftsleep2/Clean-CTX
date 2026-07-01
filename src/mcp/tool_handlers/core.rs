@@ -176,7 +176,12 @@ pub(crate) fn handle_diff_code_context(
         Ok(f) => f,
         Err(()) => return,
     };
-    match diff_code_context_handler(PathBuf::from(&resolved_path), &mut state.cache_write(), fidelity) {
+    // A-08: Use source_cache via state.read_source() instead of direct disk read
+    let source = match state.read_source(&resolved_path) {
+        Ok(s) => s.as_str().to_string(),
+        Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } })); return; }
+    };
+    match diff_code_context_handler(PathBuf::from(&resolved_path), &source, &mut state.cache_write(), fidelity) {
         Ok(body) => send_response(&serde_json::json!({
             "jsonrpc": "2.0", "id": id,
             "result": { "content": [{ "type": "text", "text": body }] }
@@ -351,6 +356,9 @@ pub(crate) fn handle_provide_code_context(
     params: &Value,
     state: &McpState,
 ) {
+    use std::time::Instant;
+    let overall_start = Instant::now();
+
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     if file_path_str.is_empty() {
         send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }));
@@ -389,6 +397,8 @@ pub(crate) fn handle_provide_code_context(
     let explicit_fidelity = params["arguments"]["fidelity"].as_str();
     let explicit_intent = params["arguments"]["intent"].as_str();
 
+    // Phase 1: Heuristics decision
+    let heuristics_start = Instant::now();
     let td_guard = state.text_delta_lock();
     let ir_read = state.ir_context_read();
     let decision = crate::mcp::heuristics::decide(
@@ -399,6 +409,7 @@ pub(crate) fn handle_provide_code_context(
     );
     drop(td_guard);
     drop(ir_read);
+    let heuristics_ms = heuristics_start.elapsed().as_millis() as u64;
 
     let effective_fidelity = decision.fidelity;
     let strategy = decision.strategy;
@@ -407,12 +418,26 @@ pub(crate) fn handle_provide_code_context(
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
 
+    // A-04: Create tracing span for this call
+    let _span = tracing::info_span!(
+        "provide_code_context",
+        file_path = %resolved_path,
+        fidelity = %format!("{:?}", effective_fidelity),
+        strategy = %format!("{:?}", strategy),
+        cbm_status = %state.cbm_status.summary(),
+        is_angular = %is_angular,
+    ).entered();
+
     match strategy {
         crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
+            let compile_start = Instant::now();
             let compiled = match compile_file_ir(&resolved_path, effective_fidelity, state) {
                 Ok(c) => c,
                 Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } })); return; }
             };
+            let compile_ms = compile_start.elapsed().as_millis() as u64;
+
+            let delta_start = Instant::now();
             let prev_version = state.file_version(&alias).unwrap_or(0);
             let mut ir_ctx = state.ir_context_lock();
             let delta = if prev_version > 0 && ir_ctx.has_file(&alias) {
@@ -428,10 +453,16 @@ pub(crate) fn handle_provide_code_context(
                 None
             };
             drop(ir_ctx);
+            let _delta_ms = delta_start.elapsed().as_millis() as u64;
+
+            let raw_tokens;
+            let comp_tokens;
 
             match delta {
                 Some(d) => {
                     let wire_delta = serde_json::to_value(&d).unwrap_or_default();
+                    raw_tokens = 0;
+                    comp_tokens = 0;
                     send_response(&serde_json::json!({
                         "jsonrpc": "2.0", "id": id, "result": {
                             "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): +{} ~{} -{} ops", compiled.file_id, d.from, d.to, d.ops.adds.len(), d.ops.mods.len(), d.ops.dels.len()) }],
@@ -442,11 +473,13 @@ pub(crate) fn handle_provide_code_context(
                     }));
                 }
                 None => {
+                    let render_start = Instant::now();
                     let hir = crate::ir::hierarchical::ir_to_hierarchical(&compiled);
                     let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
                     let full = format!("{}\n// ── {} ({}) ──\n{}", llm_text.trim(), compiled.file_id, resolved_path, state.format_dict_footer().trim());
-                    let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
-                    let comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
+                    let render_ms = render_start.elapsed().as_millis() as u64;
+                    raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
+                    comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
                     state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "full", None, "ir_compression");
                     send_response(&serde_json::json!({
                         "jsonrpc": "2.0", "id": id, "result": {
@@ -455,17 +488,34 @@ pub(crate) fn handle_provide_code_context(
                             "decision_summary": decision.summary()
                         }
                     }));
+                    tracing::info!(
+                        heuristics_ms = heuristics_ms,
+                        compile_ms = compile_ms,
+                        delta_ms = _delta_ms,
+                        render_ms = render_ms,
+                        raw_tokens = raw_tokens,
+                        comp_tokens = comp_tokens,
+                        savings_pct = if raw_tokens > 0 { ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0) as u64 } else { 0 },
+                        "provide_code_context delta full complete"
+                    );
                 }
             }
+            let _total_ms = overall_start.elapsed().as_millis() as u64;
+            state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "delta", None, "ir_compression");
         }
         crate::mcp::heuristics::ContextStrategy::FullCompress => {
+            let compile_start = Instant::now();
             let ir_result = compile_file_ir(&resolved_path, effective_fidelity, state);
+            let compile_ms = compile_start.elapsed().as_millis() as u64;
+
             if let Ok(ir) = ir_result {
+                let render_start = Instant::now();
                 state.ir_context_lock().load_ir(ir.clone());
                 let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
                 let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
                 let full = format!("{}\n// ── {} ({}) ──\n{}", llm_text.trim(), ir.file_id, resolved_path, state.format_dict_footer().trim());
                 state.llm_text_cache_lock().insert(ir.file_id.clone(), full.clone());
+                let render_ms = render_start.elapsed().as_millis() as u64;
                 let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                 let comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
                 state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "full", None, "ir_compression");
@@ -476,7 +526,19 @@ pub(crate) fn handle_provide_code_context(
                         "is_angular": is_angular, "decision_summary": decision.summary()
                     }
                 }));
+                let total_ms = overall_start.elapsed().as_millis() as u64;
+                tracing::info!(
+                    heuristics_ms = heuristics_ms,
+                    compile_ms = compile_ms,
+                    render_ms = render_ms,
+                    total_ms = total_ms,
+                    raw_tokens = raw_tokens,
+                    comp_tokens = comp_tokens,
+                    savings_pct = if raw_tokens > 0 { ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0) as u64 } else { 0 },
+                    "provide_code_context full complete"
+                );
             } else {
+                let fallback_start = Instant::now();
                 match crate::compression::pipeline::compress_file_with_source(
                     PathBuf::from(&resolved_path), Some(source),
                     &mut state.dict_lock(), &mut state.cache_write(), effective_fidelity,
@@ -494,6 +556,16 @@ pub(crate) fn handle_provide_code_context(
                                 "decision_summary": decision.summary()
                             }
                         }));
+                        let fallback_ms = fallback_start.elapsed().as_millis() as u64;
+                        tracing::info!(
+                            heuristics_ms = heuristics_ms,
+                            compile_ms = compile_ms,
+                            fallback_ms = fallback_ms,
+                            raw_tokens = raw_tokens,
+                            comp_tokens = comp_tokens,
+                            savings_pct = if raw_tokens > 0 { ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0) as u64 } else { 0 },
+                            "provide_code_context fallback complete"
+                        );
                     }
                     Err(e) => send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } })),
                 }

@@ -734,3 +734,7 @@ fn glob_match_impl(pattern: &[u8], text: &[u8]) -> bool {
 #[cfg(test)]
 #[path = "tests/config.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tests/proptest/glob_matcher.rs"]
+mod proptest_tests;

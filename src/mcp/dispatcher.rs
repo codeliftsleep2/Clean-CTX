@@ -19,6 +19,7 @@ use std::io::Write;
 use crossbeam_channel::{self, Sender};
 use crate::mcp::McpState;
 use crate::protocol::JsonRpcRequest;
+use crate::observability::metrics::Histogram;
 
 /// Maximum queue depth before backpressure kicks in.
 const DEFAULT_MAX_QUEUE_DEPTH: usize = 1000;
@@ -126,6 +127,10 @@ pub struct Dispatcher {
     traces: Arc<Mutex<Vec<TracedRequest>>>,
     /// Shutdown signal for graceful termination.
     shutdown_tx: Option<crossbeam_channel::Sender<()>>,
+    /// Queue wait time histogram (ms) — time from enqueue to execution start.
+    queue_wait_histogram: Arc<Histogram>,
+    /// Execution time histogram (ms) — time from start to completion.
+    execution_histogram: Arc<Histogram>,
 }
 
 impl Dispatcher {
@@ -191,6 +196,8 @@ impl Dispatcher {
             response_tx,
             traces,
             shutdown_tx: Some(shutdown_tx),
+            queue_wait_histogram: Arc::new(Histogram::latency_exponential()),
+            execution_histogram: Arc::new(Histogram::latency_exponential()),
         }
     }
 
@@ -217,10 +224,20 @@ impl Dispatcher {
             traces.push(trace.clone());
         }
 
+        // Clone Arcs for the boxed closure
+        let queue_wait_hist = Arc::clone(&self.queue_wait_histogram);
+        let exec_hist = Arc::clone(&self.execution_histogram);
+
         // Box the handler
         let boxed: BoxedHandler = Box::new(move |state: &mut McpState| {
             let mut trace = trace;
             trace.started_at = Some(Instant::now());
+
+            // Record queue wait time (enqueue → start)
+            let queue_wait = trace.started_at
+                .map(|start| start.duration_since(trace.enqueued_at))
+                .unwrap_or_default();
+            queue_wait_hist.record_duration(queue_wait);
 
             // Execute with panic recovery
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -228,6 +245,11 @@ impl Dispatcher {
             }));
 
             trace.completed_at = Some(Instant::now());
+
+            // Record execution time (start → complete)
+            if let Some(exec_time) = trace.processing_time() {
+                exec_hist.record_duration(exec_time);
+            }
 
             if result.is_err() {
                 eprintln!("[clean-ctx] ERROR: Handler panicked for request {}", trace.id);
