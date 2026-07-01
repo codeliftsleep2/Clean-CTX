@@ -40,4 +40,5 @@ pub mod ir;
 pub mod spring_meta;
 pub mod error;
 pub mod tokenizer;
+pub mod observability;
 

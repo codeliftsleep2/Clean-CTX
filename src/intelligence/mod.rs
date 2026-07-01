@@ -15,7 +15,10 @@
 pub mod pagerank;
 pub mod blast_radius;
 pub mod fidelity;
+pub mod budget;
+pub mod knapsack;
 
 pub use pagerank::compute_pagerank;
 pub use blast_radius::compute_blast_radius;
 pub use fidelity::{cbm_informed_fidelity, FidelityRecommendation};
+pub use knapsack::{pack_to_budget, sort_by_rank, RankedSymbol};

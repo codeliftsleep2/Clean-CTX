@@ -65,9 +65,13 @@ fn diff_code_context_unchanged_file_skips_reparse() {
 
     let mut cache = crate::cache::LocalStateCache::new();
 
+    // Read source for the diff handler (A-08: source_cache integration)
+    let source1 = std::fs::read_to_string(&path).unwrap();
+
     // First call: stores baseline.
     let result1 = diff_code_context_handler(
         path.clone(),
+        &source1,
         &mut cache,
         Fidelity::Low,
     )
@@ -79,8 +83,10 @@ fn diff_code_context_unchanged_file_skips_reparse() {
     );
 
     // Second call (unchanged file): should short-circuit.
+    let source2 = std::fs::read_to_string(&path).unwrap();
     let result2 = diff_code_context_handler(
         path.clone(),
+        &source2,
         &mut cache,
         Fidelity::Low,
     )
@@ -106,9 +112,12 @@ fn diff_code_context_changed_file_produces_diff() {
 
     let mut cache = crate::cache::LocalStateCache::new();
 
+    let source_before = std::fs::read_to_string(&path).unwrap();
+
     // First call: stores baseline.
     let _ = diff_code_context_handler(
         path.clone(),
+        &source_before,
         &mut cache,
         Fidelity::Low,
     )
@@ -124,9 +133,12 @@ fn diff_code_context_changed_file_produces_diff() {
         .unwrap();
     }
 
+    let source_after = std::fs::read_to_string(&path).unwrap();
+
     // Second call (changed file): should produce a real diff.
     let result = diff_code_context_handler(
         path,
+        &source_after,
         &mut cache,
         Fidelity::Low,
     )

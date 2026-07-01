@@ -778,6 +778,94 @@ Output includes a per-edit table (50 rows × 8 columns), final summary with per-
 
 ---
 
+## Observability (A-04)
+
+Clean-CTX uses structured tracing and in-memory metrics for observability. The `observability` module at `src/observability/` provides the infrastructure.
+
+### Initialization
+
+Tracing is initialized once at MCP server startup via `crate::observability::init_tracing()` (called in `src/mcp/server.rs`). It configures the `tracing-subscriber` from environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLEAN_CTX_LOG` | `info` | Log level |
+| `CLEAN_CTX_LOG_FORMAT` | `text` | Output format (`json` or `text`) |
+| `CLEAN_CTX_LOG_FILTER` | — | Fine-grained filter (e.g. `warn,clean_ctx=debug`) |
+
+Example usage:
+```bash
+# JSON structured logging
+CLEAN_CTX_LOG_FORMAT=json clean-ctx
+
+# Debug for clean_ctx module only
+CLEAN_CTX_LOG_FILTER=warn,clean_ctx=debug clean-ctx
+```
+
+### Adding a New Metric
+
+1. **Add a field** to `MetricsRegistry` in `src/observability/metrics.rs`:
+   - Use `Histogram` for latency/size measurements (has `record()` and `record_duration()`)
+   - Use `Counter` for event counts
+   - Use `Gauge` for current values (workers, queue depth)
+
+2. **Initialize** in `MetricsRegistry::new()`:
+   - Histograms: `Histogram::latency_default()` (fixed buckets) or `Histogram::latency_exponential()` (powers of 2)
+   - Counters/gauges: `Counter::new()` / `Gauge::new(initial)`
+
+3. **Snapshot** in `MetricsRegistry::snapshot()`:
+   - Add the field to `MetricsSnapshot` struct
+   - Record it in the snapshot method body
+
+4. **Record** at the point of measurement:
+   - `registry.some_histogram.record(value)` or `.record_duration(duration)`
+   - `registry.some_counter.increment(delta)`
+   - `registry.some_gauge.set(value)` or `.add(delta)`
+
+### Tracing Spans
+
+Key spans are instrumented in hot paths:
+
+| Span | Location | Attributes |
+|------|----------|------------|
+| `provide_code_context` | `src/mcp/tool_handlers/core.rs` | `file_path`, `fidelity`, `strategy`, `cbm_status`, phase timings |
+| `compress_workspace` | `src/mcp/workspace.rs` | `dir_path`, `fidelity`, `file_count`, `total_ms` |
+| `cbm_proxy_call` | `src/cbm/bridge.rs` | `tool_name`, `latency_ms`, `output_len`, `is_ok` |
+| Dispatcher spans | `src/mcp/dispatcher.rs` | queue wait + execution time histograms |
+
+### Structured Events
+
+Use the `tracing::info!` macro with key-value pairs:
+```rust
+tracing::info!(
+    heuristics_ms = heuristics_ms,
+    compile_ms = compile_ms,
+    raw_tokens = raw_tokens,
+    savings_pct = savings_pct,
+    "provide_code_context complete"
+);
+```
+
+### Error Categories
+
+Use `ErrorCategory` enum instead of free-form strings for metrics:
+```rust
+use crate::observability::metrics::ErrorCategory;
+registry.record_error(ErrorCategory::CbmTimeout);
+```
+
+Available categories: `CompressionFail`, `DeltaApplyError`, `CbmTimeout`, `CbmQueryFail`, `IoError`, `ParseError`, `Internal`.
+
+### Dashboard
+
+Call `context_stats` with no arguments to view the metrics dashboard, which includes:
+- Operations summary (compressions, deltas, CBM queries, workspace scans)
+- Latency histograms (compression, delta, CBM)
+- File size distribution
+- Resource gauges (active workers, queue depth)
+- Error counts by category
+
+For a verbose metrics dump (JSON format), use the `MetricsSnapshot` which implements `Serialize`.
+
 ## Code Quality Gates
 
 Every pull request must pass these checks:
