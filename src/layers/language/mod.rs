@@ -72,7 +72,7 @@ impl LanguageLayer for TypeScriptLayer {
     }
 
     fn extensions(&self) -> &'static [&'static str] {
-        &["ts", "tsx", "js", "jsx"]
+        &["ts", "tsx"]
     }
 
     fn language_ptr(&self) -> Option<Language> {
@@ -129,7 +129,7 @@ impl LanguageLayer for TypeScriptLayer {
     }
 
     fn extensions(&self) -> &'static [&'static str] {
-        &["ts", "tsx", "js", "jsx"]
+        &["ts", "tsx"]
     }
 
     fn language_ptr(&self) -> Option<Language> {
