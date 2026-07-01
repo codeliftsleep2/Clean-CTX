@@ -46,6 +46,13 @@ pub(crate) fn is_word_char(c: char) -> bool {
 /// `"$ctor"`) the inner `find` is cheap; the outer loop is
 /// `O(len(text) + num_replacements)`.
 pub(crate) fn word_boundary_replace(text: &str, pattern: &str, replacement: &str) -> String {
+    // Empty pattern guard: find("") never terminates (it matches at
+    // every position with zero width, so the loop can never advance
+    // `start` past 0). Short-circuit immediately.
+    if pattern.is_empty() {
+        return text.to_string();
+    }
+
     let mut result = String::with_capacity(text.len());
     let mut start = 0;
 
@@ -225,5 +232,9 @@ impl Decompressor {
 #[cfg(test)]
 #[path = "../tests/decompression/decompressor.rs"]
 mod integration_tests;
+
+#[cfg(test)]
+#[path = "../tests/proptest/decompressor.rs"]
+mod proptest_tests;
 
 

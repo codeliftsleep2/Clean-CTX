@@ -195,12 +195,17 @@ pub(super) fn compile_file_ir(
 /// Compute an AST-level diff between the file's in-session baseline and
 /// its current on-disk state.
 ///
+/// A-08 (Token Efficiency Audit, H-01/L-01): Now accepts source text
+/// directly instead of reading from disk, so callers control the read
+/// path and can use `state.read_source()` for source_cache integration.
+///
 /// F-21 (FAANG audit): before calling the expensive `build_snapshot`,
 /// the handler hashes the source and checks if a baseline exists *and*
 /// the hash matches. On match, it returns a "no changes" message
 /// without re-parsing the file with tree-sitter.
 pub(crate) fn diff_code_context_handler(
     file: PathBuf,
+    source: &str,
     cache: &mut crate::cache::LocalStateCache,
     fidelity: Fidelity,
 ) -> Result<String, Box<dyn std::error::Error>> {
@@ -211,14 +216,6 @@ pub(crate) fn diff_code_context_handler(
         Err(_) => file.to_string_lossy().into_owned(),
     };
     let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
-
-    // MED-02: This handler intentionally reads from disk directly rather than
-    // going through state.read_source() because the diff handler's signature
-    // predates the McpState pattern. The source_cache integration would require
-    // threading &mut McpState through the handler chain, which is a larger
-    // refactor. This is acceptable for now — the diff handler is called once
-    // per file per edit, not in a tight loop.
-    let source = std::fs::read_to_string(&file)?;
 
     // F-21: hash the source content and check if the baseline is
     // still valid before paying for the expensive tree-sitter parse.
@@ -236,7 +233,7 @@ pub(crate) fn diff_code_context_handler(
         ));
     }
 
-    let current = build_snapshot(&source, fidelity)?;
+    let current = build_snapshot(source, fidelity)?;
 
     let baseline = cache.get_baseline(&cache_key).cloned();
     let body = match baseline {
