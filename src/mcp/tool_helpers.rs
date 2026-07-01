@@ -233,7 +233,7 @@ pub(crate) fn diff_code_context_handler(
         ));
     }
 
-    let current = build_snapshot(&source, fidelity)?;
+    let current = build_snapshot(source, fidelity)?;
 
     let baseline = cache.get_baseline(&cache_key).cloned();
     let body = match baseline {

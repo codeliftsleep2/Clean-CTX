@@ -176,6 +176,12 @@ impl Counter {
     }
 }
 
+impl Default for Counter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A gauge that holds a current value.
 #[derive(Debug, Clone)]
 pub struct Gauge {
@@ -270,7 +276,7 @@ impl MetricsRegistry {
         let key = category.as_str().to_string();
         self.errors
             .entry(key)
-            .or_insert_with(Counter::new)
+            .or_default()
             .increment(1);
     }
 
@@ -289,7 +295,7 @@ impl MetricsRegistry {
             .iter()
             .map(|entry| (entry.key().clone(), entry.value().snapshot()))
             .collect();
-        error_counts.sort_by(|a, b| b.1.cmp(&a.1));
+        error_counts.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         MetricsSnapshot {
             compression_latency: self.compression_latency.snapshot(),
@@ -353,7 +359,7 @@ impl MetricsSnapshot {
         out.push_str(&format!("  Workspace Scans:   {}\n", self.total_workspace_scans));
         out.push_str(&format!("  Cache:             {} hits, {} misses\n",
             self.cache_hits, self.cache_misses));
-        out.push_str("\n");
+        out.push('\n');
 
         // Latency histograms
         out.push_str("── Latency (ms) ──\n");
@@ -363,19 +369,19 @@ impl MetricsSnapshot {
             self.delta_latency.mean, self.delta_latency.total));
         out.push_str(&format!("  CBM:               mean={:.1}ms  total={}\n",
             self.cbm_latency.mean, self.cbm_latency.total));
-        out.push_str("\n");
+        out.push('\n');
 
         // File size distribution
         out.push_str("── File Sizes (bytes) ──\n");
         out.push_str(&format!("  Mean:              {:.0} bytes  total={}\n",
             self.file_size.mean, self.file_size.total));
-        out.push_str("\n");
+        out.push('\n');
 
         // Resource gauges
         out.push_str("── Resources ──\n");
         out.push_str(&format!("  Active Workers:    {}\n", self.active_workers));
         out.push_str(&format!("  Queue Depth:       {}\n", self.queue_depth));
-        out.push_str("\n");
+        out.push('\n');
 
         // Errors
         if !self.errors.is_empty() {
@@ -383,7 +389,7 @@ impl MetricsSnapshot {
             for (category, count) in &self.errors {
                 out.push_str(&format!("  {:<20} {}\n", category, count));
             }
-            out.push_str("\n");
+            out.push('\n');
         }
 
         out.push_str("═══════════════════════════════════════════════════════════════\n");
