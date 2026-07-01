@@ -59,6 +59,13 @@ impl TypeScriptLayer {
 }
 
 #[cfg(feature = "typescript")]
+impl Default for TypeScriptLayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "typescript")]
 impl LanguageLayer for TypeScriptLayer {
     fn name(&self) -> &'static str {
         "typescript"
@@ -109,6 +116,13 @@ impl TypeScriptLayer {
 }
 
 #[cfg(not(feature = "typescript"))]
+impl Default for TypeScriptLayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(not(feature = "typescript"))]
 impl LanguageLayer for TypeScriptLayer {
     fn name(&self) -> &'static str {
         "typescript"
@@ -136,6 +150,13 @@ pub struct CSharpLayer;
 impl CSharpLayer {
     pub fn new() -> Self {
         Self
+    }
+}
+
+#[cfg(feature = "csharp")]
+impl Default for CSharpLayer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -184,6 +205,13 @@ impl CSharpLayer {
 }
 
 #[cfg(not(feature = "csharp"))]
+impl Default for CSharpLayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(not(feature = "csharp"))]
 impl LanguageLayer for CSharpLayer {
     fn name(&self) -> &'static str {
         "csharp"
@@ -211,6 +239,13 @@ pub struct RustLayer;
 impl RustLayer {
     pub fn new() -> Self {
         Self
+    }
+}
+
+#[cfg(feature = "rust")]
+impl Default for RustLayer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -259,6 +294,13 @@ impl RustLayer {
 }
 
 #[cfg(not(feature = "rust"))]
+impl Default for RustLayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(not(feature = "rust"))]
 impl LanguageLayer for RustLayer {
     fn name(&self) -> &'static str {
         "rust"
@@ -286,6 +328,13 @@ pub struct JavaLayer;
 impl JavaLayer {
     pub fn new() -> Self {
         Self
+    }
+}
+
+#[cfg(feature = "java")]
+impl Default for JavaLayer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -330,6 +379,13 @@ pub struct JavaLayer;
 impl JavaLayer {
     pub fn new() -> Self {
         Self
+    }
+}
+
+#[cfg(not(feature = "java"))]
+impl Default for JavaLayer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
