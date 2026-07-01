@@ -25,6 +25,12 @@ pub struct LayerRegistry {
     meta_layers: Vec<Box<dyn MetaLayer>>,
 }
 
+impl Default for LayerRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LayerRegistry {
     /// Build a new registry from the currently enabled Cargo features.
     ///
@@ -60,7 +66,7 @@ impl LayerRegistry {
 
     /// Get or initialize the global registry.
     pub fn global() -> &'static Self {
-        LAYER_REGISTRY.get_or_init(|| Self::new())
+        LAYER_REGISTRY.get_or_init(Self::new)
     }
 
     /// Find a language layer by name.

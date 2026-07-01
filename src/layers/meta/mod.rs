@@ -43,6 +43,13 @@ impl AngularMetaLayer {
 }
 
 #[cfg(feature = "angular")]
+impl Default for AngularMetaLayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "angular")]
 impl MetaLayer for AngularMetaLayer {
     fn name(&self) -> &'static str {
         "angular"
@@ -85,6 +92,13 @@ impl AngularMetaLayer {
 }
 
 #[cfg(not(feature = "angular"))]
+impl Default for AngularMetaLayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(not(feature = "angular"))]
 impl MetaLayer for AngularMetaLayer {
     fn name(&self) -> &'static str {
         "angular"
@@ -108,6 +122,13 @@ pub struct SpringBootMetaLayer;
 impl SpringBootMetaLayer {
     pub fn new() -> Self {
         Self
+    }
+}
+
+#[cfg(feature = "spring_boot")]
+impl Default for SpringBootMetaLayer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -150,6 +171,13 @@ pub struct SpringBootMetaLayer;
 impl SpringBootMetaLayer {
     pub fn new() -> Self {
         Self
+    }
+}
+
+#[cfg(not(feature = "spring_boot"))]
+impl Default for SpringBootMetaLayer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
