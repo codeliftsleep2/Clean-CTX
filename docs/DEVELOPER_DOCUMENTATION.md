@@ -33,18 +33,38 @@
 git clone https://github.com/codeliftsleep2/Clean-CTX.git
 cd Clean-CTX
 
-# Build (debug)
+# Build (debug) with all default features
 cargo build
 
-# Build (release)
+# Build (release) with default features
 cargo build --release
 
-# Run tests
-cargo test
+# Build with only specific languages (smaller binary, faster compile)
+cargo build --release --no-default-features --features typescript,angular
+
+# Build with .NET meta-layer (not in defaults)
+cargo build --release --features dotnet
+
+# Run tests with all features
+cargo test --all-features
 
 # Run linter (must pass before PR)
 cargo clippy --all-targets -- -D warnings
 ```
+
+**Feature flag system:**
+
+The binary uses Cargo feature flags to select which languages and meta-layers to compile. See `Cargo.toml` `[features]` for the full dependency tree.
+
+| Feature | Implies | Default | Includes |
+|---------|---------|---------|----------|
+| `typescript` | — | ✅ | Base TypeScript/JavaScript tree-sitter grammar |
+| `csharp` | — | ✅ | Base C# tree-sitter grammar |
+| `rust` | — | ✅ | Base Rust tree-sitter grammar |
+| `java` | — | ✅ | Base Java tree-sitter grammar |
+| `angular` | `typescript` | ✅ | Components, Services, DI, Pipes, Directives, Modules, Input/Output, Template/Shape extraction, Style extraction, NgRx, RxJS, Signals, PrimeNG, Bundle graph |
+| `spring_boot` | `java` | ✅ | RestController, Controller, Service, Repository, Configuration, RequestMapping, Autowired, Value, Bean, ConfigurationProperties, Cross-file graph |
+| `dotnet` | `csharp` | ❌ | ASP.NET Core (Controllers, Actions, Routes, Auth), EF Core (DbContext, DbSet, Entities), SignalR (Hubs, Clients, Streaming), AutoMapper (Profiles, Mappings), JSON Serialization, DI, Validation, Identity, Caching, Logging, Cross-file graph |
 
 **Prerequisites:**
 - Rust 1.85+ (edition 2024)
@@ -338,18 +358,37 @@ For the full protocol specification, state machine lifecycle, and all phase impl
 
 ## Adding a New Language
 
-Adding a new language to Clean-CTX requires changes in 4 locations. Here is the step-by-step guide.
+Adding a new language to Clean-CTX requires changes in 5 locations. Here is the step-by-step guide.
 
-### Step 1: Add the tree-sitter grammar dependency
+### Step 1: Add the Cargo feature flag and tree-sitter grammar dependency
 
-In `Cargo.toml`, add the new grammar:
+In `Cargo.toml`, add the new feature flag and grammar:
 
 ```toml
+[features]
+# ...existing features...
+python = ["dep:tree-sitter-python"]  # NEW: language feature
+
+[dependencies]
 # SAFETY: Must match tree-sitter 0.20.x ABI.
-tree-sitter-python = "=0.20.0"
+tree-sitter-python = { version = "0.23", optional = true }  # NEW
 ```
 
-### Step 2: Add tree-sitter queries
+The feature flag must be added to the `[features]` section so users can toggle it at build time:
+```bash
+cargo build --release --no-default-features --features python
+```
+
+### Step 2: Register the language in `src/layers/registry.rs`
+
+In `src/layers/registry.rs`, add the new language layer behind its feature flag:
+
+```rust
+#[cfg(feature = "python")]
+reg.languages.push(Box::new(crate::layers::language::PythonLayer::new()));
+```
+
+### Step 3: Add tree-sitter queries
 
 In `src/queries.rs`, add the query patterns for the new language:
 

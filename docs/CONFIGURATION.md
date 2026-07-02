@@ -205,12 +205,32 @@ Per-framework meta-layer settings:
   "meta_layers": {
     "angular": {
       "enabled": true
+    },
+    "spring_boot": {
+      "enabled": true
+    },
+    "dotnet": {
+      "enabled": true
     }
   }
 }
 ```
 
-Currently supported: `angular` (Phase 1). Future: `react`, `vue`, `svelte`.
+Currently supported: `angular`, `spring_boot`, `dotnet`. Each meta-layer can be toggled at compile time via Cargo feature flags (see `Cargo.toml` for the full dependency tree). Future: `react`, `vue`, `svelte`.
+
+**Compile-time feature flags vs runtime config:**
+
+| Layer | Cargo Feature | Implies | Includes | Default |
+|-------|---------------|---------|----------|---------|
+| TypeScript | `typescript` | — | Base TypeScript/JavaScript tree-sitter grammar | ✅ |
+| C# | `csharp` | — | Base C# tree-sitter grammar | ✅ |
+| Rust | `rust` | — | Base Rust tree-sitter grammar | ❌ |
+| Java | `java` | — | Base Java tree-sitter grammar | ❌ |
+| Angular | `angular` | `typescript` | Components, Services, DI, Pipes, Directives, Modules, Input/Output, Template/Shape extraction, Style extraction, NgRx, RxJS, Signals, PrimeNG, Bundle graph | ✅ |
+| Spring Boot | `spring_boot` | `java` | RestController, Controller, Service, Repository, Configuration, RequestMapping, Autowired, Value, Bean, ConfigurationProperties, Cross-file graph | ❌ |
+| .NET | `dotnet` | `csharp` | ASP.NET Core (Controllers, Actions, Routes, Auth), EF Core (DbContext, DbSet, Entities), SignalR (Hubs, Clients, Streaming), AutoMapper (Profiles, Mappings), JSON Serialization, DI, Validation, Identity, Caching, Logging, Cross-file graph | ❌ |
+
+The runtime `meta_layers.*.enabled` config in `.clean-ctx.json` controls whether an already-compiled meta-layer is active at runtime. Disabling it at compile time via `--no-default-features` removes the entire module from the binary.
 
 ## Intelligence Layer Configuration
 
