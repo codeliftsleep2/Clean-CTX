@@ -53,6 +53,48 @@ cargo build --release
 # The binary is at: target/release/clean-ctx.exe (Windows) or target/release/clean-ctx (Linux/Mac)
 ```
 
+### Language & Feature Selection
+
+Clean-CTX uses Cargo **feature flags** to control which languages and meta-layers are compiled into the binary. This lets you build a minimal binary with only the languages you need, reducing compile time and binary size.
+
+| Category | Feature | Implies | Includes | Build With | Default |
+|----------|---------|---------|----------|------------|---------|
+| **Language** | `typescript` | — | Base TypeScript/JavaScript grammar | `--features typescript` | ✅ |
+| **Language** | `csharp` | — | Base C# grammar | `--features csharp` | ✅ |
+| **Language** | `rust` | — | Base Rust grammar | `--features rust` | ❌ |
+| **Language** | `java` | — | Base Java grammar | `--features java` | ❌ |
+| **Meta-Layer** | `angular` | `typescript` | Components, Services, DI, Pipes, Directives, Modules, Input/Output, Template/Shape extraction, Style extraction, NgRx, RxJS, Signals, PrimeNG, Bundle graph | `--features angular` | ✅ |
+| **Meta-Layer** | `spring_boot` | `java` | RestController, Controller, Service, Repository, Configuration, RequestMapping, Autowired, Value, Bean, ConfigurationProperties, Cross-file graph | `--features spring_boot` | ❌ |
+| **Meta-Layer** | `dotnet` | `csharp` | ASP.NET Core (Controllers, Actions, Routes, Auth), EF Core (DbContext, DbSet, Entities), SignalR (Hubs, Clients, Streaming), AutoMapper (Profiles, Mappings), JSON Serialization, DI, Validation, Identity, Caching, Logging, Cross-file graph | `--features dotnet` | ✅ |
+
+**Build with only specific languages:**
+```bash
+# Default (TypeScript + C# + Angular only)
+cargo build --release
+
+# TypeScript + Angular only (no C#)
+cargo build --release --no-default-features --features typescript,angular
+
+# .NET/C# only (no TypeScript, Angular)
+cargo build --release --no-default-features --features csharp,dotnet
+
+# Rust only (no TypeScript, C#, Java, meta-layers)
+cargo build --release --no-default-features --features rust
+
+# All languages + all meta-layers
+cargo build --release --features rust,java,spring_boot,dotnet
+```
+
+Default features give you **TypeScript with Angular meta-layer, C#, and .NET enrichment** — the most common full-stack combination. Everything else is opt-in:
+
+```bash
+# Add Rust, Java, and Spring Boot
+cargo build --release --features rust,java,spring_boot
+
+# Add just Rust
+cargo build --release --features rust
+```
+
 ### Configure VS Code
 
 Add to your MCP settings (see [IDE Configuration](#ide-configuration) below for all options):
