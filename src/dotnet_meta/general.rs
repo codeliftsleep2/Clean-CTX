@@ -51,6 +51,113 @@ pub fn extract_general(class_source: &str, fidelity: Fidelity) -> Option<MetaBlo
     }
 }
 
+/// Known .NET framework interfaces that should NOT be flagged as service interfaces.
+/// These are built-in .NET types that follow the "I" prefix convention but are
+/// not application-level services or repositories.
+const KNOWN_FRAMEWORK_INTERFACES: &[&str] = &[
+    // System interfaces
+    "IDisposable",
+    "IAsyncDisposable",
+    "IComparable",
+    "IEquatable",
+    "IFormattable",
+    "ICloneable",
+    "IConvertible",
+    "IEnumerable",
+    "IEnumerator",
+    "IQueryable",
+    "ICollection",
+    "IList",
+    "ISet",
+    "IDictionary",
+    "IComparer",
+    "IEqualityComparer",
+    "IHashCodeProvider",
+    // System.IO
+    "IAsyncResult",
+    "IAsyncOperation",
+    "IAsyncInfo",
+    "INotifyCompletion",
+    // System.ComponentModel
+    "INotifyPropertyChanged",
+    "INotifyPropertyChanging",
+    "IDataErrorInfo",
+    "INotifyDataErrorInfo",
+    "ICustomTypeDescriptor",
+    // System.Threading
+    "IAsyncStateMachine",
+    "IThreadPoolWorkItem",
+    "IValueTaskSource",
+    // System.Security
+    "IPrincipal",
+    "IIdentity",
+    // ASP.NET Core / Http
+    "IResult",
+    "IActionResult",
+    "IHeaderDictionary",
+    "IFormFile",
+    "IFormCollection",
+    "IRequestCookieCollection",
+    "IResponseCookies",
+    "ISession",
+    "IWebHostEnvironment",
+    "IHostEnvironment",
+    // Logging
+    "ILogger",
+    "ILoggerFactory",
+    "ILoggerProvider",
+    // DI
+    "IServiceProvider",
+    "IServiceCollection",
+    "IServiceScope",
+    "IServiceScopeFactory",
+    // Caching
+    "IMemoryCache",
+    "IDistributedCache",
+    "ICacheEntry",
+    // Hosting
+    "IHost",
+    "IHostBuilder",
+    "IApplicationBuilder",
+    // Configuration
+    "IConfiguration",
+    "IConfigurationSection",
+    "IConfigurationBuilder",
+    "IConfigurationProvider",
+    // HTTP client
+    "IHttpClientFactory",
+    "IHttpMessageHandlerFactory",
+    "IHttpContextAccessor",
+    // MVC / Routing
+    "IRouter",
+    "IUrlHelper",
+    "IActionConstraint",
+    "IFilterMetadata",
+    "IExceptionFilter",
+    "IActionFilter",
+    "IResultFilter",
+    "IAuthorizationFilter",
+    "IResourceFilter",
+    "IAsyncActionFilter",
+    "IAsyncResultFilter",
+    "IAsyncAuthorizationFilter",
+    "IAsyncExceptionFilter",
+    "IAsyncResourceFilter",
+    "IAlwaysRunResultFilter",
+    "IOrderedFilter",
+    // JSON
+    "IJsonTypeInfoResolver",
+    // SignalR
+    "IHubContext",
+    "IHubCallerClients",
+    "IClientProxy",
+    "IHubCallerClients",
+    // Entity Framework
+    "IQueryable",
+    "IAsyncEnumerable",
+    "IAsyncEnumerator",
+];
+
 /// Extract service classes (interfaces and implementations).
 fn extract_services(class_source: &str) -> Vec<String> {
     let mut services = Vec::new();
@@ -58,18 +165,60 @@ fn extract_services(class_source: &str) -> Vec<String> {
     // Find all class/interface names
     let names = extract_all_class_names(class_source);
 
-    for name in names {
-        // Interfaces starting with 'I' (convention)
-        if name.starts_with('I') && name.len() > 1 {
-            services.push(build_service_line(&name));
-        }
-        // Service implementations
+    for name in &names {
+        // Service implementations (convention-based)
         if name.ends_with("Service") || name.ends_with("Repository") {
-            services.push(build_service_line(&name));
+            services.push(build_service_line(name));
+            continue;
+        }
+        
+        // Interfaces starting with 'I' (convention) — but exclude known framework types
+        if name.starts_with('I') && name.len() > 1
+            && !KNOWN_FRAMEWORK_INTERFACES.contains(&name.as_str())
+        {
+            // Also require the name to appear in a DI registration context or
+            // be referenced as a constructor parameter to avoid false positives
+            // from generic usage of I-prefixed names in comments or strings.
+            if appears_in_di_context(class_source, name)
+                || appears_as_constructor_param(class_source, name)
+            {
+                services.push(build_service_line(name));
+            }
         }
     }
 
     services
+}
+
+/// Check if an interface name appears in a DI registration context
+/// (AddScoped, AddSingleton, AddTransient, AddDbContext).
+fn appears_in_di_context(source: &str, name: &str) -> bool {
+    let di_keywords = ["AddScoped<", "AddSingleton<", "AddTransient<", "AddDbContext<"];
+    for keyword in &di_keywords {
+        if source.contains(&format!("{}{}", keyword, name))
+            || source.contains(&format!("{}I{}", keyword, &name[1..]))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Check if an interface name appears as a constructor parameter.
+fn appears_as_constructor_param(source: &str, name: &str) -> bool {
+    // Look for patterns like "ClassName(ITypeName paramName)" or "ClassName( ITypeName paramName )"
+    let patterns = [
+        format!("({} ", name),
+        format!("( {} ", name),
+        format!(",{} ", name),
+        format!(", {} ", name),
+    ];
+    for pattern in &patterns {
+        if source.contains(pattern) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Extract all class/interface names from source.

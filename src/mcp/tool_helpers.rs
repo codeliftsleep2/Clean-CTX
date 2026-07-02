@@ -106,6 +106,7 @@ pub(super) fn compile_file_ir(
     use crate::ir::layers::java::JavaLayer;
     use crate::ir::layers::angular::AngularMetaLayer;
     use crate::ir::layers::spring::SpringMetaLayer;
+    use crate::ir::layers::dotnet::DotNetMetaLayer;
     use crate::compression::language::language_for_extension;
 
     // Use source_cache via state.read_source() — Finding 1
@@ -159,6 +160,9 @@ pub(super) fn compile_file_ir(
         }
         "java" => {
             compiler.add_meta_layer(Box::new(SpringMetaLayer::new()));
+        }
+        "cs" => {
+            compiler.add_meta_layer(Box::new(DotNetMetaLayer::new()));
         }
         _ => {}
     }

@@ -575,6 +575,6 @@ impl BufferedStore {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/buffered_store.rs"]
 mod tests;

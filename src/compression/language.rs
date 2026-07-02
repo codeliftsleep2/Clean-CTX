@@ -275,10 +275,10 @@ pub fn language_for_extension(extension: &str) -> Option<(Language, &'static str
     })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/compression/language.rs"]
 mod tests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/compression/rust.rs"]
 mod rust_tests;

@@ -20,6 +20,7 @@ pub mod rust;
 pub mod java;
 pub mod angular;
 pub mod spring;
+pub mod dotnet;
 pub mod patterns;
 
 /// Context passed to layer processing functions.

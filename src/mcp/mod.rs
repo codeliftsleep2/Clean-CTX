@@ -37,10 +37,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     server::run()
 }
 
-#[cfg(test)]
+// Regression and audit-fix tests compress src/main.rs and other .rs files,
+// so they require the "rust" feature to be enabled.
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/regression.rs"]
 mod regression;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/audit_fixes.rs"]
 mod audit_fixes;

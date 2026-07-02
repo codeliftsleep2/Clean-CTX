@@ -840,6 +840,6 @@ fn graph_pass(_state: &McpState, _ctx: &mut PassContext, _manifest: &mut String)
     // no-op
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/workspace.rs"]
 mod tests;

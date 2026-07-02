@@ -3,6 +3,19 @@
 // MetaLayer trait + per-framework implementations.
 // Each implementation is gated by its Cargo feature so the framework-specific
 // code is only compiled when the feature is enabled.
+//
+// # Preferred pattern for new meta-layers
+//
+// New meta-layers SHOULD follow the decentralized .NET pattern:
+//   - Define the MetaLayer struct + MetaLayer trait impl in the meta-layer's
+//     own module (e.g. `src/dotnet_meta/mod.rs`)
+//   - Register it in `src/layers/registry.rs` with a `#[cfg(feature = "...")]` guard
+//   - The decentralized approach keeps the meta-layer's code co-located with
+//     its detection, extraction, and marker logic
+//
+// Legacy: Angular and Spring Boot meta-layers have their trait impls directly
+// in this file for historical reasons. New meta-layers should NOT follow
+// this pattern.
 
 use std::path::Path;
 use crate::compression::Fidelity;
@@ -25,9 +38,10 @@ pub trait MetaLayer: Send + Sync {
     ///
     /// # Arguments
     /// - `output`: The compressed output to append to (e.g. `Φ` block).
+    /// - `source`: The full source text of the file being compressed.
     /// - `ir`: The compiled IR for this file (if available).
     /// - `fidelity`: The fidelity level controlling verbosity.
-    fn enrich(&self, output: &mut String, ir: &CompiledIR, fidelity: Fidelity);
+    fn enrich(&self, output: &mut String, source: &str, ir: &CompiledIR, fidelity: Fidelity);
 }
 
 // ── Angular Meta-Layer ────────────────────────────────────────────────
@@ -60,10 +74,8 @@ impl MetaLayer for AngularMetaLayer {
         crate::angular_meta::detect::is_angular_file(source)
     }
 
-    fn enrich(&self, output: &mut String, ir: &CompiledIR, fidelity: Fidelity) {
-        // Use the existing run_meta_layer function to generate the block
-        // run_meta_layer takes source_code and class_captures, not IR
-        // We extract class names from the IR for compatibility
+    fn enrich(&self, output: &mut String, source: &str, ir: &CompiledIR, fidelity: Fidelity) {
+        // Extract class names from the IR for compatibility
         let class_captures: Vec<String> = ir.instructions
             .iter()
             .filter_map(|op| {
@@ -75,7 +87,7 @@ impl MetaLayer for AngularMetaLayer {
             })
             .collect();
         
-        if let Some(block) = crate::angular_meta::run_meta_layer(&ir.file_id, &class_captures, fidelity) {
+        if let Some(block) = crate::angular_meta::run_meta_layer(source, &class_captures, fidelity) {
             output.push_str(&block.render());
         }
     }
@@ -108,7 +120,7 @@ impl MetaLayer for AngularMetaLayer {
         false
     }
 
-    fn enrich(&self, _output: &mut String, _ir: &CompiledIR, _fidelity: Fidelity) {
+    fn enrich(&self, _output: &mut String, _source: &str, _ir: &CompiledIR, _fidelity: Fidelity) {
         // No-op when feature is disabled
     }
 }
@@ -143,10 +155,8 @@ impl MetaLayer for SpringBootMetaLayer {
         crate::spring_meta::detect::is_spring_file(source)
     }
 
-    fn enrich(&self, output: &mut String, ir: &CompiledIR, fidelity: Fidelity) {
-        // Use the existing run_meta_layer function to generate the block
-        // run_meta_layer takes source_code and class_captures, not IR
-        // We extract class names from the IR for compatibility
+    fn enrich(&self, output: &mut String, source: &str, ir: &CompiledIR, fidelity: Fidelity) {
+        // Extract class names from the IR for compatibility
         let class_captures: Vec<String> = ir.instructions
             .iter()
             .filter_map(|op| {
@@ -158,7 +168,7 @@ impl MetaLayer for SpringBootMetaLayer {
             })
             .collect();
         
-        if let Some(block) = crate::spring_meta::run_meta_layer(&ir.file_id, &class_captures, fidelity) {
+        if let Some(block) = crate::spring_meta::run_meta_layer(source, &class_captures, fidelity) {
             output.push_str(&block.render());
         }
     }
@@ -191,7 +201,7 @@ impl MetaLayer for SpringBootMetaLayer {
         false
     }
 
-    fn enrich(&self, _output: &mut String, _ir: &CompiledIR, _fidelity: Fidelity) {
+    fn enrich(&self, _output: &mut String, _source: &str, _ir: &CompiledIR, _fidelity: Fidelity) {
         // No-op when feature is disabled
     }
 }

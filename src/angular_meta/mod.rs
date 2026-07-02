@@ -146,6 +146,6 @@ pub fn run_meta_layer(
     Some(block)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "angular"))]
 #[path = "../tests/angular_meta/mod.rs"]
 mod tests;
