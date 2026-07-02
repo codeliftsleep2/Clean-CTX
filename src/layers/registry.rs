@@ -61,6 +61,9 @@ impl LayerRegistry {
         #[cfg(feature = "spring_boot")]
         reg.meta_layers.push(Box::new(crate::layers::meta::SpringBootMetaLayer::new()));
 
+        #[cfg(feature = "dotnet")]
+        reg.meta_layers.push(Box::new(crate::dotnet_meta::DotNetMetaLayer::new()));
+
         reg
     }
 
