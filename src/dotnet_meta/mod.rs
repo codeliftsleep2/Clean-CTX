@@ -144,7 +144,7 @@ pub fn run_meta_layer(
     Some(block)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dotnet"))]
 #[path = "../tests/dotnet_meta/mod.rs"]
 mod tests;
 
@@ -177,7 +177,7 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         detect::is_dotnet_file(source)
     }
 
-    fn enrich(&self, output: &mut String, ir: &crate::ir::compiler::CompiledIR, fidelity: crate::compression::Fidelity) {
+    fn enrich(&self, output: &mut String, source: &str, ir: &crate::ir::compiler::CompiledIR, fidelity: crate::compression::Fidelity) {
         // Extract class names from IR
         let class_captures: Vec<String> = ir.instructions
             .iter()
@@ -190,8 +190,8 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             })
             .collect();
 
-        // Run the meta-layer pipeline
-        if let Some(block) = run_meta_layer(&ir.file_id, &class_captures, fidelity) {
+        // Run the meta-layer pipeline using the real source code (not ir.file_id)
+        if let Some(block) = run_meta_layer(source, &class_captures, fidelity) {
             output.push_str(&block.render());
         }
     }
@@ -224,7 +224,7 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         false
     }
 
-    fn enrich(&self, _output: &mut String, _ir: &crate::ir::compiler::CompiledIR, _fidelity: crate::compression::Fidelity) {
+    fn enrich(&self, _output: &mut String, _source: &str, _ir: &crate::ir::compiler::CompiledIR, _fidelity: crate::compression::Fidelity) {
         // No-op when feature is disabled
     }
 }

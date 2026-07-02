@@ -6,10 +6,8 @@
 // When a Cargo feature is disabled, the corresponding layer is not registered,
 // and the tree-sitter grammar is not linked in the binary.
 
-use std::path::Path;
 use std::sync::OnceLock;
 use crate::compression::Fidelity;
-use crate::ir::compiler::CompiledIR;
 use crate::layers::language::LanguageLayer;
 use crate::layers::meta::MetaLayer;
 
@@ -98,12 +96,16 @@ impl LayerRegistry {
     /// `is_applicable` and, if true, calls `enrich` to append framework-specific
     /// markers to the output.
     ///
+    /// The `ir` parameter provides class captures from the compiled IR.
+    /// When called from the text pipeline, this may be an empty IR — meta-layers
+    /// that need class names should extract them from `class_captures` directly.
+    ///
     /// Returns a vector of `(layer_name, block_text)` tuples for the caller
     /// to integrate into the compressed output.
     pub fn run_meta_layers_pipeline(
         &self,
         source: &str,
-        _class_captures: &[String],
+        class_captures: &[String],
         fidelity: Fidelity,
     ) -> Vec<(String, String)> {
         let mut results = Vec::new();
@@ -112,14 +114,19 @@ impl LayerRegistry {
             // Use trait-based dispatch: check if this layer applies to the source
             if layer.is_applicable(source, std::path::Path::new("")) {
                 let mut output = String::new();
-                // Call the layer's enrich method with a minimal IR
-                // Create a basic CompiledIR with empty instructions
+                // Build a minimal CompiledIR with the class captures so meta-layers
+                // that extract class names from instructions still work.
+                let class_instructions: Vec<crate::ir::opcodes::CoreOp> = class_captures
+                    .iter()
+                    .map(|name| crate::ir::opcodes::CoreOp::DefClass(String::new(), name.clone()))
+                    .collect();
                 let ir = crate::ir::compiler::CompiledIR {
                     file_id: String::new(),
-                    instructions: Vec::new(),
+                    instructions: class_instructions,
                     version: 1,
                 };
-                layer.enrich(&mut output, &ir, fidelity);
+                // Pass the real source code so detection and extraction work correctly
+                layer.enrich(&mut output, source, &ir, fidelity);
                 if !output.is_empty() {
                     results.push((layer.name().to_string(), output));
                 }
@@ -127,20 +134,6 @@ impl LayerRegistry {
         }
         
         results
-    }
-
-    /// Run all applicable meta-layers on the given source and IR.
-    ///
-    /// Each meta-layer checks `is_applicable` and, if true, calls `enrich`.
-    /// Meta-layers are applied in registration order.
-    pub fn run_meta_layers(&self, source: &str, path: &Path, ir: &CompiledIR, fidelity: Fidelity) {
-        for layer in &self.meta_layers {
-            if layer.is_applicable(source, path) {
-                let mut output = String::new();
-                layer.enrich(&mut output, ir, fidelity);
-                // Note: the actual output integration is handled by the caller
-            }
-        }
     }
 
     /// Check if a specific meta-layer is enabled.

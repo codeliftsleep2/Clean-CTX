@@ -145,16 +145,74 @@ impl DotnetGraph {
     }
 
     /// Add edges based on relationships in a marker line.
-    #[allow(unused_variables)]
-    fn add_edges_from_line(&self, line: &str, file: &str, all_markers: &[(String, Vec<String>)]) {
-        // This is a simplified version — a full implementation would:
-        // 1. Parse Φdi: lines to create service → implementation edges
-        // 2. Parse Φaction: lines to create controller → action edges
-        // 3. Parse Φhub: lines to create hub → client interface edges
-        // 4. Parse Φrel: lines to create entity → entity edges
+    fn add_edges_from_line(&mut self, line: &str, _file: &str, _all_markers: &[(String, Vec<String>)]) {
+        // Parse Φdi: lines to create service → implementation edges
+        if let Some((kind_str, rest)) = line.split_once(':') {
+            if kind_str == "Φdi" {
+                // Format: Φdi:ServiceName → RegistrationType
+                if let Some((from, to)) = rest.split("→").map(|s| s.trim()).collect::<Vec<_>>().split_first() {
+                    if let Some(target) = to.first() {
+                        self.add_edge(GraphEdge {
+                            from: from.to_string(),
+                            to: target.to_string(),
+                            kind: "di".to_string(),
+                        });
+                    }
+                }
+            }
+        }
 
-        // For now, we just track that edges exist
-        // The full implementation would be more sophisticated
+        // Parse Φaction: lines to create controller → action edges
+        if let Some((kind_str, rest)) = line.split_once(':') {
+            if kind_str == "Φaction" {
+                // Format: Φaction:Verb Name(params) → ReturnType
+                // The class name is the first word before the verb
+                let parts: Vec<&str> = rest.splitn(2, ' ').collect();
+                if parts.len() >= 2 {
+                    let class_name = parts[0].trim();
+                    let action_sig = parts[1].trim();
+                    self.add_edge(GraphEdge {
+                        from: class_name.to_string(),
+                        to: action_sig.to_string(),
+                        kind: "action".to_string(),
+                    });
+                }
+            }
+        }
+
+        // Parse Φhub: lines to create hub → client interface edges
+        if let Some((kind_str, rest)) = line.split_once(':') {
+            if kind_str == "Φhub" {
+                // Format: Φhub:ClassName [ClientInterface]
+                if let Some(bracket_start) = rest.find('[') {
+                    if let Some(bracket_end) = rest[bracket_start..].find(']') {
+                        let class_name = rest[..bracket_start].trim();
+                        let client_iface = rest[bracket_start + 1..bracket_start + bracket_end].trim();
+                        self.add_edge(GraphEdge {
+                            from: class_name.to_string(),
+                            to: client_iface.to_string(),
+                            kind: "hub_client".to_string(),
+                        });
+                    }
+                }
+            }
+        }
+
+        // Parse Φrel: lines to create entity → entity edges
+        if let Some((kind_str, rest)) = line.split_once(':') {
+            if kind_str == "Φrel" {
+                // Format: Φrel:Name → Target
+                if let Some((from, to)) = rest.split("→").map(|s| s.trim()).collect::<Vec<_>>().split_first() {
+                    if let Some(target) = to.first() {
+                        self.add_edge(GraphEdge {
+                            from: from.to_string(),
+                            to: target.to_string(),
+                            kind: "relationship".to_string(),
+                        });
+                    }
+                }
+            }
+        }
     }
 
     /// Render the graph as a `§ΦMAP` footer.

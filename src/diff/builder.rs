@@ -191,6 +191,6 @@ fn try_build_with(
     })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/diff/builder.rs"]
 mod tests;

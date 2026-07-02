@@ -104,6 +104,6 @@ pub fn is_dotnet_file(source: &str) -> bool {
     false
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dotnet"))]
 #[path = "../tests/dotnet_meta/detect.rs"]
 mod tests;

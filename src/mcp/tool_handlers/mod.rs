@@ -25,6 +25,6 @@ pub use traits::BoxedHandlerFn;
 pub use registry::HandlerRegistry;
 
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/tool_handlers.rs"]
 pub(crate) mod tool_handlers_tests;

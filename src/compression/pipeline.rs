@@ -57,6 +57,8 @@ pub struct BuildOutputResult {
     pub meta_block: Option<crate::angular_meta::MetaBlock>,
     /// Spring Boot Meta-Layer block (Phase 1: Tier 1 annotation extraction).
     pub spring_meta_block: Option<crate::spring_meta::MetaBlock>,
+    /// .NET / C# Meta-Layer block.
+    pub dotnet_meta_block: Option<crate::dotnet_meta::MetaBlock>,
 }
 
 /// Reads a target source file and compiles it down into a highly compacted,
@@ -249,6 +251,11 @@ pub fn compress_file_with_source(
     if let Some(block) = &built.spring_meta_block {
         body_content.push_str(&block.render());
     }
+    // .NET / C# Meta-Layer: inject the Φ block into the body
+    // BEFORE symbol compression so the `Φ` markers stay untouched.
+    if let Some(block) = &built.dotnet_meta_block {
+        body_content.push_str(&block.render());
+    }
     // Phase III (Idea #11 — Micro-Opcode Table for Text):
     // Apply micro-opcodes (§C, §P) before symbol compression so the
     // §-prefixed codes are included in the symbol dictionary analysis.
@@ -326,6 +333,9 @@ pub fn compress_text(
         body_content.push_str(&block.render());
     }
     if let Some(block) = &built.spring_meta_block {
+        body_content.push_str(&block.render());
+    }
+    if let Some(block) = &built.dotnet_meta_block {
         body_content.push_str(&block.render());
     }
     body_content = apply_micro_opcodes(&body_content, fidelity);
@@ -497,9 +507,6 @@ pub fn build_output_lines(
     let meta_block = meta_results.iter()
         .find(|(name, _)| name == "angular")
         .map(|(_, text)| {
-            // Parse the rendered text back into a MetaBlock-like structure
-            // For now, we keep using the existing angular_meta::MetaBlock
-            // but we could simplify this in a future refactor
             let mut lines = Vec::new();
             for line in text.lines() {
                 if line.starts_with("Φ") {
@@ -521,6 +528,18 @@ pub fn build_output_lines(
             crate::spring_meta::MetaBlock { lines }
         });
     
+    let dotnet_meta_block = meta_results.iter()
+        .find(|(name, _)| name == "dotnet")
+        .map(|(_, text)| {
+            let mut lines = Vec::new();
+            for line in text.lines() {
+                if line.starts_with("Φ") {
+                    lines.push(line.to_string());
+                }
+            }
+            crate::dotnet_meta::MetaBlock { lines }
+        });
+    
     BuildOutputResult {
         output_lines: output,
         class_count,
@@ -528,6 +547,7 @@ pub fn build_output_lines(
         import_count,
         meta_block,
         spring_meta_block,
+        dotnet_meta_block,
     }
 }
 
