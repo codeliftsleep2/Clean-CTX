@@ -39,6 +39,7 @@ pub mod angular_meta;
 pub mod ir;
 pub mod spring_meta;
 pub mod layers;
+pub mod dotnet_meta;
 pub mod error;
 pub mod tokenizer;
 pub mod observability;

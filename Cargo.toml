@@ -23,6 +23,7 @@ java       = ["dep:tree-sitter-java"]
 # Meta layers (imply their base language)
 angular     = ["typescript", "dep:tree-sitter-html"]
 spring_boot = ["java"]
+dotnet      = ["csharp"]
 
 # Future meta layers (placeholders)
 # react      = ["typescript"]
