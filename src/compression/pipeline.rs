@@ -17,6 +17,24 @@ use crate::analytics::calculate_savings;
 /// (`compress_file_streaming`) can be used as a fallback for larger
 /// files.
 const MAX_FILE_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
+
+/// P1-10: Unified token metadata computation for cache-hit paths.
+/// Ensures consistent token counting between cache-hit and cache-miss paths.
+fn compute_token_metadata(raw_tokens: usize, compressed_text: &str) -> crate::analytics::TokenMetadata {
+    let bpe = crate::analytics::bpe();
+    let compressed_tokens = bpe.encode_with_special_tokens(compressed_text).len();
+    let savings_percentage = if raw_tokens > 0 {
+        let saved = raw_tokens.saturating_sub(compressed_tokens);
+        (saved as f64 / raw_tokens as f64) * 100.0
+    } else {
+        0.0
+    };
+    crate::analytics::TokenMetadata {
+        raw_tokens,
+        compressed_tokens,
+        savings_percentage,
+    }
+}
 use crate::cache::LocalStateCache;
 use crate::compaction::{
     compact_expression, compact_import, extract_class_name, extract_field,
@@ -128,30 +146,24 @@ pub fn compress_file_with_source(
     let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
     let is_modified = cache.update_and_verify(&cache_key, &current_hash);
     if !is_modified {
+        // P1-10: Use unified compute_token_metadata for both cache-hit paths
+        // to ensure consistent token counting. Previously the cache-hit path
+        // manually computed tokens inline while the miss path used calculate_savings(),
+        // which could produce different results for the same input.
+        let cached_notice = format!(
+            "// [CACHE_HIT] {} unchanged. Use historic memory.\n",
+            path_alias
+        );
+
+        let meta = if let Some(raw_tokens) = cache.get_raw_token_count(&current_hash) {
+            compute_token_metadata(raw_tokens, &cached_notice)
+        } else {
+            calculate_savings(&source_code, &cached_notice, None)
+        };
+
         // Phase III (Idea #8 — Progressive Header Elision):
         // Low fidelity uses the compact cache-hit format.
         if fidelity == Fidelity::Low {
-            let meta = if let Some(raw_tokens) = cache.get_raw_token_count(&current_hash) {
-                let bpe = crate::analytics::bpe();
-                let cached_notice = format!(
-                    "// [CACHE_HIT] {} unchanged. Use historic memory.\n",
-                    path_alias
-                );
-                let compressed_tokens = bpe.encode_with_special_tokens(&cached_notice).len();
-                let savings_percentage = if raw_tokens > 0 {
-                    let saved = raw_tokens.saturating_sub(compressed_tokens);
-                    (saved as f64 / raw_tokens as f64) * 100.0
-                } else {
-                    0.0
-                };
-                crate::analytics::TokenMetadata {
-                    raw_tokens,
-                    compressed_tokens,
-                    savings_percentage,
-                }
-            } else {
-                calculate_savings(&source_code, "// [CACHE_HIT]", None)
-            };
             return Ok(crate::compression::report::format_compact_cache_hit(
                 meta.raw_tokens,
                 meta.compressed_tokens,
@@ -159,32 +171,6 @@ pub fn compress_file_with_source(
                 &path_alias,
             ));
         }
-
-        let cached_notice = format!(
-            "// [CACHE_HIT] {} unchanged. Use historic memory.\n",
-            path_alias
-        );
-
-        // F-14: use the cached raw-token count to skip the BPE encode.
-        // If the count is not in the cache (e.g. an older session), fall
-        // through to a fresh `calculate_savings` call.
-        let meta = if let Some(raw_tokens) = cache.get_raw_token_count(&current_hash) {
-            let bpe = crate::analytics::bpe();
-            let compressed_tokens = bpe.encode_with_special_tokens(&cached_notice).len();
-            let savings_percentage = if raw_tokens > 0 {
-                let saved = raw_tokens.saturating_sub(compressed_tokens);
-                (saved as f64 / raw_tokens as f64) * 100.0
-            } else {
-                0.0
-            };
-            crate::analytics::TokenMetadata {
-                raw_tokens,
-                compressed_tokens,
-                savings_percentage,
-            }
-        } else {
-            calculate_savings(&source_code, &cached_notice, None)
-        };
 
         // F-04: also surface the Structures line on a cache hit so
         // the header is consistent with the miss path. We can't

@@ -10,8 +10,9 @@ use crate::ir::layers::LayerContext;
 use crate::ir::layers::LanguageLayer;
 use crate::ir::layers::typescript::TypeScriptLayer;
 use crate::ir::layers::csharp::CSharpLayer;
-use crate::ir::layers::MetaLayer;
-use crate::ir::layers::angular::AngularMetaLayer;
+// P0-4: ir::layers::MetaLayer and angular/spring/dotnet modules removed.
+// Meta-layers now use the canonical trait in src/layers/meta/.
+// LanguageLayer tests remain (TypeScript, C#).
 use crate::ir::opcodes::CoreOp;
 
 // ── TypeScript Layer Tests ────────────────────────────
@@ -200,19 +201,9 @@ fn layer_finalize_default_returns_empty() {
     assert!(ops.is_empty(), "Default finalize should return empty vec");
 }
 
-// ── Angular MetaLayer Tests ───────────────────────────
-
-#[test]
-fn angular_layer_has_correct_name() {
-    let layer = AngularMetaLayer::new();
-    assert_eq!(layer.name(), "angular");
-}
-
-#[test]
-fn angular_layer_returns_empty_for_non_angular() {
-    let mut layer = AngularMetaLayer::new();
-    let source = "class Foo { x: number; }";
-    let classes = vec!["class Foo { x: number; }".to_string()];
-    let ops = layer.extract(source, &classes, Fidelity::Low);
-    assert!(ops.is_empty(), "Non-Angular source should produce no ops");
-}
+// ── Meta-Layer Integration Tests (P0-4) ────────────────
+// Meta-layer tests now use the canonical LayerRegistry instead of the
+// removed ir::layers::angular/spring/dotnet modules. See:
+//   - src/tests/angular_meta/ (pre-existing Angular tests)
+//   - src/tests/spring_meta/  (pre-existing Spring tests)
+//   - src/tests/dotnet_meta/  (pre-existing .NET tests)

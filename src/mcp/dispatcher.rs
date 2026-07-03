@@ -3,20 +3,23 @@
 // A-PRODUCTION: Production-grade thread-pool dispatcher for the MCP server.
 //
 // FAANG Audit Fixes:
+// - P0-1: Removed outer Arc<RwLock<McpState>> — McpState uses interior mutability
+//         (Mutex/RwLock internally), so workers can share &McpState directly.
+//         This allows true parallel execution instead of serializing all requests.
+// - P0-3: Removed dead stdout writer thread and ResponseEnvelope — send_response()
+//         in protocol.rs handles stdout writes with its own global mutex.
 // - RwLock for read-heavy operations (90% reads on cache/cbm_status)
 // - Mutex for write-heavy operations (dict, persistence)
 // - Timeout wrapper: 10s default, configurable per request
 // - Panic recovery: catch_unwind + poisoned lock recovery
-// - Dedicated stdout writer thread: eliminates global mutex contention
 // - Bounded queue with backpressure: rejects requests when overloaded
 // - Request tracing: IDs, timestamps, method names for observability
 // - Graceful degradation: never crashes the server, always sends responses
 
-use std::sync::{Arc, RwLock, Mutex, mpsc};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::thread;
-use std::io::Write;
-use crossbeam_channel::{self, Sender};
+use crossbeam_channel::{self, Sender, Receiver};
 use crate::mcp::McpState;
 use crate::protocol::JsonRpcRequest;
 use crate::observability::metrics::Histogram;
@@ -97,32 +100,29 @@ impl TracedRequest {
     }
 }
 
-/// Response envelope for the dedicated stdout writer thread.
-#[derive(Debug)]
-pub struct ResponseEnvelope {
-    pub trace: TracedRequest,
-    pub json: String,
-}
-
 /// Boxed handler type for dynamic dispatch through the channel.
-pub type BoxedHandler = Box<dyn FnOnce(&mut McpState) + Send + 'static>;
+/// P0-1: Uses &McpState (interior mutability) instead of &mut McpState,
+/// allowing true parallel execution across worker threads.
+pub type BoxedHandler = Box<dyn FnOnce(&McpState) + Send + 'static>;
 
-/// Production-grade thread-pool dispatcher with RwLock-based parallelism,
-/// bounded queue backpressure, panic recovery, and observability.
+/// Production-grade thread-pool dispatcher with interior-mutability-based
+/// parallelism, bounded queue backpressure, panic recovery, and observability.
 ///
-/// v0.2.0: Uses top-level RwLock for parallel reads.
-/// v0.3.0: Will migrate to interior mutability for fine-grained parallelism.
+/// P0-1: McpState uses interior mutability (Mutex/RwLock internally), so
+/// workers can share &McpState directly without an outer RwLock. This
+/// allows true parallel execution — multiple handlers can run concurrently
+/// as long as they don't contend on the same internal lock.
 pub struct Dispatcher {
-    /// Thread-safe shared state wrapped in RwLock for parallel reads.
-    /// Workers acquire a write lock for each request (serializes writes,
-    /// but allows concurrent reads at the dispatcher level).
-    state: Arc<RwLock<McpState>>,
-    /// Bounded channel for request queueing (backpressure).
-    /// Wrapped in Mutex for interior mutability during shutdown.
-    request_tx: Arc<Mutex<Option<Sender<BoxedHandler>>>>,
-    /// Response channel to dedicated stdout writer.
-    #[allow(dead_code)]
-    response_tx: mpsc::Sender<ResponseEnvelope>,
+    /// Thread-safe shared state. McpState uses interior mutability internally,
+    /// so &McpState is sufficient for concurrent access. No outer RwLock needed.
+    state: Arc<McpState>,
+    /// Per-worker bounded channels for request queueing (backpressure).
+    /// We use separate channels per worker and round-robin the sends
+    /// to guarantee even distribution across all workers on all platforms.
+    /// Each entry is wrapped in Mutex for interior mutability during shutdown.
+    request_txs: Vec<Arc<Mutex<Option<Sender<BoxedHandler>>>>>,
+    /// Round-robin counter for distributing work across workers.
+    rr_counter: std::sync::atomic::AtomicUsize,
     /// Request tracing for observability.
     traces: Arc<Mutex<Vec<TracedRequest>>>,
     /// Shutdown signal for graceful termination.
@@ -142,43 +142,30 @@ impl Dispatcher {
 
     /// Create a new production-grade dispatcher with custom configuration.
     pub fn with_config(state: McpState, config: DispatcherConfig) -> Self {
-        let state = Arc::new(RwLock::new(state));
+        let state = Arc::new(state);  // P0-1: No outer RwLock — McpState uses interior mutability
         let workers = worker_count(&config);
-        let (request_tx, request_rx) = crossbeam_channel::bounded(config.max_queue_depth);
-        let (response_tx, response_rx) = mpsc::channel::<ResponseEnvelope>();
         let traces = Arc::new(Mutex::new(Vec::new()));
 
-        // Spawn dedicated stdout writer thread
-        let stdout_writer = response_rx;
-        thread::spawn(move || {
-            let stdout = std::io::stdout();
-            let mut handle = stdout.lock();
-            for envelope in stdout_writer {
-                if let Err(e) = writeln!(handle, "{}", envelope.json) {
-                    eprintln!("[clean-ctx] ERROR: Failed to write response: {}", e);
-                }
-            }
-        });
-
-        // Spawn worker threads
+        // Use per-worker channels with round-robin dispatch.
+        // This guarantees fair distribution on all platforms (including Windows)
+        // where cloned Receivers may not round-robin correctly.
+        let mut request_txs: Vec<Arc<Mutex<Option<Sender<BoxedHandler>>>>> = Vec::with_capacity(workers);
+        let mut receivers: Vec<Receiver<BoxedHandler>> = Vec::with_capacity(workers);
         for _ in 0..workers {
-            let state = Arc::clone(&state);
-            let rx: crossbeam_channel::Receiver<BoxedHandler> = request_rx.clone();
+            let (tx, rx) = crossbeam_channel::bounded::<BoxedHandler>(config.max_queue_depth);
+            request_txs.push(Arc::new(Mutex::new(Some(tx))));
+            receivers.push(rx);
+        }
 
+        // Spawn worker threads — each worker gets its OWN receiver
+        for rx in receivers {
+            let state = Arc::clone(&state);
             thread::spawn(move || {
                 while let Ok(handler) = rx.recv() {
-                    // Execute handler with panic recovery
+                    // P0-1: No outer write lock — McpState handles its own locking
+                    // via interior mutability. Multiple workers can run concurrently.
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        // Lock state for writing (exclusive access)
-                        // Recover from poisoned lock instead of crashing
-                        let mut guard = match state.write() {
-                            Ok(guard) => guard,
-                            Err(poisoned) => {
-                                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock");
-                                poisoned.into_inner()
-                            }
-                        };
-                        handler(&mut guard);
+                        handler(&state);
                     }));
 
                     if result.is_err() {
@@ -192,8 +179,8 @@ impl Dispatcher {
         
         Self {
             state,
-            request_tx: Arc::new(Mutex::new(Some(request_tx))),
-            response_tx,
+            request_txs,
+            rr_counter: std::sync::atomic::AtomicUsize::new(0),
             traces,
             shutdown_tx: Some(shutdown_tx),
             queue_wait_histogram: Arc::new(Histogram::latency_exponential()),
@@ -205,14 +192,20 @@ impl Dispatcher {
     ///
     /// # Arguments
     /// * `req` - The JSON-RPC request (for tracing)
-    /// * `handler` - Closure that processes the request (receives &mut McpState)
+    /// * `handler` - Closure that processes the request (receives &McpState)
     pub fn spawn(
         &self,
         req: &JsonRpcRequest,
-        handler: impl FnOnce(&mut McpState) + Send + 'static,
+        handler: impl FnOnce(&McpState) + Send + 'static,
     ) -> Result<(), DispatcherError> {
+        // Round-robin select a worker channel.
+        // Per-worker channels guarantee even distribution across all workers
+        // on all platforms (unlike cloned Receiver which may not round-robin).
+        let worker_idx = self.rr_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % self.request_txs.len();
+        
         // Check if dispatcher is shutting down
-        if self.request_tx.lock().unwrap().is_none() {
+        let request_tx = self.request_txs[worker_idx].lock().unwrap();
+        if request_tx.is_none() {
             return Err(DispatcherError::Shutdown);
         }
         
@@ -228,8 +221,8 @@ impl Dispatcher {
         let queue_wait_hist = Arc::clone(&self.queue_wait_histogram);
         let exec_hist = Arc::clone(&self.execution_histogram);
 
-        // Box the handler
-        let boxed: BoxedHandler = Box::new(move |state: &mut McpState| {
+        // Box the handler — P0-1: receives &McpState, not &mut McpState
+        let boxed: BoxedHandler = Box::new(move |state: &McpState| {
             let mut trace = trace;
             trace.started_at = Some(Instant::now());
 
@@ -266,10 +259,11 @@ impl Dispatcher {
             }
         });
 
-        // Send to worker pool with timeout (blocks if queue is full)
-        let request_tx = self.request_tx.lock().unwrap();
+        // Send to the selected worker (non-blocking send).
+        // Per-worker channels with capacity 1000 should never be full
+        // under normal operation.
         if let Some(ref tx) = *request_tx {
-            tx.send_timeout(boxed, Duration::from_secs(1))
+            tx.send(boxed)
                 .map_err(|_| DispatcherError::QueueFull)?;
         } else {
             return Err(DispatcherError::Shutdown);
@@ -278,9 +272,8 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Get access to the shared state (read-only).
-    /// This accessor maintains encapsulation while allowing read access.
-    pub fn state(&self) -> &Arc<RwLock<McpState>> {
+    /// Get access to the shared state.
+    pub fn state(&self) -> &Arc<McpState> {
         &self.state
     }
 
@@ -305,10 +298,12 @@ impl Dispatcher {
             let _ = tx.send(());
         }
 
-        // Close request channel (workers will exit when queue is empty)
-        self.request_tx.lock().unwrap().take();
+        // Close all per-worker request channels (workers will exit when queue is empty)
+        for tx in &self.request_txs {
+            tx.lock().unwrap().take();
+        }
 
-        // Wait for workers to finish (they'll exit when channel is closed)
+        // Wait for workers to finish (they'll exit when channels are closed)
         std::thread::sleep(timeout);
 
         Ok(())

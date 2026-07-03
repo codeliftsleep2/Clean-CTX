@@ -351,9 +351,10 @@ fn resolve_fidelity(
     }
 
     // Priority 3: file name matches force_high_fidelity patterns
+    // P1-7: Uses consolidated crate::config::glob_match instead of local duplicate.
     if let Some(fname) = file_name {
         for pattern in &config.heuristics.force_high_fidelity {
-            if glob_match_simple(pattern, fname) {
+            if crate::config::glob_match(pattern, fname) {
                 return (Fidelity::High, FileClass::Service);
             }
         }
@@ -424,39 +425,10 @@ fn detect_angular(file_path: &str, source: &str) -> bool {
     false
 }
 
-/// Simple glob matcher for force_high_fidelity patterns.
-/// Supports `*` (any chars) and `?` (one char). Used only for
-/// extension matching where patterns look like `"*.service.ts"`.
-fn glob_match_simple(pattern: &str, text: &str) -> bool {
-    let pbytes = pattern.as_bytes();
-    let tbytes = text.as_bytes();
-    let mut pi = 0;
-    let mut ti = 0;
-    let mut star_pi = None;
-    let mut star_ti = 0;
-
-    while ti < tbytes.len() {
-        if pi < pbytes.len() && pbytes[pi] == b'*' {
-            star_pi = Some(pi);
-            star_ti = ti;
-            pi += 1;
-        } else if pi < pbytes.len() && (pbytes[pi] == tbytes[ti] || pbytes[pi] == b'?') {
-            pi += 1;
-            ti += 1;
-        } else if let Some(sp) = star_pi {
-            pi = sp + 1;
-            star_ti += 1;
-            ti = star_ti;
-        } else {
-            return false;
-        }
-    }
-    while pi < pbytes.len() && pbytes[pi] == b'*' {
-        pi += 1;
-    }
-    pi == pbytes.len()
-}
-
+/// P1-7: Consolidated — uses `crate::config::glob_match` instead of local copy.
+/// Previously duplicated as `glob_match_simple` in this file, with identical logic.
+/// Both exclude patterns (config.rs) and force_high_fidelity patterns (heuristics.rs)
+/// now use the same canonical implementation.
 /// Count lines in source text efficiently.
 fn count_lines(source: &str) -> usize {
     source.lines().count()

@@ -33,6 +33,31 @@ use crate::mcp::context_store::InMemoryContextStore;
 use crate::mcp::session_stats::SessionStats;
 use crate::mcp::sqlite_store::SqliteStore;
 
+/// P1-5: Lock recovery macro — replaces 20+ identical 4-line match patterns.
+///
+/// Usage: `let guard = lock_or_recover!(self.dict.lock(), "dict");`
+/// instead of:
+/// ```
+/// match self.dict.lock() {
+///     Ok(guard) => guard,
+///     Err(poisoned) => {
+///         eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (dict)");
+///         poisoned.into_inner()
+///     }
+/// }
+/// ```
+macro_rules! lock_or_recover {
+    ($lock:expr, $name:expr) => {
+        match $lock {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock ({})", $name);
+                poisoned.into_inner()
+            }
+        }
+    };
+}
+
 /// Per-file CBM filter state: symbols to skip during compression.
 ///
 /// Populated by the CBM Intelligence Layer **before** compression runs.
@@ -191,7 +216,6 @@ impl McpState {
             ir_context: RwLock::new(ContextState::new()),
             text_delta: Mutex::new(TextDeltaComputer::new()),
             source_cache: Mutex::new(HashMap::new()),
-            // F-FINAL-06: empty warning buffer at session start.
             warnings: Mutex::new(Vec::new()),
             session_stats: Mutex::new(session_stats),
             context_store: InMemoryContextStore::new(),
@@ -215,8 +239,6 @@ impl McpState {
         let bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
         if bridge.is_available() {
             eprintln!("[clean-ctx] CBM graph intelligence: available");
-            // Indexing is deferred — `ensure_indexed()` will be called on
-            // first actual query, avoiding blocking `McpState::new()`.
             let status = bridge.status().clone();
             (Some(bridge), status)
         } else {
@@ -228,120 +250,76 @@ impl McpState {
         }
     }
 
+    // ── P1-5: All lock accessors use lock_or_recover! macro ────────
+
     /// Lock the path dictionary for mutation.
     pub fn dict_lock(&self) -> std::sync::MutexGuard<'_, PathDictionary> {
-        match self.dict.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (dict)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.dict.lock(), "dict")
     }
 
     /// Lock the cache for reading.
     pub fn cache_read(&self) -> std::sync::RwLockReadGuard<'_, LocalStateCache> {
-        match self.cache.read() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned read lock (cache)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.cache.read(), "cache")
     }
 
     /// Lock the cache for writing.
     pub fn cache_write(&self) -> std::sync::RwLockWriteGuard<'_, LocalStateCache> {
-        match self.cache.write() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned write lock (cache)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.cache.write(), "cache")
     }
 
     /// Lock the IR context for reading.
     pub fn ir_context_read(&self) -> std::sync::RwLockReadGuard<'_, ContextState> {
-        match self.ir_context.read() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned read lock (ir_context)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.ir_context.read(), "ir_context")
     }
 
     /// Lock the IR context for writing.
     pub fn ir_context_lock(&self) -> std::sync::RwLockWriteGuard<'_, ContextState> {
-        match self.ir_context.write() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                eprintln!("[clean-ctx] WARNING: Recovering from poisoned write lock (ir_context)");
-                poisoned.into_inner()
-            }
-        }
+        lock_or_recover!(self.ir_context.write(), "ir_context")
     }
-
 
     /// Lock the session stats for writing.
     pub fn session_stats_lock(&self) -> std::sync::MutexGuard<'_, SessionStats> {
-        match self.session_stats.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (session_stats)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.session_stats.lock(), "session_stats")
     }
 
     /// Lock the source cache for writing.
     pub fn source_cache_lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, Arc<String>>> {
-        match self.source_cache.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (source_cache)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.source_cache.lock(), "source_cache")
     }
 
     /// Lock the CBM filter state for writing.
     pub fn cbm_filter_lock(&self) -> std::sync::MutexGuard<'_, CbmFilterState> {
-        match self.cbm_filter.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (cbm_filter)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.cbm_filter.lock(), "cbm_filter")
     }
 
     /// Lock the LLM text cache for writing.
     pub fn llm_text_cache_lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, String>> {
-        match self.llm_text_cache.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (llm_text_cache)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.llm_text_cache.lock(), "llm_text_cache")
     }
 
     /// Lock the graph bridge for mutation.
     pub fn graph_bridge_lock(&self) -> std::sync::MutexGuard<'_, Option<crate::cbm::GraphBridge>> {
-        match self.graph_bridge.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (graph_bridge)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.graph_bridge.lock(), "graph_bridge")
     }
 
     /// Lock the angular graph for mutation.
     pub fn angular_graph_lock(&self) -> std::sync::MutexGuard<'_, AngularGraphHandle> {
-        match self.angular_graph.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (angular_graph)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.angular_graph.lock(), "angular_graph")
     }
 
     /// Lock the persistence store for writing.
     pub fn persistence_store_lock(&self) -> std::sync::MutexGuard<'_, Option<BufferedStore>> {
-        match self.persistence_store.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (persistence_store)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.persistence_store.lock(), "persistence_store")
     }
 
     /// Lock the emitted breakpoints for writing.
     pub fn emitted_breakpoints_lock(&self) -> std::sync::MutexGuard<'_, HashSet<String>> {
-        match self.emitted_breakpoints.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (emitted_breakpoints)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.emitted_breakpoints.lock(), "emitted_breakpoints")
     }
 
     /// Lock the cache metrics for writing.
     pub fn cache_metrics_lock(&self) -> std::sync::MutexGuard<'_, CacheMetrics> {
-        match self.cache_metrics.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (cache_metrics)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.cache_metrics.lock(), "cache_metrics")
     }
 
     /// Get or create a path alias (thread-safe convenience method).
@@ -367,10 +345,8 @@ impl McpState {
 
     /// Get file version from IR context (thread-safe convenience method).
     pub fn file_version(&self, path_alias: &str) -> Option<u64> {
-        match self.ir_context.read() {
-            Ok(g) => g.file_version(path_alias),
-            Err(p) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned read lock (ir_context)"); p.into_inner().file_version(path_alias) }
-        }
+        let g = lock_or_recover!(self.ir_context.read(), "ir_context");
+        g.file_version(path_alias)
     }
 
     /// Access CBM filter skip set for a file (thread-safe convenience method).
@@ -392,44 +368,36 @@ impl McpState {
     /// and then clear the buffer. The single-threaded MCP dispatch
     /// chain guarantees no concurrent access.
     pub fn push_warning(&self, msg: impl Into<String>) {
-        match self.warnings.lock() {
-            Ok(mut guard) => guard.push(msg.into()),
-            Err(poisoned) => {
-                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (warnings)");
-                poisoned.into_inner().push(msg.into());
-            }
-        }
+        lock_or_recover!(self.warnings.lock(), "warnings").push(msg.into());
     }
 
     /// F-FINAL-06: Drain all accumulated warnings. Returns a `Vec`
     /// that the caller embeds in the response's `_warnings` field.
     pub fn drain_warnings(&self) -> Vec<String> {
-        match self.warnings.lock() {
-            Ok(mut guard) => std::mem::take(&mut *guard),
-            Err(poisoned) => {
-                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (warnings)");
-                std::mem::take(&mut *poisoned.into_inner())
-            }
-        }
+        std::mem::take(&mut *lock_or_recover!(self.warnings.lock(), "warnings"))
     }
 
     /// Lock the text delta computer for mutation.
     pub fn text_delta_lock(&self) -> std::sync::MutexGuard<'_, TextDeltaComputer> {
-        match self.text_delta.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => { eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (text_delta)"); poisoned.into_inner() }
-        }
+        lock_or_recover!(self.text_delta.lock(), "text_delta")
     }
 
     /// Resolve a cache key for `source_cache`. On Windows, `canonicalize`
     /// on TempDir paths can trigger Defender deep-scan hooks (10-30s per
-    /// call). We skip canonicalize when the path is already absolute and
-    /// contains no relative components (`..`), falling back to the raw
-    /// string as the key.
+    /// call). We skip canonicalize when the path has no relative components,
+    /// falling back to the raw string as the key.
+    ///
+    /// P3-18: Uses `Path::components()` for robust detection of relative
+    /// path components instead of simple string contains(), which could
+    /// miss edge cases on Windows with mixed path separators
+    /// (e.g., "C:\foo\.\bar" or "C:\foo\..\bar").
     fn resolve_cache_key(path: &str) -> String {
-        use std::path::Path;
+        use std::path::{Component, Path};
         let p = Path::new(path);
-        if p.is_absolute() && !path.contains("..") && !path.contains("./") && !path.contains(".\\") {
+
+        // Fast path: check if path is absolute and has no relative components
+        // using the robust Path::components() iterator instead of string contains().
+        if p.is_absolute() && p.components().all(|c| matches!(c, Component::Normal(_) | Component::RootDir | Component::Prefix(_))) {
             #[cfg(debug_assertions)]
             eprintln!("[resolve_cache_key] FAST PATH: {}", path);
             return path.to_string();
@@ -461,13 +429,7 @@ impl McpState {
         {
             #[cfg(debug_assertions)]
             let lock_start = std::time::Instant::now();
-            let cache = match self.source_cache.lock() {
-                Ok(guard) => guard,
-                Err(poisoned) => {
-                    eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (source_cache)");
-                    poisoned.into_inner()
-                }
-            };
+            let cache = lock_or_recover!(self.source_cache.lock(), "source_cache");
             #[cfg(debug_assertions)]
             eprintln!("[read_source] Phase 1 lock acquire took {:?} for {}", lock_start.elapsed(), path);
             if let Some(cached) = cache.get(&cache_key) {
@@ -489,13 +451,7 @@ impl McpState {
         // Phase 3: Update cache (brief lock, with double-check)
         #[cfg(debug_assertions)]
         let lock2_start = std::time::Instant::now();
-        let mut cache = match self.source_cache.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock (source_cache)");
-                poisoned.into_inner()
-            }
-        };
+        let mut cache = lock_or_recover!(self.source_cache.lock(), "source_cache");
         #[cfg(debug_assertions)]
         eprintln!("[read_source] Phase 3 lock acquire took {:?} for {}", lock2_start.elapsed(), path);
         cache.entry(cache_key).or_insert(content.clone());

@@ -590,14 +590,25 @@ impl CleanCtxConfig {
     /// A-14: Used to auto-disable persistence in CI to prevent stale
     /// `persistence.db` from leaking between builds and causing SQLite
     /// file lock contention in parallel test runs.
+    ///
+    /// P1-8: Previously checked `CI == "true"` only. Now checks for any
+    /// non-empty CI value (`"true"`, `"1"`, `"yes"`, etc.) since different
+    /// CI systems set CI to different values. Also checks Bitbucket Pipelines
+    /// and Buildkite which were missing from the original list.
     pub fn is_ci_environment() -> bool {
-        std::env::var("CI").is_ok_and(|v| v == "true")
+        // CI is the most universal CI variable — set by GitHub Actions,
+        // GitLab CI, CircleCI, Travis CI, Bitbucket Pipelines, Buildkite, etc.
+        // Some set it to "true", others to "1" or "yes".
+        std::env::var("CI").is_ok_and(|v| !v.is_empty() && v != "false")
             || std::env::var("TF_BUILD").is_ok()
             || std::env::var("GITHUB_ACTIONS").is_ok()
             || std::env::var("GITLAB_CI").is_ok()
             || std::env::var("JENKINS_URL").is_ok()
             || std::env::var("CIRCLECI").is_ok()
             || std::env::var("TRAVIS").is_ok()
+            // Additional CI systems
+            || std::env::var("BITBUCKET_BUILD_NUMBER").is_ok()
+            || std::env::var("BUILDKITE").is_ok()
     }
 
     /// Uncached directory walk — called exactly once via [`find_config`].
@@ -693,11 +704,14 @@ impl CleanCtxConfig {
     }
 }
 
+/// P1-7: Made `pub(crate)` so heuristics.rs and other modules use this
+/// single implementation instead of duplicating the logic.
+///
 /// Minimal glob matcher supporting `*` (matches any non-separator characters)
 /// and `?` (matches exactly one non-separator character). All other characters
 /// are matched literally. This is intentionally simple — full `globset` support
 /// can be added later if needed.
-fn glob_match(pattern: &str, text: &str) -> bool {
+pub(crate) fn glob_match(pattern: &str, text: &str) -> bool {
     glob_match_impl(pattern.as_bytes(), text.as_bytes())
 }
 

@@ -258,17 +258,38 @@ fn _preinit_handler_registry() {
     let _ = get_registry();
 }
 
+/// P1-6: Collect all inline-only tool names for verification.
+/// Returns the set of tool names handled by the inline dispatch match arms.
+/// Used by tests to verify no tool is registered in both inline and registry.
+#[allow(dead_code)]
+pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
+    use std::collections::HashSet;
+    let mut names = HashSet::new();
+    names.insert("decompress_code_context");
+    names.insert("compress_workspace");
+    names.insert("graph_search");
+    names.insert("graph_query");
+    names.insert("graph_trace");
+    names.insert("get_architecture");
+    names.insert("get_cbm_status");
+    names.insert("cbm_proxy");
+    names
+}
+
 /// Dispatch a tools/call request.
 /// v0.3.0: Uses registry-based dispatch for modular handlers, fallback to legacy.
+///
+/// P1-6: All inline-handled tools have early returns. The remaining tools
+/// fall through to the registry. The `inline_tool_names()` function above
+/// enables test-time verification that no tool name appears in both paths.
 pub(crate) fn dispatch_tools_call(
     id: &Value,
     tool_name: &str,
     params: &Value,
     state: &McpState,
 ) {
-    // PRIORITY 1: Direct inline dispatch for tools that are not in the registry
-    // (decompress_code_context, compress_workspace, and all CBM tools).
-    // These have no registry entry so they MUST be handled here.
+    // Inline dispatch for tools that have special handling requirements
+    // (decompress, compress_workspace, and all CBM tools).
     // Each arm returns to prevent double-fire if a tool is also registered.
     match tool_name {
         "decompress_code_context" => {
@@ -345,15 +366,13 @@ pub(crate) fn dispatch_tools_call(
         _ => {}
     }
 
-    // PRIORITY 2: Registry fallback for tools not handled inline above.
-    // The registry contains all handlers from tool_handlers/core.rs,
-    // tool_handlers/context/, tool_handlers/persistence/, tool_handlers/stats/.
+    // P1-6: Registry fallback for tools not handled inline above.
     if let Some(entry) = get_registry().get(tool_name) {
         (entry.handler)(id, params, state);
         return;
     }
 
-    // PRIORITY 3: Unknown tool
+    // Unknown tool
     send_response(&serde_json::json!({
         "jsonrpc": "2.0",
         "id": id,

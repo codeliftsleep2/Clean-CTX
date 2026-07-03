@@ -300,6 +300,65 @@ fn circuit_breaker_opens_after_three_failures() {
     assert!(!bridge.status().is_available());
 }
 
+// ── P0-2 REGRESSION: CBM mock availability ────────────────────────
+
+/// P0-2 REGRESSION: Mock bridge must be available when cache is pre-seeded.
+///
+/// Before the fix, `is_available()` required `self.client.is_some()` which
+/// always returned false for mocks (client=None). After the fix, mocks with
+/// pre-seeded cache entries are considered available.
+#[test]
+fn p0_2_regression_mock_is_available_with_cached_data() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use std::collections::HashMap;
+    use crate::cbm::SymbolImportance;
+
+    let mut data = HashMap::new();
+    data.insert("UserService".to_string(), SymbolImportance {
+        symbol: "UserService".to_string(),
+        score: 0.9,
+        file: "user.rs".to_string(),
+    });
+
+    let bridge = new_mock(data);
+    assert!(bridge.is_available(),
+        "P0-2 REGRESSION: Mock with pre-seeded cache should be available");
+}
+
+/// P0-2 REGRESSION: Mock with empty cache should still be available.
+#[test]
+fn p0_2_regression_mock_empty_is_available() {
+    use crate::cbm::bridge::test_helpers::new_mock_empty;
+    let bridge = new_mock_empty();
+    assert!(bridge.is_available(),
+        "P0-2 REGRESSION: Mock with empty cache should be available (status=Available)");
+}
+
+/// P0-2 REGRESSION: Mock's get_symbol_importance_mut returns cached data.
+///
+/// Before the fix, `get_symbol_importance_mut()` would call `query()` which
+/// returned Err (no client), so the mock always returned empty data.
+/// After the fix, the cache is checked first and pre-seeded data is returned.
+#[test]
+fn p0_2_regression_mock_returns_cached_data() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use std::collections::HashMap;
+    use crate::cbm::SymbolImportance;
+
+    let mut data = HashMap::new();
+    data.insert("UserService".to_string(), SymbolImportance {
+        symbol: "UserService".to_string(),
+        score: 0.9,
+        file: "user.rs".to_string(),
+    });
+
+    let mut bridge = new_mock(data);
+    let result = bridge.get_symbol_importance_mut();
+    assert_eq!(result.len(), 1, "Should return 1 cached symbol");
+    assert!(result.contains_key("UserService"), "Should contain UserService");
+    assert_eq!(result["UserService"].score, 0.9, "Score should be preserved");
+}
+
 #[test]
 fn circuit_breaker_recovery_logs_transition() {
     // When a bridge is unavailable and remains unavailable,

@@ -21,7 +21,7 @@
 // `exclude_patterns`, `fidelity_overrides`, and `type_aliases`.
 
 use std::io::{self, BufRead};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::config::CleanCtxConfig;
 use crate::mcp::McpState;
@@ -34,29 +34,62 @@ use crate::protocol::JsonRpcRequest;
 /// or `Cargo.toml` to anchor all relative paths (config,, DB, debug log).
 static PROJECT_ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
-/// Resolve the project root directory. Walks up from the executable's
-/// location looking for `.clean-ctx.json` or `Cargo.toml`. Falls back
-/// to `current_dir()` if nothing is found.
+/// Resolve the project root directory.
+///
+/// Resolution order (P1-4): 
+///   1. `CLEAN_CTX_PROJECT_ROOT` env var (if set)
+///   2. Walk up from CWD looking for `.clean-ctx.json` or `Cargo.toml`
+///   3. Walk up from the executable's directory (for dev / local builds)
+///   4. Fallback to CWD
+///
+/// Previously the search started from the executable directory, which fails
+/// when the binary is installed system-wide (e.g., `/usr/local/bin/`).
+/// Now we check CWD first (the MCP client's working directory) which is the
+/// most reliable indicator of the project root in production.
 pub(crate) fn find_project_root() -> &'static PathBuf {
     PROJECT_ROOT.get_or_init(|| {
-        // Start from the executable's directory (e.g. target/release/)
-        let exe_dir = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-            .unwrap_or_else(|| PathBuf::from("."));
-
-        let mut current = exe_dir;
-        loop {
-            if current.join(".clean-ctx.json").exists() || current.join("Cargo.toml").exists() {
-                return current;
+        // 1. Check CLEAN_CTX_PROJECT_ROOT env var
+        if let Ok(root) = std::env::var("CLEAN_CTX_PROJECT_ROOT") {
+            let p = PathBuf::from(root);
+            if p.exists() {
+                return p;
             }
-            if !current.pop() {
-                break;
+            eprintln!("[clean-ctx] Warning: CLEAN_CTX_PROJECT_ROOT set but not found: {}", p.display());
+        }
+
+        // 2. Walk up from CWD (most reliable in production — MCP client's CWD)
+        if let Ok(cwd) = std::env::current_dir() {
+            if let Some(found) = walk_up_for_project_root(&cwd) {
+                return found;
             }
         }
-        // Fallback to CWD
+
+        // 3. Walk up from executable directory (works for dev/cargo run)
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(parent) = exe.parent() {
+                if let Some(found) = walk_up_for_project_root(parent) {
+                    return found;
+                }
+            }
+        }
+
+        // 4. Fallback to CWD
         std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
     })
+}
+
+/// Walk up from `start` looking for `.clean-ctx.json` or `Cargo.toml`.
+fn walk_up_for_project_root(start: &Path) -> Option<PathBuf> {
+    let mut current = start.to_path_buf();
+    loop {
+        if current.join(".clean-ctx.json").exists() || current.join("Cargo.toml").exists() {
+            return Some(current);
+        }
+        if !current.pop() {
+            break;
+        }
+    }
+    None
 }
 
 /// Maximum size, in bytes, of a single JSON-RPC request line. Anything
@@ -81,13 +114,15 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // This is a no-op if the subscriber is already set (e.g., in tests).
     crate::observability::init_tracing();
 
-    // Eagerly initialise the BPE engine. A failure here (e.g. the BPE
-    // data file is missing or unreadable) used to take the server
-    // down on the *first* compression call. We now surface it at
-    // startup with a clear error and a non-zero exit code.
+    // P3-19: Eagerly initialise the BPE engine. A failure here (e.g. the BPE
+    // data file is missing or unreadable) is non-fatal — the server continues
+    // running and BPE will be re-attempted lazily on first compression call.
+    // This allows CBM-only operations (graph_search, get_architecture, etc.)
+    // to work even when BPE data is unavailable.
     if let Err(e) = crate::analytics::bpe_or_init() {
-        eprintln!("[clean-ctx] fatal: {}", e);
-        std::process::exit(2);
+        eprintln!("[clean-ctx] WARNING: BPE initialization failed: {e}");
+        eprintln!("[clean-ctx] WARNING: Compression will fall back to character-count estimates.");
+        eprintln!("[clean-ctx] WARNING: CBM-only operations (graph_search, etc.) are unaffected.");
     }
 
     // F-05: load the project config and bundle it into the

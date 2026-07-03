@@ -5,6 +5,7 @@
 // Dispatched from `crate::mcp::tools::dispatch_tools_call`.
 
 use serde_json::Value;
+use crate::cbm::bridge::IndexingStatus;
 use crate::mcp::McpState;
 use crate::protocol::send_response;
 
@@ -47,17 +48,38 @@ fn set_project_from_params(bridge: &mut crate::cbm::GraphBridge, params: &Value)
     }
 }
 
-/// Ensure the project is indexed before issuing a CBM query.
-/// Sends an error response and returns `false` if indexing fails.
+/// P1-9: Ensure the project is indexed before issuing a CBM query.
+///
+/// **Non-blocking:** If indexing is in progress, sends a "retry later"
+/// response (not an error) and returns `false`. The agent will retry
+/// the query on the next turn. This prevents the 10-30s blocking
+/// that previously occurred on every first CBM handler call.
 pub(crate) fn ensure_indexed_or_error(id: &Value, bridge: &mut crate::cbm::GraphBridge) -> bool {
-    if let Err(e) = bridge.ensure_indexed() {
-        send_response(&serde_json::json!({
-            "jsonrpc": "2.0", "id": id,
-            "error": { "code": -32603, "message": format!("CBM indexing failed: {}", e) }
-        }));
-        false
-    } else {
-        true
+    match bridge.ensure_indexed() {
+        Ok(IndexingStatus::Ready) => true,
+        Ok(IndexingStatus::StillIndexing { elapsed_secs }) => {
+            let msg = if elapsed_secs < 5 {
+                "CBM project indexing in progress. Retry the query in a few seconds, or use `get_cbm_status` to check when indexing completes.".to_string()
+            } else {
+                format!("CBM is still indexing this project ({elapsed_secs}s elapsed). This is normal for large codebases. Retry the query shortly.")
+            };
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": msg }],
+                    "still_indexing": true,
+                    "elapsed_secs": elapsed_secs,
+                }
+            }));
+            false
+        }
+        Err(e) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32603, "message": format!("CBM indexing failed: {e}") }
+            }));
+            false
+        }
     }
 }
 
@@ -194,9 +216,9 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
     }
 }
 
-/// Handle `get_cbm_status` — check CBM availability.
+/// P1-9: Handle `get_cbm_status` — check CBM availability with indexing progress.
 pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
-    let (status, details, version) = match state.graph_bridge_lock().as_mut() {
+    let (status, details, version, indexing_info) = match state.graph_bridge_lock().as_mut() {
         Some(bridge) => {
             bridge.update_status();
             let _ = bridge.ensure_indexed();
@@ -208,22 +230,49 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
                     "CBM not installed or disabled. See github.com/DeusData/codebase-memory-mcp".into(),
             };
             let v = bridge.graph_version().to_string();
-            (s, d, v)
+            // P1-9: Check indexing state for progress reporting
+            let idx_info = {
+                let idx_state = bridge.indexing_state();
+                match &*idx_state {
+                    crate::cbm::bridge::IndexingState::InProgress { started_at } => {
+                        let elapsed = started_at.elapsed().as_secs();
+                        Some(serde_json::json!({
+                            "status": "in_progress",
+                            "elapsed_secs": elapsed,
+                        }))
+                    }
+                    crate::cbm::bridge::IndexingState::Complete => {
+                        Some(serde_json::json!({ "status": "complete" }))
+                    }
+                    crate::cbm::bridge::IndexingState::Failed(msg) => {
+                        Some(serde_json::json!({
+                            "status": "failed",
+                            "error": msg,
+                        }))
+                    }
+                    crate::cbm::bridge::IndexingState::NotStarted => None,
+                }
+            };
+            (s, d, v, idx_info)
         }
         None => {
             let d = match &state.cbm_status {
                 crate::cbm::CbmStatus::Available => "CBM configured but not connected.".into(),
                 _ => "CBM not available.".into(),
             };
-            (state.cbm_status.clone(), d, String::new())
+            (state.cbm_status.clone(), d, String::new(), None)
         }
     };
-    send_response(&serde_json::json!({
+    let mut response = serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": details }],
             "cbm_status": status.summary(),
             "graph_version": version,
         }
-    }));
+    });
+    if let Some(idx) = indexing_info {
+        response["result"]["indexing"] = idx;
+    }
+    send_response(&response);
 }

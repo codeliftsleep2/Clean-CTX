@@ -36,6 +36,7 @@ pub struct DecoratorsResult {
     /// Raw inline template content (from `template: '...'`), when
     /// the component uses an inline template instead of `templateUrl`.
     /// `None` when no inline template is present.
+    #[allow(dead_code)]
     pub inline_template: Option<String>,
 }
 
@@ -919,6 +920,7 @@ fn unquote(s: &str) -> &str {
 // F-ANG-13: substitute `?` for missing class names at the call site.
 // (Same as `extract_decorators`; the `let-else` → `?` swap is
 // required by clippy::question_mark when both apply.)
+#[allow(dead_code)]
 #[allow(clippy::type_complexity)]
 pub fn extract_graph_entries(raw_class: &str) -> Option<(String, ClassKind, Option<String>, Vec<String>, Option<String>)> {
     let head_end = find_class_head_end(raw_class)?;

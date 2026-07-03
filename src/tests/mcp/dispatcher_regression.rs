@@ -42,19 +42,19 @@ fn test_request(id: &str, method: &str) -> JsonRpcRequest {
 mod encapsulation_tests {
     use super::*;
 
-    /// REGRESSION TEST: State field must be private
+    /// REGRESSION TEST: State must be accessed through dispatcher API
     ///
-    /// This test verifies that external code cannot directly access
-    /// the dispatcher's internal state. All mutations must go through
-    /// the spawn() method to ensure tracing and backpressure.
-    ///
-    /// FAILURE MODE: If this compiles, encapsulation is broken.
+    /// P0-1: After removing the outer RwLock, state() returns &McpState
+    /// directly (no .read()/.write() needed). This test verifies the
+    /// encapsulation is working correctly.
     #[test]
     fn state_field_is_accessible() {
         let dispatcher = make_dispatcher();
         
-        // State is now private with accessor (v0.2.1 fix):
-        let _guard = dispatcher.state().read().unwrap();
+        // P0-1: Direct access to McpState without .read()/write()
+        // Before fix: dispatcher.state().read().unwrap().proxy_port
+        // After fix:  dispatcher.state().proxy_port
+        assert_eq!(dispatcher.state().proxy_port, 8787);
     }
 
     /// REGRESSION TEST: Request channel must be private
@@ -109,23 +109,20 @@ mod boundary_tests {
     #[test]
     fn all_mutations_go_through_dispatcher() {
         let dispatcher = make_dispatcher();
-        // Use an atomic counter to avoid RwLock reader-writer starvation
-        // on Windows. The polling loop in the old version acquired read locks
-        // in a tight loop, which could starve worker threads trying to write.
         let counter = Arc::new(AtomicUsize::new(0));
         
-        // Spawn multiple requests
+        // Spawn multiple requests that mutate state via interior mutability methods
         for i in 0..10 {
             let req = test_request(&i.to_string(), "test");
             let c = Arc::clone(&counter);
+            let path = format!("file_{}.ts", i);
             dispatcher.spawn(&req, move |state| {
-                state.proxy_port = 1000 + i as u16;
+                state.get_or_create_alias(path);
                 c.fetch_add(1, Ordering::SeqCst);
             }).unwrap();
         }
         
-        // Wait for all 10 handlers to complete (avoids RwLock read polling).
-        // Each handler acquires an exclusive write lock, so 10 handlers serialize.
+        // Wait for all 10 handlers to complete
         let deadline = std::time::Instant::now() + Duration::from_secs(30);
         loop {
             let done = counter.load(Ordering::SeqCst);
@@ -138,12 +135,9 @@ mod boundary_tests {
             std::thread::sleep(Duration::from_millis(50));
         }
         
-        // Verify the final state was set correctly
-        // Note: Due to concurrent execution, we can't guarantee which handler
-        // finished last. We can only verify that the value is in the expected range.
-        let guard = dispatcher.state().read().unwrap();
-        assert!(guard.proxy_port >= 1000 && guard.proxy_port <= 1009,
-            "proxy_port should be set by one of the handlers, got {}", guard.proxy_port);
+        // Verify mutations are visible via interior mutability
+        let footer = dispatcher.state().dict_lock().format_footer();
+        assert!(footer.contains("file_"), "interior mutations should be visible in dict");
     }
 
     /// REGRESSION TEST: Backpressure cannot be bypassed
@@ -576,26 +570,30 @@ mod concurrency_tests {
     }
 
     /// REGRESSION TEST: State mutations must be visible across spawns
+    ///
+    /// Uses interior mutability (dict_lock) to show that state changes
+    /// made by one handler are visible to subsequent handlers.
     #[test]
     fn state_mutations_are_visible_across_spawns() {
         let dispatcher = make_dispatcher();
         
-        // Spawn first mutation
+        // Spawn first mutation (add to dict via interior mutability)
         dispatcher.spawn(&test_request("1", "test"), |state| {
-            state.proxy_port = 1111;
+            state.get_or_create_alias("file_a.ts".to_string());
         }).unwrap();
         
         std::thread::sleep(Duration::from_millis(100));
         
         // Spawn second mutation
         dispatcher.spawn(&test_request("2", "test"), |state| {
-            state.proxy_port = 2222;
+            state.get_or_create_alias("file_b.ts".to_string());
         }).unwrap();
         
         std::thread::sleep(Duration::from_millis(100));
         
-        // Verify second mutation is visible
-        let guard = dispatcher.state().read().unwrap();
-        assert_eq!(guard.proxy_port, 2222, "latest mutation should be visible");
+        // Verify both mutations are visible via interior mutability
+        let footer = dispatcher.state().dict_lock().format_footer();
+        assert!(footer.contains("file_a.ts"), "first mutation should be visible");
+        assert!(footer.contains("file_b.ts"), "second mutation should be visible");
     }
 }

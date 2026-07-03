@@ -4,10 +4,13 @@
 // Separate language-specific and framework-specific logic into pluggable
 // layers that emit additional ops on top of the Core IR.
 //
-// 4-Layer Architecture:
+// 4-Layer Architecture (P0-4: merged Layer 3 with canonical src/layers/meta/):
 //   Layer 1: Core IR (language-agnostic) — in opcodes.rs
 //   Layer 2: Language Layer (TS, C#, etc.) — LanguageLayer trait
-//   Layer 3: Meta-Layer (framework-specific) — MetaLayer trait
+//   Layer 3: Meta-Layer (framework-specific) — now handled by src/layers/meta/MetaLayer
+//            via LayerRegistry::global() in IRCompiler.
+//            The duplicate ir::layers::MetaLayer trait and three Φ-line parsers
+//            (angular.rs, spring.rs, dotnet.rs) have been removed.
 //   Layer 4: Application Patterns (positional encoding) — PatternRecognizer trait
 
 use super::opcodes::CoreOp;
@@ -18,9 +21,6 @@ pub mod typescript;
 pub mod csharp;
 pub mod rust;
 pub mod java;
-pub mod angular;
-pub mod spring;
-pub mod dotnet;
 pub mod patterns;
 
 /// Context passed to layer processing functions.
@@ -105,20 +105,10 @@ pub trait LanguageLayer {
     }
 }
 
-/// Framework-specific IR layer (Layer 3).
-/// Extracts framework patterns (decorators, annotations, etc.)
-pub trait MetaLayer {
-    /// Framework name (e.g., "angular", "react", "ngrx")
-    fn name(&self) -> &str;
-
-    /// Extract framework-specific ops from the full source and class list.
-    fn extract(
-        &mut self,
-        source: &str,
-        classes: &[String],
-        fidelity: Fidelity,
-    ) -> Vec<CoreOp>;
-}
+// Layer 3 (Meta-Layer) trait removed — P0-4: unified with canonical
+// src/layers/meta::MetaLayer via LayerRegistry. IRCompiler now calls
+// LayerRegistry::global().meta_layers() instead of maintaining its own
+// meta-layer vec.
 
 /// Pattern recognizer (Layer 4).
 /// Identifies common code patterns and compresses them to single ops.

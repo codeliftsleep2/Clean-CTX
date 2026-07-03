@@ -12,17 +12,19 @@ use crate::compression::Fidelity;
 use crate::compression::language::detect_language;
 use crate::ir::compiler::{IRCompiler, CompiledIR};
 use crate::ir::layers::typescript::TypeScriptLayer;
-use crate::ir::layers::angular::AngularMetaLayer;
+// P0-4: Meta-layers use LayerRegistry::global() instead of manual add_meta_layer().
+// The compiler calls LayerRegistry internally during compile().
 use crate::ir::opcodes::CoreOp;
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-/// Create an IRCompiler configured with TypeScript language layer and
-/// Angular meta layer, ready to compile TypeScript source.
+/// Create an IRCompiler configured with TypeScript language layer,
+/// ready to compile TypeScript source.
+/// P0-4: Meta-layers are handled by LayerRegistry::global() inside
+/// IRCompiler::compile(). No manual add_meta_layer() needed.
 fn ts_compiler() -> IRCompiler {
     let mut compiler = IRCompiler::new();
     compiler.add_language_layer(Box::new(TypeScriptLayer::new()));
-    compiler.add_meta_layer(Box::new(AngularMetaLayer::new()));
     compiler
 }
 
