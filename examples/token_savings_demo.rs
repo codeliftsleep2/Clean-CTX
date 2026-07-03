@@ -19,7 +19,8 @@ use clean_ctx::analytics::bpe_or_init;
 use clean_ctx::compression::Fidelity;
 use clean_ctx::ir::compiler::IRCompiler;
 use clean_ctx::ir::layers::typescript::TypeScriptLayer;
-use clean_ctx::ir::layers::angular::AngularMetaLayer;
+// P0-4: Meta-layers are handled by LayerRegistry::global() inside
+// IRCompiler::compile(). No manual add_meta_layer() needed.
 use clean_ctx::ir::layers::patterns::CodePatternRecognizer;
 use clean_ctx::ir::patterns::CompressingPatternRecognizer;
 use clean_ctx::ir::wire::ir_to_wire;
@@ -53,7 +54,7 @@ fn compile_file_ir(file: &PathBuf, fidelity: Fidelity) -> Result<clean_ctx::ir::
 
     let mut compiler = IRCompiler::new();
     compiler.add_language_layer(Box::new(TypeScriptLayer::new()));
-    compiler.add_meta_layer(Box::new(AngularMetaLayer::new()));
+    // P0-4: Meta-layers handled by LayerRegistry::global() inside IRCompiler::compile()
     compiler.add_pattern_recognizer(Box::new(CodePatternRecognizer::new()));
     compiler.add_pattern_recognizer(Box::new(CompressingPatternRecognizer::new()));
 

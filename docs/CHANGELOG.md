@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.2.1-rc2] — 2026-07-03 — Meta-Layer Expansion & FAANG Hardening
+
+### Added
+
+#### .NET / C# Meta-Layer (R-35)
+- Full `dotnet` feature gate with 38 Φ markers mirroring the Angular/Spring architecture
+- `src/dotnet_meta/`: `controller.rs`, `service.rs`, `middleware.rs`, `endpoint.rs`, `attribute.rs`, `model.rs`, `mapper.rs`, `config.rs`, `entity.rs`, `program.rs`, `event.rs`, `background.rs`, `filter.rs`, `signalr.rs`, `health.rs`, `cors.rs`, `auth.rs`, `validation.rs`, `logging.rs`, `swagger.rs`, `fluent.rs`, `mediatr.rs`, `efcore.rs`, `serialize.rs`, `metric.rs`, `graphql.rs`, `grpc.rs`, `caching.rs`, `polly.rs`, `detect.rs`, `markers.rs`, `mod.rs`
+- `.cs` file extension support in compression pipeline, feature-gated tests
+
+#### Dual Meta-Layer Analysis (R-41/R-42)
+- `docs/DUAL_META_LAYER_ANALYSIS.md` — Comprehensive analysis of Angular + Spring Boot + .NET meta-layers with opcode inventory, fidelity tables, and feature-gate audit
+- Angular: 24 opcodes (Φcmp, Φsvc, Φmod, Φdir, Φpipe, Φin, Φout, Φmodel, Φinj, Φtpl, Φsty, Φbundle, Φgraph, Φlet, ⊕guard, ⊕sync, $a, $o, $m, $b, $P, $R, Φmap)
+- Spring Boot: 38 opcodes (7 primary ⊕ stereotypes + 31 request mapping + config + profile + test + lifecycle + messaging markers)
+- .NET: 30 opcodes (28 per-class Φ markers + controller routing + service DI)
+
+#### A-08 Token Efficiency Audit Resolution
+- Sliding context window proxy with configurable `CONTEXT_WINDOW_TOKENS` and `SLIDING_WINDOW_OVERLAP`
+- Tool output aging: `max_age_seconds` (default 1800s) drops stale tool results outside the retention window
+- Token budget enforcement: `target_tokens` soft cap trims oldest assistant-tool pairs that overflow the budget
+- Cross-reference path cache: `extract_path_strings` caches extracted paths to avoid re-parsing large tool outputs
+- `proxy/tests/audit_regression.rs` — 18 regression tests covering all audit findings
+
+### Fixed
+
+#### Feature-Gate Consistency (P1-9)
+- All angular-only imports, types, and functions across 8 files correctly gated behind `#[cfg(feature = "angular")]`:
+  - `workspace.rs`: `Arc`, `bundler`, `decorators`, `FooterBuilder`, `GraphCollector`, `template`, `style`, `extract_class_blocks`, `triplet_name`, `PassContextRef`, `format_manifest_footer`
+  - `workspace_util.rs`: `format_manifest_footer`, `PassContextRef`, `triplet_name`, `extract_class_blocks`, `find_next_class_keyword`, `find_decorator_start`, angular crate imports
+  - `template.rs`: `OnceLock`, `Language`, `Parser`, `DEFAULT_DEPTH`, and all tree-sitter helper functions
+  - `decorators.rs`: `inline_template` field and `extract_graph_entries` annotated with `#[allow(dead_code)]`
+- Non-angular stub implementations (`FooterBuilder`, `bundle_pass`, `graph_pass`) annotated with `#[allow(dead_code)]` where structurally necessary
+- All 1489 tests pass under `--all-features` with zero clippy warnings
+
+#### Clippy Warnings
+- `server.rs`: `walk_up_for_project_root` takes `&Path` instead of `&PathBuf` (clippy::ptr_arg)
+- `bridge.rs`: unused variables `c` and `status` prefixed with underscore
+- `tools.rs`: `inline_tool_names` annotated with `#[allow(dead_code)]`
+- `heuristics.rs`: empty line after doc comment merged into preceding comment
+
+### Changed
+- Proxy now includes sliding context window transform with configurable token budget and overlap
+- Documentation updated: `docs/DUAL_META_LAYER_ANALYSIS.md`, `docs/FAANG_AUDIT_FINDINGS.md`
+- Test count: 1,489 tests all passing, 0 clippy warnings
+
+### Version history
+| Version | Date | Highlights |
+|---------|------|------------|
+| 0.2.1-rc2 | 2026-07-03 | **Meta-Layer expansion.** .NET/C# meta-layer, Dual Meta-Layer analysis, A-08 sliding window proxy, P1-9 feature-gate hardening — 1,489 tests, 0 clippy warnings |
+
+---
+
 ## [0.2.1-rc1] — 2026-06-30 — Foundation Complete
 
 ### Added

@@ -13,7 +13,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if args.len() > 1 && args[1] == "setup" && args.get(2).map(|s| s.as_str()) == Some("--with-cbm") {
-        return cmd_setup_cbm();
+        let force = args.get(3).map(|s| s.as_str()) == Some("--force");
+        return cmd_setup_cbm(force);
     }
 
     // A-15: --config-dump flag to print resolved configuration
@@ -29,7 +30,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Handle `clean-ctx setup --with-cbm` — check CBM availability and
 /// optionally generate config.
-fn cmd_setup_cbm() -> Result<(), Box<dyn std::error::Error>> {
+///
+/// P3-22: Added `--force` flag to skip confirmation prompt. Without `--force`,
+/// the user is prompted to confirm before modifying `.clean-ctx.json`.
+fn cmd_setup_cbm(force: bool) -> Result<(), Box<dyn std::error::Error>> {
     let info = clean_ctx::cbm::setup::cbm_setup_check();
     let output = clean_ctx::cbm::setup::format_setup_output(&info);
     eprint!("{}", output);
@@ -38,6 +42,25 @@ fn cmd_setup_cbm() -> Result<(), Box<dyn std::error::Error>> {
     if info.is_ready {
         let config_path = std::path::Path::new(".clean-ctx.json");
         if config_path.exists() {
+            // P3-22: Ask for confirmation unless --force is set
+            if !force {
+                eprintln!();
+                eprintln!("[clean-ctx] This will update .clean-ctx.json with CBM configuration.");
+                eprint!("[clean-ctx] Proceed? [y/N] ");
+                // Flush stdout to ensure prompt appears before input
+                use std::io::Write;
+                std::io::stderr().flush()?;
+                
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input)?;
+                let input = input.trim().to_lowercase();
+                
+                if input != "y" && input != "yes" {
+                    eprintln!("[clean-ctx] Aborted.");
+                    return Ok(());
+                }
+            }
+            
             // Read existing config and merge cbm block
             match std::fs::read_to_string(config_path) {
                 Ok(content) => {

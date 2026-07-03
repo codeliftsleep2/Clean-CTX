@@ -149,3 +149,71 @@ fn diff_code_context_changed_file_produces_diff() {
         result
     );
 }
+
+// ── P3-21: Tool name cross-verification test ────────────────────────
+
+/// P3-21: Verify that `tool_list()` and the handler registry contain
+/// matching tool names. A tool added to one but not the other would
+/// either not appear in the list or not be dispatchable.
+#[test]
+fn p3_21_tool_names_match_tool_list_and_registry() {
+    use crate::mcp::tool_handlers::registry::create_default_registry;
+
+    // Get tool names from tool_list()
+    let tool_list_names: std::collections::HashSet<String> = tool_list()
+        .into_iter()
+        .filter_map(|t| t.get("name").and_then(|n| n.as_str().map(str::to_string)))
+        .collect();
+
+    // Get tool names from the registry
+    let registry_names: std::collections::HashSet<String> = create_default_registry()
+        .tool_names()
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    // Get inline tool names (tools dispatched directly in tools.rs)
+    let inline_names: std::collections::HashSet<String> = {
+        let mut set = std::collections::HashSet::new();
+        // Inline tools from dispatch_tools_call() in tools.rs
+        set.insert("decompress_code_context".to_string());
+        set.insert("compress_workspace".to_string());
+        set.insert("graph_search".to_string());
+        set.insert("graph_query".to_string());
+        set.insert("graph_trace".to_string());
+        set.insert("get_architecture".to_string());
+        set.insert("get_cbm_status".to_string());
+        set.insert("cbm_proxy".to_string());
+        set
+    };
+
+    // Verify: every tool in tool_list is either inline or in registry (or both)
+    for name in &tool_list_names {
+        let in_inline = inline_names.contains(name);
+        let in_registry = registry_names.contains(name);
+        assert!(
+            in_inline || in_registry,
+            "P3-21: Tool '{}' in tool_list() is neither inline nor in registry!",
+            name
+        );
+    }
+
+    // Verify: no tool is in both inline and registry (double-fire hazard)
+    let intersection: Vec<_> = inline_names.intersection(&registry_names).collect();
+    assert!(
+        intersection.is_empty(),
+        "P3-21: Tools in both inline and registry (double-fire hazard): {:?}",
+        intersection
+    );
+
+    // Verify: union of inline + registry equals tool_list
+    let union: std::collections::HashSet<String> = inline_names.union(&registry_names).cloned().collect();
+    assert_eq!(
+        tool_list_names, union,
+        "P3-21: tool_list() names don't match inline + registry union.\n\
+         In tool_list but not in union: {:?}\n\
+         In union but not in tool_list: {:?}",
+        tool_list_names.difference(&union).collect::<Vec<_>>(),
+        union.difference(&tool_list_names).collect::<Vec<_>>()
+    );
+}

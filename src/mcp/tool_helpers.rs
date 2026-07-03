@@ -104,9 +104,8 @@ pub(super) fn compile_file_ir(
     use crate::ir::layers::csharp::CSharpLayer;
     use crate::ir::layers::rust::RustLayer;
     use crate::ir::layers::java::JavaLayer;
-    use crate::ir::layers::angular::AngularMetaLayer;
-    use crate::ir::layers::spring::SpringMetaLayer;
-    use crate::ir::layers::dotnet::DotNetMetaLayer;
+    // P0-4: Meta-layers are now handled by LayerRegistry::global() inside IRCompiler.
+    // The old ir::layers::angular/spring/dotnet modules have been removed.
     use crate::compression::language::language_for_extension;
 
     // Use source_cache via state.read_source() — Finding 1
@@ -153,19 +152,9 @@ pub(super) fn compile_file_ir(
         _ => {}
     }
 
-    // Add framework meta layers (Layer 3)
-    match extension {
-        "ts" | "js" => {
-            compiler.add_meta_layer(Box::new(AngularMetaLayer::new()));
-        }
-        "java" => {
-            compiler.add_meta_layer(Box::new(SpringMetaLayer::new()));
-        }
-        "cs" => {
-            compiler.add_meta_layer(Box::new(DotNetMetaLayer::new()));
-        }
-        _ => {}
-    }
+    // P0-4: Framework meta-layers (Layer 3) are now handled by LayerRegistry::global()
+    // inside IRCompiler::compile(). Meta-layers are registered in src/layers/meta/
+    // and wired via McpState -> LayerRegistry. No manual add_meta_layer() needed.
 
     // F-07 (FAANG audit): Wire the additive CodePatternRecognizer into
     // the compile path. This is the Layer 4 additive recognizer that

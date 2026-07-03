@@ -10,10 +10,13 @@
 // The output is a single-line shape summary suitable for a `Φtpl:`
 // marker in the workspace manifest.
 
+#[cfg(feature = "angular")]
 use std::sync::OnceLock;
+#[cfg(feature = "angular")]
 use tree_sitter::{Language, Parser};
 
 /// Default maximum nesting depth for tag extraction.
+#[cfg(feature = "angular")]
 const DEFAULT_DEPTH: usize = 4;
 
 /// Cached tree-sitter `Language` (F-ANG-18). `tree_sitter_html::language()`
@@ -214,6 +217,7 @@ pub fn extract_template_shape_with_depth(html: &str, depth: usize) -> TemplateSh
 ///     attribute
 ///       attribute_name
 /// ```
+#[cfg(feature = "angular")]
 fn walk_node(
     node: tree_sitter::Node,
     source: &str,
@@ -273,6 +277,7 @@ fn walk_node(
 /// (`<app-heavy />`) as an `element` wrapping a `self_closing_tag`
 /// child, rather than having a `start_tag` child. We must check for
 /// both structures.
+#[cfg(feature = "angular")]
 fn process_element_node(
     node: tree_sitter::Node,
     source: &str,
@@ -319,6 +324,7 @@ fn process_element_node(
 }
 
 /// Process a `self_closing_tag` node (e.g. `<app-avatar />`).
+#[cfg(feature = "angular")]
 fn process_self_closing_tag_node(
     node: tree_sitter::Node,
     source: &str,
@@ -351,6 +357,7 @@ fn process_self_closing_tag_node(
 }
 
 /// Capture an attribute name into the appropriate binding/directive category.
+#[cfg(feature = "angular")]
 fn capture_attribute(attr_name: &str, shape: &mut TemplateShape) {
     // Structural directives: *ngIf, *ngFor, *ngSwitch, etc.
     if let Some(directive) = attr_name.strip_prefix('*') {
@@ -384,6 +391,7 @@ fn capture_attribute(attr_name: &str, shape: &mut TemplateShape) {
 /// Uses word-boundary heuristics: the `@keyword` must be preceded by
 /// start-of-text, whitespace, `{`, or `}`; and followed by whitespace,
 /// `(`, `{`, `;`, or end-of-text.
+#[cfg(feature = "angular")]
 fn contains_at_keyword(text: &str, keyword: &str) -> bool {
     let needle = format!("@{}", keyword);
     let mut search_start = 0;
@@ -417,6 +425,7 @@ fn contains_at_keyword(text: &str, keyword: &str) -> bool {
 
 /// Check if `text` contains `@defer (on <trigger>)` and return
 /// the trigger name(s) found.
+#[cfg(feature = "angular")]
 fn extract_defer_triggers(text: &str) -> Vec<String> {
     let mut triggers = Vec::new();
     let mut search_start = 0;
@@ -444,6 +453,7 @@ fn extract_defer_triggers(text: &str) -> Vec<String> {
 
 /// Extract modern Angular syntax tokens (@if, @for, @switch, @defer,
 /// @let, etc.) from a text node.
+#[cfg(feature = "angular")]
 fn extract_modern_syntax_from_text(text: &str, shape: &mut TemplateShape) {
     // --- Control-flow blocks (non-defer) ---
 
@@ -495,6 +505,7 @@ fn extract_modern_syntax_from_text(text: &str, shape: &mut TemplateShape) {
 }
 
 /// Find the first child of `node` with the given kind.
+#[cfg(feature = "angular")]
 fn find_child<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
     let mut cursor = node.walk();
     node.children(&mut cursor).find(|&child| child.kind() == kind)
@@ -502,6 +513,7 @@ fn find_child<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter
 
 /// Extract the tag name from an `element` node by finding its
 /// `start_tag` child and then the `tag_name` within it.
+#[cfg(feature = "angular")]
 fn extract_tag_name_from_element(
     node: tree_sitter::Node,
     source: &str,
@@ -521,6 +533,7 @@ fn extract_tag_name_from_element(
 
 /// Extract Angular-specific attributes (bindings, directives) from
 /// a `start_tag` node.
+#[cfg(feature = "angular")]
 fn extract_attributes(
     start_tag: tree_sitter::Node,
     source: &str,

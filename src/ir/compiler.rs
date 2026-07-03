@@ -20,7 +20,7 @@
 use crate::compaction::{extract_class_name, extract_field, extract_method_sig, extract_rust_struct_name};
 use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::Fidelity;
-use super::layers::{LanguageLayer, LayerContext, MetaLayer, PatternRecognizer};
+use super::layers::{LanguageLayer, LayerContext, PatternRecognizer};
 use super::opcodes::*;
 use super::symbol_table::SymbolKind;
 use super::compiler_methods::resolve_forward_aliases;
@@ -83,8 +83,6 @@ pub struct IRCompiler {
     current_class: Option<String>,
     /// Language-specific layers (Layer 2)
     language_layers: Vec<Box<dyn LanguageLayer>>,
-    /// Framework meta layers (Layer 3)
-    meta_layers: Vec<Box<dyn MetaLayer>>,
     /// Pattern recognizers (Layer 4)
     pattern_recognizers: Vec<Box<dyn PatternRecognizer>>,
 }
@@ -97,7 +95,6 @@ impl IRCompiler {
             current_method_flags: Vec::new(),
             current_class: None,
             language_layers: Vec::new(),
-            meta_layers: Vec::new(),
             pattern_recognizers: Vec::new(),
         }
     }
@@ -105,11 +102,6 @@ impl IRCompiler {
     /// Add a language layer (Layer 2).
     pub fn add_language_layer(&mut self, layer: Box<dyn LanguageLayer>) {
         self.language_layers.push(layer);
-    }
-
-    /// Add a meta layer (Layer 3).
-    pub fn add_meta_layer(&mut self, layer: Box<dyn MetaLayer>) {
-        self.meta_layers.push(layer);
     }
 
     /// Add a pattern recognizer (Layer 4).
@@ -452,9 +444,23 @@ impl IRCompiler {
             })
             .collect();
 
-        for ml in self.meta_layers.iter_mut() {
-            let meta_ops = ml.extract(source, &class_names, fidelity);
-            instructions.extend(meta_ops);
+        // P0-4: Use canonical LayerRegistry instead of removed ir::layers::MetaLayer trait.
+        // Meta-layers are registered in src/layers/meta/ and wired via McpState -> LayerRegistry.
+        let meta_results = crate::layers::LayerRegistry::global()
+            .run_meta_layers_pipeline(source, &class_names, fidelity);
+        for (_layer_name, block_text) in &meta_results {
+            // Parse Φ marker lines into CoreOp instructions for IR enrichment.
+            for line in block_text.lines() {
+                let line = line.trim();
+                if line.is_empty() || !line.starts_with('Φ') {
+                    continue;
+                }
+                let content = line.strip_prefix('Φ').unwrap_or(line);
+                if let Some((prefix, text)) = content.split_once(':') {
+                    let alias = format!("@{}", prefix);
+                    instructions.push(CoreOp::TypeAlias(alias, text.to_string()));
+                }
+            }
         }
 
         // ── Layer 4: Pattern recognition (F-03) ────────────────────────

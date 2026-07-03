@@ -51,8 +51,10 @@ pub fn cbm_informed_fidelity(
     let mut any_match = false;
 
     for info in symbol_importance.values() {
-        // Check if this symbol's file path matches our target
-        if !file_path.contains(&info.file) && !info.file.contains(file_path) {
+        // P1-11: Use proper path matching instead of contains().
+        // Before fix: file_path.contains(&info.file) — false positives on substring matches.
+        // "user.rs" would match "src/user_service.rs" and "api.rs" would match "src/api_handler.rs".
+        if !path_matches(file_path, &info.file) {
             continue;
         }
         any_match = true;
@@ -95,9 +97,8 @@ pub fn build_cbm_skip_set(
     let mut skip = HashSet::new();
     for info in symbol_importance.values() {
         if info.score < 0.4 {
-            // Check if this symbol's file matches our target
-            let path_match = file_path.contains(&info.file) || info.file.contains(file_path);
-            if path_match {
+            // P1-11: Use proper path matching instead of contains().
+            if path_matches(file_path, &info.file) {
                 skip.insert(info.symbol.clone());
             }
         }
@@ -114,6 +115,16 @@ pub fn apply_recommendation(rec: &FidelityRecommendation) -> Option<Fidelity> {
         FidelityRecommendation::ForceLow => Some(Fidelity::Low),
         FidelityRecommendation::NoRecommendation => None,
     }
+}
+
+/// P1-11: Proper path matching — checks if two file paths point to the same file.
+/// Uses path segment matching instead of string contains() to avoid false positives.
+/// For example, "user.rs" should NOT match "src/user_service.rs".
+fn path_matches(file_path: &str, target_file: &str) -> bool {
+    let path = std::path::Path::new(file_path);
+    let target = std::path::Path::new(target_file);
+    // Match if paths are equal, or one ends with the other (subpath match)
+    path == target || path.ends_with(target) || target.ends_with(path)
 }
 
 #[cfg(test)]

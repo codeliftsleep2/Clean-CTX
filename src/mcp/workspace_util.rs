@@ -7,9 +7,11 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::angular_meta::decorators;
 use crate::compression::Fidelity;
 use crate::mcp::McpState;
+#[cfg(feature = "angular")]
+use crate::angular_meta::decorators;
+#[cfg(feature = "angular")]
 use crate::angular_meta::footer::FooterBuilder;
 
 // F-19: Streaming directory walker (replaces recursive collect-then-sort)
@@ -49,6 +51,7 @@ pub(crate) fn format_manifest_header(
 
 /// Format the manifest footer: excluded files, errors, path map,
 /// and bundle footer.
+#[cfg(feature = "angular")]
 pub(crate) fn format_manifest_footer(
     state: &McpState,
     ctx: &PassContextRef,
@@ -87,12 +90,14 @@ pub(crate) fn format_manifest_footer(
 
 /// Minimal reference to PassContext fields needed by format_manifest_footer.
 /// Avoids a circular dependency on the full PassContext struct.
+#[cfg(feature = "angular")]
 pub(crate) struct PassContextRef<'a> {
     pub excluded: &'a [(String, Vec<String>)],
     pub errors: &'a [(String, String)],
 }
 
 /// Extract the triplet name from a component path.
+#[cfg(feature = "angular")]
 pub(crate) fn triplet_name(path: &Path) -> String {
     path.file_stem()
         .and_then(|n| n.to_str())
@@ -188,6 +193,7 @@ fn is_skipped_dir(entry: &walkdir::DirEntry) -> bool {
 ///
 /// Used by Phase 3 (cross-file graph) to feed class text into
 /// `decorators::extract_graph_entries`.
+#[cfg(feature = "angular")]
 pub(crate) fn extract_class_blocks(source: &str) -> Vec<String> {
     let mut blocks = Vec::new();
     let mut cursor = 0;
@@ -218,6 +224,7 @@ pub(crate) fn extract_class_blocks(source: &str) -> Vec<String> {
 }
 
 /// Find the next occurrence of `class ` (with trailing space) in `text`.
+#[cfg(feature = "angular")]
 fn find_next_class_keyword(text: &str) -> Option<usize> {
     text.find("class ")
 }
@@ -227,6 +234,7 @@ fn find_next_class_keyword(text: &str) -> Option<usize> {
 /// `class_pos` if no decorator found). Handles TypeScript modifier
 /// keywords (`export`, `abstract`, `default`, `declare`) that may
 /// appear between the decorator and the class keyword.
+#[cfg(feature = "angular")]
 fn find_decorator_start(source: &str, class_pos: usize) -> usize {
     let bytes = source.as_bytes();
     let mut i = class_pos;

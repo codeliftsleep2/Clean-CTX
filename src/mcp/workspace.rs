@@ -29,7 +29,6 @@
 // extracted to `workspace_util.rs`.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::time::SystemTime;
@@ -41,6 +40,8 @@ use crate::mcp::McpState;
 // Phase 5: Angular meta-layer imports are gated by the `angular` feature.
 // When disabled, these modules are not compiled and the bundling/graph
 // passes become no-ops.
+#[cfg(feature = "angular")]
+use std::sync::Arc;
 #[cfg(feature = "angular")]
 use crate::angular_meta::bundler;
 #[cfg(feature = "angular")]
@@ -57,11 +58,10 @@ use crate::angular_meta::style;
 use super::workspace_util::{
     COMPRESSIBLE_EXTENSIONS,
     collect_source_files,
-    extract_class_blocks,
     format_manifest_header,
-    triplet_name,
-    PassContextRef,
 };
+#[cfg(feature = "angular")]
+use super::workspace_util::{extract_class_blocks, triplet_name, PassContextRef};
 
 // format_manifest_footer is only available when angular is enabled
 #[cfg(feature = "angular")]
@@ -796,12 +796,14 @@ fn graph_pass(state: &McpState, ctx: &mut PassContext, manifest: &mut String) {
 /// Stub FooterBuilder for when Angular is disabled.
 /// Provides the same API but all methods are no-ops.
 #[cfg(not(feature = "angular"))]
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
 pub struct FooterBuilder {
     _private: (),
 }
 
 #[cfg(not(feature = "angular"))]
+#[allow(dead_code)]
 impl FooterBuilder {
     pub fn new() -> Self {
         Self { _private: () }
@@ -827,6 +829,7 @@ impl FooterBuilder {
 }
 
 #[cfg(not(feature = "angular"))]
+#[allow(dead_code)]
 fn bundle_pass(
     _state: &McpState,
     _ctx: &PassContext,
@@ -836,6 +839,7 @@ fn bundle_pass(
 }
 
 #[cfg(not(feature = "angular"))]
+#[allow(dead_code)]
 fn graph_pass(_state: &McpState, _ctx: &mut PassContext, _manifest: &mut String) {
     // no-op
 }
