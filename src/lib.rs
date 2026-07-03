@@ -44,3 +44,7 @@ pub mod error;
 pub mod tokenizer;
 pub mod observability;
 
+// Integration tests module
+#[cfg(test)]
+mod tests;
+

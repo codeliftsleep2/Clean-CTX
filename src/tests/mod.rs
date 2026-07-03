@@ -4,3 +4,7 @@
 // compiled. The actual test modules are loaded via `#[path]` attributes from
 // their respective source files, so this file serves as documentation and a
 // compilation anchor.
+
+// Integration tests for cross-module interactions
+#[cfg(test)]
+mod integration;
