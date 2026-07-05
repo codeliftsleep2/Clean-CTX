@@ -1,8 +1,8 @@
-# .NET / C# Meta-Layer Plan
+# .NET / C# Meta-Layer
 
-> **Status:** 📋 proposed · **Last updated:** 2026-07-01
+> **Status:** ✅ Complete · **Last updated:** 2026-07-03
 >
-> **Target:** Phase 1 (C# Core) — 5-7 days · Phase 2 (Angular Ecosystem) — 4-6 days · Phase 3 (Integration) — 3-5 days
+> **Implementation:** Phase 1 (C# Core) complete with full ASP.NET Core, EF Core, SignalR, AutoMapper, and DI support. The .NET meta-layer is now integrated and available via the dotnet Cargo feature flag (enabled by default).
 
 ---
 
