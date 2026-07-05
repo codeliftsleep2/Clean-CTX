@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-07-01 (R-41/R-42 complete ✅ — all v0.2.0 items done)
+**Last updated:** 2026-07-04 (R-43a/R-43b planned 📋 — IR Evolution Plan)
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -11,7 +11,7 @@
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
 | **Now** | v0.2.0 | Real-world ready | ✅ 0 (all complete) |
-| **Next** | v0.3.0 | Advanced capabilities | 8 |
+| **Next** | v0.3.0 | Advanced capabilities | 11 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
 | **Architectural** | Continuous | Code health & tooling | 3 (A-01, A-03, A-05) |
 | **Community** | Continuous | Docs & marketing | 5 |
@@ -81,6 +81,8 @@ All Foundation items (A-09 through A-15), all Now items (F-19 through F-22, A-08
 | **R-36** | React Meta-Layer | Additive meta-layer on TS/JS. Component/hook/context bundling, prop type compression, React-specific lifecycle markers. **A-11 ✅ (complete)** — now unblocked. | 3-4 days | 🔴 High |
 | **R-37** | Redux Meta-Layer | Additive meta-layer on TS/JS. Action/reducer/selector compression, thunk/saga patterns, store shape compression. **A-11 ✅ (complete)** — now unblocked. | 2-3 days | 🔴 High |
 | **R-23** | NgRx Meta-Layer | Framework-annotation layer for NgRx state management (sits on top of TS + Angular layers). **A-11 ✅ (complete)** — now unblocked. | 3-4 days | 🔴 High |
+| **R-43a** | IR Evolution — Execution Semantics (Phase 1) | Add 4 new `CoreOp` variants (DataFlow, ControlFlow, SideEffect, ExecutionContext) for behavioral reasoning. Rust PoC + C# SignalR/EF Core pilot + TypeScript RxJS/Angular. See [`docs/IR_EVOLUTION_PLAN.md`](IR_EVOLUTION_PLAN.md). | 4-5 days | 🔴 High |
+| **R-43b** | IR Evolution — Program Graph + Inference Layer + Semantic Delta + Validation + Query (Phases 2-6) | Local program graph, `InferenceLayer` with confidence scores, explicit pass pipeline (`IRPass` trait), semantic delta detection, IR validation engine, queryable IR with CBM fallback. See [`docs/IR_EVOLUTION_PLAN.md`](IR_EVOLUTION_PLAN.md). | 5-8 days | 🟡 Medium |
 | **R-01b** | Go language layer | Second-most requested. | 1-2 days | 🟡 Medium |
 | **R-07** | MCP `resources` support | Expose compressed snapshots as MCP resources in addition to tools, enabling LLM clients to read prior state without re-invoking tools. | 1-2 days | 🟡 Medium |
 | **R-08** | Improved diff: rename detection | Detect class/method renames (same signature, different name) and emit as `~` with a `renamed from X` hint instead of a delete+add pair. | 1 day | 🟡 Medium |
@@ -175,6 +177,8 @@ All gates clear. Meta-layer items are now unblocked (A-11 ✅). Sliding Context 
 | 🔴 High | R-36 React Meta-Layer | A-11 ✅ |
 | 🔴 High | R-37 Redux Meta-Layer | A-11 ✅ |
 | 🔴 High | R-23 NgRx Meta-Layer | A-11 ✅ |
+| 🔴 High | R-43a IR Evolution — Execution Semantics (Phase 1) | None (builds on existing IR) |
+| 🟡 Medium | R-43b IR Evolution — Program Graph + Inference Layer + Semantic Delta + Validation + Query (Phases 2-6) | R-43a ✅ |
 | 🟡 Medium | R-01b Go language layer | None |
 | 🟡 Medium | R-07 MCP resources support | None |
 | 🟡 Medium | R-08 Improved diff: rename detection | None |
