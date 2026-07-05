@@ -105,8 +105,22 @@ Location: Project root (walks up from current directory to find it)
 | `RATE_LIMIT_RPS` | Max requests per second per client IP | `60` |
 | `RATE_LIMIT_BURST` | Max burst size for rate limiter | `10` |
 | `MAX_REQUEST_BODY_SIZE` | Max request body size in bytes | `10485760` (10 MB) |
-| `PORT` | Proxy server port | `8080` |
+| `PORT` | Proxy server port | `8787` |
 | `UPSTREAM_URL` | Upstream API URL | `https://api.anthropic.com` |
+| `ANTHROPIC_BASE_URL` | Upstream API base URL (alias for UPSTREAM_URL) | `https://api.anthropic.com` |
+| `AUTO_CACHE` | Enable cache breakpoint injection (Anthropic only) | `false` |
+| `TAIL_TTL` | TTL for the rolling-tail breakpoint | `5m` |
+| `SLIDING_WINDOW` | Enable sliding context window (age-based tool-result truncation) | `false` |
+| `SLIDING_WINDOW_MAX_AGE` | Max age in turns before a tool result is aged | `20` |
+| `SLIDING_WINDOW_FLOOR` | Number of most recent turns to always preserve | `15` |
+| `STRIP_ANSI` | Strip ANSI escape codes from text blocks | `false` |
+| `TRIM_BASH_GIT` | Truncate Bash tool description at "Committing changes" | `false` |
+| `MODEL_OVERRIDE` | Override model name in every request | _(none)_ |
+| `LOG_BODIES` | Log request/response bodies to disk | `false` |
+| `LOG_DIR` | Directory for log files | `.clean-ctx/proxy-logs` |
+| `SCRUB_SECRETS` | Enable secret scrubbing in tool results | `false` |
+| `TOOL_FILTERS` | Enable tool output filtering (TOML-based) | `false` |
+| `PLATFORM` | Override platform detection (`anthropic`, `openai`, `generic`) | _(auto-detect)_ |
 
 ### CI/CD Environment Variables
 

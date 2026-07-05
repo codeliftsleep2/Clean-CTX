@@ -253,7 +253,14 @@ src/
 │   ├── router.rs                 # JSON-RPC method dispatch
 │   ├── handlers.rs               # initialize, tools/list, prompts/list
 │   ├── tools.rs                  # Tool definitions + get_tool_definitions()
-│   ├── tool_handlers.rs          # Tool handler implementations (handle_*)
+│   ├── tool_handlers/            # Tool handler implementations (handle_*)
+│   │   ├── mod.rs              # Tool handler module root
+│   │   ├── core.rs             # Core tool handlers (compress, decompress, diff, delta)
+│   │   ├── registry.rs         # Tool handler registry
+│   │   ├── traits.rs           # Tool handler trait definitions
+│   │   ├── context/            # Context-related tool handlers
+│   │   ├── persistence/        # Persistence-related tool handlers
+│   │   └── stats/              # Stats-related tool handlers
 │   ├── tool_helpers.rs           # Shared helper functions for tool handlers
 │   ├── prompts.rs                # cleanctx-notation + dashboard prompt content
 │   ├── workspace.rs              # compress_workspace_dir + collect_source_files
@@ -263,7 +270,9 @@ src/
 │   ├── context_store.rs          # ContextStore trait + InMemoryContextStore
 │   ├── sqlite_store.rs           # SqliteStore (SQLite-backed ContextStore)
 │   ├── buffered_store.rs         # BufferedStore (three-tier persistence wrapper)
-│   └── session_stats.rs          # SessionStats + dashboard rendering
+│   ├── session_stats.rs          # SessionStats + dashboard rendering
+│   ├── cache_hints.rs          # Cache hint generation for JSON-RPC responses
+│   └── proxy_stats.rs          # Proxy statistics fetcher (GET /stats endpoint)
 │
 ├── compression/                  # Core compression engine
 │   ├── mod.rs                    # Public API: compress_file, CompressionProgress

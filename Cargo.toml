@@ -11,10 +11,10 @@ license = "CC0-1.0"
 description = "Token Waste Reducer & Context Compiler - Local-first AST compression engine for LLM token optimization"
 
 [features]
-# Default: minimal — TypeScript only (most common use case).
-# Add csharp, rust, java for language support.
-# Add angular, spring_boot, dotnet for framework meta-layers.
-default = ["typescript"]
+# Default: TypeScript + C# + Angular + .NET (most common full-stack combination).
+# Add rust, java for additional language support.
+# Add spring_boot for Java framework support.
+default = ["typescript", "csharp", "angular", "dotnet"]
 
 # Language layers (each enables a tree-sitter grammar)
 typescript = ["dep:tree-sitter-typescript"]
