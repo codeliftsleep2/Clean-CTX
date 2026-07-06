@@ -51,7 +51,7 @@ fn resolve_fidelity_invalid_string_falls_back_to_default() {
 #[test]
 fn resolve_fidelity_extension_override() {
     let mut config = crate::config::CleanCtxConfig::default();
-    config.fidelity_overrides.insert("ts".to_string(), "high".to_string());
+    config.fidelity_overrides.insert("ts".to_string(), crate::compression::Fidelity::High);
     let result = resolve_fidelity(None, Some("ts"), &config);
     assert_eq!(result, Fidelity::High);
 }

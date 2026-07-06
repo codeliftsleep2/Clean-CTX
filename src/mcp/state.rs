@@ -159,6 +159,11 @@ pub struct McpState {
     /// Layer registry for language/meta-layer dispatch.
     /// Initialized once at startup from the enabled Cargo features.
     pub registry: LayerRegistry,
+
+    /// A-04: Metrics registry for operational signals.
+    /// Provides counters, histograms, and gauges for key metrics.
+    /// Thread-safe; can be shared across the server via `&MetricsRegistry`.
+    pub metrics_registry: std::sync::Arc<crate::observability::MetricsRegistry>,
 }
 
 impl McpState {
@@ -228,6 +233,7 @@ impl McpState {
             cbm_status,
             proxy_port: 8787,
             registry: LayerRegistry::new(),
+            metrics_registry: std::sync::Arc::new(crate::observability::MetricsRegistry::new()),
         }
     }
 

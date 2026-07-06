@@ -96,7 +96,7 @@ fn dispatcher_concurrent_no_data_race() {
         let counter = Arc::clone(&counter);
         dispatcher.spawn(&test_request(&i.to_string(), "test"), move |state| {
             let _ = state.proxy_port;
-            let _ = state.config.default_fidelity.clone();
+            let _ = state.config.default_fidelity;
             state.get_or_create_alias("test.ts".to_string());
             counter.fetch_add(1, Ordering::SeqCst);
         }).expect("spawn should succeed");

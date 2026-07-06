@@ -25,6 +25,23 @@ pub enum Fidelity {
     High,
 }
 
+impl serde::Serialize for Fidelity {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(match self {
+            Fidelity::Low => "low",
+            Fidelity::Medium => "medium",
+            Fidelity::High => "high",
+        })
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Fidelity {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Fidelity::parse(&s).map_err(serde::de::Error::custom)
+    }
+}
+
 /// Returned by [`Fidelity::parse`] when the input is not one of the
 /// recognised fidelity strings. The offending value is preserved in
 /// [`FidelityParseError::0`] for diagnostic purposes.

@@ -299,7 +299,7 @@ fn fidelity_from_complexity(
     }
 
     // Very small files: config default
-    Fidelity::parse_or_default(&config.default_fidelity)
+    config.default_fidelity
 }
 
 // ── Fidelity Resolution (V2) ───────────────────────────────────────
@@ -346,8 +346,7 @@ fn resolve_fidelity(
             "implement" => &config.smart_defaults.implement,
             _ => &config.default_fidelity,
         };
-        let f = Fidelity::parse_or_default(mapped);
-        return (f, FileClass::General);
+        return (*mapped, FileClass::General);
     }
 
     // Priority 3: file name matches force_high_fidelity patterns
@@ -394,7 +393,7 @@ fn resolve_fidelity(
     }
 
     // Priority 6: config default
-    (Fidelity::parse_or_default(&config.default_fidelity), FileClass::General)
+    (config.default_fidelity, FileClass::General)
 }
 
 /// Check if a file is likely an Angular file by scanning its source.

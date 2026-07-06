@@ -233,11 +233,11 @@ pub(crate) fn resolve_fidelity(
         return f;
     }
     if let Some(e) = ext
-        && let Some(s) = config.get_fidelity_for_extension(e)
+        && let Some(f) = config.get_fidelity_for_extension(e)
     {
-        return Fidelity::parse_or_default(s);
+        return f;
     }
-    Fidelity::parse_or_default(&config.default_fidelity)
+    config.default_fidelity
 }
 
 static HANDLER_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> = std::sync::OnceLock::new();

@@ -5,31 +5,54 @@
 // `init` subcommand, it creates a default `.clean-ctx.json` config
 // and `.clean-ctx/` directory in the current directory.
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = std::env::args().collect();
+use clap::Parser;
 
-    if args.len() > 1 && args[1] == "init" {
-        return cmd_init();
-    }
-
-    if args.len() > 1 && args[1] == "setup" && args.get(2).map(|s| s.as_str()) == Some("--with-cbm") {
-        let force = args.get(3).map(|s| s.as_str()) == Some("--force");
-        return cmd_setup_cbm(force);
-    }
-
-    // A-15: --config-dump flag to print resolved configuration
-    if args.len() > 1 && args[1] == "--config-dump" {
-        return cmd_config_dump();
-    }
-
-    // Default: run the MCP server
-    // Note: --with-cbm is the default behavior now (auto-detect CBM on PATH).
-    // Use CBM_DISABLE=1 env var to explicitly disable CBM integration.
-    clean_ctx::mcp::run()
+#[derive(Parser)]
+#[command(
+    name = "clean-ctx",
+    about = "Token Waste Reducer & Context Compiler",
+)]
+enum Cli {
+    /// Create default .clean-ctx.json config and .clean-ctx/ directory
+    Init,
+    /// Check CBM availability and optionally generate config
+    Setup {
+        /// Skip confirmation prompt
+        #[arg(long)]
+        force: bool,
+    },
+    /// Print resolved configuration
+    #[command(name = "--config-dump")]
+    ConfigDump,
 }
 
-/// Handle `clean-ctx setup --with-cbm` — check CBM availability and
-/// optionally generate config.
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Use try_parse_from with args_os to handle the case where no
+    // subcommand is given — clap generates an error for missing subcommand,
+    // but we want to default to running the MCP server.
+    let args: Vec<String> = std::env::args().collect();
+    
+    // Check if any known subcommand/flag is present. If not, run the server.
+    let has_subcommand = args.iter().skip(1).any(|a| {
+        matches!(a.as_str(), "init" | "setup" | "--config-dump")
+    });
+
+    if !has_subcommand {
+        // Default: run the MCP server
+        // Note: --with-cbm is the default behavior now (auto-detect CBM on PATH).
+        // Use CBM_DISABLE=1 env var to explicitly disable CBM integration.
+        return clean_ctx::mcp::run();
+    }
+
+    // Parse and dispatch known subcommands
+    match Cli::parse() {
+        Cli::Init => cmd_init(),
+        Cli::Setup { force } => cmd_setup_cbm(force),
+        Cli::ConfigDump => cmd_config_dump(),
+    }
+}
+
+/// Handle `clean-ctx setup` — check CBM availability and optionally generate config.
 ///
 /// P3-22: Added `--force` flag to skip confirmation prompt. Without `--force`,
 /// the user is prompted to confirm before modifying `.clean-ctx.json`.
