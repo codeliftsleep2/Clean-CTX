@@ -344,6 +344,30 @@ pub struct MetricsSnapshot {
 }
 
 impl MetricsSnapshot {
+    /// Format the snapshot as an OTLP-style JSON string for stdout export.
+    pub fn format_otlp_json(&self) -> String {
+        serde_json::to_string_pretty(&serde_json::json!({
+            "resourceMetrics": [{
+                "resource": { "attributes": [{ "key": "service.name", "value": { "stringValue": "clean-ctx" } }] },
+                "scopeMetrics": [{
+                    "scope": { "name": "clean-ctx.metrics" },
+                    "metrics": [
+                        { "name": "compressions.total", "counter": { "dataPoints": [{ "asInt": self.total_compressions }] } },
+                        { "name": "deltas.total", "counter": { "dataPoints": [{ "asInt": self.total_deltas }] } },
+                        { "name": "cbm.queries", "counter": { "dataPoints": [{ "asInt": self.total_cbm_queries }] } },
+                        { "name": "cache.hits", "counter": { "dataPoints": [{ "asInt": self.cache_hits }] } },
+                        { "name": "cache.misses", "counter": { "dataPoints": [{ "asInt": self.cache_misses }] } },
+                        { "name": "compression.latency.mean", "gauge": { "dataPoints": [{ "asDouble": self.compression_latency.mean }] } },
+                        { "name": "delta.latency.mean", "gauge": { "dataPoints": [{ "asDouble": self.delta_latency.mean }] } },
+                        { "name": "cbm.latency.mean", "gauge": { "dataPoints": [{ "asDouble": self.cbm_latency.mean }] } },
+                        { "name": "active.workers", "gauge": { "dataPoints": [{ "asInt": self.active_workers }] } },
+                        { "name": "queue.depth", "gauge": { "dataPoints": [{ "asInt": self.queue_depth }] } },
+                    ]
+                }]
+            }]
+        })).unwrap_or_default()
+    }
+
     /// Format the snapshot as a human-readable string for the dashboard.
     pub fn format_dashboard(&self) -> String {
         let mut out = String::new();

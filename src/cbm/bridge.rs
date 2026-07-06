@@ -161,7 +161,12 @@ impl GraphBridge {
 
         let client = if config.enabled {
             match binary_path {
-                Some(path) => match CbmClient::try_launch(&path, Duration::from_millis(config.query_timeout_ms)) {
+                Some(path) => match CbmClient::try_launch(
+                    &path,
+                    Duration::from_millis(config.query_timeout_ms),
+                    config.max_retries,
+                    config.circuit_cooldown_secs,
+                ) {
                     Ok(Some(c)) => {
                         eprintln!("[clean-ctx-cbm] Launched from: {}", path.display());
                         Some(c)

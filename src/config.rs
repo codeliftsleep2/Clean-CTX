@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use crate::compression::Fidelity;
 use crate::tokenizer::TokenizerKind;
 
 // ── Smart defaults for intent-based fidelity selection ──────────────
@@ -18,19 +19,19 @@ use crate::tokenizer::TokenizerKind;
 pub struct SmartDefaults {
     /// Fidelity for refactoring tasks — requires full structural detail.
     #[serde(default = "default_sd_refactor")]
-    pub refactor: String,
+    pub refactor: Fidelity,
     /// Fidelity for overview/summary tasks — maximum compression.
     #[serde(default = "default_sd_overview")]
-    pub overview: String,
+    pub overview: Fidelity,
     /// Fidelity for debugging tasks — balanced detail vs compression.
     #[serde(default = "default_sd_debug")]
-    pub debug: String,
+    pub debug: Fidelity,
     /// Fidelity for editing tasks — maximum compression, delta-friendly.
     #[serde(default = "default_sd_edit")]
-    pub edit: String,
+    pub edit: Fidelity,
     /// Fidelity for implementation tasks — moderate detail.
     #[serde(default = "default_sd_implement")]
-    pub implement: String,
+    pub implement: Fidelity,
 }
 
 impl Default for SmartDefaults {
@@ -45,11 +46,11 @@ impl Default for SmartDefaults {
     }
 }
 
-fn default_sd_refactor() -> String { "high".to_string() }
-fn default_sd_overview() -> String { "low".to_string() }
-fn default_sd_debug() -> String { "medium".to_string() }
-fn default_sd_edit() -> String { "low".to_string() }
-fn default_sd_implement() -> String { "medium".to_string() }
+fn default_sd_refactor() -> Fidelity { Fidelity::High }
+fn default_sd_overview() -> Fidelity { Fidelity::Low }
+fn default_sd_debug() -> Fidelity { Fidelity::Medium }
+fn default_sd_edit() -> Fidelity { Fidelity::Low }
+fn default_sd_implement() -> Fidelity { Fidelity::Medium }
 
 // ── Heuristics configuration ───────────────────────────────────────
 
@@ -286,7 +287,7 @@ pub struct CleanCtxConfig {
 
     /// Fidelity override per file extension
     #[serde(default)]
-    pub fidelity_overrides: BTreeMap<String, String>,
+    pub fidelity_overrides: BTreeMap<String, Fidelity>,
 
     /// File/directory patterns to exclude from compression.
     ///
@@ -305,7 +306,7 @@ pub struct CleanCtxConfig {
 
     /// Default fidelity level if not specified
     #[serde(default = "default_fidelity")]
-    pub default_fidelity: String,
+    pub default_fidelity: Fidelity,
 
     /// Whether to enable diff-aware compression
     #[serde(default = "default_true")]
@@ -379,6 +380,10 @@ pub struct CleanCtxConfig {
     /// fidelity for high- or low-importance files.
     #[serde(default)]
     pub intelligence: IntelligenceConfig,
+
+    /// Observability configuration for metrics export.
+    #[serde(default)]
+    pub observability: ObservabilityConfig,
 }
 
 /// Intelligence Layer configuration.
@@ -425,6 +430,28 @@ fn default_max_blast_radius() -> usize {
     10
 }
 
+/// Observability configuration for metrics export.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObservabilityConfig {
+    /// Enable periodic metrics export to stdout. Default: false.
+    #[serde(default)]
+    pub export_metrics: bool,
+    /// Interval in seconds between metrics snapshots. Default: 60.
+    #[serde(default = "default_export_interval")]
+    pub export_interval_secs: u64,
+}
+
+impl Default for ObservabilityConfig {
+    fn default() -> Self {
+        Self {
+            export_metrics: false,
+            export_interval_secs: default_export_interval(),
+        }
+    }
+}
+
+fn default_export_interval() -> u64 { 60 }
+
 /// Per-framework Meta-Layer configuration.
 ///
 /// Phase 1 ships only the `angular` variant. Future phases will add
@@ -448,8 +475,8 @@ impl Default for MetaLayerConfig {
     }
 }
 
-fn default_fidelity() -> String {
-    "low".to_string()
+fn default_fidelity() -> Fidelity {
+    Fidelity::Low
 }
 
 fn default_true() -> bool {
@@ -477,6 +504,7 @@ impl Default for CleanCtxConfig {
             resource_limits: ResourceLimits::default(),
             cbm: crate::cbm::CbmConfig::default(),
             intelligence: IntelligenceConfig::default(),
+            observability: ObservabilityConfig::default(),
         }
     }
 }
@@ -693,8 +721,8 @@ impl CleanCtxConfig {
     }
 
     /// Get fidelity override for a file extension
-    pub fn get_fidelity_for_extension(&self, ext: &str) -> Option<&str> {
-        self.fidelity_overrides.get(ext).map(|s| s.as_str())
+    pub fn get_fidelity_for_extension(&self, ext: &str) -> Option<Fidelity> {
+        self.fidelity_overrides.get(ext).copied()
     }
 
     /// Generate a default config file content

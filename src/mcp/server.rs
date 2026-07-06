@@ -136,6 +136,24 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // A-PRODUCTION: Wrap state in the production-grade dispatcher.
     let dispatcher = Dispatcher::new(state);
 
+    // A-04: Spawn periodic metrics exporter if enabled in config.
+    if dispatcher.state().config.observability.export_metrics {
+        let interval_secs = dispatcher.state().config.observability.export_interval_secs;
+        let registry = std::sync::Arc::clone(&dispatcher.state().metrics_registry);
+        eprintln!("[clean-ctx] Metrics export enabled (every {}s)", interval_secs);
+        std::thread::Builder::new()
+            .name("metrics-exporter".into())
+            .spawn(move || {
+                let interval = std::time::Duration::from_secs(interval_secs);
+                loop {
+                    std::thread::sleep(interval);
+                    let snapshot = registry.snapshot();
+                    eprintln!("[metrics] {}", snapshot.format_otlp_json());
+                }
+            })
+            .ok();
+    }
+
     let stdin = io::stdin();
     let mut handle = stdin.lock();
 

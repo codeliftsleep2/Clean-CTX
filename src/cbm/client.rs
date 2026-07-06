@@ -53,11 +53,12 @@ pub struct CbmClient {
     consecutive_failures: u32,
     /// When the circuit opened (set to Degraded). None when circuit is closed.
     degraded_since: Option<Instant>,
+    /// Maximum consecutive failures before circuit opens.
+    max_consecutive_failures: u32,
+    /// Cooldown in seconds before circuit resets to half-open.
+    circuit_cooldown_secs: u64,
 }
 
-/// Circuit breaker settings.
-const MAX_CONSECUTIVE_FAILURES: u32 = 3;
-const CIRCUIT_COOLDOWN_SECS: u64 = 30;
 
 /// Determines whether a CBM error is transient and should be retried.
 ///
@@ -89,7 +90,12 @@ impl CbmClient {
     /// into a log file. Without this, if CBM writes enough diagnostic output
     /// (~64KB), the pipe buffer fills and CBM blocks — causing a deadlock
     /// since we only read stdout. (H-1 regression guard).
-    pub fn try_launch(binary_path: &Path, timeout: Duration) -> Result<Option<Self>, CbmError> {
+    pub fn try_launch(
+        binary_path: &Path,
+        timeout: Duration,
+        max_consecutive_failures: u32,
+        circuit_cooldown_secs: u64,
+    ) -> Result<Option<Self>, CbmError> {
         if !binary_path.exists() || !binary_path.is_file() {
             return Ok(None);
         }
@@ -129,6 +135,8 @@ impl CbmClient {
             timeout,
             consecutive_failures: 0,
             degraded_since: None,
+            max_consecutive_failures,
+            circuit_cooldown_secs,
         }))
     }
 
@@ -142,12 +150,12 @@ impl CbmClient {
     /// If the circuit is open but the cooldown has elapsed, it resets
     /// automatically and allows the next call through (half-open state).
     pub(crate) fn circuit_allows(&mut self) -> bool {
-        if self.consecutive_failures < MAX_CONSECUTIVE_FAILURES {
+        if self.consecutive_failures < self.max_consecutive_failures {
             return true;
         }
         // Circuit is open — check if cooldown has elapsed
         if let Some(since) = self.degraded_since {
-            if since.elapsed() >= Duration::from_secs(CIRCUIT_COOLDOWN_SECS) {
+            if since.elapsed() >= Duration::from_secs(self.circuit_cooldown_secs) {
                 // Cooldown elapsed — reset to half-open, allow one try
                 self.consecutive_failures = 0;
                 self.degraded_since = None;
@@ -172,11 +180,11 @@ impl CbmClient {
     /// Record a transient failure — increments the counter, degrades if threshold reached.
     pub(crate) fn record_failure(&mut self) {
         self.consecutive_failures += 1;
-        if self.consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
-            self.status = CbmStatus::Degraded(format!("circuit_open_after_{}_failures", MAX_CONSECUTIVE_FAILURES));
+        if self.consecutive_failures >= self.max_consecutive_failures {
+            self.status = CbmStatus::Degraded(format!("circuit_open_after_{}_failures", self.max_consecutive_failures));
             self.degraded_since = Some(Instant::now());
             eprintln!("[clean-ctx-cbm] Circuit opened after {} consecutive failures",
-                MAX_CONSECUTIVE_FAILURES);
+                self.max_consecutive_failures);
         }
     }
 

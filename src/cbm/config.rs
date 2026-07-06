@@ -35,6 +35,14 @@ pub struct CbmConfig {
     /// Log directory for CBM proxy logs. Relative to project root.
     #[serde(default = "default_log_dir")]
     pub log_dir: String,
+
+    /// Maximum consecutive failures before circuit breaker opens. Default: 3.
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+
+    /// Cooldown in seconds before circuit breaker resets to half-open. Default: 30.
+    #[serde(default = "default_circuit_cooldown_secs")]
+    pub circuit_cooldown_secs: u64,
 }
 
 impl Default for CbmConfig {
@@ -47,6 +55,8 @@ impl Default for CbmConfig {
             query_timeout_ms: default_query_timeout_ms(),
             cbm_min_version: None,
             log_dir: default_log_dir(),
+            max_retries: default_max_retries(),
+            circuit_cooldown_secs: default_circuit_cooldown_secs(),
         }
     }
 }
@@ -56,6 +66,8 @@ fn default_cache_ttl() -> u64 { 300 }
 fn default_enabled() -> bool { true }
 fn default_query_timeout_ms() -> u64 { 30000 }
 fn default_log_dir() -> String { ".clean-ctx/cbm-logs".to_string() }
+fn default_max_retries() -> u32 { 3 }
+fn default_circuit_cooldown_secs() -> u64 { 30 }
 
 /// Status of the CBM integration, surfaced via `get_cbm_status` and `context_stats`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

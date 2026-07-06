@@ -261,7 +261,7 @@ impl BufferedStore {
         // Disable foreign key constraints during reimport to allow
         // append_delta operations to be processed before their
         // corresponding save_context (fallback files may be out of order).
-        let _ = conn.conn.execute_batch("PRAGMA foreign_keys=OFF;");
+        let _ = conn.execute_batch("PRAGMA foreign_keys=OFF;");
 
         let mut reimported = 0;
         for entry in entries {
@@ -328,7 +328,7 @@ impl BufferedStore {
         }
 
         // Re-enable foreign key constraints
-        let _ = conn.conn.execute_batch("PRAGMA foreign_keys=ON;");
+        let _ = conn.execute_batch("PRAGMA foreign_keys=ON;");
 
         if reimported > 0 {
             eprintln!("[clean-ctx] Reimported {reimported} ops from fallback files.");

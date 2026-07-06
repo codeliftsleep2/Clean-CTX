@@ -15,7 +15,7 @@ fn resolve_fidelity_uses_extension_override() {
     let mut config = CleanCtxConfig::default();
     config
         .fidelity_overrides
-        .insert("ts".to_string(), "high".to_string());
+        .insert("ts".to_string(), crate::compression::Fidelity::High);
     assert_eq!(
         resolve_fidelity(None, Some("ts"), &config),
         Fidelity::High
@@ -25,7 +25,7 @@ fn resolve_fidelity_uses_extension_override() {
 #[test]
 fn resolve_fidelity_falls_back_to_default() {
     let config = CleanCtxConfig {
-        default_fidelity: "medium".to_string(),
+        default_fidelity: crate::compression::Fidelity::Medium,
         ..Default::default()
     };
     assert_eq!(

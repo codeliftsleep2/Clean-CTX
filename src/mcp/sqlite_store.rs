@@ -24,7 +24,7 @@ use crate::ir::compiler::CompiledIR;
 
 /// SQLite-backed implementation of [`ContextStore`].
 pub struct SqliteStore {
-    pub conn: Connection,
+    conn: Connection,
 }
 
 impl SqliteStore {
@@ -262,6 +262,16 @@ impl SqliteStore {
     /// Execute a WAL checkpoint to keep file size bounded.
     pub fn wal_checkpoint(&self) {
         let _ = self.conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+    }
+
+    /// Execute a raw SQL batch statement.
+    ///
+    /// Used internally by `BufferedStore` for foreign key toggling during
+    /// fallback reimport. Exposed as `pub(crate)` to avoid exposing the
+    /// underlying `Connection` directly.
+    pub(crate) fn execute_batch(&self, sql: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.conn.execute_batch(sql)?;
+        Ok(())
     }
 
     /// Purge deltas older than the specified number of days.

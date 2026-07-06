@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn test_default_config() {
     let config = CleanCtxConfig::default();
-    assert_eq!(config.default_fidelity, "low");
+    assert_eq!(config.default_fidelity, crate::compression::Fidelity::Low);
     assert!(config.diff_compression);
     assert!(config.type_aliases.is_empty());
 }
