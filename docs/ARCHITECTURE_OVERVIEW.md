@@ -1,7 +1,7 @@
 # Clean-CTX — Architecture Overview
 
 **Version:** 0.2.1-rc1
-**Last updated:** 2026-06-30 (A-09 through A-15, F-19 through F-22: all Foundation and priority Now items complete)
+**Last updated:** 2026-07-06 (R-43a + R-43b complete: 4 new CoreOp variants, ProgramGraph, InferenceLayer, PassPipeline, Validator, QueryEngine, Semantic Delta, 29 InferenceLayer tests, 18 round-trip tests, 47 R-43b tests)
 
 ---
 
@@ -42,6 +42,8 @@
 │  ┌──────────────────────────────────────────────────┐   │
 │  │ IR Subsystem (Compiler IR + Delta Transport)     │   │
 │  │  compile → wire → string_table → delta → replay  │   │
+│  │  exec_semantics → program_graph → inference →    │   │
+│  │  validation → query                              │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
@@ -304,6 +306,11 @@ src/
 │   ├── positional.rs             # Positional encoding for compact IR format
 │   ├── render.rs                 # IR rendering to text
 │   ├── binary_wire.rs            # Binary wire format for IR transport
+│   ├── program_graph.rs          # R-43b: Local program graph (structural edges only, no CBM)
+│   ├── inference_layer.rs        # R-43b: InferenceLayer — ephemeral, never serialized, confidence-scored
+│   ├── pipeline.rs               # R-43b: IRPass trait + PassPipeline (composable 7-pass pipeline)
+│   ├── validator.rs              # R-43b: IRValidator + DefaultValidator (10 rules, E001-E010)
+│   ├── query.rs                  # R-43b: IRQueryEngine — local + CBM-enriched queries with confidence
 │   ├── patterns.rs               # CompressingPatternRecognizer
 │   └── layers/
 │       ├── mod.rs
