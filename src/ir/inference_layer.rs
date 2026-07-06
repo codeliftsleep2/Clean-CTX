@@ -46,7 +46,7 @@ pub struct InferenceEdge {
 }
 
 /// Types of inferred edges.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InferenceEdgeType {
     Calls,
     DataFlowRead,
@@ -57,7 +57,7 @@ pub enum InferenceEdgeType {
 }
 
 /// Source of an inference.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InferenceSource {
     /// From tree-sitter parsing (confidence = 1.0)
     Structural,
