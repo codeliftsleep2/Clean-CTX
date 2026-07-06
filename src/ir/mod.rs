@@ -32,6 +32,12 @@ pub mod string_table;
 pub mod hierarchical;
 pub mod binary_wire;
 pub mod render_llm;
+// R-43b: IR Evolution Phases 2-6
+pub mod program_graph;
+pub mod inference_layer;
+pub mod pipeline;
+pub mod validator;
+pub mod query;
 
 // Re-export public types for downstream consumers.
 pub use opcodes::CoreOp;
@@ -41,7 +47,7 @@ pub use render::{ir_to_text, ir_to_text_ops};
 pub use wire::{ir_to_wire, op_to_tuple};
 pub use symbol_table::{GlobalSymbolTable, SymbolEntry, SymbolKind};
 pub use delta::{
-    IRDelta, DeltaOps, ModOp, FieldPatch, DeltaComputer,
+    IRDelta, DeltaOps, ModOp, FieldPatch, DeltaComputer, SemanticIntent,
     compute_field_patches, primary_key_from_tuple, key_tuple_from_tuple,
     CompactDelta, CompactOps, compact_encode, compact_decode,
 };

@@ -358,6 +358,10 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                 type_aliases.push(vec![alias.clone(), original.clone()]);
             }
 
+            // R-43a: Execution semantics — ignored in hierarchical format
+            // (these are method-level annotations, not structural)
+            CoreOp::DataFlow(..) | CoreOp::ControlFlow(..) | CoreOp::SideEffect(..) | CoreOp::ExecutionContext(..) => {}
+
             CoreOp::Pattern(name, args) => {
                 // Parse pattern args to find the correct parent by class/method ID.
                 // PatternOp::to_tuple() format: [class_id, method_id?, ...args]

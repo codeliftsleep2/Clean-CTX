@@ -108,6 +108,37 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             v.extend(args.iter().cloned());
             v
         }
+        // R-43a: Execution Semantics
+        CoreOp::DataFlow(mid, direction, target) => {
+            vec![
+                "DATAFLOW".into(),
+                mid.clone(),
+                direction.clone(),
+                target.clone(),
+            ]
+        }
+        CoreOp::ControlFlow(mid, kind, target) => {
+            vec![
+                "CTRL".into(),
+                mid.clone(),
+                kind.clone(),
+                target.clone(),
+            ]
+        }
+        CoreOp::SideEffect(mid, effect_type) => {
+            vec![
+                "EFFECT".into(),
+                mid.clone(),
+                effect_type.clone(),
+            ]
+        }
+        CoreOp::ExecutionContext(mid, context_type) => {
+            vec![
+                "CTX".into(),
+                mid.clone(),
+                context_type.clone(),
+            ]
+        }
     }
 }
 
@@ -247,6 +278,49 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
                 Some(CoreOp::Pattern(
                     tuple[1].clone(),
                     tuple[2..].to_vec(),
+                ))
+            } else {
+                None
+            }
+        }
+        // R-43a: Execution Semantics
+        "DATAFLOW" => {
+            if tuple.len() >= 4 {
+                Some(CoreOp::DataFlow(
+                    tuple[1].clone(),
+                    tuple[2].clone(),
+                    tuple[3].clone(),
+                ))
+            } else {
+                None
+            }
+        }
+        "CTRL" => {
+            if tuple.len() >= 4 {
+                Some(CoreOp::ControlFlow(
+                    tuple[1].clone(),
+                    tuple[2].clone(),
+                    tuple[3].clone(),
+                ))
+            } else {
+                None
+            }
+        }
+        "EFFECT" => {
+            if tuple.len() >= 3 {
+                Some(CoreOp::SideEffect(
+                    tuple[1].clone(),
+                    tuple[2].clone(),
+                ))
+            } else {
+                None
+            }
+        }
+        "CTX" => {
+            if tuple.len() >= 3 {
+                Some(CoreOp::ExecutionContext(
+                    tuple[1].clone(),
+                    tuple[2].clone(),
                 ))
             } else {
                 None

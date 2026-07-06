@@ -68,6 +68,7 @@ fn add_method_delta(from: u64, to: u64) -> IRDelta {
             mods: vec![],
             dels: vec![],
         },
+        intent: None,
     }
 }
 
@@ -87,6 +88,7 @@ fn remove_method_delta(from: u64, to: u64) -> IRDelta {
                 vec!["FLAGS".into(), "M1".into(), "IF".into(), "LOOP".into()],
             ],
         },
+        intent: None,
     }
 }
 
@@ -104,6 +106,7 @@ fn modify_method_delta(from: u64, to: u64) -> IRDelta {
             )],
             dels: vec![],
         },
+        intent: None,
     }
 }
 
@@ -493,6 +496,7 @@ fn context_state_apply_combined_delta() {
                 vec!["IMP".into(), "IM1".into(), "rxjs".into(), "map".into()],
             ],
         },
+        intent: None,
     };
 
     cs.apply(delta).expect("combined delta should apply");
@@ -513,6 +517,7 @@ fn context_state_apply_unknown_file() {
         from: 0,
         to: 1,
         ops: DeltaOps::default(),
+        intent: None,
     };
 
     let result = cs.apply(delta);
@@ -534,6 +539,7 @@ fn context_state_apply_version_mismatch() {
         from: 0,
         to: 2,
         ops: DeltaOps::default(),
+        intent: None,
     };
 
     let result = cs.apply(delta);
@@ -564,6 +570,7 @@ fn context_state_apply_symbol_not_found_on_remove() {
                 vec!["DEF_M".into(), "C1".into(), "M99".into(), "ghostMethod".into()],
             ],
         },
+        intent: None,
     };
 
     let result = cs.apply(delta);
@@ -594,6 +601,7 @@ fn context_state_apply_symbol_not_found_on_modify() {
             )],
             dels: vec![],
         },
+        intent: None,
     };
 
     let result = cs.apply(delta);
@@ -623,6 +631,7 @@ fn context_state_apply_duplicate_symbol() {
             mods: vec![],
             dels: vec![],
         },
+        intent: None,
     };
 
     let result = cs.apply(delta);
@@ -673,6 +682,7 @@ fn context_state_sequential_deltas() {
                 vec!["RET".into(), "M2".into(), "$v".into()],
             ],
         },
+        intent: None,
     };
     cs.apply(delta_3_4).expect("v3→v4 apply");
 
@@ -785,6 +795,7 @@ fn context_state_empty_ir() {
         from: 1,
         to: 2,
         ops: DeltaOps::default(),
+        intent: None,
     };
 
     let result = cs.apply(delta).expect("empty delta should apply");
@@ -983,6 +994,7 @@ fn context_state_apply_no_op_mod_then_add() {
             ],
             dels: vec![],
         },
+        intent: None,
     };
 
     let result = cs.apply(delta);
