@@ -427,3 +427,9 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
 #[cfg(test)]
 #[path = "../tests/ir/wire.rs"]
 mod tests;
+
+/// Comprehensive round-trip and randomized property tests for all wire formats.
+/// Covers: named, binary, hierarchical, compact delta, and SemanticIntent.
+#[cfg(test)]
+#[path = "../tests/ir/round_trip.rs"]
+mod round_trip_tests;
