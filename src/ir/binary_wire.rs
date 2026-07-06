@@ -42,7 +42,7 @@ const VERSION: u8 = 0x02;
 /// Legacy version 0x01 (long TYPE op names) — still supported for decode.
 const VERSION_LEGACY: u8 = 0x01;
 
-/// Opcode index assignment (0-14)
+/// Opcode index assignment (0-18)
 const OP_DEF_C: u8 = 0;
 const OP_DEF_M: u8 = 1;
 const OP_DEF_F: u8 = 2;
@@ -58,6 +58,11 @@ const OP_INJECTS: u8 = 11;
 const OP_IMP: u8 = 12;    // Import
 const OP_TYPE: u8 = 13;   // TypeAlias
 const OP_PAT: u8 = 14;    // Pattern
+// R-43a: Execution Semantics
+const OP_DATAFLOW: u8 = 15;
+const OP_CTRL: u8 = 16;
+const OP_EFFECT: u8 = 17;
+const OP_CTX: u8 = 18;
 
 /// Opcodes that have a variable number of operands (beyond the first one).
 fn is_variadic(op_idx: u8) -> bool {
@@ -82,6 +87,11 @@ fn op_to_index(op: &CoreOp) -> u8 {
         CoreOp::Import(..) => OP_IMP,
         CoreOp::TypeAlias(..) => OP_TYPE,
         CoreOp::Pattern(..) => OP_PAT,
+        // R-43a: Execution Semantics
+        CoreOp::DataFlow(..) => OP_DATAFLOW,
+        CoreOp::ControlFlow(..) => OP_CTRL,
+        CoreOp::SideEffect(..) => OP_EFFECT,
+        CoreOp::ExecutionContext(..) => OP_CTX,
     }
 }
 
@@ -281,6 +291,25 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
                     encode_operand(&mut buf, a);
                 }
             }
+            // R-43a: Execution Semantics
+            CoreOp::DataFlow(mid, direction, target) => {
+                encode_operand(&mut buf, mid);
+                encode_operand(&mut buf, direction);
+                encode_operand(&mut buf, target);
+            }
+            CoreOp::ControlFlow(mid, kind, target) => {
+                encode_operand(&mut buf, mid);
+                encode_operand(&mut buf, kind);
+                encode_operand(&mut buf, target);
+            }
+            CoreOp::SideEffect(mid, effect_type) => {
+                encode_operand(&mut buf, mid);
+                encode_operand(&mut buf, effect_type);
+            }
+            CoreOp::ExecutionContext(mid, context_type) => {
+                encode_operand(&mut buf, mid);
+                encode_operand(&mut buf, context_type);
+            }
         }
     }
 
@@ -406,7 +435,7 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
         let op_idx = data[pos];
         pos += 1;
 
-        if op_idx > 14 {
+        if op_idx > 18 {
             return Err(BinaryDecodeError::UnknownOpcode(op_idx));
         }
 
@@ -517,6 +546,29 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                 OP_TYPE => {
                     let original = read_operand(&data[pos..], &mut pos)?;
                     CoreOp::TypeAlias(String::new(), original)
+                }
+                // R-43a: Execution Semantics
+                OP_DATAFLOW => {
+                    let mid = read_operand(&data[pos..], &mut pos)?;
+                    let direction = read_operand(&data[pos..], &mut pos)?;
+                    let target = read_operand(&data[pos..], &mut pos)?;
+                    CoreOp::DataFlow(mid, direction, target)
+                }
+                OP_CTRL => {
+                    let mid = read_operand(&data[pos..], &mut pos)?;
+                    let kind = read_operand(&data[pos..], &mut pos)?;
+                    let target = read_operand(&data[pos..], &mut pos)?;
+                    CoreOp::ControlFlow(mid, kind, target)
+                }
+                OP_EFFECT => {
+                    let mid = read_operand(&data[pos..], &mut pos)?;
+                    let effect_type = read_operand(&data[pos..], &mut pos)?;
+                    CoreOp::SideEffect(mid, effect_type)
+                }
+                OP_CTX => {
+                    let mid = read_operand(&data[pos..], &mut pos)?;
+                    let context_type = read_operand(&data[pos..], &mut pos)?;
+                    CoreOp::ExecutionContext(mid, context_type)
                 }
                 _ => return Err(BinaryDecodeError::UnknownOpcode(op_idx)),
             }

@@ -10,11 +10,21 @@
 //   - Abstract/export class-level flags
 //   - Visibility modifiers (private, protected, static)
 //   - Constructor injection patterns
+//
+// R-43a: Execution semantics extraction:
+//   - .subscribe() → DataFlow("reads", "observable")
+//   - .pipe() with tap → SideEffect("io")
+//   - .pipe() with map/filter → DataFlow("reads", "observable")
+//   - async keyword → SideEffect("async") + ExecutionContext("async")
+//   - new Observable() → DataFlow("writes", "observable")
+//   - @Injectable() → ExecutionContext("di_scope")
 
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{
     CoreOp, FLAG_ABSTRACT, FLAG_ASYNC, FLAG_EXPORT, FLAG_GEN, FLAG_PRIVATE, FLAG_PROTECTED,
     FLAG_STATIC,
+    DATAFLOW_READ, DATAFLOW_WRITE, EFFECT_ASYNC, EFFECT_IO,
+    CTX_ASYNC, CTRL_AWAIT, CTRL_TRY,
 };
 
 /// TypeScript language layer (Layer 2).
@@ -36,8 +46,6 @@ impl TypeScriptLayer {
         if let Some(ext_pos) = class_head.find("extends") {
             let after_ext = class_head[ext_pos + 7..].trim_start();
             // Find the end of the extended class (next keyword or boundary)
-            // F-47: use char-level iteration instead of byte-level to handle
-            // multi-byte UTF-8 correctly (non-ASCII whitespace, identifiers).
             let mut end_pos = 0;
             for (i, ch) in after_ext.char_indices() {
                 if ch == ',' || ch == '{' {
@@ -119,6 +127,77 @@ impl TypeScriptLayer {
         }
         flags
     }
+
+    /// R-43a: Extract execution semantics from TypeScript method body text.
+    fn extract_method_execution_semantics(method_id: &str, raw_sig: &str) -> Vec<CoreOp> {
+        let mut ops = Vec::new();
+
+        // Detect async method
+        if raw_sig.contains("async") {
+            ops.push(CoreOp::SideEffect(method_id.to_string(), EFFECT_ASYNC.to_string()));
+            ops.push(CoreOp::ExecutionContext(method_id.to_string(), CTX_ASYNC.to_string()));
+        }
+
+        // RxJS: detect .subscribe() → DataFlow("reads", "observable")
+        if raw_sig.contains(".subscribe(") || raw_sig.contains(".subscribe (") {
+            ops.push(CoreOp::DataFlow(
+                method_id.to_string(),
+                DATAFLOW_READ.to_string(),
+                "observable".to_string(),
+            ));
+        }
+
+        // RxJS: detect .pipe() with tap → SideEffect("io")
+        if raw_sig.contains(".pipe(") && raw_sig.contains("tap(") {
+            ops.push(CoreOp::SideEffect(method_id.to_string(), EFFECT_IO.to_string()));
+        }
+
+        // RxJS: detect .pipe() with map/filter → DataFlow("reads", "observable")
+        if raw_sig.contains(".pipe(") && (raw_sig.contains("map(") || raw_sig.contains("filter(")) {
+            ops.push(CoreOp::DataFlow(
+                method_id.to_string(),
+                DATAFLOW_READ.to_string(),
+                "observable".to_string(),
+            ));
+        }
+
+        // RxJS: detect new Observable() → DataFlow("writes", "observable")
+        if raw_sig.contains("new Observable(") || raw_sig.contains("new Observable<") {
+            ops.push(CoreOp::DataFlow(
+                method_id.to_string(),
+                DATAFLOW_WRITE.to_string(),
+                "observable".to_string(),
+            ));
+        }
+
+        // Angular: detect @Injectable() → ExecutionContext("di_scope")
+        if raw_sig.contains("@Injectable") {
+            ops.push(CoreOp::ExecutionContext(
+                method_id.to_string(),
+                "di_scope".to_string(),
+            ));
+        }
+
+        // Detect await
+        if raw_sig.contains("await ") {
+            ops.push(CoreOp::ControlFlow(
+                method_id.to_string(),
+                CTRL_AWAIT.to_string(),
+                "await".to_string(),
+            ));
+        }
+
+        // Detect try/catch
+        if raw_sig.contains("try ") || raw_sig.contains("try{") || raw_sig.contains("try\n") {
+            ops.push(CoreOp::ControlFlow(
+                method_id.to_string(),
+                CTRL_TRY.to_string(),
+                "try".to_string(),
+            ));
+        }
+
+        ops
+    }
 }
 
 impl Default for TypeScriptLayer {
@@ -170,6 +249,14 @@ impl LanguageLayer for TypeScriptLayer {
                     if !class_flags.is_empty() {
                         ops.push(CoreOp::ClassFlags(class_id.clone(), class_flags));
                     }
+
+                    // R-43a: Detect @Injectable() on class → ExecutionContext("di_scope")
+                    if raw_text.contains("@Injectable") {
+                        ops.push(CoreOp::ExecutionContext(
+                            class_id.clone(),
+                            "di_scope".to_string(),
+                        ));
+                    }
                 }
             }
             "method.root" => {
@@ -179,6 +266,10 @@ impl LanguageLayer for TypeScriptLayer {
                     if !method_flags.is_empty() {
                         ops.push(CoreOp::Flags(method_id.clone(), method_flags));
                     }
+
+                    // R-43a: Extract execution semantics
+                    let exec_ops = Self::extract_method_execution_semantics(method_id, raw_text);
+                    ops.extend(exec_ops);
                 }
             }
             _ => {}

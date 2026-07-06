@@ -5,6 +5,12 @@
 // Serialized as positional JSON arrays: [opcode, ...operands]
 //
 // Phase A: IR Core — instruction type definitions and constants.
+//
+// R-43a: Added 4 new CoreOp variants for execution semantics:
+//   - DataFlow: tracks which symbols a method reads/writes
+//   - ControlFlow: tracks control flow constructs (if, loop, match, try, await, return)
+//   - SideEffect: annotates method side-effect type (pure, io, mutation, async, transaction)
+//   - ExecutionContext: method execution context (sync, async, thread_bound, transaction_scope, realtime)
 
 use std::fmt;
 
@@ -68,6 +74,32 @@ pub enum CoreOp {
     /// Consumptive pattern op that replaces N source instructions
     /// with a single compact op. Produced by `CompressingPatternRecognizer`.
     Pattern(String, Vec<String>),
+
+    // ── R-43a: Execution Semantics ──────────────────────
+    ///
+    /// Dataflow: ["DATAFLOW", method_id, "reads"|"writes", target_symbol]
+    /// Tracks which symbols a method reads from or writes to.
+    /// Extracted from tree-sitter captures (confidence = 1.0).
+    DataFlow(String, String, String),
+
+    ///
+    /// Control flow: ["CTRL", method_id, kind, target]
+    /// kind: "if" | "loop" | "match" | "try" | "await" | "return"
+    /// target: the target symbol or expression
+    /// Extracted from tree-sitter captures (confidence = 1.0).
+    ControlFlow(String, String, String),
+
+    ///
+    /// Side-effect annotation: ["EFFECT", method_id, effect_type]
+    /// effect_type: "pure" | "io" | "mutation" | "async" | "transaction"
+    /// Extracted from tree-sitter captures (confidence = 1.0).
+    SideEffect(String, String),
+
+    ///
+    /// Execution context: ["CTX", method_id, context_type]
+    /// context_type: "sync" | "async" | "thread_bound" | "transaction_scope" | "realtime"
+    /// Extracted from tree-sitter captures (confidence = 1.0).
+    ExecutionContext(String, String),
 }
 
 impl fmt::Display for CoreOp {
@@ -91,6 +123,19 @@ impl fmt::Display for CoreOp {
             CoreOp::TypeAlias(alias, original) => write!(f, "TYPE {} {}", alias, original),
             CoreOp::Pattern(name, args) => {
                 write!(f, "PAT {} {}", name, args.join(" "))
+            }
+            // R-43a: Execution Semantics
+            CoreOp::DataFlow(mid, direction, target) => {
+                write!(f, "DATAFLOW {} {} {}", mid, direction, target)
+            }
+            CoreOp::ControlFlow(mid, kind, target) => {
+                write!(f, "CTRL {} {} {}", mid, kind, target)
+            }
+            CoreOp::SideEffect(mid, effect_type) => {
+                write!(f, "EFFECT {} {}", mid, effect_type)
+            }
+            CoreOp::ExecutionContext(mid, context_type) => {
+                write!(f, "CTX {} {}", mid, context_type)
             }
         }
     }
@@ -148,21 +193,26 @@ pub const TYPE_UNDEFINED: &str = "$ud";
 /// Used for schema validation and positional decoding.
 pub fn arity(opcode: &str) -> Option<i32> {
     match opcode {
-        "DEF_C" => Some(3),     // id, name
-        "DEF_M" => Some(4),     // class_id, id, name
-        "DEF_F" => Some(4),     // class_id, id, name
-        "DEF_I" => Some(3),     // id, name
-        "SIG" => Some(5),       // method_id, param_id, type, name
-        "RET" => Some(3),       // method_id, type
-        "FIELD_T" => Some(3),   // field_id, type
-        "FLAGS" => Some(-1),    // target_id, flags...
-        "FLAGS_C" => Some(-1),  // class_id, flags...
-        "EXT" => Some(3),       // child_id, parent_id
-        "IMPL" => Some(3),      // class_id, iface_id
-        "INJECTS" => Some(-1),  // class_id, deps...
-        "IMP" => Some(4),       // alias, module, named
-        "TYPE" => Some(3),      // alias, original
-        "PAT" => Some(-1),      // pattern_name, args...
+        "DEF_C" => Some(3),           // id, name
+        "DEF_M" => Some(4),           // class_id, id, name
+        "DEF_F" => Some(4),           // class_id, id, name
+        "DEF_I" => Some(3),           // id, name
+        "SIG" => Some(5),             // method_id, param_id, type, name
+        "RET" => Some(3),             // method_id, type
+        "FIELD_T" => Some(3),         // field_id, type
+        "FLAGS" => Some(-1),          // target_id, flags...
+        "FLAGS_C" => Some(-1),        // class_id, flags...
+        "EXT" => Some(3),             // child_id, parent_id
+        "IMPL" => Some(3),            // class_id, iface_id
+        "INJECTS" => Some(-1),        // class_id, deps...
+        "IMP" => Some(4),             // alias, module, named
+        "TYPE" => Some(3),            // alias, original
+        "PAT" => Some(-1),            // pattern_name, args...
+        // R-43a: Execution Semantics
+        "DATAFLOW" => Some(4),        // method_id, direction, target
+        "CTRL" => Some(4),            // method_id, kind, target
+        "EFFECT" => Some(3),          // method_id, effect_type
+        "CTX" => Some(3),             // method_id, context_type
         _ => None,
     }
 }
@@ -185,8 +235,55 @@ pub fn opcode_name(op: &CoreOp) -> &'static str {
         CoreOp::Import(..) => "IMP",
         CoreOp::TypeAlias(..) => "TYPE",
         CoreOp::Pattern(..) => "PAT",
+        // R-43a: Execution Semantics
+        CoreOp::DataFlow(..) => "DATAFLOW",
+        CoreOp::ControlFlow(..) => "CTRL",
+        CoreOp::SideEffect(..) => "EFFECT",
+        CoreOp::ExecutionContext(..) => "CTX",
     }
 }
+
+// ── Execution Semantics Constants ──────────────────────────────
+
+/// Dataflow direction: read
+pub const DATAFLOW_READ: &str = "reads";
+/// Dataflow direction: write
+pub const DATAFLOW_WRITE: &str = "writes";
+
+/// Control flow kind: if/conditional
+pub const CTRL_IF: &str = "if";
+/// Control flow kind: loop
+pub const CTRL_LOOP: &str = "loop";
+/// Control flow kind: match/switch
+pub const CTRL_MATCH: &str = "match";
+/// Control flow kind: try/catch
+pub const CTRL_TRY: &str = "try";
+/// Control flow kind: await
+pub const CTRL_AWAIT: &str = "await";
+/// Control flow kind: return
+pub const CTRL_RETURN: &str = "return";
+
+/// Side-effect type: pure (no side effects)
+pub const EFFECT_PURE: &str = "pure";
+/// Side-effect type: io (input/output)
+pub const EFFECT_IO: &str = "io";
+/// Side-effect type: mutation (state mutation)
+pub const EFFECT_MUTATION: &str = "mutation";
+/// Side-effect type: async (asynchronous)
+pub const EFFECT_ASYNC: &str = "async";
+/// Side-effect type: transaction (database/atomic)
+pub const EFFECT_TRANSACTION: &str = "transaction";
+
+/// Execution context: sync
+pub const CTX_SYNC: &str = "sync";
+/// Execution context: async
+pub const CTX_ASYNC: &str = "async";
+/// Execution context: thread_bound
+pub const CTX_THREAD_BOUND: &str = "thread_bound";
+/// Execution context: transaction_scope
+pub const CTX_TRANSACTION_SCOPE: &str = "transaction_scope";
+/// Execution context: realtime
+pub const CTX_REALTIME: &str = "realtime";
 
 #[cfg(test)]
 #[path = "../tests/ir/opcodes.rs"]

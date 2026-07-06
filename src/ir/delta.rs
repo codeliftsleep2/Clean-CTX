@@ -25,6 +25,40 @@ use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
 use super::wire::op_to_tuple;
 
+/// R-43a: High-level semantic intent of a delta operation.
+/// Provides human-readable context for what changed, beyond the structural diff.
+/// Empty (None) by default — wire format ready for Phase 4 enrichment.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticIntent {
+    RenameSymbol {
+        old_name: String,
+        new_name: String,
+        kind: String, // "class", "method", "field"
+    },
+    AddMethod {
+        class: String,
+        method_name: String,
+    },
+    RemoveMethod {
+        class: String,
+        method_name: String,
+    },
+    ChangeSignature {
+        method: String,
+        field_changed: String, // "return_type", "param_type", "param_name"
+    },
+    AddInjection {
+        class: String,
+        dependency: String,
+    },
+    ChangeReturnType {
+        method: String,
+        old_type: String,
+        new_type: String,
+    },
+}
+
 /// A structured delta between two IR states.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IRDelta {
@@ -36,6 +70,10 @@ pub struct IRDelta {
     pub to: u64,
     /// Operations grouped by type
     pub ops: DeltaOps,
+    /// R-43a: optional semantic intent metadata
+    /// Empty (None) by default — wire format ready for Phase 4 enrichment
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intent: Option<SemanticIntent>,
 }
 
 /// Grouped delta operations.
@@ -164,6 +202,7 @@ impl DeltaComputer {
             from: baseline.version,
             to: current.version,
             ops,
+            intent: None,
         })
     }
 }
@@ -208,9 +247,13 @@ fn primary_key(op: &CoreOp) -> String {
         CoreOp::Import(alias, _, _) => format!("IMP:{}", alias),
         CoreOp::TypeAlias(alias, _) => format!("TYPE:{}", alias),
         CoreOp::Pattern(name, args) => {
-            // Use pattern name as primary key — args may vary across compilations
             format!("PAT:{}:{}", name, args.first().map(|s| s.as_str()).unwrap_or("?"))
         }
+        // R-43a: Execution Semantics
+        CoreOp::DataFlow(mid, _, _) => format!("DATAFLOW:{}", mid),
+        CoreOp::ControlFlow(mid, _, _) => format!("CTRL:{}", mid),
+        CoreOp::SideEffect(mid, _) => format!("EFFECT:{}", mid),
+        CoreOp::ExecutionContext(mid, _) => format!("CTX:{}", mid),
     }
 }
 
@@ -239,6 +282,11 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
             }
             v
         }
+        // R-43a: Execution Semantics
+        CoreOp::DataFlow(mid, _, _) => vec!["DATAFLOW".into(), mid.clone()],
+        CoreOp::ControlFlow(mid, _, _) => vec!["CTRL".into(), mid.clone()],
+        CoreOp::SideEffect(mid, _) => vec!["EFFECT".into(), mid.clone()],
+        CoreOp::ExecutionContext(mid, _) => vec!["CTX".into(), mid.clone()],
     }
 }
 
@@ -331,6 +379,11 @@ fn abbreviate_opcode(opcode: &str) -> &str {
         "IMP" => "IP",
         "TYPE" => "T",
         "PAT" => "P",
+        // R-43a: compact abbreviations
+        "DATAFLOW" => "DF",
+        "CTRL" => "CT",
+        "EFFECT" => "EF",
+        "CTX" => "CX",
         _ => opcode,
     }
 }
@@ -353,6 +406,11 @@ fn expand_opcode(abbrev: &str) -> &str {
         "IP" => "IMP",
         "T" => "TYPE",
         "P" => "PAT",
+        // R-43a: compact abbreviations
+        "DF" => "DATAFLOW",
+        "CT" => "CTRL",
+        "EF" => "EFFECT",
+        "CX" => "CTX",
         _ => abbrev,
     }
 }
@@ -478,6 +536,7 @@ pub fn compact_decode(compact: &CompactDelta) -> Option<IRDelta> {
         from,
         to,
         ops: DeltaOps { adds, mods, dels },
+        intent: None,
     })
 }
 
@@ -520,12 +579,13 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         "INJECTS" => format!("INJECTS:{}", tuple.get(1).unwrap_or(&String::new())),
         "IMP" => format!("IMP:{}", tuple.get(1).unwrap_or(&String::new())),
         "TYPE" => format!("TYPE:{}", tuple.get(1).unwrap_or(&String::new())),
+        // R-43a: Execution Semantics
+        "DATAFLOW" => format!("DATAFLOW:{}", tuple.get(1).unwrap_or(&String::new())),
+        "CTRL" => format!("CTRL:{}", tuple.get(1).unwrap_or(&String::new())),
+        "EFFECT" => format!("EFFECT:{}", tuple.get(1).unwrap_or(&String::new())),
+        "CTX" => format!("CTX:{}", tuple.get(1).unwrap_or(&String::new())),
         _ => {
             // F-16: Unknown opcode — fallback produces a key from the full tuple.
-            // This is intentionally conservative: the content-derived key is
-            // a stable primary key (coincidentally), but callers should ensure
-            // all known opcodes are covered above. This branch should only be
-            // reached if a new CoreOp variant is added without updating this match.
             if cfg!(debug_assertions) {
                 eprintln!("[warn] primary_key_from_tuple: unknown opcode '{}'", tuple[0]);
             }
@@ -571,11 +631,13 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
         "INJECTS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "IMP" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "TYPE" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        // R-43a: Execution Semantics
+        "DATAFLOW" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "CTRL" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "EFFECT" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "CTX" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         _ => {
             // F-17: Unknown opcode — fallback returns the full instruction body.
-            // This is correct by accident (matching by full body is equivalent
-            // to matching by the entire instruction), but it conflates "match key"
-            // with "instruction body". See F-16 for the same pattern.
             if cfg!(debug_assertions) {
                 eprintln!("[warn] key_tuple_from_tuple: unknown opcode '{}'", tuple[0]);
             }

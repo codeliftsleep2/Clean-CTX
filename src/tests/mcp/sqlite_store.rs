@@ -151,6 +151,7 @@ fn test_sqlite_load_context_with_deltas() {
         file: "/test/file.ts".to_string(),
         from: 1, to: 2,
         ops: crate::ir::delta::DeltaOps { adds: vec![], mods: vec![], dels: vec![] },
+        intent: None,
     };
     let delta1_bytes = serde_json::to_vec(&delta1).unwrap();
     store.append_delta(&id, &delta1_bytes, Some("edit")).expect("append delta 1");
@@ -159,6 +160,7 @@ fn test_sqlite_load_context_with_deltas() {
         file: "/test/file.ts".to_string(),
         from: 2, to: 3,
         ops: crate::ir::delta::DeltaOps { adds: vec![], mods: vec![], dels: vec![] },
+        intent: None,
     };
     let delta2_bytes = serde_json::to_vec(&delta2).unwrap();
     store.append_delta(&id, &delta2_bytes, Some("edit")).expect("append delta 2");
