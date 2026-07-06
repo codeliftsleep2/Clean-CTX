@@ -229,3 +229,75 @@ fn resolved_flag_always_true_for_builder_output() {
     let graph = collector.build_graph();
     assert!(graph.is_resolved());
 }
+
+// --- Cycle Detection Tests ---
+
+#[test]
+fn has_cycle_no_cycle() {
+    let mut builder = AngularGraphBuilder::new();
+    let _empty: Vec<String> = Vec::new();
+    builder.register_class("SvcA", "α1", ClassKind::Service, None, &[], None);
+    builder.register_class("SvcB", "α2", ClassKind::Service, None, &["SvcA".to_string()], None);
+    let graph = builder.build();
+    assert!(!graph.has_cycle());
+}
+
+#[test]
+fn has_cycle_detected() {
+    let mut builder = AngularGraphBuilder::new();
+    let _empty: Vec<String> = Vec::new();
+    builder.register_class("SvcA", "α1", ClassKind::Service, None, &["SvcB".to_string()], None);
+    builder.register_class("SvcB", "α2", ClassKind::Service, None, &["SvcC".to_string()], None);
+    builder.register_class("SvcC", "α3", ClassKind::Service, None, &["SvcA".to_string()], None);
+    let graph = builder.build();
+    assert!(graph.has_cycle());
+}
+
+#[test]
+fn find_cycles_returns_empty_for_acyclic() {
+    let mut builder = AngularGraphBuilder::new();
+    let _empty: Vec<String> = Vec::new();
+    builder.register_class("SvcA", "α1", ClassKind::Service, None, &[], None);
+    builder.register_class("SvcB", "α2", ClassKind::Service, None, &["SvcA".to_string()], None);
+    let graph = builder.build();
+    let cycles = graph.find_cycles();
+    assert!(cycles.is_empty());
+}
+
+#[test]
+fn find_cycles_detects_simple_cycle() {
+    let mut builder = AngularGraphBuilder::new();
+    builder.register_class("A", "α1", ClassKind::Service, None, &["B".to_string()], None);
+    builder.register_class("B", "α2", ClassKind::Service, None, &["A".to_string()], None);
+    let graph = builder.build();
+    let cycles = graph.find_cycles();
+    assert!(!cycles.is_empty());
+    assert!(cycles.iter().any(|c| c.len() >= 2));
+}
+
+#[test]
+fn transitive_dependencies_depth_1() {
+    let mut builder = AngularGraphBuilder::new();
+    let empty: Vec<String> = Vec::new();
+    builder.register_class("A", "α1", ClassKind::Service, None, &["B".to_string()], None);
+    builder.register_class("B", "α2", ClassKind::Service, None, &["C".to_string()], None);
+    builder.register_class("C", "α3", ClassKind::Service, None, &empty, None);
+    let graph = builder.build();
+    let deps = graph.transitive_dependencies("A", 1);
+    assert_eq!(deps.len(), 1);
+    assert!(deps.contains(&"B".to_string()));
+}
+
+#[test]
+fn transitive_dependencies_depth_2() {
+    let mut builder = AngularGraphBuilder::new();
+    let empty: Vec<String> = Vec::new();
+    builder.register_class("A", "α1", ClassKind::Service, None, &["B".to_string()], None);
+    builder.register_class("B", "α2", ClassKind::Service, None, &["C".to_string()], None);
+    builder.register_class("C", "α3", ClassKind::Service, None, &empty, None);
+    let graph = builder.build();
+    let deps = graph.transitive_dependencies("A", 2);
+    assert_eq!(deps.len(), 2);
+    assert!(deps.contains(&"B".to_string()));
+    assert!(deps.contains(&"C".to_string()));
+}

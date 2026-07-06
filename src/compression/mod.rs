@@ -22,6 +22,7 @@
 //   - `streaming`         : Streaming variant with progress callbacks
 
 pub(crate) mod capture_pipeline;
+pub(crate) mod graph_utils;
 pub(crate) mod markers;
 pub(crate) mod micro_opcodes;
 pub(crate) mod opcodes;

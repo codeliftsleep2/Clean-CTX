@@ -21,6 +21,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, RwLock};
 use std::sync::Arc;
 use crate::angular_meta::graph_state::AngularGraphHandle;
+use crate::dotnet_meta::graph_state::DotnetGraphHandle;
+use crate::spring_meta::graph_state::SpringGraphHandle;
 use crate::cache::LocalStateCache;
 use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
@@ -92,6 +94,14 @@ pub struct McpState {
     /// Built once per `compress_workspace` call; `None` when no
     /// workspace has been compressed yet.
     pub angular_graph: Mutex<AngularGraphHandle>,
+    /// .NET cross-file dependency graph (Phase 3, Tier 3).
+    /// Built once per `compress_workspace` call; `None` when no
+    /// workspace has been compressed yet.
+    pub dotnet_graph: Mutex<DotnetGraphHandle>,
+    /// Spring Boot cross-file dependency graph (Phase 3, Tier 3).
+    /// Built once per `compress_workspace` call; `None` when no
+    /// workspace has been compressed yet.
+    pub spring_graph: Mutex<SpringGraphHandle>,
     /// Compiler IR context state — tracks all files and their IR state.
     /// Enables delta-based state transport: load full IR on first
     /// compress, then apply deltas on subsequent edits.
@@ -218,6 +228,8 @@ impl McpState {
             cache: RwLock::new(LocalStateCache::new()),
             config,
             angular_graph: Mutex::new(AngularGraphHandle::new()),
+            dotnet_graph: Mutex::new(DotnetGraphHandle::new()),
+            spring_graph: Mutex::new(SpringGraphHandle::new()),
             ir_context: RwLock::new(ContextState::new()),
             text_delta: Mutex::new(TextDeltaComputer::new()),
             source_cache: Mutex::new(HashMap::new()),
@@ -311,6 +323,16 @@ impl McpState {
     /// Lock the angular graph for mutation.
     pub fn angular_graph_lock(&self) -> std::sync::MutexGuard<'_, AngularGraphHandle> {
         lock_or_recover!(self.angular_graph.lock(), "angular_graph")
+    }
+
+    /// Lock the .NET graph for mutation.
+    pub fn dotnet_graph_lock(&self) -> std::sync::MutexGuard<'_, DotnetGraphHandle> {
+        lock_or_recover!(self.dotnet_graph.lock(), "dotnet_graph")
+    }
+
+    /// Lock the Spring graph for mutation.
+    pub fn spring_graph_lock(&self) -> std::sync::MutexGuard<'_, SpringGraphHandle> {
+        lock_or_recover!(self.spring_graph.lock(), "spring_graph")
     }
 
     /// Lock the persistence store for writing.
