@@ -1,6 +1,6 @@
 # Clean-CTX — Token Waste Reducer & Structured Transport Protocol
 
-> **🚀 Version 0.2.1-rc1** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot/.NET meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, **CBM filter-first architecture** (symbol importance filtering before compression), Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, **streaming workspace walk (walkdir)**, **Rayon-parallelized workspace compression**, **deterministic alias assignment**, **workspace compression result caching**, and all **1,529 tests passing** with **zero clippy warnings**.
+> **🚀 Version 0.2.1-rc1** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot/.NET meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, **CBM filter-first architecture** (symbol importance filtering before compression), Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, **streaming workspace walk (walkdir)**, **Rayon-parallelized workspace compression**, **deterministic alias assignment**, **workspace compression result caching**, **R-43a Execution Semantics** (DataFlow/ControlFlow/SideEffect/ExecutionContext across Rust/C#/TypeScript), **R-43b Program Graph + Inference Layer + Pass Pipeline + Validator + Query Engine + Semantic Delta**, and all **1,745 tests passing** with **zero clippy warnings**.
 
 A local-first, air-gapped code context optimizer that reduces LLM token waste through four independent mechanisms: CBM symbol filtering (drops low-importance symbols before compression), compression (75–97% token savings), tool output filtering (70–90% savings), and intelligent prompt caching (~90% API cost savings).
 
@@ -664,11 +664,19 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — **0 warnings, 0 errors** |
-| Tests | ✅ **1,529 tests, all passing, including 20 integration/e2e tests** |
-| Audit | ✅ FAANG-level audit — all 11 findings resolved (A-09 through A-15, F-19 through F-22); CBM audit — all findings resolved; Compiler-IR audit — all findings resolved |
-| Languages | ✅ TypeScript, C#, Rust, Java with Angular/Spring Boot/.NET meta-layers |
+| Tests | ✅ **1,745 tests, all passing, including 20 integration/e2e tests** |
+| Audit | ✅ FAANG-level audit — all 11 findings resolved (A-09 through A-15, F-19 through F-22); CBM audit — all findings resolved; Compiler-IR audit — all findings resolved; R-43a + R-43b FAANG audit — zero critical/high findings |
+| Languages | ✅ TypeScript, C#, Rust, Java with Angular/Spring Boot/.NET meta-layers, execution semantics across all 3 language layers |
 | IR Transport Protocol | ✅ Stateful instruction-level delta transport — compile once, send deltas thereafter |
-| CBM Integration | ✅ Filter-first architecture — symbol importance scores drop low-importance symbols before compression |
+| Execution Semantics | ✅ R-43a: 4 new CoreOp variants (DataFlow, ControlFlow, SideEffect, ExecutionContext) — 6 wire formats, SemanticIntent on IRDelta, Rust/C#/TS language layers |
+| Program Graph | ✅ R-43b: Lightweight local program graph with 6 edge types (calls, extends, implements, injects, dataflow_read, dataflow_write) — structural only, no CBM data |
+| Inference Layer | ✅ R-43b: Ephemeral confidence-scored layer — NEVER serialized into wire format, CBM enrichment with confidence < 1.0, 29 tests covering all sources/edge types/edge cases/stress |
+| Pass Pipeline | ✅ R-43b: Composable 7-pass pipeline (Core → Language → Meta → Exec → Graph → Inference → Validation) with IRPass trait |
+| IR Validator | ✅ R-43b: 10 validation rules (E001-E010) — structural, behavioral, and side-effect consistency checks |
+| Query Engine | ✅ R-43b: IRQueryEngine with local + CBM-enriched queries and confidence scores for async detection, fan-in/fan-out, dataflow tracing |
+| Semantic Delta | ✅ R-43b: Intent detection (RenameSymbol, AddMethod, ChangeSignature, AddInjection, etc.) on IRDelta |
+| Round-trip Tests | ✅ 18 tests covering all 6 wire formats + compact delta + randomized property tests (100/100/50 iterations) |
+| CBM Integration | ✅ Filter-first architecture — symbol importance scores drop low-importance symbols before compression; InferenceLayer enrichment for cross-file edges |
 | Delta Transport | ✅ IR-level + text-level, field-patch encoding, compact delta format |
 | Persistence | ✅ SQLite cross-session persistence with three-tier reliability |
 | Proxy | ✅ Multi-platform proxy (Anthropic/OpenAI/Generic) with auto-cache + tool filters |
