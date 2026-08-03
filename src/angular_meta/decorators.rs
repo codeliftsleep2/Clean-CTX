@@ -36,6 +36,10 @@ pub struct DecoratorsResult {
     /// Raw inline template content (from `template: '...'`), when
     /// the component uses an inline template instead of `templateUrl`.
     /// `None` when no inline template is present.
+    /// Consumed by `angular_meta::mod::run_meta_layer` when the
+    /// `angular` feature is enabled. `#[allow(dead_code)]` is required
+    /// because the field is written by `extract_decorators` and read
+    /// only by the `angular_meta` module when the feature is on.
     #[allow(dead_code)]
     pub inline_template: Option<String>,
 }
@@ -230,6 +234,9 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Decorat
     }
 }
 
+/// A collected decorator token. `name` is populated for potential
+/// future inspection/debug use but the dispatch only consumes `kind`
+/// and `arg` today, so it is kept under `#[allow(dead_code)]`.
 #[allow(dead_code)]
 struct Decorator {
     name: String,
@@ -920,6 +927,9 @@ fn unquote(s: &str) -> &str {
 // F-ANG-13: substitute `?` for missing class names at the call site.
 // (Same as `extract_decorators`; the `let-else` → `?` swap is
 // required by clippy::question_mark when both apply.)
+// Used by `mcp::workspace_util` and `mcp::workspace` when the
+// `angular` feature is enabled. `#[allow(dead_code)]` is required
+// because it is only reachable from those feature-gated call sites.
 #[allow(dead_code)]
 #[allow(clippy::type_complexity)]
 pub fn extract_graph_entries(raw_class: &str) -> Option<(String, ClassKind, Option<String>, Vec<String>, Option<String>)> {

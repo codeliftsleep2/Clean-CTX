@@ -8,7 +8,8 @@
 
 #![allow(
     clippy::assertions_on_constants,
-    clippy::bool_assert_comparison
+    clippy::bool_assert_comparison,
+    clippy::const_is_empty
 )]
 
 use serde_json::json;

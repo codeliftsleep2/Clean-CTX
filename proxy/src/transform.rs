@@ -330,11 +330,7 @@ pub fn age_tool_results(
     // Collect all path-like strings from the last `floor` messages
     // for cross-reference checking.
     let recent_paths: Vec<String> = {
-        let start = if total_messages > force_preserve_floor {
-            total_messages - force_preserve_floor
-        } else {
-            0
-        };
+        let start = total_messages.saturating_sub(force_preserve_floor);
         let mut paths = Vec::new();
         for i in start..total_messages {
             if let Some(msg) = messages.get(i) {

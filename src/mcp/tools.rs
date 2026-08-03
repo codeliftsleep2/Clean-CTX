@@ -18,8 +18,32 @@ use super::tool_handlers;
 #[cfg(test)]
 pub(crate) use super::tool_helpers::diff_code_context_handler;
 
+/// Compute the list of supported languages based on enabled Cargo features.
+/// This surfaces to clients which file extensions the binary can actually
+/// process, avoiding "unsupported extension" errors for unbuilt grammars.
+fn supported_languages() -> Vec<&'static str> {
+    let mut langs = Vec::new();
+    if cfg!(feature = "typescript") { langs.push("typescript"); }
+    if cfg!(feature = "csharp") { langs.push("csharp"); }
+    if cfg!(feature = "rust") { langs.push("rust"); }
+    if cfg!(feature = "java") { langs.push("java"); }
+    langs
+}
+
+/// Inject the `supportedLanguages` field into each tool's schema so clients
+/// can discover which languages the current binary supports.
+fn inject_supported_languages(mut tools: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+    let supported = supported_languages();
+    for tool in &mut tools {
+        if let Some(obj) = tool.as_object_mut() {
+            obj.insert("supportedLanguages".to_string(), serde_json::json!(supported));
+        }
+    }
+    tools
+}
+
 pub(crate) fn tool_list() -> Vec<serde_json::Value> {
-    vec![
+    let tools = vec![
         serde_json::json!({
             "name": "compress_code_context",
             "description": "High-speed local AST compilation, hash-caching, and variable mapping tool.",
@@ -196,11 +220,32 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
     ]
     .into_iter()
     .chain(cbm::cbm_tool_list())
-    .collect()
+    .collect();
+    inject_supported_languages(tools)
 }
 
-pub(crate) fn parse_fidelity_arg(id: &Value, params: &Value) -> Result<Fidelity, ()> {
-    let fidelity_str = params["arguments"]["fidelity"].as_str().unwrap_or("low");
+/// P1-4: Parse fidelity argument from request, falling back to config default.
+///
+/// Uses the user's configured `default_fidelity` instead of hardcoded "low",
+/// ensuring consistency across all tool invocations.
+pub(crate) fn parse_fidelity_arg(
+    id: &Value,
+    params: &Value,
+    config: &crate::config::CleanCtxConfig,
+) -> Result<Fidelity, ()> {
+    let fidelity_str = params["arguments"]["fidelity"]
+        .as_str()
+        .unwrap_or(match config.default_fidelity {
+            Fidelity::Low => "low",
+            Fidelity::Medium => "medium",
+            Fidelity::High => "high",
+        });
+    
+    // Log when using default
+    if params["arguments"]["fidelity"].is_null() {
+        eprintln!("[clean-ctx] fidelity not specified, using default: {} (from config)", fidelity_str);
+    }
+    
     match Fidelity::parse(fidelity_str) {
         Ok(f) => Ok(f),
         Err(e) => {
@@ -220,7 +265,9 @@ pub(crate) fn parse_tokenizer_arg(params: &Value, config: &crate::config::CleanC
 }
 
 /// Resolve the effective fidelity for a (explicit_arg, file_extension) pair.
-/// Currently unused in the new dispatch but kept for potential future use.
+/// Used by tests (`src/tests/mcp/tools.rs`, `src/tests/mcp/tool_handlers.rs`)
+/// and kept for potential future dispatch use. `#[allow(dead_code)]` is
+/// required because this is only consumed by external test modules.
 #[allow(dead_code)]
 pub(crate) fn resolve_fidelity(
     explicit: Option<&str>,
@@ -248,19 +295,28 @@ fn get_registry() -> &'static tool_handlers::registry::HandlerRegistry {
     })
 }
 
-// Eagerly initialize the handler registry at load time to avoid
-// OnceLock contention during parallel test execution. Without this,
-// the first call to get_registry() from any test triggers tree-sitter
-// WASM initialization inside the OnceLock closure, blocking all other
-// parallel threads for 10-30 seconds on Windows.
-#[ctor::ctor]
-fn _preinit_handler_registry() {
+// P3-3: Handler registry initialization.
+//
+// The registry uses OnceLock for lazy initialization - it's created on first
+// access rather than at load time. This avoids issues with sanitizers,
+// test harnesses, and dynamic linking that #[ctor] can cause.
+//
+// For tests that need eager initialization (e.g., parallel tests on Windows),
+// call `setup_handler_registry_for_tests()` in the test module.
+
+/// P3-3: Force initialization of the handler registry for test setup.
+/// Call this in test modules to avoid OnceLock contention during parallel tests.
+#[cfg(test)]
+pub fn setup_handler_registry_for_tests() {
     let _ = get_registry();
 }
 
 /// P1-6: Collect all inline-only tool names for verification.
 /// Returns the set of tool names handled by the inline dispatch match arms.
-/// Used by tests to verify no tool is registered in both inline and registry.
+/// Used by tests (`src/tests/mcp/tools.rs`) to verify no tool is registered
+/// in both inline and registry. `#[allow(dead_code)]` is required because
+/// this is only consumed by the external `src/tests/mcp/tools.rs` module,
+/// which the lib build (non-test) never references.
 #[allow(dead_code)]
 pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
     use std::collections::HashSet;
@@ -314,7 +370,7 @@ pub(crate) fn dispatch_tools_call(
         }
         "compress_workspace" => {
             let dir_path = params["arguments"]["directoryPath"].as_str().unwrap_or(".");
-            let fidelity = match parse_fidelity_arg(id, params) {
+            let fidelity = match parse_fidelity_arg(id, params, &state.config) {
                 Ok(f) => f,
                 Err(()) => return,
             };

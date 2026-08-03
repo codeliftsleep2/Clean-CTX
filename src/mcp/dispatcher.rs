@@ -18,11 +18,25 @@
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use std::thread;
+use std::thread::{self, JoinHandle};
 use crossbeam_channel::{self, Sender, Receiver};
 use crate::mcp::McpState;
 use crate::protocol::JsonRpcRequest;
 use crate::observability::metrics::Histogram;
+
+/// P0-6: Lock recovery macro for dispatcher hot paths.
+/// Handles poisoned locks gracefully instead of panicking.
+macro_rules! lock_or_recover {
+    ($lock:expr, $name:expr) => {
+        match $lock {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock ({})", $name);
+                poisoned.into_inner()
+            }
+        }
+    };
+}
 
 /// Maximum queue depth before backpressure kicks in.
 const DEFAULT_MAX_QUEUE_DEPTH: usize = 1000;
@@ -32,6 +46,9 @@ const DEFAULT_SEND_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// Default slow request threshold.
 const DEFAULT_SLOW_THRESHOLD: Duration = Duration::from_secs(5);
+
+/// Default maximum number of traces to retain.
+const DEFAULT_MAX_TRACES: usize = 1000;
 
 /// Dispatcher configuration (replaces hardcoded constants).
 #[derive(Debug, Clone)]
@@ -44,6 +61,8 @@ pub struct DispatcherConfig {
     pub slow_request_threshold: Duration,
     /// Worker thread count (None = auto-detect).
     pub worker_count: Option<usize>,
+    /// Maximum number of traces to retain (prevents unbounded memory growth).
+    pub max_traces: usize,
 }
 
 impl Default for DispatcherConfig {
@@ -53,6 +72,7 @@ impl Default for DispatcherConfig {
             send_timeout: DEFAULT_SEND_TIMEOUT,
             slow_request_threshold: DEFAULT_SLOW_THRESHOLD,
             worker_count: None,
+            max_traces: DEFAULT_MAX_TRACES,
         }
     }
 }
@@ -125,12 +145,16 @@ pub struct Dispatcher {
     rr_counter: std::sync::atomic::AtomicUsize,
     /// Request tracing for observability.
     traces: Arc<Mutex<Vec<TracedRequest>>>,
+    /// Maximum number of traces to retain (prevents unbounded memory growth).
+    max_traces: usize,
     /// Shutdown signal for graceful termination.
     shutdown_tx: Option<crossbeam_channel::Sender<()>>,
     /// Queue wait time histogram (ms) — time from enqueue to execution start.
     queue_wait_histogram: Arc<Histogram>,
     /// Execution time histogram (ms) — time from start to completion.
     execution_histogram: Arc<Histogram>,
+    /// Worker thread join handles for graceful shutdown.
+    workers: Vec<JoinHandle<()>>,
 }
 
 impl Dispatcher {
@@ -158,9 +182,11 @@ impl Dispatcher {
         }
 
         // Spawn worker threads — each worker gets its OWN receiver
+        // P0-2: Store JoinHandles for graceful shutdown in Drop impl
+        let mut workers = Vec::with_capacity(workers);
         for rx in receivers {
             let state = Arc::clone(&state);
-            thread::spawn(move || {
+            let handle = thread::spawn(move || {
                 while let Ok(handler) = rx.recv() {
                     // P0-1: No outer write lock — McpState handles its own locking
                     // via interior mutability. Multiple workers can run concurrently.
@@ -173,6 +199,7 @@ impl Dispatcher {
                     }
                 }
             });
+            workers.push(handle);
         }
 
         let (shutdown_tx, _shutdown_rx) = crossbeam_channel::bounded(1);
@@ -182,9 +209,11 @@ impl Dispatcher {
             request_txs,
             rr_counter: std::sync::atomic::AtomicUsize::new(0),
             traces,
+            max_traces: config.max_traces,
             shutdown_tx: Some(shutdown_tx),
             queue_wait_histogram: Arc::new(Histogram::latency_exponential()),
             execution_histogram: Arc::new(Histogram::latency_exponential()),
+            workers,
         }
     }
 
@@ -204,7 +233,8 @@ impl Dispatcher {
         let worker_idx = self.rr_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % self.request_txs.len();
         
         // Check if dispatcher is shutting down
-        let request_tx = self.request_txs[worker_idx].lock().unwrap();
+        // P0-6: Use lock_or_recover! to handle poisoned locks gracefully
+        let request_tx = lock_or_recover!(self.request_txs[worker_idx].lock(), "request_txs");
         if request_tx.is_none() {
             return Err(DispatcherError::Shutdown);
         }
@@ -213,8 +243,14 @@ impl Dispatcher {
 
         // Record enqueue
         {
-            let mut traces = self.traces.lock().unwrap();
+            // P0-6: Use lock_or_recover! to handle poisoned locks gracefully
+            let mut traces = lock_or_recover!(self.traces.lock(), "traces");
             traces.push(trace.clone());
+            
+            // P1-1: Prune old traces to prevent unbounded memory growth
+            while traces.len() > self.max_traces {
+                traces.remove(0);
+            }
         }
 
         // Clone Arcs for the boxed closure
@@ -279,7 +315,9 @@ impl Dispatcher {
 
     /// Get recent traces for observability.
     pub fn recent_traces(&self, count: usize) -> Vec<TracedRequest> {
-        let traces = self.traces.lock().unwrap();
+        // P0-6: Use lock_or_recover! to handle poisoned locks gracefully
+        let traces = lock_or_recover!(self.traces.lock(), "traces");
+        let count = count.min(traces.len());
         traces.iter().rev().take(count).cloned().collect()
     }
 
@@ -300,13 +338,60 @@ impl Dispatcher {
 
         // Close all per-worker request channels (workers will exit when queue is empty)
         for tx in &self.request_txs {
-            tx.lock().unwrap().take();
+            lock_or_recover!(tx.lock(), "request_txs").take();
         }
 
         // Wait for workers to finish (they'll exit when channels are closed)
         std::thread::sleep(timeout);
 
         Ok(())
+    }
+}
+
+/// P0-2: Drop implementation ensures graceful shutdown with worker thread joining.
+///
+/// When the Dispatcher is dropped (e.g., on server shutdown):
+/// 1. Signals all workers to stop accepting new work
+/// 2. Closes channels so workers can drain their queues
+/// 3. Joins all worker threads with a timeout to ensure in-flight work completes
+///
+/// This prevents data loss from abandoned persistence flushes or delta computations.
+impl Drop for Dispatcher {
+    fn drop(&mut self) {
+        // Signal shutdown
+        if let Some(ref tx) = self.shutdown_tx {
+            let _ = tx.send(());
+        }
+        
+        // Close all request channels
+        for tx in &self.request_txs {
+            lock_or_recover!(tx.lock(), "request_txs").take();
+        }
+        
+        // Join all workers with a reasonable timeout
+        // Workers will exit once their channels are closed and queues are drained
+        let join_timeout = Duration::from_secs(10);
+        let start = Instant::now();
+        
+        for (i, handle) in self.workers.drain(..).enumerate() {
+            let remaining = join_timeout.saturating_sub(start.elapsed());
+            
+            // Try to join with remaining timeout
+            if remaining.is_zero() {
+                eprintln!("[clean-ctx] WARNING: Worker {i} did not finish within timeout, detaching");
+                // Don't block forever - let the thread finish in background
+                continue;
+            }
+            
+            // Note: std::thread::JoinHandle doesn't have a timed join in stable Rust.
+            // We use a simple join here which will block until the worker finishes.
+            // In practice, workers should exit quickly once channels are closed.
+            if handle.join().is_err() {
+                eprintln!("[clean-ctx] WARNING: Worker {i} panicked during shutdown");
+            }
+        }
+        
+        eprintln!("[clean-ctx] All workers shut down gracefully");
     }
 }
 

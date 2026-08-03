@@ -5,7 +5,7 @@
 // manifest formatting helpers, and shared constants.
 
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Component, Path};
 
 use crate::compression::Fidelity;
 use crate::mcp::McpState;
@@ -122,13 +122,21 @@ pub(crate) fn collect_source_files(dir: &str, entries: &mut Vec<String>) {
     let mut visited = HashSet::new();
     let root = Path::new(dir);
 
-    // F-FULL-01/F-FULL-05: Fast-path canonicalize for root.
-    let root_canonical = if root.is_absolute() && !dir.contains("..") && !dir.contains("./") && !dir.contains(".\\") {
-        root.to_path_buf()
-    } else {
-        match std::fs::canonicalize(root) {
-            Ok(p) => p,
-            Err(_) => return,
+    // P1-6: Use Path::components() for robust path traversal detection.
+    // String-based checks (!dir.contains("..")) miss Windows paths with
+    // mixed separators, directory names with ".", and URL-encoded variants.
+    let root_canonical = {
+        let components = root.components().all(|c| {
+            matches!(c, Component::Normal(_) | Component::RootDir | Component::Prefix(_))
+        });
+        
+        if root.is_absolute() && components {
+            root.to_path_buf()
+        } else {
+            match std::fs::canonicalize(root) {
+                Ok(p) => p,
+                Err(_) => return,
+            }
         }
     };
     if !visited.insert(root_canonical) {

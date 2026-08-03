@@ -22,15 +22,32 @@ pub struct JsonRpcRequest {
     pub params: Option<serde_json::Value>,
 }
 
+/// P0-5: Lock recovery macro for protocol-level mutexes.
+/// Applied to STDOUT_MUTEX to prevent poisoned-lock panics from
+/// crashing all future responses.
+macro_rules! lock_or_recover_protocol {
+    ($lock:expr, $name:expr) => {
+        match $lock {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock ({})", $name);
+                poisoned.into_inner()
+            }
+        }
+    };
+}
+
 /// Send a JSON-RPC response to stdout.
 ///
 /// Thread-safe: uses a global mutex to serialize all stdout writes.
 /// Multiple worker threads can call this concurrently without
 /// interleaving response lines.
+///
+/// P0-5: Uses lock_or_recover_protocol! to handle poisoned locks gracefully.
 pub fn send_response(val: &serde_json::Value) {
     use std::io::{self, Write};
-    // Lock the global stdout mutex to prevent interleaved writes
-    let _lock = STDOUT_MUTEX.lock().unwrap();
+    // P0-5: Lock the global stdout mutex with poison recovery
+    let _lock = lock_or_recover_protocol!(STDOUT_MUTEX.lock(), "stdout");
     let mut stdout = io::stdout().lock();
     if let Ok(payload) = serde_json::to_string(val) {
         let _ = writeln!(stdout, "{}", payload);
