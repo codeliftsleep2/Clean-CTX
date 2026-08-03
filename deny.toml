@@ -11,22 +11,10 @@ unmaintained = "deny"
 # If 1 or more notice advisories are present, warn
 notice = "warn"
 
-# RUSTSEC-2025-0009: ring 0.17.9 AES overflow panic (debug builds only)
-# Ignored because upgrading ring >=0.17.12 requires cc ^1.2.8, which
-# conflicts with tree-sitter-html 0.20.0 requiring cc ~1.0.83 (ABI-locked).
-# Only affects debug builds with overflow checking enabled; release builds
-# are unaffected. Will resolve when tree-sitter upgrades to 0.21+ ABI.
-ignore = ["RUSTSEC-2025-0009"]
-
-# RUSTSEC-2026-0185: quinn-proto 0.11.14 remote memory exhaustion
-# Ignored because quinn-proto is a transitive dependency of the proxy crate
-# (via reqwest → hyper-rustls → rustls). The proxy is a separate workspace
-# member and the vulnerable QUIC stream reassembly code path is not exercised
-# by the HTTP/1.1 + TLS proxy use case. Upgrading to quinn-proto >=0.11.15
-# would require rustls >=0.24 which is incompatible with reqwest 0.12.
-# Will resolve when reqwest 0.13+ is adopted or the proxy migrates to
-# hyper-rustls 0.28+.
-ignore = ["RUSTSEC-2026-0185"]
+# No active ignore entries: both previously tracked advisories are resolved.
+# RUSTSEC-2025-0009 (ring AES overflow panic): patched in ring >= 0.17.12; current lockfile has 0.17.14.
+# RUSTSEC-2026-0185 (quinn-proto memory exhaustion): patched in quinn-proto >= 0.11.15; current lockfile has 0.11.15.
+ignore = []
 
 [licenses]
 # Deny unknown licenses
