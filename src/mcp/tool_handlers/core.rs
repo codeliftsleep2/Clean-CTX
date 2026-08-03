@@ -79,7 +79,7 @@ pub(crate) fn handle_compress_code_context(
         let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
         let footer = state.format_dict_footer();
         let llm_text_with_footer = format!("{}\n// ── {} ({}) ──\n{}",
-            llm_text.trim(), ir.file_id, &resolved_path, footer.trim());
+            llm_text.trim(), ir.file_id, resolved_path, footer.trim());
         state.llm_text_cache_lock().insert(ir.file_id.clone(), llm_text_with_footer.clone());
 
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
