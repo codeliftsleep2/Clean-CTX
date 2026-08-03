@@ -147,8 +147,11 @@ pub struct Dispatcher {
     traces: Arc<Mutex<Vec<TracedRequest>>>,
     /// Maximum number of traces to retain (prevents unbounded memory growth).
     max_traces: usize,
-    /// Shutdown signal for graceful termination.
-    shutdown_tx: Option<crossbeam_channel::Sender<()>>,
+    /// Shutdown flag for graceful termination.
+    ///
+    /// Replaces the previous shutdown channel whose receiver was
+    /// immediately dropped, making `shutdown()` a silent no-op.
+    shutdown_flag: Arc<std::sync::atomic::AtomicBool>,
     /// Queue wait time histogram (ms) — time from enqueue to execution start.
     queue_wait_histogram: Arc<Histogram>,
     /// Execution time histogram (ms) — time from start to completion.
@@ -183,34 +186,49 @@ impl Dispatcher {
 
         // Spawn worker threads — each worker gets its OWN receiver
         // P0-2: Store JoinHandles for graceful shutdown in Drop impl
+        // The shutdown flag is shared across all workers. We use
+        // recv_timeout so a worker blocked waiting for a message still
+        // wakes up periodically to check the shutdown flag — a plain
+        // blocking recv() would never re-check the flag until a message
+        // arrives or the channel closes, causing a hang on shutdown.
+        let shutdown_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let mut workers = Vec::with_capacity(workers);
         for rx in receivers {
             let state = Arc::clone(&state);
+            let shutdown = Arc::clone(&shutdown_flag);
             let handle = thread::spawn(move || {
-                while let Ok(handler) = rx.recv() {
-                    // P0-1: No outer write lock — McpState handles its own locking
-                    // via interior mutability. Multiple workers can run concurrently.
-                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        handler(&state);
-                    }));
+                while !shutdown.load(std::sync::atomic::Ordering::Relaxed) {
+                    match rx.recv_timeout(Duration::from_millis(100)) {
+                        Ok(handler) => {
+                            // P0-1: No outer write lock — McpState handles its own locking
+                            // via interior mutability. Multiple workers can run concurrently.
+                            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                handler(&state);
+                            }));
 
-                    if result.is_err() {
-                        eprintln!("[clean-ctx] ERROR: Handler panicked");
+                            if result.is_err() {
+                                eprintln!("[clean-ctx] ERROR: Handler panicked");
+                            }
+                        }
+                        Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
+                            // Re-check shutdown flag
+                        }
+                        Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
+                            break;
+                        }
                     }
                 }
             });
             workers.push(handle);
         }
 
-        let (shutdown_tx, _shutdown_rx) = crossbeam_channel::bounded(1);
-        
         Self {
             state,
             request_txs,
             rr_counter: std::sync::atomic::AtomicUsize::new(0),
             traces,
             max_traces: config.max_traces,
-            shutdown_tx: Some(shutdown_tx),
+            shutdown_flag,
             queue_wait_histogram: Arc::new(Histogram::latency_exponential()),
             execution_histogram: Arc::new(Histogram::latency_exponential()),
             workers,
@@ -295,12 +313,22 @@ impl Dispatcher {
             }
         });
 
-        // Send to the selected worker (non-blocking send).
-        // Per-worker channels with capacity 1000 should never be full
-        // under normal operation.
+        // Send to the selected worker.
+        // Use try_send instead of send: a blocking send would hold the
+        // request_txs mutex while the channel is full, deadlocking
+        // shutdown() which also needs that mutex. try_send maps a full
+        // channel to the intended -32603 "queue full" response instead
+        // of blocking the server indefinitely.
         if let Some(ref tx) = *request_tx {
-            tx.send(boxed)
-                .map_err(|_| DispatcherError::QueueFull)?;
+            match tx.try_send(boxed) {
+                Ok(()) => {}
+                Err(crossbeam_channel::TrySendError::Full(_)) => {
+                    return Err(DispatcherError::QueueFull);
+                }
+                Err(crossbeam_channel::TrySendError::Disconnected(_)) => {
+                    return Err(DispatcherError::Shutdown);
+                }
+            }
         } else {
             return Err(DispatcherError::Shutdown);
         }
@@ -331,10 +359,8 @@ impl Dispatcher {
     /// 2. Waits for inflight requests to complete (up to timeout)
     /// 3. Flushes traces and closes channels
     pub fn shutdown(&self, timeout: Duration) -> Result<(), DispatcherError> {
-        // Send shutdown signal
-        if let Some(ref tx) = self.shutdown_tx {
-            let _ = tx.send(());
-        }
+        // Set shutdown flag — workers check it between requests
+        self.shutdown_flag.store(true, std::sync::atomic::Ordering::Relaxed);
 
         // Close all per-worker request channels (workers will exit when queue is empty)
         for tx in &self.request_txs {
@@ -358,10 +384,8 @@ impl Dispatcher {
 /// This prevents data loss from abandoned persistence flushes or delta computations.
 impl Drop for Dispatcher {
     fn drop(&mut self) {
-        // Signal shutdown
-        if let Some(ref tx) = self.shutdown_tx {
-            let _ = tx.send(());
-        }
+        // Signal shutdown — workers check the flag between requests
+        self.shutdown_flag.store(true, std::sync::atomic::Ordering::Relaxed);
         
         // Close all request channels
         for tx in &self.request_txs {

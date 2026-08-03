@@ -54,6 +54,43 @@ pub(super) fn resolve_file_path(path: &str, workspace_root: Option<&str>) -> Str
     }
 }
 
+/// Resolve a file path and enforce a workspace boundary (XPIA mitigation).
+///
+/// The boundary is anchored to the **process CWD** (the trusted root), NOT the
+/// caller-supplied `workspace_root` (which is itself attacker-controlled).
+/// The resolved path is canonicalized (resolving symlinks and `..`) and must
+/// remain within the trusted root. Returns `Ok(canonical_path)` if inside the
+/// boundary, or `Err(message)` if the path is outside or does not exist.
+///
+/// This prevents Cross-Prompt Injection Attacks (XPIA) where source code with
+/// embedded instructions could direct the LLM to read sensitive files outside
+/// the project (e.g. `/etc/passwd`, `~/.ssh/id_rsa`).
+pub(super) fn resolve_file_path_checked(
+    path: &str,
+    workspace_root: Option<&str>,
+) -> Result<String, String> {
+    // 1. Resolve to absolute using the existing logic
+    let resolved = resolve_file_path(path, workspace_root);
+    // 2. Canonicalize the trusted root (process CWD)
+    let trusted_root = std::env::current_dir()
+        .map_err(|e| format!("cannot determine workspace root: {e}"))?;
+    let trusted_root_canon = trusted_root.canonicalize().unwrap_or(trusted_root);
+    // 3. Canonicalize the resolved path (resolves symlinks and `..`) for
+    //    the boundary check. NOTE: we return the ORIGINAL resolved path,
+    //    not the canonical form, so persistence keys and alias mappings
+    //    remain stable (canonicalizing would change the DB key and break
+    //    callers that expect the caller-supplied path form).
+    let resolved_canon = std::path::Path::new(&resolved)
+        .canonicalize()
+        .map_err(|_| format!("path does not exist: {resolved}"))?;
+    // 4. Boundary check: resolved must be within trusted root
+    if resolved_canon.starts_with(&trusted_root_canon) {
+        Ok(resolved)
+    } else {
+        Err(format!("path outside workspace root: {resolved}"))
+    }
+}
+
 /// Rough token estimation (chars / 4).
 /// In production, use tiktoken-rs; this is a lightweight approximation.
 pub(super) fn estimate_tokens(text: &str) -> usize {

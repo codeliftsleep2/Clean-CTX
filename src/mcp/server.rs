@@ -195,6 +195,14 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
                     "error": { "code": -32603, "message": "Internal error: queue full" }
                 }));
             }
+        } else {
+            // JSON-RPC 2.0 requires a -32700 Parse error response.
+            // Without this, the client hangs indefinitely waiting for a reply.
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": serde_json::Value::Null,
+                "error": { "code": -32700, "message": "Parse error" }
+            }));
         }
     }
 

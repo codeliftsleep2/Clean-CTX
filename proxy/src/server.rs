@@ -143,7 +143,7 @@ pub async fn run_server_with_listener(
                     };
 
                     let svc = service_fn(move |req| {
-                        handle_request(req, state.clone())
+                        handle_request(req, state.clone(), peer_addr)
                     });
 
                     if let Err(e) = http1::Builder::new()
@@ -168,20 +168,6 @@ pub async fn run_server_with_listener(
 
 fn is_connection_closed(e: &hyper::Error) -> bool {
     e.is_incomplete_message() || e.is_closed()
-}
-
-/// Extract the client IP from the request (X-Forwarded-For or peer addr).
-fn extract_client_ip(parts: &hyper::http::request::Parts) -> String {
-    if let Some(forwarded) = parts.headers.get("x-forwarded-for") {
-        if let Ok(val) = forwarded.to_str() {
-            if let Some(ip) = val.split(',').next() {
-                return ip.trim().to_string();
-            }
-        }
-    }
-    // Fallback: use a placeholder since we don't have direct access to peer addr here.
-    // The peer_addr is available at the connection level but not passed to handle_request.
-    "unknown".to_string()
 }
 
 /// Build a 401 Unauthorized response.
@@ -231,6 +217,7 @@ fn bad_gateway_response(msg: &str) -> Response<Full<BytesType>> {
 async fn handle_request(
     req: Request<Incoming>,
     state: SharedState,
+    peer_addr: SocketAddr,
 ) -> Result<Response<Full<BytesType>>, std::convert::Infallible> {
     let req_id = {
         let guard = state.read().await;
@@ -256,8 +243,11 @@ async fn handle_request(
                 return Ok(unauthorized_response("Missing or invalid API key. Provide via X-Api-Key header."));
             }
 
-            // Rate limit check (only when auth is active)
-            let client_ip = extract_client_ip(&parts);
+            // Rate limit check (only when auth is active).
+            // SECURITY: Use the actual TCP peer address — X-Forwarded-For is
+            // caller-controlled and can be spoofed per-request to bypass the
+            // rate limiter. This is a local proxy with no trusted upstream.
+            let client_ip = peer_addr.ip().to_string();
             if !guard.rate_limiter.check(&client_ip).await {
                 warn!("[{req_id}] Rate limit exceeded for {client_ip}");
                 return Ok(rate_limited_response());
@@ -561,26 +551,4 @@ mod tests {
         assert!(resp.headers().get("retry-after").is_some());
     }
 
-    #[test]
-    fn test_extract_client_ip_from_forwarded() {
-        let req = Request::builder()
-            .uri("/v1/messages")
-            .method(Method::POST)
-            .header("x-forwarded-for", "10.0.0.1, 10.0.0.2")
-            .body(http_body_util::Full::new(bytes::Bytes::new()))
-            .unwrap();
-        let (parts, _) = req.into_parts();
-        assert_eq!(extract_client_ip(&parts), "10.0.0.1");
-    }
-
-    #[test]
-    fn test_extract_client_ip_fallback() {
-        let req = Request::builder()
-            .uri("/v1/messages")
-            .method(Method::POST)
-            .body(http_body_util::Full::new(bytes::Bytes::new()))
-            .unwrap();
-        let (parts, _) = req.into_parts();
-        assert_eq!(extract_client_ip(&parts), "unknown");
-    }
 }

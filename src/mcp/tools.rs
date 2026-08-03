@@ -370,11 +370,23 @@ pub(crate) fn dispatch_tools_call(
         }
         "compress_workspace" => {
             let dir_path = params["arguments"]["directoryPath"].as_str().unwrap_or(".");
+            // XPIA mitigation: reject directory paths outside the trusted workspace root
+            let dir_path = match super::tool_helpers::resolve_file_path_checked(dir_path, None) {
+                Ok(p) => p,
+                Err(msg) => {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32602, "message": msg }
+                    }));
+                    return;
+                }
+            };
             let fidelity = match parse_fidelity_arg(id, params, &state.config) {
                 Ok(f) => f,
                 Err(()) => return,
             };
-            match workspace::compress_workspace_dir(dir_path, fidelity, state) {
+            match workspace::compress_workspace_dir(&dir_path, fidelity, state) {
                 Ok(result) => {
                     let mut response = serde_json::json!({
                         "jsonrpc": "2.0",
