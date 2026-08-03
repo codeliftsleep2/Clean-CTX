@@ -383,7 +383,7 @@ fn compress_pass(
             Ok(compressed) => {
                 // Alias already pre-assigned — this is a read-only lookup.
                 let alias = dict_guard.get_or_create_alias(entry.clone());
-                let mut manifest_guard = manifest_mutex.lock().unwrap();
+                let mut manifest_guard = manifest_mutex.lock().unwrap_or_else(|p| p.into_inner());
                 manifest_guard.push_str(&format!(
                     "// ===== FILE: {} =====\n// α alias: {}\n",
                     entry, alias
@@ -407,9 +407,9 @@ fn compress_pass(
                 );
             }
             Err(e) => {
-                let mut errors_guard = errors_mutex.lock().unwrap();
+                let mut errors_guard = errors_mutex.lock().unwrap_or_else(|p| p.into_inner());
                 errors_guard.push((entry.clone(), e.to_string()));
-                let mut manifest_guard = manifest_mutex.lock().unwrap();
+                let mut manifest_guard = manifest_mutex.lock().unwrap_or_else(|p| p.into_inner());
                 manifest_guard.push_str(&format!("// ERROR compressing {}: {}\n\n", entry, e));
             }
         }
