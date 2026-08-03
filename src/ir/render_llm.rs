@@ -214,9 +214,10 @@ fn render_methods(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
             }
 
             // Flags
-            if has_flags {
-                let flags = method.flags.as_ref().unwrap();
-                output.push_str(&format!(" fl:{}", flags.join(",")));
+            if let Some(flags) = &method.flags {
+                if !flags.is_empty() {
+                    output.push_str(&format!(" fl:{}", flags.join(",")));
+                }
             }
         }
 

@@ -27,28 +27,19 @@ enum Cli {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Use try_parse_from with args_os to handle the case where no
-    // subcommand is given — clap generates an error for missing subcommand,
-    // but we want to default to running the MCP server.
-    let args: Vec<String> = std::env::args().collect();
-    
-    // Check if any known subcommand/flag is present. If not, run the server.
-    let has_subcommand = args.iter().skip(1).any(|a| {
-        matches!(a.as_str(), "init" | "setup" | "--config-dump")
-    });
-
-    if !has_subcommand {
+    // Idiomatic clap dispatch: when no subcommand is given, clap emits a
+    // MissingSubcommand error, which we intercept to default to running the
+    // MCP server. Any future Cli variant is automatically dispatched here —
+    // no parallel manual whitelist to keep in sync.
+    match Cli::try_parse() {
+        Ok(Cli::Init) => cmd_init(),
+        Ok(Cli::Setup { force }) => cmd_setup_cbm(force),
+        Ok(Cli::ConfigDump) => cmd_config_dump(),
         // Default: run the MCP server
         // Note: --with-cbm is the default behavior now (auto-detect CBM on PATH).
         // Use CBM_DISABLE=1 env var to explicitly disable CBM integration.
-        return clean_ctx::mcp::run();
-    }
-
-    // Parse and dispatch known subcommands
-    match Cli::parse() {
-        Cli::Init => cmd_init(),
-        Cli::Setup { force } => cmd_setup_cbm(force),
-        Cli::ConfigDump => cmd_config_dump(),
+        Err(e) if e.kind() == clap::error::ErrorKind::MissingSubcommand => clean_ctx::mcp::run(),
+        Err(e) => e.exit(),
     }
 }
 

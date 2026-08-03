@@ -12,10 +12,11 @@ use std::process::{Command, Stdio};
 
 /// Path to the debug binary (the most common build target).
 fn binary_path() -> String {
+    let ext = if cfg!(windows) { ".exe" } else { "" };
     if cfg!(debug_assertions) {
-        "target/debug/clean-ctx.exe".to_string()
+        format!("target/debug/clean-ctx{ext}")
     } else {
-        "target/release/clean-ctx.exe".to_string()
+        format!("target/release/clean-ctx{ext}")
     }
 }
 

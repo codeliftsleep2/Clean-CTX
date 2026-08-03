@@ -212,7 +212,7 @@ impl GraphBridge {
             return false;
         }
         // Real client OR pre-seeded cache (mock mode)
-        self.client.lock().unwrap().is_some() || !self.cache.is_empty()
+        self.client.lock().unwrap_or_else(|p| p.into_inner()).is_some() || !self.cache.is_empty()
     }
     pub fn graph_version(&self) -> &str { &self.graph_version }
     pub fn set_graph_version(&mut self, v: &str) { self.graph_version = v.to_string(); }
@@ -231,12 +231,12 @@ impl GraphBridge {
         let project = self.project_str();
         eprintln!("[clean-ctx-cbm] Indexing project: {project}");
         // Call CBM's index_project tool to trigger indexing
-        let client_guard = self.client.lock().unwrap();
+        let client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
         let _result = match client_guard.as_ref() {
             Some(_c) => {
                 // We need mut access — drop guard, reacquire as mut
                 drop(client_guard);
-                let mut cg = self.client.lock().unwrap();
+                let mut cg = self.client.lock().unwrap_or_else(|p| p.into_inner());
                 let client = cg.as_mut().unwrap();
                 client.call_tool("index_project", serde_json::json!({"project": project}))
             }
@@ -254,7 +254,7 @@ impl GraphBridge {
     /// respond to the agent with a "retry later" message instead of
     /// blocking the entire dispatcher thread.
     pub fn ensure_indexed(&mut self) -> Result<IndexingStatus, CbmError> {
-        let mut state = self.indexing_state.lock().unwrap();
+        let mut state = self.indexing_state.lock().unwrap_or_else(|p| p.into_inner());
 
         match &*state {
             IndexingState::Complete => return Ok(IndexingStatus::Ready),
@@ -343,7 +343,7 @@ impl GraphBridge {
 
     /// Access the indexing state for inspection (e.g., get_cbm_status handler).
     pub fn indexing_state(&self) -> std::sync::MutexGuard<'_, IndexingState> {
-        self.indexing_state.lock().unwrap()
+        self.indexing_state.lock().unwrap_or_else(|p| p.into_inner())
     }
 
     /// Resolve project name, using explicit if set, else auto-detected.
@@ -633,7 +633,7 @@ impl GraphBridge {
     /// Cache invalidation is the caller's responsibility — when a new version
     /// is detected, the cache should be invalidated and the version updated.
     pub fn detect_changes(&mut self) -> Result<Option<String>, CbmError> {
-        let client_guard = self.client.lock().unwrap();
+        let client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
         if client_guard.is_none() {
             return Ok(None);
         }
@@ -664,7 +664,7 @@ impl GraphBridge {
         ).entered();
         let start = std::time::Instant::now();
         let result = {
-            let mut client_guard = self.client.lock().unwrap();
+            let mut client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
             match client_guard.as_mut() {
                 Some(c) => c.call_tool_raw(tool_name, args),
                 None => return Err(CbmError::LaunchError("CBM not available".into())),
@@ -691,7 +691,7 @@ impl GraphBridge {
     /// elapsed), we log the recovery.
     pub fn update_status(&mut self) {
         let previous = self.status.clone();
-        self.status = match self.client.lock().unwrap().as_ref() {
+        self.status = match self.client.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {
             Some(c) => c.status().clone(),
             None => CbmStatus::Unavailable,
         };
@@ -734,7 +734,7 @@ impl GraphBridge {
     fn query<F, T>(&mut self, f: F) -> Result<T, CbmError>
     where F: FnOnce(&mut CbmClient) -> Result<T, CbmError>,
     {
-        let mut client_guard = self.client.lock().unwrap();
+        let mut client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
         let client = match client_guard.as_mut() {
             Some(c) => c,
             None => return Err(CbmError::LaunchError("CBM not available".into())),
