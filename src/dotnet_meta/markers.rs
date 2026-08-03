@@ -354,6 +354,9 @@ impl PhiLineKind {
 // ---------------------------------------------------------------------------
 
 /// A marker line that can render itself to its `Φ…` string form.
+/// Used by tests (`src/tests/dotnet_meta/markers.rs`) to verify
+/// marker round-trips. Kept under `#[allow(dead_code)]` because the
+/// trait is only exercised in test code today.
 #[allow(dead_code)]
 pub trait PhiLine {
     /// The kind of this marker.
@@ -421,6 +424,7 @@ pub fn build_entity_line(name: &str, fields: &[String]) -> String {
 }
 
 /// Build a `Φrel:<Name> → <Target>` marker line.
+/// Used by tests (`src/tests/dotnet_meta/markers.rs`).
 #[allow(dead_code)]
 pub fn build_relationship_line(name: &str, target: &str) -> String {
     format!("Φrel:{} → {}", name, target)
@@ -465,6 +469,7 @@ pub fn build_hub_method_line(name: &str, params: &str, target: &str) -> String {
 }
 
 /// Build a `Φclient:<Interface>.<Method>(<params>)` marker line.
+/// Used by tests (`src/tests/dotnet_meta/markers.rs`).
 #[allow(dead_code)]
 pub fn build_client_line(interface: &str, method: &str, params: &str) -> String {
     format!("Φclient:{}.{}({})", interface, method, params)
@@ -575,7 +580,9 @@ pub fn build_metric_line(provider: &str) -> String {
 
 /// Expand every recognised `Φ…` marker in a line back to its
 /// attribute form. Used by the decompressor.
-#[allow(dead_code)]
+/// Called by `decompression::markers::expand_phi_in_line` when the
+/// `dotnet` feature is enabled; always used by tests.
+#[cfg_attr(not(feature = "dotnet"), allow(dead_code))]
 pub fn expand_phi_in_line(line: &str) -> String {
     let mut s = line.to_string();
     for &kind in PhiLineKind::all_in_expand_order() {
@@ -589,6 +596,7 @@ pub fn expand_phi_in_line(line: &str) -> String {
 
 /// Expand a single `Φ` marker token to its attribute form. Returns
 /// `None` for unknown markers so the caller can pass them through.
+/// Used by tests (`src/tests/dotnet_meta/markers.rs`).
 #[allow(dead_code)]
 pub fn expand_phi(token: &str) -> Option<&'static str> {
     PhiLineKind::from_token(token).map(|k| k.expansion())

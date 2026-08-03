@@ -20,6 +20,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, RwLock};
 use std::sync::Arc;
+use std::time::SystemTime;
 use crate::angular_meta::graph_state::AngularGraphHandle;
 use crate::dotnet_meta::graph_state::DotnetGraphHandle;
 use crate::spring_meta::graph_state::SpringGraphHandle;
@@ -75,10 +76,47 @@ pub struct CbmFilterState {
     pub skip_sets: HashMap<String, HashSet<String>>,
 }
 
+/// P0-3: Cache entry with metadata for invalidation.
+///
+/// Tracks file modification time and size to detect when a cached
+/// file has changed on disk. This prevents serving stale content
+/// after the user edits a file.
+#[derive(Debug, Clone)]
+pub struct CacheEntry {
+    content: Arc<String>,
+    mtime: SystemTime,
+    size: u64,
+}
+
 /// Per-session state shared by all MCP tool handlers.
 ///
 /// v0.2.0: Uses top-level RwLock for parallel reads (see dispatcher).
 /// v0.3.0: Will migrate to interior mutability for fine-grained parallelism.
+///
+/// # Lock Ordering (canonical acquisition order)
+///
+/// To prevent deadlocks, handlers must acquire locks in this order:
+/// 1. `ir_context` (RwLock) - IR state for delta computation
+/// 2. `source_cache` (Mutex) - File content cache
+/// 3. `cache` (RwLock) - Local state cache for snapshots
+/// 4. `dict` (Mutex) - Path dictionary for aliases
+/// 5. `persistence_store` (Mutex) - SQLite persistence
+/// 6. All other Mutex fields (any order)
+///
+/// Violating this order may cause deadlocks under concurrent load.
+///
+/// # Example - CORRECT:
+/// ```ignore
+/// let ir = state.ir_context_lock();
+/// let source = state.read_source(path)?;  // acquires source_cache
+/// let cache = state.cache_write();  // acquires cache
+/// ```
+///
+/// # Example - WRONG (potential deadlock):
+/// ```ignore
+/// let cache = state.cache_write();
+/// let ir = state.ir_context_lock();  // Another thread holds ir_context, waiting for cache
+/// ```
 pub struct McpState {
     /// Path-alias dictionary (`α1`, `α2`, …). Mutated in place by
     /// `compress_code_context` and `compress_workspace`.
@@ -115,7 +153,8 @@ pub struct McpState {
     /// All I/O paths check this cache first, populating it on first read.
     /// Subsequent reads (from IR compiler, bundle_pass, graph_pass) are
     /// O(1) lookups. Files are stored as `Arc<String>` to avoid clones.
-    pub source_cache: Mutex<HashMap<String, Arc<String>>>,
+    /// P0-3: Cache entries include mtime and size for invalidation.
+    pub source_cache: Mutex<HashMap<String, CacheEntry>>,
     /// F-FINAL-06: Accumulated warnings surfaced via the JSON-RPC
     /// `_warnings` field. Sub-systems that previously used `eprintln!`
     /// (e.g. duplicate class name in the Angular graph) now push
@@ -243,6 +282,8 @@ impl McpState {
             cbm_filter: Mutex::new(CbmFilterState::default()),
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,
+            // P1-3: Note - proxy config not yet in CleanCtxConfig, using default
+            // TODO: Add proxy.port to config when proxy configuration is implemented
             proxy_port: 8787,
             registry: LayerRegistry::new(),
             metrics_registry: std::sync::Arc::new(crate::observability::MetricsRegistry::new()),
@@ -301,7 +342,7 @@ impl McpState {
     }
 
     /// Lock the source cache for writing.
-    pub fn source_cache_lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, Arc<String>>> {
+    pub fn source_cache_lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, CacheEntry>> {
         lock_or_recover!(self.source_cache.lock(), "source_cache")
     }
 
@@ -448,10 +489,18 @@ impl McpState {
     /// **Two-phase locking:** The Mutex is held only during cache lookup
     /// and update, NOT during `read_to_string`. This prevents I/O from
     /// blocking concurrent readers.
+    ///
+    /// P0-3: Cache entries include mtime and size for invalidation.
+    /// If the file has changed since it was cached, we re-read it.
     pub fn read_source(&self, path: &str) -> Result<Arc<String>, std::io::Error> {
         let cache_key = Self::resolve_cache_key(path);
         #[cfg(debug_assertions)]
         let overall_start = std::time::Instant::now();
+
+        // Get file metadata for cache invalidation
+        let metadata = std::fs::metadata(path)?;
+        let current_mtime = metadata.modified()?;
+        let current_size = metadata.len();
 
         // Phase 1: Check cache (brief lock, release before I/O)
         {
@@ -461,9 +510,14 @@ impl McpState {
             #[cfg(debug_assertions)]
             eprintln!("[read_source] Phase 1 lock acquire took {:?} for {}", lock_start.elapsed(), path);
             if let Some(cached) = cache.get(&cache_key) {
+                // P0-3: Check if file has changed using mtime and size
+                if cached.mtime == current_mtime && cached.size == current_size {
+                    #[cfg(debug_assertions)]
+                    eprintln!("[read_source] CACHE HIT for {} (total: {:?})", path, overall_start.elapsed());
+                    return Ok(Arc::clone(&cached.content));
+                }
                 #[cfg(debug_assertions)]
-                eprintln!("[read_source] CACHE HIT for {} (total: {:?})", path, overall_start.elapsed());
-                return Ok(Arc::clone(cached));
+                eprintln!("[read_source] CACHE STALE for {} (mtime/size changed)", path);
             }
             #[cfg(debug_assertions)]
             eprintln!("[read_source] CACHE MISS for {}", path);
@@ -482,7 +536,14 @@ impl McpState {
         let mut cache = lock_or_recover!(self.source_cache.lock(), "source_cache");
         #[cfg(debug_assertions)]
         eprintln!("[read_source] Phase 3 lock acquire took {:?} for {}", lock2_start.elapsed(), path);
-        cache.entry(cache_key).or_insert(content.clone());
+        
+        // P0-3: Insert or update cache entry with metadata
+        cache.entry(cache_key).or_insert(CacheEntry {
+            content: Arc::clone(&content),
+            mtime: current_mtime,
+            size: current_size,
+        });
+        
         #[cfg(debug_assertions)]
         eprintln!("[read_source] TOTAL for {}: {:?}", path, overall_start.elapsed());
 

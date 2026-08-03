@@ -61,7 +61,8 @@ fn resolve_fidelity_extension_override() {
 #[test]
 fn parse_fidelity_arg_with_explicit_value() {
     let params = json!({ "arguments": { "fidelity": "high" } });
-    let result = parse_fidelity_arg(&json!(1), &params);
+    let config = crate::config::CleanCtxConfig::default();
+    let result = parse_fidelity_arg(&json!(1), &params, &config);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), Fidelity::High);
 }
@@ -69,14 +70,16 @@ fn parse_fidelity_arg_with_explicit_value() {
 #[test]
 fn parse_fidelity_arg_missing_defaults() {
     let params = json!({ "arguments": {} });
-    let result = parse_fidelity_arg(&json!(1), &params);
+    let config = crate::config::CleanCtxConfig::default();
+    let result = parse_fidelity_arg(&json!(1), &params, &config);
     assert!(result.is_ok());
 }
 
 #[test]
 fn parse_fidelity_arg_invalid_returns_error() {
     let params = json!({ "arguments": { "fidelity": "turbo" } });
-    let result = parse_fidelity_arg(&json!(1), &params);
+    let config = crate::config::CleanCtxConfig::default();
+    let result = parse_fidelity_arg(&json!(1), &params, &config);
     assert!(result.is_err());
 }
 

@@ -164,6 +164,12 @@ impl From<serde_json::Error> for CleanCtxError {
     }
 }
 
+impl From<crate::ir::compiler::CompileError> for CleanCtxError {
+    fn from(e: crate::ir::compiler::CompileError) -> Self {
+        CleanCtxError::Ir(e.to_string())
+    }
+}
+
 /// Convert a `CleanCtxError` into a JSON-RPC error response Value.
 /// Convenience for MCP tool handlers.
 pub fn to_jsonrpc_error(id: &serde_json::Value, error: &CleanCtxError) -> serde_json::Value {

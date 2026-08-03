@@ -227,6 +227,9 @@ fn read_request_line<R: BufRead>(handle: &mut R) -> Option<Result<String, Oversi
     let mut total: usize = 0;
 
     loop {
+        // `read_line` appends to its argument, so we must clear the
+        // buffer at the start of each iteration to avoid concatenating
+        // chunks from incomplete multi-read lines.
         buffer.clear();
         // `read_line` returns the number of bytes read (including the
         // trailing newline, if any). A `0` return means EOF.
@@ -267,9 +270,10 @@ fn read_request_line<R: BufRead>(handle: &mut R) -> Option<Result<String, Oversi
                 }
 
                 if buffer.ends_with('\n') {
-                    // Trim the trailing newline so downstream parsers
-                    // see the request body only.
-                    if buffer.ends_with('\n') {
+                    // Trim the trailing newline(s) so downstream parsers
+                    // see the request body only. Use a loop to handle
+                    // \r\n followed by an extra \n (malformed but possible).
+                    while buffer.ends_with('\n') {
                         buffer.pop();
                         if buffer.ends_with('\r') {
                             buffer.pop();
@@ -292,11 +296,14 @@ fn read_request_line<R: BufRead>(handle: &mut R) -> Option<Result<String, Oversi
 /// recover from an oversize request — without this, the remainder of
 /// the over-budget line would be prepended to the next legitimate
 /// request, corrupting it.
+// P1-5: Fix underreporting by counting the final chunk
 fn drain_line<R: BufRead>(handle: &mut R) {
     let mut sink = String::new();
     let mut drained: usize = 0;
     while let Ok(n) = handle.read_line(&mut sink) {
         if n == 0 || sink.ends_with('\n') {
+            // P1-5: Add final chunk to drained total
+            drained = drained.saturating_add(n);
             break;
         }
         drained = drained.saturating_add(n);

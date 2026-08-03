@@ -15,17 +15,17 @@ use crate::filter_rules::{FilterFile, compile_filter_file};
 /// Error loading community filters.
 #[derive(Debug)]
 pub enum CommunityFilterError {
-    IoError(std::io::Error),
-    ParseError(String),
-    CompileError(String),
+    Io(std::io::Error),
+    Parse(String),
+    Compile(String),
 }
 
 impl std::fmt::Display for CommunityFilterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::IoError(e) => write!(f, "IO error: {e}"),
-            Self::ParseError(e) => write!(f, "Parse error: {e}"),
-            Self::CompileError(e) => write!(f, "Compile error: {e}"),
+            Self::Io(e) => write!(f, "IO error: {e}"),
+            Self::Parse(e) => write!(f, "Parse error: {e}"),
+            Self::Compile(e) => write!(f, "Compile error: {e}"),
         }
     }
 }
@@ -58,7 +58,7 @@ pub fn load_community_filters(dir: &Path) -> CommunityFiltersResult {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(e) => {
-            result.errors.push(CommunityFilterError::IoError(e));
+            result.errors.push(CommunityFilterError::Io(e));
             return result;
         }
     };
@@ -90,10 +90,10 @@ pub fn load_community_filters(dir: &Path) -> CommunityFiltersResult {
 /// Load and compile filters from a single TOML file.
 fn load_single_filter_file(path: &Path) -> Result<Vec<crate::filter_rules::CompiledFilter>, CommunityFilterError> {
     let content = std::fs::read_to_string(path)
-        .map_err(CommunityFilterError::IoError)?;
+        .map_err(CommunityFilterError::Io)?;
 
     let file: FilterFile = toml::from_str(&content)
-        .map_err(|e| CommunityFilterError::ParseError(format!("{}: {e}", path.display())))?;
+        .map_err(|e| CommunityFilterError::Parse(format!("{}: {e}", path.display())))?;
 
     let compiled = compile_filter_file(&file)
         .map_err(|errs| {
@@ -102,7 +102,7 @@ fn load_single_filter_file(path: &Path) -> Result<Vec<crate::filter_rules::Compi
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
                 .join("; ");
-            CommunityFilterError::CompileError(msg)
+            CommunityFilterError::Compile(msg)
         })?;
 
     Ok(compiled.into_iter().map(|(f, _)| f).collect())
@@ -176,7 +176,7 @@ match_command = "^test"
 
         let result = load_single_filter_file(&file_path);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), CommunityFilterError::ParseError(_)));
+        assert!(matches!(result.unwrap_err(), CommunityFilterError::Parse(_)));
 
         let _ = std::fs::remove_dir_all(&dir);
     }

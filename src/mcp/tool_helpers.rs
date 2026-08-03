@@ -98,7 +98,7 @@ pub(super) fn compile_file_ir(
     file_path: &str,
     fidelity: Fidelity,
     state: &McpState,
-) -> Result<(crate::ir::compiler::CompiledIR, String), Box<dyn std::error::Error>> {
+) -> Result<(crate::ir::compiler::CompiledIR, String), crate::error::CleanCtxError> {
     use crate::ir::compiler::IRCompiler;
     use crate::ir::layers::typescript::TypeScriptLayer;
     use crate::ir::layers::csharp::CSharpLayer;
@@ -117,7 +117,7 @@ pub(super) fn compile_file_ir(
         .unwrap_or("");
 
     let (language, query_string) = language_for_extension(extension)
-        .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
+        .ok_or_else(|| crate::error::CleanCtxError::Ir(format!("Unsupported file extension: .{}", extension)))?;
 
     // F-FULL-10: Use raw path for alias key for deterministic results.
     // Canonicalize is still performed for the `α alias: <path>` footer

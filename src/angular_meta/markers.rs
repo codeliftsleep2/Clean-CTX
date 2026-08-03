@@ -163,6 +163,7 @@ impl PhiLineKind {
     }
 
     /// Returns the token string (without trailing `:`) for a given kind.
+    /// Used by tests (`src/tests/angular_meta/markers.rs`).
     #[allow(dead_code)]
     pub fn token(self) -> &'static str {
         match self {
@@ -195,6 +196,7 @@ impl PhiLineKind {
 /// wrappers that create the struct and call `.render()`.
 pub trait PhiLine {
     /// The kind of this marker.
+    /// Used by tests to verify marker round-trips.
     #[allow(dead_code)]
     fn kind(&self) -> PhiLineKind;
 
@@ -527,6 +529,7 @@ pub fn expand_phi_in_line(line: &str) -> String {
 ///
 /// Adding a new marker to the vocabulary only requires updating
 /// [`PhiLineKind`] — this function is generic and needs no edits.
+/// Used by tests (`src/tests/angular_meta/markers.rs`).
 #[allow(dead_code)]
 pub fn expand_phi(token: &str) -> Option<&'static str> {
     PhiLineKind::from_token(token).map(|k| k.expansion())

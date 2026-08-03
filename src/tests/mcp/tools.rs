@@ -1,6 +1,12 @@
 use super::*;
 use crate::config::CleanCtxConfig;
 
+// P3-3: Initialize handler registry before running tests
+#[test]
+fn setup_registry() {
+    crate::mcp::tools::setup_handler_registry_for_tests();
+}
+
 #[test]
 fn resolve_fidelity_prefers_explicit_arg() {
     let config = CleanCtxConfig::default();
@@ -45,7 +51,8 @@ fn parse_fidelity_arg_rejects_typo() {
     let params = serde_json::json!({
         "arguments": { "fidelity": "hihg" }
     });
-    let result = parse_fidelity_arg(&Value::Null, &params);
+    let config = CleanCtxConfig::default();
+    let result = parse_fidelity_arg(&Value::Null, &params, &config);
     assert!(result.is_err());
 }
 

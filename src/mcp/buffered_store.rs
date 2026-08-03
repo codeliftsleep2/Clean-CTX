@@ -90,11 +90,13 @@ impl BufferedStore {
         self.reimport_fallback_files();
 
         // Drain pending queue
+        // P1-2: Recover from poisoned lock instead of discarding pending writes
         let ops = match self.pending.lock() {
             Ok(mut p) => std::mem::take(&mut *p),
             Err(e) => {
-                eprintln!("[clean-ctx] WARNING: pending mutex poisoned, ops lost: {e}");
-                return 0;
+                eprintln!("[clean-ctx] WARNING: pending mutex poisoned, recovering: {e}");
+                let mut p = e.into_inner();
+                std::mem::take(&mut *p)
             }
         };
         if ops.is_empty() {
@@ -448,11 +450,13 @@ impl ContextStore for BufferedStore {
         // MED-02: Flush pending ops and read in a single lock scope to avoid
         // the double-lock that occurs when flush() acquires the inner lock
         // then releases it before sqlite() acquires it again.
+        // P1-2: Recover from poisoned lock instead of discarding pending writes
         let ops = match self.pending.lock() {
             Ok(mut p) => std::mem::take(&mut *p),
             Err(e) => {
-                eprintln!("[clean-ctx] WARNING: pending mutex poisoned: {e}");
-                return Ok(None);
+                eprintln!("[clean-ctx] WARNING: pending mutex poisoned, recovering: {e}");
+                let mut p = e.into_inner();
+                std::mem::take(&mut *p)
             }
         };
         let mut conn = match self.inner.lock() {

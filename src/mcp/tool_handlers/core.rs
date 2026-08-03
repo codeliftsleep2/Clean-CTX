@@ -9,6 +9,7 @@ use crate::ir::wire::tuple_to_op;
 use crate::ir::delta::{IRDelta, DeltaComputer};
 use crate::ir::compiler::CompiledIR;
 use crate::ir::opcodes::CoreOp;
+use crate::error::to_jsonrpc_error;
 use crate::mcp::context_store::ContextStore;
 use crate::mcp::McpState;
 use crate::protocol::send_response;
@@ -22,6 +23,8 @@ fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Vec<CoreOp> {
 
 // ── Handler: compress_code_context ───────────────────────────────
 
+/// P3-2: Main handler for compress_code_context tool.
+/// Orchestrates validation, compilation, and response building.
 pub(crate) fn handle_compress_code_context(
     id: &Value,
     params: &Value,
@@ -31,7 +34,7 @@ pub(crate) fn handle_compress_code_context(
     let encoding = params["arguments"]["encoding"].as_str().unwrap_or("named");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
     let resolved_path = resolve_file_path(file_path_str, workspace_root);
-    let fidelity = match parse_fidelity_arg(id, params) {
+    let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,
     };
@@ -46,8 +49,6 @@ pub(crate) fn handle_compress_code_context(
 
     // A-13: Check resource limits before processing
     let limits = &state.config.resource_limits;
-    
-    // Check file size if we can read it
     if let Ok(metadata) = std::fs::metadata(&resolved_path) {
         if let Err(e) = limits.check_file_size(metadata.len()) {
             send_response(&serde_json::json!({
@@ -69,6 +70,9 @@ pub(crate) fn handle_compress_code_context(
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
 
+    // P3-2: Build response using extracted helpers
+    // If IR compilation fails, fall back to legacy compression but log
+    // the structured error for diagnostics (4.4 audit fix).
     let response = if let Ok((ir, _source_hash)) = ir_result {
         state.ir_context_lock().load_ir(ir.clone(), None);
         let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
@@ -86,7 +90,6 @@ pub(crate) fn handle_compress_code_context(
         // Persist to DB
         {
             if let Some(ref store) = *state.persistence_store_lock() {
-                // Compute content hash from source text for deterministic ID
                 let mut hasher = Sha256::new();
                 hasher.update(source_text.as_bytes());
                 let source_hash = format!("{:x}", hasher.finalize());
@@ -120,6 +123,10 @@ pub(crate) fn handle_compress_code_context(
             }
         })
     } else {
+        // Log the structured IR error before falling back (4.4 audit fix)
+        if let Err(ref e) = ir_result {
+            tracing::warn!(error = %e, path = %resolved_path, "IR compilation failed, falling back to legacy compression");
+        }
         match crate::compression::pipeline::compress_file_with_source(
             PathBuf::from(&resolved_path), source_ref,
             &mut state.dict_lock(), &mut state.cache_write(), effective_fidelity,
@@ -135,7 +142,6 @@ pub(crate) fn handle_compress_code_context(
                 // Persist to DB
                 {
                     if let Some(ref store) = *state.persistence_store_lock() {
-                        // Compute content hash from source text for deterministic ID
                         let mut hasher = Sha256::new();
                         hasher.update(source_text.as_bytes());
                         let source_hash = format!("{:x}", hasher.finalize());
@@ -153,10 +159,12 @@ pub(crate) fn handle_compress_code_context(
                     "result": { "content": [{ "type": "text", "text": compressed_text }] }
                 })
             }
-            Err(e) => serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": { "code": -32603, "message": e.to_string() }
-            })
+            Err(e) => {
+                serde_json::json!({
+                    "jsonrpc": "2.0", "id": id,
+                    "error": { "code": -32603, "message": e.to_string() }
+                })
+            }
         }
     };
     send_response(&response);
@@ -172,7 +180,7 @@ pub(crate) fn handle_diff_code_context(
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
     let resolved_path = resolve_file_path(file_path_str, workspace_root);
-    let fidelity = match parse_fidelity_arg(id, params) {
+    let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,
     };
@@ -203,7 +211,7 @@ pub(crate) fn handle_delta_code_context(
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
     let resolved_path = resolve_file_path(file_path_str, workspace_root);
-    let fidelity = match parse_fidelity_arg(id, params) {
+    let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,
     };
@@ -213,6 +221,7 @@ pub(crate) fn handle_delta_code_context(
     let prev_version = state.file_version(&path_alias).unwrap_or(0);
     
     // Try to skip compilation if source is unchanged
+    // P0-4: Hold lock during entire check to prevent TOCTOU race
     let ir_ctx = state.ir_context_lock();
     if prev_version > 0 && ir_ctx.has_file(&path_alias) {
         if let Ok(source_arc) = state.read_source(&resolved_path) {
@@ -223,6 +232,7 @@ pub(crate) fn handle_delta_code_context(
             
             if ir_ctx.is_source_unchanged(&path_alias, &source_hash) {
                 // Source unchanged - return cached IR without recompiling
+                // P0-4: Lock still held, ensuring consistent state
                 let cached_ir = ir_ctx.get_ir(&path_alias).unwrap().clone();
                 let instruction_count = cached_ir.len();
                 drop(ir_ctx);
@@ -244,9 +254,11 @@ pub(crate) fn handle_delta_code_context(
     // Source changed or no baseline - compile
     let (compiled, source_hash) = match compile_file_ir(&resolved_path, fidelity, state) {
         Ok(c) => c,
-        Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } })); return; }
+        Err(e) => { send_response(&to_jsonrpc_error(id, &e)); return; }
     };
     
+    // P0-4: Re-acquire lock atomically for delta computation
+    // This ensures no other worker modified ir_context between our check and delta computation
     let mut ir_ctx = state.ir_context_lock();
     let delta = if prev_version > 0 && ir_ctx.has_file(&path_alias) {
         ir_ctx.get_ir(&path_alias).cloned().and_then(|prev_instructions| {
@@ -294,7 +306,7 @@ pub(crate) fn handle_delta_text_context(
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
     let resolved_path = resolve_file_path(file_path_str, workspace_root);
-    let fidelity = match parse_fidelity_arg(id, params) {
+    let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,
     };
@@ -466,7 +478,7 @@ pub(crate) fn handle_provide_code_context(
             let compile_start = Instant::now();
             let (compiled, _source_hash) = match compile_file_ir(&resolved_path, effective_fidelity, state) {
                 Ok(c) => c,
-                Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } })); return; }
+                Err(e) => { send_response(&to_jsonrpc_error(id, &e)); return; }
             };
             let compile_ms = compile_start.elapsed().as_millis() as u64;
 
@@ -543,6 +555,7 @@ pub(crate) fn handle_provide_code_context(
 
             if let Ok((ir, _source_hash)) = ir_result {
                 let render_start = Instant::now();
+                // Note: IR error is logged below in the else branch (4.4 audit fix)
                 state.ir_context_lock().load_ir(ir.clone(), None);
                 let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
                 let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
@@ -571,6 +584,10 @@ pub(crate) fn handle_provide_code_context(
                     "provide_code_context full complete"
                 );
             } else {
+                // Log the structured IR error before falling back (4.4 audit fix)
+                if let Err(ref e) = ir_result {
+                    tracing::warn!(error = %e, path = %resolved_path, "IR compilation failed in provide_code_context, falling back to legacy compression");
+                }
                 let fallback_start = Instant::now();
                 match crate::compression::pipeline::compress_file_with_source(
                     PathBuf::from(&resolved_path), Some(source),
@@ -621,7 +638,7 @@ pub(crate) fn handle_restore_context(
     }
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
     let resolved_path = resolve_file_path(file_path_str, workspace_root);
-    let fidelity = match parse_fidelity_arg(id, params) {
+    let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,
     };
@@ -663,7 +680,9 @@ pub(crate) fn handle_restore_context(
             state.llm_text_cache_lock().insert(ir.file_id.clone(), full.clone());
             send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": full }], "version": ir.version, "restored": true } }));
         }
-        Err(_) => {
+        Err(e) => {
+            // Log the structured IR error before falling back (4.4 audit fix)
+            tracing::warn!(error = %e, path = %resolved_path, "IR compilation failed in restore_context, falling back to legacy compression");
             match crate::compression::pipeline::compress_file_with_source(
                 PathBuf::from(&resolved_path), Some(source_text),
                 &mut state.dict_lock(), &mut state.cache_write(), fidelity,
