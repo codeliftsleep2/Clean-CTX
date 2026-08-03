@@ -15,7 +15,7 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 
 use super::super::tools::{parse_fidelity_arg, parse_tokenizer_arg};
-use super::super::tool_helpers::{compress_text_body, compile_file_ir, resolve_file_path, diff_code_context_handler, count_tokens_with_tokenizer};
+use super::super::tool_helpers::{compress_text_body, compile_file_ir, resolve_file_path_checked, diff_code_context_handler, count_tokens_with_tokenizer};
 
 fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Vec<CoreOp> {
     tuples.into_iter().filter_map(|t| tuple_to_op(&t)).collect()
@@ -33,7 +33,16 @@ pub(crate) fn handle_compress_code_context(
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let encoding = params["arguments"]["encoding"].as_str().unwrap_or("named");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = resolve_file_path(file_path_str, workspace_root);
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+        Ok(p) => p,
+        Err(msg) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32602, "message": msg }
+            }));
+            return;
+        }
+    };
     let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,
@@ -179,7 +188,16 @@ pub(crate) fn handle_diff_code_context(
 ) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = resolve_file_path(file_path_str, workspace_root);
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+        Ok(p) => p,
+        Err(msg) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32602, "message": msg }
+            }));
+            return;
+        }
+    };
     let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,
@@ -210,7 +228,16 @@ pub(crate) fn handle_delta_code_context(
 ) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = resolve_file_path(file_path_str, workspace_root);
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+        Ok(p) => p,
+        Err(msg) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32602, "message": msg }
+            }));
+            return;
+        }
+    };
     let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,
@@ -305,7 +332,16 @@ pub(crate) fn handle_delta_text_context(
 ) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = resolve_file_path(file_path_str, workspace_root);
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+        Ok(p) => p,
+        Err(msg) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32602, "message": msg }
+            }));
+            return;
+        }
+    };
     let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,
@@ -411,7 +447,16 @@ pub(crate) fn handle_provide_code_context(
     }
 
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = resolve_file_path(file_path_str, workspace_root);
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+        Ok(p) => p,
+        Err(msg) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32602, "message": msg }
+            }));
+            return;
+        }
+    };
 
     if state.config.is_excluded(&resolved_path) {
         send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("File excluded by config: {}", file_path_str) } }));
@@ -637,7 +682,16 @@ pub(crate) fn handle_restore_context(
         return;
     }
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = resolve_file_path(file_path_str, workspace_root);
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+        Ok(p) => p,
+        Err(msg) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32602, "message": msg }
+            }));
+            return;
+        }
+    };
     let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,

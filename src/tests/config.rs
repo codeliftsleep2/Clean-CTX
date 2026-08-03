@@ -1,4 +1,5 @@
 use super::*;
+use serial_test::serial;
 
 #[test]
 fn test_default_config() {
@@ -66,6 +67,11 @@ fn test_find_config_caches_result() {
 }
 
 // A-14: CI/CD awareness tests
+//
+// These tests mutate process-global env vars. They MUST run serially
+// to avoid data races with parallel test execution (a concurrent test
+// reading CI=true while this test temporarily clears it would flap).
+#[serial]
 #[test]
 fn test_is_ci_environment_detects_ci_var() {
     // Save original env vars
@@ -95,6 +101,7 @@ fn test_is_ci_environment_detects_ci_var() {
     }
 }
 
+#[serial]
 #[test]
 fn test_is_ci_environment_detects_github_actions() {
     let original_gha = std::env::var("GITHUB_ACTIONS").ok();
@@ -114,6 +121,7 @@ fn test_is_ci_environment_detects_github_actions() {
     }
 }
 
+#[serial]
 #[test]
 fn test_is_ci_environment_detects_tf_build() {
     let original_tf = std::env::var("TF_BUILD").ok();
@@ -133,6 +141,7 @@ fn test_is_ci_environment_detects_tf_build() {
     }
 }
 
+#[serial]
 #[test]
 fn test_is_ci_environment_returns_false_when_not_in_ci() {
     // Save and clear all CI env vars
@@ -159,6 +168,7 @@ fn test_is_ci_environment_returns_false_when_not_in_ci() {
     }
 }
 
+#[serial]
 #[test]
 fn test_ci_detection_integration() {
     // Test that CI detection works correctly with different env var combinations

@@ -467,9 +467,14 @@ impl ContextStore for BufferedStore {
             // Best-effort flush inside the same lock scope
             if let Err(e) = conn.begin_transaction() {
                 eprintln!("[clean-ctx] BEGIN failed during load_latest flush: {e}");
+                // Re-queue all ops so they're not lost
+                if let Ok(mut pending) = self.pending.lock() {
+                    pending.splice(0..0, ops);
+                }
             } else {
                 let mut flushed = false;
-                for op in &ops {
+                let mut failed_at = None;
+                for (idx, op) in ops.iter().enumerate() {
                     match op {
                         WriteOp::SaveContext { file_path, fidelity, compressed_output, ir_binary, source_hash, raw_tokens, compressed_tokens } => {
                             if let Err(e) = crate::mcp::context_store::ContextStore::save_context(
@@ -478,6 +483,7 @@ impl ContextStore for BufferedStore {
                             ) {
                                 let _ = conn.rollback();
                                 eprintln!("[clean-ctx] save_context during load_latest flush failed: {e}");
+                                failed_at = Some(idx);
                                 break;
                             }
                         }
@@ -487,6 +493,7 @@ impl ContextStore for BufferedStore {
                             ) {
                                 let _ = conn.rollback();
                                 eprintln!("[clean-ctx] append_delta during load_latest flush failed: {e}");
+                                failed_at = Some(idx);
                                 break;
                             }
                         }
@@ -499,6 +506,17 @@ impl ContextStore for BufferedStore {
                 if flushed {
                     let _ = conn.commit();
                     conn.wal_checkpoint();
+                }
+                // If any op failed, re-queue the un-flushed remainder so
+                // they're not permanently lost (they were dequeued but
+                // never written to the DB or fallback JSON files).
+                if let Some(failed_idx) = failed_at {
+                    let remaining: Vec<WriteOp> = ops.into_iter().skip(failed_idx).collect();
+                    if !remaining.is_empty() {
+                        if let Ok(mut pending) = self.pending.lock() {
+                            pending.splice(0..0, remaining);
+                        }
+                    }
                 }
             }
         }
@@ -525,6 +543,11 @@ impl ContextStore for BufferedStore {
                 delta_payload: delta_payload.to_vec(),
                 edit_type: edit_type.map(String::from),
             });
+            let len = pending.len();
+            if len >= BATCH_THRESHOLD {
+                drop(pending);
+                self.flush();
+            }
         }
         Ok(())
     }
