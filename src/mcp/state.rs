@@ -473,6 +473,7 @@ impl McpState {
         }
         #[cfg(debug_assertions)]
         eprintln!("[resolve_cache_key] SLOW PATH (canonicalize): {}", path);
+        #[cfg(debug_assertions)]
         let canon_start = std::time::Instant::now();
         let result = p.canonicalize()
             .map(|p| p.to_string_lossy().into_owned())
