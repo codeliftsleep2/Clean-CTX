@@ -17,30 +17,21 @@ These rules are **mandatory**. They prevent Claude from bypassing Clean-CTX's co
 
 Always pass an `intent`: `"overview"` | `"edit"` | `"refactor"` | `"debug"` | `"implement"`
 
-```xml
-<use_mcp_tool>
-<server_name>clean-ctx</server_name>
-<tool_name>provide_code_context</tool_name>
-<arguments>
-{
-  "filePath": "src/services/UserService.ts",
-  "intent": "edit"
-}
-</arguments>
-</use_mcp_tool>
+```
+mcp__clean-ctx__provide_code_context(filePath: "src/services/UserService.ts", intent: "edit")
 ```
 
 ---
 
 ## RULE 2 — CBM Queries: Use `cbm_proxy`, NOT Direct Calls
 
-**NEVER call `graph_search`, `graph_query`, `graph_trace`, `get_architecture`, `get_symbol_importance`, or `get_dead_code` directly.** They return raw ~5000-token responses that bypass compression.
+**NEVER call `search_graph`, `graph_query`, `graph_trace`, `get_architecture`, `get_symbol_importance`, or `get_dead_code` directly.** They return raw ~5000-token responses that bypass compression.
 
 **ALWAYS use `cbm_proxy`** — it intercepts the response at the pipe level and compresses it to ~1100 tokens.
 
 | FORBIDDEN direct call | Use `cbm_proxy` with |
 |-----------------------|----------------------|
-| `graph_search` | `cbm_tool: "graph_search"` |
+| `search_graph` | `cbm_tool: "search_graph"` |
 | `graph_query` | `cbm_tool: "graph_query"` |
 | `graph_trace` | `cbm_tool: "graph_trace"` |
 | `get_architecture` | `cbm_tool: "get_architecture"` |
@@ -49,18 +40,8 @@ Always pass an `intent`: `"overview"` | `"edit"` | `"refactor"` | `"debug"` | `"
 
 **Only direct CBM call allowed:** `get_cbm_status` (tiny status object).
 
-```xml
-<use_mcp_tool>
-<server_name>clean-ctx</server_name>
-<tool_name>cbm_proxy</tool_name>
-<arguments>
-{
-  "cbm_tool": "graph_search",
-  "query": "UserService",
-  "project": "my-project"
-}
-</arguments>
-</use_mcp_tool>
+```
+mcp__clean-ctx__cbm_proxy(cbm_tool: "search_graph", query: "UserService", project: "my-project")
 ```
 
 ---
