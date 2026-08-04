@@ -474,7 +474,7 @@ impl GraphBridge {
         match result {
             Ok(rows) => {
                 let edges: Vec<(String, String)> = rows.iter().filter_map(|r| {
-                    let from = r.get(0)?.as_str()?.to_string();
+                    let from = r.first()?.as_str()?.to_string();
                     let to = r.get(1)?.as_str()?.to_string();
                     Some((from, to))
                 }).collect();
@@ -510,7 +510,7 @@ impl GraphBridge {
         match result {
             Ok(rows) => {
                 let edges: Vec<(String, String, String)> = rows.iter().filter_map(|r| {
-                    let method = r.get(0)?.as_str()?.to_string();
+                    let method = r.first()?.as_str()?.to_string();
                     let target = r.get(1)?.as_str()?.to_string();
                     let direction = r.get(2)?.as_str().unwrap_or("reads").to_string();
                     Some((method, target, direction))
