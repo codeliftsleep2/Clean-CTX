@@ -299,6 +299,7 @@ impl CbmClient {
             let remaining = deadline.saturating_duration_since(std::time::Instant::now());
             if remaining.is_zero() {
                 let _ = self.child.kill();
+                let _ = self.child.try_wait();
                 self.status = CbmStatus::Degraded("timeout".into());
                 return Err(CbmError::Timeout(self.timeout));
             }
@@ -322,6 +323,7 @@ impl CbmClient {
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     let _ = self.child.kill();
+                    let _ = self.child.try_wait();
                     self.status = CbmStatus::Degraded("timeout".into());
                     return Err(CbmError::Timeout(self.timeout));
                 }
@@ -396,6 +398,7 @@ impl CbmClient {
             let remaining = deadline.saturating_duration_since(std::time::Instant::now());
             if remaining.is_zero() {
                 let _ = self.child.kill();
+                let _ = self.child.try_wait();
                 self.status = CbmStatus::Degraded("timeout".into());
                 return Err(CbmError::Timeout(self.timeout));
             }
@@ -426,6 +429,7 @@ impl CbmClient {
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     let _ = self.child.kill();
+                    let _ = self.child.try_wait();
                     self.status = CbmStatus::Degraded("timeout".into());
                     return Err(CbmError::Timeout(self.timeout));
                 }

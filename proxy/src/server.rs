@@ -63,12 +63,12 @@ pub struct ProxyState {
 }
 
 impl ProxyState {
-    pub fn new(config: ProxyConfig) -> Self {
+    pub fn new(config: ProxyConfig) -> Result<Self, ProxyError> {
         let http_client = reqwest::Client::builder()
             .timeout(UPSTREAM_TIMEOUT)
             .connect_timeout(std::time::Duration::from_secs(5))
             .build()
-            .expect("Failed to create HTTP client");
+            .map_err(|e| ProxyError::Body(format!("Failed to create HTTP client: {e}")))?;
 
         // Delegate filter loading to filter_loader module (SRP compliance)
         let filter_registry = Arc::new(load_builtin_filters());
@@ -76,7 +76,7 @@ impl ProxyState {
         // Create rate limiter with configured limits
         let rate_limiter = RateLimiter::new(config.rate_limit_rps, config.rate_limit_burst);
 
-        Self {
+        Ok(Self {
             config,
             cache_stats: CacheStats::default(),
             transform_stats: TransformStats::default(),
@@ -85,7 +85,7 @@ impl ProxyState {
             http_client,
             filter_registry,
             rate_limiter,
-        }
+        })
     }
 
     pub fn next_req_id(&self) -> String {
@@ -115,7 +115,7 @@ pub async fn run_server_with_listener(
     info!("[proxy] Clean-CTX proxy listening on http://{}", listener.local_addr().unwrap());
     info!("[proxy] Upstream: {}", config.upstream_url);
 
-    let state = Arc::new(RwLock::new(ProxyState::new(config)));
+    let state = Arc::new(RwLock::new(ProxyState::new(config)?));
     let semaphore = Arc::new(tokio::sync::Semaphore::new(MAX_CONNECTIONS));
 
     loop {
@@ -552,7 +552,7 @@ mod tests {
     #[test]
     fn test_req_id_generation() {
         let config = ProxyConfig::default();
-        let state = ProxyState::new(config);
+        let state = ProxyState::new(config).expect("Failed to create ProxyState in test");
         let id1 = state.next_req_id();
         let id2 = state.next_req_id();
         assert_ne!(id1, id2);
