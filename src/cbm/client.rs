@@ -5,7 +5,7 @@
 
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -43,7 +43,13 @@ pub const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 pub struct CbmClient {
     child: Child,
     stdin: BufWriter<ChildStdin>,
-    stdout: BufReader<ChildStdout>,
+    /// C-2 fix: stdout is read exclusively by a background reader thread.
+    /// The thread sends each line through this channel so the main thread
+    /// can drain lines with a timeout and honour the per-request deadline
+    /// even when `read_line` would otherwise block indefinitely.
+    stdout_rx: std::sync::mpsc::Receiver<Result<String, String>>,
+    /// Background thread draining CBM's stdout. Held to keep it alive.
+    _stdout_reader: Option<JoinHandle<()>>,
     /// Background thread draining CBM's stderr to avoid pipe-buffer deadlock.
     _stderr_drainer: Option<JoinHandle<()>>,
     request_id: AtomicU64,
@@ -125,10 +131,42 @@ impl CbmClient {
             })
             .ok();
 
+        // C-2 fix: read stdout in a background thread and forward each line
+        // over a channel. The main thread can then use recv_timeout() to
+        // honour the per-request deadline without blocking indefinitely in
+        // read_line().
+        let (stdout_tx, stdout_rx) = std::sync::mpsc::sync_channel::<Result<String, String>>(256);
+        let _stdout_reader = std::thread::Builder::new()
+            .name("cbm-stdout-reader".into())
+            .spawn(move || {
+                let mut reader = BufReader::new(stdout);
+                loop {
+                    let mut line = String::new();
+                    match reader.read_line(&mut line) {
+                        Ok(0) => {
+                            // EOF — child exited.
+                            let _ = stdout_tx.send(Err("CBM exited".to_string()));
+                            break;
+                        }
+                        Ok(_) => {
+                            if stdout_tx.send(Ok(line)).is_err() {
+                                break; // Main thread dropped the receiver — stop reading.
+                            }
+                        }
+                        Err(e) => {
+                            let _ = stdout_tx.send(Err(e.to_string()));
+                            break;
+                        }
+                    }
+                }
+            })
+            .ok();
+
         Ok(Some(Self {
             child,
             stdin: BufWriter::new(stdin),
-            stdout: BufReader::new(stdout),
+            stdout_rx,
+            _stdout_reader,
             _stderr_drainer,
             request_id: AtomicU64::new(1),
             status: CbmStatus::Available,
@@ -252,22 +290,20 @@ impl CbmClient {
             CbmError::ConnectionLost(e.to_string())
         })?;
 
-        // C-1 fix: accumulate lines until we have complete JSON.
+        // C-2 fix: accumulate lines until we have complete JSON, honouring the
+        // deadline on every receive call. `recv_timeout` returns immediately
+        // when the deadline has passed instead of blocking in `read_line`.
         let mut buf = String::new();
         let deadline = std::time::Instant::now() + self.timeout;
         loop {
-            if std::time::Instant::now() > deadline {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() {
                 let _ = self.child.kill();
                 self.status = CbmStatus::Degraded("timeout".into());
                 return Err(CbmError::Timeout(self.timeout));
             }
-            let mut line = String::new();
-            match self.stdout.read_line(&mut line) {
-                Ok(0) => {
-                    self.status = CbmStatus::Degraded("exited".into());
-                    return Err(CbmError::ConnectionLost("CBM exited".into()));
-                }
-                Ok(_) => {
+            match self.stdout_rx.recv_timeout(remaining) {
+                Ok(Ok(line)) => {
                     buf.push_str(&line);
                     if buf.len() > MAX_RESPONSE_BYTES {
                         self.status = CbmStatus::Degraded("oversized".into());
@@ -280,9 +316,18 @@ impl CbmClient {
                         return Ok(buf);
                     }
                 }
-                Err(e) => {
-                    self.status = CbmStatus::Degraded(format!("read: {e}"));
-                    return Err(CbmError::ConnectionLost(e.to_string()));
+                Ok(Err(msg)) => {
+                    self.status = CbmStatus::Degraded("exited".into());
+                    return Err(CbmError::ConnectionLost(msg));
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    let _ = self.child.kill();
+                    self.status = CbmStatus::Degraded("timeout".into());
+                    return Err(CbmError::Timeout(self.timeout));
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    self.status = CbmStatus::Degraded("exited".into());
+                    return Err(CbmError::ConnectionLost("CBM exited".into()));
                 }
             }
         }
@@ -343,22 +388,19 @@ impl CbmClient {
             CbmError::ConnectionLost(e.to_string())
         })?;
 
-        // C-1 fix: accumulate lines until we have complete JSON.
+        // C-2 fix: accumulate lines until we have complete JSON, honouring the
+        // deadline on every receive call.
         let mut buf = String::new();
         let deadline = std::time::Instant::now() + self.timeout;
         loop {
-            if std::time::Instant::now() > deadline {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() {
                 let _ = self.child.kill();
                 self.status = CbmStatus::Degraded("timeout".into());
                 return Err(CbmError::Timeout(self.timeout));
             }
-            let mut line = String::new();
-            match self.stdout.read_line(&mut line) {
-                Ok(0) => {
-                    self.status = CbmStatus::Degraded("exited".into());
-                    return Err(CbmError::ConnectionLost("CBM exited".into()));
-                }
-                Ok(_) => {
+            match self.stdout_rx.recv_timeout(remaining) {
+                Ok(Ok(line)) => {
                     buf.push_str(&line);
                     if buf.len() > MAX_RESPONSE_BYTES {
                         self.status = CbmStatus::Degraded("oversized".into());
@@ -378,9 +420,18 @@ impl CbmClient {
                     }
                     // Not yet complete JSON — continue reading lines
                 }
-                Err(e) => {
-                    self.status = CbmStatus::Degraded(format!("read: {e}"));
-                    return Err(CbmError::ConnectionLost(e.to_string()));
+                Ok(Err(msg)) => {
+                    self.status = CbmStatus::Degraded("exited".into());
+                    return Err(CbmError::ConnectionLost(msg));
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    let _ = self.child.kill();
+                    self.status = CbmStatus::Degraded("timeout".into());
+                    return Err(CbmError::Timeout(self.timeout));
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    self.status = CbmStatus::Degraded("exited".into());
+                    return Err(CbmError::ConnectionLost("CBM exited".into()));
                 }
             }
         }
