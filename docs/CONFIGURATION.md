@@ -81,11 +81,13 @@ Location: Project root (walks up from current directory to find it)
     "tool_defs_version": "v1"
   },
   "cbm": {
-    "enabled": false,
-    "server_path": "codebase-memory-mcp",
-    "connection_timeout_secs": 5,
-    "query_timeout_secs": 10,
-    "cache_ttl_secs": 600
+    "enabled": true,
+    "binary_path": null,
+    "auto_launch": true,
+    "cache_ttl": 300,
+    "query_timeout_ms": 30000,
+    "max_retries": 3,
+    "circuit_cooldown_secs": 30
   },
   "intelligence": {
     "enabled": true,

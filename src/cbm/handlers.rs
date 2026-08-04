@@ -217,6 +217,10 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
 }
 
 /// P1-9: Handle `get_cbm_status` — check CBM availability with indexing progress.
+///
+/// When CBM is unavailable, the response includes `checked_paths` — a list of
+/// all binary locations that were searched (config, PATH, common install dirs).
+/// This makes detection issues trivially debuggable without reading stderr logs.
 pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
     let (status, details, version, indexing_info) = match state.graph_bridge_lock().as_mut() {
         Some(bridge) => {
@@ -263,6 +267,14 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
             (state.cbm_status.clone(), d, String::new(), None)
         }
     };
+
+    // When unavailable, include diagnostic info: all checked paths
+    let checked_paths = if !status.is_available() {
+        Some(crate::cbm::bridge::checked_paths())
+    } else {
+        None
+    };
+
     let mut response = serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
@@ -273,6 +285,9 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
     });
     if let Some(idx) = indexing_info {
         response["result"]["indexing"] = idx;
+    }
+    if let Some(paths) = checked_paths {
+        response["result"]["checked_paths"] = serde_json::json!(paths);
     }
     send_response(&response);
 }
