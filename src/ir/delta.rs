@@ -197,14 +197,179 @@ impl DeltaComputer {
             return None;
         }
 
+        let intent = detect_semantic_intent(baseline, current);
+
         Some(IRDelta {
             file: current.file_id.clone(),
             from: baseline.version,
             to: current.version,
             ops,
-            intent: None,
+            intent,
         })
     }
+}
+
+/// Detect the high-level semantic intent of a delta between two IR states.
+///
+/// This examines the structural diff (adds/mods/dels) and produces a
+/// human-readable `SemanticIntent` describing *what* changed, beyond the
+/// raw instruction-level diff. Returns `None` when no single intent can
+/// be confidently identified (e.g. a mixed change with no dominant signal).
+///
+/// R-43a: Phase 1 detection is purely structural and deterministic — it
+/// inspects `CoreOp` streams directly. Phase 4 (R-43b) may enrich this
+/// with CBM cross-file impact metadata.
+///
+/// Detection precedence (first match wins):
+///   1. Rename — a DEF_* op with the same primary key but a different name
+///   2. AddInjection — an INJECTS op present in `current` but not `baseline`
+///   3. AddMethod — a DEF_M op present in `current` but not `baseline`
+///   4. RemoveMethod — a DEF_M op present in `baseline` but not `current`
+///   5. ChangeReturnType — a RET op whose type changed
+///   6. ChangeSignature — a SIG or RET op modified
+///
+/// Because the delta grouping is computed from BTreeMap-indexed instruction
+/// streams, iteration order is deterministic (invariant S4).
+fn detect_semantic_intent(baseline: &CompiledIR, current: &CompiledIR) -> Option<SemanticIntent> {
+    let base_indexed = index_instructions(&baseline.instructions);
+    let cur_indexed = index_instructions(&current.instructions);
+
+    // 1. Rename detection: same primary key, different name operand.
+    //    DEF_C / DEF_M / DEF_F are the named structural ops.
+    for (key, base_insn) in &base_indexed {
+        if let Some(cur_insn) = cur_indexed.get(key) {
+            let intent = match (base_insn, cur_insn) {
+                (CoreOp::DefClass(_, old_name), CoreOp::DefClass(_, new_name))
+                    if old_name != new_name =>
+                {
+                    Some(SemanticIntent::RenameSymbol {
+                        old_name: old_name.clone(),
+                        new_name: new_name.clone(),
+                        kind: "class".to_string(),
+                    })
+                }
+                (CoreOp::DefMethod(_, _, old_name), CoreOp::DefMethod(_, _, new_name))
+                    if old_name != new_name =>
+                {
+                    Some(SemanticIntent::RenameSymbol {
+                        old_name: old_name.clone(),
+                        new_name: new_name.clone(),
+                        kind: "method".to_string(),
+                    })
+                }
+                (CoreOp::DefField(_, _, old_name), CoreOp::DefField(_, _, new_name))
+                    if old_name != new_name =>
+                {
+                    Some(SemanticIntent::RenameSymbol {
+                        old_name: old_name.clone(),
+                        new_name: new_name.clone(),
+                        kind: "field".to_string(),
+                    })
+                }
+                _ => None,
+            };
+            if intent.is_some() {
+                return intent;
+            }
+        }
+    }
+
+    // 2. AddInjection: an INJECTS op gained a dependency. This covers both
+    //    the first-ever injection (key not in baseline) and a dependency
+    //    added to an existing INJECTS op (key in both, deps list grew).
+    for (key, cur_insn) in &cur_indexed {
+        if let CoreOp::Injects(class, cur_deps) = cur_insn {
+            let newly_added = match base_indexed.get(key) {
+                Some(CoreOp::Injects(_, base_deps)) => {
+                    // Existing INJECTS op — find a dep not in the baseline list.
+                    cur_deps.iter().find(|d| !base_deps.contains(d))
+                }
+                _ => {
+                    // First-ever injection — report the first dep.
+                    cur_deps.first()
+                }
+            };
+            if let Some(dep) = newly_added {
+                return Some(SemanticIntent::AddInjection {
+                    class: class.clone(),
+                    dependency: dep.clone(),
+                });
+            }
+        }
+    }
+
+    // 3. AddMethod: DEF_M present in current but not baseline.
+    for (key, cur_insn) in &cur_indexed {
+        if !base_indexed.contains_key(key) {
+            if let CoreOp::DefMethod(class, _, method_name) = cur_insn {
+                return Some(SemanticIntent::AddMethod {
+                    class: class.clone(),
+                    method_name: method_name.clone(),
+                });
+            }
+        }
+    }
+
+    // 4. RemoveMethod: DEF_M present in baseline but not current.
+    for (key, base_insn) in &base_indexed {
+        if !cur_indexed.contains_key(key) {
+            if let CoreOp::DefMethod(class, _, method_name) = base_insn {
+                return Some(SemanticIntent::RemoveMethod {
+                    class: class.clone(),
+                    method_name: method_name.clone(),
+                });
+            }
+        }
+    }
+
+    // 5. ChangeReturnType: RET op whose type changed.
+    for (key, base_insn) in &base_indexed {
+        if let Some(cur_insn) = cur_indexed.get(key) {
+            if let (CoreOp::Return(method, old_type), CoreOp::Return(_, new_type)) =
+                (base_insn, cur_insn)
+            {
+                if old_type != new_type {
+                    return Some(SemanticIntent::ChangeReturnType {
+                        method: method.clone(),
+                        old_type: old_type.clone(),
+                        new_type: new_type.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    // 6. ChangeSignature: SIG (Param) op modified. Return-type changes are
+    //    already reported as ChangeReturnType in step 5, so they are not
+    //    re-matched here (the Return arm would be unreachable dead code).
+    for (key, base_insn) in &base_indexed {
+        if let Some(cur_insn) = cur_indexed.get(key) {
+            if let (CoreOp::Param(method, _, _, _), CoreOp::Param(_, _, _, _)) =
+                (base_insn, cur_insn)
+            {
+                // Determine which field changed.
+                let field_changed = match (base_insn, cur_insn) {
+                    (CoreOp::Param(_, _, base_ty, _), CoreOp::Param(_, _, cur_ty, _))
+                        if base_ty != cur_ty =>
+                    {
+                        "param_type"
+                    }
+                    (CoreOp::Param(_, _, _, base_name), CoreOp::Param(_, _, _, cur_name))
+                        if base_name != cur_name =>
+                    {
+                        "param_name"
+                    }
+                    _ => continue,
+                };
+                return Some(SemanticIntent::ChangeSignature {
+                    method: method.clone(),
+                    field_changed: field_changed.to_string(),
+                });
+            }
+        }
+    }
+
+    None
 }
 
 impl Default for DeltaComputer {
@@ -345,6 +510,10 @@ pub struct CompactDelta {
     /// Operations
     #[serde(rename = "o")]
     pub ops: CompactOps,
+    /// R-43a: optional semantic intent metadata, preserved through
+    /// the compact encode → decode round-trip.
+    #[serde(rename = "i", skip_serializing_if = "Option::is_none")]
+    pub intent: Option<SemanticIntent>,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -470,6 +639,7 @@ pub fn compact_encode(delta: &IRDelta) -> CompactDelta {
         file: delta.file.clone(),
         version_range,
         ops,
+        intent: delta.intent.clone(),
     }
 }
 
@@ -536,7 +706,7 @@ pub fn compact_decode(compact: &CompactDelta) -> Option<IRDelta> {
         from,
         to,
         ops: DeltaOps { adds, mods, dels },
-        intent: None,
+        intent: compact.intent.clone(),
     })
 }
 

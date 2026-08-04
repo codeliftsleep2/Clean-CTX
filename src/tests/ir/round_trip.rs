@@ -268,6 +268,65 @@ fn round_trip_compact_delta_with_ops() {
     assert_eq!(decoded.ops.dels.len(), delta.ops.dels.len());
 }
 
+// ── R-43a: Compact Delta Preserves SemanticIntent ───────────────
+//
+// The compact format must be lossless — including the optional
+// `intent` metadata. Previously the compact path dropped intent
+// (hardcoded `None` on decode). These tests verify intent survives
+// the compact encode → decode round-trip.
+
+#[test]
+fn round_trip_compact_delta_preserves_intent() {
+    let delta = IRDelta {
+        file: "test.ts".to_string(),
+        from: 1,
+        to: 2,
+        ops: DeltaOps {
+            adds: vec![
+                vec!["DEF_M".into(), "C1".into(), "M2".into(), "newMethod".into()],
+            ],
+            mods: vec![],
+            dels: vec![],
+        },
+        intent: Some(crate::ir::delta::SemanticIntent::AddMethod {
+            class: "C1".to_string(),
+            method_name: "newMethod".to_string(),
+        }),
+    };
+
+    let compact = compact_encode(&delta);
+    let decoded = compact_decode(&compact).expect("compact delta round-trip should succeed");
+
+    assert_eq!(decoded.file, delta.file);
+    assert_eq!(decoded.from, delta.from);
+    assert_eq!(decoded.to, delta.to);
+    assert!(decoded.intent.is_some(), "intent should survive compact round-trip");
+    match decoded.intent.unwrap() {
+        crate::ir::delta::SemanticIntent::AddMethod { class, method_name } => {
+            assert_eq!(class, "C1");
+            assert_eq!(method_name, "newMethod");
+        }
+        other => panic!("expected AddMethod, got: {:?}", other),
+    }
+}
+
+#[test]
+fn round_trip_compact_delta_intent_absent_when_none() {
+    let delta = IRDelta {
+        file: "test.ts".to_string(),
+        from: 1,
+        to: 2,
+        ops: DeltaOps::default(),
+        intent: None,
+    };
+    let compact = compact_encode(&delta);
+    // The intent field should be absent from the compact JSON (skip_serializing_if)
+    let json = serde_json::to_value(&compact).expect("serialize compact delta");
+    assert!(json.get("i").is_none(), "intent field should be absent when None");
+    let decoded = compact_decode(&compact).expect("compact delta round-trip should succeed");
+    assert!(decoded.intent.is_none(), "decoded intent should be None");
+}
+
 // ── 6. Randomized Property Tests ────────────────────────────────
 //
 // These tests generate random IRs with all variant types and verify

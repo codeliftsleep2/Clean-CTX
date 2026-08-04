@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-07-04 (R-43a/R-43b planned 📋 — IR Evolution Plan)
+**Last updated:** 2026-08-04 (R-43a/R-43b ✅ shipped — IR Evolution complete)
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -11,14 +11,14 @@
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
 | **Now** | v0.2.0 | Real-world ready | ✅ 0 (all complete) |
-| **Next** | v0.3.0 | Advanced capabilities | 12 |
+| **Next** | v0.3.0 | Advanced capabilities | 10 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
 | **Architectural** | Continuous | Code health & tooling | 3 (A-01, A-03, A-05) |
 | **Community** | Continuous | Docs & marketing | 5 |
 
 ---
 
-## Completed (v0.1.x – v0.2.0) — shipped ✅
+## Completed (v0.1.x – v0.3.0) — shipped ✅
 
 These items are complete and documented. Listed for historical context.
 
@@ -58,6 +58,8 @@ These items are complete and documented. Listed for historical context.
 | **F-20** | Rayon parallelization for `compress_workspace` | v0.2.0 | ✅ Applied `par_iter()` to the per-file compression loop with Mutex-wrapped manifest/errors collectors. Pre-assigns aliases deterministically (F-21) before parallel work. **Prerequisites:** F-19 (walkdir) ✅, A-12 (Parser `Send`) ✅. |
 | **F-21** | Deterministic alias assignment | v0.2.0 | ✅ Pre-assigns α1, α2…αN aliases sequentially before the parallel Rayon loop. Once assigned, `get_or_create_alias` is a read-only HashMap lookup safe for concurrent access. |
 | **F-22** | Workspace compression result caching | v0.2.0 | ✅ Caches the complete `WorkspaceResult` keyed by a content hash of file paths + mtimes/sizes. Subsequent calls with no file changes return the cached result instantly. Saves 5-15s per redundant call for a 100-file workspace. |
+| **R-43a** | IR Evolution — Execution Semantics (Phase 1) | v0.3.0 | ✅ 4 new `CoreOp` variants (DataFlow, ControlFlow, SideEffect, ExecutionContext) for behavioral reasoning. Full wire-format support (named/positional/binary/hierarchical/string_table/compact). `SemanticIntent` delta metadata with detection in `DeltaComputer::compute()` (rename/add/remove method, change return type/signature, add injection). Compact delta intent preservation. Rust/C#/TypeScript language-layer behavioral extraction. `IRValidator` behavioral consistency checks. See `docs/IR_EVOLUTION_PLAN.md`. |
+| **R-43b** | IR Evolution — Program Graph + Inference Layer + Semantic Delta + Validation + Query (Phases 2-6) | v0.3.0 | ✅ `ProgramGraph` (local graph), `InferenceLayer` (confidence-scored ephemeral overlay), `PassPipeline` (composable `IRPass` chain), `IRValidator` (structural + behavioral invariants), `IRQueryEngine` (queryable IR). All wired into `src/ir/mod.rs`. See `docs/IR_EVOLUTION_PLAN.md`. **Phase 3 CBM enrichment ✅:** `InferenceLayer::enrich_from_cbm()` consumes cross-file CALLS/DATAFLOW edges + importance/dead-code annotations (confidence 0.75); `GraphBridge::get_call_edges()`/`get_dataflow_edges()` added; `InferenceLayerPass::with_cbm()` wires enrichment into the pipeline. See `docs/CHANGELOG.md` [0.3.0]. |
 
 ---
 
@@ -75,12 +77,10 @@ All Foundation items (A-09 through A-15), all Now items (F-19 through F-22, A-08
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **R-43a** | IR Evolution — Execution Semantics (Phase 1) | Add 4 new `CoreOp` variants (DataFlow, ControlFlow, SideEffect, ExecutionContext) for behavioral reasoning. Rust PoC + C# SignalR/EF Core pilot + TypeScript RxJS/Angular. See [`docs/IR_EVOLUTION_PLAN.md`](IR_EVOLUTION_PLAN.md). | 4-5 days | 🔴 High |
 | **R-02** | Type-aware compression | Inline `type_aliases` from config: `UserId` → `$uid`, `JsonObject` → `$jo`. Currently the type table is loaded but not injected into the capture pipeline. | 2-3 days | 🔴 High |
 | **R-12** | Multi-file / git-commit diff | Diff an entire workspace between two git commits; emit per-file deltas in one tool call. Powers "what changed in this PR?" workflows. **A-09 ✅ (complete)** — now unblocked. | 3-5 days | 🔴 High |
 | **R-23** | NgRx Meta-Layer | Framework-annotation layer for NgRx state management (sits on top of TS + Angular layers). **A-11 ✅ (complete)** — now unblocked. | 3-4 days | 🔴 High |
 | **R-24** | RxJS Meta-Layer | Additive meta-layer on TS/JS. Observable chain compression, operator pattern recognition, subscription lifecycle markers. **A-11 ✅ (complete)** — now unblocked. | 3-4 days | 🔴 High |
-| **R-43b** | IR Evolution — Program Graph + Inference Layer + Semantic Delta + Validation + Query (Phases 2-6) | Local program graph, `InferenceLayer` with confidence scores, explicit pass pipeline (`IRPass` trait), semantic delta detection, IR validation engine, queryable IR with CBM fallback. See [`docs/IR_EVOLUTION_PLAN.md`](IR_EVOLUTION_PLAN.md). | 5-8 days | 🟡 Medium |
 | **R-07** | MCP `resources` support | Expose compressed snapshots as MCP resources in addition to tools, enabling LLM clients to read prior state without re-invoking tools. | 1-2 days | 🟡 Medium |
 | **R-08** | Improved diff: rename detection | Detect class/method renames (same signature, different name) and emit as `~` with a `renamed from X` hint instead of a delete+add pair. | 1 day | 🟡 Medium |
 | **R-01** | Python language layer | Most-requested language. Follows the 4-step guide in `DEVELOPER_DOCUMENTATION.md`. | 1-2 days | 🟡 Medium |
@@ -172,12 +172,10 @@ All gates clear. Meta-layer items are now unblocked (A-11 ✅). Sliding Context 
 
 | Priority | Item | Dependency |
 |----------|------|------------|
-| 🔴 High | R-43a IR Evolution — Execution Semantics (Phase 1) | None (builds on existing IR) |
 | 🔴 High | R-02 Type-aware compression | None |
 | 🔴 High | R-12 Multi-file git-commit diff | A-09 ✅ |
 | 🔴 High | R-23 NgRx Meta-Layer | A-11 ✅ |
 | 🔴 High | R-24 RxJS Meta-Layer | A-11 ✅ |
-| 🟡 Medium | R-43b IR Evolution — Program Graph + Inference Layer + Semantic Delta + Validation + Query (Phases 2-6) | R-43a ✅ |
 | 🟡 Medium | R-07 MCP resources support | None |
 | 🟡 Medium | R-08 Improved diff: rename detection | None |
 | 🟡 Medium | R-01 Python language layer | None |

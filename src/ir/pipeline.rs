@@ -16,10 +16,13 @@
 //   Pass 6: Inference    (CBM enrichment + derived analysis)
 //   Pass 7: Validation   (structural + consistency checks)
 
+use std::sync::Mutex;
+
 use super::inference_layer::InferenceLayer;
 use super::opcodes::CoreOp;
 use super::program_graph::{ProgramGraph, GraphBuilder};
 use super::layers::LayerContext;
+use crate::cbm::bridge::GraphBridge;
 use crate::compression::Fidelity;
 
 /// Error type for pass execution.
@@ -238,11 +241,23 @@ impl IRPass for ProgramGraphPass {
 }
 
 /// Pass 6: Inference layer (CBM enrichment + derived analysis).
-pub struct InferenceLayerPass;
+///
+/// R-43b Phase 3: The pass now holds an optional CBM `GraphBridge` wrapped
+/// in a `Mutex` so `run(&self)` can lock it mutably for enrichment. When no
+/// bridge is provided (or CBM is unavailable), the layer is built empty —
+/// invariant C2 (all core functionality works without CBM).
+pub struct InferenceLayerPass {
+    cbm_bridge: Mutex<Option<GraphBridge>>,
+}
 
 impl InferenceLayerPass {
     pub fn new() -> Self {
-        Self
+        Self { cbm_bridge: Mutex::new(None) }
+    }
+
+    /// Create a pass with an optional CBM bridge for enrichment.
+    pub fn with_cbm(bridge: Option<GraphBridge>) -> Self {
+        Self { cbm_bridge: Mutex::new(bridge) }
     }
 }
 
@@ -255,7 +270,9 @@ impl Default for InferenceLayerPass {
 impl IRPass for InferenceLayerPass {
     fn name(&self) -> &str { "inference_layer" }
     fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
-        let layer = InferenceLayer::new();
+        let mut layer = InferenceLayer::new();
+        let mut guard = self.cbm_bridge.lock().unwrap_or_else(|p| p.into_inner());
+        layer.enrich_from_cbm(guard.as_mut());
         state.inference_layer = Some(layer);
         Ok(())
     }

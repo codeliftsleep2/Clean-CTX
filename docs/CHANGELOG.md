@@ -6,6 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.3.0] — 2026-08-04 — IR Evolution: Execution Semantics & Behavioral Reasoning
+
+### Added
+
+#### R-43a: Execution Semantics (Phase 1)
+- 4 new `CoreOp` variants in `src/ir/opcodes.rs`:
+  - `DataFlow` (`DATAFLOW`) — tracks which symbols a method reads/writes
+  - `ControlFlow` (`CTRL`) — control flow constructs (if, loop, match, try, await, return)
+  - `SideEffect` (`EFFECT`) — method side-effect type (pure, io, mutation, async, transaction)
+  - `ExecutionContext` (`CTX`) — method execution context (sync, async, thread_bound, transaction_scope, realtime)
+- Full wire-format support across all 6 encodings: named, positional, binary, hierarchical, string_table, and compact delta abbreviations (DF/CT/EF/CX)
+- `primary_key`/`key_tuple`/`primary_key_from_tuple`/`key_tuple_from_tuple` match arms for all 4 new variants
+- `SemanticIntent` enum + `intent` field on `IRDelta` — high-level semantic delta metadata
+- **Semantic intent detection** in `DeltaComputer::compute()`: rename (class/method/field), add/remove method, change return type, change signature, add injection
+- **Compact delta intent preservation** — `CompactDelta` now carries `intent` through encode → decode (previously dropped)
+- Language-layer behavioral extraction:
+  - Rust: async/unsafe/io → SideEffect + ExecutionContext; match/loop/if/return → ControlFlow
+  - C#: IAsyncEnumerable, SignalR Hub, DbSet, SaveChangesAsync, TransactionScope, IDisposable → behavioral ops
+  - TypeScript: RxJS subscribe/pipe, async, Observable, @Injectable → behavioral ops
+- `IRValidator` behavioral consistency checks (EFFECT("async") ↔ CTX("async"), orphan method refs)
+
+#### R-43b: Program Graph + Inference Layer + Pipeline + Validation + Query (Phases 2-6)
+- `src/ir/program_graph.rs` — lightweight local program graph (Calls, Extends, Implements, Injects, DataFlowRead/Write edges)
+- `src/ir/inference_layer.rs` — ephemeral inference layer with confidence scores (1.0 structural / 0.75 CBM / 0.5 heuristic)
+- `src/ir/pipeline.rs` — composable `IRPass` pipeline (Core → Language → Meta → Execution → Program Graph → Inference → Validation)
+- `src/ir/validator.rs` — structural + behavioral invariant validation
+- `src/ir/query.rs` — queryable IR (e.g. `find_async_methods`)
+- All modules wired into `src/ir/mod.rs` and re-exported
+
+#### R-43b Phase 3: Inference Layer CBM Enrichment
+- `InferenceLayer::enrich_from_cbm()` — consumes CBM graph data into the ephemeral inference layer (cross-file CALLS edges, DATAFLOW read/write edges → `inferred_edges`; symbol importance + dead code → `annotations`)
+- `GraphBridge::get_call_edges()` — returns `(caller, callee)` pairs for all CALLS relationships (TTL-cached)
+- `GraphBridge::get_dataflow_edges()` — returns `(method, target, direction)` triples for DATAFLOW relationships (TTL-cached)
+- `InferenceLayerPass` now accepts an optional CBM bridge via `InferenceLayerPass::with_cbm()`, wiring enrichment into Pass 6 of the pipeline
+- All CBM-derived data carries `confidence = 0.75` and `source = Cbm` (invariant C3); no-op when CBM is unavailable (invariant C2)
+- Mock test helper `new_mock_with_edges()` pre-seeds call/dataflow/importance/dead-code cache entries for deterministic tests
+
+### Changed
+- `DeltaComputer::compute()` now populates `IRDelta.intent` with detected semantic intent
+- `CompactDelta` gained an `intent` field (serde `skip_serializing_if` — absent when `None`)
+- `InferenceLayerPass` changed from a unit struct to a struct holding `Mutex<Option<GraphBridge>>`; `new()` still builds an empty layer, `with_cbm()` enables CBM enrichment
+- Test count increased with semantic-intent detection tests and compact intent round-trip tests
+
+### Version history
+| Version | Date | Highlights |
+|---------|------|------------|
+| 0.3.0 | 2026-08-04 | **IR Evolution.** Execution semantics (DataFlow/ControlFlow/SideEffect/ExecutionContext), semantic delta intent, program graph, inference layer, pass pipeline, validation, query |
+
+---
+
 ## [0.2.1-rc2] — 2026-07-03 — Meta-Layer Expansion & FAANG Hardening
 
 ### Added
