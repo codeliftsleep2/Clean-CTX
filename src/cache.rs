@@ -12,7 +12,7 @@
 // registry or baseline in sorted order; `HashMap` is faster for lookups.
 
 use sha2::{Digest, Sha256};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::diff::CapturedStructure;
 
@@ -36,8 +36,14 @@ pub struct LocalStateCache {
     /// same raw-token count.
     /// F-FULL-17: LRU-evicting cache bounded by MAX_RAW_TOKEN_COUNT_ENTRIES.
     raw_token_counts: HashMap<String, usize>,
-    /// LRU eviction order for `raw_token_counts`. Newest at the back.
-    raw_token_order: VecDeque<String>,
+    /// H-3 fix: O(1) LRU ordering.
+    /// Maps content hash → the generation number at which it was last used.
+    raw_token_gen: HashMap<String, u64>,
+    /// Maps generation number → content hash, ordered so the minimum (oldest)
+    /// generation can be found and removed in O(log n) time.
+    raw_token_order: BTreeMap<u64, String>,
+    /// Monotonically increasing generation counter.
+    raw_token_clock: u64,
 }
 
 impl Default for LocalStateCache {
@@ -53,7 +59,9 @@ impl LocalStateCache {
             baseline_snapshots: HashMap::new(),
             baseline_hashes: HashMap::new(),
             raw_token_counts: HashMap::new(),
-            raw_token_order: VecDeque::new(),
+            raw_token_gen: HashMap::new(),
+            raw_token_order: BTreeMap::new(),
+            raw_token_clock: 0,
         }
     }
 
@@ -109,20 +117,27 @@ impl LocalStateCache {
     /// F-14: Store the raw-token count for a content hash so the cache-hit
     /// path can skip the BPE encode.
     /// F-FULL-17: LRU-evicting cache bounded by MAX_RAW_TOKEN_COUNT_ENTRIES.
+    /// H-3 fix: O(log n) promote/evict using a generation counter + BTreeMap
+    /// instead of O(n) VecDeque::iter().position() + remove().
     pub fn store_raw_token_count(&mut self, content_hash: &str, count: usize) {
-        // If already present, move to back (most recently used).
-        if self.raw_token_counts.contains_key(content_hash) {
-            if let Some(pos) = self.raw_token_order.iter().position(|k| k == content_hash) {
-                self.raw_token_order.remove(pos);
-            }
+        // Promote: remove the old ordering entry for this key (if any).
+        if let Some(&old_gen) = self.raw_token_gen.get(content_hash) {
+            self.raw_token_order.remove(&old_gen);
         } else if self.raw_token_counts.len() >= MAX_RAW_TOKEN_COUNT_ENTRIES {
-            // Evict the oldest (front of the queue).
-            if let Some(oldest) = self.raw_token_order.pop_front() {
-                self.raw_token_counts.remove(&oldest);
+            // Evict the entry with the smallest (oldest) generation in O(log n).
+            if let Some((&oldest_gen, oldest_key)) = self.raw_token_order.iter().next() {
+                let oldest_key = oldest_key.clone();
+                self.raw_token_order.remove(&oldest_gen);
+                self.raw_token_gen.remove(&oldest_key);
+                self.raw_token_counts.remove(&oldest_key);
             }
         }
+        // Assign a fresh generation and record it.
+        let clock = self.raw_token_clock;
+        self.raw_token_clock += 1;
+        self.raw_token_gen.insert(content_hash.to_string(), clock);
+        self.raw_token_order.insert(clock, content_hash.to_string());
         self.raw_token_counts.insert(content_hash.to_string(), count);
-        self.raw_token_order.push_back(content_hash.to_string());
     }
 
     /// F-14: Retrieve a previously-stored raw-token count for the given
@@ -138,7 +153,9 @@ impl LocalStateCache {
         self.baseline_snapshots.clear();
         self.baseline_hashes.clear();
         self.raw_token_counts.clear();
+        self.raw_token_gen.clear();
         self.raw_token_order.clear();
+        self.raw_token_clock = 0;
     }
 }
 

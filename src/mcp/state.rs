@@ -40,7 +40,7 @@ use crate::mcp::sqlite_store::SqliteStore;
 ///
 /// Usage: `let guard = lock_or_recover!(self.dict.lock(), "dict");`
 /// instead of:
-/// ```
+/// ```ignore
 /// match self.dict.lock() {
 ///     Ok(guard) => guard,
 ///     Err(poisoned) => {
@@ -54,7 +54,17 @@ macro_rules! lock_or_recover {
         match $lock {
             Ok(guard) => guard,
             Err(poisoned) => {
-                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock ({})", $name);
+                // The lock was poisoned by a panic on another thread. The
+                // data may be in a partially-updated, inconsistent state.
+                // Log a prominent warning so operators can correlate this
+                // with any preceding panic messages, then proceed with the
+                // potentially corrupt contents — callers must treat the
+                // returned state as untrusted and re-validate critical fields.
+                eprintln!(
+                    "[clean-ctx] WARNING: Recovering from poisoned lock ({}). \
+                     State may be inconsistent; validate before use.",
+                    $name
+                );
                 poisoned.into_inner()
             }
         }

@@ -63,12 +63,12 @@ pub struct ProxyState {
 }
 
 impl ProxyState {
-    pub fn new(config: ProxyConfig) -> Self {
+    pub fn new(config: ProxyConfig) -> Result<Self, ProxyError> {
         let http_client = reqwest::Client::builder()
             .timeout(UPSTREAM_TIMEOUT)
             .connect_timeout(std::time::Duration::from_secs(5))
             .build()
-            .expect("Failed to create HTTP client");
+            .map_err(|e| ProxyError::Body(format!("Failed to create HTTP client: {e}")))?;
 
         // Delegate filter loading to filter_loader module (SRP compliance)
         let filter_registry = Arc::new(load_builtin_filters());
@@ -76,7 +76,7 @@ impl ProxyState {
         // Create rate limiter with configured limits
         let rate_limiter = RateLimiter::new(config.rate_limit_rps, config.rate_limit_burst);
 
-        Self {
+        Ok(Self {
             config,
             cache_stats: CacheStats::default(),
             transform_stats: TransformStats::default(),
@@ -85,7 +85,7 @@ impl ProxyState {
             http_client,
             filter_registry,
             rate_limiter,
-        }
+        })
     }
 
     pub fn next_req_id(&self) -> String {
@@ -115,7 +115,7 @@ pub async fn run_server_with_listener(
     info!("[proxy] Clean-CTX proxy listening on http://{}", listener.local_addr().unwrap());
     info!("[proxy] Upstream: {}", config.upstream_url);
 
-    let state = Arc::new(RwLock::new(ProxyState::new(config)));
+    let state = Arc::new(RwLock::new(ProxyState::new(config)?));
     let semaphore = Arc::new(tokio::sync::Semaphore::new(MAX_CONNECTIONS));
 
     loop {
@@ -297,11 +297,11 @@ async fn handle_messages_request(
     let mut body_value: serde_json::Value = serde_json::from_slice(&body_bytes)
         .map_err(|e| ProxyError::Body(format!("Failed to parse request JSON: {e}")))?;
 
-    // Single lock acquisition for all transforms
-    {
-        let mut guard = state.write().await;
-
-        // Build pipeline config from current proxy state
+    // H-2 fix: Extract everything needed for transforms under a read lock,
+    // run the CPU-intensive pipeline without holding any lock, then acquire
+    // a write lock only to commit the stats delta at the end.
+    let (pipeline_config, adapter, auto_cache, tail_ttl, log_bodies, log_dir) = {
+        let guard = state.read().await;
         let pipeline_config = PipelineConfig {
             drop_tools_set: guard.config.drop_tools_set.clone(),
             strip_ansi: guard.config.strip_ansi,
@@ -314,39 +314,51 @@ async fn handle_messages_request(
             sliding_window_max_age_turns: guard.config.sliding_window_max_age_turns,
             sliding_window_force_preserve_floor: guard.config.sliding_window_force_preserve_floor,
         };
-
-        // Detect platform from request body or config override
         let adapter: Box<dyn PlatformAdapter> = if let Some(ref platform_name) = guard.config.platform {
             platform::get_platform(platform_name)
         } else {
             platform::detect_platform(&body_value)
         };
+        (
+            pipeline_config,
+            adapter,
+            guard.config.auto_cache,
+            guard.config.tail_ttl.clone(),
+            guard.config.log_bodies,
+            guard.config.log_dir.clone(),
+        )
+    };
 
-        // Build and run the transform pipeline (OCP: new transforms added in pipeline.rs)
-        let pipeline = Pipeline::build(&pipeline_config);
-        pipeline.run(&mut body_value, &mut guard.transform_stats, &pipeline_config, adapter.as_ref());
+    // Run the CPU-intensive pipeline with no lock held.
+    let pipeline = Pipeline::build(&pipeline_config);
+    let mut local_transform_stats = crate::transform::TransformStats::default();
+    pipeline.run(&mut body_value, &mut local_transform_stats, &pipeline_config, adapter.as_ref());
 
-        // Reset per-request sliding window counters after this request
+    // Inject cache breakpoints (cheap — no lock needed for the transform itself).
+    let mut local_cache_stats = crate::cache::CacheStats::default();
+    if auto_cache && adapter.platform_name() == "anthropic" {
+        inject_breakpoints(&mut body_value, &tail_ttl, &mut local_cache_stats);
+    }
+
+    // Commit stats under a write lock (brief, no heavy work inside).
+    {
+        let mut guard = state.write().await;
+        guard.transform_stats.merge(&local_transform_stats);
         guard.transform_stats.sliding_window.reset_request();
+        guard.cache_stats.merge(&local_cache_stats);
+    }
 
-        // Cache breakpoints (Anthropic only — other platforms don't support cache_control)
-        if guard.config.auto_cache && adapter.platform_name() == "anthropic" {
-            let tail_ttl = guard.config.tail_ttl.clone();
-            inject_breakpoints(&mut body_value, &tail_ttl, &mut guard.cache_stats);
-        }
-
-        // Log request body if configured
-        if guard.config.log_bodies {
-            let log_dir = PathBuf::from(&guard.config.log_dir);
-            let body_value_clone = body_value.clone();
-            let req_id_owned = req_id.to_string();
-            tokio::spawn(async move {
-                let mut log_stats = LogStats::default();
-                if let Err(e) = logger::log_request(&log_dir, &req_id_owned, &body_value_clone, &mut log_stats).await {
-                    warn!("[{req_id_owned}] Failed to log request: {e}");
-                }
-            });
-        }
+    // Log request body if configured (fire-and-forget, never under any lock).
+    if log_bodies {
+        let log_dir = PathBuf::from(&log_dir);
+        let body_value_clone = body_value.clone();
+        let req_id_owned = req_id.to_string();
+        tokio::spawn(async move {
+            let mut log_stats = LogStats::default();
+            if let Err(e) = logger::log_request(&log_dir, &req_id_owned, &body_value_clone, &mut log_stats).await {
+                warn!("[{req_id_owned}] Failed to log request: {e}");
+            }
+        });
     }
 
     let modified_body = serde_json::to_vec(&body_value)?;
@@ -488,18 +500,30 @@ async fn forward_to_upstream(
 }
 
 /// Read the full body from an incoming hyper request with size limit.
+///
+/// C-1 fix: accumulate frames one-at-a-time and enforce the size cap
+/// *during* streaming rather than after buffering the entire body.
+/// This prevents an oversized request from causing OOM before the check runs.
 async fn read_body(body: Incoming, max_size: usize) -> Result<Bytes, ProxyError> {
     use http_body_util::BodyExt;
-    let collected = body.collect().await?;
-    let bytes = collected.to_bytes();
-    if bytes.len() > max_size {
-        return Err(ProxyError::Body(format!(
-            "Request body too large: {} bytes (max {})",
-            bytes.len(),
-            max_size
-        )));
+    use bytes::BufMut;
+
+    let mut buf = bytes::BytesMut::new();
+    // Drive the body frame-by-frame so we can enforce the cap incrementally.
+    let mut body = std::pin::pin!(body);
+    while let Some(frame) = body.frame().await {
+        let frame = frame?;
+        if let Ok(data) = frame.into_data() {
+            if buf.len() + data.len() > max_size {
+                return Err(ProxyError::Body(format!(
+                    "Request body too large (max {} bytes)",
+                    max_size
+                )));
+            }
+            buf.put(data);
+        }
     }
-    Ok(bytes)
+    Ok(buf.freeze())
 }
 
 /// Handle `GET /stats` — return proxy filter + cache + sliding window stats as JSON.
@@ -528,7 +552,7 @@ mod tests {
     #[test]
     fn test_req_id_generation() {
         let config = ProxyConfig::default();
-        let state = ProxyState::new(config);
+        let state = ProxyState::new(config).expect("Failed to create ProxyState in test");
         let id1 = state.next_req_id();
         let id2 = state.next_req_id();
         assert_ne!(id1, id2);

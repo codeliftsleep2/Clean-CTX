@@ -43,6 +43,21 @@ pub struct CacheStats {
     pub client_breakpoints_stripped: u64,
 }
 
+impl CacheStats {
+    /// H-2 fix: Accumulate stats from a per-request local copy into the shared
+    /// cumulative stats. Called under a write lock after inject_breakpoints has
+    /// run without holding any lock.
+    pub fn merge(&mut self, other: &CacheStats) {
+        self.total_injected += other.total_injected;
+        self.tools_slots += other.tools_slots;
+        self.system_slots += other.system_slots;
+        self.messages_slots += other.messages_slots;
+        self.tail_slots += other.tail_slots;
+        self.small_blocks_filtered += other.small_blocks_filtered;
+        self.client_breakpoints_stripped += other.client_breakpoints_stripped;
+    }
+}
+
 /// Inject cache_control breakpoints into a /v1/messages request body.
 ///
 /// Modifies `body` in-place. Returns the number of breakpoints placed
