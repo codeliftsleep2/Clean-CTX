@@ -792,3 +792,274 @@ fn test_key_tuple_from_tuple() {
     );
     assert!(key_tuple_from_tuple([].as_slice()).is_empty());
 }
+
+// ── R-43a: Semantic Intent Detection ────────────────────────────
+//
+// `DeltaComputer::compute()` now populates `IRDelta.intent` with a
+// high-level `SemanticIntent` describing *what* changed, beyond the
+// structural diff. These tests verify each detection path.
+
+use crate::ir::delta::SemanticIntent;
+
+#[test]
+fn intent_rename_method() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Rename M1 from "processData" to "renamedMethod"
+    for op in &mut current.instructions {
+        if let CoreOp::DefMethod(_cid, mid, name) = op {
+            if mid == "M1" {
+                *name = "renamedMethod".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::RenameSymbol { old_name, new_name, kind }) => {
+            assert_eq!(old_name, "processData");
+            assert_eq!(new_name, "renamedMethod");
+            assert_eq!(kind, "method");
+        }
+        other => panic!("expected RenameSymbol, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_rename_class() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    for op in &mut current.instructions {
+        if let CoreOp::DefClass(cid, name) = op {
+            if cid == "C1" {
+                *name = "RenamedService".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::RenameSymbol { old_name, new_name, kind }) => {
+            assert_eq!(old_name, "SampleService");
+            assert_eq!(new_name, "RenamedService");
+            assert_eq!(kind, "class");
+        }
+        other => panic!("expected RenameSymbol, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_rename_field() {
+    let mut baseline = baseline_ir("a1", 1);
+    baseline.instructions.push(CoreOp::DefField("C1".into(), "F1".into(), "oldField".into()));
+    baseline.version = 1;
+
+    let mut current = baseline.clone();
+    current.version = 2;
+    for op in &mut current.instructions {
+        if let CoreOp::DefField(_cid, fid, name) = op {
+            if fid == "F1" {
+                *name = "newField".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::RenameSymbol { old_name, new_name, kind }) => {
+            assert_eq!(old_name, "oldField");
+            assert_eq!(new_name, "newField");
+            assert_eq!(kind, "field");
+        }
+        other => panic!("expected RenameSymbol, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_add_method() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    current.instructions.push(CoreOp::DefMethod("C1".into(), "M2".into(), "newMethod".into()));
+    current.instructions.push(CoreOp::Return("M2".into(), "$v".into()));
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::AddMethod { class, method_name }) => {
+            assert_eq!(class, "C1");
+            assert_eq!(method_name, "newMethod");
+        }
+        other => panic!("expected AddMethod, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_remove_method() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Remove M1 method instructions
+    current.instructions.retain(|op| match op {
+        CoreOp::DefMethod(_, mid, _) => mid != "M1",
+        CoreOp::Param(mid, _, _, _) => mid != "M1",
+        CoreOp::Return(mid, _) => mid != "M1",
+        CoreOp::Flags(tid, _) => tid != "M1",
+        _ => true,
+    });
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::RemoveMethod { class, method_name }) => {
+            assert_eq!(class, "C1");
+            assert_eq!(method_name, "processData");
+        }
+        other => panic!("expected RemoveMethod, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_change_return_type() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Change return type of M1 from "$b" to "$s"
+    for op in &mut current.instructions {
+        if let CoreOp::Return(mid, ty) = op {
+            if mid == "M1" {
+                *ty = "$s".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::ChangeReturnType { method, old_type, new_type }) => {
+            assert_eq!(method, "M1");
+            assert_eq!(old_type, "$b");
+            assert_eq!(new_type, "$s");
+        }
+        other => panic!("expected ChangeReturnType, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_change_signature_param_type() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Change param type from "$s" to "$n"
+    for op in &mut current.instructions {
+        if let CoreOp::Param(mid, pid, ty, _name) = op {
+            if mid == "M1" && pid == "P1" {
+                *ty = "$n".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::ChangeSignature { method, field_changed }) => {
+            assert_eq!(method, "M1");
+            assert_eq!(field_changed, "param_type");
+        }
+        other => panic!("expected ChangeSignature, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_add_injection() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    current.instructions.push(CoreOp::Injects("C1".into(), vec!["S1".into()]));
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::AddInjection { class, dependency }) => {
+            assert_eq!(class, "C1");
+            assert_eq!(dependency, "S1");
+        }
+        other => panic!("expected AddInjection, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_add_injection_to_existing() {
+    // Adding a dependency to an existing INJECTS op (key in both base and cur).
+    // The doc comment claims this is handled — verify it produces AddInjection.
+    let mut baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Baseline has INJECTS C1 -> [S1]; current adds S2.
+    baseline.instructions.push(CoreOp::Injects("C1".into(), vec!["S1".into()]));
+    current.instructions.retain(|op| !matches!(op, CoreOp::Injects(_, _)));
+    current.instructions.push(CoreOp::Injects("C1".into(), vec!["S1".into(), "S2".into()]));
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::AddInjection { class, dependency }) => {
+            assert_eq!(class, "C1");
+            assert_eq!(dependency, "S2", "should report the newly-added dep, not the existing one");
+        }
+        other => panic!("expected AddInjection, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_change_signature_param_name() {
+    // Changing a param's name (not type) should yield ChangeSignature with
+    // field_changed = "param_name".
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    for op in &mut current.instructions {
+        if let CoreOp::Param(mid, pid, _ty, name) = op {
+            if mid == "M1" && pid == "P1" {
+                *name = "renamedInput".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::ChangeSignature { method, field_changed }) => {
+            assert_eq!(method, "M1");
+            assert_eq!(field_changed, "param_name");
+        }
+        other => panic!("expected ChangeSignature, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_none_for_identical_ir() {
+    let baseline = baseline_ir("a1", 1);
+    let current = baseline.clone();
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current);
+    assert!(delta.is_none(), "identical IR should produce no delta");
+}
+
+#[test]
+fn intent_none_for_import_only_change() {
+    // Adding an import is not a recognized semantic intent — should be None.
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    current.instructions.push(CoreOp::Import("IM2".into(), "fs".into(), "readFile".into()));
+
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    assert!(delta.intent.is_none(), "import-only change should have no semantic intent");
+}

@@ -91,3 +91,50 @@ fn test_inference_layer_pass_builds_layer() {
     assert!(result.is_ok());
     assert!(ctx.inference_layer.is_some());
 }
+
+// ── R-43b Phase 3: CBM enrichment through the pass ──────────────────
+
+#[test]
+fn test_inference_layer_pass_with_cbm_enriches_layer() {
+    use std::collections::HashMap;
+    use crate::cbm::bridge::test_helpers::new_mock_with_edges;
+    use crate::cbm::bridge::SymbolImportance;
+
+    let bridge = new_mock_with_edges(
+        vec![("CallerA".to_string(), "CalleeB".to_string())],
+        vec![("MethodX".to_string(), "TargetY".to_string(), "reads".to_string())],
+        {
+            let mut m = HashMap::new();
+            m.insert("Sym1".to_string(), SymbolImportance {
+                symbol: "Sym1".to_string(),
+                score: 0.9,
+                file: "a.ts".to_string(),
+            });
+            m
+        },
+        vec![],
+    );
+
+    let mut ctx = PassContext::new("source".to_string(), "file.ts".to_string(), Fidelity::Low);
+    let pass = InferenceLayerPass::with_cbm(Some(bridge));
+    let result = pass.run(&mut ctx);
+    assert!(result.is_ok());
+
+    let layer = ctx.inference_layer.expect("inference layer should be set");
+    // 1 call edge + 1 dataflow edge
+    assert_eq!(layer.inferred_edges.len(), 2);
+    // importance annotation
+    assert!(layer.has_annotation_key("importance"));
+}
+
+#[test]
+fn test_inference_layer_pass_without_cbm_builds_empty_layer() {
+    let mut ctx = PassContext::new("source".to_string(), "file.ts".to_string(), Fidelity::Low);
+    let pass = InferenceLayerPass::with_cbm(None);
+    let result = pass.run(&mut ctx);
+    assert!(result.is_ok());
+
+    let layer = ctx.inference_layer.expect("inference layer should be set");
+    assert!(layer.inferred_edges.is_empty());
+    assert!(layer.annotations.is_empty());
+}

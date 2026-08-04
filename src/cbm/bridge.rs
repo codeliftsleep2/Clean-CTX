@@ -450,6 +450,78 @@ impl GraphBridge {
         }
     }
 
+    /// Get all CALLS edges from CBM's knowledge graph.
+    /// Returns `(caller, callee)` pairs across all files.
+    ///
+    /// R-43b Phase 3: Consumed by `InferenceLayer::enrich_from_cbm()` to
+    /// populate cross-file call edges (confidence = 0.75). Cached with TTL.
+    pub fn get_call_edges(&mut self) -> Vec<(String, String)> {
+        let key = "call_edges".to_string();
+        let project = self.project_str();
+        if self.check_cache(&key) {
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .unwrap_or_default();
+        }
+        let cypher = "MATCH (a:Function)-[:CALLS]->(b:Function) RETURN a.name, b.name".to_string();
+        let result = self.query(move |c| c.query_graph(&cypher, &project));
+        match result {
+            Ok(rows) => {
+                let edges: Vec<(String, String)> = rows.iter().filter_map(|r| {
+                    let from = r.get(0)?.as_str()?.to_string();
+                    let to = r.get(1)?.as_str()?.to_string();
+                    Some((from, to))
+                }).collect();
+                self.cache_insert(&key, &edges);
+                edges
+            }
+            Err(_) => vec![],
+        }
+    }
+
+    /// Get all dataflow edges from CBM's knowledge graph.
+    /// Returns `(method, target, direction)` triples where direction is
+    /// "reads" or "writes".
+    ///
+    /// R-43b Phase 3: Consumed by `InferenceLayer::enrich_from_cbm()` to
+    /// populate cross-file dataflow edges (confidence = 0.75). Cached with TTL.
+    pub fn get_dataflow_edges(&mut self) -> Vec<(String, String, String)> {
+        let key = "dataflow_edges".to_string();
+        let project = self.project_str();
+        if self.check_cache(&key) {
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .unwrap_or_default();
+        }
+        let cypher = "MATCH (m:Function)-[r:DATAFLOW]->(t) RETURN m.name, t.name, type(r)".to_string();
+        let result = self.query(move |c| c.query_graph(&cypher, &project));
+        match result {
+            Ok(rows) => {
+                let edges: Vec<(String, String, String)> = rows.iter().filter_map(|r| {
+                    let method = r.get(0)?.as_str()?.to_string();
+                    let target = r.get(1)?.as_str()?.to_string();
+                    let direction = r.get(2)?.as_str().unwrap_or("reads").to_string();
+                    Some((method, target, direction))
+                }).collect();
+                self.cache_insert(&key, &edges);
+                edges
+            }
+            Err(_) => vec![],
+        }
+    }
+
     pub fn get_architecture(&mut self) -> Option<ArchitectureOverview> {
         let key = "architecture".to_string();
         let project = self.project_str();
@@ -858,5 +930,51 @@ pub mod test_helpers {
     /// symbol_importance cache returns empty).
     pub fn new_mock_empty() -> GraphBridge {
         new_mock(HashMap::new())
+    }
+
+    /// Create a mock GraphBridge pre-seeded with call edges, dataflow edges,
+    /// symbol importance, and dead code for exercising
+    /// `InferenceLayer::enrich_from_cbm()`.
+    ///
+    /// R-43b Phase 3: Pre-seeds the `call_edges`, `dataflow_edges`,
+    /// `symbol_importance`, and `dead_code` cache entries so the mock serves
+    /// canned data without a real CBM binary.
+    pub fn new_mock_with_edges(
+        call_edges: Vec<(String, String)>,
+        dataflow_edges: Vec<(String, String, String)>,
+        symbol_importance: HashMap<String, SymbolImportance>,
+        dead_code: Vec<DeadCodeEntry>,
+    ) -> GraphBridge {
+        let bridge = GraphBridge {
+            client: Arc::new(Mutex::new(None)),
+            cache: DashMap::new(),
+            status: CbmStatus::Available,
+            cache_ttl: 3600,
+            project: Some("test-project".to_string()),
+            graph_version: String::new(),
+            indexing_state: Arc::new(Mutex::new(IndexingState::Complete)),
+        };
+        let ttl = Duration::from_secs(3600);
+        let call_json = serde_json::to_value(&call_edges).unwrap_or_default();
+        bridge.cache.insert("call_edges".to_string(), CachedGraphData {
+            data: call_json,
+            expires_at: Instant::now() + ttl,
+        });
+        let df_json = serde_json::to_value(&dataflow_edges).unwrap_or_default();
+        bridge.cache.insert("dataflow_edges".to_string(), CachedGraphData {
+            data: df_json,
+            expires_at: Instant::now() + ttl,
+        });
+        let si_json = serde_json::to_value(&symbol_importance).unwrap_or_default();
+        bridge.cache.insert("symbol_importance".to_string(), CachedGraphData {
+            data: si_json,
+            expires_at: Instant::now() + ttl,
+        });
+        let dc_json = serde_json::to_value(&dead_code).unwrap_or_default();
+        bridge.cache.insert("dead_code".to_string(), CachedGraphData {
+            data: dc_json,
+            expires_at: Instant::now() + ttl,
+        });
+        bridge
     }
 }
