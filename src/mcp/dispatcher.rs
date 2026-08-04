@@ -16,6 +16,7 @@
 // - Request tracing: IDs, timestamps, method names for observability
 // - Graceful degradation: never crashes the server, always sends responses
 
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::thread::{self, JoinHandle};
@@ -144,7 +145,7 @@ pub struct Dispatcher {
     /// Round-robin counter for distributing work across workers.
     rr_counter: std::sync::atomic::AtomicUsize,
     /// Request tracing for observability.
-    traces: Arc<Mutex<Vec<TracedRequest>>>,
+    traces: Arc<Mutex<VecDeque<TracedRequest>>>,
     /// Maximum number of traces to retain (prevents unbounded memory growth).
     max_traces: usize,
     /// Shutdown flag for graceful termination.
@@ -171,7 +172,7 @@ impl Dispatcher {
     pub fn with_config(state: McpState, config: DispatcherConfig) -> Self {
         let state = Arc::new(state);  // P0-1: No outer RwLock — McpState uses interior mutability
         let workers = worker_count(&config);
-        let traces = Arc::new(Mutex::new(Vec::new()));
+        let traces = Arc::new(Mutex::new(VecDeque::new()));
 
         // Use per-worker channels with round-robin dispatch.
         // This guarantees fair distribution on all platforms (including Windows)
@@ -263,11 +264,11 @@ impl Dispatcher {
         {
             // P0-6: Use lock_or_recover! to handle poisoned locks gracefully
             let mut traces = lock_or_recover!(self.traces.lock(), "traces");
-            traces.push(trace.clone());
+            traces.push_back(trace.clone());
             
-            // P1-1: Prune old traces to prevent unbounded memory growth
+            // H-1 fix: O(1) pop_front instead of O(n) remove(0) on a Vec.
             while traces.len() > self.max_traces {
-                traces.remove(0);
+                traces.pop_front();
             }
         }
 
