@@ -153,21 +153,20 @@ pub fn scrub_secrets(content: &str) -> ScrubResult {
 
     for rule in scrub_rules() {
         let re = (rule.re)();
-        if re.is_match(&result) {
-            let new_result = re.replace_all(&result, rule.replacement).to_string();
-            if new_result != result {
-                // Count hits
-                let count = re.find_iter(&result).count();
-                for _ in 0..count {
-                    hits.push(ScrubHit {
-                        secret_type: rule.secret_type.clone(),
-                        line: 0,
-                        replacement: rule.replacement.to_string(),
-                    });
-                }
-                debug!("[scrub] Applied {} rule, {} hits", rule.secret_type, hits.len());
-                result = new_result;
+        let new_result = re.replace_all(&result, rule.replacement);
+        // Detect changes by comparing lengths (avoids a full string comparison
+        // and eliminates the separate is_match / find_iter passes).
+        if new_result.len() != result.len() {
+            let count = re.captures_iter(&result).count();
+            for _ in 0..count {
+                hits.push(ScrubHit {
+                    secret_type: rule.secret_type.clone(),
+                    line: 0,
+                    replacement: rule.replacement.to_string(),
+                });
             }
+            debug!("[scrub] Applied {} rule, {} hits", rule.secret_type, count);
+            result = new_result.into_owned();
         }
     }
 
