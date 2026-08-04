@@ -88,6 +88,22 @@ impl Default for TransformStats {
     }
 }
 
+impl TransformStats {
+    /// H-2 fix: Accumulate stats from a per-request local copy into the shared
+    /// cumulative stats. Called under a write lock after the pipeline has run
+    /// without holding any lock.
+    pub fn merge(&mut self, other: &TransformStats) {
+        self.tools_dropped += other.tools_dropped;
+        self.ansi_sequences_stripped += other.ansi_sequences_stripped;
+        self.ansi_bytes_stripped += other.ansi_bytes_stripped;
+        self.bash_git_trims += other.bash_git_trims;
+        self.model_overrides += other.model_overrides;
+        self.secrets_scrubbed += other.secrets_scrubbed;
+        self.tool_filters_applied += other.tool_filters_applied;
+        self.sliding_window.cumulative_bytes_removed += other.sliding_window.cumulative_bytes_removed;
+    }
+}
+
 /// Lazy-initialized ANSI escape regex.
 fn ansi_regex() -> &'static Regex {
     static ANSI_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
