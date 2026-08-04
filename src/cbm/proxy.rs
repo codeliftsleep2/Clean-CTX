@@ -114,16 +114,10 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
             let raw_tokens = count_tokens_with_tokenizer(&raw_response, tokenizer_ref);
             let comp_tokens = count_tokens_with_tokenizer(&compressed.compressed_text, tokenizer_ref);
 
-            state.record_compression(
-                &format!("cbm://{cbm_tool}"),
-                raw_tokens,
-                comp_tokens,
-                "low",
-                false,
-                "cbm_proxy",
-                None,
-                "cbm_filter",
-            );
+            // Record CBM pipe-level interception savings. This ACCUMULATES
+            // across calls (unlike per-file compression which overwrites),
+            // so the dashboard reflects total CBM output saved this session.
+            state.record_cbm_proxy(cbm_tool, raw_tokens, comp_tokens);
 
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
@@ -151,6 +145,10 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
             let min_compressed = apply_minimum_compression(&raw_response);
             let raw_tokens = count_tokens_with_tokenizer(&raw_response, tokenizer_ref);
             let comp_tokens = count_tokens_with_tokenizer(&min_compressed, tokenizer_ref);
+
+            // Record minimum-compression savings too (fallback path previously
+            // skipped stats entirely).
+            state.record_cbm_proxy(cbm_tool, raw_tokens, comp_tokens);
 
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,

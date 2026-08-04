@@ -48,6 +48,126 @@ fn test_empty_stats() {
 }
 
 #[test]
+fn test_record_cbm_proxy_accumulates() {
+    // CBM pipe-level interceptions are DISTINCT events that must ACCUMULATE
+    // in session totals (unlike per-file compression which overwrites).
+    let mut stats = SessionStats::new();
+
+    // 3 calls to the same CBM tool, each intercepting ~5000 raw tokens → ~1100
+    stats.record_cbm_proxy("graph_search", 5000, 1100);
+    stats.record_cbm_proxy("graph_search", 5000, 1100);
+    stats.record_cbm_proxy("graph_search", 5000, 1100);
+
+    // Session totals should be the SUM across all 3 calls (not just the last)
+    let summary = stats.summary();
+    assert_eq!(summary.total_raw_tokens, 15000, "should accumulate raw tokens across calls");
+    assert_eq!(summary.total_compressed_tokens, 3300, "should accumulate compressed tokens across calls");
+    assert_eq!(summary.full_compress_count, 3, "each CBM call is a full compression event");
+
+    // Per-tool file entry should accumulate
+    let fs = stats.file_stats("cbm://graph_search").expect("cbm://graph_search should be tracked");
+    assert_eq!(fs.raw_tokens, 15000);
+    assert_eq!(fs.compressed_tokens, 3300);
+    assert_eq!(fs.version, 3, "version should increment per call");
+    // 78% savings: (15000-3300)/15000
+    assert!((fs.savings_pct - 78.0).abs() < 0.1);
+
+    // Domain breakdown should accumulate. `file_count` counts UNIQUE tools
+    // (3 calls to the same tool = 1 unique tool), consistent with
+    // `ir_compression`'s unique-file semantics.
+    let domain = stats.domain_breakdown().get("cbm_filter").expect("cbm_filter domain");
+    assert_eq!(domain.total_raw_tokens, 15000);
+    assert_eq!(domain.total_compressed_tokens, 3300);
+    assert_eq!(domain.file_count, 1, "3 calls to same tool = 1 unique tool");
+}
+
+#[test]
+fn test_record_cbm_proxy_distinct_tools() {
+    // Different CBM tools should create separate per-tool entries but
+    // all contribute to the same cbm_filter domain.
+    let mut stats = SessionStats::new();
+    stats.record_cbm_proxy("graph_search", 5000, 1100);
+    stats.record_cbm_proxy("graph_trace", 3000, 800);
+
+    let summary = stats.summary();
+    assert_eq!(summary.total_files, 2, "two distinct CBM tools = two file entries");
+    assert_eq!(summary.total_raw_tokens, 8000);
+    assert_eq!(summary.total_compressed_tokens, 1900);
+
+    // Both tools in the cbm_filter domain
+    let domain = stats.domain_breakdown().get("cbm_filter").expect("cbm_filter domain");
+    assert_eq!(domain.total_raw_tokens, 8000);
+    assert_eq!(domain.total_compressed_tokens, 1900);
+    assert_eq!(domain.file_count, 2);
+}
+
+// ── Regression: CBM proxy events survive merge (persistence restore) ──
+//
+// REGRESSION GUARD: `merge()` recalculates `full_compress_count` from unique
+// file entries. Each CBM tool creates ONE file entry regardless of call count,
+// so without the dedicated `cbm_proxy_events` counter, a persistence restore
+// would understate CBM activity (10 calls to graph_search → count=1). This
+// test locks in the fix.
+
+#[test]
+fn test_merge_preserves_cbm_proxy_event_count() {
+    // In-memory session: 3 CBM proxy calls to graph_search
+    let mut in_memory = SessionStats::new();
+    in_memory.record_cbm_proxy("graph_search", 5000, 1100);
+    in_memory.record_cbm_proxy("graph_search", 5000, 1100);
+    in_memory.record_cbm_proxy("graph_search", 5000, 1100);
+
+    // DB-recovered session: 2 CBM proxy calls to graph_trace
+    let mut db = SessionStats::new();
+    db.record_cbm_proxy("graph_trace", 3000, 800);
+    db.record_cbm_proxy("graph_trace", 3000, 800);
+
+    // Merge DB into in-memory (simulates persistence restore)
+    in_memory.merge(&db);
+
+    let summary = in_memory.summary();
+    // 3 + 2 = 5 CBM proxy events must survive the merge
+    assert_eq!(
+        summary.full_compress_count, 5,
+        "CBM proxy event count must survive merge (3 graph_search + 2 graph_trace)"
+    );
+
+    // Token totals accumulate across both sessions
+    assert_eq!(summary.total_raw_tokens, 5000*3 + 3000*2, "raw tokens accumulate across merge");
+    assert_eq!(summary.total_compressed_tokens, 1100*3 + 800*2, "compressed tokens accumulate across merge");
+
+    // Both tools present as file entries
+    assert!(in_memory.file_stats("cbm://graph_search").is_some());
+    assert!(in_memory.file_stats("cbm://graph_trace").is_some());
+}
+
+// ── Regression: cbm_filter domain file_count = unique tools, not calls ──
+//
+// REGRESSION GUARD: `record_cbm_proxy` must count UNIQUE tools in the
+// `cbm_filter` domain `file_count` (consistent with `ir_compression`'s
+// unique-file semantics), not the number of calls. Without the `is_new_tool`
+// check, 3 calls to the same tool would inflate file_count to 3.
+
+#[test]
+fn test_cbm_filter_domain_file_count_is_unique_tools() {
+    let mut stats = SessionStats::new();
+    // 3 calls to graph_search, 1 call to graph_trace
+    stats.record_cbm_proxy("graph_search", 5000, 1100);
+    stats.record_cbm_proxy("graph_search", 5000, 1100);
+    stats.record_cbm_proxy("graph_search", 5000, 1100);
+    stats.record_cbm_proxy("graph_trace", 3000, 800);
+
+    let domain = stats.domain_breakdown().get("cbm_filter").expect("cbm_filter domain");
+    assert_eq!(
+        domain.file_count, 2,
+        "file_count should count unique tools (graph_search + graph_trace), not 4 calls"
+    );
+    // But token totals reflect ALL calls
+    assert_eq!(domain.total_raw_tokens, 5000*3 + 3000);
+    assert_eq!(domain.total_compressed_tokens, 1100*3 + 800);
+}
+
+#[test]
 fn test_render_dashboard_text() {
     let mut stats = SessionStats::new();
     stats.record_compression("/test/file.ts", 1000, 250, "low", false, "full", None, "ir_compression");

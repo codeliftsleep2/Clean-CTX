@@ -422,6 +422,12 @@ impl McpState {
         self.session_stats_lock().record_compression(file_path, raw_tokens, compressed_tokens, fidelity, is_angular, source, full_compressed_tokens, domain);
     }
 
+    /// Record a CBM pipe-level proxy compression event (thread-safe convenience
+    /// method). Each CBM interception call ACCUMULATES into session stats.
+    pub fn record_cbm_proxy(&self, tool_name: &str, raw_tokens: usize, compressed_tokens: usize) {
+        self.session_stats_lock().record_cbm_proxy(tool_name, raw_tokens, compressed_tokens);
+    }
+
     /// Get file version from IR context (thread-safe convenience method).
     pub fn file_version(&self, path_alias: &str) -> Option<u64> {
         let g = lock_or_recover!(self.ir_context.read(), "ir_context");

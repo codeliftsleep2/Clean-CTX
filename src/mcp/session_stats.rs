@@ -114,10 +114,18 @@ pub struct SessionStats {
     total_raw_tokens: usize,
     /// Total compressed tokens across all files.
     total_compressed_tokens: usize,
-    /// Number of full compression operations.
+    /// Number of full compression operations (per-file events).
     full_compress_count: usize,
     /// Number of delta operations.
     delta_count: usize,
+    /// Number of CBM pipe-level proxy interception events.
+    ///
+    /// Tracked SEPARATELY from `full_compress_count` because each CBM call is a
+    /// distinct event but only creates ONE per-tool file entry (`cbm://tool`).
+    /// `full_compress_count` (derived from unique file entries during `merge()`)
+    /// would understate CBM activity after a persistence restore. This counter
+    /// survives merges by direct addition.
+    cbm_proxy_events: usize,
     /// Session start time.
     started_at: SystemTime,
     /// Per-domain breakdown (Phase 2).
@@ -140,6 +148,7 @@ impl SessionStats {
             total_compressed_tokens: 0,
             full_compress_count: 0,
             delta_count: 0,
+            cbm_proxy_events: 0,
             started_at: SystemTime::now(),
             domain_stats: HashMap::new(),
         }
@@ -316,6 +325,84 @@ impl SessionStats {
         }
     }
 
+    /// Record a CBM pipe-level proxy interception event.
+    ///
+    /// Unlike `record_compression` (which OVERWRITES a per-file entry — each
+    /// new call subtracts the old values and re-adds the new, so repeated
+    /// calls to the same tool only reflect the LAST interception), CBM proxy
+    /// interceptions are DISTINCT EVENTS that must ACCUMULATE. Repeated
+    /// `cbm_proxy` calls previously understated the dashboard because the
+    /// per-tool key (`cbm://graph_search`) was overwritten each time.
+    ///
+    /// This method accumulates raw/compressed tokens in:
+    ///   - session totals (never subtracts)
+    ///   - the per-tool file entry (sum across calls)
+    ///   - the `cbm_filter` domain (sum across calls)
+    pub fn record_cbm_proxy(&mut self, tool: &str, raw_tokens: usize, compressed_tokens: usize) {
+        // Session totals ACCUMULATE (never subtract)
+        self.total_raw_tokens += raw_tokens;
+        self.total_compressed_tokens += compressed_tokens;
+        // Track as a distinct CBM event (survives merge — see struct doc).
+        self.cbm_proxy_events += 1;
+
+        // Per-tool entry accumulates across calls
+        let file_path = format!("cbm://{tool}");
+        let is_new_tool = !self.files.contains_key(&file_path);
+        let entry = self.files.entry(file_path.clone()).or_insert_with(|| FileStats {
+            file_path,
+            raw_tokens: 0,
+            compressed_tokens: 0,
+            savings_pct: 0.0,
+            version: 0,
+            delta_count: 0,
+            fidelity: "low".into(),
+            is_angular: false,
+            strategy: "full".into(),
+            full_compressed_tokens: None,
+            delta_efficiency_pct: None,
+            domain: "cbm_filter".into(),
+        });
+        entry.raw_tokens += raw_tokens;
+        entry.compressed_tokens += compressed_tokens;
+        entry.version += 1;
+        entry.savings_pct = if entry.raw_tokens > 0 {
+            let saved = entry.raw_tokens.saturating_sub(entry.compressed_tokens);
+            (saved as f64 / entry.raw_tokens as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // Domain breakdown accumulates across calls.
+        // `file_count` counts UNIQUE tools (first call per tool), consistent
+        // with `ir_compression`'s unique-file semantics.
+        let domain = self.domain_stats
+            .entry("cbm_filter".to_string())
+            .or_insert_with(|| DomainStats {
+                domain: "cbm_filter".into(),
+                total_raw_tokens: 0,
+                total_compressed_tokens: 0,
+                savings_pct: 0.0,
+                file_count: 0,
+                tokens_removed: Some(0),
+                cache_hits: None,
+                cache_misses: None,
+            });
+        domain.total_raw_tokens += raw_tokens;
+        domain.total_compressed_tokens += compressed_tokens;
+        if is_new_tool {
+            domain.file_count += 1;
+        }
+        let removed = domain.total_raw_tokens.saturating_sub(domain.total_compressed_tokens);
+        domain.savings_pct = if domain.total_raw_tokens > 0 {
+            (removed as f64 / domain.total_raw_tokens as f64) * 100.0
+        } else {
+            0.0
+        };
+        if let Some(ref mut tr) = domain.tokens_removed {
+            *tr = removed;
+        }
+    }
+
     /// Record a cache hit event (prompt cache breakpoint dedup).
     /// This is a separate method because cache tokens are saved by NOT
     /// sending them, not by compressing them.
@@ -428,13 +515,18 @@ impl SessionStats {
         // were blindly added even for files that were skipped during merge.
         self.total_raw_tokens = self.files.values().map(|f| f.raw_tokens).sum();
         self.total_compressed_tokens = self.files.values().map(|f| f.compressed_tokens).sum();
-        // Recalculate operation counts from the merged file entries
+        // Recalculate operation counts from the merged file entries.
+        // NOTE: CBM proxy events are added SEPARATELY because they are not
+        // derivable from unique file entries — each tool creates one entry
+        // regardless of how many times it was called.
         self.full_compress_count = self.files.values()
-            .filter(|f| f.strategy != "delta")
+            .filter(|f| f.strategy != "delta" && !f.file_path.starts_with("cbm://"))
             .count();
         self.delta_count = self.files.values()
             .filter(|f| f.strategy == "delta")
             .count();
+        // Accumulated CBM proxy events survive merges (in-memory + DB-recovered)
+        self.cbm_proxy_events += other.cbm_proxy_events;
 
         // Rebuild domain stats from merged files
         self.rebuild_domain_stats();
@@ -568,7 +660,8 @@ impl SessionStats {
             total_raw_tokens: total_raw,
             total_compressed_tokens: total_compressed,
             total_savings_pct: (total_savings_pct * 10.0).round() / 10.0,
-            full_compress_count: self.full_compress_count,
+            // Full compression ops = per-file events + accumulated CBM proxy events
+            full_compress_count: self.full_compress_count + self.cbm_proxy_events,
             delta_count: self.delta_count,
             session_duration_secs,
             avg_savings_pct: (avg_savings_pct * 10.0).round() / 10.0,
@@ -638,10 +731,11 @@ pub fn render_dashboard_text(stats: &SessionStats) -> String {
                         ));
                     }
                     "cbm_filter" => {
-                        let removed = ds.total_raw_tokens.saturating_sub(ds.total_compressed_tokens);
                         output.push_str(&format!(
-                            "  CBM Filter:                    {:>10} tokens removed\n",
-                            format_number(removed),
+                            "  CBM Intercept:       {:>10} → {:>10} ({:>5.1}%↓)\n",
+                            format_number(ds.total_raw_tokens),
+                            format_number(ds.total_compressed_tokens),
+                            ds.savings_pct,
                         ));
                     }
                     "prompt_cache" => {
