@@ -20,6 +20,28 @@
 
 use tracing_subscriber::EnvFilter;
 
+/// Writer that routes all tracing output to **stderr**.
+///
+/// **CRITICAL (MCP protocol):** `tracing_subscriber::fmt()` defaults to
+/// stdout, which would corrupt the JSON-RPC 2.0 response stream that MCP
+/// clients (Claude Code, VS Code, etc.) parse from the process's stdout.
+/// All diagnostics must go to stderr; stdout is reserved exclusively for
+/// `send_response()` payloads.
+///
+/// This is a named type (rather than an inline `std::io::stderr`) so the
+/// regression test can assert at compile time that the writer is stderr —
+/// if someone changes it to stdout, the test fails to compile.
+#[derive(Debug, Clone, Copy)]
+pub struct StderrWriter;
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for StderrWriter {
+    type Writer = std::io::Stderr;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        std::io::stderr()
+    }
+}
+
 /// Initialize the tracing subscriber.
 ///
 /// Called once at server startup. Configures:
@@ -27,6 +49,8 @@ use tracing_subscriber::EnvFilter;
 ///   - Output format from `CLEAN_CTX_LOG_FORMAT` env var
 ///     (`json` or `text`, default: `text`)
 ///   - Filtering via `CLEAN_CTX_LOG_FILTER` env var (e.g., `warn,clean_ctx=debug`)
+///
+/// All output is routed to **stderr** via [`StderrWriter`] — never stdout.
 ///
 /// If the subscriber is already set (e.g., by a test harness), this
 /// is a no-op.
@@ -44,6 +68,7 @@ pub fn init_tracing() {
         "json" => {
             tracing_subscriber::fmt()
                 .json()
+                .with_writer(StderrWriter)
                 .with_env_filter(filter)
                 .with_target(true)
                 .with_thread_ids(true)
@@ -54,6 +79,7 @@ pub fn init_tracing() {
         }
         _ => {
             tracing_subscriber::fmt()
+                .with_writer(StderrWriter)
                 .with_env_filter(filter)
                 .with_target(true)
                 .with_thread_ids(true)

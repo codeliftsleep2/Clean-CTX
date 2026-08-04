@@ -7,9 +7,10 @@
 
 use clap::Parser;
 
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[command(
     name = "clean-ctx",
+    version = env!("CARGO_PKG_VERSION"),
     about = "Token Waste Reducer & Context Compiler",
 )]
 enum Cli {
@@ -27,18 +28,28 @@ enum Cli {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Idiomatic clap dispatch: when no subcommand is given, clap emits a
-    // MissingSubcommand error, which we intercept to default to running the
-    // MCP server. Any future Cli variant is automatically dispatched here —
-    // no parallel manual whitelist to keep in sync.
+    // Idiomatic clap dispatch. With `version` now set on the command builder,
+    // clap natively handles `--version` / `-V` / `--help` / `-h` (printing and
+    // exiting) with code 0. This prevents MCP clients (Claude Code, VS Code,
+    // etc.) that probe the binary with `--version` from hanging in the stdio
+    // server loop.
+    //
+    // When NO subcommand is given, clap emits
+    // `DisplayHelpOnMissingArgumentOrSubcommand`, which we intercept to
+    // default to running the MCP server. Any future Cli variant is
+    // automatically dispatched above — no parallel manual whitelist to keep
+    // in sync.
     match Cli::try_parse() {
         Ok(Cli::Init) => cmd_init(),
         Ok(Cli::Setup { force }) => cmd_setup_cbm(force),
         Ok(Cli::ConfigDump) => cmd_config_dump(),
-        // Default: run the MCP server
-        // Note: --with-cbm is the default behavior now (auto-detect CBM on PATH).
-        // Use CBM_DISABLE=1 env var to explicitly disable CBM integration.
-        Err(e) if e.kind() == clap::error::ErrorKind::MissingSubcommand => clean_ctx::mcp::run(),
+        // When no arguments are given, clap emits DisplayHelpOnMissingArgumentOrSubcommand.
+        // Intercept it to default to running the MCP server (stdio JSON-RPC loop).
+        // Any future Cli variant is automatically dispatched above — no parallel
+        // manual whitelist to keep in sync.
+        Err(e) if e.kind() == clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => {
+            clean_ctx::mcp::run()
+        }
         Err(e) => e.exit(),
     }
 }
@@ -188,6 +199,10 @@ fn cmd_config_dump() -> Result<(), Box<dyn std::error::Error>> {
     
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "tests/main.rs"]
+mod tests;
 
 /// Generate the default `.clean-ctx.json` content.
 fn generate_default_config() -> String {

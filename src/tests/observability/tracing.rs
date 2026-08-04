@@ -5,12 +5,27 @@
 // Note: `init_tracing` uses `try_init()` so it's safe to call
 // multiple times in tests (subsequent calls are no-ops).
 
-use crate::observability::tracing::init_tracing;
+use tracing_subscriber::fmt::MakeWriter;
+use crate::observability::tracing::{init_tracing, StderrWriter};
 
 #[test]
 fn test_init_tracing_default() {
     // Should not panic — uses default env filter (info)
     init_tracing();
+}
+
+/// Regression guard: the tracing writer MUST be stderr, never stdout.
+///
+/// MCP clients (Claude Code, VS Code, etc.) parse JSON-RPC responses from
+/// the process's **stdout**. If tracing ever writes to stdout, it corrupts
+/// the protocol stream and the client fails. This test asserts at compile
+/// time that `StderrWriter` produces a `std::io::Stderr` — if someone
+/// changes the writer to stdout, this test fails to compile.
+#[test]
+fn test_tracing_writer_is_stderr() {
+    // Compile-time assertion: the Writer type must be std::io::Stderr.
+    // If this line fails to compile, the writer was changed to stdout.
+    let _: std::io::Stderr = StderrWriter.make_writer();
 }
 
 #[test]
