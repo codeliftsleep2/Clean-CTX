@@ -46,3 +46,10 @@ mod regression;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/audit_fixes.rs"]
 mod audit_fixes;
+
+// Black-box E2E tests that spawn the built binary and exchange JSON-RPC.
+// Tests are `#[ignore]` by default (require `cargo build` first); run with
+// `cargo test -- --ignored`.
+#[cfg(test)]
+#[path = "../tests/mcp/e2e_server.rs"]
+mod e2e_server;

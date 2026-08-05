@@ -22,10 +22,27 @@ fn binary_path() -> String {
 
 /// Spawn the clean-ctx binary, send a JSON-RPC request, and read the response.
 fn spawn_and_send(request: &str, timeout_secs: u64) -> (String, std::process::Child) {
-    let mut child = Command::new(binary_path())
-        .stdin(Stdio::piped())
+    spawn_and_send_in_dir(request, None, timeout_secs)
+}
+
+/// Spawn the clean-ctx binary with an optional working directory, send a
+/// JSON-RPC request, and read the response.
+///
+/// Setting `current_dir` anchors the server's trusted root (process CWD),
+/// which is required for the `diff_commits` XPIA boundary check.
+fn spawn_and_send_in_dir(
+    request: &str,
+    dir: Option<&std::path::Path>,
+    timeout_secs: u64,
+) -> (String, std::process::Child) {
+    let mut cmd = Command::new(binary_path());
+    cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::null());
+    if let Some(d) = dir {
+        cmd.current_dir(d);
+    }
+    let mut child = cmd
         .spawn()
         .expect("Failed to spawn clean-ctx binary — run `cargo build` first");
 
@@ -101,6 +118,94 @@ fn test_e2e_unknown_method() {
     let _ = child.wait();
 }
 
+/// Create a temp git repo with two commits (one modified file) for the
+/// `diff_commits` e2e test. Returns the temp dir.
+fn init_git_repo() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().to_str().unwrap();
+
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .expect("git command");
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {:?}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "test@example.com"]);
+    git(&["config", "user.name", "Test"]);
+
+    // Commit 1
+    std::fs::write(
+        dir.path().join("app.ts"),
+        "class UserService {\n  getUser(id: string): Promise<User> {\n    return api.get(id);\n  }\n}\n",
+    )
+    .unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "commit1"]);
+
+    // Commit 2: add a method to app.ts
+    std::fs::write(
+        dir.path().join("app.ts"),
+        "class UserService {\n  getUser(id: string): Promise<User> {\n    return api.get(id);\n  }\n  saveUser(u: User): void {\n    api.post(u);\n  }\n}\n",
+    )
+    .unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "commit2"]);
+
+    dir
+}
+
+/// Black-box E2E test: `diff_commits` against a temp git repo returns a
+/// valid manifest with per-file change entries.
+#[ignore]
+#[test]
+fn test_e2e_diff_commits() {
+    let dir = init_git_repo();
+    let request = r#"{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"diff_commits","arguments":{"fromRef":"HEAD~1","toRef":"HEAD"}}}"#;
+    let (response, mut child) = spawn_and_send_in_dir(request, Some(dir.path()), 15);
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&response).expect("Response should be valid JSON");
+    assert_eq!(parsed["jsonrpc"], "2.0", "Should be JSON-RPC 2.0");
+    assert_eq!(parsed["id"], 7, "Should echo request ID");
+
+    // If the binary returned an error (e.g. git not found), surface it.
+    if let Some(err) = parsed.get("error") {
+        panic!("diff_commits returned an error: {}", err);
+    }
+
+    let result = parsed.get("result").expect("Should have a result field");
+    let content = result.get("content").and_then(|c| c.as_array()).expect("content array");
+    let text = content[0]["text"].as_str().expect("text field");
+
+    // Header + per-file change entry.
+    assert!(
+        text.contains("§GITDIFF HEAD~1..HEAD (1 files)"),
+        "unexpected manifest header:\n{text}"
+    );
+    assert!(
+        text.contains("src") || text.contains("app.ts"),
+        "expected changed file path in manifest:\n{text}"
+    );
+
+    // _meta should carry the file count.
+    let meta = result.get("_meta").expect("_meta field");
+    assert_eq!(meta["fileCount"], 1, "1 file changed");
+
+    // Clean shutdown
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 /// Test that clean-ctx init creates the expected output.
 #[ignore]
 #[test]
@@ -108,7 +213,7 @@ fn test_e2e_init_subcommand() {
     let dir = tempfile::TempDir::new().unwrap();
     let binary = binary_path();
 
-    let mut child = Command::new(binary)
+    let child = Command::new(binary)
         .arg("init")
         .current_dir(dir.path())
         .stdout(Stdio::piped())
@@ -149,7 +254,7 @@ fn test_e2e_config_dump() {
     assert!(init_status.success());
 
     // Now dump config
-    let mut child = Command::new(&binary)
+    let child = Command::new(&binary)
         .arg("--config-dump")
         .current_dir(dir.path())
         .stdout(Stdio::piped())

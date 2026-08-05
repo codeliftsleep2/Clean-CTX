@@ -164,6 +164,28 @@ Prevent OOM crashes on large codebases:
 - `max_workspace_files`: Checked in `compress_workspace_dir` after file collection
 - `max_memory_bytes`: Checked in `compress_workspace_dir` before compression (estimates 2× file size)
 
+## `diff_commits` Tool (R-12)
+
+Diffs an entire workspace between two git refs, emitting per-file AST-level change-sets in a single call. Powers "what changed in this PR?" workflows.
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `fromRef` | ✅ | Base ref, e.g. `HEAD~1`, `main`, `abc123`, `v1.0`. Strictly validated. |
+| `toRef` | ❌ | Target ref. Defaults to the working tree (uncommitted changes). |
+| `workspaceRoot` | ❌ | Project root. Defaults to CWD. Resolved against the trusted root. |
+| `fidelity` | ❌ | `low` / `medium` / `high`. Defaults to config `default_fidelity`. |
+
+**Output:** A `§GITDIFF <from>..<to> (N files)` header followed by per-file `┌ FILE αN <path> (+A -D ~M)` sections. Added files emit a compact skeleton; deleted files a one-line entry; renamed files (via `--find-renames`) a `~ FILE αN <old> → <new>` section. Non-compressible extensions (html/css/json) fall back to a line-count delta so the tool never fails on grammar-missing files.
+
+**Security posture:**
+- **Ref injection** — refs are validated against the strict allowlist `^[A-Za-z0-9][A-Za-z0-9._/\-~]*$` (first char never `-`), rejecting flag-injection attempts like `--upload-pack`.
+- **XPIA** — `workspaceRoot` is resolved via `resolve_file_path_checked` (anchored to the process CWD); git output paths are validated (no absolute escapes).
+- **No shell** — all git calls use `std::process::Command` with explicit `arg()` calls and `--end-of-options`; never shell-interpolated.
+- **Resource limits** — the changed-file count is capped by `resource_limits.max_workspace_files` and per-file size by `resource_limits.max_file_size_bytes`; files exceeding either are counted in `_meta.skipped`.
+- **Fail-closed** — invalid refs, non-git directories, or git errors return structured `-32602`/`-32603` errors, never partial output.
+
 ## Persistence Configuration
 
 Controls SQLite-backed cross-session storage:
