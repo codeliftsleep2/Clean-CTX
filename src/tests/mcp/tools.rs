@@ -185,6 +185,7 @@ fn p3_21_tool_names_match_tool_list_and_registry() {
         // Inline tools from dispatch_tools_call() in tools.rs
         set.insert("decompress_code_context".to_string());
         set.insert("compress_workspace".to_string());
+        set.insert("diff_commits".to_string());
         set.insert("graph_search".to_string());
         set.insert("graph_query".to_string());
         set.insert("graph_trace".to_string());

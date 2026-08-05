@@ -43,6 +43,7 @@ pub mod dotnet_meta;
 pub mod error;
 pub mod tokenizer;
 pub mod observability;
+pub mod gitdiff;
 
 // Integration tests module
 #[cfg(test)]

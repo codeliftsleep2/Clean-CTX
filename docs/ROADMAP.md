@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-08-04 (R-43a/R-43b ✅ shipped — IR Evolution complete)
+**Last updated:** 2026-08-05 (R-02 ✅ + R-12 ✅ shipped — Type-Aware Compression + Multi-file / Git-Commit Diff)
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -11,7 +11,7 @@
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
 | **Now** | v0.2.0 | Real-world ready | ✅ 0 (all complete) |
-| **Next** | v0.3.0 | Advanced capabilities | 10 |
+| **Next** | v0.3.0 | Advanced capabilities | 8 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
 | **Architectural** | Continuous | Code health & tooling | 3 (A-01, A-03, A-05) |
 | **Community** | Continuous | Docs & marketing | 5 |
@@ -24,6 +24,8 @@ These items are complete and documented. Listed for historical context.
 
 | ID | Title | Shipped in | Notes |
 |----|-------|-----------|-------|
+| **R-02** | Type-aware compression | v0.3.0 | Inline `type_aliases` applied across both text + IR compression paths. Text path: configured type names replaced with `$alias` tokens + `§TA $uid→UserId` footer. IR path: `CoreOp::TypeAlias(alias, original)` ops appended. Token-boundary matching (`$` treated as identifier char) prevents false matches in `UserService`/`user_id`. 5-15% additional savings on type-heavy files at Medium/High fidelity. See `docs/TYPE_AWARE_COMPRESSION_PLAN.md`. |
+| **R-12** | Multi-file / Git-Commit Diff | v0.3.0 | New `diff_commits` MCP tool + `src/gitdiff/` module (refs, runner, workspace, engine). Per-file AST change-sets across an entire workspace between two git refs. Strict ref allowlist + `--end-of-options` + XPIA mitigation. Resource limits (file count + per-file size). 32 unit tests + black-box e2e dispatch test. See `docs/R12_MULTI_FILE_GIT_DIFF_PLAN.md`. |
 | **R-22** | Angular Meta-Layer | v0.1.x | Phase 1 (decorators) ✅ · Phase 2 (triplet bundling) ✅ · Phase 2.5 (Angular 17–21 syntax) ✅ · Phase 3 (cross-file DI + selector graph) ✅ |
 | **R-30** | SQLite Persistence Layer | v0.1.x | `SqliteStore` with WAL mode, contexts/deltas/symbols/sessions tables, content-hash deterministic IDs, non-fatal fire-and-forget writes |
 | **R-31** | Zero-Touch Workflow + Heuristics Engine | v0.1.x | `provide_code_context` single entry point, `heuristics.rs` auto-selects fidelity + strategy, session stats dashboard |
@@ -77,8 +79,6 @@ All Foundation items (A-09 through A-15), all Now items (F-19 through F-22, A-08
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **R-02** | Type-aware compression | Inline `type_aliases` from config: `UserId` → `$uid`, `JsonObject` → `$jo`. Currently the type table is loaded but not injected into the capture pipeline. | 2-3 days | 🔴 High |
-| **R-12** | Multi-file / git-commit diff | Diff an entire workspace between two git commits; emit per-file deltas in one tool call. Powers "what changed in this PR?" workflows. **A-09 ✅ (complete)** — now unblocked. | 3-5 days | 🔴 High |
 | **R-23** | NgRx Meta-Layer | Framework-annotation layer for NgRx state management (sits on top of TS + Angular layers). **A-11 ✅ (complete)** — now unblocked. | 3-4 days | 🔴 High |
 | **R-24** | RxJS Meta-Layer | Additive meta-layer on TS/JS. Observable chain compression, operator pattern recognition, subscription lifecycle markers. **A-11 ✅ (complete)** — now unblocked. | 3-4 days | 🔴 High |
 | **R-07** | MCP `resources` support | Expose compressed snapshots as MCP resources in addition to tools, enabling LLM clients to read prior state without re-invoking tools. | 1-2 days | 🟡 Medium |
@@ -172,8 +172,6 @@ All gates clear. Meta-layer items are now unblocked (A-11 ✅). Sliding Context 
 
 | Priority | Item | Dependency |
 |----------|------|------------|
-| 🔴 High | R-02 Type-aware compression | None |
-| 🔴 High | R-12 Multi-file git-commit diff | A-09 ✅ |
 | 🔴 High | R-23 NgRx Meta-Layer | A-11 ✅ |
 | 🔴 High | R-24 RxJS Meta-Layer | A-11 ✅ |
 | 🟡 Medium | R-07 MCP resources support | None |

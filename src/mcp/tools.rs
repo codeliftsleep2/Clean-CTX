@@ -217,6 +217,20 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 }
             }
         }),
+        serde_json::json!({
+            "name": "diff_commits",
+            "description": "Diff an entire workspace between two git refs; emits per-file AST-level change-sets in one call.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "workspaceRoot": { "type": "string", "description": "Optional. Defaults to CWD. Resolved against trusted root." },
+                    "fromRef": { "type": "string", "description": "Required. e.g. HEAD~1, main, abc123, v1.0. Strictly validated." },
+                    "toRef": { "type": "string", "description": "Optional. Defaults to working tree (uncommitted changes)." },
+                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: config default." }
+                },
+                "required": ["fromRef"]
+            }
+        }),
     ]
     .into_iter()
     .chain(cbm::cbm_tool_list())
@@ -323,6 +337,7 @@ pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
     let mut names = HashSet::new();
     names.insert("decompress_code_context");
     names.insert("compress_workspace");
+    names.insert("diff_commits");
     names.insert("graph_search");
     names.insert("graph_query");
     names.insert("graph_trace");
@@ -403,6 +418,126 @@ pub(crate) fn dispatch_tools_call(
                     if state.config.cache.enabled {
                         let ttl = state.config.cache.baseline_ttl.clone();
                         let breaker = compute_workspace_breaker(std::slice::from_ref(&result.manifest));
+                        let tok_box = crate::tokenizer::create_tokenizer(
+                            crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
+                        ).ok();
+                        let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
+                        if let Some(result_obj) = response.get_mut("result") {
+                            inject_cache_breakpoints(result_obj, state, "baseline", &ttl, &breaker, tok_ref);
+                        }
+                    }
+                    send_response(&response);
+                }
+                Err(e) => {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32603, "message": e.to_string() }
+                    }));
+                }
+            }
+            return;
+        }
+        "diff_commits" => {
+            // Resolve the workspace root (XPIA mitigation). Defaults to CWD.
+            let root_arg = params["arguments"]["workspaceRoot"].as_str();
+            let root = match super::tool_helpers::resolve_file_path_checked(
+                root_arg.unwrap_or("."),
+                None,
+            ) {
+                Ok(p) => p,
+                Err(msg) => {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32602, "message": msg }
+                    }));
+                    return;
+                }
+            };
+
+            // fromRef is required and strictly validated (flag-injection guard).
+            let from_ref = match params["arguments"]["fromRef"].as_str() {
+                Some(r) => r,
+                None => {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32602, "message": "missing required argument: fromRef" }
+                    }));
+                    return;
+                }
+            };
+            if let Err(e) = crate::gitdiff::validate_ref(from_ref) {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": { "code": -32602, "message": e.to_string() }
+                }));
+                return;
+            }
+
+            // toRef is optional; if present, validate it too.
+            let to_ref = params["arguments"]["toRef"].as_str();
+            if let Some(t) = to_ref
+                && let Err(e) = crate::gitdiff::validate_ref(t)
+            {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": { "code": -32602, "message": e.to_string() }
+                }));
+                return;
+            }
+
+            // Fail-closed: the root must be a git repository.
+            if !crate::gitdiff::is_git_repo(&root) {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": { "code": -32603, "message": format!("not a git repository: {root}") }
+                }));
+                return;
+            }
+
+            let fidelity = match parse_fidelity_arg(id, params, &state.config) {
+                Ok(f) => f,
+                Err(()) => return,
+            };
+
+            // Resource limits from config: cap changed-file count and per-file size.
+            let max_files = Some(state.config.resource_limits.max_workspace_files);
+            let max_file_size = Some(state.config.resource_limits.max_file_size_bytes);
+
+            match crate::gitdiff::gitdiff_workspace(
+                &root,
+                from_ref,
+                to_ref,
+                fidelity,
+                max_files,
+                max_file_size,
+            ) {
+                Ok(summary) => {
+                    let mut response = serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "result": {
+                            "content": [{ "type": "text", "text": summary.manifest }],
+                            "_meta": {
+                                "fileCount": summary.file_count,
+                                "counts": {
+                                    "added": summary.counts.0,
+                                    "deleted": summary.counts.1,
+                                    "modified": summary.counts.2,
+                                    "renamed": summary.counts.3,
+                                },
+                                "skipped": summary.skipped,
+                            }
+                        }
+                    });
+                    if state.config.cache.enabled {
+                        let ttl = state.config.cache.baseline_ttl.clone();
+                        let breaker = compute_workspace_breaker(std::slice::from_ref(&summary.manifest));
                         let tok_box = crate::tokenizer::create_tokenizer(
                             crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
                         ).ok();

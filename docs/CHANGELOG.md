@@ -43,6 +43,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - All CBM-derived data carries `confidence = 0.75` and `source = Cbm` (invariant C3); no-op when CBM is unavailable (invariant C2)
 - Mock test helper `new_mock_with_edges()` pre-seeds call/dataflow/importance/dead-code cache entries for deterministic tests
 
+#### R-12: Multi-file / Git-Commit Diff
+- New `diff_commits` MCP tool — diffs an entire workspace between two git refs in one call (`fromRef` required, `toRef` defaults to working tree)
+- New `src/gitdiff/` module:
+  - `refs.rs` — strict ref validation (`^[A-Za-z0-9][A-Za-z0-9._/\-~]*$`, rejects flag injection) + `rev-parse --verify` resolution
+  - `runner.rs` — safe `git` subprocess execution with `--end-of-options` (never shell-interpolated)
+  - `workspace.rs` — `collect_changed_files` via `git diff --name-status --find-renames` (Added/Deleted/Modified/Renamed classification, path validation)
+  - `engine.rs` — `gitdiff_workspace()` orchestrator: per-file AST diff for compressible files (ts/js/cs), line-count fallback for non-compressible, compact skeleton for added files, one-line entry for deleted, rename pairing
+- `§GITDIFF <from>..<to> (N files)` header + per-file `┌ FILE αN <path> (+A -D ~M)` sections
+- Security: strict ref allowlist, `resolve_file_path_checked` XPIA mitigation, no-shell Command execution, fail-closed structured errors
+- Resource limits: changed-file count capped by `resource_limits.max_workspace_files`, per-file size by `resource_limits.max_file_size_bytes` (excess → `_meta.skipped`)
+- Tests: 30 `src/gitdiff` unit tests (real temp repos) + black-box e2e dispatch test (`test_e2e_diff_commits`, `#[ignore]`)
+
 ### Changed
 - `DeltaComputer::compute()` now populates `IRDelta.intent` with detected semantic intent
 - `CompactDelta` gained an `intent` field (serde `skip_serializing_if` — absent when `None`)
