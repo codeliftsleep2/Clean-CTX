@@ -5,7 +5,7 @@
 // were historically private to `compressor.rs`. These are `pub(crate)` so
 // the streaming variant can also call them.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 
@@ -50,6 +50,7 @@ use crate::compression::markers::build_marker;
 use crate::compression::report::{format_compacted_body, format_final_output};
 use crate::compression::micro_opcodes::apply_micro_opcodes;
 use crate::compression::symbol_compression::apply_symbol_compression;
+use crate::compression::type_aliases::apply_type_aliases;
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
 use crate::dictionary::PathDictionary;
@@ -242,12 +243,25 @@ pub fn compress_file_with_source(
     if let Some(block) = &built.dotnet_meta_block {
         body_content.push_str(&block.render());
     }
+    // R-02: Apply type aliases before micro-opcodes and symbol
+    // compression so `$uid` tokens are preserved. At Low fidelity types
+    // are already stripped, so this is a natural no-op.
+    let ta_footer = if let Some(cfg) = config
+        && !cfg.type_aliases.is_empty()
+    {
+        let (substituted, footer) = apply_type_aliases(&body_content, &cfg.type_aliases);
+        body_content = substituted;
+        footer
+    } else {
+        String::new()
+    };
     // Phase III (Idea #11 — Micro-Opcode Table for Text):
     // Apply micro-opcodes (§C, §P) before symbol compression so the
     // §-prefixed codes are included in the symbol dictionary analysis.
     body_content = apply_micro_opcodes(&body_content, fidelity);
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
-    let compacted_body = format_compacted_body(&display_body, &sym_footer, &path_alias, fidelity);
+    let combined_footer = combine_footers(&sym_footer, &ta_footer);
+    let compacted_body = format_compacted_body(&display_body, &combined_footer, &path_alias, fidelity);
     // F-14: store the raw-token count for this content hash so the
     // cache-hit path can skip the BPE encode on subsequent calls.
     let raw_tokens = crate::analytics::bpe()
@@ -279,6 +293,7 @@ pub fn compress_text(
     extension: &str,
     fidelity: Fidelity,
     path_alias: &str,
+    aliases: Option<&BTreeMap<String, String>>,
 ) -> Result<(Vec<String>, String), Box<dyn std::error::Error>> {
     let (language, query_string) = language_for_extension(extension)
         .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
@@ -324,6 +339,17 @@ pub fn compress_text(
     if let Some(block) = &built.dotnet_meta_block {
         body_content.push_str(&block.render());
     }
+    // R-02: Apply type aliases before micro-opcodes and symbol
+    // compression so `$uid` tokens are preserved.
+    let ta_footer = if let Some(aliases) = aliases
+        && !aliases.is_empty()
+    {
+        let (substituted, footer) = apply_type_aliases(&body_content, aliases);
+        body_content = substituted;
+        footer
+    } else {
+        String::new()
+    };
     body_content = apply_micro_opcodes(&body_content, fidelity);
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
 
@@ -331,7 +357,8 @@ pub fn compress_text(
     let body_lines: Vec<String> = display_body.lines().map(String::from).collect();
 
     // Build full output (header + body + symbol footer)
-    let compacted_body = format_compacted_body(&display_body, &sym_footer, path_alias, fidelity);
+    let combined_footer = combine_footers(&sym_footer, &ta_footer);
+    let compacted_body = format_compacted_body(&display_body, &combined_footer, path_alias, fidelity);
     let full_output = format_final_output(
         source_code,
         &compacted_body,
@@ -548,6 +575,7 @@ pub fn compress_source(
     dict: &mut PathDictionary,
     cache: &mut LocalStateCache,
     fidelity: Fidelity,
+    aliases: Option<&BTreeMap<String, String>>,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let source_bytes = source_code.as_bytes();
     let current_hash = cache.compute_hash(source_bytes);
@@ -671,6 +699,17 @@ pub fn compress_source(
      }
      #[cfg(debug_assertions)]
      eprintln!("[compress_source] meta_block rendered");
+     // R-02: Apply type aliases before micro-opcodes so `$uid` tokens
+     // are preserved. At Low fidelity types are already stripped.
+     let ta_footer = if let Some(aliases) = aliases
+        && !aliases.is_empty()
+    {
+        let (substituted, footer) = apply_type_aliases(&body_content, aliases);
+        body_content = substituted;
+        footer
+    } else {
+        String::new()
+    };
      // Phase III (Idea #11 — Micro-Opcode Table for Text):
      // Apply micro-opcodes (§C, §P) for workspace-level compression too.
      body_content = apply_micro_opcodes(&body_content, fidelity);
@@ -678,9 +717,10 @@ pub fn compress_source(
      eprintln!("[compress_source] apply_micro_opcodes done");
      // NOTE: Symbol compression is NOT applied here — it will be applied
      // by the workspace-level global symbol table instead.
+     let combined_footer = combine_footers("", &ta_footer);
      let compacted_body = crate::compression::report::format_compacted_body(
          &body_content,
-         "",
+         &combined_footer,
          &path_alias,
          fidelity,
      );
@@ -748,6 +788,20 @@ pub(crate) fn should_skip_capture(cap: &crate::compression::CapEntry, skip_set: 
     }
 
     false
+}
+
+/// Combine the symbol-dictionary footer and the type-alias footer into
+/// a single string. The `§TA` footer is appended after the `§SYM` footer
+/// so both are present in the output. If either is empty, the other is
+/// returned as-is.
+fn combine_footers(sym_footer: &str, ta_footer: &str) -> String {
+    if ta_footer.is_empty() {
+        sym_footer.to_string()
+    } else if sym_footer.is_empty() {
+        ta_footer.to_string()
+    } else {
+        format!("{}\n{}", sym_footer, ta_footer)
+    }
 }
 
 /// Join the body lines using the per-fidelity separator.

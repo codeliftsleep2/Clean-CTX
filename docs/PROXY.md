@@ -149,7 +149,9 @@ All settings are controlled via environment variables. Defaults are sensible for
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8787` | Port to bind on (always `127.0.0.1`) |
-| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Upstream API URL |
+| `PROXY_UPSTREAM_URL` | _(none)_ | **Dedicated upstream URL** (takes precedence over all others). Use this when the client-facing `ANTHROPIC_BASE_URL` must point at the proxy itself. |
+| `COPILOT_BRIDGE_URL` | _(none)_ | Alias for `PROXY_UPSTREAM_URL`. Convenient shorthand when forwarding to a local Copilot bridge (e.g. `http://127.0.0.1:4141`). |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Legacy upstream URL. **Falls back** to the default when the dedicated vars above are set. |
 | `AUTO_CACHE` | `false` | Enable cache breakpoint injection (Anthropic only) |
 | `TAIL_TTL` | `5m` | TTL for the rolling-tail breakpoint |
 | `DROP_TOOLS` | _(none)_ | Comma-separated tool names to remove (e.g. `NotebookEdit,CronCreate`) |
@@ -177,6 +179,56 @@ This enables all cost-saving features:
 - **ANSI stripping** to remove terminal escape codes from tool results
 - **Secret scrubbing** to redact AWS keys, GitHub tokens, JWTs, etc.
 - **Tool output filtering** to compress verbose cargo/npm/pytest output
+
+### GitHub Copilot Enterprise (Claude via Copilot Gateway)
+
+Organizations running **GitHub Copilot Enterprise** serve Claude through Copilot's infrastructure — not AWS Bedrock or Anthropic directly. In this setup `ANTHROPIC_BASE_URL` points at an **ephemeral Copilot relay port** (e.g. `http://127.0.0.1:52644`) that changes every session.
+
+Clean-CTX's proxy intercepts this by sandwiching itself between Claude Code and a **Copilot bridge**:
+
+```
+Claude Code
+    │  ANTHROPIC_BASE_URL = http://127.0.0.1:8787
+    ▼
+Clean-CTX Proxy (8787)
+    │  PROXY_UPSTREAM_URL = http://127.0.0.1:4141
+    │  applies tool filtering, secret scrubbing,
+    │  cache hints, sliding window
+    ▼
+copilot-proxy-api (4141)
+    │  translates Anthropic → Copilot protocol
+    │  handles GitHub Enterprise auth (Bearer token)
+    ▼
+GitHub Copilot Enterprise Gateway
+    │
+    ▼
+Claude via Copilot
+```
+
+**Setup:**
+
+1. **Run the Copilot bridge** — `copilot-proxy-api` on a stable port (4141). It handles GitHub Enterprise auth automatically using your GitHub token.
+
+2. **Point the Clean-CTX proxy at the bridge:**
+   ```bash
+   PROXY_UPSTREAM_URL=http://127.0.0.1:4141 clean-ctx-proxy
+   ```
+
+3. **Point Claude Code at the Clean-CTX proxy** in `~/.claude/settings.json`:
+   ```json
+   {
+     "env": {
+       "ANTHROPIC_BASE_URL": "http://127.0.0.1:8787",
+       "ANTHROPIC_API_KEY": "dummy"
+     }
+   }
+   ```
+
+The `dummy` key is intentional — auth is handled by the Copilot bridge using your GitHub token, not an Anthropic key. The bridge's `Authorization: Bearer` header passes through the proxy untouched (hop-by-hop headers are filtered, all others are forwarded).
+
+> **Why a dedicated `PROXY_UPSTREAM_URL`?** Without it, the proxy inherits the client's `ANTHROPIC_BASE_URL` (which points at the proxy itself for Claude Code). This creates a **self-forwarding loop**. The dedicated var decouples the proxy's upstream target from the client-facing URL, and the proxy refuses to start if it detects this configuration (validation error: `self-forwarding loop detected`).
+
+> **Note:** Some enterprise Copilot policies block reverse-engineered Copilot API access. Check with IT before investing in this setup.
 
 ## How It Works
 
@@ -388,7 +440,7 @@ The test suite includes 243 tests: 112 unit tests, 18 audit regression tests (co
 ## Limitations
 
 - **Response streaming**: The proxy buffers the full response from the upstream API before returning it to the client. This means Copilot and other IDEs will see responses as a complete block rather than token-by-token streaming. Response content is fully intact and correct — only the progressive rendering timing is affected.
-- **Copilot requires BYOK**: Default Copilot traffic routes through GitHub's own API gateway and never reaches the proxy. You must configure a custom endpoint as described above.
+- **Copilot requires BYOK or a bridge**: Default Copilot traffic routes through GitHub's own API gateway and never reaches the proxy. You must configure a custom endpoint (BYOK) or use a Copilot bridge (`copilot-proxy-api`) as described in the GitHub Copilot Enterprise section above.
 - **Cache injection is Anthropic-only**: The `cache_control` breakpoint injection only works with Anthropic's API. Other providers don't support this feature.
 
 ## Troubleshooting
@@ -396,7 +448,8 @@ The test suite includes 243 tests: 112 unit tests, 18 audit regression tests (co
 | Symptom | Fix |
 |---------|-----|
 | `ECONNREFUSED` on port 8787 | Proxy isn't running. Start it with `cargo run -p clean-ctx-proxy` |
-| Proxy returns 502 | Upstream URL is wrong or API is unreachable. Check `ANTHROPIC_BASE_URL` |
+| Proxy refuses to start: `self-forwarding loop detected` | Upstream resolves to the proxy's own port (e.g. `ANTHROPIC_BASE_URL=http://127.0.0.1:8787` inherited by the proxy). Set `PROXY_UPSTREAM_URL` to the real upstream target. |
+| Proxy returns 502 | Upstream URL is wrong or API is unreachable. Check `PROXY_UPSTREAM_URL` (or `ANTHROPIC_BASE_URL` for legacy setups) |
 | Cache savings not showing | Make sure `AUTO_CACHE=1` is set (Anthropic only) |
 | Tools still appear in request | Check `DROP_TOOLS` is set correctly (comma-separated, no spaces) |
 | Copilot not using proxy | Make sure you've configured a custom endpoint in VS Code (not using default GitHub routing) |

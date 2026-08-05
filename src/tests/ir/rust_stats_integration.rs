@@ -41,6 +41,7 @@ fn rust_compressed_output_contains_rust_markers() {
         &mut dict,
         &mut cache,
         Fidelity::Low,
+        None,
     )
     .expect("compress_source should succeed for Rust file");
 
@@ -76,6 +77,7 @@ fn rust_session_stats_reports_token_savings() {
         &mut dict,
         &mut cache,
         Fidelity::Medium,
+        None,
     )
     .expect("compress_source should succeed");
 

@@ -38,6 +38,8 @@ pub mod inference_layer;
 pub mod pipeline;
 pub mod validator;
 pub mod query;
+// R-02 Phase 3: Type-aware compression for the IR path.
+pub mod type_aliases;
 
 // Re-export public types for downstream consumers.
 pub use opcodes::CoreOp;

@@ -96,6 +96,26 @@ impl ProxyState {
 
 type SharedState = Arc<RwLock<ProxyState>>;
 
+/// Whether a request header should be forwarded to the upstream.
+///
+/// Hop-by-hop headers are connection-specific and must NOT be forwarded:
+/// `host`, `connection`, `keep-alive`, `transfer-encoding`, `te`,
+/// `trailer`, and `upgrade`.
+///
+/// All other headers — including `authorization`, `x-api-key`, and
+/// `anthropic-version` — are forwarded unchanged. This is critical for
+/// Copilot bridge operation, where the GitHub token travels in the
+/// `Authorization` header and must reach the bridge intact.
+fn should_forward_header(name: &str) -> bool {
+    !name.eq_ignore_ascii_case("host")
+        && !name.eq_ignore_ascii_case("connection")
+        && !name.eq_ignore_ascii_case("keep-alive")
+        && !name.eq_ignore_ascii_case("transfer-encoding")
+        && !name.eq_ignore_ascii_case("te")
+        && !name.eq_ignore_ascii_case("trailer")
+        && !name.eq_ignore_ascii_case("upgrade")
+}
+
 /// Start the proxy server. Runs until `shutdown_rx` receives a signal.
 pub async fn run_server(
     config: ProxyConfig,
@@ -432,14 +452,7 @@ async fn forward_to_upstream(
 
     for (name, value) in parts.headers.iter() {
         let name_str = name.as_str();
-        if !name_str.eq_ignore_ascii_case("host")
-            && !name_str.eq_ignore_ascii_case("connection")
-            && !name_str.eq_ignore_ascii_case("keep-alive")
-            && !name_str.eq_ignore_ascii_case("transfer-encoding")
-            && !name_str.eq_ignore_ascii_case("te")
-            && !name_str.eq_ignore_ascii_case("trailer")
-            && !name_str.eq_ignore_ascii_case("upgrade")
-        {
+        if should_forward_header(name_str) {
             req_builder = req_builder.header(name_str, value.as_bytes());
         }
     }
@@ -573,6 +586,36 @@ mod tests {
         let resp = rate_limited_response();
         assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
         assert!(resp.headers().get("retry-after").is_some());
+    }
+
+    #[test]
+    fn test_hop_by_hop_headers_are_filtered() {
+        // These connection-scoped headers must never be forwarded upstream.
+        for header in ["host", "connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade"] {
+            assert!(!should_forward_header(header), "{header} should be filtered");
+            // Case-insensitive.
+            assert!(!should_forward_header(&header.to_uppercase()), "{} should be filtered case-insensitively", header);
+        }
+    }
+
+    #[test]
+    fn test_auth_headers_are_forwarded() {
+        // Critical for Copilot bridge: the GitHub token in Authorization
+        // must reach the bridge unchanged.
+        assert!(should_forward_header("authorization"));
+        assert!(should_forward_header("x-api-key"));
+        assert!(should_forward_header("anthropic-version"));
+        assert!(should_forward_header("anthropic-beta"));
+        assert!(should_forward_header("content-type"));
+        assert!(should_forward_header("user-agent"));
+        assert!(should_forward_header("x-request-id"));
+    }
+
+    #[test]
+    fn test_auth_headers_forwarded_case_insensitive() {
+        assert!(should_forward_header("Authorization"));
+        assert!(should_forward_header("X-Api-Key"));
+        assert!(should_forward_header("ANTHROPIC-VERSION"));
     }
 
 }

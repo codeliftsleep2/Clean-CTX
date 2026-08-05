@@ -93,6 +93,11 @@ Location: Project root (walks up from current directory to find it)
     "enabled": true,
     "blast_radius_enabled": false,
     "max_blast_radius_files": 10
+  },
+  "type_aliases": {
+    "UserId": "$uid",
+    "JsonObject": "$jo",
+    "HttpClient": "$http"
   }
 }
 ```
@@ -261,6 +266,49 @@ CBM-informed fidelity and blast radius:
   }
 }
 ```
+
+## Type Aliases (R-02)
+
+Type-aware compression: replaces configured type names in compressed
+output with short alias tokens, reducing token usage on type-heavy files.
+
+```json
+{
+  "type_aliases": {
+    "UserId": "$uid",
+    "JsonObject": "$jo",
+    "HttpClient": "$http"
+  }
+}
+```
+
+**How it works:**
+- At Medium/High fidelity, type names in method signatures, field types,
+  and IR ops are replaced with the alias token.
+- A `§TA` footer (`§TA $uid→UserId $jo→JsonObject`) is emitted in the
+  text compression path so the LLM can resolve every alias.
+- In the IR path, `CoreOp::TypeAlias(alias, original)` ops are appended
+  for each used alias.
+- At Low fidelity, types are already stripped — aliases are a natural
+  no-op.
+
+**Alias token rules:**
+- Must start with `$` (distinguishes from structural markers `⊕`, `Φ`, `§`)
+- Must be ≥ 2 chars total (at least one char after `$`)
+- Chars after `$` must be `[A-Za-z0-9_]`
+- Must NOT be numeric-only after `$` (`$1`, `$2`, …) — the symbol
+  dictionary owns the `$N` opcode space
+- Original type must be ≥ 4 chars (avoids replacing trivial types like
+  `int`, `str` where savings are negligible)
+
+**Token-boundary matching:**
+- `$` is treated as an identifier character (like `_`) so `$`-prefixed
+  tokens (aliases, symbol-dictionary refs) are atomic.
+- `User` matches in `id:User`, `Map<string,User>`, `Promise<User>`,
+  `A | User`, but NOT in `UserService`, `GitUserProfile`, or `user_id`.
+
+**Estimated savings:** 5-15% additional on type-heavy files at
+Medium/High fidelity. Low fidelity is unaffected.
 
 ## Cache Configuration
 

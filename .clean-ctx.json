@@ -16,5 +16,10 @@
   },
   "cbm": {
     "enabled": true
+  },
+  "type_aliases": {
+    "UserId": "$uid",
+    "JsonObject": "$jo",
+    "HttpClient": "$http"
   }
 }
