@@ -293,6 +293,40 @@ impl ProxyConfig {
         }
         Ok(())
     }
+
+    /// Detect non-fatal configuration issues and return human-readable warnings.
+    ///
+    /// Unlike [`validate`](Self::validate), this does not prevent startup —
+    /// it surfaces configuration combinations that are legal but likely to
+    /// waste effort or confuse the user. Callers should print each warning.
+    pub fn warnings(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        if self.auto_cache && is_local_upstream(&self.upstream_url) {
+            out.push(format!(
+                "AUTO_CACHE=1 with local upstream {} — cache_control breakpoints \
+                 are stripped by local bridges (e.g. copilot-proxy-api) and have \
+                 no effect. Set AUTO_CACHE=0 when forwarding to a local bridge.",
+                self.upstream_url
+            ));
+        }
+        out
+    }
+}
+
+/// Whether an upstream URL points at a loopback address (127.0.0.1,
+/// localhost, or [::1]). Used to warn when cache injection is configured
+/// against a local bridge that strips `cache_control` markers.
+fn is_local_upstream(url: &str) -> bool {
+    let after_scheme = url
+        .strip_prefix("http://")
+        .or_else(|| url.strip_prefix("https://"))
+        .unwrap_or(url);
+    let authority = after_scheme.split('/').next().unwrap_or("");
+    let host = authority
+        .strip_prefix('[')
+        .and_then(|a| a.split_once(']').map(|(h, _)| h))
+        .unwrap_or_else(|| authority.split(':').next().unwrap_or(""));
+    host == "127.0.0.1" || host.eq_ignore_ascii_case("localhost") || host == "::1"
 }
 
 /// Extract the port from an upstream URL string, if present.
@@ -418,5 +452,47 @@ mod tests {
         unsafe {
             std::env::remove_var("COPILOT_BRIDGE_URL");
         }
+    }
+
+    #[test]
+    fn test_is_local_upstream() {
+        assert!(is_local_upstream("http://127.0.0.1:4141"));
+        assert!(is_local_upstream("http://localhost:4141"));
+        assert!(is_local_upstream("http://[::1]:4141"));
+        assert!(!is_local_upstream("https://api.anthropic.com"));
+        assert!(!is_local_upstream("https://copilot.github.com"));
+    }
+
+    #[test]
+    fn test_warnings_auto_cache_with_local_upstream() {
+        let cfg = ProxyConfig {
+            upstream_url: "http://127.0.0.1:4141".to_string(),
+            auto_cache: true,
+            ..Default::default()
+        };
+        let warnings = cfg.warnings();
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("AUTO_CACHE=1"));
+        assert!(warnings[0].contains("copilot-proxy-api"));
+    }
+
+    #[test]
+    fn test_warnings_no_auto_cache_with_local_upstream() {
+        let cfg = ProxyConfig {
+            upstream_url: "http://127.0.0.1:4141".to_string(),
+            auto_cache: false,
+            ..Default::default()
+        };
+        assert!(cfg.warnings().is_empty());
+    }
+
+    #[test]
+    fn test_warnings_auto_cache_with_remote_upstream() {
+        let cfg = ProxyConfig {
+            upstream_url: "https://api.anthropic.com".to_string(),
+            auto_cache: true,
+            ..Default::default()
+        };
+        assert!(cfg.warnings().is_empty());
     }
 }
