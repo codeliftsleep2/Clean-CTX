@@ -301,11 +301,45 @@ impl McpState {
     }
 
     /// Try to initialize the CBM graph bridge.
+    ///
+    /// Resolves the disk-cache DB path from config scope:
+    ///   1. `cache_db_path` (explicit override) if set
+    ///   2. `PerWorkspace` → `<project_root>/.clean-ctx/cbm-graph-cache.db`
+    ///   3. `Global` (default) → `.clean-ctx/cbm-graph-cache.db`
+    ///
+    /// The `GraphCacheStore` is attached to the bridge so query results
+    /// are hydrated from disk on first touch (avoiding CBM re-indexing
+    /// on restart) and written through on insert.
     fn init_cbm_bridge(
         cbm_config: &crate::cbm::CbmConfig,
         project_root: &std::path::Path,
     ) -> (Option<crate::cbm::GraphBridge>, crate::cbm::CbmStatus) {
-        let bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
+        let mut bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
+
+        // Resolve the disk-cache DB path by scope precedence.
+        let cache_db_path = cbm_config.cache_db_path.as_ref().map(std::path::PathBuf::from).or_else(|| {
+            match cbm_config.cache_scope {
+                crate::cbm::config::CacheScope::Global => {
+                    Some(std::path::PathBuf::from(".clean-ctx/cbm-graph-cache.db"))
+                }
+                crate::cbm::config::CacheScope::PerWorkspace => {
+                    Some(project_root.join(".clean-ctx/cbm-graph-cache.db"))
+                }
+            }
+        });
+
+        if let Some(db_path) = cache_db_path {
+            match crate::cbm::cache_store::GraphCacheStore::open(&db_path) {
+                Ok(store) => {
+                    eprintln!("[clean-ctx] CBM graph cache: {}", db_path.display());
+                    bridge.attach_disk_cache(store);
+                }
+                Err(e) => {
+                    eprintln!("[clean-ctx] WARNING: Failed to open CBM graph cache DB: {e}");
+                }
+            }
+        }
+
         if bridge.is_available() {
             eprintln!("[clean-ctx] CBM graph intelligence: available");
             let status = bridge.status().clone();

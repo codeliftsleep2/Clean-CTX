@@ -12,6 +12,7 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::cbm::cache_store::GraphCacheStore;
 use crate::cbm::client::{CbmClient, CbmError};
 use crate::cbm::config::CbmConfig;
 use crate::cbm::config::CbmStatus;
@@ -138,9 +139,19 @@ pub struct GraphBridge {
     pub(crate) status: CbmStatus,
     cache_ttl: u64,
     project: Option<String>,
+    /// Canonicalized project root. Used as the disk-cache partition key and
+    /// to derive the project name. Multi-repo support: each repo gets its
+    /// own cache partition and indexing state.
+    project_root: PathBuf,
+    /// Optional SQLite-backed disk cache. When present, cache entries are
+    /// hydrated from disk on first touch (avoiding CBM re-indexing on
+    /// restart) and written through on insert.
+    disk_cache: Option<GraphCacheStore>,
     graph_version: String,
     /// P1-9: Replaced `indexed: bool` with state machine.
-    pub(crate) indexing_state: Arc<Mutex<IndexingState>>,
+    /// Multi-repo: keyed by project name so switching projects doesn't
+    /// corrupt another project's indexing state.
+    pub(crate) indexing_state: Arc<Mutex<HashMap<String, IndexingState>>>,
 }
 
 impl GraphBridge {
@@ -184,18 +195,67 @@ impl GraphBridge {
             None
         };
 
+        // Canonicalize the project root for use as the disk-cache partition key.
+        let project_root_canon = project_root.canonicalize().unwrap_or_else(|_| project_root.to_path_buf());
+
         Self {
             status: if client.is_some() { CbmStatus::Available } else { CbmStatus::Unavailable },
             client: Arc::new(Mutex::new(client)),
             cache: DashMap::new(),
             cache_ttl: config.cache_ttl,
             project: Some(project_name),
+            project_root: project_root_canon,
+            disk_cache: None,
             graph_version: String::new(),
-            indexing_state: Arc::new(Mutex::new(IndexingState::NotStarted)),
+            indexing_state: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    pub fn set_project(&mut self, project: &str) { self.project = Some(project.to_string()); }
+    /// Attach a disk cache store to this bridge. Called by `McpState` after
+    /// resolving the cache DB path from config scope.
+    pub fn attach_disk_cache(&mut self, store: GraphCacheStore) {
+        self.disk_cache = Some(store);
+    }
+
+    /// Switch the active project by name. Also clears the in-memory cache
+    /// so cached results from the previous project are never served to the
+    /// new project (the disk cache is project-partitioned and remains).
+    pub fn set_project(&mut self, project: &str) {
+        let changed = self.project.as_deref() != Some(project);
+        self.project = Some(project.to_string());
+        if changed {
+            self.cache.clear();
+        }
+    }
+
+    /// Switch the active workspace (multi-repo support).
+    ///
+    /// Updates both the canonicalized `project_root` (the disk-cache
+    /// partition key) and the derived project name, then clears the
+    /// in-memory cache. This ensures memory AND disk caches are scoped
+    /// to the correct repo when a handler passes `workspaceRoot`.
+    ///
+    /// Only the switched-to project's indexing state is reset (so it
+    /// re-indexes on first query). Other projects' states are preserved,
+    /// avoiding unnecessary re-indexing when bouncing between repos.
+    pub fn set_workspace_root(&mut self, root: &Path) {
+        let root_canon = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+        if self.project_root == root_canon {
+            return;
+        }
+        self.project_root = root_canon;
+        let name = self.project_root
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "default".to_string());
+        self.project = Some(name.clone());
+        self.cache.clear();
+        // Reset only this project's indexing state so it re-indexes on the
+        // next query; unrelated projects' states are preserved.
+        if let Ok(mut states) = self.indexing_state.lock() {
+            states.remove(&name);
+        }
+    }
     pub fn status(&self) -> &CbmStatus { &self.status }
     /// Check if the bridge can serve data.
     ///
@@ -254,9 +314,11 @@ impl GraphBridge {
     /// respond to the agent with a "retry later" message instead of
     /// blocking the entire dispatcher thread.
     pub fn ensure_indexed(&mut self) -> Result<IndexingStatus, CbmError> {
-        let mut state = self.indexing_state.lock().unwrap_or_else(|p| p.into_inner());
+        let project = self.project_str();
+        let mut states = self.indexing_state.lock().unwrap_or_else(|p| p.into_inner());
+        let state = states.entry(project.clone()).or_insert(IndexingState::NotStarted);
 
-        match &*state {
+        match state {
             IndexingState::Complete => return Ok(IndexingStatus::Ready),
             IndexingState::InProgress { started_at } => {
                 let elapsed = started_at.elapsed().as_secs();
@@ -276,11 +338,11 @@ impl GraphBridge {
         *state = IndexingState::InProgress {
             started_at: Instant::now(),
         };
+        drop(states);
 
         // Clone Arc handles for the background thread
         let client_arc = Arc::clone(&self.client);
         let state_arc = Arc::clone(&self.indexing_state);
-        let project = self.project_str();
         let _status = self.status.clone();
 
         // Spawn background indexing thread
@@ -314,13 +376,14 @@ impl GraphBridge {
                     }
                 };
 
-                let mut s = match state_arc.lock() {
+                let mut states = match state_arc.lock() {
                     Ok(g) => g,
                     Err(poisoned) => {
                         eprintln!("[clean-ctx-cbm] WARNING: Recovering from poisoned state lock");
                         poisoned.into_inner()
                     }
                 };
+                let s = states.entry(project.clone()).or_insert(IndexingState::NotStarted);
                 match result {
                     Ok(()) => {
                         *s = IndexingState::Complete;
@@ -341,8 +404,8 @@ impl GraphBridge {
         Ok(IndexingStatus::StillIndexing { elapsed_secs: 0 })
     }
 
-    /// Access the indexing state for inspection (e.g., get_cbm_status handler).
-    pub fn indexing_state(&self) -> std::sync::MutexGuard<'_, IndexingState> {
+    /// Access the indexing state map for inspection (e.g., get_cbm_status handler).
+    pub fn indexing_state(&self) -> std::sync::MutexGuard<'_, HashMap<String, IndexingState>> {
         self.indexing_state.lock().unwrap_or_else(|p| p.into_inner())
     }
 
@@ -696,8 +759,25 @@ impl GraphBridge {
     }
 
     pub fn invalidate_symbol(&mut self, symbol: &str) { self.cache.retain(|k, _| !k.contains(symbol)); }
-    pub fn invalidate_cache(&mut self) { self.cache.clear(); }
-    pub fn clear_cache(&mut self) { self.cache.clear(); }
+
+    /// Invalidate both the in-memory AND disk caches for the current project.
+    ///
+    /// Critical: clearing only memory would allow stale data to be re-hydrated
+    /// from disk on the next lookup within the TTL window (e.g. after a graph
+    /// version change). This must purge the current project's disk partition.
+    pub fn invalidate_cache(&mut self) {
+        self.cache.clear();
+        if let Some(ref disk) = self.disk_cache {
+            let project_root = self.project_root.to_string_lossy().into_owned();
+            disk.invalidate_project(&project_root);
+        }
+    }
+
+    /// Alias for `invalidate_cache` — clears memory and the current project's
+    /// disk partition (disk coherence).
+    pub fn clear_cache(&mut self) {
+        self.invalidate_cache();
+    }
 
     /// Detect whether the CBM graph has changed since the last call.
     /// Returns the new graph version if changed, or `None` if CBM is unavailable.
@@ -775,8 +855,22 @@ impl GraphBridge {
 
     // ── Internal helpers ──────────────────────────────────────────
 
+    /// Disk key scope: `{project_name}:{key}` so the effective disk
+    /// partition is `(project_root, project_name)`. This prevents a
+    /// cross-project data leak when `set_project("repo-b")` is called
+    /// while `project_root` is still pinned to repo-a — repo-b queries
+    /// would otherwise hydrate repo-a's cached results.
+    fn disk_key(&self, key: &str) -> String {
+        format!("{}:{key}", self.project_str())
+    }
+
     /// Check cache for a valid (non-expired) entry. Also evicts any
     /// expired entries found during lookup (H-3 fix: lazy GC).
+    ///
+    /// **Disk hydration:** On a memory miss, checks the disk cache first.
+    /// If a valid entry exists on disk, it is hydrated into the in-memory
+    /// `DashMap` (zero CBM round-trips) and `true` is returned. This avoids
+    /// re-indexing CBM on process restart or when switching projects.
     fn check_cache(&self, key: &str) -> bool {
         if let Some(cached) = self.cache.get(key) {
             if cached.value().expires_at > Instant::now() {
@@ -787,16 +881,44 @@ impl GraphBridge {
             drop(cached);
             self.cache.remove(&owned_key);
         }
+
+        // Memory miss — try disk cache (lazy hydration on first touch).
+        if let Some(ref disk) = self.disk_cache {
+            let project_root = self.project_root.to_string_lossy().into_owned();
+            let disk_key = self.disk_key(key);
+            if let Some(data_json) = disk.get(&project_root, &disk_key) {
+                if let Ok(data) = serde_json::from_str::<Value>(&data_json) {
+                    let expires_at = Instant::now() + Duration::from_secs(self.cache_ttl);
+                    self.cache.insert(key.to_string(), CachedGraphData { data, expires_at });
+                    return true;
+                }
+            }
+        }
         false
     }
 
-    /// Insert into cache with TTL expiry.
+    /// Insert into cache with TTL expiry. Write-through to disk when a
+    /// disk cache is attached, so memory and disk stay in sync.
     fn cache_insert<T: Serialize>(&self, key: &str, value: &T) {
         let data = serde_json::to_value(value).unwrap_or_default();
+        let expires_at = Instant::now() + Duration::from_secs(self.cache_ttl);
         self.cache.insert(key.to_string(), CachedGraphData {
-            data,
-            expires_at: Instant::now() + Duration::from_secs(self.cache_ttl),
+            data: data.clone(),
+            expires_at,
         });
+
+        // Write-through to disk cache (scoped by project name).
+        if let Some(ref disk) = self.disk_cache {
+            let project_root = self.project_root.to_string_lossy().into_owned();
+            let disk_key = self.disk_key(key);
+            let data_json = data.to_string();
+            let expires_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0)
+                + (self.cache_ttl as i64 * 1000);
+            disk.put(&project_root, &disk_key, &data_json, expires_ms);
+        }
     }
 
     /// Internal query dispatch. Syncs status on success (M-1).
@@ -976,14 +1098,18 @@ pub mod test_helpers {
     /// `ensure_indexed()` returns `Ready` immediately. Tests that need
     /// to exercise indexing states should override this after creation.
     pub fn new_mock(symbol_importance: HashMap<String, SymbolImportance>) -> GraphBridge {
+        let mut states = HashMap::new();
+        states.insert("test-project".to_string(), IndexingState::Complete);
         let bridge = GraphBridge {
             client: Arc::new(Mutex::new(None)),
             cache: DashMap::new(),
             status: CbmStatus::Available,
             cache_ttl: 3600,
             project: Some("test-project".to_string()),
+            project_root: PathBuf::from("."),
+            disk_cache: None,
             graph_version: String::new(),
-            indexing_state: Arc::new(Mutex::new(IndexingState::Complete)),
+            indexing_state: Arc::new(Mutex::new(states)),
         };
         // Pre-seed the symbol_importance cache entry
         let key = "symbol_importance".to_string();
@@ -1014,14 +1140,18 @@ pub mod test_helpers {
         symbol_importance: HashMap<String, SymbolImportance>,
         dead_code: Vec<DeadCodeEntry>,
     ) -> GraphBridge {
+        let mut states = HashMap::new();
+        states.insert("test-project".to_string(), IndexingState::Complete);
         let bridge = GraphBridge {
             client: Arc::new(Mutex::new(None)),
             cache: DashMap::new(),
             status: CbmStatus::Available,
             cache_ttl: 3600,
             project: Some("test-project".to_string()),
+            project_root: PathBuf::from("."),
+            disk_cache: None,
             graph_version: String::new(),
-            indexing_state: Arc::new(Mutex::new(IndexingState::Complete)),
+            indexing_state: Arc::new(Mutex::new(states)),
         };
         let ttl = Duration::from_secs(3600);
         let call_json = serde_json::to_value(&call_edges).unwrap_or_default();

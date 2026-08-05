@@ -5,12 +5,37 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Where the CBM graph cache DB is stored.
+///
+/// - `Global` (default): one shared DB across all workspaces, partitioned by
+///   `project_root`. Survives across workspaces and process restarts.
+/// - `PerWorkspace`: one DB per project, stored under that project's
+///   `.clean-ctx/` directory. Isolated per repo.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CacheScope {
+    /// One shared DB across all workspaces (default).
+    #[default]
+    Global,
+    /// One DB per project, stored under that project's `.clean-ctx/` dir.
+    PerWorkspace,
+}
+
 /// CBM integration configuration, loaded from `.clean-ctx.json` `cbm` key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CbmConfig {
     /// Path to the `codebase-memory-mcp` binary. When `None`, auto-detect on PATH.
     #[serde(default)]
     pub binary_path: Option<String>,
+
+    /// Where the CBM graph cache DB is stored. Default: `Global`.
+    #[serde(default)]
+    pub cache_scope: CacheScope,
+
+    /// Explicit path to the CBM graph cache DB. When set, overrides
+    /// `cache_scope` resolution. Default: `None` (use scope-based path).
+    #[serde(default)]
+    pub cache_db_path: Option<String>,
 
     /// Automatically launch CBM as subprocess on first graph query. Default: `true`.
     #[serde(default = "default_auto_launch")]
@@ -49,6 +74,8 @@ impl Default for CbmConfig {
     fn default() -> Self {
         Self {
             binary_path: None,
+            cache_scope: CacheScope::default(),
+            cache_db_path: None,
             auto_launch: default_auto_launch(),
             cache_ttl: default_cache_ttl(),
             enabled: default_enabled(),
