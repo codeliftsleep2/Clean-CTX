@@ -16,6 +16,7 @@
 pub mod config;
 pub mod client;
 pub mod bridge;
+pub mod cache_store;
 pub mod tools;
 pub mod handlers;
 pub mod proxy;

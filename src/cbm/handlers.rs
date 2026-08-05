@@ -42,9 +42,19 @@ fn with_bridge<'a>(id: &Value, state: &'a McpState) -> Option<std::sync::MutexGu
 }
 
 /// M-3: Set project from params if provided.
+///
+/// Multi-repo support: accepts `workspaceRoot` (canonicalized) and derives
+/// the project name from its directory name, so CBM queries scope to the
+/// correct repo. Explicit `project` takes precedence over `workspaceRoot`.
 fn set_project_from_params(bridge: &mut crate::cbm::GraphBridge, params: &Value) {
     if let Some(p) = params["arguments"]["project"].as_str() {
         bridge.set_project(p);
+        return;
+    }
+    if let Some(root) = params["arguments"]["workspaceRoot"].as_str() {
+        // Multi-repo: switch the workspace root so both the disk-cache
+        // partition key and the derived project name scope to the correct repo.
+        bridge.set_workspace_root(std::path::Path::new(root));
     }
 }
 
@@ -234,28 +244,42 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
                     "CBM not installed or disabled. See github.com/DeusData/codebase-memory-mcp".into(),
             };
             let v = bridge.graph_version().to_string();
-            // P1-9: Check indexing state for progress reporting
+            // P1-9: Check indexing state for progress reporting.
+            // Multi-repo: the state map is keyed by project name; report
+            // the first non-NotStarted entry found.
             let idx_info = {
-                let idx_state = bridge.indexing_state();
-                match &*idx_state {
-                    crate::cbm::bridge::IndexingState::InProgress { started_at } => {
-                        let elapsed = started_at.elapsed().as_secs();
-                        Some(serde_json::json!({
-                            "status": "in_progress",
-                            "elapsed_secs": elapsed,
-                        }))
+                let idx_states = bridge.indexing_state();
+                let mut found = None;
+                for (project, state) in idx_states.iter() {
+                    match state {
+                        crate::cbm::bridge::IndexingState::InProgress { started_at } => {
+                            let elapsed = started_at.elapsed().as_secs();
+                            found = Some(serde_json::json!({
+                                "status": "in_progress",
+                                "elapsed_secs": elapsed,
+                                "project": project,
+                            }));
+                            break;
+                        }
+                        crate::cbm::bridge::IndexingState::Complete => {
+                            found = Some(serde_json::json!({
+                                "status": "complete",
+                                "project": project,
+                            }));
+                            break;
+                        }
+                        crate::cbm::bridge::IndexingState::Failed(msg) => {
+                            found = Some(serde_json::json!({
+                                "status": "failed",
+                                "error": msg,
+                                "project": project,
+                            }));
+                            break;
+                        }
+                        crate::cbm::bridge::IndexingState::NotStarted => {}
                     }
-                    crate::cbm::bridge::IndexingState::Complete => {
-                        Some(serde_json::json!({ "status": "complete" }))
-                    }
-                    crate::cbm::bridge::IndexingState::Failed(msg) => {
-                        Some(serde_json::json!({
-                            "status": "failed",
-                            "error": msg,
-                        }))
-                    }
-                    crate::cbm::bridge::IndexingState::NotStarted => None,
                 }
+                found
             };
             (s, d, v, idx_info)
         }

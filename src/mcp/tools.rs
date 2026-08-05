@@ -440,10 +440,12 @@ pub(crate) fn dispatch_tools_call(
         }
         "diff_commits" => {
             // Resolve the workspace root (XPIA mitigation). Defaults to CWD.
+            // Pass the caller-supplied workspaceRoot through so the boundary
+            // check honors it (multi-repo support) instead of pinning to CWD.
             let root_arg = params["arguments"]["workspaceRoot"].as_str();
             let root = match super::tool_helpers::resolve_file_path_checked(
                 root_arg.unwrap_or("."),
-                None,
+                root_arg,
             ) {
                 Ok(p) => p,
                 Err(msg) => {

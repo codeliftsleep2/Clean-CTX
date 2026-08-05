@@ -57,25 +57,43 @@ pub(super) fn resolve_file_path(path: &str, workspace_root: Option<&str>) -> Str
 
 /// Resolve a file path and enforce a workspace boundary (XPIA mitigation).
 ///
-/// The boundary is anchored to the **process CWD** (the trusted root), NOT the
-/// caller-supplied `workspace_root` (which is itself attacker-controlled).
-/// The resolved path is canonicalized (resolving symlinks and `..`) and must
-/// remain within the trusted root. Returns `Ok(canonical_path)` if inside the
+/// The boundary is anchored to the caller-supplied `workspace_root` when
+/// provided, falling back to the **process CWD** when not. The trusted root
+/// is canonicalized (resolving symlinks and `..`) and must be a real,
+/// existing directory. The resolved path is also canonicalized and must
+/// remain within the trusted root. Returns `Ok(resolved_path)` if inside the
 /// boundary, or `Err(message)` if the path is outside or does not exist.
 ///
-/// This prevents Cross-Prompt Injection Attacks (XPIA) where source code with
-/// embedded instructions could direct the LLM to read sensitive files outside
-/// the project (e.g. `/etc/passwd`, `~/.ssh/id_rsa`).
+/// Security note: the caller-supplied `workspace_root` is itself
+/// attacker-controlled, so it is canonicalized and required to exist before
+/// being used as the boundary. This still prevents Cross-Prompt Injection
+/// Attacks (XPIA) where source code with embedded instructions could direct
+/// the LLM to read sensitive files outside the project (e.g. `/etc/passwd`,
+/// `~/.ssh/id_rsa`) — the resolved path must remain within the (canonicalized)
+/// root, so escaping via `..` or symlinks is rejected.
 pub(super) fn resolve_file_path_checked(
     path: &str,
     workspace_root: Option<&str>,
 ) -> Result<String, String> {
     // 1. Resolve to absolute using the existing logic
     let resolved = resolve_file_path(path, workspace_root);
-    // 2. Canonicalize the trusted root (process CWD)
-    let trusted_root = std::env::current_dir()
-        .map_err(|e| format!("cannot determine workspace root: {e}"))?;
-    let trusted_root_canon = trusted_root.canonicalize().unwrap_or(trusted_root);
+    // 2. Determine the trusted root: caller-supplied workspace_root when
+    //    provided (canonicalized, must exist), else the process CWD.
+    let trusted_root = match workspace_root {
+        Some(root) => {
+            let root_path = std::path::Path::new(root);
+            if root_path.is_absolute() {
+                root_path.to_path_buf()
+            } else {
+                std::env::current_dir().unwrap_or_default().join(root)
+            }
+        }
+        None => std::env::current_dir()
+            .map_err(|e| format!("cannot determine workspace root: {e}"))?,
+    };
+    let trusted_root_canon = trusted_root
+        .canonicalize()
+        .map_err(|_| format!("workspace root does not exist: {}", trusted_root.display()))?;
     // 3. Canonicalize the resolved path (resolves symlinks and `..`) for
     //    the boundary check. NOTE: we return the ORIGINAL resolved path,
     //    not the canonical form, so persistence keys and alias mappings
