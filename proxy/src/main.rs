@@ -65,6 +65,13 @@ async fn main() -> Result<(), ProxyError> {
     // Validate configuration (rejects self-forwarding loops).
     config.validate()?;
 
+    // Print non-fatal configuration warnings (e.g. AUTO_CACHE against a local bridge)
+    // BEFORE the banner so they're visible without box-formatting truncation.
+    for warning in config.warnings() {
+        println!("⚠  {warning}");
+        info!("[proxy] WARNING: {}", warning);
+    }
+
     println!("╔═══════════════════════════════════════════════════════════╗");
     println!("║     Clean-CTX Anthropic Proxy                           ║");
     println!("╠═══════════════════════════════════════════════════════════╣");
