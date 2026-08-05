@@ -549,10 +549,20 @@ pub(crate) fn handle_provide_code_context(
             let comp_tokens;
 
             match delta {
-                Some(d) => {
-                    let wire_delta = serde_json::to_value(&d).unwrap_or_default();
-                    raw_tokens = 0;
-                    comp_tokens = 0;
+                Some(ref d) => {
+                    let wire_delta = serde_json::to_value(d).unwrap_or_default();
+                    // DASHBOARD FIX (R-02 FAANG): count the delta wire tokens
+                    // (the actual payload sent to the LLM) so the dashboard
+                    // can show delta efficiency. The previous full compression's
+                    // compressed token count is passed as `full_compressed_tokens`
+                    // so `record_compression` can compute CPU savings vs a full
+                    // re-compress.
+                    let delta_text = serde_json::to_string(&wire_delta).unwrap_or_default();
+                    raw_tokens = count_tokens_with_tokenizer(&delta_text, tokenizer_ref);
+                    comp_tokens = raw_tokens; // delta is the payload itself
+                    let prev_full_compressed = state.session_stats_lock()
+                        .file_stats(&resolved_path)
+                        .map(|f| f.compressed_tokens);
                     send_response(&serde_json::json!({
                         "jsonrpc": "2.0", "id": id, "result": {
                             "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): +{} ~{} -{} ops", compiled.file_id, d.from, d.to, d.ops.adds.len(), d.ops.mods.len(), d.ops.dels.len()) }],
@@ -561,6 +571,11 @@ pub(crate) fn handle_provide_code_context(
                             "decision_summary": decision.summary()
                         }
                     }));
+                    // Record the delta with the previous full compressed token
+                    // count for delta efficiency computation.
+                    state.record_compression(&resolved_path, raw_tokens, comp_tokens,
+                        &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "delta",
+                        prev_full_compressed, "ir_compression");
                 }
                 None => {
                     let render_start = Instant::now();
@@ -591,7 +606,13 @@ pub(crate) fn handle_provide_code_context(
                 }
             }
             let _total_ms = overall_start.elapsed().as_millis() as u64;
-            state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "delta", None, "ir_compression");
+            // The delta branch already recorded stats inside `Some(d)`.
+            // The `None` branch (baseline stored) records a full compression
+            // below. This trailing call is now a no-op for the delta case
+            // (it would double-record), so we only record for the None branch.
+            if delta.is_none() {
+                state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "delta", None, "ir_compression");
+            }
         }
         crate::mcp::heuristics::ContextStrategy::FullCompress => {
             let compile_start = Instant::now();

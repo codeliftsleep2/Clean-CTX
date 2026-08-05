@@ -662,3 +662,119 @@ fn round_trip_delta_without_intent_skips_field() {
     assert!(parsed.get("intent").is_none() || parsed["intent"].is_null(),
         "intent field should be absent when None");
 }
+
+// ── 9. R-02: Type Alias IR Round-Trip Tests ─────────────────────
+//
+// Verifies that CoreOp::TypeAlias ops emitted by apply_type_aliases_to_ir
+// survive wire-format round-trips, and that the alias mapping is
+// preserved.
+
+use std::collections::BTreeMap;
+use crate::ir::type_aliases::apply_type_aliases_to_ir;
+
+fn make_aliases(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
+}
+
+#[test]
+fn round_trip_type_alias_op_named_wire() {
+    let original = CoreOp::TypeAlias("$uid".into(), "User".into());
+    let tuple = op_to_tuple(&original);
+    assert_eq!(tuple, vec!["TYPE", "$uid", "User"]);
+    let restored = tuple_to_op(&tuple).unwrap();
+    assert_eq!(original, restored);
+}
+
+#[test]
+fn round_trip_ir_with_type_aliases_named_wire() {
+    // Build IR with type-bearing ops, apply aliases, then round-trip
+    // through named wire format.
+    let mut instructions = vec![
+        CoreOp::DefClass("C1".into(), "UserService".into()),
+        CoreOp::DefMethod("C1".into(), "M1".into(), "getUser".into()),
+        CoreOp::Param("M1".into(), "P1".into(), "User".into(), "id".into()),
+        CoreOp::Return("M1".into(), "Promise<User>".into()),
+        CoreOp::DefField("C1".into(), "F1".into(), "user".into()),
+        CoreOp::FieldType("F1".into(), "User".into()),
+    ];
+    let aliases = make_aliases(&[("User", "$uid")]);
+    apply_type_aliases_to_ir(&mut instructions, &aliases);
+
+    // Verify substitution occurred
+    assert!(instructions.iter().any(|op| matches!(op,
+        CoreOp::Param(_, _, t, _) if t == "$uid")));
+    assert!(instructions.iter().any(|op| matches!(op,
+        CoreOp::FieldType(_, t) if t == "$uid")));
+    // Verify TypeAlias op was appended
+    assert!(instructions.iter().any(|op| matches!(op,
+        CoreOp::TypeAlias(a, o) if a == "$uid" && o == "User")));
+
+    // Round-trip through named wire
+    let ir = CompiledIR {
+        file_id: "test.ts".to_string(),
+        version: 1,
+        instructions,
+    };
+    let wire = ir_to_wire(&ir);
+    let restored = wire_to_ir(&wire).expect("named wire round-trip with type aliases");
+    assert_ir_eq(&ir, &restored);
+}
+
+#[test]
+fn round_trip_ir_with_type_aliases_binary_wire() {
+    let mut instructions = vec![
+        CoreOp::FieldType("F1".into(), "User".into()),
+        CoreOp::Return("M1".into(), "User".into()),
+    ];
+    let aliases = make_aliases(&[("User", "$uid")]);
+    apply_type_aliases_to_ir(&mut instructions, &aliases);
+
+    let ir = CompiledIR {
+        file_id: "test.ts".to_string(),
+        version: 1,
+        instructions,
+    };
+    let bytes = encode(&ir);
+    let restored = decode(&bytes).expect("binary wire round-trip with type aliases");
+    // Binary wire format uses empty strings for TypeAlias ID fields (like
+    // DefClass, Import, etc.), so we verify the TYPE opcode is present
+    // rather than the full alias/original content.
+    assert!(restored.instructions.iter().any(|op| matches!(op,
+        CoreOp::TypeAlias(..))), "TypeAlias op should survive binary wire round-trip");
+    // Verify the substituted type values survived (FieldType/Return are
+    // data-preserving in binary wire).
+    assert!(restored.instructions.iter().any(|op| matches!(op,
+        CoreOp::FieldType(_, t) if t == "$uid")), "FieldType with $uid should survive");
+    assert!(restored.instructions.iter().any(|op| matches!(op,
+        CoreOp::Return(_, t) if t == "$uid")), "Return with $uid should survive");
+}
+
+#[test]
+fn round_trip_ir_with_multiple_type_aliases() {
+    let mut instructions = vec![
+        CoreOp::FieldType("F1".into(), "User".into()),
+        CoreOp::FieldType("F2".into(), "JsonObject".into()),
+        CoreOp::Return("M1".into(), "Promise<User>".into()),
+    ];
+    let aliases = make_aliases(&[("User", "$uid"), ("JsonObject", "$jo")]);
+    apply_type_aliases_to_ir(&mut instructions, &aliases);
+
+    // Both TypeAlias ops should be present
+    let ta_count = instructions.iter()
+        .filter(|op| matches!(op, CoreOp::TypeAlias(..)))
+        .count();
+    assert_eq!(ta_count, 2, "expected 2 TypeAlias ops");
+
+    // Round-trip through named wire
+    let ir = CompiledIR {
+        file_id: "multi.ts".to_string(),
+        version: 1,
+        instructions,
+    };
+    let wire = ir_to_wire(&ir);
+    let restored = wire_to_ir(&wire).expect("named wire round-trip with multiple aliases");
+    assert_ir_eq(&ir, &restored);
+}

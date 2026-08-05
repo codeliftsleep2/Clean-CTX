@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -117,4 +118,69 @@ fn compress_file_rejects_file_larger_than_max() {
         "error should mention 'File too large', got: {}",
         err_msg
     );
+}
+
+// ---------- R-02: Type-alias integration tests ----------
+
+fn make_aliases(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
+}
+
+#[test]
+fn compress_text_with_aliases_medium_fidelity() {
+    // At Medium fidelity, type names in method signatures should be
+    // substituted with alias tokens.
+    let source = "class UserService { getUser(id: string): Promise<User> {} }";
+    let aliases = make_aliases(&[("User", "$uid")]);
+    let result = compress_text(source, "ts", Fidelity::Medium, "α1", Some(&aliases));
+    assert!(result.is_ok(), "compress_text with aliases should succeed");
+    let (_body_lines, full_output) = result.unwrap();
+    assert!(
+        full_output.contains("$uid"),
+        "output should contain $uid alias, got: {}",
+        full_output
+    );
+    assert!(
+        full_output.contains("§TA"),
+        "output should contain §TA footer, got: {}",
+        full_output
+    );
+}
+
+#[test]
+fn compress_text_with_aliases_high_fidelity() {
+    let source = "class UserService { getUser(id: string): Promise<User> {} }";
+    let aliases = make_aliases(&[("User", "$uid")]);
+    let result = compress_text(source, "ts", Fidelity::High, "α1", Some(&aliases));
+    assert!(result.is_ok());
+    let (_body_lines, full_output) = result.unwrap();
+    assert!(full_output.contains("$uid"), "output should contain $uid alias");
+    assert!(full_output.contains("§TA"), "output should contain §TA footer");
+}
+
+#[test]
+fn compress_text_without_aliases_no_footer() {
+    // When no aliases are configured, no §TA footer should appear.
+    let source = "class UserService { getUser(id: string): Promise<User> {} }";
+    let result = compress_text(source, "ts", Fidelity::Medium, "α1", None);
+    assert!(result.is_ok());
+    let (_body_lines, full_output) = result.unwrap();
+    assert!(
+        !full_output.contains("§TA"),
+        "output should NOT contain §TA footer when no aliases configured"
+    );
+}
+
+#[test]
+fn compress_text_aliases_deterministic() {
+    // Same input + same aliases → same output (delta consistency).
+    let source = "class Service { get(id: string): Promise<User> {} }";
+    let aliases = make_aliases(&[("User", "$uid")]);
+    let r1 = compress_text(source, "ts", Fidelity::Medium, "α1", Some(&aliases)).unwrap();
+    let r2 = compress_text(source, "ts", Fidelity::Medium, "α1", Some(&aliases)).unwrap();
+    assert_eq!(r1.0, r2.0, "body lines should be identical");
+    assert_eq!(r1.1, r2.1, "full output should be identical");
 }

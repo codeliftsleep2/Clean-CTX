@@ -196,7 +196,8 @@ fn test_multiple_records_same_file() {
     let fs = stats.file_stats("/test/file.ts").unwrap();
     assert_eq!(fs.version, 2);
     assert_eq!(fs.delta_count, 1);
-    assert!(!fs.has_llm_savings());
+    // R-02 FAANG: delta after a full PRESERVES the full's LLM savings.
+    assert!(fs.has_llm_savings(), "delta after full should preserve LLM savings");
     // Delta efficiency: (250 - 200) / 250 = 20%
     assert!(fs.delta_efficiency_pct.is_some());
     assert!((fs.delta_efficiency_pct.unwrap() - 20.0).abs() < 0.1);
@@ -214,7 +215,8 @@ fn test_delta_efficiency_with_full_compressed_tokens() {
     
     let fs = stats.file_stats("/test/f.ts").unwrap();
     assert_eq!(fs.strategy, "delta");
-    assert!(!fs.has_llm_savings());
+    // R-02 FAANG: delta after a full PRESERVES the full's LLM savings.
+    assert!(fs.has_llm_savings(), "delta after full should preserve LLM savings");
     assert!(fs.delta_efficiency_pct.is_some());
     let eff = fs.delta_efficiency_pct.unwrap();
     assert!((eff - 76.0).abs() < 0.1, "expected ~76%, got {}", eff);
@@ -521,4 +523,81 @@ fn test_dashboard_json_includes_prompt_cache_after_sync() {
     assert_eq!(pc["cache_hits"], 4);
     assert_eq!(pc["cache_misses"], 1);
     assert_eq!(pc["total_raw_tokens"], 800);
+}
+
+// ── R-02 FAANG: Delta preserves prior full-compression savings ──
+//
+// When a delta is recorded for a file that previously had a FULL
+// compression, the full compression's token counts and LLM token
+// savings must be PRESERVED. Delta ops are local CPU events — they
+// do not change the file's LLM-visible token profile. Previously the
+// delta recording erased the full compression's savings (dashboard
+// showed N/A).
+
+#[test]
+fn test_delta_preserves_full_compression_savings() {
+    let mut stats = SessionStats::new();
+
+    // 1. Full compression: 1000 raw → 250 compressed (75% savings)
+    stats.record_compression("/test/file.ts", 1000, 250, "low", false, "full", None, "ir_compression");
+    let fs = stats.file_stats("/test/file.ts").unwrap();
+    assert_eq!(fs.raw_tokens, 1000);
+    assert_eq!(fs.compressed_tokens, 250);
+    assert!((fs.savings_pct - 75.0).abs() < 0.01);
+    assert!(fs.has_llm_savings());
+
+    // 2. Delta arrives (handler passes 0/0 for raw/comp, prev full compressed = 250)
+    stats.record_compression("/test/file.ts", 0, 0, "low", false, "delta", Some(250), "ir_compression");
+
+    // The full compression's savings must be PRESERVED
+    let fs = stats.file_stats("/test/file.ts").unwrap();
+    assert_eq!(fs.raw_tokens, 1000, "raw_tokens should be preserved from full compression");
+    assert_eq!(fs.compressed_tokens, 250, "compressed_tokens should be preserved from full compression");
+    assert!((fs.savings_pct - 75.0).abs() < 0.01, "savings_pct should be preserved");
+    assert!(fs.has_llm_savings(), "delta file with preserved savings should still show LLM savings");
+    assert_eq!(fs.strategy, "delta");
+    assert_eq!(fs.delta_count, 1);
+
+    // Session totals should still reflect the full compression's tokens
+    let summary = stats.summary();
+    assert_eq!(summary.total_raw_tokens, 1000, "session raw should reflect full compression");
+    assert_eq!(summary.total_compressed_tokens, 250, "session compressed should reflect full compression");
+    assert!((summary.total_savings_pct - 75.0).abs() < 0.01, "session savings should be preserved");
+    // full_compress_count stays 1 (the file still counts as a full compression)
+    assert_eq!(summary.full_compress_count, 1);
+    assert_eq!(summary.delta_count, 1);
+}
+
+#[test]
+fn test_delta_preserves_savings_in_dashboard() {
+    let mut stats = SessionStats::new();
+    stats.record_compression("/test/file.ts", 1000, 250, "low", false, "full", None, "ir_compression");
+    stats.record_compression("/test/file.ts", 0, 0, "low", false, "delta", Some(250), "ir_compression");
+
+    // Dashboard should show the real savings %, not N/A
+    let text = render_dashboard_text(&stats);
+    assert!(text.contains("75.0%"), "dashboard should show 75.0% savings, got: {}", text);
+    assert!(!text.contains("N/A"), "dashboard should NOT show N/A for a delta file with preserved savings");
+
+    // JSON dashboard should show numeric savings_pct, not null
+    let json = render_dashboard_json(&stats);
+    let file = &json["files"][0];
+    assert!(file["savings_pct"].is_number(), "JSON savings_pct should be numeric, got: {}", file["savings_pct"]);
+    assert_eq!(file["savings_pct"], 75.0);
+}
+
+#[test]
+fn test_delta_without_prior_full_still_shows_na() {
+    // A delta with NO prior full compression has no LLM savings to preserve.
+    let mut stats = SessionStats::new();
+    stats.record_compression("/test/file.ts", 0, 0, "low", false, "delta", None, "ir_compression");
+
+    let fs = stats.file_stats("/test/file.ts").unwrap();
+    assert_eq!(fs.raw_tokens, 0);
+    assert_eq!(fs.compressed_tokens, 0);
+    assert_eq!(fs.savings_pct, 0.0);
+    assert!(!fs.has_llm_savings(), "delta with no prior full should NOT have LLM savings");
+
+    let text = render_dashboard_text(&stats);
+    assert!(text.contains("N/A"), "delta with no prior full should show N/A");
 }

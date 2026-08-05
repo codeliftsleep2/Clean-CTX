@@ -48,10 +48,36 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
         }
     };
 
-    // Step 1: Extract the CBM tool name and its parameters
-    let cbm_tool = params["arguments"]["cbm_tool"].as_str().unwrap_or("graph_search");
+    // Step 1: Extract the CBM tool name and its parameters.
+    // IMPORTANT: `cbm_tool` is forwarded DIRECTLY to CBM, so it MUST use
+    // CBM's actual tool names, NOT Clean-CTX's wrapper names:
+    //   Clean-CTX tool   → CBM tool
+    //   graph_search     → search_graph
+    //   graph_query      → query_graph
+    //   graph_trace      → trace_path
+    //   get_architecture → get_architecture
+    // `get_symbol_importance` and `get_dead_code` are NOT CBM tools — they
+    // are implemented in Clean-CTX via query_graph Cypher, so they must
+    // NOT be passed as cbm_tool.
+    // Normalize Clean-CTX wrapper names to CBM's actual tool names so the
+    // proxy is resilient to either convention.
+    let raw_tool = params["arguments"]["cbm_tool"].as_str().unwrap_or("search_graph");
+    let cbm_tool = match raw_tool {
+        "graph_search" => "search_graph",
+        "graph_query" => "query_graph",
+        "graph_trace" => "trace_path",
+        other => other,
+    };
 
-    // Build the parameters object for CBM
+    // Build the parameters object for CBM.
+    // When the caller passes an explicit `parameters` object, it is forwarded
+    // as-is (with `project` merged in if missing) — the caller is responsible
+    // for using CBM-native parameter names.
+    // Otherwise, translate Clean-CTX shorthand args into CBM-native names:
+    //   - search_graph:  query → name_pattern
+    //   - query_graph:   query → query (same)
+    //   - trace_path:    from → function_name, to → direction
+    //   - get_architecture: project only
     let tool_params = match params["arguments"]["parameters"].as_object() {
         Some(obj) => {
             let mut merged = obj.clone();
@@ -63,19 +89,43 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
             Value::Object(merged)
         }
         None => {
-            // Handle non-object parameters (string query, etc.)
             let mut default = serde_json::Map::new();
-            if let Some(q) = params["arguments"]["query"].as_str() {
-                default.insert("query".into(), Value::String(q.to_string()));
+            match cbm_tool {
+                "search_graph" => {
+                    // CBM expects `name_pattern`; accept Clean-CTX `query` shorthand.
+                    let name_pattern = params["arguments"]["name_pattern"].as_str()
+                        .or_else(|| params["arguments"]["query"].as_str())
+                        .unwrap_or("");
+                    if !name_pattern.is_empty() {
+                        default.insert("name_pattern".into(), Value::String(name_pattern.to_string()));
+                    }
+                }
+                "trace_path" => {
+                    // CBM expects `function_name` + `direction` (inbound|outbound|both).
+                    // Accept Clean-CTX `from`/`to` shorthand: from → function_name.
+                    let function_name = params["arguments"]["function_name"].as_str()
+                        .or_else(|| params["arguments"]["from"].as_str())
+                        .unwrap_or("");
+                    if !function_name.is_empty() {
+                        default.insert("function_name".into(), Value::String(function_name.to_string()));
+                    }
+                    if let Some(dir) = params["arguments"]["direction"].as_str() {
+                        default.insert("direction".into(), Value::String(dir.to_string()));
+                    }
+                    if let Some(d) = params["arguments"]["depth"].as_u64() {
+                        default.insert("depth".into(), Value::Number(d.into()));
+                    }
+                }
+                _ => {
+                    // query_graph, get_architecture, detect_changes, index_project:
+                    // `query` and `project` map directly to CBM names.
+                    if let Some(q) = params["arguments"]["query"].as_str() {
+                        default.insert("query".into(), Value::String(q.to_string()));
+                    }
+                }
             }
             if let Some(p) = params["arguments"]["project"].as_str() {
                 default.insert("project".into(), Value::String(p.to_string()));
-            }
-            if let Some(f) = params["arguments"]["from"].as_str() {
-                default.insert("from".into(), Value::String(f.to_string()));
-            }
-            if let Some(t) = params["arguments"]["to"].as_str() {
-                default.insert("to".into(), Value::String(t.to_string()));
             }
             Value::Object(default)
         }

@@ -72,8 +72,14 @@ pub struct FileStats {
 
 impl FileStats {
     /// True if this file's savings percentage represents real LLM token savings.
+    ///
+    /// A delta-strategy file that PRESERVED its prior full-compression
+    /// savings (see `record_compression`'s `preserve_full_on_delta`) still
+    /// has real LLM token savings — the delta is a local CPU event that
+    /// doesn't change the file's LLM-visible token profile. So we return
+    /// true when `savings_pct > 0.0` even for delta files.
     pub fn has_llm_savings(&self) -> bool {
-        self.strategy != "delta"
+        self.strategy != "delta" || self.savings_pct > 0.0
     }
 }
 
@@ -187,13 +193,30 @@ impl SessionStats {
         // old `FileStats` so the domain-transition block below can subtract
         // the exact previously-counted values.
         let prev_file_stats: Option<FileStats> = self.files.get(file_path).cloned();
+
+        // DASHBOARD FIX (R-02 FAANG): When a delta is recorded for a file
+        // that previously had a FULL compression, PRESERVE the full
+        // compression's token counts and LLM token savings. Delta ops are
+        // local CPU events — they do not change the file's LLM-visible token
+        // profile. Previously the delta recording subtracted the full
+        // compression's real raw/compressed tokens from the session totals
+        // and overwrote the per-file entry with 0/0, erasing the savings the
+        // file had on its initial hit (dashboard showed N/A).
+        let preserve_full_on_delta = strategy == "delta"
+            && prev_file_stats.as_ref().is_some_and(|f| f.strategy == "full");
+
         if let Some(ref existing) = prev_file_stats {
-            self.total_raw_tokens = self.total_raw_tokens.saturating_sub(existing.raw_tokens);
-            self.total_compressed_tokens = self
-                .total_compressed_tokens
-                .saturating_sub(existing.compressed_tokens);
-            // If strategy changed, decrement the old strategy counter
-            if strategy != existing.strategy {
+            // Only deduct previous counters when NOT preserving full→delta.
+            // When preserving, the full compression's tokens/savings remain
+            // in the session totals.
+            if !preserve_full_on_delta {
+                self.total_raw_tokens = self.total_raw_tokens.saturating_sub(existing.raw_tokens);
+                self.total_compressed_tokens = self.total_compressed_tokens.saturating_sub(existing.compressed_tokens);
+            }
+            // If strategy changed, decrement the old strategy counter.
+            // When preserving full→delta, the full_compress_count stays
+            // (the file still counts as a full compression for LLM savings).
+            if strategy != existing.strategy && !preserve_full_on_delta {
                 match existing.strategy.as_str() {
                     "delta" => {
                         self.delta_count = self.delta_count.saturating_sub(1);
@@ -234,9 +257,16 @@ impl SessionStats {
             }
         }
 
-        // Update session totals
-        self.total_raw_tokens += raw_tokens;
-        self.total_compressed_tokens += compressed_tokens;
+        // Update session totals. When preserving full→delta, the delta's
+        // raw/compressed tokens are NOT added — the full compression's
+        // tokens already represent the file's LLM-visible profile, and the
+        // delta is a local CPU event. (The handler passes 0/0 for delta,
+        // but this guard makes the invariant explicit and correct even if
+        // a caller passes real delta wire tokens.)
+        if !preserve_full_on_delta {
+            self.total_raw_tokens += raw_tokens;
+            self.total_compressed_tokens += compressed_tokens;
+        }
         match strategy {
             "delta" => self.delta_count += 1,
             _ => self.full_compress_count += 1,
@@ -284,9 +314,15 @@ impl SessionStats {
             }
         });
 
-        entry.raw_tokens = raw_tokens;
-        entry.compressed_tokens = compressed_tokens;
-        entry.savings_pct = savings_pct;
+        // When preserving full→delta, keep the full compression's token
+        // counts and savings_pct in the per-file entry (so the dashboard
+        // shows the real LLM savings, not N/A). Only the strategy, delta
+        // count, and delta efficiency are updated to reflect the delta.
+        if !preserve_full_on_delta {
+            entry.raw_tokens = raw_tokens;
+            entry.compressed_tokens = compressed_tokens;
+            entry.savings_pct = savings_pct;
+        }
         entry.version += 1;
         entry.fidelity = fidelity.to_string();
         entry.is_angular = is_angular;
@@ -311,12 +347,16 @@ impl SessionStats {
                 cache_misses: if domain == "prompt_cache" { Some(0) } else { None },
             }
         });
-        domain_entry.total_raw_tokens += raw_tokens;
-        domain_entry.total_compressed_tokens += compressed_tokens;
-        if domain_entry.total_raw_tokens > 0 {
-            let saved = domain_entry.total_raw_tokens
-                .saturating_sub(domain_entry.total_compressed_tokens);
-            domain_entry.savings_pct = (saved as f64 / domain_entry.total_raw_tokens as f64) * 100.0;
+        // When preserving full→delta, the domain stats already reflect the
+        // full compression's tokens — do not add the delta's (0/0) on top.
+        if !preserve_full_on_delta {
+            domain_entry.total_raw_tokens += raw_tokens;
+            domain_entry.total_compressed_tokens += compressed_tokens;
+            if domain_entry.total_raw_tokens > 0 {
+                let saved = domain_entry.total_raw_tokens
+                    .saturating_sub(domain_entry.total_compressed_tokens);
+                domain_entry.savings_pct = (saved as f64 / domain_entry.total_raw_tokens as f64) * 100.0;
+            }
         }
         // Increment file count only if this is a new file for this domain
         // (tracked by whether the entry was just created)

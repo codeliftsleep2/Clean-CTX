@@ -11,7 +11,9 @@
 //
 // Environment variables (all optional):
 //   PORT               : Local port (default: 8787)
-//   ANTHROPIC_BASE_URL : Upstream URL (default: https://api.anthropic.com)
+//   PROXY_UPSTREAM_URL : Upstream URL (dedicated; takes precedence)
+//   COPILOT_BRIDGE_URL : Alias for the Copilot bridge upstream
+//   ANTHROPIC_BASE_URL : Legacy upstream URL (default: https://api.anthropic.com)
 //   AUTO_CACHE         : Enable cache injection (1/true)
 //   TAIL_TTL           : Tail breakpoint TTL (default: "5m")
 //   DROP_TOOLS         : Comma-separated tool names to drop
@@ -60,11 +62,17 @@ async fn main() -> Result<(), ProxyError> {
     // Parse configuration from environment
     let config = ProxyConfig::from_env();
 
+    // Validate configuration (rejects self-forwarding loops).
+    config.validate()?;
+
     println!("╔═══════════════════════════════════════════════════════════╗");
     println!("║     Clean-CTX Anthropic Proxy                           ║");
     println!("╠═══════════════════════════════════════════════════════════╣");
-    println!("║  Listen:     http://127.0.0.1:{}                        ", config.port);
-    println!("║  Upstream:   {}           ", config.upstream_url);
+    println!("║  Listen:     http://127.0.0.1:{:<24}             ", config.port);
+    println!("║  Upstream:   {:<34} ", config.upstream_url);
+    if config.upstream_url.contains("127.0.0.1") || config.upstream_url.contains("localhost") {
+        println!("║              (local upstream — e.g. Copilot bridge)          ");
+    }
     println!("║  Auto-cache: {}                                    ", if config.auto_cache { "ON " } else { "OFF" });
     if config.auto_cache {
         println!("║  Tail TTL:   {}                                       ", config.tail_ttl);

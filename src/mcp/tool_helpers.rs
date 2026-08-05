@@ -29,6 +29,7 @@ pub(super) fn compress_text_body(
         extension,
         fidelity,
         &path_alias,
+        Some(&state.config.type_aliases),
     )
 }
 
@@ -223,6 +224,14 @@ pub(super) fn compile_file_ir(
         fidelity,
         skip_set.as_ref(),
     )?;
+
+    // R-02 Phase 3: Apply type aliases to the IR instruction stream.
+    // Replaces type names in FieldType, Return, and Param ops with
+    // alias tokens, and appends CoreOp::TypeAlias ops for used aliases.
+    crate::ir::type_aliases::apply_type_aliases_to_ir(
+        &mut compiled.instructions,
+        &state.config.type_aliases,
+    );
 
     // NF-02: Override the version with the next monotonic value.
     // The compiler always sets version=1; we fix it here.

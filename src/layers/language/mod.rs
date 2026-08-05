@@ -86,6 +86,7 @@ impl LanguageLayer for TypeScriptLayer {
             "ts",
             fidelity,
             "ts",
+            None,
         ).map_err(|e| CompileError::CompressionError(e.to_string()))?;
 
         let (body_lines, _full_output) = result;
@@ -180,6 +181,7 @@ impl LanguageLayer for CSharpLayer {
             "cs",
             fidelity,
             "cs",
+            None,
         ).map_err(|e| CompileError::CompressionError(e.to_string()))?;
 
         let (body_lines, _full_output) = result;
@@ -269,6 +271,7 @@ impl LanguageLayer for RustLayer {
             "rs",
             fidelity,
             "rs",
+            None,
         ).map_err(|e| CompileError::CompressionError(e.to_string()))?;
 
         let (body_lines, _full_output) = result;
@@ -358,6 +361,7 @@ impl LanguageLayer for JavaLayer {
             "java",
             fidelity,
             "java",
+            None,
         ).map_err(|e| CompileError::CompressionError(e.to_string()))?;
 
         let (body_lines, _full_output) = result;
