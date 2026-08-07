@@ -497,3 +497,127 @@ result = provide_code_context(
     file_path="src/foo.ts",
     tokenizer="claude"  # Override for this call only
 )
+```
+
+---
+
+## Central vs Per-Repo Configuration
+
+Clean-CTX supports both a **central** config (one `.clean-ctx.json` shared across many repos) and **per-repo** configs (each repo overrides the central one).
+
+### How the project root is resolved
+
+`find_project_root()` resolves the project root in this order:
+
+1. **`CLEAN_CTX_PROJECT_ROOT` env var** (if set and exists) — highest priority, overrides everything
+2. **Walk up from CWD** — looks for `.clean-ctx.json` or `Cargo.toml` in the current directory, then each parent
+3. **Walk up from the executable's directory** — useful for self-contained install folders
+4. **Fallback to CWD**
+
+### Central configuration (recommended for workspace-mode setups)
+
+Place `.clean-ctx.json` at a common **parent** directory of all your repos:
+
+```
+C:\Outcomes\.clean-ctx.json      ← shared central config
+C:\Outcomes\fe\
+C:\Outcomes\API\
+C:\Outcomes\Functions\
+```
+
+When VS Code opens the `C:\Outcomes` workspace, the walk-up from CWD finds the config immediately. When any single repo is opened alone (e.g. `C:\Outcomes\fe`), the walk-up from its `Cargo.toml` anchors the project root at `C:\Outcomes\fe`, and `CleanCtxConfig::load` **continues walking up** from there — finding `C:\Outcomes\.clean-ctx.json` on the way.
+
+> **Note:** The config walk-up only looks **up**, never at sibling directories. If your central config lives in a repo that is a sibling of the repos you're working on (e.g. `C:\source\repos\clean-ctx\.clean-ctx.json` used from `C:\source\repos\repo-A`), the walk-up from `repo-A` cannot see it. Use `CLEAN_CTX_PROJECT_ROOT` for this layout.
+
+### Using `CLEAN_CTX_PROJECT_ROOT`
+
+Set it to your central config directory to make the override explicit:
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "CLEAN_CTX_PROJECT_ROOT",
+  "C:\source\repos\clean-ctx",
+  "User"
+)
+```
+
+- **Advantage:** The config is always found regardless of which repo is opened.
+- **Caveat:** This is a **process-global override** — any per-repo `.clean-ctx.json` in a repo you open will be **ignored** while the env var is set. Clean-CTX logs `[clean-ctx] Using CLEAN_CTX_PROJECT_ROOT override: <path>` at startup so you always see which root won.
+- **Caveat:** Relative paths (persistence `db_path`, proxy `log_dir`) anchor to this root, not the opened repo.
+
+### Proxy working directory
+
+The proxy is spawned with its working directory set to the **config file's directory** (not the project root). This ensures `filters/` and proxy `log_dir` resolve consistently regardless of which repo window is open. Keep your `filters/*.toml` files next to `.clean-ctx.json`.
+
+---
+
+## Proxy Lifecycle
+
+### Auto-start behavior
+
+When `proxy.auto_start` is `true`, the MCP server spawns `clean-ctx-proxy` as a child process at startup and terminates it on shutdown.
+
+**Graceful degradation:** Every failure path degrades gracefully — the MCP server logs a warning and continues:
+
+- **Binary not found** → `[clean-ctx] Warning: proxy.auto_start is enabled but the clean-ctx-proxy binary was not found... Continuing without the proxy.`
+- **Spawn failure** → `[clean-ctx] WARNING: Failed to spawn clean-ctx-proxy...`
+- **Proxy exits shortly after start** (port in use, validation failure) → the fast-fail check returns `Ok(None)` and the server continues.
+- **Startup grace timeout** → controlled by `start_grace_ms` (default `300`). Raise this if your proxy takes longer to bind on slow disks or under antivirus.
+
+There is **no path** where a missing or failed proxy kills the MCP server.
+
+### Port-ownership detection (adoption)
+
+If something is already listening on the configured port when the MCP server starts, it **adopts** the existing instance instead of spawning a duplicate:
+
+```
+[clean-ctx] Proxy already running on port 8787 — adopting existing instance.
+```
+
+Because the adopted proxy is not a child of this MCP server, it is **not** terminated on shutdown. This prevents a second Clean-CTX instance (or a standalone `clean-ctx proxy` process) from being clobbered.
+
+### Shutdown behavior
+
+Only a proxy that this MCP server **spawned itself** is terminated on shutdown. An adopted proxy survives. To stop an adopted/running proxy manually:
+
+```powershell
+clean-ctx proxy --stop
+```
+
+This finds the process listening on the configured port (Windows: strict `LISTENING` local-address matching) and kills it with `taskkill /T /F` (Windows) or SIGTERM→SIGKILL (Unix).
+
+---
+
+## Two Cache Systems
+
+Clean-CTX has **two independent** prompt-cache breakpoint systems that target different layers:
+
+### 1. MCP-side `_meta.cache_hints` (client hinting)
+
+The MCP server injects `_meta.cache_hints` into **JSON-RPC responses** sent back to the MCP client (Cline, Claude Code). These hints instruct the *client* to set `cache_control` breakpoints on its own request payloads.
+
+- Regions: `system_prompt`, `tools`, `baseline`, `tail`
+- Controlled by: `cache.enabled` in `.clean-ctx.json`
+- TTLs: `cache.system_prompt_ttl` (1h), `cache.tools_ttl` (1h), `cache.baseline_ttl` (1h), `cache.tail_ttl` (5m)
+
+### 2. Proxy-side HTTP `cache_control` injection
+
+The `clean-ctx-proxy` intercepts the raw HTTP **request** from the client to `api.anthropic.com` and injects `cache_control` breakpoints directly into the system, tools, and message blocks.
+
+- Slots: tools, system (last block > 500 chars), messages[0], tail
+- Controlled by: `proxy.auto_cache` in `.clean-ctx.json`
+- TTL: `proxy.tail_ttl` (default `"5m"` — keep this at 5m; the tail changes every turn and a longer TTL forces re-writes)
+
+### How they relate
+
+These systems are **complementary** — the MCP hints target the client's request construction, while the proxy targets the HTTP stream. They are **not** mutually exclusive. If the client already sent its own `cache_control` breakpoints, the proxy's injection is **skipped** (client-sent breakpoints are presumed intentional and never clobbered).
+
+### Cache-state transport (Phase 5)
+
+The MCP server queries the proxy's `GET /cache/state` endpoint at startup to learn the proxy's actual cache configuration:
+
+```
+[clean-ctx] Proxy cache state: auto_cache=true tail_ttl=5m
+```
+
+This bridges the two systems so the MCP server can align its `_meta.cache_hints` breakers with the proxy's real injection behavior.
