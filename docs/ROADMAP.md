@@ -87,6 +87,7 @@ All Foundation items (A-09 through A-15), all Now items (F-19 through F-22, A-08
 | **R-36** | React Meta-Layer | Additive meta-layer on TS/JS. Component/hook/context bundling, prop type compression, React-specific lifecycle markers. **A-11 ✅ (complete)** — now unblocked. | 3-4 days | 🟡 Medium |
 | **R-37** | Redux Meta-Layer | Additive meta-layer on TS/JS. Action/reducer/selector compression, thunk/saga patterns, store shape compression. **A-11 ✅ (complete)** — now unblocked. | 2-3 days | 🟡 Medium |
 | **R-01b** | Go language layer | Second-most requested. | 1-2 days | 🟡 Medium |
+| **R-44** | Angular HTML Template Compression | Fidelity-gated template compression for Angular `.component.html` files. Extends the existing `template.rs` extractor with Medium/High fidelity rendering that preserves Angular semantics (bindings, conditions, loop variables, component inputs/outputs) while stripping HTML scaffolding. Integrates with `diff_commits` (AST-level HTML diffs) and `provide_code_context` (single-file template compression). Includes PrimeNG pattern recognition (`Φp-table:`, `Φp-card:`). See `docs/ANGULAR_HTML_COMPRESSION_PLAN.md`. **R-22 ✅ (complete)** — builds on existing template extraction. | 4-5 days | 🔴 High |
 
 ---
 

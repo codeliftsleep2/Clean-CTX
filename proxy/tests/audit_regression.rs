@@ -36,17 +36,20 @@ fn critical_1_system_blocks_not_deleted() {
     body["system"][0]["cache_control"] = json!({"type": "ephemeral"});
 
     let mut stats = CacheStats::default();
-    inject_breakpoints(&mut body, "5m", &mut stats);
+    let slots = inject_breakpoints(&mut body, "5m", &mut stats);
 
     // CRITICAL: The small system block must still exist in the array
     let system = body["system"].as_array().expect("system should be array");
     assert_eq!(system.len(), 2, "System blocks must NOT be deleted — found {}", system.len());
     assert_eq!(system[0]["text"], "Short.", "Small block text must be preserved");
 
-    // The breakpoint on the small block should be stripped (not the block itself)
+    // Client-sent breakpoints are PRESERVED — injection is skipped entirely.
+    // The proxy must NOT clobber client caching.
+    assert_eq!(slots, 0, "Injection should be skipped when client breakpoints exist");
+    assert_eq!(stats.client_breakpoints_preserved, 1);
     assert!(
-        system[0].get("cache_control").is_none(),
-        "cache_control should be stripped from small block, not the block deleted"
+        system[0].get("cache_control").is_some(),
+        "Client-sent cache_control must be preserved, not stripped"
     );
 }
 
@@ -209,20 +212,23 @@ fn cache_small_block_breakpoint_stripped_not_deleted() {
     body["system"][0]["cache_control"] = json!({"type": "ephemeral"});
 
     let mut stats = CacheStats::default();
-    inject_breakpoints(&mut body, "5m", &mut stats);
+    let slots = inject_breakpoints(&mut body, "5m", &mut stats);
 
     let system = body["system"].as_array().unwrap();
 
     // Both blocks should still exist
     assert_eq!(system.len(), 2, "All system blocks must be preserved");
 
-    // Small block's cache_control should be stripped
-    assert!(system[0].get("cache_control").is_none(),
-        "Small block's cache_control should be stripped");
+    // Client-sent breakpoints are PRESERVED — injection is skipped entirely.
+    // The proxy must NOT clobber client caching.
+    assert_eq!(slots, 0, "Injection should be skipped when client breakpoints exist");
+    assert_eq!(stats.client_breakpoints_preserved, 1);
+    assert!(system[0].get("cache_control").is_some(),
+        "Client-sent cache_control must be preserved, not stripped");
 
-    // Large block should get the new breakpoint
-    assert!(system[1].get("cache_control").is_some(),
-        "Large block should get cache_control breakpoint");
+    // Large block should NOT get a new breakpoint (injection skipped)
+    assert!(system[1].get("cache_control").is_none(),
+        "Large block should NOT get cache_control when client breakpoints exist");
 }
 
 // ============================================================

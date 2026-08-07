@@ -110,6 +110,61 @@ pub(super) fn resolve_file_path_checked(
     }
 }
 
+/// Inject a `"baseline"` cache breakpoint into a JSON-RPC response.
+///
+/// Uses `compute_baseline_breaker(compressed_text)` as the breaker so the
+/// cache is invalidated when the compressed output changes. This is the
+/// primary consumer of the smart cache for per-file compression outputs.
+///
+/// No-op when cache is disabled in config.
+pub(crate) fn inject_baseline_breakpoint(
+    response: &mut serde_json::Value,
+    state: &McpState,
+    compressed_text: &str,
+) {
+    if !state.config.cache.enabled {
+        return;
+    }
+    let ttl = state.config.cache.baseline_ttl.clone();
+    let breaker = crate::mcp::cache_hints::compute_baseline_breaker(compressed_text);
+    let tok_box = crate::tokenizer::create_tokenizer(
+        crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
+    ).ok();
+    let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
+    if let Some(result_obj) = response.get_mut("result") {
+        crate::mcp::cache_hints::inject_cache_breakpoints(
+            result_obj, state, "baseline", &ttl, &breaker, tok_ref,
+        );
+    }
+}
+
+/// Inject a `"tail"` cache breakpoint into a JSON-RPC response.
+///
+/// The tail is always rolling (breaker = "rolling") — it represents
+/// dynamic content that changes each turn and should never be cached
+/// across turns. Marks the tail as ephemeral in cache metrics.
+///
+/// No-op when cache is disabled in config.
+pub(crate) fn inject_tail_breakpoint(
+    response: &mut serde_json::Value,
+    state: &McpState,
+) {
+    if !state.config.cache.enabled {
+        return;
+    }
+    let ttl = state.config.cache.tail_ttl.clone();
+    let tok_box = crate::tokenizer::create_tokenizer(
+        crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
+    ).ok();
+    let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
+    if let Some(result_obj) = response.get_mut("result") {
+        crate::mcp::cache_hints::inject_cache_breakpoints(
+            result_obj, state, "tail", &ttl, "rolling", tok_ref,
+        );
+    }
+    crate::mcp::cache_hints::mark_tail_ephemeral(state);
+}
+
 /// Rough token estimation (chars / 4).
 /// In production, use tiktoken-rs; this is a lightweight approximation.
 pub(super) fn estimate_tokens(text: &str) -> usize {

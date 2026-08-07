@@ -450,7 +450,7 @@ fn test_sync_cache_metrics_populates_prompt_cache_domain() {
 }
 
 #[test]
-fn test_sync_cache_metrics_overwrites_existing() {
+fn test_sync_cache_metrics_accumulates_existing() {
     let mut stats = SessionStats::new();
     let metrics1 = crate::mcp::cache_hints::CacheMetrics {
         hits: 3,
@@ -469,9 +469,38 @@ fn test_sync_cache_metrics_overwrites_existing() {
     stats.sync_cache_metrics(&metrics2);
 
     let domain = stats.domain_breakdown().get("prompt_cache").unwrap();
-    assert_eq!(domain.cache_hits, Some(10));
-    assert_eq!(domain.cache_misses, Some(4));
-    assert_eq!(domain.total_raw_tokens, 3500);
+    // ACCUMULATES hits/misses: 3+10=13, 1+4=5
+    assert_eq!(domain.cache_hits, Some(13), "hits should accumulate across syncs");
+    assert_eq!(domain.cache_misses, Some(5), "misses should accumulate across syncs");
+    // ACCUMULATES: 500 + 3500 = 4000. Real proxy cache-read tokens
+    // (recorded via `record_cache_hit`) are preserved alongside MCP-side
+    // dedup savings — they must NOT be overwritten.
+    assert_eq!(domain.total_raw_tokens, 4000);
+}
+
+#[test]
+fn test_sync_cache_metrics_preserves_proxy_hits() {
+    // Real proxy cache hits (recorded via `record_cache_hit`) must be
+    // preserved when MCP-side metrics are synced.
+    let mut stats = SessionStats::new();
+    // Proxy records 1 real hit with 5000 tokens saved
+    stats.record_cache_hit(5000);
+
+    // MCP-side metrics sync with 3 hits, 2 misses, 1200 tokens
+    let metrics = crate::mcp::cache_hints::CacheMetrics {
+        hits: 3,
+        misses: 2,
+        tokens_saved: 1200,
+        breakpoints: std::collections::HashMap::new(),
+    };
+    stats.sync_cache_metrics(&metrics);
+
+    let domain = stats.domain_breakdown().get("prompt_cache").unwrap();
+    // Proxy hit (1) + MCP hits (3) = 4
+    assert_eq!(domain.cache_hits, Some(4), "proxy hits must be preserved");
+    assert_eq!(domain.cache_misses, Some(2));
+    // Proxy tokens (5000) + MCP tokens (1200) = 6200
+    assert_eq!(domain.total_raw_tokens, 6200, "proxy tokens must be preserved");
 }
 
 #[test]

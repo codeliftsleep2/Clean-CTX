@@ -66,8 +66,7 @@ pub struct CacheBreakpoint {
 ///
 /// Returns a short stable hash string prefixed with "bl_" that changes
 /// when the compressed output changes. Used as the cache breaker for
-/// persisted workspace baselines.
-#[allow(dead_code)]
+/// persisted workspace baselines and per-file compression outputs.
 pub fn compute_baseline_breaker(compressed_text: &str) -> String {
     let hash = sha2::Sha256::digest(compressed_text.as_bytes());
     format!("bl_{:x}", hash)
@@ -208,7 +207,6 @@ pub fn inject_cache_breakpoints(
 }
 
 /// Update cache metrics for the rolling tail (always ephemeral).
-#[allow(dead_code)]
 pub fn mark_tail_ephemeral(state: &crate::mcp::McpState) {
     state.cache_metrics_lock().breakpoints.insert("tail".to_string(), "ephemeral".to_string());
 }

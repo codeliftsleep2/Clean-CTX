@@ -12,6 +12,11 @@
 //
 // The extended-cache-ttl beta header makes `{type: "ephemeral"}`
 // without explicit `ttl` default to 1h instead of 5m.
+//
+// IMPORTANT: If the client has already sent its own cache_control
+// breakpoints, injection is SKIPPED entirely. Client-sent breakpoints
+// are presumed intentional (e.g. fine-grained per-file baselines) and
+// must not be clobbered by the proxy's coarse 4-slot scheme.
 
 use serde_json::Value;
 use tracing::debug;
@@ -41,6 +46,18 @@ pub struct CacheStats {
 
     /// Number of client-sent breakpoints stripped.
     pub client_breakpoints_stripped: u64,
+
+    /// Number of requests where client-sent breakpoints were preserved
+    /// (injection skipped entirely).
+    pub client_breakpoints_preserved: u64,
+
+    /// Tokens read from Anthropic's prompt cache on this request
+    /// (from `usage.cache_read_input_tokens` in the upstream response).
+    pub cache_read_tokens: u64,
+
+    /// Tokens written to Anthropic's prompt cache on this request
+    /// (from `usage.cache_creation_input_tokens` in the upstream response).
+    pub cache_creation_tokens: u64,
 }
 
 impl CacheStats {
@@ -55,6 +72,9 @@ impl CacheStats {
         self.tail_slots += other.tail_slots;
         self.small_blocks_filtered += other.small_blocks_filtered;
         self.client_breakpoints_stripped += other.client_breakpoints_stripped;
+        self.client_breakpoints_preserved += other.client_breakpoints_preserved;
+        self.cache_read_tokens += other.cache_read_tokens;
+        self.cache_creation_tokens += other.cache_creation_tokens;
     }
 }
 
@@ -62,8 +82,23 @@ impl CacheStats {
 ///
 /// Modifies `body` in-place. Returns the number of breakpoints placed
 /// and updates `stats`.
+///
+/// If the body already contains client-sent `cache_control` breakpoints,
+/// injection is SKIPPED entirely — the client's breakpoints are preserved
+/// and `stats.client_breakpoints_preserved` is incremented.
 pub fn inject_breakpoints(body: &mut Value, tail_ttl: &str, stats: &mut CacheStats) -> usize {
     if !body.is_object() {
+        return 0;
+    }
+
+    // Respect client-sent breakpoints — do NOT clobber them.
+    // `has_any_breakpoints` detects cache_control on tools, system,
+    // and message content blocks. If the client already placed
+    // breakpoints, they are presumed intentional (e.g. fine-grained
+    // per-file baselines) and must be preserved.
+    if has_any_breakpoints(body) {
+        debug!("[cache] Client-sent breakpoints detected, skipping injection");
+        stats.client_breakpoints_preserved += 1;
         return 0;
     }
 
@@ -71,6 +106,8 @@ pub fn inject_breakpoints(body: &mut Value, tail_ttl: &str, stats: &mut CacheSta
     let max_slots: usize = 4;
 
     // ---- Phase 1: Strip any existing client-sent breakpoints ----
+    // (Unreachable when client breakpoints exist — the guard above
+    //  returns early. Kept for safety in case of nested/edge cases.)
     let stripped = strip_existing_breakpoints(body);
     stats.client_breakpoints_stripped += stripped as u64;
 
@@ -154,6 +191,9 @@ pub fn inject_breakpoints(body: &mut Value, tail_ttl: &str, stats: &mut CacheSta
     }
 
     // ---- Slot 4: tail (last text/tool_result/image across all messages) ----
+    // The tail breakpoint uses the configured `tail_ttl` (default "5m") so
+    // the rolling tail is invalidated quickly. The other slots use the
+    // default 1h TTL from the extended-cache-ttl beta header.
     if let Some(messages) = body["messages"].as_array_mut() {
         let mut found_tail = false;
         for msg in messages.iter_mut().rev() {
@@ -162,7 +202,10 @@ pub fn inject_breakpoints(body: &mut Value, tail_ttl: &str, stats: &mut CacheSta
                     if block["type"].as_str().is_some_and(|t| {
                         matches!(t, "text" | "tool_result" | "image")
                     }) {
-                        block["cache_control"] = serde_json::json!({"type": "ephemeral"});
+                        block["cache_control"] = serde_json::json!({
+                            "type": "ephemeral",
+                            "ttl": tail_ttl
+                        });
                         found_tail = true;
                         slots += 1;
                         stats.tail_slots += 1;
@@ -223,7 +266,9 @@ fn strip_existing_breakpoints(body: &mut Value) -> usize {
 }
 
 /// Check if the body has any cache_control breakpoints already.
-#[allow(dead_code)]
+///
+/// Used by `inject_breakpoints` to detect client-sent breakpoints and
+/// skip injection entirely (preserving the client's cache strategy).
 pub fn has_any_breakpoints(body: &Value) -> bool {
     // Check tools
     if let Some(tools) = body["tools"].as_array() {
@@ -375,5 +420,101 @@ mod tests {
         assert!(!has_any_breakpoints(&body));
         body["tools"][0]["cache_control"] = json!({"type": "ephemeral"});
         assert!(has_any_breakpoints(&body));
+    }
+
+    #[test]
+    fn test_inject_skips_when_client_breakpoints_exist() {
+        // Body with client-sent breakpoint on tools[0]
+        let mut body = make_test_body(2);
+        body["tools"][0]["cache_control"] = json!({"type": "ephemeral"});
+
+        let mut stats = CacheStats::default();
+        let slots = inject_breakpoints(&mut body, "5m", &mut stats);
+
+        // Injection must be skipped entirely
+        assert_eq!(slots, 0, "Should not inject when client breakpoints exist");
+        assert_eq!(stats.client_breakpoints_preserved, 1);
+        assert_eq!(stats.total_injected, 0);
+        assert_eq!(stats.tools_slots, 0);
+        assert_eq!(stats.system_slots, 0);
+        assert_eq!(stats.messages_slots, 0);
+        assert_eq!(stats.tail_slots, 0);
+
+        // Client breakpoint must be preserved
+        assert!(body["tools"][0].get("cache_control").is_some());
+    }
+
+    #[test]
+    fn test_inject_skips_when_client_breakpoints_on_system() {
+        let mut body = make_test_body(1);
+        body["system"][0]["cache_control"] = json!({"type": "ephemeral"});
+
+        let mut stats = CacheStats::default();
+        let slots = inject_breakpoints(&mut body, "5m", &mut stats);
+
+        assert_eq!(slots, 0, "Should not inject when client breakpoints exist on system");
+        assert_eq!(stats.client_breakpoints_preserved, 1);
+        assert!(body["system"][0].get("cache_control").is_some());
+    }
+
+    #[test]
+    fn test_inject_skips_when_client_breakpoints_on_messages() {
+        let mut body = make_test_body(1);
+        body["messages"][0]["content"][0]["cache_control"] = json!({"type": "ephemeral"});
+
+        let mut stats = CacheStats::default();
+        let slots = inject_breakpoints(&mut body, "5m", &mut stats);
+
+        assert_eq!(slots, 0, "Should not inject when client breakpoints exist on messages");
+        assert_eq!(stats.client_breakpoints_preserved, 1);
+        assert!(body["messages"][0]["content"][0].get("cache_control").is_some());
+    }
+
+    #[test]
+    fn test_tail_breakpoint_uses_configured_ttl() {
+        let mut body = make_test_body(1);
+        let mut stats = CacheStats::default();
+        inject_breakpoints(&mut body, "5m", &mut stats);
+
+        // The tail breakpoint must include the configured TTL
+        let messages = body["messages"].as_array().unwrap();
+        let content = messages[0]["content"].as_array().unwrap();
+        let last_block = content.last().unwrap();
+        assert_eq!(
+            last_block["cache_control"]["ttl"], "5m",
+            "Tail breakpoint must include the configured TTL"
+        );
+        assert_eq!(last_block["cache_control"]["type"], "ephemeral");
+    }
+
+    #[test]
+    fn test_tail_breakpoint_custom_ttl() {
+        let mut body = make_test_body(1);
+        let mut stats = CacheStats::default();
+        inject_breakpoints(&mut body, "1h", &mut stats);
+
+        let messages = body["messages"].as_array().unwrap();
+        let content = messages[0]["content"].as_array().unwrap();
+        let last_block = content.last().unwrap();
+        assert_eq!(
+            last_block["cache_control"]["ttl"], "1h",
+            "Tail breakpoint must use the custom TTL"
+        );
+    }
+
+    #[test]
+    fn test_cache_stats_merge_accumulates_new_fields() {
+        let mut a = CacheStats::default();
+        let mut b = CacheStats::default();
+        a.client_breakpoints_preserved = 3;
+        a.cache_read_tokens = 1000;
+        a.cache_creation_tokens = 500;
+        b.client_breakpoints_preserved = 2;
+        b.cache_read_tokens = 2000;
+        b.cache_creation_tokens = 300;
+        a.merge(&b);
+        assert_eq!(a.client_breakpoints_preserved, 5);
+        assert_eq!(a.cache_read_tokens, 3000);
+        assert_eq!(a.cache_creation_tokens, 800);
     }
 }

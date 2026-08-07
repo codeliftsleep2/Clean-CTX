@@ -475,6 +475,20 @@ async fn forward_to_upstream(
 
     debug!("[{req_id}] Upstream returned {status} ({} bytes)", resp_bytes.len());
 
+    // Parse real cache usage tokens from the upstream response.
+    // Anthropic returns `usage.cache_read_input_tokens` and
+    // `usage.cache_creation_input_tokens` when prompt caching is active.
+    // These are the REAL savings numbers — not estimates.
+    let (cache_read_tokens, cache_creation_tokens) = parse_cache_usage(&resp_bytes);
+    if cache_read_tokens > 0 || cache_creation_tokens > 0 {
+        let mut guard = state.write().await;
+        guard.cache_stats.cache_read_tokens += cache_read_tokens;
+        guard.cache_stats.cache_creation_tokens += cache_creation_tokens;
+        debug!(
+            "[{req_id}] Cache usage: read={cache_read_tokens} creation={cache_creation_tokens}"
+        );
+    }
+
     // Log response body if configured
     {
         let guard = state.read().await;
@@ -510,6 +524,50 @@ async fn forward_to_upstream(
     Ok(response
         .body(Full::new(resp_bytes))
         .unwrap())
+}
+
+/// Parse real cache usage tokens from an upstream response body.
+///
+/// Anthropic returns `usage.cache_read_input_tokens` and
+/// `usage.cache_creation_input_tokens` when prompt caching is active.
+/// Returns `(cache_read_tokens, cache_creation_tokens)`.
+///
+/// This is a best-effort parse — if the body is not valid JSON or the
+/// fields are absent, returns `(0, 0)`.
+fn parse_cache_usage(resp_bytes: &[u8]) -> (u64, u64) {
+    // Try non-streaming JSON first
+    if let Ok(value) = serde_json::from_slice::<serde_json::Value>(resp_bytes) {
+        let read = value["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0);
+        let creation = value["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0);
+        return (read, creation);
+    }
+
+    // Fall back to SSE parsing — scan for `data: {...}` lines and look for
+    // the `message_delta` event which carries the final usage block.
+    let text = String::from_utf8_lossy(resp_bytes);
+    let mut read: u64 = 0;
+    let mut creation: u64 = 0;
+    for line in text.lines() {
+        let line = line.trim();
+        if !line.starts_with("data:") {
+            continue;
+        }
+        let data = line.trim_start_matches("data:").trim();
+        if data == "[DONE]" {
+            continue;
+        }
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(data) else {
+            continue;
+        };
+        // The `message_delta` event carries the final usage block in SSE.
+        if value["type"].as_str() == Some("message_delta") {
+            read = value["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0);
+            creation = value["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0);
+            // The message_delta is the last event — no need to keep scanning.
+            break;
+        }
+    }
+    (read, creation)
 }
 
 /// Read the full body from an incoming hyper request with size limit.
@@ -618,4 +676,73 @@ mod tests {
         assert!(should_forward_header("ANTHROPIC-VERSION"));
     }
 
+    #[test]
+    fn test_parse_cache_usage_extracts_real_tokens() {
+        let body = br#"{
+            "id": "msg_123",
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 50,
+                "cache_read_input_tokens": 5000,
+                "cache_creation_input_tokens": 2000
+            }
+        }"#;
+        let (read, creation) = parse_cache_usage(body);
+        assert_eq!(read, 5000);
+        assert_eq!(creation, 2000);
+    }
+
+    #[test]
+    fn test_parse_cache_usage_returns_zero_when_absent() {
+        let body = br#"{
+            "id": "msg_123",
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 50
+            }
+        }"#;
+        let (read, creation) = parse_cache_usage(body);
+        assert_eq!(read, 0);
+        assert_eq!(creation, 0);
+    }
+
+    #[test]
+    fn test_parse_cache_usage_returns_zero_on_invalid_json() {
+        let body = b"not json";
+        let (read, creation) = parse_cache_usage(body);
+        assert_eq!(read, 0);
+        assert_eq!(creation, 0);
+    }
+
+    #[test]
+    fn test_parse_cache_usage_extracts_from_sse_stream() {
+        // SSE streaming response — usage data is in the final message_delta event
+        let body = br#"event: message_start
+data: {"type":"message_start","message":{"id":"msg_123"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}
+
+event: message_delta
+data: {"type":"message_delta","usage":{"output_tokens":50,"cache_read_input_tokens":8000,"cache_creation_input_tokens":3000}}
+
+data: [DONE]
+"#;
+        let (read, creation) = parse_cache_usage(body);
+        assert_eq!(read, 8000, "SSE message_delta should carry cache_read_input_tokens");
+        assert_eq!(creation, 3000, "SSE message_delta should carry cache_creation_input_tokens");
+    }
+
+    #[test]
+    fn test_parse_cache_usage_sse_no_cache_fields() {
+        // SSE with no cache usage fields — should return (0, 0)
+        let body = br#"event: message_delta
+data: {"type":"message_delta","usage":{"output_tokens":50}}
+
+data: [DONE]
+"#;
+        let (read, creation) = parse_cache_usage(body);
+        assert_eq!(read, 0);
+        assert_eq!(creation, 0);
+    }
 }
