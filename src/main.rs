@@ -25,6 +25,12 @@ enum Cli {
     /// Print resolved configuration
     #[command(name = "--config-dump")]
     ConfigDump,
+    /// Start the Clean-CTX proxy standalone (no MCP server)
+    Proxy {
+        /// Stop a running auto-started proxy
+        #[arg(long)]
+        stop: bool,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -43,6 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(Cli::Init) => cmd_init(),
         Ok(Cli::Setup { force }) => cmd_setup_cbm(force),
         Ok(Cli::ConfigDump) => cmd_config_dump(),
+        Ok(Cli::Proxy { stop }) => cmd_proxy(stop),
         // When no arguments are given, clap emits DisplayHelpOnMissingArgumentOrSubcommand.
         // Intercept it to default to running the MCP server (stdio JSON-RPC loop).
         // Any future Cli variant is automatically dispatched above — no parallel
@@ -198,6 +205,159 @@ fn cmd_config_dump() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("  For more information, see: docs/CONFIGURATION.md");
     
     Ok(())
+}
+
+/// Handle `clean-ctx proxy` — start or stop the proxy standalone.
+///
+/// With no flags, loads `.clean-ctx.json`, spawns the proxy as a child
+/// process, prints its PID, and blocks until Ctrl+C (then terminates it).
+/// With `--stop`, finds the process listening on the configured port and
+/// terminates it.
+fn cmd_proxy(stop: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let config = clean_ctx::config::CleanCtxConfig::load(std::path::Path::new("."));
+    let proxy_cfg = &config.proxy;
+
+    if stop {
+        // Find and kill the process listening on the configured port.
+        let pid = find_pid_by_port(proxy_cfg.port);
+        match pid {
+            Some(pid) => {
+                #[cfg(windows)]
+                {
+                    let pid_str = pid.to_string();
+                    let _ = std::process::Command::new("taskkill")
+                        .arg("/PID")
+                        .arg(&pid_str)
+                        .arg("/T")
+                        .arg("/F")
+                        .status();
+                }
+                #[cfg(not(windows))]
+                {
+                    // Send SIGTERM, then escalate to SIGKILL after a
+                    // 3-second grace period (mirrors shutdown_proxy).
+                    let _ = std::process::Command::new("kill")
+                        .arg(pid.to_string())
+                        .status();
+                    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+                    loop {
+                        if !process_alive(pid) {
+                            break;
+                        }
+                        if std::time::Instant::now() >= deadline {
+                            let _ = std::process::Command::new("kill")
+                                .arg("-9")
+                                .arg(pid.to_string())
+                                .status();
+                            break;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                    }
+                }
+                eprintln!("[clean-ctx] Stopped proxy on port {} (pid {})", proxy_cfg.port, pid);
+                Ok(())
+            }
+            None => {
+                eprintln!("[clean-ctx] No proxy found listening on port {}", proxy_cfg.port);
+                Ok(())
+            }
+        }
+    } else {
+        // Start the proxy standalone and wait for Ctrl+C.
+        // `force = true` — an explicit `clean-ctx proxy` invocation must
+        // start the proxy even when `proxy.auto_start` is false (default).
+        let cwd = std::env::current_dir()?;
+        let mut child = match clean_ctx::proxy_spawner::spawn_proxy(proxy_cfg, &cwd, true)? {
+            Some(c) => c,
+            None => {
+                eprintln!(
+                    "[clean-ctx] Proxy could not be started (auto_start disabled or binary not found)."
+                );
+                return Ok(());
+            }
+        };
+        eprintln!("[clean-ctx] Proxy running — press Ctrl+C to stop.");
+        // Block until Ctrl+C, then terminate the child.
+        let (tx, rx) = std::sync::mpsc::channel();
+        ctrlc::set_handler(move || {
+            let _ = tx.send(());
+        })?;
+        let _ = rx.recv();
+        clean_ctx::proxy_spawner::shutdown_proxy(&mut child);
+        eprintln!("[clean-ctx] Proxy stopped.");
+        Ok(())
+    }
+}
+
+/// Find the PID of the process listening on the given port.
+///
+/// Uses `netstat -ano` on Windows and `lsof -i :PORT` on Unix.
+///
+/// Windows parsing is strict: only lines in the `LISTENING` state whose
+/// **local** address ends in `:{port}` are considered. The previous
+/// implementation matched `:{port}` anywhere in the line, which could
+/// return the PID of an unrelated process that merely had an outbound
+/// connection to a remote host on that port (e.g. an ESTABLISHED line
+/// whose foreign address was `1.2.3.4:8787`).
+fn find_pid_by_port(port: u16) -> Option<u32> {
+    #[cfg(windows)]
+    {
+        let output = std::process::Command::new("netstat")
+            .args(["-ano"])
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&output.stdout);
+        let needle = format!(":{port}");
+        for line in text.lines() {
+            let upper = line.to_uppercase();
+            // Only consider LISTENING lines.
+            if !upper.contains("LISTENING") {
+                continue;
+            }
+            // netstat columns: Proto  Local Address  Foreign Address  State  PID
+            let mut cols = line.split_whitespace();
+            let _proto = cols.next()?;
+            let local = cols.next()?;
+            // Local address must end with :{port} (e.g. 127.0.0.1:8787 or [::]:8787).
+            if !local.to_uppercase().ends_with(&needle) {
+                continue;
+            }
+            // PID is the last column.
+            if let Some(pid_str) = cols.last() {
+                if let Ok(pid) = pid_str.parse::<u32>() {
+                    if pid != 0 {
+                        return Some(pid);
+                    }
+                }
+            }
+        }
+        None
+    }
+    #[cfg(not(windows))]
+    {
+        let output = std::process::Command::new("lsof")
+            .args(["-ti", &format!(":{port}")])
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&output.stdout);
+        text.lines().next()?.trim().parse::<u32>().ok()
+    }
+}
+
+/// Check whether a process with the given PID is still alive.
+///
+/// Used by the Unix `--stop` path to wait for a SIGTERM'd proxy to
+/// exit before escalating to SIGKILL. On Windows this is not needed
+/// (`taskkill /F` is synchronous and forceful).
+#[cfg(not(windows))]
+fn process_alive(pid: u32) -> bool {
+    // `kill -0` probes for process existence without sending a signal.
+    std::process::Command::new("kill")
+        .arg("-0")
+        .arg(pid.to_string())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 #[cfg(test)]

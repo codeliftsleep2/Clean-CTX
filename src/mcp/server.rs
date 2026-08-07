@@ -131,7 +131,24 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     let project_root = find_project_root();
     eprintln!("[clean-ctx] Project root: {}", project_root.display());
     let config = CleanCtxConfig::load(project_root);
-    let state = McpState::new(config);
+    let state = McpState::new(config.clone());
+
+    // Auto-start the proxy if enabled in config. Non-fatal: if the
+    // proxy binary is missing or fails to spawn, the MCP server
+    // continues without it (logged above).
+    if config.proxy.auto_start {
+        match crate::proxy_spawner::spawn_proxy(&config.proxy, project_root, false) {
+            Ok(Some(child)) => {
+                *state.proxy_child.lock().unwrap_or_else(|p| p.into_inner()) = Some(child);
+            }
+            Ok(None) => {
+                // auto_start disabled or binary not found — already logged.
+            }
+            Err(e) => {
+                eprintln!("[clean-ctx] WARNING: {e}");
+            }
+        }
+    }
 
     // A-PRODUCTION: Wrap state in the production-grade dispatcher.
     let dispatcher = Dispatcher::new(state);
@@ -207,9 +224,19 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // A-09: Wait for all queued work to complete before exiting.
-    // The Dispatcher's drop impl (via rayon) will block until all
-    // spawned tasks finish.
+    // The Dispatcher's drop impl will block until all spawned tasks
+    // finish, so terminate the auto-started proxy child FIRST (while
+    // we still have access to the state via `dispatcher.state()`).
     eprintln!("[clean-ctx] Stdin exhausted, waiting for pending work...");
+
+    // Terminate the auto-started proxy child (if any).
+    if let Some(ref mut child) =
+        *dispatcher.state().proxy_child.lock().unwrap_or_else(|p| p.into_inner())
+    {
+        crate::proxy_spawner::shutdown_proxy(child);
+        eprintln!("[clean-ctx] Proxy stopped.");
+    }
+
     drop(dispatcher);
 
     Ok(())

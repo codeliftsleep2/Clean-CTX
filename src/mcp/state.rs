@@ -223,6 +223,12 @@ pub struct McpState {
     /// Provides counters, histograms, and gauges for key metrics.
     /// Thread-safe; can be shared across the server via `&MetricsRegistry`.
     pub metrics_registry: std::sync::Arc<crate::observability::MetricsRegistry>,
+
+    /// Auto-started proxy child process handle.
+    /// `Some(child)` when `proxy.auto_start` is enabled and the proxy
+    /// was successfully spawned; `None` otherwise. Terminated in
+    /// `shutdown_proxy` when the MCP server exits.
+    pub proxy_child: Mutex<Option<std::process::Child>>,
 }
 
 impl McpState {
@@ -266,11 +272,12 @@ impl McpState {
             }
         }
 
-        // Initialize CBM graph bridge from config *before* moving config
-        // into Self (avoiding after-move borrow).
+        // Capture config-derived values *before* moving config into Self
+        // (avoiding after-move borrows).
         let cbm_config = config.cbm.clone();
         let project_root = crate::mcp::server::find_project_root().clone();
         let (graph_bridge, cbm_status) = Self::init_cbm_bridge(&cbm_config, &project_root);
+        let proxy_port = config.proxy.port;
 
         Self {
             dict: Mutex::new(PathDictionary::new()),
@@ -292,11 +299,10 @@ impl McpState {
             cbm_filter: Mutex::new(CbmFilterState::default()),
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,
-            // P1-3: Note - proxy config not yet in CleanCtxConfig, using default
-            // TODO: Add proxy.port to config when proxy configuration is implemented
-            proxy_port: 8787,
+            proxy_port,
             registry: LayerRegistry::new(),
             metrics_registry: std::sync::Arc::new(crate::observability::MetricsRegistry::new()),
+            proxy_child: Mutex::new(None),
         }
     }
 

@@ -109,6 +109,9 @@ ureq = { version = "3", features = ["json"] }
 # Constructor attribute for eager static initialization (prevents OnceLock contention in parallel tests)
 ctor = "0.2"
 
+# Ctrl+C handler for the `clean-ctx proxy` standalone subcommand
+ctrlc = "3.4"
+
 [dev-dependencies]
 tempfile = "3.27.0"
 serial_test = "3.2"

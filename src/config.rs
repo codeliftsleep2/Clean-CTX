@@ -384,6 +384,12 @@ pub struct CleanCtxConfig {
     /// Observability configuration for metrics export.
     #[serde(default)]
     pub observability: ObservabilityConfig,
+
+    /// Proxy auto-start configuration. When `auto_start` is `true`,
+    /// the MCP server spawns the `clean-ctx-proxy` binary as a child
+    /// process on startup and terminates it on shutdown.
+    #[serde(default)]
+    pub proxy: ProxyAutoStartConfig,
 }
 
 /// Intelligence Layer configuration.
@@ -452,6 +458,100 @@ impl Default for ObservabilityConfig {
 
 fn default_export_interval() -> u64 { 60 }
 
+// ── Proxy auto-start configuration ────────────────────────────────
+
+/// Auto-start configuration for the Clean-CTX proxy.
+///
+/// When `auto_start` is `true`, the MCP server spawns the `clean-ctx-proxy`
+/// binary as a child process on startup, maps each field to the proxy's
+/// environment variables (see `proxy/src/config.rs`), and terminates the
+/// child on shutdown. Defaults mirror the proxy's env-var defaults so an
+/// empty JSON block behaves identically to an unconfigured proxy.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProxyAutoStartConfig {
+    /// Master switch. When `true`, the MCP server spawns the proxy on
+    /// startup and terminates it on shutdown. Default: `false`.
+    #[serde(default)]
+    pub auto_start: bool,
+    /// Port to bind (always 127.0.0.1). Maps to `PORT`. Default: 8787.
+    #[serde(default = "default_proxy_port")]
+    pub port: u16,
+    /// Enable cache_control breakpoint injection (Anthropic only).
+    /// Maps to `AUTO_CACHE`. Default: `false`.
+    #[serde(default)]
+    pub auto_cache: bool,
+    /// TTL for the rolling-tail breakpoint. Maps to `TAIL_TTL`.
+    /// Default: "5m".
+    #[serde(default = "default_proxy_tail_ttl")]
+    pub tail_ttl: String,
+    /// Comma-separated tool names to remove from request bodies.
+    /// Maps to `DROP_TOOLS`. Default: empty.
+    #[serde(default)]
+    pub drop_tools: Vec<String>,
+    /// Strip ANSI escape codes from tool results. Maps to `STRIP_ANSI`.
+    /// Default: `false`.
+    #[serde(default)]
+    pub strip_ansi: bool,
+    /// Truncate Bash tool output at "Committing changes". Maps to
+    /// `TRIM_BASH_GIT`. Default: `false`.
+    #[serde(default)]
+    pub trim_bash_git: bool,
+    /// Override the model name in every request. Maps to `MODEL_OVERRIDE`.
+    /// Default: none.
+    #[serde(default)]
+    pub model_override: Option<String>,
+    /// Enable secret scrubbing in tool results. Maps to `SCRUB_SECRETS`.
+    /// Default: `false`.
+    #[serde(default)]
+    pub scrub_secrets: bool,
+    /// Enable TOML-based tool output filtering. Maps to `TOOL_FILTERS`.
+    /// Default: `false`.
+    #[serde(default)]
+    pub tool_filters: bool,
+    /// Dedicated upstream URL. Maps to `PROXY_UPSTREAM_URL`.
+    /// Default: none (the proxy falls back to `https://api.anthropic.com`).
+    #[serde(default)]
+    pub upstream_url: Option<String>,
+    /// Optional API key for `X-Api-Key` header authentication.
+    /// Maps to `PROXY_API_KEY`. Default: none.
+    #[serde(default)]
+    pub api_key: Option<String>,
+    /// Per-client requests per second. Maps to `RATE_LIMIT_RPS`.
+    /// Default: 60.
+    #[serde(default = "default_proxy_rate_limit_rps")]
+    pub rate_limit_rps: f64,
+    /// Per-client burst window size. Maps to `RATE_LIMIT_BURST`.
+    /// Default: 10.
+    #[serde(default = "default_proxy_rate_limit_burst")]
+    pub rate_limit_burst: f64,
+}
+
+impl Default for ProxyAutoStartConfig {
+    fn default() -> Self {
+        Self {
+            auto_start: false,
+            port: default_proxy_port(),
+            auto_cache: false,
+            tail_ttl: default_proxy_tail_ttl(),
+            drop_tools: Vec::new(),
+            strip_ansi: false,
+            trim_bash_git: false,
+            model_override: None,
+            scrub_secrets: false,
+            tool_filters: false,
+            upstream_url: None,
+            api_key: None,
+            rate_limit_rps: default_proxy_rate_limit_rps(),
+            rate_limit_burst: default_proxy_rate_limit_burst(),
+        }
+    }
+}
+
+fn default_proxy_port() -> u16 { 8787 }
+fn default_proxy_tail_ttl() -> String { "5m".to_string() }
+fn default_proxy_rate_limit_rps() -> f64 { 60.0 }
+fn default_proxy_rate_limit_burst() -> f64 { 10.0 }
+
 /// Per-framework Meta-Layer configuration.
 ///
 /// Phase 1 ships only the `angular` variant. Future phases will add
@@ -505,6 +605,7 @@ impl Default for CleanCtxConfig {
             cbm: crate::cbm::CbmConfig::default(),
             intelligence: IntelligenceConfig::default(),
             observability: ObservabilityConfig::default(),
+            proxy: ProxyAutoStartConfig::default(),
         }
     }
 }
