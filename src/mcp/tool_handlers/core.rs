@@ -15,7 +15,7 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 
 use super::super::tools::{parse_fidelity_arg, parse_tokenizer_arg};
-use super::super::tool_helpers::{compress_text_body, compile_file_ir, resolve_file_path_checked, diff_code_context_handler, count_tokens_with_tokenizer};
+use super::super::tool_helpers::{compress_text_body, compile_file_ir, resolve_file_path_checked, diff_code_context_handler, count_tokens_with_tokenizer, inject_baseline_breakpoint, inject_tail_breakpoint};
 
 fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Vec<CoreOp> {
     tuples.into_iter().filter_map(|t| tuple_to_op(&t)).collect()
@@ -82,7 +82,7 @@ pub(crate) fn handle_compress_code_context(
     // P3-2: Build response using extracted helpers
     // If IR compilation fails, fall back to legacy compression but log
     // the structured error for diagnostics (4.4 audit fix).
-    let response = if let Ok((ir, _source_hash)) = ir_result {
+    let mut response = if let Ok((ir, _source_hash)) = ir_result {
         state.ir_context_lock().load_ir(ir.clone(), None);
         let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
         let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
@@ -176,6 +176,14 @@ pub(crate) fn handle_compress_code_context(
             }
         }
     };
+
+    // Inject baseline cache breakpoint into the response so the LLM
+    // client can set cache_control on the stable compressed output.
+    if let Some(text) = response["result"]["content"][0]["text"].as_str() {
+        let text_owned = text.to_string();
+        inject_baseline_breakpoint(&mut response, state, &text_owned);
+    }
+
     send_response(&response);
 }
 
@@ -208,10 +216,15 @@ pub(crate) fn handle_diff_code_context(
         Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } })); return; }
     };
     match diff_code_context_handler(PathBuf::from(&resolved_path), &source, &mut state.cache_write(), fidelity) {
-        Ok(body) => send_response(&serde_json::json!({
-            "jsonrpc": "2.0", "id": id,
-            "result": { "content": [{ "type": "text", "text": body }] }
-        })),
+        Ok(body) => {
+            let mut response = serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "result": { "content": [{ "type": "text", "text": body }] }
+            });
+            // Diff output is rolling dynamic content — mark as tail (ephemeral).
+            inject_tail_breakpoint(&mut response, state);
+            send_response(&response);
+        }
         Err(e) => send_response(&serde_json::json!({
             "jsonrpc": "2.0", "id": id,
             "error": { "code": -32603, "message": e.to_string() }
@@ -263,7 +276,7 @@ pub(crate) fn handle_delta_code_context(
                 let cached_ir = ir_ctx.get_ir(&path_alias).unwrap().clone();
                 let instruction_count = cached_ir.len();
                 drop(ir_ctx);
-                send_response(&serde_json::json!({
+                let mut response = serde_json::json!({
                     "jsonrpc": "2.0", "id": id,
                     "result": {
                         "content": [{ "type": "text", "text": format!("Cached IR for {} (v{})", path_alias, prev_version) }],
@@ -271,7 +284,14 @@ pub(crate) fn handle_delta_code_context(
                         "instruction_count": instruction_count,
                         "cached": true
                     }
-                }));
+                });
+                // Cached IR is a stable snapshot — inject baseline breakpoint
+                // so the client can cache the unchanged output.
+                if let Some(text) = response["result"]["content"][0]["text"].as_str() {
+                    let text_owned = text.to_string();
+                    inject_baseline_breakpoint(&mut response, state, &text_owned);
+                }
+                send_response(&response);
                 return;
             }
         }
@@ -305,21 +325,32 @@ pub(crate) fn handle_delta_code_context(
     match delta {
         Some(d) => {
             let wire_delta = serde_json::to_value(&d).unwrap_or_default();
-            send_response(&serde_json::json!({
+            let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": serde_json::to_string_pretty(&wire_delta).unwrap_or_default() }],
                     "delta": wire_delta, "from_version": prev_version, "to_version": compiled.version
                 }
-            }));
+            });
+            // Delta output is rolling dynamic content — mark as tail (ephemeral).
+            inject_tail_breakpoint(&mut response, state);
+            send_response(&response);
         }
-        None => send_response(&serde_json::json!({
-            "jsonrpc": "2.0", "id": id,
-            "result": {
-                "content": [{ "type": "text", "text": format!("Baseline stored for {} (v{})", compiled.file_id, compiled.version) }],
-                "version": compiled.version, "instruction_count": compiled.instructions.len()
+        None => {
+            let mut response = serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": format!("Baseline stored for {} (v{})", compiled.file_id, compiled.version) }],
+                    "version": compiled.version, "instruction_count": compiled.instructions.len()
+                }
+            });
+            // Baseline stored — this is a stable snapshot, inject baseline breakpoint.
+            if let Some(text) = response["result"]["content"][0]["text"].as_str() {
+                let text_owned = text.to_string();
+                inject_baseline_breakpoint(&mut response, state, &text_owned);
             }
-        })),
+            send_response(&response);
+        }
     }
 }
 
@@ -355,7 +386,7 @@ pub(crate) fn handle_delta_text_context(
                     // Store updated baseline for next call
                     td.store_snapshot(&alias, body_lines.clone());
                     drop(td);
-                    send_response(&serde_json::json!({
+                    let mut response = serde_json::json!({
                         "jsonrpc": "2.0", "id": id,
                         "result": {
                             "content": [{ "type": "text", "text": delta.to_wire_format() }],
@@ -363,27 +394,43 @@ pub(crate) fn handle_delta_text_context(
                             "removed": delta.dels.len(),
                             "modified": delta.mods.len(),
                         }
-                    }));
+                    });
+                    // Delta output is rolling dynamic content — mark as tail (ephemeral).
+                    inject_tail_breakpoint(&mut response, state);
+                    send_response(&response);
                 } else {
                     drop(td);
-                    send_response(&serde_json::json!({
+                    let mut response = serde_json::json!({
                         "jsonrpc": "2.0", "id": id,
                         "result": {
                             "content": [{ "type": "text", "text": "No changes since last call." }]
                         }
-                    }));
+                    });
+                    // "No changes" is a stable response — inject baseline breakpoint
+                    // so the client can cache the unchanged output.
+                    if let Some(text) = response["result"]["content"][0]["text"].as_str() {
+                        let text_owned = text.to_string();
+                        inject_baseline_breakpoint(&mut response, state, &text_owned);
+                    }
+                    send_response(&response);
                 }
             } else {
                 // Actually store the baseline snapshot on first call
                 td.store_snapshot(&alias, body_lines.clone());
                 drop(td);
-                send_response(&serde_json::json!({
+                let mut response = serde_json::json!({
                     "jsonrpc": "2.0", "id": id,
                     "result": {
                         "content": [{ "type": "text", "text": format!("Baseline stored for {}.\nCall again after edits.\n\nFull output:\n{}", alias, full_output) }],
                         "stored": true
                     }
-                }));
+                });
+                // Baseline stored — this is a stable snapshot, inject baseline breakpoint.
+                if let Some(text) = response["result"]["content"][0]["text"].as_str() {
+                    let text_owned = text.to_string();
+                    inject_baseline_breakpoint(&mut response, state, &text_owned);
+                }
+                send_response(&response);
             }
         }
         Err(e) => send_response(&serde_json::json!({
@@ -418,10 +465,13 @@ pub(crate) fn handle_apply_delta(
     match ir_ctx.apply(delta) {
         Ok(new_version) => {
             let rendered = ir_ctx.render_pretty(&file, crate::compressor::Fidelity::Low);
-            send_response(&serde_json::json!({
+            let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": { "content": [{ "type": "text", "text": rendered.unwrap_or_default() }], "version": new_version }
-            }));
+            });
+            // Applied delta output is rolling dynamic content — mark as tail (ephemeral).
+            inject_tail_breakpoint(&mut response, state);
+            send_response(&response);
         }
         Err(e) => send_response(&serde_json::json!({
             "jsonrpc": "2.0", "id": id,
@@ -563,14 +613,17 @@ pub(crate) fn handle_provide_code_context(
                     let prev_full_compressed = state.session_stats_lock()
                         .file_stats(&resolved_path)
                         .map(|f| f.compressed_tokens);
-                    send_response(&serde_json::json!({
+                    let mut response = serde_json::json!({
                         "jsonrpc": "2.0", "id": id, "result": {
                             "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): +{} ~{} -{} ops", compiled.file_id, d.from, d.to, d.ops.adds.len(), d.ops.mods.len(), d.ops.dels.len()) }],
                             "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                             "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                             "decision_summary": decision.summary()
                         }
-                    }));
+                    });
+                    // Delta output is rolling dynamic content — mark as tail (ephemeral).
+                    inject_tail_breakpoint(&mut response, state);
+                    send_response(&response);
                     // Record the delta with the previous full compressed token
                     // count for delta efficiency computation.
                     state.record_compression(&resolved_path, raw_tokens, comp_tokens,
@@ -586,13 +639,16 @@ pub(crate) fn handle_provide_code_context(
                     raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                     comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
                     state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "full", None, "ir_compression");
-                    send_response(&serde_json::json!({
+                    let mut response = serde_json::json!({
                         "jsonrpc": "2.0", "id": id, "result": {
                             "content": [{ "type": "text", "text": full }], "version": compiled.version,
                             "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                             "decision_summary": decision.summary()
                         }
-                    }));
+                    });
+                    // Inject baseline cache breakpoint for the stable full-compression output.
+                    inject_baseline_breakpoint(&mut response, state, &full);
+                    send_response(&response);
                     tracing::info!(
                         heuristics_ms = heuristics_ms,
                         compile_ms = compile_ms,
@@ -631,13 +687,16 @@ pub(crate) fn handle_provide_code_context(
                 let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                 let comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
                 state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "full", None, "ir_compression");
-                send_response(&serde_json::json!({
+                let mut response = serde_json::json!({
                     "jsonrpc": "2.0", "id": id, "result": {
                         "content": [{ "type": "text", "text": full }], "version": ir.version,
                         "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                         "is_angular": is_angular, "decision_summary": decision.summary()
                     }
-                }));
+                });
+                // Inject baseline cache breakpoint for the stable full-compression output.
+                inject_baseline_breakpoint(&mut response, state, &full);
+                send_response(&response);
                 let total_ms = overall_start.elapsed().as_millis() as u64;
                 tracing::info!(
                     heuristics_ms = heuristics_ms,
@@ -665,13 +724,16 @@ pub(crate) fn handle_provide_code_context(
                         let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                         let comp_tokens = count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
                         state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "full", None, "ir_compression");
-                        send_response(&serde_json::json!({
+                        let mut response = serde_json::json!({
                             "jsonrpc": "2.0", "id": id, "result": {
                                 "content": [{ "type": "text", "text": compressed_text }],
                                 "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                                 "decision_summary": decision.summary()
                             }
-                        }));
+                        });
+                        // Fallback compression output is a stable full snapshot — inject baseline breakpoint.
+                        inject_baseline_breakpoint(&mut response, state, &compressed_text);
+                        send_response(&response);
                         let fallback_ms = fallback_start.elapsed().as_millis() as u64;
                         tracing::info!(
                             heuristics_ms = heuristics_ms,
@@ -753,7 +815,10 @@ pub(crate) fn handle_restore_context(
             let llm_text = crate::ir::render_hierarchical_for_llm(&hir, fidelity);
             let full = format!("{}\n// ── {} ({}) ──\n{}", llm_text.trim(), ir.file_id, resolved_path, state.format_dict_footer().trim());
             state.llm_text_cache_lock().insert(ir.file_id.clone(), full.clone());
-            send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": full }], "version": ir.version, "restored": true } }));
+            let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": full }], "version": ir.version, "restored": true } });
+            // Restored context is a stable full snapshot — inject baseline breakpoint.
+            inject_baseline_breakpoint(&mut response, state, &full);
+            send_response(&response);
         }
         Err(e) => {
             // Log the structured IR error before falling back (4.4 audit fix)
@@ -765,7 +830,10 @@ pub(crate) fn handle_restore_context(
             ) {
                 Ok(mut compressed_text) => {
                     compressed_text.push_str(&state.format_dict_footer());
-                    send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": compressed_text }], "restored": true } }));
+                    let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": compressed_text }], "restored": true } });
+                    // Restored context is a stable full snapshot — inject baseline breakpoint.
+                    inject_baseline_breakpoint(&mut response, state, &compressed_text);
+                    send_response(&response);
                 }
                 Err(e) => send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } })),
             }

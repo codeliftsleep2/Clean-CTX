@@ -467,11 +467,6 @@ impl SessionStats {
         entry.total_raw_tokens += tokens_saved;
         // compressed_tokens stays 0 — the tokens were never sent
         entry.savings_pct = 100.0; // 100% savings on cached tokens
-        if let Some(ref mut misses) = entry.cache_misses {
-            if *misses == 0 {
-                *misses = 0; // ensure exists
-            }
-        }
     }
 
     /// Record a proxy filter event (tool output filtering savings).
@@ -500,6 +495,10 @@ impl SessionStats {
     /// This bridges the per-breakpoint cache tracking in `McpState.cache_metrics`
     /// into the per-domain dashboard breakdown. After this call, the
     /// `prompt_cache` domain will show hits, misses, and tokens saved.
+    ///
+    /// ACCUMULATES into `total_raw_tokens` rather than overwriting, so real
+    /// proxy cache-read token counts (recorded via `record_cache_hit`) are
+    /// preserved alongside the MCP-side dedup savings.
     pub fn sync_cache_metrics(&mut self, metrics: &CacheMetrics) {
         let domain = "prompt_cache";
         let entry = self.domain_stats.entry(domain.to_string()).or_insert_with(|| {
@@ -514,12 +513,21 @@ impl SessionStats {
                 cache_misses: Some(0),
             }
         });
-        entry.cache_hits = Some(metrics.hits);
-        entry.cache_misses = Some(metrics.misses);
-        // tokens_saved is tracked as total_raw_tokens in the prompt_cache domain
-        // (compressed_tokens stays 0 because cached tokens were never sent)
-        entry.total_raw_tokens = metrics.tokens_saved;
-        entry.savings_pct = if metrics.tokens_saved > 0 { 100.0 } else { 0.0 };
+        // ACCUMULATE hits/misses rather than overwrite. Real proxy cache hits
+        // (recorded via `record_cache_hit`) must be preserved alongside the
+        // MCP-side dedup hits. Overwriting would erase the proxy's real
+        // cache-read token count from the dashboard.
+        if let Some(ref mut hits) = entry.cache_hits {
+            *hits += metrics.hits;
+        }
+        if let Some(ref mut misses) = entry.cache_misses {
+            *misses += metrics.misses;
+        }
+        // ACCUMULATE MCP-side dedup savings into total_raw_tokens.
+        // Real proxy cache-read tokens (from `record_cache_hit`) are already
+        // in total_raw_tokens and must not be overwritten.
+        entry.total_raw_tokens += metrics.tokens_saved;
+        entry.savings_pct = if entry.total_raw_tokens > 0 { 100.0 } else { 0.0 };
     }
 
     /// Merge another `SessionStats` into this one.
@@ -630,6 +638,12 @@ impl SessionStats {
                         stats.cache_misses = preserved.cache_misses;
                         // tokens_removed is not used for prompt_cache, but preserve if set
                         stats.tokens_removed = preserved.tokens_removed;
+                        // Preserve real cache-read token counts recorded via
+                        // `record_cache_hit` / `sync_cache_metrics`. These are
+                        // NOT derived from per-file entries, so they must be
+                        // carried across rebuilds.
+                        stats.total_raw_tokens = preserved.total_raw_tokens;
+                        stats.savings_pct = if stats.total_raw_tokens > 0 { 100.0 } else { 0.0 };
                     }
                 } else if d == "cbm_filter" {
                     if let Some(ref preserved) = preserved_cbm_filter {

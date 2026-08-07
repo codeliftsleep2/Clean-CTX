@@ -168,6 +168,110 @@ fn handle_delta_code_context_no_baseline() {
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }
 
+// ── Cache breakpoint injection regression tests ─────────────────────
+// These tests guard against regressions in the cache breakpoint wiring
+// added during the smart-cache FAANG audit.
+
+#[test]
+fn inject_baseline_breakpoint_helper_injects_hint() {
+    use crate::mcp::tool_helpers::inject_baseline_breakpoint;
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let mut response = serde_json::json!({
+        "jsonrpc": "2.0", "id": 1,
+        "result": { "content": [{ "type": "text", "text": "compressed output" }] }
+    });
+
+    inject_baseline_breakpoint(&mut response, &state, "compressed output");
+
+    assert!(response.get("_meta").is_none(), "_meta should NOT be at response root");
+    let hints = &response["result"]["_meta"]["cache_hints"];
+    let breakpoints = hints["breakpoints"].as_array().unwrap();
+    assert_eq!(breakpoints.len(), 1);
+    assert_eq!(breakpoints[0]["region"], "baseline");
+    assert_eq!(breakpoints[0]["ttl"], "1h");
+    assert!(breakpoints[0]["breaker"].as_str().unwrap().starts_with("bl_"));
+    assert_eq!(state.cache_metrics_lock().misses, 1);
+}
+
+#[test]
+fn inject_tail_breakpoint_helper_injects_hint() {
+    use crate::mcp::tool_helpers::inject_tail_breakpoint;
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let mut response = serde_json::json!({
+        "jsonrpc": "2.0", "id": 1,
+        "result": { "content": [{ "type": "text", "text": "delta output" }] }
+    });
+
+    inject_tail_breakpoint(&mut response, &state);
+
+    assert!(response.get("_meta").is_none(), "_meta should NOT be at response root");
+    let hints = &response["result"]["_meta"]["cache_hints"];
+    let breakpoints = hints["breakpoints"].as_array().unwrap();
+    assert_eq!(breakpoints.len(), 1);
+    assert_eq!(breakpoints[0]["region"], "tail");
+    assert_eq!(breakpoints[0]["ttl"], "5m");
+    assert_eq!(breakpoints[0]["breaker"], "rolling");
+    assert_eq!(state.cache_metrics_lock().breakpoints.get("tail").unwrap(), "ephemeral");
+}
+
+#[test]
+fn inject_baseline_breakpoint_skips_when_cache_disabled() {
+    use crate::mcp::tool_helpers::inject_baseline_breakpoint;
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.cache.enabled = false;
+    let state = crate::mcp::McpState::new(config);
+    let mut response = serde_json::json!({
+        "jsonrpc": "2.0", "id": 1,
+        "result": { "content": [{ "type": "text", "text": "compressed output" }] }
+    });
+
+    inject_baseline_breakpoint(&mut response, &state, "compressed output");
+
+    assert!(response["result"].get("_meta").is_none());
+    assert_eq!(state.cache_metrics_lock().misses, 0);
+}
+
+#[test]
+fn inject_tail_breakpoint_skips_when_cache_disabled() {
+    use crate::mcp::tool_helpers::inject_tail_breakpoint;
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.cache.enabled = false;
+    let state = crate::mcp::McpState::new(config);
+    let mut response = serde_json::json!({
+        "jsonrpc": "2.0", "id": 1,
+        "result": { "content": [{ "type": "text", "text": "delta output" }] }
+    });
+
+    inject_tail_breakpoint(&mut response, &state);
+
+    assert!(response["result"].get("_meta").is_none());
+    assert_eq!(state.cache_metrics_lock().misses, 0);
+}
+
+// REGRESSION: The cached-IR fast path in `delta_code_context` must not panic.
+#[test]
+fn delta_code_context_cached_ir_path_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    dispatch_tools_call(&id, "delta_code_context", &params, &state);
+    dispatch_tools_call(&id, "delta_code_context", &params, &state);
+}
+
+// REGRESSION: The "No changes" path in `delta_text_context` must not panic.
+#[test]
+fn delta_text_context_no_changes_path_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    dispatch_tools_call(&id, "delta_text_context", &params, &state);
+    dispatch_tools_call(&id, "delta_text_context", &params, &state);
+}
+
 #[test]
 fn handle_delta_text_context_no_baseline() {
     let config = crate::config::CleanCtxConfig::default();

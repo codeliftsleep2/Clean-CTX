@@ -350,6 +350,76 @@ Anthropic API prompt cache optimization:
 }
 ```
 
+### `_meta.cache_hints` Contract
+
+When `cache.enabled` is `true`, the MCP server injects `_meta.cache_hints`
+into JSON-RPC responses. This is the **consumer contract** for LLM clients
+(Claude Desktop, Cline, custom MCP clients) that want to set Anthropic
+`cache_control` breakpoints on stable content regions.
+
+**Response shape:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "..." }],
+    "_meta": {
+      "cache_hints": {
+        "breakpoints": [
+          {
+            "region": "baseline",
+            "ttl": "1h",
+            "breaker": "bl_<sha256>"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+**Regions emitted by each tool:**
+
+| Tool | Region | Breaker | TTL |
+|------|--------|---------|-----|
+| `tools/list` | `tools` | `tools-<version>` | `tools_ttl` |
+| `prompts/list` | `system_prompt` | `vocab-<version>` | `system_prompt_ttl` |
+| `prompts/get` (cleanctx-notation) | `system_prompt` | `vocab-<version>` | `system_prompt_ttl` |
+| `prompts/get` (clean-ctx-vocabulary) | `system_prompt` | `vocab-<version>` | `system_prompt_ttl` |
+| `compress_code_context` | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |
+| `provide_code_context` (full) | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |
+| `provide_code_context` (delta) | `tail` | `rolling` | `tail_ttl` |
+| `delta_code_context` | `tail` | `rolling` | `tail_ttl` |
+| `delta_text_context` | `tail` | `rolling` | `tail_ttl` |
+| `apply_delta` | `tail` | `rolling` | `tail_ttl` |
+| `diff_code_context` | `tail` | `rolling` | `tail_ttl` |
+| `restore_context` | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |
+| `compress_workspace` | `baseline` | `ws_<sha256 of manifest>` | `baseline_ttl` |
+| `diff_commits` | `baseline` | `ws_<sha256 of manifest>` | `baseline_ttl` |
+
+**How clients should consume the hints:**
+
+1. Read `result._meta.cache_hints.breakpoints[]` from each response.
+2. For each breakpoint, set `cache_control: {"type": "ephemeral"}` on the
+   corresponding stable content block in the next Anthropic API request.
+3. The `breaker` value is the cache invalidation key — when it changes,
+   the cached content is stale and must be re-sent.
+4. The `tail` region is always `rolling` — it represents dynamic content
+   that changes each turn and should never be cached across turns.
+
+**Deduplication:** The MCP server deduplicates breakpoint emission per
+session via `state.emitted_breakpoints`. The same `{region}::{breaker}`
+combo is only emitted once — subsequent calls increment `cache_metrics.hits`
+and return a token-savings estimate instead of re-emitting.
+
+**Real cache savings:** When the Clean-CTX proxy is running with
+`AUTO_CACHE=1`, it parses Anthropic's `usage.cache_read_input_tokens` and
+`usage.cache_creation_input_tokens` from upstream responses. These REAL
+token counts are surfaced in the `context_stats` dashboard's `prompt_cache`
+domain — no fabricated estimates.
+
 ## Debug: Print Resolved Configuration
 
 To see the final resolved configuration (after all precedence rules), run:
