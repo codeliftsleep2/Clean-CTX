@@ -168,6 +168,85 @@ fn test_is_ci_environment_returns_false_when_not_in_ci() {
     }
 }
 
+#[test]
+fn proxy_config_missing_block_uses_defaults() {
+    let json = serde_json::json!({});
+    let config: CleanCtxConfig = serde_json::from_value(json).unwrap();
+    assert!(!config.proxy.auto_start);
+    assert_eq!(config.proxy.port, 8787);
+    assert_eq!(config.proxy.tail_ttl, "5m");
+    assert_eq!(config.proxy.rate_limit_rps, 60.0);
+    assert_eq!(config.proxy.rate_limit_burst, 10.0);
+}
+
+#[test]
+fn proxy_config_partial_block_uses_defaults() {
+    let json = serde_json::json!({
+        "proxy": { "auto_start": true }
+    });
+    let config: CleanCtxConfig = serde_json::from_value(json).unwrap();
+    assert!(config.proxy.auto_start);
+    // Missing fields fall back to defaults.
+    assert_eq!(config.proxy.port, 8787);
+    assert!(!config.proxy.auto_cache);
+    assert_eq!(config.proxy.tail_ttl, "5m");
+    assert!(config.proxy.drop_tools.is_empty());
+    assert!(!config.proxy.strip_ansi);
+    assert!(!config.proxy.trim_bash_git);
+    assert!(config.proxy.model_override.is_none());
+    assert!(!config.proxy.scrub_secrets);
+    assert!(!config.proxy.tool_filters);
+    assert!(config.proxy.upstream_url.is_none());
+    assert!(config.proxy.api_key.is_none());
+    assert_eq!(config.proxy.rate_limit_rps, 60.0);
+    assert_eq!(config.proxy.rate_limit_burst, 10.0);
+}
+
+// ── Proxy auto-start config tests ─────────────────────────────────
+
+#[test]
+fn proxy_auto_start_defaults_false() {
+    let config = CleanCtxConfig::default();
+    assert!(!config.proxy.auto_start);
+}
+
+#[test]
+fn proxy_config_parses_all_fields() {
+    let json = serde_json::json!({
+        "proxy": {
+            "auto_start": true,
+            "port": 9999,
+            "auto_cache": true,
+            "tail_ttl": "10m",
+            "drop_tools": ["NotebookEdit", "CronCreate"],
+            "strip_ansi": true,
+            "trim_bash_git": true,
+            "model_override": "claude-opus-4-6",
+            "scrub_secrets": true,
+            "tool_filters": true,
+            "upstream_url": "http://127.0.0.1:4141",
+            "api_key": "secret-key",
+            "rate_limit_rps": 30.0,
+            "rate_limit_burst": 5.0
+        }
+    });
+    let config: CleanCtxConfig = serde_json::from_value(json).unwrap();
+    assert!(config.proxy.auto_start);
+    assert_eq!(config.proxy.port, 9999);
+    assert!(config.proxy.auto_cache);
+    assert_eq!(config.proxy.tail_ttl, "10m");
+    assert_eq!(config.proxy.drop_tools, vec!["NotebookEdit", "CronCreate"]);
+    assert!(config.proxy.strip_ansi);
+    assert!(config.proxy.trim_bash_git);
+    assert_eq!(config.proxy.model_override.as_deref(), Some("claude-opus-4-6"));
+    assert!(config.proxy.scrub_secrets);
+    assert!(config.proxy.tool_filters);
+    assert_eq!(config.proxy.upstream_url.as_deref(), Some("http://127.0.0.1:4141"));
+    assert_eq!(config.proxy.api_key.as_deref(), Some("secret-key"));
+    assert_eq!(config.proxy.rate_limit_rps, 30.0);
+    assert_eq!(config.proxy.rate_limit_burst, 5.0);
+}
+
 #[serial]
 #[test]
 fn test_ci_detection_integration() {
@@ -206,4 +285,40 @@ fn test_ci_detection_integration() {
             }
         }
     }
+}
+
+#[test]
+fn proxy_config_serializes_roundtrip() {
+    let mut config = CleanCtxConfig::default();
+    config.proxy.auto_start = true;
+    config.proxy.port = 9999;
+    config.proxy.auto_cache = true;
+    config.proxy.tail_ttl = "10m".to_string();
+    config.proxy.drop_tools = vec!["NotebookEdit".to_string()];
+    config.proxy.strip_ansi = true;
+    config.proxy.trim_bash_git = true;
+    config.proxy.model_override = Some("claude-opus-4-6".to_string());
+    config.proxy.scrub_secrets = true;
+    config.proxy.tool_filters = true;
+    config.proxy.upstream_url = Some("http://127.0.0.1:4141".to_string());
+    config.proxy.api_key = Some("secret-key".to_string());
+    config.proxy.rate_limit_rps = 30.0;
+    config.proxy.rate_limit_burst = 5.0;
+
+    let json = serde_json::to_string(&config).unwrap();
+    let roundtrip: CleanCtxConfig = serde_json::from_str(&json).unwrap();
+    assert!(roundtrip.proxy.auto_start);
+    assert_eq!(roundtrip.proxy.port, 9999);
+    assert!(roundtrip.proxy.auto_cache);
+    assert_eq!(roundtrip.proxy.tail_ttl, "10m");
+    assert_eq!(roundtrip.proxy.drop_tools, vec!["NotebookEdit"]);
+    assert!(roundtrip.proxy.strip_ansi);
+    assert!(roundtrip.proxy.trim_bash_git);
+    assert_eq!(roundtrip.proxy.model_override.as_deref(), Some("claude-opus-4-6"));
+    assert!(roundtrip.proxy.scrub_secrets);
+    assert!(roundtrip.proxy.tool_filters);
+    assert_eq!(roundtrip.proxy.upstream_url.as_deref(), Some("http://127.0.0.1:4141"));
+    assert_eq!(roundtrip.proxy.api_key.as_deref(), Some("secret-key"));
+    assert_eq!(roundtrip.proxy.rate_limit_rps, 30.0);
+    assert_eq!(roundtrip.proxy.rate_limit_burst, 5.0);
 }

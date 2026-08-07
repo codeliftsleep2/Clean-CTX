@@ -110,3 +110,17 @@ fn cli_config_dump_subcommand_parses() {
     let cli = Cli::try_parse_from(["clean-ctx", "--config-dump"]).unwrap();
     assert!(matches!(cli, Cli::ConfigDump));
 }
+
+/// The `proxy` subcommand must parse correctly.
+#[test]
+fn cli_proxy_subcommand_parses() {
+    let cli = Cli::try_parse_from(["clean-ctx", "proxy"]).unwrap();
+    assert!(matches!(cli, Cli::Proxy { stop: false }));
+}
+
+/// The `proxy --stop` subcommand must parse correctly.
+#[test]
+fn cli_proxy_stop_flag_parses() {
+    let cli = Cli::try_parse_from(["clean-ctx", "proxy", "--stop"]).unwrap();
+    assert!(matches!(cli, Cli::Proxy { stop: true }));
+}

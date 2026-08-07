@@ -44,6 +44,7 @@ pub mod error;
 pub mod tokenizer;
 pub mod observability;
 pub mod gitdiff;
+pub mod proxy_spawner;
 
 // Integration tests module
 #[cfg(test)]
