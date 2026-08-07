@@ -229,6 +229,13 @@ pub struct McpState {
     /// was successfully spawned; `None` otherwise. Terminated in
     /// `shutdown_proxy` when the MCP server exits.
     pub proxy_child: Mutex<Option<std::process::Child>>,
+
+    /// Cache configuration reported by the proxy's `GET /cache/state`
+    /// endpoint (Phase 5 cache-hint transport). `None` when the proxy
+    /// is not running or the endpoint is unavailable. Populated at MCP
+    /// server startup; used to align the MCP-side `_meta.cache_hints`
+    /// breakers with the proxy's actual injection behavior.
+    pub proxy_cache: Option<crate::proxy_spawner::ProxyCacheStateInfo>,
 }
 
 impl McpState {
@@ -303,6 +310,7 @@ impl McpState {
             registry: LayerRegistry::new(),
             metrics_registry: std::sync::Arc::new(crate::observability::MetricsRegistry::new()),
             proxy_child: Mutex::new(None),
+            proxy_cache: None,
         }
     }
 
@@ -439,6 +447,11 @@ impl McpState {
     /// Lock the cache metrics for writing.
     pub fn cache_metrics_lock(&self) -> std::sync::MutexGuard<'_, CacheMetrics> {
         lock_or_recover!(self.cache_metrics.lock(), "cache_metrics")
+    }
+
+    /// Lock the auto-started proxy child handle for mutation.
+    pub fn proxy_child_lock(&self) -> std::sync::MutexGuard<'_, Option<std::process::Child>> {
+        lock_or_recover!(self.proxy_child.lock(), "proxy_child")
     }
 
     /// Get or create a path alias (thread-safe convenience method).

@@ -130,23 +130,82 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // thrown away; tool handlers consult it via `state.config`.
     let project_root = find_project_root();
     eprintln!("[clean-ctx] Project root: {}", project_root.display());
+
+    // Phase 3: If CLEAN_CTX_PROJECT_ROOT is set, log it prominently so
+    // the user always sees which root won. This makes the override
+    // explicit rather than a silent footgun.
+    if let Ok(root) = std::env::var("CLEAN_CTX_PROJECT_ROOT") {
+        eprintln!("[clean-ctx] Using CLEAN_CTX_PROJECT_ROOT override: {}", root);
+    }
+
     let config = CleanCtxConfig::load(project_root);
-    let state = McpState::new(config.clone());
+    let mut state = McpState::new(config.clone());
 
     // Auto-start the proxy if enabled in config. Non-fatal: if the
     // proxy binary is missing or fails to spawn, the MCP server
     // continues without it (logged above).
+    //
+    // Phase 4b: The proxy's working directory is the config file's
+    // directory (not the project root). This ensures `filters/` and
+    // `log_dir` resolve consistently regardless of which repo window
+    // is open — critical for workspace-mode setups where the project
+    // root may be a single repo but the config lives at the workspace
+    // root.
     if config.proxy.auto_start {
-        match crate::proxy_spawner::spawn_proxy(&config.proxy, project_root, false) {
+        let proxy_cwd = CleanCtxConfig::find_config(project_root)
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+            .unwrap_or_else(|| project_root.clone());
+        match crate::proxy_spawner::spawn_proxy(&config.proxy, &proxy_cwd, false) {
             Ok(Some(child)) => {
-                *state.proxy_child.lock().unwrap_or_else(|p| p.into_inner()) = Some(child);
+                *state.proxy_child_lock() = Some(child);
             }
             Ok(None) => {
-                // auto_start disabled or binary not found — already logged.
+                // auto_start disabled, binary not found, or proxy already
+                // running (adopted) — already logged.
             }
             Err(e) => {
                 eprintln!("[clean-ctx] WARNING: {e}");
             }
+        }
+
+        // Phase 5 (cache-hint transport): query the proxy's cache
+        // configuration so the MCP server can align its `_meta.cache_hints`
+        // breakers with the proxy's actual injection behavior. Non-fatal —
+        // if the proxy isn't reachable, we simply skip the alignment.
+        if let Some(cache_state) = crate::proxy_spawner::query_proxy_cache_state(config.proxy.port) {
+            state.proxy_cache = Some(cache_state.clone());
+            eprintln!(
+                "[clean-ctx] Proxy cache state: auto_cache={} tail_ttl={}",
+                cache_state.auto_cache, cache_state.tail_ttl
+            );
+        }
+
+        // Crash monitor: if the auto-started proxy dies mid-session
+        // (crash, OOM, external kill), log a prominent warning so the
+        // operator knows the proxy is no longer intercepting requests.
+        // We poll the port rather than the child handle — `Child` cannot
+        // be cloned across threads, and port polling detects the proxy
+        // being down regardless of how it died. The monitor thread is
+        // detached; it exits when the port stops listening.
+        if state.proxy_child_lock().is_some() {
+            let monitor_port = config.proxy.port;
+            std::thread::Builder::new()
+                .name("proxy-crash-monitor".into())
+                .spawn(move || {
+                    // Give the proxy a moment to finish binding before we
+                    // start watching (the spawner already verified it, but
+                    // a slow disk/AV could still be mid-startup).
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    if !crate::proxy_spawner::port_in_use(monitor_port) {
+                        eprintln!(
+                            "[clean-ctx] WARNING: Auto-started proxy on port {} is no longer \
+                             listening. The proxy is not intercepting requests. Restart \
+                             Clean-CTX to relaunch it.",
+                            monitor_port
+                        );
+                    }
+                })
+                .ok();
         }
     }
 
@@ -230,9 +289,7 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("[clean-ctx] Stdin exhausted, waiting for pending work...");
 
     // Terminate the auto-started proxy child (if any).
-    if let Some(ref mut child) =
-        *dispatcher.state().proxy_child.lock().unwrap_or_else(|p| p.into_inner())
-    {
+    if let Some(ref mut child) = *dispatcher.state().proxy_child_lock() {
         crate::proxy_spawner::shutdown_proxy(child);
         eprintln!("[clean-ctx] Proxy stopped.");
     }

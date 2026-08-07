@@ -524,6 +524,12 @@ pub struct ProxyAutoStartConfig {
     /// Default: 10.
     #[serde(default = "default_proxy_rate_limit_burst")]
     pub rate_limit_burst: f64,
+    /// Startup grace period in milliseconds before the spawner declares
+    /// a freshly-spawned proxy dead. Slow disks or antivirus scanners can
+    /// delay binary startup past the default 300ms; raise this if you see
+    /// spurious "exited shortly after start" warnings. Default: 300.
+    #[serde(default = "default_proxy_start_grace_ms")]
+    pub start_grace_ms: u64,
 }
 
 impl Default for ProxyAutoStartConfig {
@@ -543,6 +549,7 @@ impl Default for ProxyAutoStartConfig {
             api_key: None,
             rate_limit_rps: default_proxy_rate_limit_rps(),
             rate_limit_burst: default_proxy_rate_limit_burst(),
+            start_grace_ms: default_proxy_start_grace_ms(),
         }
     }
 }
@@ -551,6 +558,7 @@ fn default_proxy_port() -> u16 { 8787 }
 fn default_proxy_tail_ttl() -> String { "5m".to_string() }
 fn default_proxy_rate_limit_rps() -> f64 { 60.0 }
 fn default_proxy_rate_limit_burst() -> f64 { 10.0 }
+fn default_proxy_start_grace_ms() -> u64 { 300 }
 
 /// Per-framework Meta-Layer configuration.
 ///

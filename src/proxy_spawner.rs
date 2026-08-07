@@ -9,6 +9,7 @@
 // variables (see `proxy/src/config.rs`), so the proxy itself needs
 // zero changes to honor them.
 
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
@@ -138,12 +139,25 @@ pub fn build_proxy_env(config: &ProxyAutoStartConfig) -> Vec<(String, String)> {
     env
 }
 
+/// Check whether something is already listening on the given port.
+///
+/// Attempts a TCP connect to `127.0.0.1:{port}` with a short timeout.
+/// Returns `true` if the connect succeeds (a proxy — or any other
+/// process — is already bound to the port).
+pub fn port_in_use(port: u16) -> bool {
+    // The format string is always a valid socket address, so the parse
+    // cannot fail; unwrap is safe here.
+    let addr: std::net::SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
+    TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok()
+}
+
 /// Spawn the proxy child process.
 ///
 /// Returns `Ok(Some(child))` on success, `Ok(None)` if auto-start is
-/// disabled (unless `force` is set) or the binary could not be found
-/// (non-fatal — the MCP server continues without the proxy), and `Err`
-/// only on a genuine spawn failure.
+/// disabled (unless `force` is set), the binary could not be found, or
+/// a proxy is **already running** on the configured port (adopted, not
+/// duplicated — non-fatal, the MCP server continues), and `Err` only
+/// on a genuine spawn failure.
 ///
 /// `force` bypasses the `auto_start` gate. The MCP server passes
 /// `false` (it already gates on `config.proxy.auto_start`); the
@@ -155,6 +169,19 @@ pub fn spawn_proxy(
     force: bool,
 ) -> Result<Option<Child>, String> {
     if !config.auto_start && !force {
+        return Ok(None);
+    }
+
+    // Port-ownership detection: if something is already listening on the
+    // configured port, adopt it instead of spawning a duplicate. This
+    // prevents a second Clean-CTX instance (or a standalone proxy) from
+    // being clobbered, and ensures shutdown does NOT kill a proxy owned
+    // by another process (we return Ok(None) → no child to manage).
+    if port_in_use(config.port) {
+        eprintln!(
+            "[clean-ctx] Proxy already running on port {} — adopting existing instance.",
+            config.port
+        );
         return Ok(None);
     }
 
@@ -183,12 +210,14 @@ pub fn spawn_proxy(
 
     match cmd.spawn() {
         Ok(mut child) => {
-            // Fast-fail detection: a child that exits within the first
-            // 300 ms almost certainly failed to bind the port (already in
-            // use) or failed config validation (e.g. self-forwarding
-            // loop). Return `Ok(None)` so the caller treats it as "proxy
+            // Fast-fail detection: a child that exits within the grace
+            // period (configurable via `start_grace_ms`, default 300ms)
+            // almost certainly failed to bind the port (already in use)
+            // or failed config validation (e.g. self-forwarding loop).
+            // Return `Ok(None)` so the caller treats it as "proxy
             // unavailable" instead of storing a dead child handle.
-            std::thread::sleep(Duration::from_millis(300));
+            let grace = Duration::from_millis(config.start_grace_ms);
+            std::thread::sleep(grace);
             if let Ok(Some(status)) = child.try_wait() {
                 let _ = child.wait();
                 eprintln!(
@@ -199,6 +228,25 @@ pub fn spawn_proxy(
                     config.port
                 );
                 return Ok(None);
+            }
+
+            // Liveness probe: even if the child hasn't exited, verify the
+            // port is actually listening before declaring success. This
+            // catches the case where the proxy is still starting up (slow
+            // disk/AV) but hasn't bound yet — we give it a short extra
+            // window rather than declaring it dead.
+            if !port_in_use(config.port) {
+                // Give it one more grace period to bind.
+                std::thread::sleep(grace);
+                if let Ok(Some(status)) = child.try_wait() {
+                    let _ = child.wait();
+                    eprintln!(
+                        "[clean-ctx] WARNING: clean-ctx-proxy exited during startup ({}). \
+                         Continuing without the proxy.",
+                        status
+                    );
+                    return Ok(None);
+                }
             }
 
             eprintln!(
@@ -275,6 +323,54 @@ pub fn proxy_child_exited(child: &mut Child) -> bool {
         Ok(None) => false,
         Err(_) => false,
     }
+}
+
+/// Cache configuration reported by the proxy's `GET /cache/state` endpoint.
+///
+/// Phase 5 (cache-hint transport): bridges the MCP-side `_meta.cache_hints`
+/// system and the proxy-side HTTP `cache_control` injection. The MCP server
+/// stores this in `McpState.proxy_cache` and uses it to align its own
+/// breakers with the proxy's actual injection behavior.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ProxyCacheStateInfo {
+    /// Whether the proxy is injecting breakpoints into /v1/messages bodies.
+    #[serde(default)]
+    pub auto_cache: bool,
+    /// TTL used for the proxy's rolling-tail breakpoint.
+    #[serde(default)]
+    pub tail_ttl: String,
+    /// Requests where client-sent breakpoints were preserved (injection skipped).
+    #[serde(default)]
+    pub client_breakpoints_preserved: u64,
+    /// Requests where client-sent breakpoints were stripped.
+    #[serde(default)]
+    pub client_breakpoints_stripped: u64,
+    /// Requests where breakpoints were injected.
+    #[serde(default)]
+    pub total_injected: u64,
+}
+
+/// Query the proxy's cache configuration via `GET /cache/state`.
+///
+/// Bridges the MCP-side `_meta.cache_hints` system and the proxy-side HTTP
+/// `cache_control` injection. Returns the proxy's `auto_cache`, `tail_ttl`,
+/// and breakpoint-preservation stats so the MCP server can align its own
+/// breakers with the proxy's behavior.
+///
+/// A short 2-second global timeout is applied because this runs at MCP server
+/// startup — a proxy that accepts TCP but hangs on HTTP must not block server
+/// startup indefinitely.
+///
+/// Returns `None` if the proxy is not reachable (not running, or the
+/// endpoint is unavailable) — non-fatal, the MCP server continues.
+pub fn query_proxy_cache_state(port: u16) -> Option<ProxyCacheStateInfo> {
+    let url = format!("http://127.0.0.1:{port}/cache/state");
+    let agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(2)))
+        .build()
+        .new_agent();
+    let resp = agent.get(&url).call().ok()?;
+    resp.into_body().read_json::<ProxyCacheStateInfo>().ok()
 }
 
 #[cfg(test)]

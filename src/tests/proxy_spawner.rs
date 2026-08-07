@@ -3,7 +3,10 @@
 // Unit tests for the proxy auto-start spawner.
 
 use crate::config::ProxyAutoStartConfig;
-use crate::proxy_spawner::{build_proxy_env, resolve_proxy_binary, spawn_proxy, proxy_child_exited};
+use crate::proxy_spawner::{
+    build_proxy_env, resolve_proxy_binary, spawn_proxy, proxy_child_exited,
+    ProxyCacheStateInfo,
+};
 
 fn test_config() -> ProxyAutoStartConfig {
     ProxyAutoStartConfig::default()
@@ -175,6 +178,134 @@ fn resolve_proxy_binary_returns_none_when_not_found() {
     // We can't guarantee the binary isn't on PATH, but we can at least
     // verify the function doesn't panic and returns an Option.
     let _ = resolve_proxy_binary();
+}
+
+// ── ProxyCacheStateInfo serde round-trip ──────────────────────────
+
+#[test]
+fn proxy_cache_state_info_serde_roundtrip() {
+    let info = ProxyCacheStateInfo {
+        auto_cache: true,
+        tail_ttl: "10m".to_string(),
+        client_breakpoints_preserved: 3,
+        client_breakpoints_stripped: 1,
+        total_injected: 7,
+    };
+    let json = serde_json::to_string(&info).unwrap();
+    let deserialized: ProxyCacheStateInfo = serde_json::from_str(&json).unwrap();
+    assert!(deserialized.auto_cache);
+    assert_eq!(deserialized.tail_ttl, "10m");
+    assert_eq!(deserialized.client_breakpoints_preserved, 3);
+    assert_eq!(deserialized.client_breakpoints_stripped, 1);
+    assert_eq!(deserialized.total_injected, 7);
+}
+
+#[test]
+fn proxy_cache_state_info_defaults() {
+    // Missing fields in the proxy response must deserialize to defaults
+    // (the proxy may add fields in future versions).
+    let json = r#"{"auto_cache": false}"#;
+    let info: ProxyCacheStateInfo = serde_json::from_str(json).unwrap();
+    assert!(!info.auto_cache);
+    assert_eq!(info.tail_ttl, "");
+    assert_eq!(info.client_breakpoints_preserved, 0);
+    assert_eq!(info.client_breakpoints_stripped, 0);
+    assert_eq!(info.total_injected, 0);
+}
+
+// ── Regression: query_proxy_cache_state must not block startup ────
+//
+// Fix 1 (FAANG audit): the original implementation used
+// `ureq::get(&url).call()` with no timeout. A proxy that accepted TCP
+// but hung on HTTP would block MCP server startup indefinitely. The
+// fix added a 2-second global timeout. These tests guard against a
+// regression to the unbounded call.
+
+#[test]
+fn query_proxy_cache_state_returns_none_when_unreachable() {
+    // Nothing listening on an ephemeral port — must return None quickly
+    // (non-blocking), never panic.
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener); // release the port so nothing is listening
+
+    let start = std::time::Instant::now();
+    let result = crate::proxy_spawner::query_proxy_cache_state(port);
+    let elapsed = start.elapsed();
+
+    assert!(result.is_none(), "unreachable proxy must yield None");
+    assert!(
+        elapsed < std::time::Duration::from_secs(5),
+        "unreachable proxy query took {:?} — must fail fast, not block",
+        elapsed
+    );
+}
+
+#[test]
+fn query_proxy_cache_state_times_out_on_hanging_server() {
+    // A server that accepts the TCP connection but never responds must
+    // not block the caller past the 2s timeout. This is the exact
+    // regression the fix addressed.
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    // Accept the connection on a background thread and hold it open
+    // without ever writing a response.
+    let handle = std::thread::spawn(move || {
+        let (_stream, _) = listener.accept().unwrap();
+        // Hold the stream open indefinitely (no response written).
+        std::thread::sleep(std::time::Duration::from_secs(10));
+    });
+
+    let start = std::time::Instant::now();
+    let result = crate::proxy_spawner::query_proxy_cache_state(port);
+    let elapsed = start.elapsed();
+
+    // Must return None (timeout) and must not block past ~2s + margin.
+    assert!(result.is_none(), "hanging server must yield None (timeout)");
+    assert!(
+        elapsed < std::time::Duration::from_secs(5),
+        "hanging server blocked for {:?} — timeout not applied",
+        elapsed
+    );
+
+    // Clean up the background thread.
+    drop(handle);
+}
+
+// ── Regression: port_in_use (crash-monitor primitive) ─────────────
+//
+// Fix 2 (FAANG audit): the crash monitor polls `port_in_use` to detect
+// a dead proxy. This test guards the primitive it relies on.
+
+#[test]
+fn port_in_use_detects_listening_and_closed() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    // Listening → true.
+    assert!(crate::proxy_spawner::port_in_use(port));
+
+    // Released → false.
+    drop(listener);
+    // Small delay so the OS fully releases the port.
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    assert!(!crate::proxy_spawner::port_in_use(port));
+}
+
+// ── Regression: proxy_cache state is persisted on McpState ────────
+//
+// Fix 3 (FAANG audit): the Phase 5 cache state was fetched and logged
+// but never stored, so the "alignment" was cosmetic. This guards the
+// field that now persists it.
+
+#[test]
+fn mcp_state_proxy_cache_defaults_none() {
+    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    assert!(
+        state.proxy_cache.is_none(),
+        "proxy_cache must default to None (no proxy queried yet)"
+    );
 }
 
 // ── proxy_child_exited tests ──────────────────────────────────────

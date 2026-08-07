@@ -280,6 +280,15 @@ async fn handle_request(
         return Ok(handle_stats_endpoint(state).await);
     }
 
+    // ── GET /cache/state: return proxy cache configuration as JSON ──
+    // Phase 5 (cache-hint transport): exposes the proxy's current
+    // breakpoint configuration so the MCP server can align its
+    // `_meta.cache_hints` breakers with the proxy's actual injection
+    // behavior. This bridges the two independent cache systems.
+    if path == "/cache/state" && method == Method::GET {
+        return Ok(handle_cache_state_endpoint(state).await);
+    }
+
     // Detect platform from path to determine intercept endpoint
     // Use exact path matching to avoid intercepting non-API endpoints
     let should_intercept = method == Method::POST && (
@@ -613,6 +622,32 @@ async fn handle_stats_endpoint(state: SharedState) -> Response<Full<BytesType>> 
         .status(StatusCode::OK)
         .header("content-type", "application/json")
         .body(Full::new(BytesType::from(body)))
+        .unwrap()
+}
+
+/// Handle `GET /cache/state` — return the proxy's cache breakpoint
+/// configuration as JSON. This is the Phase 5 cache-hint transport
+/// endpoint: the MCP server queries it at startup to learn whether
+/// the proxy is injecting breakpoints (auto_cache), what TTL it uses
+/// for the rolling tail, and whether client-sent breakpoints are
+/// preserved or stripped. The MCP server can then align its own
+/// `_meta.cache_hints` breakers with the proxy's behavior.
+async fn handle_cache_state_endpoint(state: SharedState) -> Response<Full<BytesType>> {
+    let guard = state.read().await;
+    let body = serde_json::json!({
+        "auto_cache": guard.config.auto_cache,
+        "tail_ttl": guard.config.tail_ttl,
+        "client_breakpoints_preserved": guard.cache_stats.client_breakpoints_preserved,
+        "client_breakpoints_stripped": guard.cache_stats.client_breakpoints_stripped,
+        "total_injected": guard.cache_stats.total_injected,
+        "port": guard.config.port,
+    });
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/json")
+        .body(Full::new(BytesType::from(
+            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string())
+        )))
         .unwrap()
 }
 

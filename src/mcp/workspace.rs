@@ -174,19 +174,31 @@ pub(crate) fn compress_workspace_dir(
     ).entered();
     let overall_start = std::time::Instant::now();
 
+    // Phase 4: Resolve relative `dir_path` against the caller's CWD, not
+    // the process-global project root. This enables cross-repo workspace
+    // compression in workspace-mode setups (e.g. `fe/src` from a parent
+    // `Outcomes/` workspace root). Absolute paths pass through unchanged.
+    let resolved_dir = if Path::new(dir_path).is_absolute() {
+        dir_path.to_string()
+    } else {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(dir_path).to_string_lossy().into_owned())
+            .unwrap_or_else(|_| dir_path.to_string())
+    };
+
     // F-22: Check workspace result cache before doing any work.
     // We collect entries first to compute the cache key, but if we get
     // a cache hit, we skip the entire compression pipeline.
     let mut all_entries: Vec<String> = Vec::new();
-    collect_source_files(dir_path, &mut all_entries);
+    collect_source_files(&resolved_dir, &mut all_entries);
     let file_count = all_entries.len();
-    let cache_hash = WorkspaceCache::compute_hash(dir_path, &fidelity, &all_entries);
+    let cache_hash = WorkspaceCache::compute_hash(&resolved_dir, &fidelity, &all_entries);
     
     if let Ok(guard) = WORKSPACE_CACHE.lock() {
         if let Some(ref cache) = *guard {
             if let Some(cached) = cache.get(cache_hash) {
                 #[cfg(debug_assertions)]
-                eprintln!("[compress_workspace_dir] Cache HIT for {} ({} files)", dir_path, all_entries.len());
+                eprintln!("[compress_workspace_dir] Cache HIT for {} ({} files)", resolved_dir, all_entries.len());
                 tracing::info!(file_count = file_count, cached = true, "compress_workspace cache hit");
                 return Ok(cached.clone());
             }
@@ -194,9 +206,9 @@ pub(crate) fn compress_workspace_dir(
     }
 
     #[cfg(debug_assertions)]
-    eprintln!("[compress_workspace_dir] Cache MISS for {} ({} files)", dir_path, all_entries.len());
+    eprintln!("[compress_workspace_dir] Cache MISS for {} ({} files)", resolved_dir, all_entries.len());
 
-    let mut manifest = format_manifest_header(dir_path, fidelity, state);
+    let mut manifest = format_manifest_header(&resolved_dir, fidelity, state);
 
     // File collection + exclusion.
     let mut excluded: Vec<(String, Vec<String>)> = Vec::new();
