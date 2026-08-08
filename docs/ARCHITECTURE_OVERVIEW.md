@@ -1,7 +1,7 @@
 # Clean-CTX — Architecture Overview
 
-**Version:** 0.2.1-rc1
-**Last updated:** 2026-07-06 (R-43a + R-43b complete: 4 new CoreOp variants, ProgramGraph, InferenceLayer, PassPipeline, Validator, QueryEngine, Semantic Delta, 29 InferenceLayer tests, 18 round-trip tests, 47 R-43b tests)
+**Version:** 0.3.0
+**Last updated:** 2026-08-07 (R-44 complete: Angular HTML template compression, PrimeNG markers, GitDiff integration)
 
 ---
 
@@ -194,7 +194,7 @@ The zero-touch workflow is the **recommended entry point** for any file-related 
 
 ## Persistence Layer
 
-The persistence layer provides **cross-session persistence** for compression contexts via SQLite. It is enabled by setting the `CLEANCTX_PERSISTENCE_DB` environment variable.
+The persistence layer provides **cross-session persistence** for compression contexts via SQLite. It is **enabled by default** (stored in `.clean-ctx/persistence.db` relative to the project root) and can be disabled in `.clean-ctx.json` with `"persistence": { "enabled": false }`. See [`docs/CONFIGURATION.md`](CONFIGURATION.md) for the full persistence configuration reference.
 
 ```
      provide_code_context(file)
@@ -226,8 +226,8 @@ The persistence layer provides **cross-session persistence** for compression con
 
 - **Non-fatal persistence**: All DB writes are fire-and-forget with `eprintln!` warnings — compression never fails due to DB issues.
 - **Content-hash deterministic IDs**: `ctx-{sha256_hex}` ensures idempotent saves (same content → same ID → UPSERT).
-- **No Mutex**: MCP server is single-threaded (stdin/stdout loop), so no concurrent access protection needed.
-- **Lazy initialization**: DB only opens if `CLEANCTX_PERSISTENCE_DB` env var is set — zero overhead for users who don't need persistence.
+- **Thread-safe state**: `McpState` is wrapped in `RwLock` for the A-09 multi-threaded dispatcher — parallel reads, serial writes.
+- **Lazy initialization**: DB only opens when persistence is enabled — zero overhead for users who don't need persistence.
 - **`binary_wire::encode/decode`**: IR is serialized/deserialized as BLOBs; `file_id` and `version` are restored from DB columns on load.
 
 ### Tools
@@ -765,7 +765,7 @@ These are embedded in the `Φtpl:` marker line (`@if`, `@for`) or emit their own
 
 **Config:** `meta_layers.angular.enabled` in `.clean-ctx.json` (default: on)
 
-**Dependencies:** `tree-sitter-html = "=0.20.0"` (Phase 2+)
+**Dependencies:** `tree-sitter-html = "0.23"` (Phase 2+)
 
 ---
 
@@ -837,7 +837,7 @@ See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for full per-edit breakdown and the 
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks
-- 1,306 tests passing (unit + integration + E2E + proxy regression tests)
+- 2,141 tests passing (unit + integration + E2E + proxy regression tests)
 
 > **ℹ️ Cache System Separation:** Clean-CTX has **two independent cache systems** with different scopes and configuration paths:
 > 1. **MCP Server `CacheConfig`** (in `.clean-ctx.json`) — Controls `_meta.cache_hints` annotations in JSON-RPC responses. These annotations tell the LLM which parts of compressed output are cacheable (stable vocabulary, tool definitions, persisted baselines). Configuration is via the `cache` key in `.clean-ctx.json`.

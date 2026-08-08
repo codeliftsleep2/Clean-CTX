@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "clean-ctx"
-version = "0.2.1-rc1"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.85"
 license = "CC0-1.0"

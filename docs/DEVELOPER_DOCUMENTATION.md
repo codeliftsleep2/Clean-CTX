@@ -1,7 +1,7 @@
 # Clean-CTX — Developer Documentation
 
-**Version:** 0.1.6
-**Last updated:** 2026-06-10
+**Version:** 0.3.0
+**Last updated:** 2026-08-07
 
 ---
 
@@ -42,8 +42,8 @@ cargo build --release
 # Build with only specific languages (smaller binary, faster compile)
 cargo build --release --no-default-features --features typescript,angular
 
-# Build with .NET meta-layer (not in defaults)
-cargo build --release --features dotnet
+# Build with .NET meta-layer (in defaults)
+cargo build --release
 
 # Run tests with all features
 cargo test --all-features
@@ -60,11 +60,11 @@ The binary uses Cargo feature flags to select which languages and meta-layers to
 |---------|---------|---------|----------|
 | `typescript` | — | ✅ | Base TypeScript/JavaScript tree-sitter grammar |
 | `csharp` | — | ✅ | Base C# tree-sitter grammar |
-| `rust` | — | ✅ | Base Rust tree-sitter grammar |
-| `java` | — | ✅ | Base Java tree-sitter grammar |
+| `rust` | — | ❌ | Base Rust tree-sitter grammar |
+| `java` | — | ❌ | Base Java tree-sitter grammar |
 | `angular` | `typescript` | ✅ | Components, Services, DI, Pipes, Directives, Modules, Input/Output, Template/Shape extraction, Style extraction, NgRx, RxJS, Signals, PrimeNG, Bundle graph |
-| `spring_boot` | `java` | ✅ | RestController, Controller, Service, Repository, Configuration, RequestMapping, Autowired, Value, Bean, ConfigurationProperties, Cross-file graph |
-| `dotnet` | `csharp` | ❌ | ASP.NET Core (Controllers, Actions, Routes, Auth), EF Core (DbContext, DbSet, Entities), SignalR (Hubs, Clients, Streaming), AutoMapper (Profiles, Mappings), JSON Serialization, DI, Validation, Identity, Caching, Logging, Cross-file graph |
+| `spring_boot` | `java` | ❌ | RestController, Controller, Service, Repository, Configuration, RequestMapping, Autowired, Value, Bean, ConfigurationProperties, Cross-file graph |
+| `dotnet` | `csharp` | ✅ | ASP.NET Core (Controllers, Actions, Routes, Auth), EF Core (DbContext, DbSet, Entities), SignalR (Hubs, Clients, Streaming), AutoMapper (Profiles, Mappings), JSON Serialization, DI, Validation, Identity, Caching, Logging, Cross-file graph |
 
 **Prerequisites:**
 - Rust 1.85+ (edition 2024)
@@ -370,7 +370,7 @@ In `Cargo.toml`, add the new feature flag and grammar:
 python = ["dep:tree-sitter-python"]  # NEW: language feature
 
 [dependencies]
-# SAFETY: Must match tree-sitter 0.20.x ABI.
+# SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
 tree-sitter-python = { version = "0.23", optional = true }  # NEW
 ```
 
@@ -715,42 +715,23 @@ See [`docs/ANGULAR_META_LAYER.md`](ANGULAR_META_LAYER.md) for the reference impl
 
 ## Configuration System
 
-The `CleanCtxConfig` struct (in `src/config.rs`) is loaded from `.clean-ctx.json` at the project root:
+The `CleanCtxConfig` struct (in `src/config.rs`) is loaded from `.clean-ctx.json` at the project root. The **complete configuration reference** — including the full `.clean-ctx.json` schema, precedence rules, environment variables, resource limits, persistence, heuristics, meta-layers, intelligence layer, type aliases, cache, and proxy lifecycle — is documented in **[`docs/CONFIGURATION.md`](CONFIGURATION.md)**, which is the single source of truth for configuration.
 
-```json
-{
-    "exclude_patterns": ["dist", "node_modules", "*.spec.ts"],
-    "fidelity_overrides": {
-        ".cs": "medium",
-        ".test.ts": "high"
-    },
-    "default_fidelity": "medium",
-    "type_aliases": {
-        "UserId": "string",
-        "JsonObject": "Record<string, unknown>"
-    },
-    "custom_markers": {
-        "$custom": "Custom marker description"
-    },
-    "diff_compression": true,
-    "workspace_type_detection": true
-}
-```
-
-The config is:
-- Loaded once at server startup (cached in a `OnceLock`)
+Key facts for developers:
+- Config is loaded once at server startup (cached in a `OnceLock`)
 - Shared across all tools via `McpState.config`
 - Immutable for the session — edits require a server restart
+- Precedence: tool argument > environment variable > config file > default
 
-### Exclusion globs
+### Adding a New Config Field
 
-Exclusion patterns use a simple two-tier matcher:
+To add a new field to `.clean-ctx.json`:
 
-| Pattern Type | Example | Matching Behavior |
-|-------------|---------|-------------------|
-| Plain name | `"dist"` | Matches any path segment literally named `dist` (NOT `distribute`) |
-| Dot pattern | `".test."` | Substring match against the file name, so `".test."` matches `file.test.ts` |
-| Glob pattern | `"*.spec.ts"` | Standard `*`/`?` glob match against the file name |
+1. Add the field to the `CleanCtxConfig` struct in `src/config.rs` with a sensible default
+2. Add the serde `#[serde(default)]` attribute so old config files continue to work (backward compatible)
+3. Wire the field into the relevant subsystem (heuristics, compression, proxy, etc.)
+4. Document the field in `docs/CONFIGURATION.md` (the source of truth)
+5. Add tests in `src/tests/config.rs`
 
 ---
 
@@ -911,7 +892,7 @@ Every pull request must pass these checks:
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test`** — all 1,035 tests pass
+3. **`cargo test`** — all 2,141 tests pass
 4. **`cargo audit`** — no known security vulnerabilities
 5. **No new `#![allow(...)]`** annotations without a `// SAFETY:` or `// Phase N:` comment
 6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail

@@ -233,7 +233,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [0.1.7] — Unreleased
+## [0.1.7] — 2026-06-20
 
 ### Added
 
@@ -315,27 +315,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Workspace cache breakpoint**: `compress_workspace` now injects a baseline cache hint keyed on a SHA-256 hash of the manifest, so the entire workspace scan result is cacheable across sessions.
 - **Cache metrics in context_history**: Per-file cache breakpoint status and session hit rate now shown in `context_history` output (both single-file and all-files modes).
 - **Pluggable tokenizer for cache savings**: `inject_cache_breakpoints` now accepts an optional `&dyn Tokenizer` for accurate token savings estimates on cache hits. When a tokenizer is available, the full response JSON is tokenized; otherwise falls back to the rough `chars/4` heuristic.
-
-### Changed
-- `handle_tools_list`, `handle_prompts_list`, `handle_prompts_get` now take `&mut McpState` for cache hint injection
-- `inject_cache_breakpoints` signature extended with 6th parameter: `tokenizer: Option<&dyn Tokenizer>`
-- All persistence `save_context` calls in `handle_provide_code_context` (both FullCompress and DeltaTransport paths) now use the pluggable tokenizer for accurate token counts instead of the `estimate_tokens` chars/4 heuristic
-- `compute_workspace_breaker` no longer has `#[allow(dead_code)]` — it's wired into the `compress_workspace` handler (manifests hashed directly)
-- `handle_context_history` now emits per-file cache breakpoint status and session-level cache hit rate
-- Tokenizer parsed earlier in `handle_provide_code_context` so both persistence and cache breakpoints use real token counts
-
-### Fixed
-- All remaining `estimate_tokens()` call sites in `handle_provide_code_context` persistence blocks replaced with pluggable tokenizer counts
-
-### Test count
-- 1006/1006 tests pass
-- 0 new clippy warnings (1 pre-existing `too_many_arguments` on `queue_save_context`, 1 pre-existing `compute_workspace_breaker` dead-code suppression)
-
-## [0.1.6] — 2026-06-10
-
-### Added
-
-#### Zero-Touch Workflow
 - `src/mcp/heuristics.rs` — New heuristics engine that automatically selects optimal fidelity and compression strategy based on file characteristics, explicit intent, and existing baselines
 - `src/mcp/session_stats.rs` — Session statistics tracking with per-file metrics (raw/compressed tokens, savings %, delta count, strategy, Angular detection) and dashboard rendering (text + JSON formats)
 - `src/mcp/tools.rs` — Four new zero-touch workflow tools:
@@ -361,6 +340,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 #### FAANG Audit — Zero-Touch Workflow
 - `docs/FAANG_AUDIT_ZERO_TOUCH.md` — Complete audit of zero-touch workflow and persistence layer with 4 issues found and fixed
+
+### Changed
+- `handle_tools_list`, `handle_prompts_list`, `handle_prompts_get` now take `&mut McpState` for cache hint injection
+- `inject_cache_breakpoints` signature extended with 6th parameter: `tokenizer: Option<&dyn Tokenizer>`
+- All persistence `save_context` calls in `handle_provide_code_context` (both FullCompress and DeltaTransport paths) now use the pluggable tokenizer for accurate token counts instead of the `estimate_tokens` chars/4 heuristic
+- `compute_workspace_breaker` no longer has `#[allow(dead_code)]` — it's wired into the `compress_workspace` handler (manifests hashed directly)
+- `handle_context_history` now emits per-file cache breakpoint status and session-level cache hit rate
+- Tokenizer parsed earlier in `handle_provide_code_context` so both persistence and cache breakpoints use real token counts
 
 ### Fixed
 
@@ -606,8 +593,11 @@ This project follows [Semantic Versioning](https://semver.org/). Major version z
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.3.0 | 2026-08-07 | **Angular HTML Template Compression (R-44).** Fidelity-gated `.component.html` compression, PrimeNG markers, GitDiff integration, `angular_template` dashboard domain — 2,141 tests, 0 clippy warnings |
+| 0.3.0 | 2026-08-04 | **IR Evolution (R-43a + R-43b).** Execution semantics, program graph, inference layer, pass pipeline, validation, query, semantic delta intent |
+| 0.2.1-rc2 | 2026-07-03 | **Meta-Layer expansion.** .NET/C# meta-layer, Dual Meta-Layer analysis, A-08 sliding window proxy, P1-9 feature-gate hardening — 1,489 tests, 0 clippy warnings |
 | 0.2.1-rc1 | 2026-06-30 | **Foundation complete.** A-09 through A-15, F-19 through F-22 — 1,512 tests, 0 clippy warnings |
-| 0.1.7 | Unreleased | Prompt cache optimization — 1006 tests, 0 clippy warnings |
+| 0.1.7 | 2026-06-20 | Multi-platform proxy, tool output filtering (R-38), secret scrubbing (R-37), pluggable tokenizers (R-19), Java/Rust language layers (R-01d/R-01c) |
 | 0.1.6 | 2026-06-10 | Zero-touch workflow + SQLite persistence + XHTML fix + inline template — 798 tests, 0 clippy warnings |
 | 0.1.5 | 2026-06-08 | FAANG Audit Compiler IR Phase E (F-30 through F-47) — 318 tests, 0 clippy warnings |
 | 0.1.4 | 2026-06-08 | Tracks C+D: Phi marker centralisation + god-function split — 301 tests, 0 clippy warnings |

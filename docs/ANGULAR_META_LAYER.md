@@ -1,6 +1,6 @@
 # Angular Meta-Layer Plan
 
-> **Status:** 🚧 Phase 1 ✅ · Phase 2 ✅ · Phase 2.5 ✅ · Phase 3 ✅ · **Last updated:** 2026-06-07
+> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 2.5 ✅ · Phase 3 ✅ · Phase 4 ✅ · **Last updated:** 2026-08-07
 >
 
 ---
@@ -204,7 +204,7 @@ You will know Phase 2 is complete when **all** of the following are true:
 | `§ΦMAP` footer lists bundles | ✅ | `footer.rs` + `footer::tests` (8 tests) |
 | All 229 tests pass | ✅ | `cargo test` |
 | `cargo clippy` clean | ✅ | `cargo clippy --all-targets -- -D warnings` |
-| `tree-sitter-html` is only new dep | ✅ | `Cargo.toml` pinned at `=0.20.0` |
+| `tree-sitter-html` is only new dep | ✅ | `Cargo.toml` — `tree-sitter-html = "0.23"` |
 | Zero overhead for non-Angular files | ✅ | `is_angular_file()` gates all Phase 2 logic |
 
 **Bugs found and fixed during Phase 2 implementation:**
@@ -440,7 +440,7 @@ You will know Phase 3 is complete when **all** of the following are true:
 
 ---
 
-## Phase 4 — Fidelity-Gated HTML Template Compression (Proposed)
+## Phase 4 — Fidelity-Gated HTML Template Compression (Implemented)
 
 ### Goal
 
@@ -452,35 +452,36 @@ Angular HTML templates are not generic HTML — they are a domain-specific langu
 
 ### Status
 
-📋 **Proposed.** See `docs/ANGULAR_HTML_COMPRESSION_PLAN.md` for the full plan. Tracked as **R-44** in `docs/ROADMAP.md`.
+✅ **Implemented in v0.3.0 (2026-08-07).** Tracked as **R-44** in `docs/ROADMAP.md`. The implementation plan lives in `extradocs/ANGULAR_HTML_COMPRESSION_PLAN.md` (local planning doc, gitignored).
 
-### What's Already in Place
+### What Was Already in Place (pre-R-44)
 
-- `tree-sitter-html` (0.23) is already a dependency via the `angular` feature
-- `TemplateShape` in `template.rs` already captures all Angular semantics (tags, bindings, directives, control flow, custom elements)
-- `to_marker_line()` already produces a single-line `Φtpl:` summary
-- The `Fidelity` enum (Low/Medium/High) is wired through the compression pipeline
-- `run_meta_layer()` already passes `fidelity` to template extraction (but it's ignored)
-- `bundle_pass()` in `workspace.rs` already extracts template shape for external `.component.html` files
-- `diff_commits` engine already handles non-compressible files with line-count fallback
+- `tree-sitter-html` (0.23) was already a dependency via the `angular` feature
+- `TemplateShape` in `template.rs` already captured all Angular semantics (tags, bindings, directives, control flow, custom elements)
+- `to_marker_line()` already produced a single-line `Φtpl:` summary
+- The `Fidelity` enum (Low/Medium/High) was wired through the compression pipeline
+- `bundle_pass()` in `workspace.rs` already extracted template shape for external `.component.html` files
+- `diff_commits` engine already handled non-compressible files with line-count fallback
 
-### What's Missing
+### What R-44 Added (all now implemented)
 
-1. **Fidelity-gated rendering:** `TemplateShape` always produces the same low-fidelity output regardless of `Fidelity`
-2. **Condition/loop detail:** The shape summary captures *that* `@if`/`@for` exist, but not *what condition* or *what loop variable/iterable*
-3. **Binding expressions:** Property bindings captured as names (`[title]`) but not expressions (`[title]="user.name"`)
-4. **GitDiff HTML support:** `is_compressible()` returns `false` for `.html` files
-5. **Single-file template compression:** `provide_code_context` has no special handling for `.component.html`
-6. **PrimeNG markers:** No `Φp-table:`, `Φp-card:` pattern recognition
+1. **Fidelity-gated rendering:** `TemplateShape::to_marker_lines(fidelity)` — Low (single-line, byte-identical to `to_marker_line()`), Medium (multi-line structural), High (near-full)
+2. **Condition/loop detail:** `if_conditions` / `for_loops` capture *what condition* (`@if (isLoading)`) and *what loop variable/iterable* (`@for (item of items)`)
+3. **Binding expressions:** `prop_binding_exprs` / `event_binding_exprs` / `two_way_binding_exprs` capture expressions (`[title]="user.name"`)
+4. **GitDiff HTML support:** `.component.html` files route through the template compressor in `diff_two_contents()` and `compress_added_file()` (AST-level change-sets)
+5. **Single-file template compression:** `provide_code_context` routes `.component.html` through `compress_template_with_prime_ng()` with DB persistence + baseline cache breakpoint
+6. **PrimeNG markers:** `Φp-<name>:` markers for `p-table`, `p-card`, `p-message`, etc.
 
-### Implementation Phases
+### Implementation Phases (all ✅ complete)
 
-| Phase | Description | Effort |
-|-------|-------------|--------|
-| 1 | Fidelity-gated template rendering (`template_compress.rs`, `to_marker_lines(fidelity)`) | 2-3 days |
-| 2 | GitDiff integration (AST-level HTML diffs) | 1 day |
-| 3 | Heuristics + `provide_code_context` integration | 1 day |
-| 4 | PrimeNG pattern recognition (`Φp-*` markers) | 0.5 day |
+| Phase | Description | Effort | Status |
+|-------|-------------|--------|--------|
+| 1 | Fidelity-gated template rendering (`template_compress.rs`, `to_marker_lines(fidelity)`) | 2-3 days | ✅ |
+| 2 | GitDiff integration (AST-level HTML diffs) | 1 day | ✅ |
+| 3 | Heuristics + `provide_code_context` integration | 1 day | ✅ |
+| 4 | PrimeNG pattern recognition (`Φp-*` markers) | 0.5 day | ✅ |
+
+**New markers added in Phase 4:** `Φtbind:` (template binding), `Φtdir:` (template directive), `Φtcmp:` (template component), `Φp-<name>:` (PrimeNG component). `TemplateShape::to_marker_lines(fidelity)` produces Low (single-line), Medium (multi-line structural), High (near-full) output. `.component.html` files route through `compress_template_with_prime_ng()` in `provide_code_context`, with DB persistence and baseline cache breakpoint injection.
 
 ---
 
