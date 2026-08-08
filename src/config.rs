@@ -261,11 +261,11 @@ pub struct PersistenceConfig {
 impl Default for PersistenceConfig {
     fn default() -> Self {
         Self {
-            // RAM-first: persistence is opt-in, not on by default.
-            // Every test calling McpState::new() with default config
-            // opened the same .clean-ctx/persistence.db and contended
-            // on SQLite file locks, causing 60s+ hangs in parallel runs.
-            enabled: false,
+            // Persistence is ON by default — cross-session compression
+            // history is a core feature. The A-14 CI detection auto-disables
+            // persistence in CI environments (CI=true, TF_BUILD, etc.) to
+            // prevent SQLite file lock contention in parallel test runs.
+            enabled: true,
             auto_save: default_true(),
             max_history_days: default_max_history_days(),
             db_path: default_db_path(),
