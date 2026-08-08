@@ -10,8 +10,8 @@
 
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
-| **Now** | v0.2.0 | Real-world ready | ✅ 0 (all complete) |
-| **Next** | v0.3.0 | Advanced capabilities | 7 |
+| **Now** | v0.3.0 | Advanced capabilities | ✅ 0 (all complete) |
+| **Next** | v0.4.0 | Advanced capabilities | 8 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
 | **Architectural** | Continuous | Code health & tooling | 3 (A-01, A-03, A-05) |
 | **Community** | Continuous | Docs & marketing | 5 |
@@ -66,17 +66,17 @@ These items are complete and documented. Listed for historical context.
 
 ---
 
-## Now (v0.2.0) — "Real-world ready" ✅ ALL COMPLETE
+## Now (v0.3.0) — "Advanced capabilities" ✅ ALL COMPLETE
 
-**ALL ITEMS COMPLETE.** v0.2.0 is fully ready for release.
+**ALL ITEMS COMPLETE.** v0.3.0 is fully shipped.
 
-All Foundation items (A-09 through A-15), all Now items (F-19 through F-22, A-08), and all Next items implemented in this cycle (R-41, R-42) are resolved. No remaining blockers.
+All Foundation items (A-09 through A-15), all Now items (F-19 through F-22, A-08), all Next items implemented in this cycle (R-41, R-42, R-43a, R-43b, R-44), and the IR Evolution are resolved. No remaining blockers.
 
 ---
 
-## Next (v0.3.0) — "Advanced capabilities"
+## Next (v0.4.0) — "Advanced capabilities"
 
-**GATE:** All Foundation (A-09 through A-15), Now (A-08, F-19 through F-22), and Sliding Context Window (R-41, R-42) items are complete. v0.3.0 work can begin. Meta-layer items (R-23, R-24) depend on A-11 (detection hardening) which is also complete.
+**GATE:** All Foundation (A-09 through A-15), Now (A-08, F-19 through F-22), Sliding Context Window (R-41, R-42), and IR Evolution (R-43a, R-43b, R-44) items are complete. v0.4.0 work can begin. Meta-layer items (R-23, R-24) depend on A-11 (detection hardening) which is also complete.
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
@@ -167,9 +167,9 @@ All items identified by the FAANG-level architectural review plus the Token Effi
 | **R-41** | Sliding Context Window (Tier 1) | v0.2.0 | Age-based tool-result truncation with force-preserve rules. Opt-in via `SLIDING_WINDOW=1`. |
 | **R-42** | Sliding Context Window (Tier 2) | v0.2.0 | Relevance-scored pruning with dry-run mode. Integrated with proxy dashboard. |
 
-### Next list priorities (v0.3.0)
+### Next list priorities (v0.4.0)
 
-All gates clear. Meta-layer items are now unblocked (A-11 ✅). Sliding Context Window (R-41, R-42) completed in v0.2.0.
+All gates clear. Meta-layer items are now unblocked (A-11 ✅). Sliding Context Window (R-41, R-42) and IR Evolution (R-43a, R-43b, R-44) completed in v0.3.0.
 
 | Priority | Item | Dependency |
 |----------|------|------------|
