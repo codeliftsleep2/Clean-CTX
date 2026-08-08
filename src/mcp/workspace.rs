@@ -636,6 +636,11 @@ fn bundle_pass(
 ) -> FooterBuilder {
     let mut footer_builder = FooterBuilder::new();
     let mut bundle_count = 0usize;
+    // ANGULAR_HTML_COMPRESSION_PLAN: use the config's default fidelity
+    // for template rendering. The workspace pass doesn't receive an
+    // explicit fidelity, so we use the config default (Low for the
+    // single-line shape summary, Medium/High for structural output).
+    let fidelity = state.config.default_fidelity;
 
     let compressible: Vec<&String> = ctx
         .kept
@@ -670,7 +675,10 @@ fn bundle_pass(
             // read in compress_pass / graph_pass are not re-read here.
             if let Ok(content) = state.read_source(&tpl_path.to_string_lossy()) {
                 let shape = template::extract_template_shape(&content);
-                tpl_summary = Some(shape.to_marker_line());
+                // Fidelity-gated rendering: Low → single-line summary,
+                // Medium/High → multi-line structural output.
+                let lines = shape.to_marker_lines(fidelity);
+                tpl_summary = Some(lines.join("\n"));
             }
         }
         if let Some(ref sty_path) = triplet.style {

@@ -488,3 +488,54 @@ fn complex_modern_template_all_features() {
     assert!(line.contains("@defer(placeholder)"));
     assert!(line.contains("@let"));
 }
+
+/// FAANG AUDIT regression: `@if`/`@for` inside string literals or
+/// identifiers must NOT be captured into `if_conditions`/`for_loops`.
+///
+/// Previously `extract_at_if_condition` / `extract_at_for_loop` used a
+/// bare `text.find("@if")` / `text.find("@for")` which matched `@if`/`@for`
+/// inside string literals (e.g. `{{ "@if (x)" }}`) or identifiers like
+/// `@formatter`, producing false control-flow markers even though
+/// `control_flow_blocks` (via `contains_at_keyword`) correctly rejected them.
+#[test]
+fn at_if_for_inside_string_not_captured() {
+    // `@if`/`@for` appear only inside a string literal and an identifier.
+    let html = r#"<div>{{ "@if (x)" }} {{ "@for (y of z)" }} @formatter</div>"#;
+    let shape = extract_template_shape(html);
+
+    // The word-boundary check must reject these — no control-flow blocks.
+    assert!(
+        shape.control_flow_blocks.is_empty(),
+        "string-literal @if/@for must not be detected as control flow: {:?}",
+        shape.control_flow_blocks
+    );
+    assert!(
+        shape.if_conditions.is_empty(),
+        "string-literal @if must not be captured as a condition: {:?}",
+        shape.if_conditions
+    );
+    assert!(
+        shape.for_loops.is_empty(),
+        "string-literal @for must not be captured as a loop: {:?}",
+        shape.for_loops
+    );
+}
+
+/// FAANG AUDIT regression: real `@if`/`@for` blocks ARE captured into
+/// `if_conditions`/`for_loops` (the positive case for the word-boundary fix).
+#[test]
+fn at_if_for_blocks_captured() {
+    let html = r#"@if (isLoading) { <div>Loading</div> } @for (item of items; track item.id) { <p>{{ item.name }}</p> }"#;
+    let shape = extract_template_shape(html);
+
+    assert!(
+        shape.if_conditions.contains(&"isLoading".to_string()),
+        "real @if condition should be captured: {:?}",
+        shape.if_conditions
+    );
+    assert!(
+        shape.for_loops.contains(&("item".to_string(), "items".to_string())),
+        "real @for loop should be captured: {:?}",
+        shape.for_loops
+    );
+}

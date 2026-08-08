@@ -37,11 +37,21 @@ fn meta_layer_extracts_inline_template_shape() {
     assert!(rendered.contains("Φcmp:HelloComponent"), "missing Φcmp marker: {}", rendered);
     // Should contain the inline template shape extraction
     assert!(rendered.contains("Φtpl:"), "missing Φtpl marker for inline template: {}", rendered);
-    // The inline template has div, span, *ngIf, and {{ }}
-    let tpl_line = rendered.lines().find(|l| l.contains("Φtpl:")).unwrap();
-    assert!(tpl_line.contains("div"), "missing div tag: {}", tpl_line);
-    assert!(tpl_line.contains("span"), "missing span tag: {}", tpl_line);
-    assert!(tpl_line.contains("[ngIf]"), "missing [ngIf] directive: {}", tpl_line);
+    // Medium fidelity = multi-line structural output. The `Φtpl:` header
+    // line is bare; the structural lines follow it. The template has
+    // *ngIf (condition captured), and the div/span are HTML scaffolding
+    // (stripped at Medium fidelity).
+    let tpl_block: Vec<&str> = rendered.lines().filter(|l| l.starts_with("Φtpl:") || l.starts_with('@') || l.starts_with('*') || l.starts_with('<')).collect();
+    assert!(
+        tpl_block.iter().any(|l| l.contains("[ngIf]") || l.contains("*ngIf")),
+        "missing [ngIf] directive in template output: {:?}",
+        tpl_block
+    );
+    assert!(
+        tpl_block.iter().any(|l| l.contains("show")),
+        "missing *ngIf condition in template output: {:?}",
+        tpl_block
+    );
 }
 
 #[test]

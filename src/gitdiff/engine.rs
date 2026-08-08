@@ -25,6 +25,10 @@
 use crate::compression::Fidelity;
 use crate::diff::{build_snapshot, diff_snapshots, format_diff};
 use crate::gitdiff::workspace::{collect_changed_files, show_file, FileChange};
+// ANGULAR_HTML_COMPRESSION_PLAN Phase 2: HTML template compression
+// in the diff path. Only available when the `angular` feature is enabled.
+#[cfg(feature = "angular")]
+use crate::angular_meta::template_compress::compress_template_to_string;
 
 /// Result of a multi-file git diff operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -248,9 +252,11 @@ fn diff_renamed_file(
 
 /// Diff two content strings, returning `(body, Option<error>)`.
 ///
-/// Compressible extensions (ts/js/cs) use the AST diff. All others fall
-/// back to a compact line-count delta so the tool never fails on
-/// grammar-missing files.
+/// Compressible extensions (ts/js/cs) use the AST diff. Angular
+/// `.component.html` files use the fidelity-gated template compressor
+/// (ANGULAR_HTML_COMPRESSION_PLAN Phase 2). All others fall back to a
+/// compact line-count delta so the tool never fails on grammar-missing
+/// files.
 fn diff_two_contents(
     from_content: &str,
     to_content: &str,
@@ -270,6 +276,28 @@ fn diff_two_contents(
             },
             Err(e) => (String::new(), Some(e.to_string())),
         }
+    } else if is_angular_template(path) {
+        // Angular `.component.html` — produce a compressed template
+        // change-set. We emit the compressed form of both the old and
+        // new content so the LLM can see what changed at the semantic
+        // level (bindings, conditions, components) rather than a raw
+        // line-count delta.
+        let from_compressed = compress_template_to_string(from_content, fidelity);
+        let to_compressed = compress_template_to_string(to_content, fidelity);
+        if from_compressed == to_compressed {
+            (format!("  ~ template unchanged ({} lines → {} lines)", from_content.lines().count(), to_content.lines().count()), None)
+        } else {
+            let mut body = String::new();
+            body.push_str("  - template (old):\n");
+            for line in from_compressed.lines() {
+                body.push_str(&format!("    - {}\n", line));
+            }
+            body.push_str("  + template (new):\n");
+            for line in to_compressed.lines() {
+                body.push_str(&format!("    + {}\n", line));
+            }
+            (body, None)
+        }
     } else {
         // Non-compressible — line-count delta.
         let from_lines = from_content.lines().count();
@@ -282,6 +310,10 @@ fn diff_two_contents(
 
 /// Compress an added file via the legacy pipeline (best-effort).
 fn compress_added_file(content: &str, path: &str, fidelity: Fidelity) -> String {
+    if is_angular_template(path) {
+        // Angular `.component.html` — emit the compressed template skeleton.
+        return compress_template_to_string(content, fidelity);
+    }
     if !is_compressible(path) {
         return format_line_delta(0, content.lines().count());
     }
@@ -343,6 +375,24 @@ fn is_compressible(path: &str) -> bool {
         return false;
     };
     matches!(ext, "ts" | "js" | "cs")
+}
+
+/// Whether a file path is an Angular `.component.html` template.
+///
+/// ANGULAR_HTML_COMPRESSION_PLAN Phase 2: these files are treated as
+/// compressible when the `angular` feature is enabled, producing
+/// AST-level change-sets instead of line-count deltas.
+fn is_angular_template(path: &str) -> bool {
+    #[cfg(feature = "angular")]
+    {
+        let lower = path.to_lowercase();
+        lower.ends_with(".component.html")
+    }
+    #[cfg(not(feature = "angular"))]
+    {
+        let _ = path;
+        false
+    }
 }
 
 #[cfg(test)]

@@ -173,7 +173,9 @@ fn phi_in_line_rewrite_is_idempotent_only_known_tokens() {
 #[test]
 fn phi_line_kind_uniqueness() {
     let all_kinds = PhiLineKind::all_in_expand_order();
-    assert_eq!(all_kinds.len(), 14, "expected 14 PhiLineKind variants");
+    // ANGULAR_HTML_COMPRESSION_PLAN: added TemplateBinding, TemplateDirective,
+    // TemplateComponent — 14 original + 3 new = 17.
+    assert_eq!(all_kinds.len(), 17, "expected 17 PhiLineKind variants");
 
     // Check that marker_prefix is unique across all variants.
     let mut prefixes = std::collections::HashSet::new();

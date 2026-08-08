@@ -281,3 +281,126 @@ fn gitdiff_workspace_invalid_ref_rejected() {
         "expected ref validation error, got: {err}"
     );
 }
+
+// ══════════════════════════════════════════════════════════════════
+// ANGULAR_HTML_COMPRESSION_PLAN Phase 2: `.component.html` tests
+// ══════════════════════════════════════════════════════════════════
+
+/// Create a temp git repo with a `.component.html` file that changes
+/// between two commits.
+fn init_html_repo() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().to_str().unwrap();
+
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .expect("git command");
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {:?}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "test@example.com"]);
+    git(&["config", "user.name", "Test"]);
+
+    // Commit 1: simple template
+    std::fs::create_dir_all(dir.path().join("src/app")).unwrap();
+    std::fs::write(
+        dir.path().join("src/app/user-card.component.html"),
+        "<div class=\"container\"><app-card [data]=\"cardData\"></app-card></div>\n",
+    )
+    .unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "commit1"]);
+
+    // Commit 2: template gains a binding and a condition
+    std::fs::write(
+        dir.path().join("src/app/user-card.component.html"),
+        "<div class=\"container\"><app-card *ngIf=\"showCard\" [data]=\"cardData\" (select)=\"onSelect($event)\"></app-card></div>\n",
+    )
+    .unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "commit2"]);
+
+    dir
+}
+
+#[test]
+fn gitdiff_workspace_component_html_emits_template_changeset() {
+    let dir = init_html_repo();
+    let root = dir.path().to_str().unwrap();
+
+    let summary = gitdiff_workspace(root, "HEAD~1", Some("HEAD"), Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+
+    // The .component.html file should produce a compressed template
+    // change-set, not a line-count delta.
+    assert!(
+        summary.manifest.contains("user-card.component.html"),
+        "expected .component.html in manifest, got:\n{}",
+        summary.manifest
+    );
+    assert!(
+        summary.manifest.contains("template (old)"),
+        "expected old template section, got:\n{}",
+        summary.manifest
+    );
+    assert!(
+        summary.manifest.contains("template (new)"),
+        "expected new template section, got:\n{}",
+        summary.manifest
+    );
+    // The new template should show the *ngIf condition.
+    assert!(
+        summary.manifest.contains("showCard"),
+        "expected *ngIf condition in compressed template, got:\n{}",
+        summary.manifest
+    );
+}
+
+#[test]
+fn gitdiff_workspace_component_html_added_emits_skeleton() {
+    let dir = init_html_repo();
+    let root = dir.path().to_str().unwrap();
+
+    // Add a new .component.html file in the working tree.
+    std::fs::write(
+        dir.path().join("src/app/new-card.component.html"),
+        "<p-card [value]=\"rows\"><p-inputtext /></p-card>\n",
+    )
+    .unwrap();
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["add", "-N", "src/app/new-card.component.html"])
+        .output()
+        .expect("git add -N");
+    assert!(
+        out.status.success(),
+        "git add -N failed: {:?}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let summary = gitdiff_workspace(root, "HEAD", None, Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+
+    assert!(
+        summary.manifest.contains("new-card.component.html"),
+        "expected added .component.html in manifest, got:\n{}",
+        summary.manifest
+    );
+    // The added template should be compressed (not a line-count delta).
+    assert!(
+        summary.manifest.contains("Φtpl:"),
+        "expected compressed template skeleton, got:\n{}",
+        summary.manifest
+    );
+}

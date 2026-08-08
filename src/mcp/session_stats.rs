@@ -766,7 +766,7 @@ pub fn render_dashboard_text(stats: &SessionStats) -> String {
         output.push_str("── Per-Domain LLM Token Savings ──\n");
 
         // Define display order for domains
-        let domain_order = ["ir_compression", "cbm_filter", "prompt_cache", "tool_filter"];
+        let domain_order = ["ir_compression", "angular_template", "cbm_filter", "prompt_cache", "tool_filter"];
         let mut has_any = false;
 
         for domain_key in &domain_order {
@@ -779,6 +779,14 @@ pub fn render_dashboard_text(stats: &SessionStats) -> String {
                     "ir_compression" => {
                         output.push_str(&format!(
                             "  IR Compression:      {:>10} → {:>10} ({:>5.1}%↓)\n",
+                            format_number(ds.total_raw_tokens),
+                            format_number(ds.total_compressed_tokens),
+                            ds.savings_pct,
+                        ));
+                    }
+                    "angular_template" => {
+                        output.push_str(&format!(
+                            "  Angular Templates:   {:>10} → {:>10} ({:>5.1}%↓)\n",
                             format_number(ds.total_raw_tokens),
                             format_number(ds.total_compressed_tokens),
                             ds.savings_pct,

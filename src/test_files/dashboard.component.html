@@ -1,0 +1,26 @@
+<div class="dashboard-wrapper">
+  <app-header [user]="currentUser" (menuToggle)="onMenuToggle($event)"></app-header>
+  <p-table [value]="orders" [loading]="isLoading" (onRowSelect)="onSelect($event)">
+    <ng-template pTemplate="header">
+      <tr>
+        <th>Order ID</th>
+        <th>Status</th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-row>
+      <tr *ngFor="let order of orders">
+        <td>{{ order.id }}</td>
+        <td>{{ order.status }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+  <div *ngIf="isLoading" class="spinner"></div>
+  @for (item of items; track item.id) {
+    <app-card [data]="item" (click)="onItemClick(item)"></app-card>
+  }
+  @if (errorMessage) {
+    <p-message severity="error" [text]="errorMessage"></p-message>
+  }
+  <button (click)="refresh()">Refresh</button>
+  <input [(ngModel)]="searchTerm" placeholder="Search..."/>
+</div>
