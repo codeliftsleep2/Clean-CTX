@@ -72,6 +72,13 @@ pub enum PhiLineKind {
     Map,
     Template,
     Style,
+    // --- ANGULAR_HTML_COMPRESSION_PLAN: template detail markers ---
+    /// `[prop]="expr"` property binding on a template element.
+    TemplateBinding,
+    /// `*ngIf`, `*ngFor`, etc. structural directive on a template element.
+    TemplateDirective,
+    /// Custom element tag with its inputs/outputs (e.g. `<app-user-card>`).
+    TemplateComponent,
 }
 
 impl PhiLineKind {
@@ -93,6 +100,9 @@ impl PhiLineKind {
             Self::Map => "ΦMAP",
             Self::Template => "Φtpl:",
             Self::Style => "Φsty:",
+            Self::TemplateBinding => "Φtbind:",
+            Self::TemplateDirective => "Φtdir:",
+            Self::TemplateComponent => "Φtcmp:",
         }
     }
 
@@ -114,6 +124,9 @@ impl PhiLineKind {
             Self::Map => "@Map",
             Self::Template => "@Template",
             Self::Style => "@Style",
+            Self::TemplateBinding => "@TemplateBinding",
+            Self::TemplateDirective => "@TemplateDirective",
+            Self::TemplateComponent => "@TemplateComponent",
         }
     }
 
@@ -133,10 +146,13 @@ impl PhiLineKind {
             Self::Input,      // Φin:       (4 chars)
             Self::Output,     // Φout:      (5 chars)
             Self::Graph,      // Φgraph:    (7 chars)
-            Self::Template,   // Φtpl:      (5 chars)
-            Self::Style,      // Φsty:      (5 chars)
-            Self::Bundle,     // ΦBUNDLE    (8 chars)
-            Self::Map,        // ΦMAP       (5 chars)
+            Self::Template,        // Φtpl:      (5 chars)
+            Self::Style,           // Φsty:      (5 chars)
+            Self::TemplateBinding, // Φtbind:    (7 chars)
+            Self::TemplateDirective, // Φtdir:    (6 chars)
+            Self::TemplateComponent, // Φtcmp:    (6 chars)
+            Self::Bundle,          // ΦBUNDLE    (8 chars)
+            Self::Map,             // ΦMAP       (5 chars)
         ]
     }
 
@@ -158,6 +174,9 @@ impl PhiLineKind {
             "ΦMAP" => Some(Self::Map),
             "Φtpl" => Some(Self::Template),
             "Φsty" => Some(Self::Style),
+            "Φtbind" => Some(Self::TemplateBinding),
+            "Φtdir" => Some(Self::TemplateDirective),
+            "Φtcmp" => Some(Self::TemplateComponent),
             _ => None,
         }
     }
@@ -181,6 +200,9 @@ impl PhiLineKind {
             Self::Map => "ΦMAP",
             Self::Template => "Φtpl",
             Self::Style => "Φsty",
+            Self::TemplateBinding => "Φtbind",
+            Self::TemplateDirective => "Φtdir",
+            Self::TemplateComponent => "Φtcmp",
         }
     }
 }

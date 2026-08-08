@@ -25,6 +25,7 @@ pub(crate) mod detect;
 pub(crate) mod markers;
 pub mod bundler;
 pub mod template;
+pub mod template_compress;
 pub mod style;
 pub mod footer;
 pub mod graph;
@@ -127,10 +128,14 @@ pub fn run_meta_layer(
             #[cfg(feature = "angular")]
             if let Some(tpl) = &result.inline_template {
                 if !tpl.trim().is_empty() {
+                    // Fidelity-gated template rendering (ANGULAR_HTML_COMPRESSION_PLAN).
+                    // Low → single-line shape summary; Medium/High → multi-line
+                    // structural Angular semantics.
                     let shape = template::extract_template_shape(tpl);
-                    let tpl_line = shape.to_marker_line();
-                    if tpl_line != "Φtpl:empty" {
-                        block.lines.push(tpl_line);
+                    for line in shape.to_marker_lines(fidelity) {
+                        if line != "Φtpl:empty" {
+                            block.lines.push(line);
+                        }
                     }
                 }
             }

@@ -212,6 +212,16 @@ fn is_implementation_path(file_path: &str) -> bool {
         || lower.contains(".resolver.") || lower.contains(".pipe.")
 }
 
+/// Check if the file path is an Angular `.component.html` template.
+///
+/// ANGULAR_HTML_COMPRESSION_PLAN Phase 3: these files are classified
+/// as `FileClass::Implementation` with `Fidelity::Medium` default, and
+/// "template editing" (intent = "edit") triggers High fidelity.
+fn is_angular_template_path(file_path: &str) -> bool {
+    let lower = file_path.to_lowercase();
+    lower.ends_with(".component.html")
+}
+
 // ── Content-Based Classification (V2) ──────────────────────────────
 
 /// Classify a file based on its content and path.
@@ -231,6 +241,14 @@ fn classify_file(
     // Tier 1: Test files
     if test_markers > 0 || is_test_path(file_path) {
         return (FileClass::Test, Fidelity::Low);
+    }
+
+    // ANGULAR_HTML_COMPRESSION_PLAN Phase 3: `.component.html` files
+    // are implementation files with Medium fidelity default. This must
+    // be checked BEFORE the config classification (small HTML files
+    // would otherwise be misclassified as Config).
+    if is_angular_template_path(file_path) {
+        return (FileClass::Implementation, Fidelity::Medium);
     }
 
     // Tier 2: Config files
@@ -346,6 +364,12 @@ fn resolve_fidelity(
             "implement" => &config.smart_defaults.implement,
             _ => &config.default_fidelity,
         };
+        // ANGULAR_HTML_COMPRESSION_PLAN Phase 3: "template editing"
+        // (intent = "edit" on a `.component.html` file) triggers High
+        // fidelity so the LLM sees the full semantic template.
+        if intent == "edit" && is_angular_template_path(file_path) {
+            return (Fidelity::High, FileClass::Implementation);
+        }
         return (*mapped, FileClass::General);
     }
 

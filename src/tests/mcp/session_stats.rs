@@ -178,6 +178,31 @@ fn test_render_dashboard_text() {
 }
 
 #[test]
+fn test_render_dashboard_shows_angular_template_domain() {
+    // ANGULAR_HTML_COMPRESSION_PLAN Phase 3: `.component.html` files
+    // record to the `angular_template` domain. The dashboard must show
+    // this domain in the per-domain breakdown.
+    let mut stats = SessionStats::new();
+    stats.record_compression(
+        "/test/dashboard.component.html", 917, 300, "high", true, "full", None, "angular_template",
+    );
+    let text = render_dashboard_text(&stats);
+    assert!(
+        text.contains("Angular Templates"),
+        "dashboard should show Angular Templates domain, got:\n{text}"
+    );
+    assert!(text.contains("917"), "dashboard should show raw token count");
+    assert!(text.contains("300"), "dashboard should show compressed token count");
+
+    // JSON dashboard should also carry the domain breakdown.
+    let json = render_dashboard_json(&stats);
+    let at = &json["session"]["domain_breakdown"]["angular_template"];
+    assert_eq!(at["total_raw_tokens"], 917);
+    assert_eq!(at["total_compressed_tokens"], 300);
+    assert_eq!(at["file_count"], 1);
+}
+
+#[test]
 fn test_render_dashboard_json() {
     let mut stats = SessionStats::new();
     stats.record_compression("/test/file.ts", 1000, 250, "low", false, "full", None, "ir_compression");

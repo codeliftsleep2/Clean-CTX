@@ -534,6 +534,72 @@ pub(crate) fn handle_provide_code_context(
     let source = source_arc.as_str();
     let alias = state.get_or_create_alias(resolved_path.clone());
 
+    // ANGULAR_HTML_COMPRESSION_PLAN Phase 3: route `.component.html`
+    // files through the Angular template compressor. These files have
+    // no tree-sitter grammar for the IR compiler, so we handle them
+    // specially before the heuristics decision.
+    #[cfg(feature = "angular")]
+    if resolved_path.to_lowercase().ends_with(".component.html") {
+        let explicit_fidelity = params["arguments"]["fidelity"].as_str();
+        let explicit_intent = params["arguments"]["intent"].as_str();
+        let fidelity = match explicit_fidelity {
+            Some(s) => match crate::compression::Fidelity::parse(s) {
+                Ok(f) => f,
+                Err(_) => {
+                    // Template editing intent → High fidelity.
+                    if explicit_intent == Some("edit") {
+                        crate::compression::Fidelity::High
+                    } else {
+                        crate::compression::Fidelity::Medium
+                    }
+                }
+            },
+            None => {
+                // Template editing intent → High fidelity.
+                if explicit_intent == Some("edit") {
+                    crate::compression::Fidelity::High
+                } else {
+                    crate::compression::Fidelity::Medium
+                }
+            }
+        };
+        let lines = crate::angular_meta::template_compress::compress_template_with_prime_ng(source, fidelity);
+        let body = lines.join("\n");
+        let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
+        let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
+        let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
+        let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
+        let comp_tokens = count_tokens_with_tokenizer(&body, tokenizer_ref);
+        state.record_compression(&resolved_path, raw_tokens, comp_tokens,
+            &format!("{:?}", fidelity).to_lowercase(), true, "full", None, "angular_template");
+
+        // Persist to DB so `context_stats` and cross-session dashboards
+        // can report Angular template compression savings.
+        {
+            if let Some(ref store) = *state.persistence_store_lock() {
+                let mut hasher = Sha256::new();
+                hasher.update(source.as_bytes());
+                let source_hash = format!("{:x}", hasher.finalize());
+                store.queue_save_context(
+                    &resolved_path, fidelity, &body,
+                    &[], &source_hash, raw_tokens as u64, comp_tokens as u64,
+                );
+            }
+        }
+        state.flush_persistence();
+
+        let mut response = serde_json::json!({
+            "jsonrpc": "2.0", "id": id, "result": {
+                "content": [{ "type": "text", "text": body }],
+                "strategy": "full", "fidelity": format!("{:?}", fidelity).to_lowercase(),
+                "is_angular": true, "template_compressed": true
+            }
+        });
+        inject_baseline_breakpoint(&mut response, state, &body);
+        send_response(&response);
+        return;
+    }
+
     let explicit_fidelity = params["arguments"]["fidelity"].as_str();
     let explicit_intent = params["arguments"]["intent"].as_str();
 

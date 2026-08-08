@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-08-05 (R-02 ✅ + R-12 ✅ shipped — Type-Aware Compression + Multi-file / Git-Commit Diff)
+**Last updated:** 2026-08-07 (R-44 ✅ shipped — Angular HTML Template Compression)
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -11,7 +11,7 @@
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
 | **Now** | v0.2.0 | Real-world ready | ✅ 0 (all complete) |
-| **Next** | v0.3.0 | Advanced capabilities | 8 |
+| **Next** | v0.3.0 | Advanced capabilities | 7 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
 | **Architectural** | Continuous | Code health & tooling | 3 (A-01, A-03, A-05) |
 | **Community** | Continuous | Docs & marketing | 5 |
@@ -62,6 +62,7 @@ These items are complete and documented. Listed for historical context.
 | **F-22** | Workspace compression result caching | v0.2.0 | ✅ Caches the complete `WorkspaceResult` keyed by a content hash of file paths + mtimes/sizes. Subsequent calls with no file changes return the cached result instantly. Saves 5-15s per redundant call for a 100-file workspace. |
 | **R-43a** | IR Evolution — Execution Semantics (Phase 1) | v0.3.0 | ✅ 4 new `CoreOp` variants (DataFlow, ControlFlow, SideEffect, ExecutionContext) for behavioral reasoning. Full wire-format support (named/positional/binary/hierarchical/string_table/compact). `SemanticIntent` delta metadata with detection in `DeltaComputer::compute()` (rename/add/remove method, change return type/signature, add injection). Compact delta intent preservation. Rust/C#/TypeScript language-layer behavioral extraction. `IRValidator` behavioral consistency checks. See `docs/IR_EVOLUTION_PLAN.md`. |
 | **R-43b** | IR Evolution — Program Graph + Inference Layer + Semantic Delta + Validation + Query (Phases 2-6) | v0.3.0 | ✅ `ProgramGraph` (local graph), `InferenceLayer` (confidence-scored ephemeral overlay), `PassPipeline` (composable `IRPass` chain), `IRValidator` (structural + behavioral invariants), `IRQueryEngine` (queryable IR). All wired into `src/ir/mod.rs`. See `docs/IR_EVOLUTION_PLAN.md`. **Phase 3 CBM enrichment ✅:** `InferenceLayer::enrich_from_cbm()` consumes cross-file CALLS/DATAFLOW edges + importance/dead-code annotations (confidence 0.75); `GraphBridge::get_call_edges()`/`get_dataflow_edges()` added; `InferenceLayerPass::with_cbm()` wires enrichment into the pipeline. See `docs/CHANGELOG.md` [0.3.0]. |
+| **R-44** | Angular HTML Template Compression | v0.3.0 | ✅ Fidelity-gated template compression for Angular `.component.html` files. New `template_compress.rs` module with `compress_template()` / `compress_template_with_prime_ng()`. `TemplateShape::to_marker_lines(fidelity)` produces Low (single-line), Medium (multi-line structural), High (near-full) output. `PhiLineKind` extended with `TemplateBinding`/`TemplateDirective`/`TemplateComponent`. GitDiff routes `.component.html` through the compressor (AST-level change-sets). Heuristics classify `.component.html` as Implementation/Medium, upgrade to High on `intent="edit"`. `provide_code_context` routes `.component.html` through the compressor with DB persistence. PrimeNG `Φp-<name>:` markers. Post-implementation FAANG audit fixed a word-boundary bug (`@if`/`@for` in string literals) and a persistence gap. 2,141 tests passing, 0 clippy warnings. See `extradocs/ANGULAR_HTML_COMPRESSION_PLAN.md`. |
 
 ---
 
@@ -87,7 +88,6 @@ All Foundation items (A-09 through A-15), all Now items (F-19 through F-22, A-08
 | **R-36** | React Meta-Layer | Additive meta-layer on TS/JS. Component/hook/context bundling, prop type compression, React-specific lifecycle markers. **A-11 ✅ (complete)** — now unblocked. | 3-4 days | 🟡 Medium |
 | **R-37** | Redux Meta-Layer | Additive meta-layer on TS/JS. Action/reducer/selector compression, thunk/saga patterns, store shape compression. **A-11 ✅ (complete)** — now unblocked. | 2-3 days | 🟡 Medium |
 | **R-01b** | Go language layer | Second-most requested. | 1-2 days | 🟡 Medium |
-| **R-44** | Angular HTML Template Compression | Fidelity-gated template compression for Angular `.component.html` files. Extends the existing `template.rs` extractor with Medium/High fidelity rendering that preserves Angular semantics (bindings, conditions, loop variables, component inputs/outputs) while stripping HTML scaffolding. Integrates with `diff_commits` (AST-level HTML diffs) and `provide_code_context` (single-file template compression). Includes PrimeNG pattern recognition (`Φp-table:`, `Φp-card:`). See `docs/ANGULAR_HTML_COMPRESSION_PLAN.md`. **R-22 ✅ (complete)** — builds on existing template extraction. | 4-5 days | 🔴 High |
 
 ---
 

@@ -640,3 +640,72 @@ fn test_v2_auto_classify_disabled_v1_fallback() {
         "V1 fallback: large file -> Low when auto_classify is disabled");
     assert_eq!(decision.file_class, heuristics::FileClass::General);
 }
+
+// ══════════════════════════════════════════════════════════════════
+// ANGULAR_HTML_COMPRESSION_PLAN Phase 3: `.component.html` tests
+// ══════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_v2_classify_component_html_implementation() {
+    let config = CleanCtxConfig::default();
+    let text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+    let html = r#"<div class="container"><app-card [data]="cardData"></app-card></div>"#;
+    let decision = heuristics::decide(
+        "/project/src/app/user-card.component.html",
+        None,
+        None,
+        &config,
+        &text_delta,
+        &ir_ctx,
+        html,
+        None,
+        None,
+    );
+    assert_eq!(decision.fidelity, Fidelity::Medium,
+        ".component.html files should get Medium fidelity by default");
+    assert_eq!(decision.file_class, heuristics::FileClass::Implementation);
+}
+
+#[test]
+fn test_v2_component_html_edit_intent_high_fidelity() {
+    let config = CleanCtxConfig::default();
+    let text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+    let html = r#"<div><span>{{ name }}</span></div>"#;
+    let decision = heuristics::decide(
+        "/project/src/app/user-card.component.html",
+        None,
+        Some("edit"),
+        &config,
+        &text_delta,
+        &ir_ctx,
+        html,
+        None,
+        None,
+    );
+    assert_eq!(decision.fidelity, Fidelity::High,
+        "template editing intent on .component.html should get High fidelity");
+    assert_eq!(decision.file_class, heuristics::FileClass::Implementation);
+}
+
+#[test]
+fn test_v2_component_html_explicit_fidelity_overrides() {
+    let config = CleanCtxConfig::default();
+    let text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+    let html = r#"<div><span>{{ name }}</span></div>"#;
+    let decision = heuristics::decide(
+        "/project/src/app/user-card.component.html",
+        Some("low"),
+        None,
+        &config,
+        &text_delta,
+        &ir_ctx,
+        html,
+        None,
+        None,
+    );
+    assert_eq!(decision.fidelity, Fidelity::Low,
+        "explicit fidelity=low should override .component.html default");
+}
