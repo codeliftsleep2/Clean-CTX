@@ -39,7 +39,7 @@ Location: Project root (walks up from current directory to find it)
     "max_memory_bytes": 536870912
   },
   "persistence": {
-    "enabled": false,
+    "enabled": true,
     "auto_save": true,
     "max_history_days": 30,
     "db_path": ".clean-ctx/persistence.db"
@@ -193,7 +193,7 @@ Controls SQLite-backed cross-session storage:
 ```json
 {
   "persistence": {
-    "enabled": false,           // Master switch (default: false)
+    "enabled": true,            // Master switch (default: true)
     "auto_save": true,          // Auto-save after each operation
     "max_history_days": 30,     // Prune history older than this
     "db_path": ".clean-ctx/persistence.db"
@@ -201,7 +201,7 @@ Controls SQLite-backed cross-session storage:
 }
 ```
 
-**Note**: Persistence is disabled by default to avoid SQLite file lock contention in parallel test runs. Enable it only when you need cross-session compression history.
+**Note**: Persistence is **enabled by default** — cross-session compression history is a core feature. It is automatically disabled in CI environments (A-14) to prevent stale `persistence.db` from leaking between builds and to avoid SQLite file lock contention in parallel test runs. Set `"enabled": false` to opt out.
 
 ## Smart Defaults
 
@@ -271,7 +271,7 @@ Currently supported: `angular`, `spring_boot`, `dotnet`. Each meta-layer can be 
 | Java | `java` | — | Base Java tree-sitter grammar | ❌ |
 | Angular | `angular` | `typescript` | Components, Services, DI, Pipes, Directives, Modules, Input/Output, Template/Shape extraction, Style extraction, NgRx, RxJS, Signals, PrimeNG, Bundle graph | ✅ |
 | Spring Boot | `spring_boot` | `java` | RestController, Controller, Service, Repository, Configuration, RequestMapping, Autowired, Value, Bean, ConfigurationProperties, Cross-file graph | ❌ |
-| .NET | `dotnet` | `csharp` | ASP.NET Core (Controllers, Actions, Routes, Auth), EF Core (DbContext, DbSet, Entities), SignalR (Hubs, Clients, Streaming), AutoMapper (Profiles, Mappings), JSON Serialization, DI, Validation, Identity, Caching, Logging, Cross-file graph | ❌ |
+| .NET | `dotnet` | `csharp` | ASP.NET Core (Controllers, Actions, Routes, Auth), EF Core (DbContext, DbSet, Entities), SignalR (Hubs, Clients, Streaming), AutoMapper (Profiles, Mappings), JSON Serialization, DI, Validation, Identity, Caching, Logging, Cross-file graph | ✅ |
 
 The runtime `meta_layers.*.enabled` config in `.clean-ctx.json` controls whether an already-compiled meta-layer is active at runtime. Disabling it at compile time via `--no-default-features` removes the entire module from the binary.
 
@@ -288,6 +288,8 @@ CBM-informed fidelity and blast radius:
   }
 }
 ```
+
+**Why blast radius is opt-in:** Unlike the intelligence layer's fidelity adjustment (which is token-*saving* — it drops low-importance symbols to lower fidelity), blast radius is token-*adding* — it appends up to `max_blast_radius_files` (10) depth-1 affected files to each `provide_code_context` response. It also requires CBM to be installed, running, and have indexed the project graph; without CBM it is inert. Enable it only when you want change-impact context and are running CBM.
 
 ## Type Aliases (R-02)
 
@@ -437,7 +439,7 @@ println!("{:#?}", config);
 
 - **No breaking changes**: All new fields have sensible defaults
 - **Backward compatible**: Old `.clean-ctx.json` files continue to work
-- **Opt-in features**: New features (persistence, CBM, intelligence) default to `false`/`disabled`
+- **Opt-in features**: New features (CBM, intelligence) default to `false`/`disabled`. Persistence defaults to `true` (enabled).
 
 ## Common Patterns
 
