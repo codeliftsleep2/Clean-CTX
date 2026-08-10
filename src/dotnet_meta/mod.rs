@@ -173,11 +173,17 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         "dotnet"
     }
 
-    fn is_applicable(&self, source: &str, _path: &std::path::Path) -> bool {
+    fn is_applicable(&self, source: &str, _path: &std::path::Path, _config: Option<&crate::config::CleanCtxConfig>) -> bool {
         detect::is_dotnet_file(source)
     }
 
-    fn enrich(&self, output: &mut String, source: &str, ir: &crate::ir::compiler::CompiledIR, fidelity: crate::compression::Fidelity) {
+    fn enrich(
+        &self,
+        source: &str,
+        ir: &crate::ir::compiler::CompiledIR,
+        fidelity: crate::compression::Fidelity,
+        _config: Option<&crate::config::CleanCtxConfig>,
+    ) -> Option<crate::layers::meta::MetaLayerOutput> {
         // Extract class names from IR
         let class_captures: Vec<String> = ir.instructions
             .iter()
@@ -191,9 +197,17 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             .collect();
 
         // Run the meta-layer pipeline using the real source code (not ir.file_id)
-        if let Some(block) = run_meta_layer(source, &class_captures, fidelity) {
-            output.push_str(&block.render());
+        let block = run_meta_layer(source, &class_captures, fidelity)?;
+        if block.is_empty() {
+            return None;
         }
+        Some(crate::layers::meta::MetaLayerOutput {
+            layer_name: self.name(),
+            rendered: block.render(),
+            angular_block: None,
+            spring_block: None,
+            dotnet_block: Some(block),
+        })
     }
 }
 
@@ -220,11 +234,18 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         "dotnet"
     }
 
-    fn is_applicable(&self, _source: &str, _path: &std::path::Path) -> bool {
+    fn is_applicable(&self, _source: &str, _path: &std::path::Path, _config: Option<&crate::config::CleanCtxConfig>) -> bool {
         false
     }
 
-    fn enrich(&self, _output: &mut String, _source: &str, _ir: &crate::ir::compiler::CompiledIR, _fidelity: crate::compression::Fidelity) {
+    fn enrich(
+        &self,
+        _source: &str,
+        _ir: &crate::ir::compiler::CompiledIR,
+        _fidelity: crate::compression::Fidelity,
+        _config: Option<&crate::config::CleanCtxConfig>,
+    ) -> Option<crate::layers::meta::MetaLayerOutput> {
         // No-op when feature is disabled
+        None
     }
 }

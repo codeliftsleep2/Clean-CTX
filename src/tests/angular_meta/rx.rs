@@ -1,0 +1,316 @@
+// src/tests/angular_meta/rx.rs
+//
+// Unit tests for the RxJS Meta-Layer (Phase 1 of the Angular
+// Ecosystem Deepening).
+
+use crate::angular_meta::phi::PhiMarker;
+use crate::angular_meta::rx::{
+    expand_phi, expand_phi_in_line, extract_rx_shape, has_rxjs_imports,
+    RxJsKind, SubjectKind,
+};
+use crate::compression::Fidelity;
+
+// ── Import gate ────────────────────────────────────────────────────
+
+#[test]
+fn detects_rxjs_imports() {
+    let src = "import { Observable } from 'rxjs';";
+    assert!(has_rxjs_imports(src));
+}
+
+#[test]
+fn detects_rxjs_operators_import() {
+    let src = "import { map } from 'rxjs/operators';";
+    assert!(has_rxjs_imports(src));
+}
+
+#[test]
+fn rejects_non_rxjs_imports() {
+    let src = "import { Component } from '@angular/core';";
+    assert!(!has_rxjs_imports(src));
+}
+
+// ── Observable detection ───────────────────────────────────────────
+
+#[test]
+fn detects_observable_field_with_type_annotation() {
+    let src = r#"
+import { Observable } from 'rxjs';
+
+export class UserService {
+  users$: Observable<User[]>;
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.observables.len(), 1);
+    assert_eq!(shape.observables[0].name, "users$");
+    assert_eq!(shape.observables[0].type_param.as_deref(), Some("User[]"));
+}
+
+#[test]
+fn detects_observable_from_http_get() {
+    let src = r#"
+import { Observable } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+
+export class UserService {
+  users$ = this.http.get<User[]>('/api/users');
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.observables.len(), 1);
+    assert_eq!(shape.observables[0].name, "users$");
+    assert!(shape.observables[0].source.as_deref().unwrap_or("").contains("http.get"));
+}
+
+// ── Subject detection ──────────────────────────────────────────────
+
+#[test]
+fn detects_plain_subject() {
+    let src = r#"
+import { Subject } from 'rxjs';
+
+export class UserService {
+  refreshTrigger = new Subject<void>();
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.subjects.len(), 1);
+    assert_eq!(shape.subjects[0].name, "refreshTrigger");
+    assert_eq!(shape.subjects[0].kind, SubjectKind::Subject);
+    assert_eq!(shape.subjects[0].type_param.as_deref(), Some("void"));
+}
+
+#[test]
+fn detects_behavior_subject_with_initial_value() {
+    let src = r#"
+import { BehaviorSubject } from 'rxjs';
+
+export class UserService {
+  selectedUser$ = new BehaviorSubject<User | null>(null);
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.subjects.len(), 1);
+    assert_eq!(shape.subjects[0].name, "selectedUser$");
+    assert_eq!(shape.subjects[0].kind, SubjectKind::BehaviorSubject);
+    assert_eq!(shape.subjects[0].initial_value.as_deref(), Some("null"));
+}
+
+#[test]
+fn detects_replay_subject() {
+    let src = r#"
+import { ReplaySubject } from 'rxjs';
+
+export class UserService {
+  cache$ = new ReplaySubject<User>(1);
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.subjects.len(), 1);
+    assert_eq!(shape.subjects[0].name, "cache$");
+    assert_eq!(shape.subjects[0].kind, SubjectKind::ReplaySubject);
+    assert_eq!(shape.subjects[0].initial_value.as_deref(), Some("1"));
+}
+
+// ── Pipe chain extraction ──────────────────────────────────────────
+
+#[test]
+fn extracts_pipe_operator_sequence() {
+    let src = r#"
+import { Observable, of } from 'rxjs';
+import { switchMap, map, catchError, shareReplay } from 'rxjs/operators';
+
+export class UserService {
+  users$ = this.refreshTrigger.pipe(
+    switchMap(() => this.http.get<User[]>('/api/users')),
+    map(users => users.sort((a, b) => a.name.localeCompare(b.name))),
+    catchError(err => of([])),
+    shareReplay(1)
+  );
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.pipes.len(), 1);
+    assert_eq!(shape.pipes[0].owner, "users$");
+    assert_eq!(shape.pipes[0].operators.len(), 4);
+    assert_eq!(shape.pipes[0].operators[0].operator_name, "switchMap");
+    assert_eq!(shape.pipes[0].operators[1].operator_name, "map");
+    assert_eq!(shape.pipes[0].operators[2].operator_name, "catchError");
+    assert_eq!(shape.pipes[0].operators[3].operator_name, "shareReplay");
+}
+
+// ── Round-3 audit: pipe owner must be the bare field name, not the
+// access modifier or type annotation. `private users$: Observable<User[]>`
+// must yield owner `users$`, not `private users$` or `users$: Observable`.
+#[test]
+fn pipe_owner_strips_modifiers_and_type_annotations() {
+    let src = r#"
+import { Observable, of } from 'rxjs';
+import { switchMap, map } from 'rxjs/operators';
+
+export class UserService {
+  private users$: Observable<User[]> = this.refreshTrigger.pipe(
+    switchMap(() => this.http.get<User[]>('/api/users')),
+    map(users => users)
+  );
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.pipes.len(), 1);
+    assert_eq!(
+        shape.pipes[0].owner, "users$",
+        "pipe owner must be the bare field name, got: {}",
+        shape.pipes[0].owner
+    );
+    // The owner must also be registered as an observable field.
+    assert!(
+        shape.observables.iter().any(|o| o.name == "users$"),
+        "pipe owner should be registered as an observable"
+    );
+}
+
+#[test]
+fn low_fidelity_emits_names_only() {
+    let src = r#"
+import { Observable, of } from 'rxjs';
+import { switchMap, map } from 'rxjs/operators';
+
+export class UserService {
+  users$ = this.refreshTrigger.pipe(
+    switchMap(() => this.http.get<User[]>('/api/users')),
+    map(users => users)
+  );
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Low).expect("should detect RxJS");
+    let rendered = shape.render(Fidelity::Low);
+    // Low fidelity: field names only, no operator sequence
+    assert!(rendered.contains("Φobs:users$"));
+    assert!(!rendered.contains("switchMap"));
+}
+
+#[test]
+fn medium_fidelity_emits_operator_names() {
+    let src = r#"
+import { Observable, of } from 'rxjs';
+import { switchMap, map } from 'rxjs/operators';
+
+export class UserService {
+  users$ = this.refreshTrigger.pipe(
+    switchMap(() => this.http.get<User[]>('/api/users')),
+    map(users => users)
+  );
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    let rendered = shape.render(Fidelity::Medium);
+    assert!(rendered.contains("ΦpipeRx:users$"));
+    assert!(rendered.contains("switchMap"));
+    assert!(rendered.contains("map"));
+}
+
+#[test]
+fn high_fidelity_emits_operator_args() {
+    let src = r#"
+import { Observable, of } from 'rxjs';
+import { debounceTime, map } from 'rxjs/operators';
+
+export class UserService {
+  search$ = this.searchTerm$.pipe(
+    debounceTime(300),
+    map(term => term.trim())
+  );
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::High).expect("should detect RxJS");
+    let rendered = shape.render(Fidelity::High);
+    assert!(rendered.contains("ΦpipeRx:search$"));
+    assert!(rendered.contains("debounceTime"));
+    assert!(rendered.contains("300"));
+}
+
+// ── Combinator detection ───────────────────────────────────────────
+
+#[test]
+fn detects_combine_latest() {
+    let src = r#"
+import { combineLatest } from 'rxjs';
+
+export class UserService {
+  combined$ = combineLatest([this.searchTerm$, this.results$]);
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.combinators.len(), 1);
+    assert_eq!(shape.combinators[0].name, "combineLatest");
+    assert_eq!(shape.combinators[0].args.len(), 2);
+}
+
+#[test]
+fn detects_fork_join() {
+    let src = r#"
+import { forkJoin } from 'rxjs';
+
+export class UserService {
+  allData$ = forkJoin([this.loadUsers(), this.loadOrders()]);
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.combinators.len(), 1);
+    assert_eq!(shape.combinators[0].name, "forkJoin");
+    assert_eq!(shape.combinators[0].args.len(), 2);
+}
+
+// ── No-RxJS no-op ──────────────────────────────────────────────────
+
+#[test]
+fn no_rxjs_imports_produces_none() {
+    let src = r#"
+export class PlainService {
+  private data: string[] = [];
+  addItem(item: string): void { this.data.push(item); }
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium);
+    assert!(shape.is_none(), "non-RxJS file should return None");
+}
+
+// ── Marker round-trip ──────────────────────────────────────────────
+
+#[test]
+fn expand_phi_round_trip() {
+    assert_eq!(expand_phi("Φobs"), Some("Observable"));
+    assert_eq!(expand_phi("Φsubject"), Some("Subject"));
+    assert_eq!(expand_phi("ΦpipeRx"), Some("PipeRx"));
+    assert_eq!(expand_phi("Φmap"), Some("Map"));
+    assert_eq!(expand_phi("Φtap"), Some("Tap"));
+    assert_eq!(expand_phi("Φfilter"), Some("Filter"));
+    assert_eq!(expand_phi("Φcatch"), Some("CatchError"));
+    assert_eq!(expand_phi("Φfinalize"), Some("Finalize"));
+    assert_eq!(expand_phi("Φdelay"), Some("Delay"));
+    assert_eq!(expand_phi("Φcombine"), Some("CombineLatest"));
+    assert_eq!(expand_phi("Φshare"), Some("Share"));
+    assert_eq!(expand_phi("Φto"), Some("FirstValueFrom"));
+    assert_eq!(expand_phi("Φwith"), Some("WithLatestFrom"));
+    assert_eq!(expand_phi("Φscan"), Some("Scan"));
+    assert_eq!(expand_phi("Φdistinct"), Some("DistinctUntilChanged"));
+    assert_eq!(expand_phi("Φretry"), Some("Retry"));
+    assert_eq!(expand_phi("Φunknown"), None);
+}
+
+#[test]
+fn expand_phi_in_line_rewrites_rxjs_markers() {
+    let line = "  Φobs:users$ → http.get";
+    let expanded = expand_phi_in_line(line);
+    assert!(expanded.contains("Observable users$"));
+}
+
+#[test]
+fn rxjs_kind_marker_prefixes_are_unique() {
+    let mut seen = std::collections::HashSet::new();
+    for kind in RxJsKind::all_in_expand_order() {
+        let prefix = kind.marker_prefix();
+        assert!(seen.insert(prefix), "duplicate prefix: {}", prefix);
+    }
+}

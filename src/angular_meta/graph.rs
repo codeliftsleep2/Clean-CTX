@@ -51,6 +51,56 @@ pub enum ClassKind {
     Module,
 }
 
+/// The kind of an NgRx cross-layer graph edge (Phase 5 of the Angular
+/// Ecosystem Deepening). These wire NgRx store artifacts — actions,
+/// reducers, effects, selectors, and components — into the DI graph so
+/// the LLM can trace `dispatch(loadUsers)` → `loadUsers$ effect` →
+/// `UserService.getUsers()` → `.NET UserController.GetAll()` as a single
+/// semantic chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NgRxEdgeKind {
+    /// `Φaction:loadUsers` → `Φreducer:users` (via `on(loadUsers)` handler).
+    ActionReducer,
+    /// `Φaction:loadUsers` → `Φeffect:loadUsers$` (via `ofType(loadUsers)`).
+    ActionEffect,
+    /// `Φeffect:loadUsers$` → `UserService@α3` (via `switchMap(() => svc.getAll())`).
+    EffectService,
+    /// `Φeffect:loadUsers$` → `Φaction:loadUsersSuccess` (via `map(...)`).
+    EffectAction,
+    /// `UserComponent@α7` → `Φngrx:UserFeature` (via `Store<AppState>` DI).
+    ComponentStore,
+    /// `UserComponent@α7` → `Φselector:selectAllUsers` (via `store.select(...)`).
+    ComponentSelector,
+    /// `Φeffect:loadUsers$` → `UserController.GetAll@α12` (CBM cross-language).
+    EffectEndpoint,
+}
+
+impl NgRxEdgeKind {
+    /// The `Φ` marker prefix for this edge kind.
+    pub fn marker_prefix(self) -> &'static str {
+        match self {
+            Self::ActionReducer => "Φact→red:",
+            Self::ActionEffect => "Φact→eff:",
+            Self::EffectService => "Φeff→svc:",
+            Self::EffectAction => "Φeff→act:",
+            Self::ComponentStore => "Φcmp→store:",
+            Self::ComponentSelector => "Φcmp→sel:",
+            Self::EffectEndpoint => "Φeff→endpoint:",
+        }
+    }
+}
+
+/// A single NgRx cross-layer graph edge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NgRxEdge {
+    /// The source node (e.g. `Φaction:loadUsers`, `UserComponent@α7`).
+    pub from: String,
+    /// The target node (e.g. `Φreducer:users`, `UserService@α3`).
+    pub to: String,
+    /// The edge kind.
+    pub kind: NgRxEdgeKind,
+}
+
 /// Metadata for a single Angular class registered in the graph.
 #[derive(Debug, Clone)]
 pub struct ClassEntry {
@@ -97,6 +147,10 @@ pub struct AngularGraphBuilder {
     /// `register_class` (currently: duplicate class name).
     /// Propagated to the `AngularGraph` by `build()`.
     pub(crate) warnings: Vec<String>,
+    /// NgRx cross-layer edges (Phase 5). Collected via
+    /// [`add_ngrx_edge`](Self::add_ngrx_edge) and propagated to the
+    /// resolved graph by `build()`.
+    ngrx_edges: Vec<NgRxEdge>,
 }
 
 impl AngularGraphBuilder {
@@ -106,7 +160,22 @@ impl AngularGraphBuilder {
             classes: HashMap::new(),
             selectors: HashMap::new(),
             warnings: Vec::new(),
+            ngrx_edges: Vec::new(),
         }
+    }
+
+    /// Record an NgRx cross-layer edge (Phase 5 of the Angular
+    /// Ecosystem Deepening). These are appended to the resolved graph
+    /// and emitted in the `§ΦGRAPH` footer as `// Φact→red: …` style
+    /// lines, enabling the LLM to trace
+    /// `dispatch(loadUsers)` → `loadUsers$ effect` →
+    /// `UserService.getUsers()` → `.NET UserController.GetAll()`.
+    pub fn add_ngrx_edge(&mut self, from: &str, to: &str, kind: NgRxEdgeKind) {
+        self.ngrx_edges.push(NgRxEdge {
+            from: from.to_string(),
+            to: to.to_string(),
+            kind,
+        });
     }
 
     /// Register a class in the graph. If the class name already exists
@@ -187,6 +256,8 @@ impl AngularGraphBuilder {
             // into `WorkspaceResult.warnings` (and ultimately the
             // JSON-RPC `_warnings` field).
             warnings: self.warnings,
+            // Phase 5: propagate collected NgRx edges.
+            ngrx_edges: self.ngrx_edges,
             // Builder-side invariant: every `AngularGraph` produced by
             // `build()` is resolved. The flag is kept (privately) so
             // query methods can assert the invariant without forcing
@@ -241,6 +312,10 @@ pub struct AngularGraph {
     /// construction path). Kept for `is_resolved` symmetry and to
     /// allow `pub(crate)` direct construction in tests.
     resolved: bool,
+    /// NgRx cross-layer edges (Phase 5). Populated via the builder's
+    /// [`add_ngrx_edge`](AngularGraphBuilder::add_ngrx_edge) and emitted
+    /// in [`format_graph_footer`](Self::format_graph_footer).
+    ngrx_edges: Vec<NgRxEdge>,
 }
 
 impl AngularGraph {
@@ -369,6 +444,11 @@ impl AngularGraph {
     /// Iterate over all registered classes in insertion order.
     pub fn all_classes(&self) -> Vec<&ClassEntry> {
         self.classes.values().collect()
+    }
+
+    /// Iterate over all collected NgRx cross-layer edges (Phase 5).
+    pub fn ngrx_edges(&self) -> &[NgRxEdge] {
+        &self.ngrx_edges
     }
 
     /// Check if the graph contains a cycle using DFS.
@@ -541,6 +621,23 @@ impl AngularGraph {
             }
         }
 
+        // Phase 5: NgRx cross-layer edges. These are emitted as raw
+        // `Φ` markers (no `//` prefix) so they are consistent with the
+        // rest of the `§ΦGRAPH` footer and can be expanded by
+        // `expand_phi_in_line` if the manifest is passed through the
+        // decompressor.
+        if !self.ngrx_edges.is_empty() {
+            s.push_str("\n// NgRx cross-layer edges\n");
+            for edge in &self.ngrx_edges {
+                s.push_str(&format!(
+                    "  {} {} → {}\n",
+                    edge.kind.marker_prefix(),
+                    edge.from,
+                    edge.to
+                ));
+            }
+        }
+
         s
     }
 }
@@ -555,6 +652,9 @@ impl AngularGraph {
 pub struct GraphCollector {
     /// List of (class_name, file_alias, kind, selector, injects, pipe_name)
     pub entries: Vec<GraphEntry>,
+    /// NgRx cross-layer edges (Phase 5). Propagated to the builder in
+    /// [`build_graph`](Self::build_graph).
+    pub ngrx_edges: Vec<NgRxEdge>,
 }
 
 /// A single graph entry collected during compression.
@@ -570,7 +670,20 @@ pub struct GraphEntry {
 
 impl GraphCollector {
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+            ngrx_edges: Vec::new(),
+        }
+    }
+
+    /// Record an NgRx cross-layer edge (Phase 5). These are flushed
+    /// into the `AngularGraph` by [`build_graph`](Self::build_graph).
+    pub fn add_ngrx_edge(&mut self, from: &str, to: &str, kind: NgRxEdgeKind) {
+        self.ngrx_edges.push(NgRxEdge {
+            from: from.to_string(),
+            to: to.to_string(),
+            kind,
+        });
     }
 
     /// Register a class for later graph building.
@@ -612,6 +725,10 @@ impl GraphCollector {
                 entry.pipe_name.as_deref(),
             );
         }
+        // Phase 5: propagate collected NgRx edges.
+        for edge in &self.ngrx_edges {
+            builder.add_ngrx_edge(&edge.from, &edge.to, edge.kind);
+        }
         builder.build()
     }
 
@@ -637,3 +754,7 @@ mod di_tests;
 #[cfg(test)]
 #[path = "../tests/angular_meta/selector_linkage.rs"]
 mod selector_tests;
+
+#[cfg(test)]
+#[path = "../tests/angular_meta/graph_ngrx.rs"]
+mod ngrx_tests;

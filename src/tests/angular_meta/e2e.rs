@@ -5,9 +5,72 @@
 // with proper abbreviations (Φcmp:, Φsvc:, Φdir:, etc.) and no old-format markers.
 
 use crate::angular_meta::run_meta_layer;
+use crate::angular_meta::run_meta_layer_with_config;
 use crate::compression::Fidelity;
 
 // ── Component E2E ──────────────────────────────────
+
+// ── Config-Threading Regression (Deep Audit Phase F) ──────────────
+//
+// Verifies the `MetaLayerConfig` actually reaches the pipeline. Prior to
+// the deep audit, `run_meta_layer` (the backward-compat variant) was
+// always called — the `enabled` flags and sub-layer settings in
+// `.clean-ctx.json` were silently ignored. This test would have failed
+// before the config was threaded through `MetaLayer::enrich` →
+// `run_meta_layer_with_config`.
+
+#[test]
+fn disabled_rxjs_ngrx_produces_zero_markers() {
+    use crate::config::{MetaLayerConfig, NgRxConfig, RxJsConfig, SignalsConfig, RoutingConfig};
+
+    let source = r#"
+        import { Injectable } from '@angular/core';
+        import { Observable, BehaviorSubject, of, from } from 'rxjs';
+        import { map, switchMap, catchError } from 'rxjs/operators';
+        import { createAction, createReducer, on, createSelector } from '@ngrx/store';
+
+        const loadUsers = createAction('[User] Load Users', (u: any) => ({ u }));
+        const loadUsersSuccess = createAction('[User] Load Users Success');
+
+        @Injectable({ providedIn: 'root' })
+        export class UserService {
+            users$: Observable<User[]> = of([]);
+            private trigger$ = new BehaviorSubject<void>(undefined);
+            load() {
+                return this.trigger$.pipe(
+                    switchMap(() => of([])),
+                    map(users => users),
+                    catchError(err => of([]))
+                );
+            }
+        }
+    "#;
+    let class_captures = vec![source.to_string()];
+
+    // Disable RxJS and NgRx sub-layers — they must NOT emit anything.
+    // Keep signals/routing enabled (defaults) so we prove only the
+    // disabled layers are suppressed.
+    let cfg = MetaLayerConfig {
+        rxjs: RxJsConfig { enabled: false, ..Default::default() },
+        ngrx: NgRxConfig { enabled: false, ..Default::default() },
+        signals: SignalsConfig::default(),
+        routing: RoutingConfig::default(),
+        ..Default::default()
+    };
+
+    let block = run_meta_layer_with_config(source, &class_captures, Fidelity::Medium, Some(&cfg))
+        .expect("should still detect Angular @Injectable");
+    let rendered = block.render();
+
+    // The Angular decorator block is still emitted.
+    assert!(rendered.contains("Φsvc:UserService"), "should contain Φsvc marker\n{}", rendered);
+    // Disabled layers must produce zero markers.
+    assert!(!rendered.contains("Φobs:"), "disabled RxJS must not emit Φobs:\n{}", rendered);
+    assert!(!rendered.contains("Φsubject:"), "disabled RxJS must not emit Φsubject:\n{}", rendered);
+    assert!(!rendered.contains("Φmap:"), "disabled RxJS must not emit Φmap:\n{}", rendered);
+    assert!(!rendered.contains("Φcatch:"), "disabled RxJS must not emit Φcatch:\n{}", rendered);
+    assert!(!rendered.contains("Φaction:"), "disabled NgRx must not emit Φaction:\n{}", rendered);
+}
 
 #[test]
 fn angular_component_to_phi_markers_e2e() {
@@ -251,4 +314,148 @@ fn angular_low_fidelity_emits_base_phi_markers_e2e() {
     // Low fidelity still emits base markers (no template shapes, no injects)
     assert!(rendered.contains("Φcmp:AppComponent"), "should contain Φcmp at Low fidelity\n{}", rendered);
     assert!(!rendered.contains("NG_COMPONENT_"), "should not contain old NG_ prefix\n{}", rendered);
+}
+
+// ── Phase C: Structured MetaLayerOutput (no render-then-reparse) ──
+//
+// The deep-audit remediation replaced the render-then-reparse anti-pattern:
+// `MetaLayer::enrich` previously wrote a rendered `String` which the
+// pipeline re-parsed back into a structured `MetaBlock` by string-splitting
+// on `// ---` headers. Now `enrich` returns a structured `MetaLayerOutput`
+// (structured block + rendered text) and the pipeline consumes the
+// structured block directly.
+//
+// This test drives the full registry path and verifies:
+//   1. The structured Angular block carries decorator lines + named
+//      sections (RxJS), with no cross-contamination.
+//   2. The rendered text matches `MetaBlock::render()` exactly — i.e.
+//      the structured form and the string form are consistent (no
+//      information is lost in either direction).
+
+#[test]
+fn structured_meta_layer_output_preserves_angular_sections() {
+    let source = r#"
+        import { Injectable } from '@angular/core';
+        import { BehaviorSubject, Observable, of } from 'rxjs';
+        import { map, switchMap } from 'rxjs/operators';
+
+        @Injectable({ providedIn: 'root' })
+        export class UserService {
+            users$: Observable<string[]> = of([]);
+            private refresh$ = new BehaviorSubject<void>(undefined);
+            load() {
+                return this.refresh$.pipe(
+                    switchMap(() => of([])),
+                    map((x: string[]) => x)
+                );
+            }
+        }
+    "#;
+
+    let registry = crate::layers::LayerRegistry::global();
+    let results = registry.run_meta_layers_pipeline(source, &[source.to_string()], Fidelity::Medium, None);
+
+    // The angular layer must have emitted a structured output.
+    let angular = results
+        .iter()
+        .find(|o| o.layer_name == "angular")
+        .expect("angular layer should produce output for this source");
+
+    // Structured block is present and carries the decorator line.
+    let block = angular
+        .angular_block
+        .as_ref()
+        .expect("angular output must carry a structured MetaBlock");
+    assert!(
+        block.lines.iter().any(|l| l.contains("Φsvc:UserService")),
+        "structured block should contain Φsvc line, got: {:?}",
+        block.lines
+    );
+
+    // The RxJS section is a named section (not leaked into the decorator lines).
+    let rx_section = block
+        .sections
+        .iter()
+        .find(|s| s.header.contains("RxJS"))
+        .expect("structured block should contain an RxJS named section");
+    assert!(
+        rx_section.lines.iter().any(|l| l.trim_start().starts_with("Φsubject:refresh$")),
+        "RxJS section should contain Φsubject:refresh$ line, got: {:?}",
+        rx_section.lines
+    );
+    assert!(
+        rx_section.lines.iter().any(|l| l.trim_start().starts_with("Φobs:users$")),
+        "RxJS section should contain Φobs:users$ line, got: {:?}",
+        rx_section.lines
+    );
+
+    // The rendered text in MetaLayerOutput must match MetaBlock::render()
+    // exactly — this is the invariant that makes the structured form and
+    // the string form interchangeable (no information loss).
+    let block_rendered = block.render();
+    assert_eq!(
+        angular.rendered, block_rendered,
+        "MetaLayerOutput.rendered must equal MetaBlock::render()"
+    );
+    assert!(
+        block_rendered.contains("// --- Φ RxJS Meta ---"),
+        "rendered text should contain the RxJS section header"
+    );
+}
+
+/// The pipeline's `build_output_lines` must assign the structured blocks
+/// directly — a regression that fails if the render-then-reparse path is
+/// reintroduced (blocks would no longer be sectioned correctly).
+#[test]
+fn build_output_lines_assigns_structured_meta_blocks() {
+    let source = r#"
+        import { Injectable } from '@angular/core';
+        import { Observable, of } from 'rxjs';
+        import { map } from 'rxjs/operators';
+
+        @Injectable({ providedIn: 'root' })
+        export class DataService {
+            items$: Observable<string[]> = of([]);
+            fetch() {
+                return this.items$.pipe(map((x) => x));
+            }
+        }
+    "#;
+
+    // Use the compression pipeline directly. `skip_set` = None,
+    // `config` = None (defaults).
+    // The decorator extractor walks each class capture's text looking for
+    // `@Injectable` immediately preceding the class — so the capture text
+    // must carry the full source (matching the other e2e tests).
+    let all_captures = vec![crate::compression::CapEntry {
+        name: "class.root".to_string(),
+        text: source.to_string(),
+        raw_text: source.to_string(),
+        start_byte: 0,
+    }];
+    let built = crate::compression::pipeline::build_output_lines(
+        &all_captures,
+        source,
+        Fidelity::Medium,
+        None,
+        None,
+    );
+
+    // Angular leaf block must exist and carry both decorator lines and a
+    // named RxJS section — proving the structured form survived the
+    // pipeline (no string-splitting re-parse happened).
+    let block = built
+        .meta_block
+        .as_ref()
+        .expect("build_output_lines should attach the angular MetaBlock");
+    assert!(
+        block.lines.iter().any(|l| l.contains("Φsvc:DataService")),
+        "MetaBlock.lines should carry the decorator line, got: {:?}",
+        block.lines
+    );
+    assert!(
+        block.sections.iter().any(|s| s.header.contains("RxJS")),
+        "MetaBlock.sections should carry the RxJS section, got: {:?}",
+        block.sections
+    );
 }

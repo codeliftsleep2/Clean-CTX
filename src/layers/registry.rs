@@ -8,8 +8,9 @@
 
 use std::sync::OnceLock;
 use crate::compression::Fidelity;
+use crate::config::CleanCtxConfig;
 use crate::layers::language::LanguageLayer;
-use crate::layers::meta::MetaLayer;
+use crate::layers::meta::{MetaLayer, MetaLayerOutput};
 
 /// Global registry, initialized once per process.
 static LAYER_REGISTRY: OnceLock<LayerRegistry> = OnceLock::new();
@@ -93,27 +94,32 @@ impl LayerRegistry {
     /// Run all applicable meta-layers on the given source and class captures.
     ///
     /// This is the pipeline-compatible entry point. Each meta-layer checks
-    /// `is_applicable` and, if true, calls `enrich` to append framework-specific
-    /// markers to the output.
+    /// `is_applicable` and, if true, calls `enrich` to produce a structured
+    /// [`MetaLayerOutput`] (structured block + rendered text).
     ///
     /// The `ir` parameter provides class captures from the compiled IR.
     /// When called from the text pipeline, this may be an empty IR — meta-layers
     /// that need class names should extract them from `class_captures` directly.
     ///
-    /// Returns a vector of `(layer_name, block_text)` tuples for the caller
-    /// to integrate into the compressed output.
+    /// The `config` parameter is forwarded to each layer's `enrich` so
+    /// per-framework `enabled` flags and sub-layer settings are honored.
+    ///
+    /// Returns a vector of [`MetaLayerOutput`] values — one per layer that
+    /// produced markers. The structured blocks are used directly by the
+    /// compression pipeline (no render-then-reparse); the rendered text is
+    /// retained for consumers that only need the flat string.
     pub fn run_meta_layers_pipeline(
         &self,
         source: &str,
         class_captures: &[String],
         fidelity: Fidelity,
-    ) -> Vec<(String, String)> {
+        config: Option<&CleanCtxConfig>,
+    ) -> Vec<MetaLayerOutput> {
         let mut results = Vec::new();
         
         for layer in &self.meta_layers {
             // Use trait-based dispatch: check if this layer applies to the source
-            if layer.is_applicable(source, std::path::Path::new("")) {
-                let mut output = String::new();
+            if layer.is_applicable(source, std::path::Path::new(""), config) {
                 // Build a minimal CompiledIR with the class captures so meta-layers
                 // that extract class names from instructions still work.
                 let class_instructions: Vec<crate::ir::opcodes::CoreOp> = class_captures
@@ -126,9 +132,8 @@ impl LayerRegistry {
                     version: 1,
                 };
                 // Pass the real source code so detection and extraction work correctly
-                layer.enrich(&mut output, source, &ir, fidelity);
-                if !output.is_empty() {
-                    results.push((layer.name().to_string(), output));
+                if let Some(output) = layer.enrich(source, &ir, fidelity, config) {
+                    results.push(output);
                 }
             }
         }
