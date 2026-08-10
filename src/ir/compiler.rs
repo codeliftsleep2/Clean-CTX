@@ -447,10 +447,11 @@ impl IRCompiler {
         // P0-4: Use canonical LayerRegistry instead of removed ir::layers::MetaLayer trait.
         // Meta-layers are registered in src/layers/meta/ and wired via McpState -> LayerRegistry.
         let meta_results = crate::layers::LayerRegistry::global()
-            .run_meta_layers_pipeline(source, &class_names, fidelity);
-        for (_layer_name, block_text) in &meta_results {
-            // Parse Φ marker lines into CoreOp instructions for IR enrichment.
-            for line in block_text.lines() {
+            .run_meta_layers_pipeline(source, &class_names, fidelity, None);
+        for output in &meta_results {
+            // Parse Φ marker lines from the rendered block into CoreOp
+            // instructions for IR enrichment.
+            for line in output.rendered.lines() {
                 let line = line.trim();
                 if line.is_empty() || !line.starts_with('Φ') {
                     continue;

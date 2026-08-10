@@ -9,6 +9,63 @@ fn test_default_config() {
     assert!(config.type_aliases.is_empty());
 }
 
+// ── Angular Ecosystem Deepening sub-layer configs (Phase 6) ───────
+
+#[test]
+fn test_meta_layer_config_defaults() {
+    let config = MetaLayerConfig::default();
+    assert!(config.enabled);
+    assert!(config.rxjs.enabled);
+    assert_eq!(config.rxjs.min_pipe_operators, 2);
+    assert!(config.ngrx.enabled);
+    assert!(config.ngrx.include_dispatch_sites);
+    assert!(config.ngrx.include_select_sites);
+    assert!(config.ngrx.entity_selectors);
+    assert!(config.ngrx.cross_layer_cbm);
+    assert!(config.signals.enabled);
+    assert!(config.routing.enabled);
+}
+
+#[test]
+fn test_meta_layer_config_json_round_trip() {
+    let config = MetaLayerConfig {
+        enabled: true,
+        rxjs: RxJsConfig {
+            enabled: true,
+            min_pipe_operators: 3,
+        },
+        ngrx: NgRxConfig {
+            enabled: true,
+            include_dispatch_sites: false,
+            include_select_sites: true,
+            entity_selectors: false,
+            cross_layer_cbm: true,
+        },
+        signals: SignalsConfig { enabled: true },
+        routing: RoutingConfig { enabled: false },
+    };
+    let json = serde_json::to_string(&config).expect("serialize");
+    let parsed: MetaLayerConfig = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(parsed.rxjs.min_pipe_operators, 3);
+    assert!(!parsed.ngrx.include_dispatch_sites);
+    assert!(!parsed.ngrx.entity_selectors);
+    assert!(!parsed.routing.enabled);
+}
+
+#[test]
+fn test_meta_layer_config_backward_compatible_partial_json() {
+    // A legacy .clean-ctx.json with only `{ "enabled": false }` still
+    // parses — the new sub-layer fields are `#[serde(default)]`.
+    let json = r#"{ "enabled": false }"#;
+    let parsed: MetaLayerConfig = serde_json::from_str(json).expect("parse");
+    assert!(!parsed.enabled);
+    assert!(parsed.rxjs.enabled);
+    assert_eq!(parsed.rxjs.min_pipe_operators, 2);
+    assert!(parsed.ngrx.enabled);
+    assert!(parsed.signals.enabled);
+    assert!(parsed.routing.enabled);
+}
+
 /// F-12 (FAANG audit): the old substring check matched `"dist"` inside
 /// `"distribute"`. The new glob matcher must NOT do that.
 #[test]

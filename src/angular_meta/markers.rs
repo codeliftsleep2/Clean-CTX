@@ -540,8 +540,19 @@ pub fn expand_phi_in_line(line: &str) -> String {
             // Expansion includes a trailing space so that
             // `Φcmp:Foo` → `@Component Foo` (space separates
             // decorator from name).
-            s = s.replace(prefix, &format!("{} ", kind.expansion()));
+        s = s.replace(prefix, &format!("{} ", kind.expansion()));
         }
+    }
+    // Chain the registered sub-layer expansions (RxJS, NgRx, Signals,
+    // Routing) via the [`PHI_EXPANDERS`](crate::angular_meta::phi::PHI_EXPANDERS)
+    // registry. The Angular Ecosystem Deepening markers are block-scoped
+    // to their own `// --- Φ … Meta ---` sections, so they never collide
+    // with the Angular decorator markers above.
+    //
+    // Adding a new sub-layer (e.g. React) only requires registering its
+    // `expand_phi_in_line` in `phi.rs` — no edit needed here.
+    for expander in crate::angular_meta::phi::PHI_EXPANDERS {
+        s = expander(&s);
     }
     s
 }

@@ -644,10 +644,25 @@ impl GraphBridge {
             Ok(rows) => {
                 // CBM Cypher returns {columns, rows} — rows are Vec<Vec<Value>>.
                 // We try to interpret each row as either node or edge data.
-                let mut nodes = vec![]; let edges = vec![];
+                // A row with >= 2 columns is treated as an edge (from, to);
+                // a single-column row is a node.
+                let mut nodes = vec![];
+                let mut edges = vec![];
                 for row in &rows {
-                    // First column is typically a name or label
-                    if let Some(first) = row.first() {
+                    if row.len() >= 2 {
+                        // Edge: first two columns are (from, to).
+                        let from = row[0].as_str().unwrap_or("").to_string();
+                        let to = row[1].as_str().unwrap_or("").to_string();
+                        if !from.is_empty() && !to.is_empty() {
+                            edges.push(GraphEdge {
+                                from,
+                                to,
+                                label: String::new(),
+                                properties: HashMap::new(),
+                            });
+                        }
+                    } else if let Some(first) = row.first() {
+                        // Node: single column is the name/label.
                         let label = first.as_str().unwrap_or("");
                         nodes.push(GraphNode {
                             id: label.to_string(),
@@ -664,6 +679,82 @@ impl GraphBridge {
             }
             Err(_) => QueryResult { nodes: vec![], edges: vec![] },
         }
+    }
+
+    /// Resolve a cross-language endpoint for a method name, using CBM's
+    /// knowledge graph. This is the **Phase 5** cross-layer edge primitive:
+    /// it finds a matching `.cs` function (e.g. a .NET controller action)
+    /// for an Angular NgRx effect's service call.
+    ///
+    /// Best-effort + incremental: returns `None` (silent skip) when CBM is
+    /// unavailable or no candidate matches. Uses the existing `query_graph`
+    /// Cypher path with TTL in-memory + disk caching — **no new tool**.
+    ///
+    /// Returns the best-match as `"{ClassName}.{MethodName}"` (e.g.
+    /// `"UserController.GetAll"`); empty/no-match → `None`.
+    ///
+    /// The Cypher now joins the declaring `Class` node so the returned
+    /// endpoint is **Controller-qualified** — the LLM can trace
+    /// `Φeffect:loadUsers$ → UserController.GetAll` as a single semantic
+    /// chain, not just a bare method name.
+    pub fn resolve_cross_language_endpoint(&mut self, method_name: &str) -> Option<String> {
+        // Graceful skip when CBM is unavailable — no error, no graph line.
+        if !self.is_available() {
+            return None;
+        }
+        let key = format!("endpoint:{method_name}");
+        let project = self.project_str();
+        if self.check_cache(&key) {
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .unwrap_or_default();
+        }
+
+        let escaped = method_name.replace('\'', "\\'");
+        // Join the declaring Class node (e.g. `UserController`) so the
+        // result is `"{Class}.{Method}"`. Prefer Controller classes.
+        // We call the client directly (via `self.query`) to get the raw
+        // `{columns, rows}` — the generic `query_graph` flattens rows to
+        // the first column, discarding the Controller class. We match on
+        // the exact method name (case-sensitive) so we never return an
+        // arbitrary fuzzy match.
+        let cypher = format!(
+            "MATCH (c:Class)-[:DECLARES]->(f:Function) \
+             WHERE f.name = '{escaped}' AND f.file_path =~ '.*\\.cs$' \
+             RETURN f.name, c.name LIMIT 5"
+        );
+        let rows = self.query(move |c| c.query_graph(&cypher, &project));
+        let result: Option<String> = match rows {
+            Ok(rows) => {
+                // rows are Vec<Vec<Value>>: [f.name, c.name].
+                // Prefer a row whose class name contains "Controller".
+                let controller_hit = rows.iter().find_map(|row| {
+                    let fname = row.first().and_then(|v| v.as_str())?;
+                    let cname = row.get(1).and_then(|v| v.as_str())?;
+                    if cname.contains("Controller") {
+                        Some(format!("{cname}.{fname}"))
+                    } else {
+                        None
+                    }
+                });
+                controller_hit.or_else(|| rows.first().and_then(|row| {
+                    let fname = row.first().and_then(|v| v.as_str())?;
+                    let cname = row.get(1).and_then(|v| v.as_str())?;
+                    Some(format!("{cname}.{fname}"))
+                }))
+            }
+            Err(_) => None,
+        };
+
+        // Cache (write-through to disk when present).
+        self.cache_insert(&key, &result);
+        result
     }
 
     pub fn search(&mut self, query: &str) -> Vec<GraphNode> {

@@ -758,6 +758,18 @@ fn graph_pass(state: &McpState, ctx: &mut PassContext, manifest: &mut String) {
             Ok(s) => s,
             Err(_) => continue,
         };
+
+        // Phase 5: Collect NgRx cross-layer edges even for files that
+        // aren't "Angular" in the decorator sense (e.g. actions/selectors
+        // files have no @Injectable decorator but import @ngrx/store).
+        // Use the workspace's configured fidelity (not hardcoded Medium).
+        let ngrx_fidelity = state.config.default_fidelity;
+        if let Some(ngrx_shape) = crate::angular_meta::ngrx::extract_ngrx_shape(&source_code, ngrx_fidelity) {
+            for (from, to, kind) in ngrx_shape.to_graph_edges() {
+                graph_collector.add_ngrx_edge(&from, &to, kind);
+            }
+        }
+
         if !crate::angular_meta::detect::is_angular_file(&source_code) {
             continue;
         }
@@ -780,6 +792,49 @@ fn graph_pass(state: &McpState, ctx: &mut PassContext, manifest: &mut String) {
             }
         }
         file_contents.insert((*entry).clone(), source_code);
+    }
+
+    // Phase 5: Resolve EffectService edges to cross-language .NET
+    // endpoints via CBM (when available and enabled by config). This
+    // wires the `Φeffect:loadUsers$ → UserController.GetAll@α12` edge.
+    // Graceful skip: when CBM is unavailable or `cross_layer_cbm` is
+    // disabled, no EffectEndpoint edges are added and no error is raised.
+    let cross_layer_cbm = state
+        .config
+        .meta_layers
+        .get("angular")
+        .map(|c| c.ngrx.cross_layer_cbm)
+        .unwrap_or(true);
+    if cross_layer_cbm {
+        let effect_service_edges: Vec<(String, String)> = graph_collector
+            .ngrx_edges
+            .iter()
+            .filter(|e| e.kind == crate::angular_meta::graph::NgRxEdgeKind::EffectService)
+            .map(|e| (e.from.clone(), e.to.clone()))
+            .collect();
+        if !effect_service_edges.is_empty() {
+            if let Some(bridge) = state.graph_bridge_lock().as_mut() {
+                for (from, service_call) in effect_service_edges {
+                    // Extract the method name from the service call
+                    // (e.g. `UserService.getUsers()` → `getUsers`).
+                    let method_name = service_call
+                        .split('.')
+                        .next_back()
+                        .map(|s| s.trim_end_matches(')').trim().to_string())
+                        .unwrap_or_default();
+                    if method_name.is_empty() {
+                        continue;
+                    }
+                    if let Some(endpoint) = bridge.resolve_cross_language_endpoint(&method_name) {
+                        graph_collector.add_ngrx_edge(
+                            &from,
+                            &endpoint,
+                            crate::angular_meta::graph::NgRxEdgeKind::EffectEndpoint,
+                        );
+                    }
+                }
+            }
+        }
     }
 
     let mut angular_graph = graph_collector.build_graph();
