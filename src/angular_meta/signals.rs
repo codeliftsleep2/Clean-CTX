@@ -128,7 +128,9 @@ impl SignalShape {
         for sig in &self.signals {
             match fidelity {
                 Fidelity::Low => {
-                    s.push_str(&format!("  {}:{}\n", sig.kind.marker_prefix(), sig.name));
+                    // `marker_prefix()` already includes the trailing `:`
+                    // (e.g. `"Φsignal:"`), so we must NOT add another one.
+                    s.push_str(&format!("  {}{}\n", sig.kind.marker_prefix(), sig.name));
                 }
                 Fidelity::Medium | Fidelity::High => {
                     if let Some(ref tp) = sig.type_param {
@@ -141,11 +143,11 @@ impl SignalShape {
                         } else {
                             (expansion, "")
                         };
-                        s.push_str(&format!("  {}:{} = {}<{}>{}\n",
+                        s.push_str(&format!("  {}{} = {}<{}>{}\n",
                             sig.kind.marker_prefix(),
                             sig.name, base, tp, suffix));
                     } else {
-                        s.push_str(&format!("  {}:{}\n",
+                        s.push_str(&format!("  {}{}\n",
                             sig.kind.marker_prefix(), sig.name));
                     }
                 }
@@ -216,6 +218,26 @@ pub fn extract_signal_shape(source: &str, _fidelity: Fidelity) -> Option<SignalS
     Some(shape)
 }
 
+/// Extract the declaration name from the text preceding a signal call.
+///
+/// Returns `None` when the call is a bare statement (e.g. `effect()` in a
+/// constructor body) rather than an assignment (`name = ...`). In the
+/// bare-statement case the last whitespace token before the call is a
+/// punctuation character (`{`, `(`, `;`, etc.) which must NOT be treated
+/// as a name — the marker renders `?` instead.
+fn extract_decl_name(before: &str) -> Option<String> {
+    let candidate = before.split_whitespace()
+        .last()
+        .map(|s| s.trim_end_matches('=').trim().to_string())?;
+    if candidate.is_empty()
+        || candidate == "="
+        || !candidate.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '$')
+    {
+        return None;
+    }
+    Some(candidate)
+}
+
 /// Extract signal declarations matching a pattern.
 fn extract_signal_decls(
     source: &str,
@@ -237,11 +259,7 @@ fn extract_signal_decls(
         }
 
         let before = &source[..abs_idx];
-        let name = before.split_whitespace()
-            .last()
-            .map(|s| s.trim_end_matches('=').trim().to_string())
-            .filter(|s| !s.is_empty() && *s != "=")
-            .unwrap_or_else(|| "?".to_string());
+        let name = extract_decl_name(before).unwrap_or_else(|| "?".to_string());
 
         // Extract type param from `<T>` in the call
         let after_start = abs_idx + pattern.len();
@@ -307,11 +325,7 @@ fn extract_effect_decls(source: &str, shape: &mut SignalShape) {
 
         // Extract the variable name (if this is `name = effect(`).
         let before = &source[..abs_idx];
-        let name = before.split_whitespace()
-            .last()
-            .map(|s| s.trim_end_matches('=').trim().to_string())
-            .filter(|s| !s.is_empty() && *s != "=")
-            .unwrap_or_else(|| "?".to_string());
+        let name = extract_decl_name(before).unwrap_or_else(|| "?".to_string());
 
         // Extract type param from `<T>` in the call (rare for effect).
         let after_start = abs_idx + "effect(".len();

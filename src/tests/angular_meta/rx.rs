@@ -244,7 +244,11 @@ export class UserService {
     let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
     assert_eq!(shape.combinators.len(), 1);
     assert_eq!(shape.combinators[0].name, "combineLatest");
-    assert_eq!(shape.combinators[0].args.len(), 2);
+    // The array literal is a single depth-aware argument (commas inside
+    // brackets must NOT fragment it).
+    assert_eq!(shape.combinators[0].args.len(), 1);
+    assert!(shape.combinators[0].args[0].contains("searchTerm$"));
+    assert!(shape.combinators[0].args[0].contains("results$"));
 }
 
 #[test]
@@ -259,7 +263,44 @@ export class UserService {
     let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
     assert_eq!(shape.combinators.len(), 1);
     assert_eq!(shape.combinators[0].name, "forkJoin");
-    assert_eq!(shape.combinators[0].args.len(), 2);
+    // The array literal is a single depth-aware argument.
+    assert_eq!(shape.combinators[0].args.len(), 1);
+    assert!(shape.combinators[0].args[0].contains("loadUsers()"));
+    assert!(shape.combinators[0].args[0].contains("loadOrders()"));
+}
+
+// ── Round-6 audit: depth-aware combinator argument splitting ───────
+//
+// A combinator call with an object-literal / nested-array argument
+// containing commas (e.g. `combineLatest([a$, b$], { some, options })`)
+// must NOT fragment the arguments list. The old naive `body.split(',')`
+// would split on the commas inside the nested brackets/braces.
+
+#[test]
+fn combinator_args_with_nested_commas() {
+    let src = r#"
+import { combineLatest } from 'rxjs';
+
+export class UserService {
+  combined$ = combineLatest([this.searchTerm$, this.results$], {
+    some: 'option',
+    other: null,
+  });
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.combinators.len(), 1);
+    assert_eq!(shape.combinators[0].name, "combineLatest");
+    // The two top-level arguments must NOT be fragmented by the commas
+    // inside the array literal or the options object.
+    assert_eq!(
+        shape.combinators[0].args.len(),
+        2,
+        "combinator args: {:?}",
+        shape.combinators[0].args
+    );
+    assert!(shape.combinators[0].args[0].contains("searchTerm$"));
+    assert!(shape.combinators[0].args[0].contains("results$"));
 }
 
 // ── No-RxJS no-op ──────────────────────────────────────────────────

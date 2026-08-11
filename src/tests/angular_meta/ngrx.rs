@@ -335,6 +335,38 @@ export const selectLoading = createSelector(selectUserState, (state) => state.lo
     assert_eq!(shape.selectors[1].name, "selectLoading");
 }
 
+// ── Round-6 audit: depth-aware selector input splitting ────────────
+//
+// A projection function returning an object literal with commas (e.g.
+// `state => ({ users, loading })`) must NOT fragment the input-selector
+// list. The old naive `body.split(',')` would split on the commas inside
+// the object literal, producing garbage inputs.
+
+#[test]
+fn selector_projection_with_object_literal_commas() {
+    let src = r#"
+import { createSelector } from '@ngrx/store';
+
+export const selectUserSummary = createSelector(
+  selectUserState,
+  selectLoadingState,
+  (userState, loadingState) => ({
+    users: userState.users,
+    loading: loadingState.loading,
+    total: userState.users.length,
+  })
+);
+"#;
+    let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
+    assert_eq!(shape.selectors.len(), 1);
+    assert_eq!(shape.selectors[0].name, "selectUserSummary");
+    // The two input selectors must be captured intact — the commas inside
+    // the returned object literal must NOT leak into the inputs list.
+    assert_eq!(shape.selectors[0].inputs.len(), 2, "inputs: {:?}", shape.selectors[0].inputs);
+    assert!(shape.selectors[0].inputs.iter().any(|i| i.contains("selectUserState")));
+    assert!(shape.selectors[0].inputs.iter().any(|i| i.contains("selectLoadingState")));
+}
+
 // ── Entity adapter extraction ──────────────────────────────────────
 
 #[test]

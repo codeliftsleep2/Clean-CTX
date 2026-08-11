@@ -179,6 +179,62 @@ export class UserComponent {
     );
 }
 
+// ── Single-colon marker rendering (Round-6 audit) ───────────────────
+//
+// `marker_prefix()` already includes the trailing `:` (e.g. `"Φsignal:"`).
+// The renderer must NOT add a second colon — `Φsignal::count` is a bug.
+// Prior audits missed this because the round-trip tests used a
+// correctly-formatted single-colon input and the generic-param test only
+// checked `contains("signal<number>()")`, which passes despite the broken
+// prefix.
+
+#[test]
+fn renders_single_colon_markers() {
+    let src = r#"
+import { signal, computed, effect } from '@angular/core';
+
+export class UserComponent {
+  count = signal(0);
+  fullName = computed(() => 'x');
+  constructor() {
+    effect(() => {});
+  }
+}
+"#;
+    let shape = extract_signal_shape(src, Fidelity::Medium).expect("should detect signals");
+    let rendered = shape.render(Fidelity::Medium);
+    // Every marker line must have exactly one colon after the Φ prefix.
+    for line in rendered.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("Φ") {
+            assert!(
+                !trimmed.contains("::"),
+                "marker must not contain double colon, got: {}",
+                trimmed
+            );
+        }
+    }
+    // Spot-check the exact expected forms.
+    assert!(rendered.contains("Φsignal:count"), "got: {}", rendered);
+    assert!(rendered.contains("Φcomputed:fullName"), "got: {}", rendered);
+    assert!(rendered.contains("Φsig-effect:?"), "got: {}", rendered);
+}
+
+#[test]
+fn low_fidelity_renders_single_colon_markers() {
+    let src = r#"
+import { signal } from '@angular/core';
+
+export class UserComponent {
+  count = signal(0);
+}
+"#;
+    let shape = extract_signal_shape(src, Fidelity::Low).expect("should detect signals");
+    let rendered = shape.render(Fidelity::Low);
+    assert!(rendered.contains("Φsignal:count"), "got: {}", rendered);
+    assert!(!rendered.contains("::"), "got: {}", rendered);
+}
+
 #[test]
 fn extracts_to_signal_interop() {
     let src = r#"
