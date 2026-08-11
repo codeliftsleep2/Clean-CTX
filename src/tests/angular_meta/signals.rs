@@ -100,6 +100,35 @@ export class UserComponent {
     assert_eq!(shape.signals[1].kind, SignalKind::SignalEffect);
 }
 
+// ── Round-7 audit: named effect() assignments ──────────────────────
+//
+// `this.logEffect = effect(...)` must capture the assignment LHS as the
+// marker name. The old token-split hit the trailing `=` and rendered
+// `Φsig-effect:?` — the doc comment promised the name but the code
+// didn't skip the `=` token.
+
+#[test]
+fn extracts_named_effect_assignment() {
+    let src = r#"
+import { effect, signal } from '@angular/core';
+
+export class UserComponent {
+  count = signal(0);
+
+  constructor() {
+    this.logEffect = effect(() => {
+      console.log('Count:', this.count());
+    });
+  }
+}
+"#;
+    let shape = extract_signal_shape(src, Fidelity::Medium).expect("should detect signals");
+    assert_eq!(shape.signals.len(), 2, "signals: {:?}", shape.signals);
+    let effect_sig = shape.signals.iter().find(|s| s.kind == SignalKind::SignalEffect)
+        .expect("should have an effect");
+    assert_eq!(effect_sig.name, "logEffect", "named effect LHS should be captured");
+}
+
 // ── NgRx createEffect collision guard (Round-3 audit) ──────────────
 //
 // The bare `effect(` pattern matches inside `createEffect(`, which would

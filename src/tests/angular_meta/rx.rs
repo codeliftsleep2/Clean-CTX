@@ -269,6 +269,33 @@ export class UserService {
     assert!(shape.combinators[0].args[0].contains("loadOrders()"));
 }
 
+// ── Round-7 audit: string-aware pipe-body scanning ─────────────────
+//
+// `(`/`)` inside string literals in a pipe body must NOT affect the
+// bracket-depth scan that finds the pipe's closing paren, nor the
+// operator-splitting scan. The old naive scans would truncate the pipe
+// body at a `)` inside a string (e.g. `x.replace('(', ')')`).
+
+#[test]
+fn pipe_body_ignores_parens_in_strings() {
+    let src = r#"
+import { Observable, of } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
+
+export class UserService {
+  users$ = this.refreshTrigger.pipe(
+    map(x => x.replace('(', ')')),
+    tap(x => console.log("done)"))
+  );
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.pipes.len(), 1, "pipe chain should be detected intact");
+    assert_eq!(shape.pipes[0].operators.len(), 2, "operators: {:?}", shape.pipes[0].operators);
+    assert_eq!(shape.pipes[0].operators[0].operator_name, "map");
+    assert_eq!(shape.pipes[0].operators[1].operator_name, "tap");
+}
+
 // ── Round-6 audit: depth-aware combinator argument splitting ───────
 //
 // A combinator call with an object-literal / nested-array argument

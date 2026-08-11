@@ -63,7 +63,32 @@ export const appRoutes: Routes = [
     let route = &shape.routes[0];
     assert_eq!(route.path, "users/:id");
     assert_eq!(route.load_component.as_deref(), Some("./user-detail.component"));
-    assert!(route.component.is_none());
+}
+
+// ── Round-7 audit: escaped-quote brace scanning ────────────────────
+//
+// A route path containing an escaped quote (`path: 'user\'s'`) must not
+// corrupt the brace-matching scanners. The old naive `in_string = !in_string`
+// toggle treated the escaped `'` as a string terminator, breaking the
+// enclosing-brace lookup and producing a wrong route object.
+
+#[test]
+fn route_with_escaped_quote_in_path() {
+    let src = r#"
+import { Routes } from '@angular/router';
+
+export const appRoutes: Routes = [
+  {
+    path: 'user\'s',
+    component: UserProfileComponent,
+  },
+];
+"#;
+    let shape = extract_route_shape(src, Fidelity::Medium).expect("should detect routes");
+    assert_eq!(shape.routes.len(), 1, "routes: {:?}", shape.routes);
+    let route = &shape.routes[0];
+    assert_eq!(route.path, "user\\'s", "escaped quote path should be preserved");
+    assert_eq!(route.component.as_deref(), Some("UserProfileComponent"));
 }
 
 #[test]

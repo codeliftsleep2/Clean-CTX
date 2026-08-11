@@ -427,17 +427,43 @@ fn class_name_before(before: &str) -> Option<String> {
 /// is balanced by a `}` before `path:`.
 fn find_enclosing_brace(before: &str) -> Option<usize> {
     let mut depth = 0i32;
-    let mut in_string = false;
-    for (i, c) in before.char_indices().rev() {
-        match c {
-            '"' | '\'' => {
-                // Toggle string state (naive — doesn't handle escapes).
-                in_string = !in_string;
+    let chars: Vec<(usize, char)> = before.char_indices().collect();
+    // Scan backwards. To handle escaped quotes correctly, we walk
+    // forward from the start tracking string state (skipping escaped
+    // chars), then use the recorded per-char string state when
+    // scanning backwards.
+    let mut in_string_at: Vec<bool> = vec![false; chars.len()];
+    let mut cur_in_string = false;
+    let mut cur_quote = '\0';
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i].1;
+        if cur_in_string {
+            if c == '\\' {
+                // Skip the escaped char — it cannot toggle string state.
+                in_string_at[i] = true;
+                if i + 1 < chars.len() {
+                    in_string_at[i + 1] = true;
+                    i += 2;
+                    continue;
+                }
+            } else if c == cur_quote {
+                cur_in_string = false;
             }
-            '}' if !in_string => depth += 1,
-            '{' if !in_string => {
+        } else if c == '\'' || c == '"' {
+            cur_in_string = true;
+            cur_quote = c;
+        }
+        in_string_at[i] = cur_in_string;
+        i += 1;
+    }
+    for (i, (pos, c)) in chars.iter().enumerate().rev() {
+        let in_str = in_string_at[i];
+        match c {
+            '}' if !in_str => depth += 1,
+            '{' if !in_str => {
                 if depth == 0 {
-                    return Some(i);
+                    return Some(*pos);
                 }
                 depth -= 1;
             }
@@ -452,14 +478,24 @@ fn find_enclosing_brace(before: &str) -> Option<usize> {
 fn find_matching_brace(text: &str) -> Option<usize> {
     let mut depth = 0i32;
     let mut in_string = false;
-    for (i, c) in text.char_indices() {
-        match c {
-            '"' | '\'' => {
-                // Toggle string state (naive — doesn't handle escapes).
-                in_string = !in_string;
+    let mut quote = '\0';
+    let mut chars = text.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        if in_string {
+            if c == '\\' {
+                // Skip the escaped char.
+                if let Some(&(_, _next)) = chars.peek() {
+                    chars.next();
+                }
+            } else if c == quote {
+                in_string = false;
             }
-            '{' if !in_string => depth += 1,
-            '}' if !in_string => {
+            continue;
+        }
+        match c {
+            '\'' | '"' => { in_string = true; quote = c; }
+            '{' => depth += 1,
+            '}' => {
                 depth -= 1;
                 if depth == 0 {
                     return Some(i);
@@ -472,6 +508,11 @@ fn find_matching_brace(text: &str) -> Option<usize> {
 }
 
 /// Extract a quoted string value for a key in an object literal.
+///
+/// The scan is escape-aware: an escaped quote (`\'` / `\"`) inside the
+/// string does NOT terminate it (Round-7 audit). The old naive
+/// `rest.find(quote)` stopped at the escaped quote, truncating paths
+/// like `path: 'user\'s'` to `user\`.
 fn extract_quoted_value(obj: &str, key: &str) -> Option<String> {
     let pattern = format!("{}:", key);
     let idx = obj.find(&pattern)?;
@@ -480,8 +521,24 @@ fn extract_quoted_value(obj: &str, key: &str) -> Option<String> {
     if after.starts_with('\'') || after.starts_with('"') {
         let quote = after.chars().next()?;
         let rest = &after[quote.len_utf8()..];
-        let end = rest.find(quote)?;
-        Some(rest[..end].to_string())
+        let mut end = 0;
+        let mut chars = rest.char_indices().peekable();
+        while let Some((i, c)) = chars.next() {
+            if c == '\\' {
+                // Skip the escaped char — it cannot be a terminator.
+                if let Some(&(_, _next)) = chars.peek() {
+                    chars.next();
+                }
+            } else if c == quote {
+                end = i;
+                break;
+            }
+        }
+        if end > 0 || rest.starts_with(quote) {
+            Some(rest[..end].to_string())
+        } else {
+            None
+        }
     } else {
         None
     }
