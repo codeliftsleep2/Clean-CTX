@@ -25,6 +25,7 @@ fn streaming_callback_receives_initial_phase() {
         &mut cache,
         Fidelity::Low,
         4096,
+        None,
         |progress: CompressionProgress| {
             phases.lock().unwrap().push(progress.phase.clone());
             Ok(())
@@ -52,6 +53,7 @@ fn streaming_callback_sees_done_phase_at_end() {
         &mut cache,
         Fidelity::Low,
         4096,
+        None,
         |progress: CompressionProgress| {
             phases.lock().unwrap().push(progress.phase.clone());
             Ok(())
@@ -79,6 +81,7 @@ fn streaming_callback_progress_monotonic() {
         &mut cache,
         Fidelity::Low,
         4096,
+        None,
         |progress: CompressionProgress| {
             vals.lock().unwrap().push(progress.progress);
             Ok(())
@@ -116,6 +119,7 @@ fn streaming_callback_error_stops_pipeline() {
         &mut cache,
         Fidelity::Low,
         4096,
+        None,
         |_: CompressionProgress| Err("user-aborted".into()),
     );
 
@@ -141,6 +145,7 @@ fn streaming_cache_hit_receives_cache_hit_phase() {
         &mut cache,
         Fidelity::Low,
         4096,
+        None,
         |_: CompressionProgress| Ok(()),
     );
 
@@ -151,6 +156,7 @@ fn streaming_cache_hit_receives_cache_hit_phase() {
         &mut cache,
         Fidelity::Low,
         4096,
+        None,
         |progress: CompressionProgress| {
             phases2.lock().unwrap().push(progress.phase.clone());
             Ok(())

@@ -486,12 +486,18 @@ pub fn build_output_lines(
 }
 
 /// Compress source code from a string (not from a file path).
+///
+/// `config` is threaded through to the meta-layer registry so per-framework
+/// `enabled` flags and sub-layer settings (min_pipe_operators,
+/// include_dispatch_sites, etc.) are honored. When `None`, all meta-layers
+/// run with their defaults.
 pub fn compress_source(
     source_code: &str,
     absolute_path: &str,
     dict: &mut PathDictionary,
     cache: &mut LocalStateCache,
     fidelity: Fidelity,
+    config: Option<&crate::config::CleanCtxConfig>,
     aliases: Option<&BTreeMap<String, String>>,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let source_bytes = source_code.as_bytes();
@@ -598,7 +604,9 @@ pub fn compress_source(
      // F-04/compress_source: append ALL meta-layer blocks (Angular, Spring
      // Boot, and .NET), not just the Angular one. Previously the Spring and
      // .NET blocks were silently dropped in this workspace global-symbol path.
-     let built = build_output_lines(&all_captures, source_code, fidelity, None, None);
+     // The `config` is threaded through so per-framework `enabled` flags and
+     // sub-layer settings are honored (previously hardcoded to `None`).
+     let built = build_output_lines(&all_captures, source_code, fidelity, None, config);
      let mut body_content = assemble_body(&built.output_lines, fidelity);
      if let Some(block) = &built.meta_block {
          body_content.push_str(&block.render());

@@ -462,6 +462,49 @@ export const loadUsers$ = createEffect(() =>
         Some("loadUsers"),
         "ofType multi-action should take the first action as primary source"
     );
+    assert_eq!(
+        shape.effects[0].source_actions,
+        vec!["loadUsers".to_string(), "loadUsersFailed".to_string()],
+        "all ofType actions should be retained for per-action graph edges"
+    );
+
+    // Phase 3 completion criterion: one Action → Effect edge per ofType action.
+    let edges = shape.to_graph_edges();
+    let action_effect: Vec<&(String, String, crate::angular_meta::graph::NgRxEdgeKind)> = edges
+        .iter()
+        .filter(|(_, _, k)| *k == crate::angular_meta::graph::NgRxEdgeKind::ActionEffect)
+        .collect();
+    assert_eq!(action_effect.len(), 2, "should emit one edge per ofType action");
+    assert!(
+        action_effect.iter().any(|(from, _, _)| from == "Φaction:loadUsers"),
+        "should have edge from loadUsers"
+    );
+    assert!(
+        action_effect.iter().any(|(from, _, _)| from == "Φaction:loadUsersFailed"),
+        "should have edge from loadUsersFailed"
+    );
+}
+
+// ── Round-5 audit: reducer identifier-boundary guard ───────────────
+
+#[test]
+fn rejects_reducer_like_identifiers() {
+    // `myCreateReducer(...)` and `helper.createReducer(...)` must NOT be
+    // treated as NgRx reducers - the bare `createReducer(` pattern would
+    // otherwise match inside a longer identifier or a method call.
+    let src = r#"
+import { createAction } from '@ngrx/store';
+
+export function myCreateReducer(state: any) { return state; }
+export function helper() { return something.createReducer(initialState); }
+export const loadUsers = createAction('[User] Load Users');
+"#;
+    let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
+    assert!(
+        shape.reducer.is_none(),
+        "reducer-like identifiers must not be extracted as reducers"
+    );
+    assert_eq!(shape.actions.len(), 1, "real createAction should still be extracted");
 }
 
 // ── No-NgRx no-op ──────────────────────────────────────────────────
