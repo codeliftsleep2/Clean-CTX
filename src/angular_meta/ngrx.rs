@@ -1043,9 +1043,13 @@ fn extract_selectors(source: &str, shape: &mut NgRxShape) {
         // The projection fn is the last argument and contains `=>` — drop it.
         // Note: we must NOT filter on "state" — feature selectors like
         // `selectUserState` legitimately contain "state" and are valid inputs.
-        let inputs: Vec<String> = body.split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty() && !s.contains("=>"))
+        //
+        // Use depth-aware splitting so commas inside the projection function
+        // or object literals (e.g. `state => ({ users, loading })`) do NOT
+        // fragment the argument list.
+        let inputs: Vec<String> = crate::angular_meta::util::split_top_level(&body, ',')
+            .into_iter()
+            .filter(|s| !s.contains("=>"))
             .collect();
 
         if !name.is_empty() {

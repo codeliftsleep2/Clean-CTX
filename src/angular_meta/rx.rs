@@ -952,8 +952,11 @@ fn extract_combinators(source: &str, shape: &mut RxShape) {
             let after_start = abs_idx + pattern.len();
             let (body, _) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
-            // Extract arguments from the body.
-            let args: Vec<String> = body.split(',')
+            // Extract arguments from the body. Use depth-aware splitting so
+            // commas inside object literals or nested calls (e.g.
+            // `combineLatest([a$, b$], { ... })`) do NOT fragment the args.
+            let args: Vec<String> = crate::angular_meta::util::split_top_level(&body, ',')
+                .into_iter()
                 .map(|s| s.trim().trim_end_matches(')').trim().to_string())
                 .filter(|s| !s.is_empty() && *s != "[" && *s != "]")
                 .collect();
