@@ -623,9 +623,13 @@ impl AngularGraph {
 
         // Phase 5: NgRx cross-layer edges. These are emitted as raw
         // `Φ` markers (no `//` prefix) so they are consistent with the
-        // rest of the `§ΦGRAPH` footer and can be expanded by
-        // `expand_phi_in_line` if the manifest is passed through the
-        // decompressor.
+        // rest of the `§ΦGRAPH` footer.
+        //
+        // NOTE: The `Φact→red:`/`Φeff→svc:` edge markers are NOT part of
+        // any `PhiMarker` vocabulary — they are graph-edge labels emitted
+        // only in the `§ΦGRAPH` footer. They are intentionally NOT
+        // expanded by `expand_phi_in_line` (the decompressor leaves them
+        // as-is). The `→` (U+2192) is already human-readable.
         if !self.ngrx_edges.is_empty() {
             s.push_str("\n// NgRx cross-layer edges\n");
             for edge in &self.ngrx_edges {

@@ -152,7 +152,11 @@ pub struct ReducerDecl {
 #[derive(Debug, Clone)]
 pub struct EffectDecl {
     pub name: String,
+    /// The primary source action (first in `ofType(...)`).
     pub source_action: Option<String>,
+    /// All source actions from `ofType(a, b, c)` — one graph edge is
+    /// emitted per action so multi-action effects wire every trigger.
+    pub source_actions: Vec<String>,
     pub service_call: Option<String>,
     pub success_action: Option<String>,
     pub failure_action: Option<String>,
@@ -243,9 +247,16 @@ impl NgRxShape {
             }
         }
 
-        // Action → Effect (via `ofType(action)`).
+        // Action → Effect (via `ofType(action)`). One edge per source
+        // action so `ofType(loadUsers, loadUsersFailed)` wires both
+        // triggers to the effect (Phase 3 completion criterion).
         for effect in &self.effects {
-            if let Some(source) = &effect.source_action {
+            let sources: Vec<&str> = if !effect.source_actions.is_empty() {
+                effect.source_actions.iter().map(|s| s.as_str()).collect()
+            } else {
+                effect.source_action.iter().map(|s| s.as_str()).collect()
+            };
+            for source in sources {
                 edges.push((
                     format!("Φaction:{}", source),
                     format!("Φeffect:{}", effect.name),
@@ -647,10 +658,10 @@ fn extract_actions(source: &str, shape: &mut NgRxShape) {
         };
 
         // Collect the full call body (up to matching close paren).
-        let (body, body_len) = collect_call_body(&source[after_paren..]);
+        let (body, body_len) = crate::angular_meta::util::collect_call_body(&source[after_paren..]);
 
         // Extract event string (first quoted string)
-        let event_string = extract_first_quoted(&body).unwrap_or_default();
+        let event_string = crate::angular_meta::util::extract_first_quoted(&body).unwrap_or_default();
 
         // Extract props type. Prefer the explicit `props<T>()` form;
         // fall back to the generic `createAction<T>(` parameter.
@@ -676,41 +687,6 @@ fn extract_actions(source: &str, shape: &mut NgRxShape) {
     }
 }
 
-/// Collect the full body of a call expression (up to the matching
-/// close paren). Returns `(body, end_offset)`.
-fn collect_call_body(text: &str) -> (String, usize) {
-    let mut depth = 0;
-    let mut body = String::new();
-    let mut end = 0;
-    for (i, ch) in text.chars().enumerate() {
-        match ch {
-            '(' => { depth += 1; body.push(ch); }
-            ')' => {
-                if depth == 0 {
-                    end = i;
-                    break;
-                }
-                depth -= 1;
-                body.push(ch);
-            }
-            _ => body.push(ch),
-        }
-    }
-    (body, end)
-}
-
-/// Extract the first quoted string from a text.
-fn extract_first_quoted(text: &str) -> Option<String> {
-    let trimmed = text.trim_start();
-    if let Some(stripped) = trimmed.strip_prefix('\'') {
-        stripped.split('\'').next().map(|s| s.to_string())
-    } else if let Some(stripped) = trimmed.strip_prefix('"') {
-        stripped.split('"').next().map(|s| s.to_string())
-    } else {
-        None
-    }
-}
-
 /// Extract the reducer from `createReducer(...)` calls.
 ///
 /// Handles both forms:
@@ -726,6 +702,17 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find("createReducer(") {
         let abs_idx = search_from + idx;
+        // Reject `myCreateReducer(` / `obj.createReducer(` — the bare
+        // pattern would otherwise match inside a longer identifier or a
+        // method call. A genuine `createReducer(` call is preceded by
+        // whitespace, `=`, `:`, `(`, `,`, `;`, or the start of the file.
+        let prev = source[..abs_idx].chars().last();
+        if let Some(c) = prev {
+            if c.is_alphanumeric() || matches!(c, '_' | '$' | '.') {
+                search_from = abs_idx + "createReducer(".len();
+                continue;
+            }
+        }
         let before = &source[..abs_idx];
         // Determine if this is ` = createReducer(` (assignment) or
         // `: createReducer(` (inline in createFeature). The feature name
@@ -749,7 +736,7 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
         // The match pattern is `createReducer(` — `idx` points at the `C`.
         // Advance past the `createReducer(` to collect the call body.
         let after_start = abs_idx + "createReducer(".len();
-        let (body, _) = collect_call_body(&source[after_start..]);
+        let (body, _) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
         // Extract state type from the first argument's type annotation
         // (e.g. `initialState: UserState` or `initialState`).
@@ -871,7 +858,7 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
             .unwrap_or_default();
 
         let after_start = abs_idx + " = createEffect(".len();
-        let (after, _) = collect_call_body(&source[after_start..]);
+        let (after, _) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
         // Check for `{ dispatch: false }` option
         let no_dispatch = after.contains("dispatch: false");
@@ -992,6 +979,7 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
             shape.effects.push(EffectDecl {
                 name,
                 source_action,
+                source_actions,
                 service_call,
                 success_action,
                 failure_action,
@@ -1049,7 +1037,7 @@ fn extract_selectors(source: &str, shape: &mut NgRxShape) {
             .unwrap_or_default();
 
         let after_start = abs_idx + " = createSelector(".len();
-        let (body, _) = collect_call_body(&source[after_start..]);
+        let (body, _) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
         // Extract input selectors (comma-separated, before the projection fn).
         // The projection fn is the last argument and contains `=>` — drop it.
@@ -1088,11 +1076,11 @@ fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
         // Extract the entity type from between `<` and `>`.
         // For nested generics like `EntityState<User>`, we need to find the
         // matching `>` by tracking bracket depth, not just `split('>')`.
-        let entity_type = extract_entity_type(&source[after_start..]);
+        let entity_type = crate::angular_meta::util::extract_entity_type(&source[after_start..]);
 
         // The config object starts after the `>`.
         let config_start = after_start + entity_type.len() + 1; // skip `>`
-        let (body, _) = collect_call_body(&source[config_start..]);
+        let (body, _) = crate::angular_meta::util::collect_call_body(&source[config_start..]);
 
         // Extract selectId and sortComparer from the config object body.
         // The body starts with `({...})` — strip the outer parens.
@@ -1135,30 +1123,6 @@ fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
         }
         search_from = after_start + body.len();
     }
-}
-
-/// Extract the entity type from a generic parameter like `User` or `EntityState<User>`.
-/// Uses bracket-depth tracking to find the matching `>`.
-fn extract_entity_type(text: &str) -> String {
-    let mut depth = 0;
-    let mut result = String::new();
-    for ch in text.chars() {
-        match ch {
-            '<' => { depth += 1; result.push(ch); }
-            '>' => {
-                if depth == 0 {
-                    break;
-                }
-                depth -= 1;
-                result.push(ch);
-            }
-            // `depth` is always >= 0 here: the only `depth` decrement
-            // happens in the `>` arm above, which never goes negative
-            // (it breaks out at 0 before decrementing).
-            _ => result.push(ch),
-        }
-    }
-    result.trim().to_string()
 }
 
 /// Extract the enclosing component class name from a `@Component`

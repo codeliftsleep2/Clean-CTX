@@ -487,7 +487,15 @@ fn compress_pass_with_global_symbols(
         let mut dict_guard = state.dict_lock();
         let mut cache_guard = state.cache_write();
 
-        match compress_source(&source_code, entry, &mut dict_guard, &mut cache_guard, fidelity, Some(&state.config.type_aliases)) {
+        match compress_source(
+            &source_code,
+            entry,
+            &mut dict_guard,
+            &mut cache_guard,
+            fidelity,
+            Some(&state.config),
+            Some(&state.config.type_aliases),
+        ) {
             Ok(compressed) => {
                 // Use the already-held dict_guard instead of re-locking through state
                 let alias = dict_guard.get_or_create_alias(entry.clone());

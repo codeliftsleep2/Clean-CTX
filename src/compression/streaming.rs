@@ -41,12 +41,17 @@ pub struct CompressionProgress {
 /// Reads the source file in chunks, reports progress via a caller-provided
 /// callback, and delegates all structural logic to the shared pipeline
 /// helpers.
+///
+/// `config` is threaded through to the meta-layer registry so per-framework
+/// `enabled` flags and sub-layer settings are honored. When `None`, all
+/// meta-layers run with their defaults.
 pub fn compress_file_streaming<F>(
     file: PathBuf,
     dict: &mut PathDictionary,
     cache: &mut LocalStateCache,
     fidelity: Fidelity,
     chunk_bytes: usize,
+    config: Option<&crate::config::CleanCtxConfig>,
     mut on_progress: F,
 ) -> Result<String, Box<dyn std::error::Error>>
 where
@@ -217,7 +222,7 @@ where
     // F-04: `build_output_lines` now returns `BuildOutputResult` with
     // real counts; we destructure only what we need here.
     let total_captures = all_captures.len();
-    let built = build_output_lines(&all_captures, &source_code, fidelity, None, None);
+    let built = build_output_lines(&all_captures, &source_code, fidelity, None, config);
     for idx in 0..total_captures {
         let p = 0.4 + (idx as f64 / total_captures.max(1) as f64) * 0.5;
         on_progress(CompressionProgress {
@@ -228,9 +233,17 @@ where
     }
 
     let mut body_content = assemble_body(&built.output_lines, fidelity);
-    // Angular Meta-Layer (Phase 1): inject the Φ block into the body
-    // BEFORE symbol compression so the `Φ` markers stay untouched.
+    // Meta-Layer blocks (Angular, Spring Boot, .NET): inject the Φ blocks
+    // into the body BEFORE symbol compression so the `Φ` markers stay
+    // untouched. Previously only the Angular block was appended — the
+    // Spring and .NET blocks were silently dropped in this path.
     if let Some(block) = &built.meta_block {
+        body_content.push_str(&block.render());
+    }
+    if let Some(block) = &built.spring_meta_block {
+        body_content.push_str(&block.render());
+    }
+    if let Some(block) = &built.dotnet_meta_block {
         body_content.push_str(&block.render());
     }
 
