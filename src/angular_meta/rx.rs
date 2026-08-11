@@ -709,10 +709,17 @@ fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
             // Collect the full pipe body, which may span multiple lines.
             // After `.pipe(`, we're at depth 1 (the pipe's own paren).
             // We need to find the `)` that brings us back to depth 0.
+            // The scan is string-aware: `(`/`)` inside single-quoted,
+            // double-quoted, or backtick template literals must NOT
+            // affect bracket depth (Round-6/7 audit — same fix applied
+            // to `collect_call_body`).
             let mut pipe_body = String::new();
             let mut depth = 1; // the `.pipe(` itself
             let mut j = i;
             let mut found_close = false;
+            let mut in_single = false;
+            let mut in_double = false;
+            let mut in_template = false;
 
             // Compute the offset between the trimmed and untrimmed line
             // so `pipe_idx` (computed on the trimmed line) maps correctly
@@ -728,8 +735,44 @@ fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
                 };
                 let segment = &line[start_idx..];
 
-                for ch in segment.chars() {
+                let mut chars = segment.chars().peekable();
+                while let Some(ch) = chars.next() {
+                    // String-literal awareness (escaped quotes handled).
+                    if in_single {
+                        if ch == '\\' {
+                            if let Some(&_next) = chars.peek() {
+                                chars.next();
+                            }
+                        } else if ch == '\'' {
+                            in_single = false;
+                        }
+                        continue;
+                    }
+                    if in_double {
+                        if ch == '\\' {
+                            if let Some(&_next) = chars.peek() {
+                                chars.next();
+                            }
+                        } else if ch == '"' {
+                            in_double = false;
+                        }
+                        continue;
+                    }
+                    if in_template {
+                        if ch == '\\' {
+                            if let Some(&_next) = chars.peek() {
+                                chars.next();
+                            }
+                        } else if ch == '`' {
+                            in_template = false;
+                        }
+                        continue;
+                    }
+
                     match ch {
+                        '\'' => { in_single = true; }
+                        '"' => { in_double = true; }
+                        '`' => { in_template = true; }
                         '(' => { depth += 1; }
                         ')' => {
                             depth -= 1;
@@ -785,14 +828,63 @@ fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
 }
 
 /// Extract operators from inside a `.pipe(...)` call.
+///
+/// The scan is string-aware: `(`/`)` inside single-quoted, double-quoted,
+/// or backtick template literals are literal characters and must NOT
+/// affect paren depth (Round-7 audit — matches `collect_call_body`).
 fn extract_operators(pipe_body: &str) -> Vec<PipeOperator> {
     let mut operators = Vec::new();
     let mut depth = 0;
     let mut current_op = String::new();
     let mut paren_depth = 0;
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut in_template = false;
+    let mut chars = pipe_body.chars().peekable();
 
-    for ch in pipe_body.chars() {
+    while let Some(ch) = chars.next() {
+        // String-literal awareness (escaped quotes handled).
+        if in_single {
+            current_op.push(ch);
+            if ch == '\\' {
+                if let Some(&next) = chars.peek() {
+                    current_op.push(next);
+                    chars.next();
+                }
+            } else if ch == '\'' {
+                in_single = false;
+            }
+            continue;
+        }
+        if in_double {
+            current_op.push(ch);
+            if ch == '\\' {
+                if let Some(&next) = chars.peek() {
+                    current_op.push(next);
+                    chars.next();
+                }
+            } else if ch == '"' {
+                in_double = false;
+            }
+            continue;
+        }
+        if in_template {
+            current_op.push(ch);
+            if ch == '\\' {
+                if let Some(&next) = chars.peek() {
+                    current_op.push(next);
+                    chars.next();
+                }
+            } else if ch == '`' {
+                in_template = false;
+            }
+            continue;
+        }
+
         match ch {
+            '\'' => { in_single = true; current_op.push(ch); }
+            '"' => { in_double = true; current_op.push(ch); }
+            '`' => { in_template = true; current_op.push(ch); }
             '(' => {
                 if paren_depth > 0 {
                     // Nested paren inside an operator's arguments

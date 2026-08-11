@@ -742,10 +742,19 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
         // (e.g. `initialState: UserState` or `initialState`).
         // The first argument is the initial state; its type annotation
         // (if present) is the state type.
-        let state_type = body.split(',')
+        //
+        // Round-7 audit: use depth-aware splitting so an inline object
+        // literal initialState (`createReducer({ users: [], ... }, ...)`)
+        // is treated as a single argument — the old naive `body.split(',')`
+        // would fragment it and mis-parse `[]` as the state type. We also
+        // guard against mistaking object-literal property colons for a
+        // type annotation.
+        let state_type = crate::angular_meta::util::split_top_level(&body, ',')
+            .into_iter()
             .next()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
+            .filter(|s| !s.starts_with('{') && !s.starts_with('['))
             .and_then(|first_arg| {
                 // Look for `: Type` in the first argument (e.g. `initialState: UserState`).
                 if let Some(colon_idx) = first_arg.find(':') {
@@ -1196,73 +1205,82 @@ fn extract_store_injections(source: &str, shape: &mut NgRxShape) {
 
 /// Extract dispatch and select call sites.
 ///
-/// Handles:
-/// - `this.store.dispatch(action())` and bare `store.dispatch(action())`
+/// Handles (multi-line aware — Round-7 audit):
+/// - `this.store.dispatch(action)` and bare `store.dispatch(action)`
 /// - `this.store.select(selector)` and bare `store.select(selector)`
 /// - `store.pipe(select(selector))` (the modern RxJS-pipe selector form)
+///
+/// The old line-based scan missed multi-line calls
+/// (`this.store.dispatch(\n  loadUsersSuccess({ users })\n)`) and used a
+/// naive `split(')')` that truncated nested selectors
+/// (`store.select(selectUser({ id }))`). We now scan the whole source and
+/// use `collect_call_body` so string-aware paren matching handles nested
+/// args and multi-line bodies.
 fn extract_call_sites(source: &str, shape: &mut NgRxShape) {
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("//") || trimmed.starts_with('*') {
-            continue;
-        }
+    for (pattern, kind) in [
+        ("this.store.dispatch(", SiteKind::Dispatch),
+        ("store.dispatch(", SiteKind::Dispatch),
+        ("this.store.select(", SiteKind::Select),
+        ("store.select(", SiteKind::Select),
+        ("this.store.pipe(select(", SiteKind::PipeSelect),
+        ("store.pipe(select(", SiteKind::PipeSelect),
+    ] {
+        let mut search_from = 0;
+        while let Some(idx) = source[search_from..].find(pattern) {
+            let abs_idx = search_from + idx;
 
-        // Dispatch: `this.store.dispatch(` or bare `store.dispatch(`.
-        if let Some(idx) = find_any(trimmed, &["this.store.dispatch(", "store.dispatch("]) {
-            let after = &trimmed[idx + after_pattern(trimmed, idx, &["this.store.dispatch(", "store.dispatch("]).len()..];
-            let action = after.split('(').next()
+            // Skip bare matches that are actually part of a `this.`-prefixed
+            // call — `store.dispatch(` matches inside `this.store.dispatch(`
+            // at a later offset (Round-7 audit: prevents double-counting).
+            if !pattern.starts_with("this.") && source[..abs_idx].ends_with('.') {
+                search_from = abs_idx + pattern.len();
+                continue;
+            }
+
+            // Skip matches inside comment lines (`// ...` or `* ...`).
+            let line_start = source[..abs_idx].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let line_trim = source[line_start..abs_idx].trim_start();
+            if line_trim.starts_with("//") || line_trim.starts_with('*') {
+                search_from = abs_idx + pattern.len();
+                continue;
+            }
+
+            // Collect the full call body (up to matching close paren).
+            // `collect_call_body` is string-aware and multi-line capable.
+            let after_start = abs_idx + pattern.len();
+            let (body, _) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
+
+            // The action/selector name is the first identifier in the body
+            // (e.g. `loadUsersSuccess({ users })` → `loadUsersSuccess`;
+            // `selectUser({ id })` → `selectUser`).
+            let first_ident = body.trim_start()
+                .split(['(', ',', ' ', '\t', '\n', '\r'])
+                .next()
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default();
-            if !action.is_empty() {
-                shape.dispatch_sites.push(DispatchSite {
-                    action_name: action,
-                });
-            }
-        }
 
-        // Select: `this.store.select(` or bare `store.select(`.
-        if let Some(idx) = find_any(trimmed, &["this.store.select(", "store.select("]) {
-            let after = &trimmed[idx + after_pattern(trimmed, idx, &["this.store.select(", "store.select("]).len()..];
-            let selector = after.split(')').next()
-                .map(|s| s.trim().to_string())
-                .unwrap_or_default();
-            if !selector.is_empty() {
-                shape.select_sites.push(SelectSite {
-                    selector_name: selector,
-                });
+            if !first_ident.is_empty() {
+                match kind {
+                    SiteKind::Dispatch => {
+                        shape.dispatch_sites.push(DispatchSite { action_name: first_ident });
+                    }
+                    SiteKind::Select | SiteKind::PipeSelect => {
+                        shape.select_sites.push(SelectSite { selector_name: first_ident });
+                    }
+                }
             }
-        }
 
-        // Pipe-select: `store.pipe(select(selector))`.
-        // `this.store.pipe(select(` or bare `store.pipe(select(`.
-        if let Some(idx) = find_any(trimmed, &["this.store.pipe(select(", "store.pipe(select("]) {
-            let pat_len = after_pattern(trimmed, idx, &["this.store.pipe(select(", "store.pipe(select("]).len();
-            let after = &trimmed[idx + pat_len..];
-            let selector = after.split(')').next()
-                .map(|s| s.trim().to_string())
-                .unwrap_or_default();
-            if !selector.is_empty() {
-                shape.select_sites.push(SelectSite {
-                    selector_name: selector,
-                });
-            }
+            search_from = after_start + body.len();
         }
     }
 }
 
-/// Find the index of the first of several candidate substrings in `text`.
-fn find_any(text: &str, candidates: &[&str]) -> Option<usize> {
-    candidates.iter()
-        .filter_map(|c| text.find(c))
-        .min()
-}
-
-/// Return the candidate substring that actually matched at `idx`.
-fn after_pattern<'a>(text: &str, idx: usize, candidates: &[&'a str]) -> &'a str {
-    candidates.iter()
-        .copied()
-        .find(|c| text[idx..].starts_with(c))
-        .unwrap_or(candidates[0])
+/// The flavour of store call site extracted by [`extract_call_sites`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SiteKind {
+    Dispatch,
+    Select,
+    PipeSelect,
 }
 
 // ---------------------------------------------------------------------------

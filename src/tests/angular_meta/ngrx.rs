@@ -367,6 +367,63 @@ export const selectUserSummary = createSelector(
     assert!(shape.selectors[0].inputs.iter().any(|i| i.contains("selectLoadingState")));
 }
 
+// ── Round-7 audit: multi-line dispatch + object-literal reducer ────
+//
+// 1. `this.store.dispatch(\n  action()\n)` spans multiple lines — the
+//    old line-based scan missed it entirely.
+// 2. `createReducer({ users: [], ... }, ...)` uses an inline object
+//    literal initialState — the old naive `body.split(',')` mis-parsed
+//    `[]` as the state type.
+
+#[test]
+fn extracts_multi_line_dispatch_site() {
+    let src = r#"
+import { Component } from '@angular/core';
+import { Store } from '@ngrx/store';
+import { loadUsersSuccess } from './user.actions';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+  constructor(private store: Store<AppState>) {}
+
+  onLoad() {
+    this.store.dispatch(
+      loadUsersSuccess({ users: [] })
+    );
+  }
+}
+"#;
+    let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
+    assert_eq!(shape.dispatch_sites.len(), 1, "dispatch sites: {:?}", shape.dispatch_sites);
+    assert_eq!(shape.dispatch_sites[0].action_name, "loadUsersSuccess");
+}
+
+#[test]
+fn reducer_with_object_literal_initial_state() {
+    let src = r#"
+import { createReducer, on } from '@ngrx/store';
+import { loadUsersSuccess } from './user.actions';
+
+export const initialState = {
+  users: [],
+  loading: false,
+  error: null,
+};
+
+export const userReducer = createReducer(
+  initialState,
+  on(loadUsersSuccess, (state, { users }) => ({ ...state, users }))
+);
+"#;
+    let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
+    let reducer = shape.reducer.expect("should have a reducer");
+    assert_eq!(reducer.name, "userReducer");
+    // The object-literal initialState must NOT be mis-parsed as a state type.
+    assert!(reducer.state_type.is_none(), "state_type should be None for object literal, got: {:?}", reducer.state_type);
+    assert_eq!(reducer.transitions.len(), 1);
+    assert_eq!(reducer.transitions[0].action_name, "loadUsersSuccess");
+}
+
 // ── Entity adapter extraction ──────────────────────────────────────
 
 #[test]
