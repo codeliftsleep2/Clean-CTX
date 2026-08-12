@@ -79,6 +79,38 @@ export class UserComponent {
     assert_eq!(shape.signals[1].name, "fullName");
 }
 
+// ── Round-9 audit: partial-identifier guard ─────────────────────────
+//
+// The extractor patterns are partial identifiers (`= signal`, `= computed`,
+// `= toSignal`, etc.). Without a next-char guard, `= signalName(` or
+// `= computedTotal(` (longer identifiers that merely START with the
+// pattern) would be falsely captured as signal declarations. A genuine
+// signal call is followed by `(` or `<` (the generic type-parameterized
+// form).
+
+#[test]
+fn does_not_match_longer_identifiers() {
+    let src = r#"
+import { signal, computed } from '@angular/core';
+
+export class UserComponent {
+  signalName = 'not a signal';       // longer identifier, not a signal call
+  computedTotal = 42;                // longer identifier, not a signal call
+  realSignal = signal(0);            // genuine signal() call
+}
+"#;
+    let shape = extract_signal_shape(src, Fidelity::Medium).expect("should detect signals");
+    // Only the genuine `signal(0)` should be captured — `signalName` and
+    // `computedTotal` are just identifiers that start with the pattern.
+    assert_eq!(
+        shape.signals.len(), 1,
+        "only the genuine signal() should be captured, got: {:?}",
+        shape.signals
+    );
+    assert_eq!(shape.signals[0].name, "realSignal");
+    assert_eq!(shape.signals[0].kind, SignalKind::Signal);
+}
+
 #[test]
 fn extracts_effect_registration() {
     let src = r#"

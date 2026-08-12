@@ -63,6 +63,44 @@ export class UserService {
     assert!(shape.observables[0].source.as_deref().unwrap_or("").contains("http.get"));
 }
 
+// ── Round-9 audit: type-annotated + assigned observable declaration ──
+//
+// `users$: Observable<User[]> = this.http.get(...)` has BOTH a type
+// annotation AND an assignment. The old `extract_service_call_observable`
+// took the last whitespace token of the full LHS (`Observable<User[]>`),
+// emitting `Φobs:Observable<User[]>` instead of `Φobs:users$`. The type
+// annotation must be stripped before the field name is extracted.
+
+#[test]
+fn detects_type_annotated_assigned_observable() {
+    let src = r#"
+import { Observable } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+
+export class UserService {
+  users$: Observable<User[]> = this.http.get<User[]>('/api/users');
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.observables.len(), 1, "observables: {:?}", shape.observables);
+    assert_eq!(
+        shape.observables[0].name, "users$",
+        "type-annotated assignment must extract the field name, got: {}",
+        shape.observables[0].name
+    );
+    assert!(
+        !shape.observables[0].name.contains("Observable"),
+        "the field name must not be the type annotation, got: {}",
+        shape.observables[0].name
+    );
+    // The source must still be captured.
+    assert!(
+        shape.observables[0].source.as_deref().unwrap_or("").contains("http.get"),
+        "source should be captured, got: {:?}",
+        shape.observables[0].source
+    );
+}
+
 // ── Subject detection ──────────────────────────────────────────────
 
 #[test]
@@ -111,6 +149,41 @@ export class UserService {
     assert_eq!(shape.subjects[0].name, "cache$");
     assert_eq!(shape.subjects[0].kind, SubjectKind::ReplaySubject);
     assert_eq!(shape.subjects[0].initial_value.as_deref(), Some("1"));
+}
+
+// ── Round-9 audit: type-annotated + assigned subject declaration ─────
+//
+// `selectedUser$: BehaviorSubject<User | null> = new BehaviorSubject(null)`
+// has BOTH a type annotation AND an assignment. The old subject extractor
+// took the last non-`=` token of the text before `new` — which for
+// `selectedUser$: BehaviorSubject<User | null> = ` landed on `|` (from the
+// union type), emitting `Φsubject:|`. The declarator must be isolated
+// (split on `=` then `:`) before the field name is extracted.
+
+#[test]
+fn detects_type_annotated_assigned_subject() {
+    let src = r#"
+import { BehaviorSubject } from 'rxjs';
+
+export class UserService {
+  selectedUser$: BehaviorSubject<User | null> = new BehaviorSubject<User | null>(null);
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
+    assert_eq!(shape.subjects.len(), 1, "subjects: {:?}", shape.subjects);
+    assert_eq!(
+        shape.subjects[0].name, "selectedUser$",
+        "type-annotated assignment must extract the field name, got: {}",
+        shape.subjects[0].name
+    );
+    assert!(
+        !shape.subjects[0].name.contains('|'),
+        "the field name must not contain the union type, got: {}",
+        shape.subjects[0].name
+    );
+    // The initial value and type param must still be captured.
+    assert_eq!(shape.subjects[0].initial_value.as_deref(), Some("null"));
+    assert!(shape.subjects[0].type_param.as_deref().unwrap_or("").contains("User"));
 }
 
 // ── Pipe chain extraction ──────────────────────────────────────────

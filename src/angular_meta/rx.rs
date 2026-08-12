@@ -479,7 +479,14 @@ fn extract_service_call_observable(line: &str) -> Option<ObservableDecl> {
     // or `name$: Observable<T> = this.http.get(...)`
     let eq_idx = line.find(" = ")?;
     let before = &line[..eq_idx];
-    let name = extract_field_name(before)?;
+    // Round-9 audit: strip the type annotation BEFORE extracting the field
+    // name. For `users$: Observable<User[]> = this.http.get(...)`, the last
+    // whitespace token of the full LHS is `Observable<User[]>` (the type),
+    // not the field name — the old code emitted `Φobs:Observable<User[]>`.
+    // Split on `:` first so only the declarator part (`private users$`) is
+    // passed to `extract_field_name`.
+    let name_part = before.split(':').next().unwrap_or(before).trim();
+    let name = extract_field_name(name_part)?;
 
     // Check various HTTP/service patterns.
     // Note: the call may include a generic type param, e.g.
@@ -580,6 +587,22 @@ fn extract_subjects(source: &str, shape: &mut RxShape) {
                 // The line looks like: `name = new Subject<T>()` or
                 // `private name = new Subject<T>()`.
                 let before = &trimmed[..idx].trim();
+                // Round-9 audit: strip the type annotation before extracting
+                // the field name. For
+                // `selectedUser$: BehaviorSubject<User | null> = new ...`,
+                // the text before `new` is
+                // `selectedUser$: BehaviorSubject<User | null> = ` — the old
+                // last-token logic landed on `|` (from the type), not the field
+                // name. Split on `=` to keep only the declarator, then on `:`
+                // to drop the type annotation → `selectedUser$`.
+                let before = before
+                    .split('=')
+                    .next()
+                    .unwrap_or(before)
+                    .split(':')
+                    .next()
+                    .unwrap_or(before)
+                    .trim();
                 // Take the last non-empty token, stripping trailing `=`.
                 let name = before.split_whitespace()
                     .last()

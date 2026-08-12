@@ -253,9 +253,21 @@ fn extract_signal_decls(
         let before = &source[..abs_idx];
         let name = extract_decl_name(before).unwrap_or_else(|| "?".to_string());
 
-        // Extract type param from `<T>` in the call
+        // Round-9 audit: the pattern is a partial identifier (`= signal`,
+        // `= computed`, etc.). Reject matches where the next character is
+        // an identifier char — `= signalName(`, `= computedTotal(`,
+        // `= signalFactory(` — which are longer identifiers, not genuine
+        // signal calls. A genuine call is followed by `(` or `<` (generic
+        // type-parameterized form).
         let after_start = abs_idx + pattern.len();
         let after = &source[after_start..];
+        let next = after.chars().next();
+        if let Some(c) = next {
+            if c.is_alphanumeric() || matches!(c, '_' | '$') {
+                search_from = after_start + 1;
+                continue;
+            }
+        }
         let type_param = if after.starts_with('<') {
             after.find('>').map(|end| {
                 let tp = &after[1..end];
