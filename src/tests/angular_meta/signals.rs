@@ -331,6 +331,35 @@ export class UserComponent {
     assert_eq!(shape.signals[1].name, "count$");
 }
 
+// ── Round-11 audit: trailing comments must NOT create phantom signals ──
+//
+// The global `= signal(` / `effect(` scans only skipped lines whose content
+// BEGAN with `//` / `*`. A trailing `// count = signal(0)` comment on a code
+// line produced a phantom signal. The shared `is_inside_comment_or_string`
+// guard rejects these.
+
+#[test]
+fn ignores_signals_in_trailing_comments() {
+    let src = r#"
+import { signal, effect } from '@angular/core';
+
+export class UserComponent {
+  count = signal(0);  // phantom = signal(99)
+  constructor() {
+    effect(() => {});  // phantomEffect = effect(() => {})
+  }
+}
+"#;
+    let shape = extract_signal_shape(src, Fidelity::Medium).expect("should detect signals");
+    assert_eq!(
+        shape.signals.len(), 2,
+        "trailing-comment signals must not be extracted, got: {:?}",
+        shape.signals
+    );
+    assert_eq!(shape.signals[0].name, "count");
+    assert_eq!(shape.signals[1].kind, SignalKind::SignalEffect);
+}
+
 // ── No-signal no-op ────────────────────────────────────────────────
 
 #[test]

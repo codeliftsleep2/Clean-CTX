@@ -590,6 +590,11 @@ pub fn extract_ngrx_shape(source: &str, _fidelity: Fidelity) -> Option<NgRxShape
 fn extract_feature_name(source: &str, shape: &mut NgRxShape) {
     // Pattern: `createFeature({ name: 'featureName', ... })`
     if let Some(idx) = source.find("createFeature({") {
+        // Round-11 audit: reject when the match is inside a comment/string
+        // (e.g. a `// createFeature({ name: 'x' })` trailing comment).
+        if crate::angular_meta::util::is_inside_comment_or_string(source, idx) {
+            return;
+        }
         let rest = &source[idx + "createFeature({".len()..];
         if let Some(name_idx) = rest.find("name:") {
             let after_name = &rest[name_idx + "name:".len()..];
@@ -613,6 +618,10 @@ fn extract_feature_name(source: &str, shape: &mut NgRxShape) {
 
     // Pattern: `StoreModule.forFeature('featureName', ...)`
     if let Some(idx) = source.find("StoreModule.forFeature(") {
+        // Round-11 audit: reject when the match is inside a comment/string.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, idx) {
+            return;
+        }
         let rest = &source[idx + "StoreModule.forFeature(".len()..];
         let name = rest.trim_start()
             .trim_start_matches('\'')
@@ -643,6 +652,11 @@ fn extract_actions(source: &str, shape: &mut NgRxShape) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find(" = createAction") {
         let abs_idx = search_from + idx;
+        // Round-11 audit: reject when the match is inside a comment/string.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            search_from = abs_idx + " = createAction".len();
+            continue;
+        }
         let before = &source[..abs_idx];
         let name = before.split_whitespace()
             .last()
@@ -718,6 +732,12 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find("createReducer(") {
         let abs_idx = search_from + idx;
+        // Round-11 audit: reject when the match is inside a comment/string
+        // (e.g. a `// createReducer(...)` trailing comment).
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            search_from = abs_idx + "createReducer(".len();
+            continue;
+        }
         // Reject `myCreateReducer(` / `obj.createReducer(` — the bare
         // pattern would otherwise match inside a longer identifier or a
         // method call. A genuine `createReducer(` call is preceded by
@@ -790,6 +810,14 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
         let mut on_search = 0;
         while let Some(on_idx) = body[on_search..].find("on(") {
             let abs_on = on_search + on_idx;
+            // Round-11 audit: reject `on(` matches inside comments or
+            // string literals within the reducer body (e.g. a
+            // `// on(someAction)` comment inside the reducer, or an
+            // `onPress(` string) — they are not real transitions.
+            if crate::angular_meta::util::is_inside_comment_or_string(&body, abs_on) {
+                on_search = abs_on + "on(".len() + 1;
+                continue;
+            }
             let after_on = &body[abs_on + "on(".len()..];
             let action_name = after_on.split(',').next()
                 .map(|s| s.trim().to_string())
@@ -869,6 +897,11 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find(" = createEffect(") {
         let abs_idx = search_from + idx;
+        // Round-11 audit: reject when the match is inside a comment/string.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            search_from = abs_idx + " = createEffect(".len();
+            continue;
+        }
         let before = &source[..abs_idx];
         let name = before.split_whitespace()
             .last()
@@ -1047,6 +1080,11 @@ fn extract_selectors(source: &str, shape: &mut NgRxShape) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find(" = createSelector(") {
         let abs_idx = search_from + idx;
+        // Round-11 audit: reject when the match is inside a comment/string.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            search_from = abs_idx + " = createSelector(".len();
+            continue;
+        }
         let before = &source[..abs_idx];
         let name = before.split_whitespace()
             .last()
@@ -1087,6 +1125,11 @@ fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find(" = createEntityAdapter<") {
         let abs_idx = search_from + idx;
+        // Round-11 audit: reject when the match is inside a comment/string.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            search_from = abs_idx + " = createEntityAdapter<".len();
+            continue;
+        }
         let before = &source[..abs_idx];
         let _name = before.split_whitespace()
             .last()
@@ -1153,6 +1196,11 @@ fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
     let mut data_search = 0;
     while let Some(idx) = source[data_search..].find("EntityCollectionServiceBase<") {
         let abs_idx = data_search + idx;
+        // Round-11 audit: reject when the match is inside a comment/string.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            data_search = abs_idx + "EntityCollectionServiceBase<".len();
+            continue;
+        }
         let after_start = abs_idx + "EntityCollectionServiceBase<".len();
         let entity_type = crate::angular_meta::util::extract_entity_type(&source[after_start..]);
         // Capture the length before moving `entity_type` into the struct.
@@ -1178,6 +1226,12 @@ fn extract_component_name(source: &str, shape: &mut NgRxShape) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find("@Component(") {
         let abs_idx = search_from + idx;
+        // Round-11 audit: reject when the decorator match is inside a
+        // comment/string (e.g. a `// @Component({...})` trailing comment).
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            search_from = abs_idx + "@Component(".len() + 1;
+            continue;
+        }
         // Round-10 audit: use the shared string-aware `find_matching_brace`
         // primitive instead of a hand-rolled depth counter. The old scan
         // ignored string literals — an `@Component({ template: '<div>)</div>' })`
@@ -1213,14 +1267,28 @@ fn extract_component_name(source: &str, shape: &mut NgRxShape) {
 
 /// Extract store injections from constructor parameters.
 fn extract_store_injections(source: &str, shape: &mut NgRxShape) {
-    for line in source.lines() {
+    // Track absolute byte offsets so matches inside trailing comments or
+    // string literals are rejected (Round-11 audit).
+    let mut line_start = 0usize;
+    for line in source.split('\n') {
         let trimmed = line.trim();
         if trimmed.starts_with("//") || trimmed.starts_with('*') {
+            line_start += line.len() + 1;
             continue;
         }
 
+        let leading = line.len() - line.trim_start().len();
+        let trimmed_abs = line_start + leading;
+
         // Pattern: `private store: Store<AppState>` or `store: Store<AppState>`
         if let Some(idx) = trimmed.find(": Store<") {
+            // Round-11 audit: reject when the match is inside a comment/string.
+            if crate::angular_meta::util::is_inside_comment_or_string(
+                source, trimmed_abs + idx,
+            ) {
+                line_start += line.len() + 1;
+                continue;
+            }
             let after = &trimmed[idx + ": Store<".len()..];
             let state_type = after.split('>').next()
                 .map(|s| s.trim().to_string())
@@ -1230,6 +1298,7 @@ fn extract_store_injections(source: &str, shape: &mut NgRxShape) {
                 shape.store_injections.push(state_type);
             }
         }
+        line_start += line.len() + 1;
     }
 }
 
@@ -1271,6 +1340,13 @@ fn extract_call_sites(source: &str, shape: &mut NgRxShape) {
             let line_start = source[..abs_idx].rfind('\n').map(|i| i + 1).unwrap_or(0);
             let line_trim = source[line_start..abs_idx].trim_start();
             if line_trim.starts_with("//") || line_trim.starts_with('*') {
+                search_from = abs_idx + pattern.len();
+                continue;
+            }
+
+            // Round-11 audit: reject matches inside trailing comments, block
+            // comments, or string literals.
+            if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
                 search_from = abs_idx + pattern.len();
                 continue;
             }

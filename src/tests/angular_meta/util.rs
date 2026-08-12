@@ -3,7 +3,9 @@
 // Unit tests for the shared string-scanning helpers used across the
 // Angular Ecosystem Deepening sub-layers (RxJS, NgRx, Routing).
 
-use crate::angular_meta::util::{collect_call_body, extract_entity_type, split_top_level};
+use crate::angular_meta::util::{
+    collect_call_body, extract_entity_type, is_inside_comment_or_string, split_top_level,
+};
 
 // ── collect_call_body: string-awareness (Round-6 audit) ────────────
 //
@@ -90,6 +92,53 @@ fn split_top_level_empty_segments_are_skipped() {
     assert_eq!(parts.len(), 2, "parts: {:?}", parts);
     assert_eq!(parts[0].trim(), "a");
     assert_eq!(parts[1].trim(), "b");
+}
+
+// ── is_inside_comment_or_string (Round-11 audit) ───────────────────
+//
+// The meta-layer extractors use this to reject pattern matches that occur
+// inside comments (line, trailing, block) or string/template literals.
+
+#[test]
+fn is_inside_comment_or_string_detects_line_comment() {
+    let src = "const x = 1; // users$ = of(1)";
+    let pos = src.find("users$").unwrap();
+    assert!(is_inside_comment_or_string(src, pos));
+}
+
+#[test]
+fn is_inside_comment_or_string_detects_trailing_comment() {
+    let src = "users$ = of([]);  // phantom$ = of(1)";
+    let pos = src.find("phantom$").unwrap();
+    assert!(is_inside_comment_or_string(src, pos));
+}
+
+#[test]
+fn is_inside_comment_or_string_detects_block_comment() {
+    let src = "/* implements CanActivate */";
+    let pos = src.find("implements").unwrap();
+    assert!(is_inside_comment_or_string(src, pos));
+}
+
+#[test]
+fn is_inside_comment_or_string_detects_string_literal() {
+    let src = r#"label = "combineLatest([a$, b$])""#;
+    let pos = src.find("combineLatest").unwrap();
+    assert!(is_inside_comment_or_string(src, pos));
+}
+
+#[test]
+fn is_inside_comment_or_string_false_for_code() {
+    let src = "users$ = of([]);";
+    let pos = src.find("users$").unwrap();
+    assert!(!is_inside_comment_or_string(src, pos));
+}
+
+#[test]
+fn is_inside_comment_or_string_false_after_comment_ends() {
+    let src = "// comment\nusers$ = of([]);";
+    let pos = src.find("users$").unwrap();
+    assert!(!is_inside_comment_or_string(src, pos));
 }
 
 // ── extract_entity_type: nested generics ──────────────────────────

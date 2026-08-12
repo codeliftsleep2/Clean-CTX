@@ -250,6 +250,13 @@ fn extract_signal_decls(
             continue;
         }
 
+        // Round-11 audit: reject matches inside trailing comments, block
+        // comments, or string literals.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            search_from = abs_idx + pattern.len();
+            continue;
+        }
+
         let before = &source[..abs_idx];
         let name = extract_decl_name(before).unwrap_or_else(|| "?".to_string());
 
@@ -312,6 +319,13 @@ fn extract_effect_decls(source: &str, shape: &mut SignalShape) {
         let line = &source[line_start..abs_idx];
         let line_trim = line.trim_start();
         if line_trim.starts_with("//") || line_trim.starts_with('*') {
+            search_from = abs_idx + "effect(".len();
+            continue;
+        }
+
+        // Round-11 audit: reject matches inside trailing comments, block
+        // comments, or string literals.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
             search_from = abs_idx + "effect(".len();
             continue;
         }

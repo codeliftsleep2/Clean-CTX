@@ -180,6 +180,83 @@ export const appRoutes: Routes = [
     assert_eq!(shape.routes[2].path, "**");
 }
 
+// ── Round-11 audit: trailing comments, sibling-object strings, and block
+// comments must NOT create phantom routes/guards/resolvers ────────────
+//
+// The Round-10 fix only skipped comment lines whose content BEGAN with
+// `//` / `*`. A `path:` in a trailing comment (`{ path: 'x' }, // path: 'y'`),
+// a `path:` in an unrelated sibling object (`const menu = { path: '/home' }`),
+// or a block-comment `implements` still produced phantom artifacts. The
+// shared `is_inside_comment_or_string` + `is_routes_context` guards close
+// this defect class.
+
+#[test]
+fn ignores_path_in_trailing_comment() {
+    let src = r#"
+import { Routes } from '@angular/router';
+
+export const appRoutes: Routes = [
+  { path: 'users', component: UserListComponent },  // path: 'ignored-trailing'
+];
+"#;
+    let shape = extract_route_shape(src, Fidelity::Medium).expect("should detect routes");
+    assert_eq!(
+        shape.routes.len(), 1,
+        "trailing comment path must not duplicate the route, got: {:?}",
+        shape.routes
+    );
+    assert_eq!(shape.routes[0].path, "users");
+}
+
+#[test]
+fn ignores_path_in_sibling_object_literal() {
+    let src = r#"
+import { Routes } from '@angular/router';
+
+export const appRoutes: Routes = [
+  { path: 'users', component: UserListComponent },
+];
+
+const menuItem = { path: '/home', label: 'Home' };
+"#;
+    let shape = extract_route_shape(src, Fidelity::Medium).expect("should detect routes");
+    assert_eq!(
+        shape.routes.len(), 1,
+        "sibling object literal path must not be a route, got: {:?}",
+        shape.routes
+    );
+    assert_eq!(shape.routes[0].path, "users");
+}
+
+#[test]
+fn ignores_implement_resolve_in_block_comments() {
+    let src = r#"
+import { Injectable } from '@angular/core';
+import { CanActivate, Resolve } from '@angular/router';
+
+/* implements CanActivate — block comment, must NOT be a guard */
+/* class BlockedGuard implements CanActivate { } */
+/* Resolve<User> — block comment, must NOT be a resolver */
+
+@Injectable({ providedIn: 'root' })
+export class AuthGuard implements CanActivate {
+  canActivate(): boolean { return true; }
+}
+"#;
+    let shape = extract_route_shape(src, Fidelity::Medium).expect("should detect guards");
+    assert_eq!(
+        shape.guards.len(), 1,
+        "only the real guard should be extracted, got: {:?}",
+        shape.guards
+    );
+    assert_eq!(shape.guards[0].name, "AuthGuard");
+    assert!(
+        shape.resolvers.is_empty(),
+        "block-comment Resolve<User> must not be a resolver, got: {:?}",
+        shape.resolvers
+    );
+}
+
 // ── Round-10 audit: comment `implements`/`Resolve<` must NOT create
 // phantom guards/resolvers ────────────────────────────────────────────
 //

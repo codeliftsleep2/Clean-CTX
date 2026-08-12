@@ -245,6 +245,13 @@ fn extract_routes(source: &str, shape: &mut RouteShape) {
             continue;
         }
 
+        // Round-11 audit: reject matches inside trailing comments, block
+        // comments, or string literals (e.g. `{ path: 'x' }, // path: 'y'`).
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            search_from = abs_idx + "path:".len();
+            continue;
+        }
+
         // Find the enclosing `{ ... }` object by scanning backwards
         // for the opening brace. We use the shared string-aware
         // primitive (Round-8 structural audit — same depth/string
@@ -252,6 +259,15 @@ fn extract_routes(source: &str, shape: &mut RouteShape) {
         let before = &source[..abs_idx];
         let open_brace = crate::angular_meta::util::find_enclosing_brace(before, before.len());
         if let Some(open) = open_brace {
+            // Round-11 audit: require the enclosing object to be inside a
+            // genuine `Routes` context (a `Routes = [...]` array or a
+            // `RouterModule.forRoot/forChild([...])` call). A `path:` key
+            // inside an unrelated object literal (`const menu = {
+            // path: '/home' }`) must NOT produce a phantom route.
+            if !is_routes_context(source, open) {
+                search_from = abs_idx + 5;
+                continue;
+            }
             // Find the matching closing brace, starting from the
             // opening brace so bracket depth is balanced.
             let after = &source[open..];
@@ -303,6 +319,36 @@ fn extract_routes(source: &str, shape: &mut RouteShape) {
     }
 }
 
+/// Return `true` if byte index `pos` in `source` lies inside a genuine
+/// `Routes` context — a `Routes = [...]` array or a
+/// `RouterModule.forRoot/forChild([...])` call.
+///
+/// Round-11 audit: the global `path:` scan would otherwise treat a
+/// `path:` key inside an unrelated object literal (`const menu = {
+/// path: '/home' }`) as a route, producing a phantom `Φroute:` entry.
+/// This gate requires the nearest preceding `Routes` / `RouterModule`
+/// marker to appear after the last top-level `;` (i.e. we are still
+/// inside the same statement as the Routes declaration).
+fn is_routes_context(source: &str, pos: usize) -> bool {
+    let before = &source[..pos];
+    // Nearest context marker (last occurrence wins).
+    let ctx = before
+        .rfind("RouterModule.forRoot(")
+        .or_else(|| before.rfind("RouterModule.forChild("))
+        .or_else(|| before.rfind("Routes"));
+    let Some(ctx_idx) = ctx else {
+        return false;
+    };
+    // A `;` between the marker and `pos` means we've exited the Routes
+    // statement — the object at `pos` is NOT part of the route array.
+    if let Some(sep) = before.rfind(';') {
+        if sep > ctx_idx {
+            return false;
+        }
+    }
+    true
+}
+
 /// Extract standalone guard declarations (classes implementing
 /// `CanActivate`/`CanLoad`/`CanDeactivate` or functions typed as such).
 fn extract_guards(source: &str, shape: &mut RouteShape) {
@@ -316,6 +362,13 @@ fn extract_guards(source: &str, shape: &mut RouteShape) {
         let line_start = source[..abs_idx].rfind('\n').map(|i| i + 1).unwrap_or(0);
         let line_trim = source[line_start..abs_idx].trim_start();
         if line_trim.starts_with("//") || line_trim.starts_with('*') {
+            search_from = abs_idx + "implements".len();
+            continue;
+        }
+
+        // Round-11 audit: reject matches inside trailing comments, block
+        // comments, or string literals.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
             search_from = abs_idx + "implements".len();
             continue;
         }
@@ -361,6 +414,12 @@ fn extract_guards(source: &str, shape: &mut RouteShape) {
             continue;
         }
 
+        // Round-11 audit: reject matches inside comments or strings.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            search_from = abs_idx + "CanActivateFn".len() + 1;
+            continue;
+        }
+
         // Find the variable name before the type annotation.
         let name = before.split_whitespace()
             .last()
@@ -394,6 +453,13 @@ fn extract_resolvers(source: &str, shape: &mut RouteShape) {
             continue;
         }
 
+        // Round-11 audit: reject matches inside trailing comments, block
+        // comments, or string literals.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            search_from = abs_idx + "Resolve<".len();
+            continue;
+        }
+
         let before = &source[..abs_idx];
 
         // Find the class name: the token immediately after `class`.
@@ -415,6 +481,12 @@ fn extract_resolvers(source: &str, shape: &mut RouteShape) {
         let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
         let line = &source[line_start..abs_idx + "ResolveFn".len()];
         if line.contains("import") {
+            search_from = abs_idx + "ResolveFn".len() + 1;
+            continue;
+        }
+
+        // Round-11 audit: reject matches inside comments or strings.
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
             search_from = abs_idx + "ResolveFn".len() + 1;
             continue;
         }

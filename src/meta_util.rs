@@ -615,6 +615,92 @@ pub fn extract_entity_type(text: &str) -> String {
     result.trim().to_string()
 }
 
+/// Returns `true` if byte index `pos` in `source` lies inside a comment
+/// (`//` line comment or `/* */` block comment) or a string/template
+/// literal.
+///
+/// Used by the meta-layer extractors to reject pattern matches that occur
+/// inside comments or strings — the defect class where a global
+/// `.find(pattern)` scan picks up phantom artifacts (e.g. a `path:` key
+/// inside a trailing `// path: 'x'` comment, or a `combineLatest(` inside
+/// a string literal). Round-11 audit.
+///
+/// `pos` must be a valid byte index into `source` (i.e. `pos <= source.len()`).
+/// The opening quote/comment marker itself is NOT considered "inside" —
+/// only characters after it are.
+pub fn is_inside_comment_or_string(source: &str, pos: usize) -> bool {
+    let bytes = source.as_bytes();
+    let mut i = 0usize;
+    let mut in_line_comment = false;
+    let mut in_block_comment = false;
+    let mut in_string: Option<(char, bool)> = None; // (quote, is_template)
+    let mut interp_depth: i32 = 0;
+
+    while i < pos && i < bytes.len() {
+        let c = bytes[i] as char;
+        if in_line_comment {
+            if c == '\n' {
+                in_line_comment = false;
+            }
+            i += 1;
+            continue;
+        }
+        if in_block_comment {
+            if c == '*' && i + 1 < bytes.len() && bytes[i + 1] as char == '/' {
+                in_block_comment = false;
+                i += 2;
+                continue;
+            }
+            i += 1;
+            continue;
+        }
+        if let Some((quote, is_template)) = in_string {
+            if is_template && interp_depth > 0 {
+                // Inside `${...}` interpolation — treat like code.
+                match c {
+                    '{' => interp_depth += 1,
+                    '}' => {
+                        interp_depth -= 1;
+                        if interp_depth == 0 {
+                            in_string = Some(('`', true));
+                        }
+                    }
+                    _ => {
+                        if c == quote {
+                            in_string = Some(('`', true));
+                        }
+                    }
+                }
+            } else if c == '\\' {
+                i += 2; // skip escaped char
+                continue;
+            } else if c == quote {
+                in_string = None;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            '/' if i + 1 < bytes.len() && bytes[i + 1] as char == '/' => {
+                in_line_comment = true;
+                i += 2;
+                continue;
+            }
+            '/' if i + 1 < bytes.len() && bytes[i + 1] as char == '*' => {
+                in_block_comment = true;
+                i += 2;
+                continue;
+            }
+            '\'' | '"' | '`' => {
+                in_string = Some((c, c == '`'));
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    in_line_comment || in_block_comment || in_string.is_some()
+}
+
 /// Extract a declarator/assignment name from the text BEFORE the value
 /// expression. Handles:
 /// - simple identifiers: `count`
