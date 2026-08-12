@@ -251,9 +251,15 @@ fn audit8_state_new_is_fast() {
     // Verify it completes within 1s (should be sub-ms without CBM blocking).
     use std::time::Instant;
     let start = Instant::now();
-    // Disable CBM to avoid subprocess launch latency skewing the timing
+    // Disable CBM to avoid subprocess launch latency skewing the timing.
+    // Also disable persistence: the default SQLite BufferedStore does disk
+    // I/O on init, which is unrelated to the CBM-blocking concern and can
+    // exceed 1s under parallel test load (flaky). The test's intent is to
+    // verify no CBM subprocess blocking, so both external I/O sources are
+    // disabled.
     let mut config = crate::config::CleanCtxConfig::default();
     config.cbm.enabled = false;
+    config.persistence.enabled = false;
     let _state = crate::mcp::McpState::new(config);
     let elapsed = start.elapsed();
     assert!(elapsed.as_millis() < 1000,

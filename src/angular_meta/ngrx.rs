@@ -1178,24 +1178,22 @@ fn extract_component_name(source: &str, shape: &mut NgRxShape) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find("@Component(") {
         let abs_idx = search_from + idx;
-        let after_decorator = &source[abs_idx + "@Component(".len()..];
-        // Find the matching close paren of the decorator call.
-        let mut depth = 1;
-        let mut end = 0;
-        for (i, ch) in after_decorator.chars().enumerate() {
-            match ch {
-                '(' => depth += 1,
-                ')' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        end = i;
-                        break;
-                    }
-                }
-                _ => {}
+        // Round-10 audit: use the shared string-aware `find_matching_brace`
+        // primitive instead of a hand-rolled depth counter. The old scan
+        // ignored string literals — an `@Component({ template: '<div>)</div>' })`
+        // with a `)` inside the template string would prematurely terminate
+        // the scan, breaking the class-name lookup. The shared primitive
+        // (Round-8 centralization) handles strings/templates correctly.
+        let after_component = &source[abs_idx + "@Component".len()..];
+        // `after_component` starts with `(` (the decorator open paren).
+        let close_rel = match crate::angular_meta::util::find_matching_brace(after_component, '(') {
+            Some(close) => close,
+            None => {
+                search_from = abs_idx + "@Component(".len() + 1;
+                continue;
             }
-        }
-        let after_close = &after_decorator[end + 1..];
+        };
+        let after_close = &after_component[close_rel + 1..];
         // Look for `export class Name` or `class Name` after the decorator.
         let class_idx = after_close.find("class ").map(|i| i + "class ".len());
         if let Some(class_start) = class_idx {

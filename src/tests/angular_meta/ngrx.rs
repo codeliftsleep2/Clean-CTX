@@ -603,6 +603,36 @@ export class UserComponent {
     );
 }
 
+// ── Round-10 audit: string-aware @Component decorator scan ─────────
+//
+// The old component-name extractor used a hand-rolled depth counter that
+// ignored string literals. A `template: '<div>)</div>'` (with a `)` inside
+// the template string) prematurely terminated the decorator scan, so the
+// class name after the decorator was never found. The shared string-aware
+// `find_matching_brace` primitive (Round-8 centralization) handles this.
+
+#[test]
+fn captures_component_name_when_template_contains_paren() {
+    let src = r#"
+import { Component } from '@angular/core';
+import { Store } from '@ngrx/store';
+
+@Component({
+  selector: 'app-user',
+  template: '<div>)</div>',
+})
+export class UserComponent {
+  constructor(private store: Store<AppState>) {}
+}
+"#;
+    let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
+    assert_eq!(
+        shape.component_name.as_deref(),
+        Some("UserComponent"),
+        "component name should be captured despite ')' inside the template string"
+    );
+}
+
 // ── Round-4 audit: inline reducer in createFeature ─────────────────
 
 #[test]
