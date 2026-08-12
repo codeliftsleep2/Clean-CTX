@@ -110,6 +110,39 @@ export const appRoutes: Routes = [
     assert_eq!(route.load_children.as_deref(), Some("./admin.routes"));
 }
 
+// ── Round-10 audit: comment/string `path:` must NOT create phantom routes ──
+//
+// The route extractor scans globally for `path:` keys. A `path:` inside a
+// comment line (e.g. `// path: 'ignored'`) or a template-literal string
+// embedded in a route object must be skipped — otherwise it produces a
+// phantom route with a bogus path.
+
+#[test]
+fn ignores_path_in_comments_and_strings() {
+    let src = r#"
+import { Routes } from '@angular/router';
+
+// path: 'ignored-comment'
+export const appRoutes: Routes = [
+  {
+    path: 'users',
+    component: UserListComponent,
+    // path: 'ignored-inner'
+    data: { label: 'path: not-a-route' },
+  },
+];
+"#;
+    let shape = extract_route_shape(src, Fidelity::Medium).expect("should detect routes");
+    // Only the real `path: 'users'` should be extracted — no phantom routes
+    // from the comment `path:` or the string `'path: not-a-route'`.
+    assert_eq!(
+        shape.routes.len(), 1,
+        "only the real route should be extracted, got: {:?}",
+        shape.routes
+    );
+    assert_eq!(shape.routes[0].path, "users");
+}
+
 #[test]
 fn extracts_route_with_resolver() {
     let src = r#"
@@ -145,6 +178,49 @@ export const appRoutes: Routes = [
     assert_eq!(shape.routes[0].path, "");
     assert_eq!(shape.routes[1].path, "users");
     assert_eq!(shape.routes[2].path, "**");
+}
+
+// ── Round-10 audit: comment `implements`/`Resolve<` must NOT create
+// phantom guards/resolvers ────────────────────────────────────────────
+//
+// The guard/resolver extractors scan for `implements`, `Resolve<`, and
+// `ResolveFn`. A match inside a comment line must be skipped.
+
+#[test]
+fn ignores_implements_and_resolve_in_comments() {
+    let src = r#"
+import { Injectable } from '@angular/core';
+import { CanActivate, Resolve } from '@angular/router';
+
+// implements CanActivate — commented out, must NOT be a guard
+// class OldGuard implements CanActivate { }
+// Resolve<User> commented, must NOT be a resolver
+
+@Injectable({ providedIn: 'root' })
+export class AuthGuard implements CanActivate {
+  canActivate(): boolean { return true; }
+}
+
+@Injectable({ providedIn: 'root' })
+export class UserResolver implements Resolve<User> {
+  resolve(): Observable<User> { return of(null); }
+}
+"#;
+    let shape = extract_route_shape(src, Fidelity::Medium).expect("should detect guards/resolvers");
+    // Only the real guard and resolver should be extracted — no phantom
+    // entries from the commented-out `implements` / `Resolve<User>`.
+    assert_eq!(
+        shape.guards.len(), 1,
+        "only the real guard should be extracted, got: {:?}",
+        shape.guards
+    );
+    assert_eq!(shape.guards[0].name, "AuthGuard");
+    assert_eq!(
+        shape.resolvers.len(), 1,
+        "only the real resolver should be extracted, got: {:?}",
+        shape.resolvers
+    );
+    assert_eq!(shape.resolvers[0].name, "UserResolver");
 }
 
 // ── Guard extraction ───────────────────────────────────────────────

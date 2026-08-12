@@ -234,6 +234,17 @@ fn extract_routes(source: &str, shape: &mut RouteShape) {
     while let Some(idx) = source[search_from..].find("path:") {
         let abs_idx = search_from + idx;
 
+        // Round-10 audit: skip `path:` matches inside comment lines or
+        // string literals. The global scan would otherwise pick up
+        // `// path: 'ignored'` comments and `{ path: 'users' }` strings
+        // embedded in template literals, producing phantom routes.
+        let line_start = source[..abs_idx].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_trim = source[line_start..abs_idx].trim_start();
+        if line_trim.starts_with("//") || line_trim.starts_with('*') {
+            search_from = abs_idx + "path:".len();
+            continue;
+        }
+
         // Find the enclosing `{ ... }` object by scanning backwards
         // for the opening brace. We use the shared string-aware
         // primitive (Round-8 structural audit — same depth/string
@@ -299,6 +310,16 @@ fn extract_guards(source: &str, shape: &mut RouteShape) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find("implements") {
         let abs_idx = search_from + idx;
+
+        // Round-10 audit: skip `implements` matches inside comment lines
+        // (e.g. `// implements CanActivate` or a doc comment).
+        let line_start = source[..abs_idx].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_trim = source[line_start..abs_idx].trim_start();
+        if line_trim.starts_with("//") || line_trim.starts_with('*') {
+            search_from = abs_idx + "implements".len();
+            continue;
+        }
+
         let before = &source[..abs_idx];
 
         // Find the class name: the token immediately after `class`.
@@ -363,6 +384,16 @@ fn extract_resolvers(source: &str, shape: &mut RouteShape) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find("Resolve<") {
         let abs_idx = search_from + idx;
+
+        // Round-10 audit: skip `Resolve<` matches inside comment lines
+        // (e.g. `// Resolve<User>` in a doc comment).
+        let line_start = source[..abs_idx].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_trim = source[line_start..abs_idx].trim_start();
+        if line_trim.starts_with("//") || line_trim.starts_with('*') {
+            search_from = abs_idx + "Resolve<".len();
+            continue;
+        }
+
         let before = &source[..abs_idx];
 
         // Find the class name: the token immediately after `class`.
@@ -408,17 +439,32 @@ fn extract_resolvers(source: &str, shape: &mut RouteShape) {
 /// Find the class name in source text preceding an `implements` or
 /// `Resolve<` keyword. The class name is the token immediately after
 /// the `class` keyword.
+///
+/// Round-10 audit: the old logic returned the FIRST `class` token in the
+/// whole preceding region. For `class Foo {} class AuthGuard implements
+/// CanActivate`, that produced `Foo` (the wrong guard/resolver name). We
+/// now return the NEAREST preceding `class` (last match), and skip
+/// `class` tokens on comment lines (a commented-out class must not
+/// shadow the real declaration).
 fn class_name_before(before: &str) -> Option<String> {
-    // Find the `class` keyword and take the next token.
-    let tokens: Vec<&str> = before.split_whitespace().collect();
-    for (i, tok) in tokens.iter().enumerate() {
-        if *tok == "class" {
-            if let Some(next) = tokens.get(i + 1) {
-                return Some(next.trim_end_matches('{').to_string());
+    let mut last: Option<String> = None;
+    for line in before.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("//") || trimmed.starts_with('*') {
+            continue;
+        }
+        let tokens: Vec<&str> = line.split_whitespace().collect();
+        for (i, tok) in tokens.iter().enumerate() {
+            if *tok == "class" {
+                if let Some(next) = tokens.get(i + 1) {
+                    // Overwrite on each match so the final value is the
+                    // NEAREST preceding class declaration.
+                    last = Some(next.trim_end_matches('{').to_string());
+                }
             }
         }
     }
-    None
+    last
 }
 
 /// Extract an identifier value for a key in an object literal
