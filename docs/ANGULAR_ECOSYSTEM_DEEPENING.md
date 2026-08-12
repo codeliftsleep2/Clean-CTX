@@ -1,8 +1,12 @@
 # Angular Ecosystem Deepening — Meta-Layer Working Document
 
-> **Status:** ✅ Complete · **Last updated:** 2026-08-11 · **Target:** v0.4.0
+> **Status:** ✅ Complete · **Last updated:** 2026-08-12 · **Target:** v0.4.0
 > **Effort:** 9–13 days · **Prereqs:** A-11 ✅ · Angular Meta-Layer Phases 1–4 ✅ · DOTNET_META_LAYER.md Phase 2 ✅
-> **Roadmap items:** R-23 (NgRx) ✅ · R-24 (RxJS) ✅ · signals + routing (from DOTNET_META_LAYER.md Phase 2) ✅
+> **Roadmap items:** R-23 (NgRx) ✅ · R-24 (RxJS) ✅ · R-25 (Signals + Routing + cross-layer graph) ✅
+> **Audit status:** Hardened through Round-5 → Round-11 FAANG audits (Round-11 = comment/string-aware extraction guards). 3,023 tests passing, 0 clippy warnings.
+>
+> **Post-implementation audit hardening (Round-5 → Round-11):** the four extraction layers were iteratively hardened through FAANG audits. Round-8 centralized all string/depth-aware parsing into `src/meta_util.rs` (no per-layer hand-rolled scanners). Round-9 fixed type-annotated assignment names + false-positive guards. Round-10 added string-aware `@Component` scanning + comment-skip guards. Round-11 added the layer-agnostic `is_inside_comment_or_string` primitive threaded through every scan site, plus the `is_routes_context` gate so a `path:` in an unrelated object literal is not treated as a route. See `docs/CHANGELOG.md` [0.3.0] 2026-08-12.
+>
 
 ---
 

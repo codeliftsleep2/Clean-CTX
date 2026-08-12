@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-08-07 (R-44 ✅ shipped — Angular HTML Template Compression)
+**Last updated:** 2026-08-12 (Angular Ecosystem Deepening ✅ — R-23/R-24/R-25 shipped through Round-11 audits)
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -11,7 +11,7 @@
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
 | **Now** | v0.3.0 | Advanced capabilities | ✅ 0 (all complete) |
-| **Next** | v0.4.0 | Advanced capabilities | 8 |
+| **Next** | v0.4.0 | Advanced capabilities | 6 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
 | **Architectural** | Continuous | Code health & tooling | 3 (A-01, A-03, A-05) |
 | **Community** | Continuous | Docs & marketing | 5 |
@@ -26,7 +26,7 @@ These items are complete and documented. Listed for historical context.
 |----|-------|-----------|-------|
 | **R-02** | Type-aware compression | v0.3.0 | Inline `type_aliases` applied across both text + IR compression paths. Text path: configured type names replaced with `$alias` tokens + `§TA $uid→UserId` footer. IR path: `CoreOp::TypeAlias(alias, original)` ops appended. Token-boundary matching (`$` treated as identifier char) prevents false matches in `UserService`/`user_id`. 5-15% additional savings on type-heavy files at Medium/High fidelity. See `docs/TYPE_AWARE_COMPRESSION_PLAN.md`. |
 | **R-12** | Multi-file / Git-Commit Diff | v0.3.0 | New `diff_commits` MCP tool + `src/gitdiff/` module (refs, runner, workspace, engine). Per-file AST change-sets across an entire workspace between two git refs. Strict ref allowlist + `--end-of-options` + XPIA mitigation. Resource limits (file count + per-file size). 32 unit tests + black-box e2e dispatch test. See `docs/R12_MULTI_FILE_GIT_DIFF_PLAN.md`. |
-| **R-22** | Angular Meta-Layer | v0.1.x | Phase 1 (decorators) ✅ · Phase 2 (triplet bundling) ✅ · Phase 2.5 (Angular 17–21 syntax) ✅ · Phase 3 (cross-file DI + selector graph) ✅ |
+| **R-22** | Angular Meta-Layer | v0.1.x | Phase 1 (decorators) ✅ · Phase 2 (triplet bundling) ✅ · Phase 2.5 (Angular 17–21 syntax) ✅ · Phase 3 (cross-file DI + selector graph) ✅ · Phase 4 (fidelity-gated template compression) ✅ |
 | **R-30** | SQLite Persistence Layer | v0.1.x | `SqliteStore` with WAL mode, contexts/deltas/symbols/sessions tables, content-hash deterministic IDs, non-fatal fire-and-forget writes |
 | **R-31** | Zero-Touch Workflow + Heuristics Engine | v0.1.x | `provide_code_context` single entry point, `heuristics.rs` auto-selects fidelity + strategy, session stats dashboard |
 | **R-32** | ULTRA_COMPACT_PLAN — All Phases | v0.1.x | Phase I (string table + field-level delta diffing + contextual delta) ✅ · Phase II (hierarchical IR + binary wire) ✅ · Phase III (header elision + structural dedup + cross-file symbols + Huffman + VarInt micro-opcodes) ✅ · Phase IV (text delta transport) ✅ · 759 tests passing |
@@ -63,6 +63,9 @@ These items are complete and documented. Listed for historical context.
 | **R-43a** | IR Evolution — Execution Semantics (Phase 1) | v0.3.0 | ✅ 4 new `CoreOp` variants (DataFlow, ControlFlow, SideEffect, ExecutionContext) for behavioral reasoning. Full wire-format support (named/positional/binary/hierarchical/string_table/compact). `SemanticIntent` delta metadata with detection in `DeltaComputer::compute()` (rename/add/remove method, change return type/signature, add injection). Compact delta intent preservation. Rust/C#/TypeScript language-layer behavioral extraction. `IRValidator` behavioral consistency checks. See `docs/IR_EVOLUTION_PLAN.md`. |
 | **R-43b** | IR Evolution — Program Graph + Inference Layer + Semantic Delta + Validation + Query (Phases 2-6) | v0.3.0 | ✅ `ProgramGraph` (local graph), `InferenceLayer` (confidence-scored ephemeral overlay), `PassPipeline` (composable `IRPass` chain), `IRValidator` (structural + behavioral invariants), `IRQueryEngine` (queryable IR). All wired into `src/ir/mod.rs`. See `docs/IR_EVOLUTION_PLAN.md`. **Phase 3 CBM enrichment ✅:** `InferenceLayer::enrich_from_cbm()` consumes cross-file CALLS/DATAFLOW edges + importance/dead-code annotations (confidence 0.75); `GraphBridge::get_call_edges()`/`get_dataflow_edges()` added; `InferenceLayerPass::with_cbm()` wires enrichment into the pipeline. See `docs/CHANGELOG.md` [0.3.0]. |
 | **R-44** | Angular HTML Template Compression | v0.3.0 | ✅ Fidelity-gated template compression for Angular `.component.html` files. New `template_compress.rs` module with `compress_template()` / `compress_template_with_prime_ng()`. `TemplateShape::to_marker_lines(fidelity)` produces Low (single-line), Medium (multi-line structural), High (near-full) output. `PhiLineKind` extended with `TemplateBinding`/`TemplateDirective`/`TemplateComponent`. GitDiff routes `.component.html` through the compressor (AST-level change-sets). Heuristics classify `.component.html` as Implementation/Medium, upgrade to High on `intent="edit"`. `provide_code_context` routes `.component.html` through the compressor with DB persistence. PrimeNG `Φp-<name>:` markers. Post-implementation FAANG audit fixed a word-boundary bug (`@if`/`@for` in string literals) and a persistence gap. 2,141 tests passing, 0 clippy warnings. See `extradocs/ANGULAR_HTML_COMPRESSION_PLAN.md`. |
+| **R-23** | NgRx Meta-Layer | v0.4.0 | ✅ Shipped 2026-08-11. `src/angular_meta/ngrx.rs` — actions, reducers (incl. inline `createReducer` in `createFeature`), effects, selectors, entity adapters, NgRx Data `EntityCollectionServiceBase<T>` (`Φentity:T (data-layer)`), `{ dispatch:false }`, Store DI, dispatch/select sites. Namespaced `NgRxKind` (`Φngrx:`/`Φaction:`/`Φreducer:`/`Φeffect:`/`Φselector:`/`Φentity:`/`Φstore:`/`Φdispatch:`/`Φselect:`). |
+| **R-24** | RxJS Meta-Layer | v0.4.0 | ✅ Shipped 2026-08-11. `src/angular_meta/rx.rs` — observable fields, subject instantiations, pipe chains (`ΦpipeRx:`), static combinators, creation functions. Namespaced `RxJsKind` (`Φobs:`/`Φsubject:`/`ΦpipeRx:`/`Φmap:`/`Φtap:`/`Φfilter:`/`Φcatch:`/`Φfinalize:`/`Φdelay:`/`Φcombine:`/`Φshare:`/`Φto:`/`Φwith:`/`Φscan:`/`Φdistinct:`/`Φretry:`). |
+| **R-25** | Angular Ecosystem Deepening (Signals + Routing + cross-layer graph) | v0.4.0 | ✅ Shipped 2026-08-11. Signals (`src/angular_meta/signals.rs` — `signal()`/`computed()`/`effect()`/`toSignal()`/`toObservable()`/`linkedSignal()`, `Φsignal:`/`Φcomputed:`/`Φsig-effect:`/`ΦtoSignal:`/`ΦtoObservable:`/`ΦlinkedSignal:`) + Routing (`src/angular_meta/routing.rs` — `Routes` arrays, `RouterModule.forRoot/forChild`, lazy loads, guards, resolvers; `Φroute:`/`Φguard:`/`Φresolver:`). Cross-layer NgRx graph edges (`Action→Reducer`, `Action→Effect`, `Effect→Service`, `Effect→Action`, `Component→Store`, `Component→Selector`) via `NgRxEdgeKind`. Hardened through Round-5 → Round-11 FAANG audits (string/depth-aware scans, comment/string-aware extraction guards, type-annotated names, false-positive elimination). 3,023 tests passing, 0 clippy warnings. See `docs/ANGULAR_ECOSYSTEM_DEEPENING.md`. |
 
 ---
 
@@ -76,12 +79,10 @@ All Foundation items (A-09 through A-15), all Now items (F-19 through F-22, A-08
 
 ## Next (v0.4.0) — "Advanced capabilities"
 
-**GATE:** All Foundation (A-09 through A-15), Now (A-08, F-19 through F-22), Sliding Context Window (R-41, R-42), and IR Evolution (R-43a, R-43b, R-44) items are complete. v0.4.0 work can begin. Meta-layer items (R-23, R-24) depend on A-11 (detection hardening) which is also complete.
+**GATE:** All Foundation (A-09 through A-15), Now (A-08, F-19 through F-22), Sliding Context Window (R-41, R-42), IR Evolution (R-43a, R-43b, R-44), and the Angular Ecosystem Deepening (R-23, R-24, R-25) items are complete. v0.4.0 work can begin. The NgRx/RxJS/Signals/Routing meta-layers shipped through Round-11 audits.
 
 | ID | Title | Description | Effort | Priority |
 |----|-------|-------------|-------:|---------:|
-| **R-23** | NgRx Meta-Layer | Framework-annotation layer for NgRx state management (sits on top of TS + Angular layers). **A-11 ✅ (complete)** — now unblocked. | 3-4 days | 🔴 High |
-| **R-24** | RxJS Meta-Layer | Additive meta-layer on TS/JS. Observable chain compression, operator pattern recognition, subscription lifecycle markers. **A-11 ✅ (complete)** — now unblocked. | 3-4 days | 🔴 High |
 | **R-07** | MCP `resources` support | Expose compressed snapshots as MCP resources in addition to tools, enabling LLM clients to read prior state without re-invoking tools. | 1-2 days | 🟡 Medium |
 | **R-08** | Improved diff: rename detection | Detect class/method renames (same signature, different name) and emit as `~` with a `renamed from X` hint instead of a delete+add pair. | 1 day | 🟡 Medium |
 | **R-01** | Python language layer | Most-requested language. Follows the 4-step guide in `DEVELOPER_DOCUMENTATION.md`. | 1-2 days | 🟡 Medium |
@@ -169,12 +170,10 @@ All items identified by the FAANG-level architectural review plus the Token Effi
 
 ### Next list priorities (v0.4.0)
 
-All gates clear. Meta-layer items are now unblocked (A-11 ✅). Sliding Context Window (R-41, R-42) and IR Evolution (R-43a, R-43b, R-44) completed in v0.3.0.
+All gates clear. Meta-layer items (R-23, R-24, R-25) are now complete and shipped through Round-11 audits. Sliding Context Window (R-41, R-42) and IR Evolution (R-43a, R-43b, R-44) completed in v0.3.0.
 
 | Priority | Item | Dependency |
 |----------|------|------------|
-| 🔴 High | R-23 NgRx Meta-Layer | A-11 ✅ |
-| 🔴 High | R-24 RxJS Meta-Layer | A-11 ✅ |
 | 🟡 Medium | R-07 MCP resources support | None |
 | 🟡 Medium | R-08 Improved diff: rename detection | None |
 | 🟡 Medium | R-01 Python language layer | None |
