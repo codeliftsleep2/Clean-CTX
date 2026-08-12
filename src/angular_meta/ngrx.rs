@@ -178,6 +178,10 @@ pub struct EntityAdapterDecl {
     pub select_id: Option<String>,
     pub sort_comparer: Option<String>,
     pub selectors: Vec<String>,
+    /// True when this is an NgRx Data `EntityCollectionServiceBase<T>`
+    /// service (auto-generated CRUD — no explicit createAction/
+    /// createReducer) rather than a manual `createEntityAdapter<T>(...)`.
+    pub data_layer: bool,
 }
 
 /// A store dispatch call site.
@@ -448,10 +452,20 @@ impl NgRxShape {
         if let Some(ref entity) = self.entity_adapter {
             match fidelity {
                 Fidelity::Low | Fidelity::Medium => {
-                    s.push_str(&format!("  Φentity:{}\n", entity.entity_type));
+                    let mut line = format!("  Φentity:{}", entity.entity_type);
+                    // NgRx Data auto-generated CRUD services are noted at
+                    // every fidelity level (per the plan's Gotchas section).
+                    if entity.data_layer {
+                        line.push_str(" (data-layer)");
+                    }
+                    s.push_str(&line);
+                    s.push('\n');
                 }
                 Fidelity::High => {
                     let mut line = format!("  Φentity:{}", entity.entity_type);
+                    if entity.data_layer {
+                        line.push_str(" (data-layer)");
+                    }
                     if let Some(ref sid) = entity.select_id {
                         line.push_str(&format!(" selectId=({})", sid));
                     }
@@ -1108,9 +1122,33 @@ fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
                 select_id,
                 sort_comparer,
                 selectors,
+                data_layer: false,
             });
         }
         search_from = after_start + end_offset;
+    }
+
+    // NgRx Data `EntityCollectionServiceBase<T>` — auto-generated CRUD
+    // services. Per the plan's Gotchas section: no explicit
+    // createAction/createReducer; emit `Φentity:T (data-layer)` noting
+    // auto-generated CRUD. The import gate already accepts `@ngrx/data`.
+    let mut data_search = 0;
+    while let Some(idx) = source[data_search..].find("EntityCollectionServiceBase<") {
+        let abs_idx = data_search + idx;
+        let after_start = abs_idx + "EntityCollectionServiceBase<".len();
+        let entity_type = crate::angular_meta::util::extract_entity_type(&source[after_start..]);
+        // Capture the length before moving `entity_type` into the struct.
+        let consumed = entity_type.len() + 1; // skip `>`
+        if !entity_type.is_empty() {
+            shape.entity_adapter = Some(EntityAdapterDecl {
+                entity_type,
+                select_id: None,
+                sort_comparer: None,
+                selectors: Vec::new(),
+                data_layer: true,
+            });
+        }
+        data_search = after_start + consumed;
     }
 }
 
