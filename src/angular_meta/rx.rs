@@ -641,312 +641,112 @@ fn extract_subjects(source: &str, shape: &mut RxShape) {
 ///
 /// Detects `.pipe(operator1(...), operator2(...), ...)` chains.
 /// The pipe must be assigned to a field or variable.
+///
+/// Uses the shared [`collect_call_body`](crate::angular_meta::util::collect_call_body)
+/// primitive for the multi-line, string-aware body scan — the SAME
+/// primitive used by NgRx and the combinator extractor. This is the
+/// single source of truth for bracket-depth + string-literal awareness;
+/// no layer hand-rolls its own scanner (Round-8 structural audit).
 fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
-    // This is a simplified extraction — we look for `.pipe(` patterns
-    // and extract the operator sequence.
-    // Full AST-based extraction would be more accurate, but string-based
-    // is consistent with the existing Angular meta-layer approach.
+    let mut search_from = 0;
+    while let Some(rel) = source[search_from..].find(".pipe(") {
+        let abs_idx = search_from + rel;
 
-    // We need to handle multi-line pipe bodies. The strategy:
-    // 1. Find each `.pipe(` occurrence.
-    // 2. Collect the full pipe body (which may span multiple lines)
-    //    by tracking bracket depth.
-    // 3. Extract operators from the collected body.
-
-    let lines: Vec<&str> = source.lines().collect();
-    let mut i = 0;
-    while i < lines.len() {
-        let trimmed = lines[i].trim();
-        if trimmed.starts_with("//") || trimmed.starts_with('*') {
-            i += 1;
+        // Skip matches inside comment lines (`// ...` or `* ...`).
+        let line_start = source[..abs_idx].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line = &source[line_start..abs_idx];
+        let line_trim = line.trim_start();
+        if line_trim.starts_with("//") || line_trim.starts_with('*') {
+            search_from = abs_idx + ".pipe(".len();
             continue;
         }
 
-        // Check for `.pipe(` pattern
-        if let Some(pipe_idx) = trimmed.find(".pipe(") {
-            // Extract the owner (the expression before .pipe).
-            // For `users$ = this.refreshTrigger.pipe(`, the owner is
-            // `users$` (the field name before `=`). For
-            // `this.refreshTrigger.pipe(`, the owner is the expression
-            // itself.
-            let before = &trimmed[..pipe_idx].trim();
-            let owner = if let Some(eq_idx) = before.find('=') {
-                // The assignment LHS is everything before `=`. Strip
-                // access modifiers (`private`, `public`, etc.) and type
-                // annotations (`name: Observable<T>` → `name`) to get the
-                // bare field name. The type annotation must be stripped
-                // FIRST (split on ':'), then modifiers, then the last
-                // whitespace token is the field name.
-                let lhs = before[..eq_idx].trim();
-                // Strip the type annotation: `private users$: Observable<User[]>`
-                // → `private users$`.
-                let name_part = lhs.split(':').next().unwrap_or(lhs).trim();
-                let mut words: Vec<&str> = name_part.split_whitespace().collect();
-                // Drop a leading access modifier / `readonly` / `static`.
-                while let Some(first) = words.first() {
-                    if matches!(*first, "private" | "public" | "protected" | "readonly" | "static") {
-                        words.remove(0);
-                    } else {
-                        break;
-                    }
-                }
-                // The last remaining token is the field name.
-                let candidate = words.last().map(|s| s.to_string()).unwrap_or_default();
-                candidate
-                    .split(':')
-                    .next()
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty() && *s != "=" && *s != ":")
-                    .unwrap_or_else(|| "?".to_string())
-            } else {
-                before.split_whitespace()
-                    .last()
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty() && *s != "return" && *s != ")" && *s != "}")
-                    .unwrap_or_else(|| "?".to_string())
-            };
-
-            // Collect the full pipe body, which may span multiple lines.
-            // After `.pipe(`, we're at depth 1 (the pipe's own paren).
-            // We need to find the `)` that brings us back to depth 0.
-            // The scan is string-aware: `(`/`)` inside single-quoted,
-            // double-quoted, or backtick template literals must NOT
-            // affect bracket depth (Round-6/7 audit — same fix applied
-            // to `collect_call_body`).
-            let mut pipe_body = String::new();
-            let mut depth = 1; // the `.pipe(` itself
-            let mut j = i;
-            let mut found_close = false;
-            let mut in_single = false;
-            let mut in_double = false;
-            let mut in_template = false;
-
-            // Compute the offset between the trimmed and untrimmed line
-            // so `pipe_idx` (computed on the trimmed line) maps correctly
-            // to the untrimmed line.
-            let leading_ws = lines[i].len() - lines[i].trim_start().len();
-
-            while j < lines.len() {
-                let line = lines[j];
-                let start_idx = if j == i {
-                    leading_ws + pipe_idx + ".pipe(".len()
+        // Extract the owner (the expression before .pipe).
+        // For `users$ = this.refreshTrigger.pipe(`, the owner is
+        // `users$` (the field name before `=`). For
+        // `this.refreshTrigger.pipe(`, the owner is the expression
+        // itself.
+        let before = &source[..abs_idx];
+        let owner = if let Some(eq_idx) = before.rfind('=') {
+            // The assignment LHS is everything before `=`. Strip
+            // access modifiers (`private`, `public`, etc.) and type
+            // annotations (`name: Observable<T>` → `name`) to get the
+            // bare field name. The type annotation must be stripped
+            // FIRST (split on ':'), then modifiers, then the last
+            // whitespace token is the field name.
+            let lhs = before[..eq_idx].trim();
+            // Strip the type annotation: `private users$: Observable<User[]>`
+            // → `private users$`.
+            let name_part = lhs.split(':').next().unwrap_or(lhs).trim();
+            let mut words: Vec<&str> = name_part.split_whitespace().collect();
+            // Drop a leading access modifier / `readonly` / `static`.
+            while let Some(first) = words.first() {
+                if matches!(*first, "private" | "public" | "protected" | "readonly" | "static") {
+                    words.remove(0);
                 } else {
-                    0
-                };
-                let segment = &line[start_idx..];
-
-                let mut chars = segment.chars().peekable();
-                while let Some(ch) = chars.next() {
-                    // String-literal awareness (escaped quotes handled).
-                    if in_single {
-                        if ch == '\\' {
-                            if let Some(&_next) = chars.peek() {
-                                chars.next();
-                            }
-                        } else if ch == '\'' {
-                            in_single = false;
-                        }
-                        continue;
-                    }
-                    if in_double {
-                        if ch == '\\' {
-                            if let Some(&_next) = chars.peek() {
-                                chars.next();
-                            }
-                        } else if ch == '"' {
-                            in_double = false;
-                        }
-                        continue;
-                    }
-                    if in_template {
-                        if ch == '\\' {
-                            if let Some(&_next) = chars.peek() {
-                                chars.next();
-                            }
-                        } else if ch == '`' {
-                            in_template = false;
-                        }
-                        continue;
-                    }
-
-                    match ch {
-                        '\'' => { in_single = true; }
-                        '"' => { in_double = true; }
-                        '`' => { in_template = true; }
-                        '(' => { depth += 1; }
-                        ')' => {
-                            depth -= 1;
-                            if depth == 0 {
-                                // This closes the pipe() call.
-                                found_close = true;
-                                break;
-                            }
-                        }
-                        _ => {}
-                    }
-                    if found_close { break; }
+                    break;
                 }
-
-                if j == i {
-                    // Include the rest of the first line after `.pipe(`
-                    pipe_body.push_str(segment);
-                } else {
-                    pipe_body.push('\n');
-                    pipe_body.push_str(line);
-                }
-
-                if found_close { break; }
-                j += 1;
             }
+            // The last remaining token is the field name.
+            let candidate = words.last().map(|s| s.to_string()).unwrap_or_default();
+            candidate
+                .split(':')
+                .next()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty() && *s != "=" && *s != ":")
+                .unwrap_or_else(|| "?".to_string())
+        } else {
+            before.split_whitespace()
+                .last()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty() && *s != "return" && *s != ")" && *s != "}")
+                .unwrap_or_else(|| "?".to_string())
+        };
 
-            // Extract operators from the collected body
-            let operators = extract_operators(&pipe_body);
+        // Collect the full pipe body (which may span multiple lines) using
+        // the shared string-aware primitive. `after_pipe` is the slice
+        // starting just after `.pipe(`.
+        let after_pipe = abs_idx + ".pipe(".len();
+        let (pipe_body, end_offset) =
+            crate::angular_meta::util::collect_call_body(&source[after_pipe..]);
 
-            if !operators.is_empty() {
-                // The owner (e.g. `users$`) is also an observable field
-                // declaration — register it so Low fidelity emits `Φobs:`.
-                if owner != "?" && !shape.observables.iter().any(|o| o.name == owner) {
-                    shape.observables.push(ObservableDecl {
-                        name: owner.clone(),
-                        source: None,
-                        type_param: None,
-                    });
-                }
-                shape.pipes.push(PipeChain {
-                    owner,
-                    operators,
+        // Extract operators from the collected body.
+        let operators = extract_operators(&pipe_body);
+
+        if !operators.is_empty() {
+            // The owner (e.g. `users$`) is also an observable field
+            // declaration — register it so Low fidelity emits `Φobs:`.
+            if owner != "?" && !shape.observables.iter().any(|o| o.name == owner) {
+                shape.observables.push(ObservableDecl {
+                    name: owner.clone(),
+                    source: None,
+                    type_param: None,
                 });
             }
-
-            // Skip to the line after the pipe body
-            i = j + 1;
-            continue;
+            shape.pipes.push(PipeChain {
+                owner,
+                operators,
+            });
         }
 
-        i += 1;
+        // Advance past the whole pipe call (including its close paren).
+        search_from = after_pipe + end_offset;
     }
 }
 
 /// Extract operators from inside a `.pipe(...)` call.
 ///
-/// The scan is string-aware: `(`/`)` inside single-quoted, double-quoted,
-/// or backtick template literals are literal characters and must NOT
-/// affect paren depth (Round-7 audit — matches `collect_call_body`).
+/// Uses the shared [`split_top_level`](crate::angular_meta::util::split_top_level)
+/// primitive: each top-level comma-separated segment is one operator
+/// expression (e.g. `map(x => x * 2)`, `tap(console.log)`). Commas inside
+/// nested parens, object literals, strings, or template interpolations are
+/// NOT treated as operator separators — the SAME depth/string-awareness
+/// used everywhere else in the meta-layer (Round-8 structural audit).
 fn extract_operators(pipe_body: &str) -> Vec<PipeOperator> {
-    let mut operators = Vec::new();
-    let mut depth = 0;
-    let mut current_op = String::new();
-    let mut paren_depth = 0;
-    let mut in_single = false;
-    let mut in_double = false;
-    let mut in_template = false;
-    let mut chars = pipe_body.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        // String-literal awareness (escaped quotes handled).
-        if in_single {
-            current_op.push(ch);
-            if ch == '\\' {
-                if let Some(&next) = chars.peek() {
-                    current_op.push(next);
-                    chars.next();
-                }
-            } else if ch == '\'' {
-                in_single = false;
-            }
-            continue;
-        }
-        if in_double {
-            current_op.push(ch);
-            if ch == '\\' {
-                if let Some(&next) = chars.peek() {
-                    current_op.push(next);
-                    chars.next();
-                }
-            } else if ch == '"' {
-                in_double = false;
-            }
-            continue;
-        }
-        if in_template {
-            current_op.push(ch);
-            if ch == '\\' {
-                if let Some(&next) = chars.peek() {
-                    current_op.push(next);
-                    chars.next();
-                }
-            } else if ch == '`' {
-                in_template = false;
-            }
-            continue;
-        }
-
-        match ch {
-            '\'' => { in_single = true; current_op.push(ch); }
-            '"' => { in_double = true; current_op.push(ch); }
-            '`' => { in_template = true; current_op.push(ch); }
-            '(' => {
-                if paren_depth > 0 {
-                    // Nested paren inside an operator's arguments
-                    depth += 1;
-                    current_op.push(ch);
-                } else {
-                    // Start of a new operator
-                    paren_depth += 1;
-                    current_op.push(ch);
-                }
-            }
-            ')' => {
-                if depth > 0 {
-                    depth -= 1;
-                    current_op.push(ch);
-                } else if paren_depth > 0 {
-                    paren_depth -= 1;
-                    if paren_depth == 0 {
-                        // End of this operator — don't push the closing
-                        // paren; it's the operator's terminator.
-                        if let Some(op) = parse_operator(&current_op) {
-                            operators.push(op);
-                        }
-                        current_op.clear();
-                    } else {
-                        current_op.push(ch);
-                    }
-                }
-            }
-            ',' => {
-                if paren_depth == 0 && depth == 0 {
-                    // Separator between operators — flush current
-                    if !current_op.trim().is_empty() {
-                        if let Some(op) = parse_operator(&current_op) {
-                            operators.push(op);
-                        }
-                        current_op.clear();
-                    }
-                } else {
-                    current_op.push(ch);
-                }
-            }
-            ' ' | '\t' | '\n' | '\r' => {
-                if paren_depth > 0 || depth > 0 {
-                    current_op.push(ch);
-                }
-                // Skip whitespace outside parens
-            }
-            _ => {
-                current_op.push(ch);
-            }
-        }
-    }
-
-    // Flush remaining operator
-    if !current_op.trim().is_empty() {
-        if let Some(op) = parse_operator(&current_op) {
-            operators.push(op);
-        }
-    }
-
-    operators
+    crate::angular_meta::util::split_top_level(pipe_body, ',')
+        .iter()
+        .filter_map(|seg| parse_operator(seg))
+        .collect()
 }
 
 /// Parse a single operator expression (e.g. `switchMap(x => x.getUsers())`).
@@ -1042,7 +842,8 @@ fn extract_combinators(source: &str, shape: &mut RxShape) {
 
             // Collect the full call body (up to matching close paren).
             let after_start = abs_idx + pattern.len();
-            let (body, _) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
+            let (body, end_offset) =
+                crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
             // Extract arguments from the body. Use depth-aware splitting so
             // commas inside object literals or nested calls (e.g.
@@ -1059,7 +860,9 @@ fn extract_combinators(source: &str, shape: &mut RxShape) {
                 args,
             });
 
-            search_from = after_start + body.len();
+            // Advance past the whole call (including its close paren) using
+            // the standardized end_offset contract.
+            search_from = after_start + end_offset;
         }
     }
 }

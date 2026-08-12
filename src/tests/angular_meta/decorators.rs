@@ -281,17 +281,21 @@ fn medium_fidelity_omits_phi_injects() {
 #[test]
 fn find_matching_brace_returns_none_on_unclosed_body() {
     // F-ANG-08: no closing `}` — used to return `len-1` (silent
-    // truncation to end of text). Now returns `None`.
+    // truncation to end of text). Now returns `None`. The primitive
+    // lives in the layer-agnostic `meta_util` module (Round-8
+    // structural audit).
     let body = "{ unclosed";
-    assert!(crate::angular_meta::decorators::find_matching_brace(body, 0).is_none());
+    assert!(crate::meta_util::find_matching_brace(body, '{').is_none());
 }
 
 #[test]
 fn consume_call_expression_returns_none_on_unterminated_call() {
     // F-ANG-09: no closing `)` — used to return `(i-open_paren,
-    // text[open_paren+1..i])` (silent EOF). Now returns `None`.
+    // text[open_paren+1..i])` (silent EOF). Now returns `None`. The
+    // primitive lives in the layer-agnostic `meta_util` module
+    // (Round-8 structural audit).
     let text = "(unterminated call";
-    assert!(crate::angular_meta::decorators::consume_call_expression(text, 0).is_none());
+    assert!(crate::meta_util::consume_call_expression(text, 0).is_none());
 }
 
 #[test]

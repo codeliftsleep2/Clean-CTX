@@ -26,6 +26,7 @@ use crate::angular_meta::markers::{
     ComponentFields,
 };
 use crate::compression::Fidelity;
+use crate::meta_util::{consume_call_expression, split_top_level};
 
 /// Result of [`extract_decorators`]: the Φ marker lines plus any
 /// inline template content that should be fed through the HTML
@@ -137,7 +138,8 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Decorat
     // with `&&` so the nested block is unnecessary.)
     if fidelity != Fidelity::Low
         && let Some(class_body_start) = find_class_body_open(raw_class)
-        && let Some(body_end) = find_matching_brace(&raw_class[class_body_start..], 0)
+        && let Some(body_end) =
+            crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
     {
         let body = &raw_class[class_body_start..];
         let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
@@ -178,7 +180,8 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Decorat
     let mut inject_fn_types: Vec<String> = Vec::new();
     if fidelity == Fidelity::High
         && let Some(class_body_start) = find_class_body_open(raw_class)
-        && let Some(body_end) = find_matching_brace(&raw_class[class_body_start..], 0)
+        && let Some(body_end) =
+            crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
     {
         let body = &raw_class[class_body_start..];
         let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
@@ -405,113 +408,11 @@ fn collect_decorators(head: &str) -> Vec<Decorator> {
     decorators
 }
 
-// F-ANG-09: returns `None` if the call expression is unterminated
-// (was returning `i-open_paren` and slicing to end of text — silent
-// EOF behaviour).
-fn consume_call_expression(text: &str, open_paren: usize) -> Option<(usize, String)> {
-    let bytes = text.as_bytes();
-    let mut depth: i32 = 0;
-    let mut i = open_paren;
-    let len = bytes.len();
-    while i < len {
-        let c = bytes[i];
-        match c {
-            b'(' => depth += 1,
-            b')' => {
-                depth -= 1;
-                if depth == 0 {
-                    let end = i + 1;
-                    let arg = text[open_paren + 1..end - 1].to_string();
-                    return Some((end - open_paren, arg));
-                }
-            }
-            b'"' | b'\'' => {
-                let quote = c;
-                i += 1;
-                while i < len && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-// F-FINAL-02: The template-literal branch now explicitly recognises
-// `\\` (escaped backslash) followed by a backtick. The previous code
-// relied on the generic `i += 2` skip for *any* escape sequence, which
-// correctly handles `\n`, `\t`, etc., but for the specific case of
-// `\` + backtick (an escaped backtick inside a template literal), the
-// code advanced past the *real* terminator backtick and silently
-// truncated the arg. The fix: when we see `\\` and the next byte is a
-// backtick, skip 2 bytes *and* continue the inner loop (do not treat
-// the backtick as a terminator). The check is a single comparison —
-// the generic `i += 2` already does the right thing for non-backtick
-// escapes, so this just makes the backtick case explicit.
-            b'`' => {
-                i += 1;
-                while i < len && bytes[i] != b'`' {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        // If the escape is a backtick, skip both bytes
-                        // and continue scanning; the backtick is escaped,
-                        // not a terminator.
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    None
-}
-
-// F-ANG-08: returns `None` if no matching `}` is found (was
-// `text.len().saturating_sub(1)` — silent truncation).
-// `pub(crate)` so Track D's `extract_class_blocks` rewrite can use it
-// (see `docs/FAANG_AUDIT_ANGULAR_DEFERRED_PLAN.md`).
-pub(crate) fn find_matching_brace(text: &str, open_brace: usize) -> Option<usize> {
-    let bytes = text.as_bytes();
-    let mut depth: i32 = 0;
-    let mut i = open_brace;
-    let len = bytes.len();
-    while i < len {
-        match bytes[i] {
-            b'{' => depth += 1,
-            b'}' => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i);
-                }
-            }
-            b'"' | b'\'' => {
-                let quote = bytes[i];
-                i += 1;
-                while i < len && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            b'`' => {
-                i += 1;
-                while i < len && bytes[i] != b'`' {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    None
-}
+// F-ANG-09: `consume_call_expression` now comes from the shared
+// layer-agnostic `meta_util` primitive set (Round-8 structural audit).
+// It returns `None` if the call expression is unterminated (was
+// returning `i-open_paren` and slicing to end of text — silent EOF
+// behaviour).
 
 fn classify_decorator(name: &str) -> DecoratorKind {
     match name {
@@ -547,56 +448,15 @@ fn find_class_head_end(raw: &str) -> Option<usize> {
 // F-ANG-07: the function still uses `?` rather than `let-else`
 // (clippy::question_mark prefers `?` when the enclosing function
 // returns `Option` — both produce identical control flow but `?`
-// is the canonical idiom). The previous audit deferred this as
-// cosmetic; the new behaviour is byte-identical to the pre-audit
-// version. Promoting to `pub(crate)` is the substantive change so
-// Track D's `extract_class_blocks` rewrite can use it
-// (see `docs/FAANG_AUDIT_ANGULAR_DEFERRED_PLAN.md`).
+// is the canonical idiom). Promoting to `pub(crate)` lets Track D's
+// `extract_class_blocks` rewrite use it
+// (see `docs/FAANG_AUDIT_ANGULAR_DEFERRED_PLAN.md`). The brace-depth
+// + string-literal scan itself delegates to the shared
+// `meta_util::find_first_top_level` primitive (Round-8 structural
+// audit) — no hand-rolled scanner remains in this file.
 pub(crate) fn find_class_body_open(raw: &str) -> Option<usize> {
     let class_pos = raw.find("class ")?;
-    let search_start = class_pos + 6;
-    let bytes = raw.as_bytes();
-    let len = bytes.len();
-    let mut depth: i32 = 0;
-    let mut i = search_start;
-
-    while i < len {
-        match bytes[i] {
-            b'{' => {
-                if depth == 0 {
-                    return Some(i);
-                }
-                depth += 1;
-            }
-            b'}' => {
-                depth -= 1;
-            }
-            b'"' | b'\'' => {
-                let quote = bytes[i];
-                i += 1;
-                while i < len && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            b'`' => {
-                i += 1;
-                while i < len && bytes[i] != b'`' {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    None
+    crate::meta_util::find_first_top_level(raw, '{', class_pos + 6)
 }
 
 // F-ANG-13: returns `None` when no class name can be found (was
@@ -632,7 +492,7 @@ fn parse_object_literal(arg: &str) -> ComponentFields {
     }
     let mut fields = ComponentFields::default();
 
-    for part in split_top_level_commas(&trimmed) {
+    for part in split_top_level(&trimmed, ',') {
         let part = part.trim();
         if part.is_empty() {
             continue;
@@ -652,7 +512,7 @@ fn parse_object_literal(arg: &str) -> ComponentFields {
             "styleUrls" => {
                 if value.starts_with('[') {
                     let inner = value.trim_start_matches('[').trim_end_matches(']').trim();
-                    let urls: Vec<String> = split_top_level_commas(inner)
+                    let urls: Vec<String> = split_top_level(inner, ',')
                         .into_iter()
                         .map(|s| unquote(s.trim()).to_string())
                         .filter(|s| !s.is_empty())
@@ -678,7 +538,7 @@ fn parse_provided_in(arg: &str) -> Option<String> {
     if trimmed.starts_with('{') && trimmed.ends_with('}') {
         trimmed = trimmed[1..trimmed.len() - 1].trim().to_string();
     }
-    for part in split_top_level_commas(&trimmed) {
+    for part in split_top_level(&trimmed, ',') {
         let part = part.trim();
         if let Some(colon) = part.find(':') {
             let key = part[..colon].trim();
@@ -702,7 +562,7 @@ fn parse_module_fields(arg: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
     let mut imp = Vec::new();
     let mut exp = Vec::new();
 
-    for part in split_top_level_commas(&trimmed) {
+    for part in split_top_level(&trimmed, ',') {
         let part = part.trim();
         let Some(colon) = part.find(':') else { continue; };
         let key = part[..colon].trim();
@@ -723,7 +583,7 @@ fn parse_identifier_list(value: &str) -> Vec<String> {
         return Vec::new();
     }
     let inner = trimmed.trim_start_matches('[').trim_end_matches(']').trim();
-    split_top_level_commas(inner)
+    split_top_level(inner, ',')
         .into_iter()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
@@ -736,7 +596,7 @@ fn parse_pipe_fields(arg: &str) -> (Option<String>, bool) {
         trimmed = trimmed[1..trimmed.len() - 1].trim().to_string();
     }
     let mut name: Option<String> = None;
-    for part in split_top_level_commas(&trimmed) {
+    for part in split_top_level(&trimmed, ',') {
         let part = part.trim();
         let Some(colon) = part.find(':') else { continue; };
         let key = part[..colon].trim().trim_matches(|c: char| c == '"' || c == '\'');
@@ -791,7 +651,7 @@ fn extract_constructor_injects(raw_class: &str) -> Option<Vec<String>> {
         .unwrap_or_default();
 
     let mut types: Vec<String> = Vec::new();
-    for param in split_top_level_commas(&params) {
+    for param in split_top_level(&params, ',') {
         let param = param.trim();
         if param.is_empty() {
             continue;
@@ -979,7 +839,8 @@ pub fn extract_graph_entries(raw_class: &str) -> Option<(String, ClassKind, Opti
     // Also check for signal-based inject() calls.
     // F-ANG-08: skip the body scan if no matching `}` is found.
     if let Some(class_body_start) = find_class_body_open(raw_class)
-        && let Some(body_end) = find_matching_brace(&raw_class[class_body_start..], 0)
+        && let Some(body_end) =
+            crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
     {
         let body = &raw_class[class_body_start..];
         let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
@@ -991,65 +852,6 @@ pub fn extract_graph_entries(raw_class: &str) -> Option<(String, ClassKind, Opti
     }
 
     kind.map(|k| (class_name, k, selector, injects, pipe_name))
-}
-
-fn split_top_level_commas(s: &str) -> Vec<String> {
-    let bytes = s.as_bytes();
-    let len = bytes.len();
-    let mut parts: Vec<String> = Vec::new();
-    let mut start = 0;
-    let mut depth_brace: i32 = 0;
-    let mut depth_bracket: i32 = 0;
-    let mut depth_paren: i32 = 0;
-    let mut i = 0;
-
-    while i < len {
-        let c = bytes[i];
-        match c {
-            b',' if depth_brace == 0 && depth_bracket == 0 && depth_paren == 0 => {
-                parts.push(s[start..i].to_string());
-                start = i + 1;
-            }
-            b'{' => depth_brace += 1,
-            b'}' => depth_brace -= 1,
-            b'[' => depth_bracket += 1,
-            b']' => depth_bracket -= 1,
-            b'(' => depth_paren += 1,
-            b')' => depth_paren -= 1,
-            b'"' | b'\'' => {
-                let quote = c;
-                i += 1;
-                while i < len && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            b'`' => {
-                i += 1;
-                while i < len && bytes[i] != b'`' {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-
-    if start < len {
-        parts.push(s[start..].to_string());
-    } else if start == len && !parts.is_empty() {
-        // trailing empty
-    } else if start == len {
-        parts.push(String::new());
-    }
-    parts
 }
 
 #[cfg(test)]

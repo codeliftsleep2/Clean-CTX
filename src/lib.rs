@@ -40,6 +40,7 @@ pub mod ir;
 pub mod spring_meta;
 pub mod layers;
 pub mod dotnet_meta;
+pub mod meta_util;
 pub mod error;
 pub mod tokenizer;
 pub mod observability;

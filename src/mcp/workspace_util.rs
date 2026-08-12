@@ -220,9 +220,13 @@ pub(crate) fn extract_class_blocks(source: &str) -> Vec<String> {
         let block_start = find_decorator_start(source, abs);
         if let Some(open) = decorators::find_class_body_open(&source[block_start..]) {
             let abs_open = block_start + open;
-            if let Some(close) = decorators::find_matching_brace(source, abs_open) {
-                blocks.push(source[block_start..=close].to_string());
-                cursor = close + 1;
+            // Find the matching close brace using the shared layer-agnostic
+            // primitive. The slice starts at the `{`, so pass `'{'` as the
+            // open char (Round-8 structural audit).
+            if let Some(close) = crate::meta_util::find_matching_brace(&source[abs_open..], '{') {
+                let abs_close = abs_open + close;
+                blocks.push(source[block_start..=abs_close].to_string());
+                cursor = abs_close + 1;
                 continue;
             }
         }

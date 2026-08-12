@@ -25,6 +25,7 @@ use crate::spring_meta::markers::{
     RequestMappingMapping,
 };
 use crate::compression::Fidelity;
+use crate::meta_util::{consume_call_expression, split_top_level};
 
 /// Result of [`extract_annotations`]: the Φ marker lines.
 pub struct AnnotationsResult {
@@ -125,7 +126,8 @@ pub fn extract_annotations(raw_class: &str, fidelity: Fidelity) -> Option<Annota
     // Method-level markers: scan the class body for @Bean, @GetMapping, etc.
     if fidelity != Fidelity::Low
         && let Some(class_body_start) = find_class_body_open(raw_class)
-            && let Some(body_end) = find_matching_brace(&raw_class[class_body_start..], 0)
+            && let Some(body_end) =
+                crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
         {
             let body = &raw_class[class_body_start..];
             let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
@@ -180,7 +182,8 @@ pub fn extract_annotations(raw_class: &str, fidelity: Fidelity) -> Option<Annota
     // Field-level markers: scan the class body for @Autowired and @Value
     if fidelity == Fidelity::High
         && let Some(class_body_start) = find_class_body_open(raw_class)
-            && let Some(body_end) = find_matching_brace(&raw_class[class_body_start..], 0)
+            && let Some(body_end) =
+                crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
         {
             let body = &raw_class[class_body_start..];
             let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
@@ -347,7 +350,7 @@ fn parse_request_mappings(arg: &str) -> Vec<RequestMappingMapping> {
         let mut value = None;
         let mut method = None;
 
-        for part in split_top_level_commas(inner) {
+        for part in split_top_level(inner, ',') {
             let part = part.trim();
             if let Some(colon) = part.find(':') {
                 let key = part[..colon].trim();
@@ -390,7 +393,7 @@ fn parse_mapping_paths(arg: &str) -> Vec<String> {
 
     if trimmed.starts_with('{') && trimmed.ends_with('}') {
         let inner = &trimmed[1..trimmed.len() - 1];
-        for part in split_top_level_commas(inner) {
+        for part in split_top_level(inner, ',') {
             let part = part.trim();
             if let Some(colon) = part.find(':') {
                 let key = part[..colon].trim();
@@ -563,50 +566,11 @@ fn collect_field_annotations(body: &str) -> Vec<(String, AnnotationKind)> {
     out
 }
 
-fn consume_call_expression(text: &str, open_paren: usize) -> Option<(usize, String)> {
-    let bytes = text.as_bytes();
-    let mut depth: i32 = 0;
-    let mut i = open_paren;
-    let len = bytes.len();
-    while i < len {
-        let c = bytes[i];
-        match c {
-            b'(' => depth += 1,
-            b')' => {
-                depth -= 1;
-                if depth == 0 {
-                    let end = i + 1;
-                    let arg = text[open_paren + 1..end - 1].to_string();
-                    return Some((end - open_paren, arg));
-                }
-            }
-            b'"' | b'\'' => {
-                let quote = c;
-                i += 1;
-                while i < len && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            b'`' => {
-                i += 1;
-                while i < len && bytes[i] != b'`' {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    None
-}
+// F-ANG-09: `consume_call_expression` now comes from the shared
+// layer-agnostic `meta_util` primitive set (Round-8 structural audit).
+// It returns `None` if the call expression is unterminated (was
+// returning `i-open_paren` and slicing to end of text — silent EOF
+// behaviour).
 
 fn find_class_head_end(raw: &str) -> Option<usize> {
     if let Some(pos) = raw.find("class ") {
@@ -624,93 +588,19 @@ fn find_class_head_end(raw: &str) -> Option<usize> {
     None
 }
 
+/// Find the byte offset of the `{` that opens the class body, not any `{`
+/// inside an annotation object literal. Scans from the `class` keyword
+/// forward, tracking brace depth so that `@RequestMapping({...})` braces
+/// are skipped.
+///
+/// The brace-depth + string-literal scan delegates to the shared
+/// `meta_util::find_first_top_level` primitive (Round-8 structural audit)
+/// — no hand-rolled scanner remains in this file.
 fn find_class_body_open(raw: &str) -> Option<usize> {
+    // NOTE: only the `class ` keyword is used here, matching the original
+    // per-layer behaviour (interface/record bodies are not body-scanned).
     let class_pos = raw.find("class ")?;
-    let search_start = class_pos + 6;
-    let bytes = raw.as_bytes();
-    let len = bytes.len();
-    let mut depth: i32 = 0;
-    let mut i = search_start;
-
-    while i < len {
-        match bytes[i] {
-            b'{' => {
-                if depth == 0 {
-                    return Some(i);
-                }
-                depth += 1;
-            }
-            b'}' => {
-                depth -= 1;
-            }
-            b'"' | b'\'' => {
-                let quote = bytes[i];
-                i += 1;
-                while i < len && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            b'`' => {
-                i += 1;
-                while i < len && bytes[i] != b'`' {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    None
-}
-
-fn find_matching_brace(text: &str, open_brace: usize) -> Option<usize> {
-    let bytes = text.as_bytes();
-    let mut depth: i32 = 0;
-    let mut i = open_brace;
-    let len = bytes.len();
-    while i < len {
-        match bytes[i] {
-            b'{' => depth += 1,
-            b'}' => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i);
-                }
-            }
-            b'"' | b'\'' => {
-                let quote = bytes[i];
-                i += 1;
-                while i < len && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            b'`' => {
-                i += 1;
-                while i < len && bytes[i] != b'`' {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    None
+    crate::meta_util::find_first_top_level(raw, '{', class_pos + 6)
 }
 
 fn extract_class_name(raw: &str) -> Option<String> {
@@ -750,50 +640,6 @@ fn extract_class_name(raw: &str) -> Option<String> {
     None
 }
 
-fn split_top_level_commas(s: &str) -> Vec<String> {
-    let bytes = s.as_bytes();
-    let len = bytes.len();
-    let mut parts: Vec<String> = Vec::new();
-    let mut start = 0;
-    let mut depth_brace: i32 = 0;
-    let mut depth_bracket: i32 = 0;
-    let mut depth_paren: i32 = 0;
-    let mut i = 0;
-
-    while i < len {
-        let c = bytes[i];
-        match c {
-            b',' if depth_brace == 0 && depth_bracket == 0 && depth_paren == 0 => {
-                parts.push(s[start..i].to_string());
-                start = i + 1;
-            }
-            b'{' => depth_brace += 1,
-            b'}' => depth_brace -= 1,
-            b'[' => depth_bracket += 1,
-            b']' => depth_bracket -= 1,
-            b'(' => depth_paren += 1,
-            b')' => depth_paren -= 1,
-            b'"' | b'\'' => {
-                let quote = c;
-                i += 1;
-                while i < len && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < len {
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    if start < len {
-        parts.push(s[start..].to_string());
-    }
-    parts
-}
-
 fn unquote(s: &str) -> &str {
     let s = s.trim();
     if s.len() >= 2 {
@@ -806,4 +652,3 @@ fn unquote(s: &str) -> &str {
     }
     s
 }
-
