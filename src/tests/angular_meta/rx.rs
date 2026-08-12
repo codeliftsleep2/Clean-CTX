@@ -101,6 +101,70 @@ export class UserService {
     );
 }
 
+// ── Round-11 audit: comments/strings must NOT create phantom RxJS ──
+//
+// The line-based and global scanners only skipped lines whose content
+// BEGAN with `//` / `*`. A trailing `// users$ = of(1)` comment on a code
+// line, or a `combineLatest(` inside a string literal, produced phantom
+// observables/subjects/combinators. The shared `is_inside_comment_or_string`
+// guard rejects these.
+
+#[test]
+fn ignores_observables_in_trailing_comments() {
+    let src = r#"
+import { of } from 'rxjs';
+
+export class UserService {
+  users$ = of([]);  // phantom$ = of(1)
+  // commented$: Observable<number> = of(0)
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect observables");
+    assert_eq!(
+        shape.observables.len(), 1,
+        "trailing/comment observables must not be extracted, got: {:?}",
+        shape.observables
+    );
+    assert_eq!(shape.observables[0].name, "users$");
+}
+
+#[test]
+fn ignores_subjects_in_trailing_comments() {
+    let src = r#"
+import { Subject } from 'rxjs';
+
+export class UserService {
+  selected$ = new Subject<number>();  // phantom$ = new Subject<string>()
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect subjects");
+    assert_eq!(
+        shape.subjects.len(), 1,
+        "trailing-comment subject must not be extracted, got: {:?}",
+        shape.subjects
+    );
+    assert_eq!(shape.subjects[0].name, "selected$");
+}
+
+#[test]
+fn ignores_combinators_in_strings() {
+    let src = r#"
+import { combineLatest } from 'rxjs';
+
+export class UserService {
+  label = "combineLatest([a$, b$]) must be ignored";
+  combined$ = combineLatest([a$, b$]);
+}
+"#;
+    let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect combinators");
+    assert_eq!(
+        shape.combinators.len(), 1,
+        "string-literal combinator must not be extracted, got: {:?}",
+        shape.combinators
+    );
+    assert_eq!(shape.combinators[0].name, "combineLatest");
+}
+
 // ── Subject detection ──────────────────────────────────────────────
 
 #[test]

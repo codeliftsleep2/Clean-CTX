@@ -404,43 +404,59 @@ pub fn extract_rx_shape(source: &str, _fidelity: Fidelity) -> Option<RxShape> {
 ///   `timer(...)`, `fromEvent(...)`
 /// - Service calls: `http.get(...)`, `this.http.get(...)`
 fn extract_observables(source: &str, shape: &mut RxShape) {
-    // Scan line-by-line for observable patterns
-    for line in source.lines() {
+    // Scan line-by-line for observable patterns. Track the absolute byte
+    // offset of each line so matches inside trailing comments or string
+    // literals can be rejected (Round-11 audit: a `// users$ = of(1)`
+    // trailing comment or a string containing `Observable<` must not
+    // produce a phantom observable).
+    let mut line_start = 0usize;
+    for line in source.split('\n') {
         let trimmed = line.trim();
 
-        // Skip comments and strings
+        // Skip comment-only lines
         if trimmed.starts_with("//") || trimmed.starts_with('*') {
+            line_start += line.len() + 1;
             continue;
         }
 
+        // Absolute offset of the trimmed line within `source`.
+        let leading = line.len() - line.trim_start().len();
+        let trimmed_abs = line_start + leading;
+
         // Pattern: `name$: Observable<T>` or `name$ = http.get(...)`
         // or `name$ = of(...)`, `name$ = from(...)`, etc.
-        if let Some(obs) = extract_observable_from_line(trimmed) {
+        if let Some(obs) = extract_observable_from_line(source, trimmed_abs, trimmed) {
             shape.observables.push(obs);
         }
+        line_start += line.len() + 1;
     }
 }
 
 /// Try to extract an observable declaration from a single line.
-fn extract_observable_from_line(line: &str) -> Option<ObservableDecl> {
+///
+/// `line_abs` is the absolute byte offset of `line` within `source`, used
+/// to reject matches inside comments/strings (Round-11 audit).
+fn extract_observable_from_line(source: &str, line_abs: usize, line: &str) -> Option<ObservableDecl> {
     // Check for service calls first (e.g. `name$: Observable<T> = this.http.get(...)`)
     // so the source is captured when the type annotation is also present.
-    if let Some(obs) = extract_service_call_observable(line) {
+    if let Some(obs) = extract_service_call_observable(source, line_abs, line) {
         return Some(obs);
     }
 
     // Check for `Observable<T>` type annotation
     // Pattern: `name$: Observable<Type>` or `name: Observable<Type>`
     if let Some(idx) = line.find(": Observable<") {
-        let before = &line[..idx];
-        let name = extract_field_name(before)?;
-        let rest = &line[idx + ": Observable<".len()..];
-        let type_param = rest.split('>').next().map(|s| s.trim().to_string());
-        return Some(ObservableDecl {
-            name,
-            source: None,
-            type_param,
-        });
+        if !crate::angular_meta::util::is_inside_comment_or_string(source, line_abs + idx) {
+            let before = &line[..idx];
+            let name = extract_field_name(before)?;
+            let rest = &line[idx + ": Observable<".len()..];
+            let type_param = rest.split('>').next().map(|s| s.trim().to_string());
+            return Some(ObservableDecl {
+                name,
+                source: None,
+                type_param,
+            });
+        }
     }
 
     // Check for `Observable<Type>` without field prefix (e.g. return type)
@@ -458,13 +474,15 @@ fn extract_observable_from_line(line: &str) -> Option<ObservableDecl> {
 
     for func in &creation_funcs {
         if let Some(idx) = line.find(&format!(" = {}", func)) {
-            let before = &line[..idx];
-            let name = extract_field_name(before)?;
-            return Some(ObservableDecl {
-                name,
-                source: Some(func.trim_end_matches('(').to_string()),
-                type_param: None,
-            });
+            if !crate::angular_meta::util::is_inside_comment_or_string(source, line_abs + idx) {
+                let before = &line[..idx];
+                let name = extract_field_name(before)?;
+                return Some(ObservableDecl {
+                    name,
+                    source: Some(func.trim_end_matches('(').to_string()),
+                    type_param: None,
+                });
+            }
         }
     }
 
@@ -474,10 +492,18 @@ fn extract_observable_from_line(line: &str) -> Option<ObservableDecl> {
 /// Extract an observable from a service-call assignment pattern.
 /// Handles lines like `name$: Observable<T> = this.http.get(...)` or
 /// `name$ = this.http.get(...)`.
-fn extract_service_call_observable(line: &str) -> Option<ObservableDecl> {
+///
+/// `line_abs` is the absolute byte offset of `line` within `source`, used
+/// to reject matches inside comments/strings (Round-11 audit).
+fn extract_service_call_observable(source: &str, line_abs: usize, line: &str) -> Option<ObservableDecl> {
     // Check for service calls: `name$ = this.http.get(...)` or `name$ = http.get(...)`
     // or `name$: Observable<T> = this.http.get(...)`
     let eq_idx = line.find(" = ")?;
+    // Reject when the ` = ` itself is inside a comment/string (e.g. a
+    // trailing `// users$ = http.get(...)` comment).
+    if crate::angular_meta::util::is_inside_comment_or_string(source, line_abs + eq_idx) {
+        return None;
+    }
     let before = &line[..eq_idx];
     // Round-9 audit: strip the type annotation BEFORE extracting the field
     // name. For `users$: Observable<User[]> = this.http.get(...)`, the last
@@ -500,7 +526,13 @@ fn extract_service_call_observable(line: &str) -> Option<ObservableDecl> {
     ];
 
     for pat in &service_patterns {
-        if after.starts_with(pat) || after.contains(pat) {
+        if let Some(pat_idx) = after.find(pat) {
+            // Reject when the service pattern is inside a comment/string.
+            if crate::angular_meta::util::is_inside_comment_or_string(
+                source, line_abs + eq_idx + 3 + pat_idx,
+            ) {
+                continue;
+            }
             // Extract the URL or first argument.
             // The pattern may be followed by `<Type>` (generic) then `(`.
             let rest = after.split(pat).nth(1).unwrap_or("");
@@ -526,15 +558,28 @@ fn extract_service_call_observable(line: &str) -> Option<ObservableDecl> {
     }
 
     // Check for `this.service.method()` patterns
-    if after.contains(".get(") || after.contains(".post(") || after.contains(".put(")
-        || after.contains(".delete(") || after.contains(".patch(") {
-        // Extract up to the first '('
-        let method_call = after.split('(').next().unwrap_or("").trim();
-        return Some(ObservableDecl {
-            name,
-            source: Some(method_call.to_string()),
-            type_param: None,
-        });
+    let method_patterns = [".get(", ".post(", ".put(", ".delete(", ".patch("];
+    let mut earliest: Option<usize> = None;
+    for mp in &method_patterns {
+        if let Some(mp_idx) = after.find(mp) {
+            if earliest.is_none_or(|e| mp_idx < e) {
+                earliest = Some(mp_idx);
+            }
+        }
+    }
+    if let Some(mp_idx) = earliest {
+        // Reject when the method pattern is inside a comment/string.
+        if !crate::angular_meta::util::is_inside_comment_or_string(
+            source, line_abs + eq_idx + 3 + mp_idx,
+        ) {
+            // Extract up to the first '('
+            let method_call = after.split('(').next().unwrap_or("").trim();
+            return Some(ObservableDecl {
+                name,
+                source: Some(method_call.to_string()),
+                type_param: None,
+            });
+        }
     }
 
     None
@@ -575,14 +620,31 @@ fn extract_subjects(source: &str, shape: &mut RxShape) {
         ("new AsyncSubject<", SubjectKind::AsyncSubject),
     ];
 
-    for line in source.lines() {
+    // Track the absolute byte offset of each line so matches inside
+    // trailing comments or string literals can be rejected (Round-11
+    // audit: a `// selectedUser$ = new Subject()` trailing comment must
+    // not produce a phantom subject).
+    let mut line_start = 0usize;
+    for line in source.split('\n') {
         let trimmed = line.trim();
         if trimmed.starts_with("//") || trimmed.starts_with('*') {
+            line_start += line.len() + 1;
             continue;
         }
 
+        // Absolute offset of the trimmed line within `source`.
+        let leading = line.len() - line.trim_start().len();
+        let trimmed_abs = line_start + leading;
+
         for (pattern, kind) in &subject_patterns {
             if let Some(idx) = trimmed.find(pattern) {
+                // Round-11 audit: reject when the pattern match is inside a
+                // comment or string literal (e.g. a trailing comment).
+                if crate::angular_meta::util::is_inside_comment_or_string(
+                    source, trimmed_abs + idx,
+                ) {
+                    continue;
+                }
                 // Extract field name before the `new` keyword.
                 // The line looks like: `name = new Subject<T>()` or
                 // `private name = new Subject<T>()`.
@@ -657,6 +719,7 @@ fn extract_subjects(source: &str, shape: &mut RxShape) {
                 break;
             }
         }
+        line_start += line.len() + 1;
     }
 }
 
@@ -680,6 +743,13 @@ fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
         let line = &source[line_start..abs_idx];
         let line_trim = line.trim_start();
         if line_trim.starts_with("//") || line_trim.starts_with('*') {
+            search_from = abs_idx + ".pipe(".len();
+            continue;
+        }
+
+        // Round-11 audit: reject matches inside trailing comments, block
+        // comments, or string literals (e.g. `this.x.pipe(a) // .pipe(b)`).
+        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
             search_from = abs_idx + ".pipe(".len();
             continue;
         }
@@ -859,6 +929,14 @@ fn extract_combinators(source: &str, shape: &mut RxShape) {
             let line = &source[line_start..abs_idx];
             let line_trim = line.trim_start();
             if line_trim.starts_with("//") || line_trim.starts_with('*') {
+                search_from = abs_idx + pattern.len();
+                continue;
+            }
+
+            // Round-11 audit: reject matches inside trailing comments, block
+            // comments, or string literals (e.g. a `combineLatest(` inside a
+            // string literal or a trailing `// combineLatest(...)` comment).
+            if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
                 search_from = abs_idx + pattern.len();
                 continue;
             }

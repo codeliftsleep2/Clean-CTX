@@ -13,7 +13,7 @@
 pub use crate::meta_util::{
     collect_call_body, consume_call_expression, extract_decl_name, extract_entity_type,
     extract_first_quoted, extract_quoted_value, find_enclosing_brace, find_first_top_level,
-    find_matching_brace, skip_string, skip_template, split_top_level,
+    find_matching_brace, is_inside_comment_or_string, skip_string, skip_template, split_top_level,
 };
 
 #[cfg(test)]
