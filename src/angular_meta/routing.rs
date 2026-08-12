@@ -235,21 +235,23 @@ fn extract_routes(source: &str, shape: &mut RouteShape) {
         let abs_idx = search_from + idx;
 
         // Find the enclosing `{ ... }` object by scanning backwards
-        // for the opening brace. We use a depth-aware scan so nested
-        // objects (e.g. `resolve: { user: UserResolver }`) don't
-        // cause us to pick the wrong `{`.
+        // for the opening brace. We use the shared string-aware
+        // primitive (Round-8 structural audit — same depth/string
+        // awareness as every other meta-layer).
         let before = &source[..abs_idx];
-        let open_brace = find_enclosing_brace(before);
+        let open_brace = crate::angular_meta::util::find_enclosing_brace(before, before.len());
         if let Some(open) = open_brace {
             // Find the matching closing brace, starting from the
             // opening brace so bracket depth is balanced.
             let after = &source[open..];
-            if let Some(close_rel) = find_matching_brace(after) {
+            if let Some(close_rel) = crate::angular_meta::util::find_matching_brace(after, '{') {
                 let close = open + close_rel;
                 let obj = &source[open..=close];
 
                 // Extract the path value.
-                let path = extract_quoted_value(obj, "path").unwrap_or_else(|| "?".to_string());
+                let path = crate::angular_meta::util::extract_quoted_value(obj, "path")
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "?".to_string());
 
                 // Extract component / loadComponent / loadChildren.
                 let component = extract_ident_value(obj, "component");
@@ -419,131 +421,6 @@ fn class_name_before(before: &str) -> Option<String> {
     None
 }
 
-/// Find the opening brace of the object that contains the position
-/// `abs_idx` (the `path:` key). Scans backwards from the end of
-/// `before` tracking brace depth: the first `{` encountered at depth 0
-/// is the enclosing object's opening brace. Nested objects (e.g.
-/// `resolve: { user: UserResolver }`) are skipped because their `{`
-/// is balanced by a `}` before `path:`.
-fn find_enclosing_brace(before: &str) -> Option<usize> {
-    let mut depth = 0i32;
-    let chars: Vec<(usize, char)> = before.char_indices().collect();
-    // Scan backwards. To handle escaped quotes correctly, we walk
-    // forward from the start tracking string state (skipping escaped
-    // chars), then use the recorded per-char string state when
-    // scanning backwards.
-    let mut in_string_at: Vec<bool> = vec![false; chars.len()];
-    let mut cur_in_string = false;
-    let mut cur_quote = '\0';
-    let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i].1;
-        if cur_in_string {
-            if c == '\\' {
-                // Skip the escaped char — it cannot toggle string state.
-                in_string_at[i] = true;
-                if i + 1 < chars.len() {
-                    in_string_at[i + 1] = true;
-                    i += 2;
-                    continue;
-                }
-            } else if c == cur_quote {
-                cur_in_string = false;
-            }
-        } else if c == '\'' || c == '"' {
-            cur_in_string = true;
-            cur_quote = c;
-        }
-        in_string_at[i] = cur_in_string;
-        i += 1;
-    }
-    for (i, (pos, c)) in chars.iter().enumerate().rev() {
-        let in_str = in_string_at[i];
-        match c {
-            '}' if !in_str => depth += 1,
-            '{' if !in_str => {
-                if depth == 0 {
-                    return Some(*pos);
-                }
-                depth -= 1;
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
-/// Find the index of the matching closing brace for the opening brace
-/// at the start of `text`. Returns `None` if unbalanced.
-fn find_matching_brace(text: &str) -> Option<usize> {
-    let mut depth = 0i32;
-    let mut in_string = false;
-    let mut quote = '\0';
-    let mut chars = text.char_indices().peekable();
-    while let Some((i, c)) = chars.next() {
-        if in_string {
-            if c == '\\' {
-                // Skip the escaped char.
-                if let Some(&(_, _next)) = chars.peek() {
-                    chars.next();
-                }
-            } else if c == quote {
-                in_string = false;
-            }
-            continue;
-        }
-        match c {
-            '\'' | '"' => { in_string = true; quote = c; }
-            '{' => depth += 1,
-            '}' => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
-/// Extract a quoted string value for a key in an object literal.
-///
-/// The scan is escape-aware: an escaped quote (`\'` / `\"`) inside the
-/// string does NOT terminate it (Round-7 audit). The old naive
-/// `rest.find(quote)` stopped at the escaped quote, truncating paths
-/// like `path: 'user\'s'` to `user\`.
-fn extract_quoted_value(obj: &str, key: &str) -> Option<String> {
-    let pattern = format!("{}:", key);
-    let idx = obj.find(&pattern)?;
-    let after = &obj[idx + pattern.len()..];
-    let after = after.trim_start();
-    if after.starts_with('\'') || after.starts_with('"') {
-        let quote = after.chars().next()?;
-        let rest = &after[quote.len_utf8()..];
-        let mut end = 0;
-        let mut chars = rest.char_indices().peekable();
-        while let Some((i, c)) = chars.next() {
-            if c == '\\' {
-                // Skip the escaped char — it cannot be a terminator.
-                if let Some(&(_, _next)) = chars.peek() {
-                    chars.next();
-                }
-            } else if c == quote {
-                end = i;
-                break;
-            }
-        }
-        if end > 0 || rest.starts_with(quote) {
-            Some(rest[..end].to_string())
-        } else {
-            None
-        }
-    } else {
-        None
-    }
-}
-
 /// Extract an identifier value for a key in an object literal
 /// (e.g. `component: UserListComponent`).
 fn extract_ident_value(obj: &str, key: &str) -> Option<String> {
@@ -570,14 +447,11 @@ fn extract_load_value(obj: &str, key: &str) -> Option<String> {
     let import_idx = after.find("import(")?;
     let import_after = &after[import_idx + "import(".len()..];
     let import_after = import_after.trim_start();
-    if import_after.starts_with('\'') || import_after.starts_with('"') {
-        let quote = import_after.chars().next()?;
-        let rest = &import_after[quote.len_utf8()..];
-        let end = rest.find(quote)?;
-        Some(rest[..end].to_string())
-    } else {
-        None
-    }
+    // Escape-aware first-quoted extraction (Round-8 audit): the shared
+    // `extract_first_quoted` handles escaped quotes (`user\'s`), unlike
+    // the old naive `rest.find(quote)` which truncated on the first
+    // backslash-escaped quote.
+    crate::angular_meta::util::extract_first_quoted(import_after)
 }
 
 /// Extract identifier names from an array value for a key

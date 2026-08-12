@@ -658,7 +658,9 @@ fn extract_actions(source: &str, shape: &mut NgRxShape) {
         };
 
         // Collect the full call body (up to matching close paren).
-        let (body, body_len) = crate::angular_meta::util::collect_call_body(&source[after_paren..]);
+        // `end_offset` is the offset just past the close paren — the
+        // standardized contract (Round-8 structural audit).
+        let (body, end_offset) = crate::angular_meta::util::collect_call_body(&source[after_paren..]);
 
         // Extract event string (first quoted string)
         let event_string = crate::angular_meta::util::extract_first_quoted(&body).unwrap_or_default();
@@ -683,7 +685,7 @@ fn extract_actions(source: &str, shape: &mut NgRxShape) {
             });
         }
         // Advance past the whole call (including the closing paren).
-        search_from = after_paren + body_len + 1;
+        search_from = after_paren + end_offset;
     }
 }
 
@@ -736,7 +738,7 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
         // The match pattern is `createReducer(` — `idx` points at the `C`.
         // Advance past the `createReducer(` to collect the call body.
         let after_start = abs_idx + "createReducer(".len();
-        let (body, _) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
+        let (body, end_offset) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
         // Extract state type from the first argument's type annotation
         // (e.g. `initialState: UserState` or `initialState`).
@@ -798,7 +800,7 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
                 transitions,
             });
         }
-        search_from = after_start + body.len();
+        search_from = after_start + end_offset;
     }
 }
 
@@ -829,22 +831,15 @@ fn extract_state_summary(after_on: &str) -> String {
         Some(i) => i,
         None => return String::new(),
     };
+    // Use the shared string-aware matching primitive for the brace depth
+    // scan (Round-8 structural audit: no per-layer hand-rolled scanners).
     let rest = &after_arrow[open_idx..];
-    let mut depth = 0;
-    let mut summary = String::new();
-    for ch in rest.chars() {
-        match ch {
-            '{' => { depth += 1; if depth > 1 { summary.push(ch); } }
-            '}' => {
-                depth -= 1;
-                if depth == 0 { break; }
-                summary.push(ch);
-            }
-            _ => {
-                if depth > 0 { summary.push(ch); }
-            }
-        }
-    }
+    let close_rel = match crate::angular_meta::util::find_matching_brace(rest, '{') {
+        Some(close) => close,
+        None => return String::new(),
+    };
+    let inner = &rest[1..close_rel];
+    let mut summary = inner.to_string();
     // Truncate long summaries
     if summary.len() > 60 {
         summary.truncate(57);
@@ -867,7 +862,7 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
             .unwrap_or_default();
 
         let after_start = abs_idx + " = createEffect(".len();
-        let (after, _) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
+        let (after, end_offset) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
         // Check for `{ dispatch: false }` option
         let no_dispatch = after.contains("dispatch: false");
@@ -879,34 +874,15 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
         // primary; additional actions are stored in `source_actions`).
         let source_actions: Vec<String> = if let Some(ot_idx) = after.find("ofType(") {
             let after_ot = &after[ot_idx + "ofType(".len()..];
-            // Split on commas (the full ofType(...) body is on one logical
-            // line or spans the collected `after` with nested parens).
-            let mut actions = Vec::new();
-            let mut depth = 0;
-            let mut current = String::new();
-            for ch in after_ot.chars() {
-                match ch {
-                    '(' => { depth += 1; current.push(ch); }
-                    ')' => {
-                        if depth == 0 { break; }
-                        depth -= 1;
-                        current.push(ch);
-                    }
-                    ',' if depth == 0 => {
-                        let trimmed = current.trim();
-                        if !trimmed.is_empty() {
-                            actions.push(trimmed.to_string());
-                        }
-                        current.clear();
-                    }
-                    _ => current.push(ch),
-                }
-            }
-            let trimmed = current.trim();
-            if !trimmed.is_empty() {
-                actions.push(trimmed.to_string());
-            }
-            actions
+            // Collect the ofType(...) body with the shared string-aware
+            // primitive, then depth-split on commas (Round-8 audit).
+            let (of_body, _) =
+                crate::angular_meta::util::collect_call_body(after_ot);
+            crate::angular_meta::util::split_top_level(&of_body, ',')
+                .into_iter()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
         } else {
             Vec::new()
         };
@@ -995,7 +971,7 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
                 no_dispatch,
             });
         }
-        search_from = after_start + after.len();
+        search_from = after_start + end_offset;
     }
 }
 
@@ -1046,7 +1022,7 @@ fn extract_selectors(source: &str, shape: &mut NgRxShape) {
             .unwrap_or_default();
 
         let after_start = abs_idx + " = createSelector(".len();
-        let (body, _) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
+        let (body, end_offset) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
         // Extract input selectors (comma-separated, before the projection fn).
         // The projection fn is the last argument and contains `=>` — drop it.
@@ -1068,7 +1044,7 @@ fn extract_selectors(source: &str, shape: &mut NgRxShape) {
                 return_type: None,
             });
         }
-        search_from = after_start + body.len();
+        search_from = after_start + end_offset;
     }
 }
 
@@ -1093,7 +1069,7 @@ fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
 
         // The config object starts after the `>`.
         let config_start = after_start + entity_type.len() + 1; // skip `>`
-        let (body, _) = crate::angular_meta::util::collect_call_body(&source[config_start..]);
+        let (body, end_offset) = crate::angular_meta::util::collect_call_body(&source[config_start..]);
 
         // Extract selectId and sortComparer from the config object body.
         // The body starts with `({...})` — strip the outer parens.
@@ -1134,7 +1110,7 @@ fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
                 selectors,
             });
         }
-        search_from = after_start + body.len();
+        search_from = after_start + end_offset;
     }
 }
 
@@ -1248,7 +1224,7 @@ fn extract_call_sites(source: &str, shape: &mut NgRxShape) {
             // Collect the full call body (up to matching close paren).
             // `collect_call_body` is string-aware and multi-line capable.
             let after_start = abs_idx + pattern.len();
-            let (body, _) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
+            let (body, end_offset) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
             // The action/selector name is the first identifier in the body
             // (e.g. `loadUsersSuccess({ users })` → `loadUsersSuccess`;
@@ -1270,7 +1246,7 @@ fn extract_call_sites(source: &str, shape: &mut NgRxShape) {
                 }
             }
 
-            search_from = after_start + body.len();
+            search_from = after_start + end_offset;
         }
     }
 }

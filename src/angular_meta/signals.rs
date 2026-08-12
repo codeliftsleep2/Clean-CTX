@@ -220,40 +220,14 @@ pub fn extract_signal_shape(source: &str, _fidelity: Fidelity) -> Option<SignalS
 
 /// Extract the declaration name from the text preceding a signal call.
 ///
-/// Returns `None` when the call is a bare statement (e.g. `effect()` in a
-/// constructor body) rather than an assignment (`name = ...`). In the
-/// bare-statement case the last whitespace token before the call is a
-/// punctuation character (`{`, `(`, `;`, etc.) which must NOT be treated
-/// as a name — the marker renders `?` instead.
+/// Delegates to the shared [`extract_decl_name`](crate::angular_meta::util::extract_decl_name)
+/// primitive (Round-8 structural audit — single source of truth for
+/// assignment-name extraction across all meta-layers). Handles:
+/// - `name = signal(` → `name`
+/// - `this.logEffect = effect(` → `logEffect` (member-expression LHS)
+/// - bare `effect()` in a constructor body → `None` (renders `?`)
 fn extract_decl_name(before: &str) -> Option<String> {
-    // Walk tokens from the end, skipping a trailing `=` (assignment).
-    // `name = effect(` → the last token is `=`; the actual name is the
-    // token before it. A bare `effect()` call in a constructor body has
-    // no assignable name — the last token is punctuation (`{`, `(`, `;`)
-    // which fails the identifier check and yields `?`.
-    //
-    // Member-expression LHS (`this.logEffect = effect(`) is normalized
-    // to the final segment (`logEffect`) — the `.` is not an identifier
-    // char but the assignment target is still a meaningful name.
-    let mut tokens: Vec<&str> = before.split_whitespace().collect();
-    while let Some(last) = tokens.last() {
-        let last = last.trim_end_matches('=').trim();
-        if last.is_empty() || last == "=" {
-            tokens.pop();
-            continue;
-        }
-        // Normalize `this.logEffect` / `obj.logEffect` → `logEffect`.
-        let last = last.rsplit('.').next().unwrap_or(last);
-        if last.is_empty() {
-            tokens.pop();
-            continue;
-        }
-        if !last.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '$') {
-            return None;
-        }
-        return Some(last.to_string());
-    }
-    None
+    crate::angular_meta::util::extract_decl_name(before)
 }
 
 /// Extract signal declarations matching a pattern.
