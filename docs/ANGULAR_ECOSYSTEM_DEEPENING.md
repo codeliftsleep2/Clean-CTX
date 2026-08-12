@@ -1,6 +1,6 @@
 # Angular Ecosystem Deepening — Meta-Layer Working Document
 
-> **Status:** ✅ Complete · **Last updated:** 2026-08-08 · **Target:** v0.4.0
+> **Status:** ✅ Complete · **Last updated:** 2026-08-11 · **Target:** v0.4.0
 > **Effort:** 9–13 days · **Prereqs:** A-11 ✅ · Angular Meta-Layer Phases 1–4 ✅ · DOTNET_META_LAYER.md Phase 2 ✅
 > **Roadmap items:** R-23 (NgRx) ✅ · R-24 (RxJS) ✅ · signals + routing (from DOTNET_META_LAYER.md Phase 2) ✅
 
@@ -84,29 +84,29 @@ Purely **additive** meta-layers. They never modify existing TS compression outpu
 
 ## Phase 1 — RxJS (2–3 days)
 
-`src/angular_meta/rx.rs` — `RxShape`, `extract_rx_shape()`, `build_rx_block()`.
+`src/angular_meta/rx.rs` — `RxShape`, `extract_rx_shape()`, `shape.render(fidelity)`.
 **Detection:** import gate `from 'rxjs'` / `from 'rxjs/operators'`. Observable fields (`Observable<T>` / `$` suffix), subject instantiations, pipe chains (`.pipe(`), static combinators, creation functions.
 **Fidelity:** Low = names only. Medium = + operator sequence. High = + args, ms values, buffer sizes.
-**Tests:** `src/tests/angular_meta/rx.rs` — 12 min. Fixtures in `src/test_files/angular/rx/`.
+**Tests:** `src/tests/angular_meta/rx.rs` — 21 tests. Fixtures in `src/test_files/angular/rx/`.
 
 ## Phase 2 — NgRx (2–3 days)
 
-`src/angular_meta/ngrx.rs` — `NgRxShape`, `extract_ngrx_shape()`, `build_ngrx_block()`.
-**Detection:** gate `from '@ngrx/store'` / `@ngrx/effects` / `@ngrx/entity`. Actions, reducers (incl. `createFeature` inline), effects (source → service → result), selectors, entity adapters, Store DI, dispatch/select sites. NgRx Data `EntityCollectionServiceBase<T>` + `{ dispatch: false }` handling.
-**Tests:** `src/tests/angular_meta/ngrx.rs` — 16 min. Fixtures in `src/test_files/angular/ngrx/`.
+`src/angular_meta/ngrx.rs` — `NgRxShape`, `extract_ngrx_shape()`, `shape.render(fidelity)`.
+**Detection:** gate `from '@ngrx/store'` / `@ngrx/effects` / `@ngrx/entity` / `@ngrx/data`. Actions, reducers (incl. `createFeature` inline), effects (source → service → result), selectors, entity adapters, Store DI, dispatch/select sites. NgRx Data `EntityCollectionServiceBase<T>` (emits `Φentity:T (data-layer)`) + `{ dispatch: false }` handling.
+**Tests:** `src/tests/angular_meta/ngrx.rs` — 34 tests. Fixtures in `src/test_files/angular/ngrx/`.
 
 ## Phase 3 — Signals (1–2 days)
 
-`src/angular_meta/signals.rs` — `SignalShape`, `extract_signal_shape()`, `build_signal_block()`.
+`src/angular_meta/signals.rs` — `SignalShape`, `extract_signal_shape()`, `shape.render(fidelity)`.
 **Detection:** gate `@angular/core`. `signal()`, `computed()`, `effect()`, `toSignal()`, `toObservable()`, `linkedSignal()`.
 **Cross-ref:** emits `Φsig-effect:` to disambiguate from NgRx `Φeffect:`.
-**Tests:** `src/tests/angular_meta/signals.rs` — 10 min. Fixtures in `src/test_files/angular/signals/`.
+**Tests:** `src/tests/angular_meta/signals.rs` — 19 tests. Fixtures in `src/test_files/angular/signals/`.
 
 ## Phase 4 — Routing (1 day)
 
-`src/angular_meta/routing.rs` — `RouteShape`, `extract_route_shape()`, `build_route_block()`.
+`src/angular_meta/routing.rs` — `RouteShape`, `extract_route_shape()`, `shape.render(fidelity)`.
 **Detection:** gate `@angular/router`. `Routes` arrays, `RouterModule.forRoot/forChild`, lazy `loadComponent`/`loadChildren`, guards, resolvers. Field-order-agnostic parsing.
-**Tests:** `src/tests/angular_meta/routing.rs` — 8 min. Fixtures in `src/test_files/angular/routing/`.
+**Tests:** `src/tests/angular_meta/routing.rs` — 18 tests. Fixtures in `src/test_files/angular/routing/`.
 
 ## Phase 5 — Cross-Layer CBM Edges (2 days)
 
@@ -138,7 +138,7 @@ pub fn resolve_cross_language_endpoint(&mut self, method_name: &str) -> Option<S
 
 CBM resolution is best-effort + incremental. Zero candidates → silent skip, no error, no graph line.
 
-**Tests:** `src/tests/angular_meta/graph_ngrx.rs` — 6 min (incl. CBM-absent graceful skip).
+**Tests:** `src/tests/angular_meta/graph_ngrx.rs` — 7 tests (incl. CBM-absent graceful skip).
 
 ## Phase 6 — Config + Prompts + Tests + Docs + Audit (1–2 days)
 
@@ -146,9 +146,9 @@ CBM resolution is best-effort + incremental. Zero candidates → silent skip, no
 
 **SYSTEM_PROMPT (`src/mcp/prompts.rs`):** one consolidated "Angular Ecosystem Deepening Meta Markers" section covering all four namespaces.
 
-**Non-regression:** all 2,141 existing tests pass; `cargo clippy --all-targets -- -D warnings` clean; non-matching `.ts`/`.cs` files byte-identical.
+**Non-regression:** all 2,255 workspace tests pass; `cargo clippy --all-targets -- -D warnings` clean; non-matching `.ts`/`.cs` files byte-identical.
 
-**Test totals:** 56 new tests (RxJS 12, NgRx 16, Signals 10, Routing 8, Graph 6, Config 4).
+**Test totals:** 99 new tests (RxJS 21, NgRx 34, Signals 19, Routing 18, Graph 7).
 
 **Docs:** this document + `docs/ROADMAP.md` (R-23/R-24 🚧→✅) + `docs/CHANGELOG.md` (test count delta) + `docs/DOTNET_META_LAYER.md` reconciliation note.
 

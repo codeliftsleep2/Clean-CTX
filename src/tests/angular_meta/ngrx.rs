@@ -442,6 +442,66 @@ export const userAdapter = createEntityAdapter<User>({
     assert!(entity.select_id.as_deref().unwrap_or("").contains("user.id"));
 }
 
+// ── NgRx Data EntityCollectionServiceBase (data-layer gotcha) ──────
+//
+// Per the plan's Gotchas section: NgRx Data `EntityCollectionServiceBase<T>`
+// services have no explicit createAction/createReducer — CRUD is
+// auto-generated. We emit `Φentity:T (data-layer)` noting this.
+
+#[test]
+fn detects_entity_collection_service_base_data_layer() {
+    let src = r#"
+import { Injectable } from '@angular/core';
+import { EntityCollectionServiceBase, EntityCollectionServiceElementsFactory } from '@ngrx/data';
+
+@Injectable({ providedIn: 'root' })
+export class UserService extends EntityCollectionServiceBase<User> {
+  constructor(serviceElementsFactory: EntityCollectionServiceElementsFactory) {
+    super('User', serviceElementsFactory);
+  }
+}
+"#;
+    let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
+    let entity = shape.entity_adapter.as_ref().expect("should have data-layer entity");
+    assert_eq!(entity.entity_type, "User");
+    assert!(entity.data_layer, "NgRx Data service must be flagged data_layer");
+    // No actions/reducers emitted for auto-generated CRUD.
+    assert!(shape.actions.is_empty());
+    assert!(shape.reducer.is_none());
+
+    let rendered = shape.render(Fidelity::Medium);
+    assert!(
+        rendered.contains("Φentity:User (data-layer)"),
+        "rendered: {rendered}"
+    );
+}
+
+#[test]
+fn entity_collection_service_base_renders_data_layer_at_all_fidelities() {
+    let src = r#"
+import { EntityCollectionServiceBase, EntityCollectionServiceElementsFactory } from '@ngrx/data';
+
+export class OrderService extends EntityCollectionServiceBase<Order> {
+  constructor(serviceElementsFactory: EntityCollectionServiceElementsFactory) {
+    super('Order', serviceElementsFactory);
+  }
+}
+"#;
+    let shape = extract_ngrx_shape(src, Fidelity::Low).expect("should detect NgRx");
+    let rendered = shape.render(Fidelity::Low);
+    assert!(
+        rendered.contains("Φentity:Order (data-layer)"),
+        "Low fidelity rendered: {rendered}"
+    );
+
+    let shape_high = extract_ngrx_shape(src, Fidelity::High).expect("should detect NgRx");
+    let rendered_high = shape_high.render(Fidelity::High);
+    assert!(
+        rendered_high.contains("Φentity:Order (data-layer)"),
+        "High fidelity rendered: {rendered_high}"
+    );
+}
+
 // ── Store injection ────────────────────────────────────────────────
 
 #[test]
