@@ -49,15 +49,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Round-11:** systematic comment/string-awareness — new `is_inside_comment_or_string` threaded through every scan site (rx, ngrx, signals, routing); `is_routes_context` gate in routing so `path:` in an unrelated object literal is not treated as a route; 16 new regression tests
 
 ### Tests
-- `src/tests/angular_meta/rx.rs` — 24 tests (observable/subject/combinator/pipe/fidelity/marker round-trip + Round-9/11 regressions)
-- `src/tests/angular_meta/ngrx.rs` — 34 tests (actions/reducers/effects/selectors/entity/data-layer/inline-feature/marker round-trip + Round-9/10/11 regressions)
-- `src/tests/angular_meta/signals.rs` — 20 tests (signal/computed/effect/toSignal/toObservable/linked/render + Round-9/11 regressions)
-- `src/tests/angular_meta/routing.rs` — 21 tests (routes/guards/resolvers/fidelity + Round-10/11 regressions)
+- `src/tests/angular_meta/rx.rs` — 26 tests (observable/subject/combinator/pipe/fidelity/marker round-trip + Round-9/11 regressions)
+- `src/tests/angular_meta/ngrx.rs` — 24 tests (actions/reducers/effects/selectors/entity/data-layer/inline-feature/marker round-trip + Round-9/10/11 regressions)
+- `src/tests/angular_meta/signals.rs` — 21 tests (signal/computed/effect/toSignal/toObservable/linked/render + Round-9/11 regressions)
+- `src/tests/angular_meta/routing.rs` — 23 tests (routes/guards/resolvers/fidelity + Round-10/11 regressions)
 - `src/tests/angular_meta/graph_ngrx.rs` — 7 cross-layer graph tests
 - `src/tests/angular_meta/util.rs` — 6 new `is_inside_comment_or_string` tests
 - Flagged tests: `ngrx` optional-method syntaxes (`OptionalMethod`) and `missing_docs` gates verified
 
-**Verification:** 3,023 tests passing (up from 2,141), 0 clippy warnings under `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
+**Verification:** 2,263 tests passing (up from 2,141), 0 clippy warnings under `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
 
 ---
 
@@ -648,7 +648,7 @@ This project follows [Semantic Versioning](https://semver.org/). Major version z
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 0.3.0 | 2026-08-12 | **Angular Ecosystem Deepening (R-23/R-24/R-25).** RxJS/NgRx/Signals/Routing meta-layers, cross-layer NgRx graph edges, Round-7→Round-11 FAANG audit hardening — 3,023 tests, 0 clippy warnings |
+| 0.3.0 | 2026-08-12 | **Angular Ecosystem Deepening (R-23/R-24/R-25).** RxJS/NgRx/Signals/Routing meta-layers, cross-layer NgRx graph edges, Round-7→Round-11 FAANG audit hardening — 2,263 tests, 0 clippy warnings |
 | 0.3.0 | 2026-08-07 | **Angular HTML Template Compression (R-44).** Fidelity-gated `.component.html` compression, PrimeNG markers, GitDiff integration, `angular_template` dashboard domain — 2,141 tests, 0 clippy warnings |
 | 0.3.0 | 2026-08-04 | **IR Evolution (R-43a + R-43b).** Execution semantics, program graph, inference layer, pass pipeline, validation, query, semantic delta intent |
 | 0.2.1-rc2 | 2026-07-03 | **Meta-Layer expansion.** .NET/C# meta-layer, Dual Meta-Layer analysis, A-08 sliding window proxy, P1-9 feature-gate hardening — 1,489 tests, 0 clippy warnings |
