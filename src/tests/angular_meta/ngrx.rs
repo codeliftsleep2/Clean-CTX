@@ -283,6 +283,47 @@ export class UserEffects {
     assert_eq!(shape.effects[0].failure_action.as_deref(), Some("loadUsersFailure"));
 }
 
+// ── Round-9 audit: array-transform `map(` must NOT be a success action ──
+//
+// The `find_effect_map_action` heuristic scans for `map(...)` returning an
+// action creator. But a `map(` inside the switchMap callback body can be
+// an ARRAY transform (`users.map(u => u.name)`), not an RxJS operator. The
+// old heuristic returned the FIRST `=> ...(` it found — capturing `u` (the
+// projection variable) as a bogus success action. We now require the
+// returned identifier to be a plausible action name (PascalCase or
+// Success/Failure/Error suffix), filtering out lowercase projection vars.
+
+#[test]
+fn array_map_inside_effect_is_not_a_success_action() {
+    let src = r#"
+import { Injectable } from '@angular/core';
+import { Actions, createEffect, ofType } from '@ngrx/effects';
+import { map, switchMap } from 'rxjs/operators';
+
+@Injectable()
+export class UserEffects {
+  refreshNames$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(refreshNames),
+      switchMap(() =>
+        this.userService.getUsers().pipe(
+          map(users => users.map(u => u.name)), // array transform — NOT an action
+          map(names => refreshNamesSuccess({ names }))
+        )
+      )
+    )
+  );
+}
+"#;
+    let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
+    assert_eq!(shape.effects.len(), 1);
+    assert_eq!(
+        shape.effects[0].success_action.as_deref(),
+        Some("refreshNamesSuccess"),
+        "array-map projection variable must NOT be captured as a success action"
+    );
+}
+
 #[test]
 fn extracts_no_dispatch_effect() {
     let src = r#"

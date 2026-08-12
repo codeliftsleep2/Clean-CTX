@@ -999,6 +999,14 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
 /// This avoids false positives from nested `map(` calls inside the
 /// `switchMap` callback body (e.g. `users.map(u => u.name)`), which are
 /// array transformations, not RxJS operators.
+///
+/// Round-9 audit: the old heuristic returned the FIRST `=> ...(` after any
+/// `map(`, which could capture an array-transform `users.map(u => u.name)`
+/// as a "success action" called `u`. We now require the returned identifier
+/// to be a plausible action-creator name — it must start with an uppercase
+/// letter or contain `Success`/`Failure`/`Error`/`$`, and must be followed
+/// by `(` (an action creator call). This filters out lowercase projection
+/// variables like `u`, `users`, `result`.
 fn find_effect_map_action(effect_body: &str) -> Option<String> {
     let mut search_from = 0;
     while let Some(idx) = effect_body[search_from..].find("map(") {
@@ -1011,7 +1019,17 @@ fn find_effect_map_action(effect_body: &str) -> Option<String> {
             let action = after_arrow.split('(').next()
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default();
-            if !action.is_empty() {
+            // Round-9 audit: require a plausible action-creator name. An
+            // array transform (`users.map(u => u.name)`) yields a lowercase
+            // `u` — reject it. A genuine success action is either
+            // PascalCase (`loadUsersSuccess`) or contains an action suffix.
+            let is_plausible_action = !action.is_empty()
+                && (action.starts_with(|c: char| c.is_uppercase())
+                    || action.contains("Success")
+                    || action.contains("Failure")
+                    || action.contains("Error")
+                    || action.ends_with('$'));
+            if is_plausible_action {
                 return Some(action);
             }
         }
