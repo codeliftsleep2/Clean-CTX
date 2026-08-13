@@ -1,5 +1,7 @@
 # Configuration Guide
 
+> **Owner:** Configuration reference (`.clean-ctx.json` schema, env vars, precedence, resource limits, persistence, heuristics, meta-layers) · **Status:** Living reference — single source of truth for configuration.
+
 Clean-CTX uses a two-tier configuration system with explicit precedence rules.
 
 ## Configuration Precedence

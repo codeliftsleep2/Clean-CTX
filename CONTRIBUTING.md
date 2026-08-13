@@ -46,7 +46,7 @@ Every pull request **must** pass these checks. The full checklist is in [`PULL_R
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test`** — all 1,360+ tests pass
+3. **`cargo test`** — all 2,263+ tests pass
 4. **`cargo audit`** — no known security vulnerabilities
 5. **`scripts/check-tree-sitter-versions.ps1`** — all tree-sitter crates share the same `tree-sitter-language` ABI version
 6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
@@ -168,7 +168,6 @@ See [Developer Documentation → Testing Conventions](docs/DEVELOPER_DOCUMENTATI
 | `docs/SECURITY.md` | Enterprise admins | Compliance, hardening, deployment |
 | `docs/TROUBLESHOOTING.md` | Users | Common issues and resolutions |
 | `docs/CHANGELOG.md` | All | Version history |
-| `docs/INTELLIGENCE_LAYER_PLAN.md` | Architects | Intelligence Layer: PageRank scoring, blast radius, token budget packing |
 | `docs/ROADMAP.md` | Contributors | Future plans and priorities |
 
 ---

@@ -1,6 +1,9 @@
 # Clean-CTX — 50-Edit Simulation: Per-Edit Breakdown by Fidelity
 
-This document provides the complete per-edit breakdown of the 50-edit simulation on `UserManagementService.ts` (~440 lines) across **all three fidelity levels**.
+> **Owner:** 50-edit simulation per-edit data appendix · **Status:** Living reference
+> **Cross-fidelity summary table:** owned by `docs/PERFORMANCE.md` (this document provides the **per-edit** detail only — the summary is not duplicated here).
+
+This document provides the complete per-edit breakdown of the 50-edit simulation on `UserManagementService.ts` (~440 lines) across **all three fidelity levels**. The aggregate cross-fidelity summary lives in `docs/PERFORMANCE.md`.
 
 **Run the simulation yourself:**
 - `cargo run --example fifty_edit_simulation` (Low fidelity)
@@ -8,17 +11,7 @@ This document provides the complete per-edit breakdown of the 50-edit simulation
 
 ---
 
-## 1. Cross-Fidelity Summary
-
-| Fidelity | Raw (50 edits) | ReComp (50 edits) | Delta (50 edits) | ReSav% | DelSav% | Delta vs ReComp |
-|----------|---------------:|------------------:|-----------------:|-------|-------:|:---------------:|
-| **Low** | 227,310 | 7,823 | 8,490 | 96.6% | 96.3% | +8.5% overhead |
-| **Medium** | 227,310 | 37,338 | 18,287 | 83.6% | 92.0% | −51.0% cheaper |
-| **High** | 227,310 | 48,556 | 22,955 | 78.6% | 89.9% | −52.7% cheaper |
-
----
-
-## 2. Per-Edit Table (All Three Fidelities)
+## 1. Per-Edit Table (All Three Fidelities)
 
 Edit category markers: **S**=Small, **M**=Method, **T**=Structural, **X**=Cross-method, **R**=Refactor
 

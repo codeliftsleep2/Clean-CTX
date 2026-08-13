@@ -1,12 +1,9 @@
 # Angular Ecosystem Deepening — Meta-Layer Working Document
 
-> **Status:** ✅ Complete · **Last updated:** 2026-08-12 · **Target:** v0.4.0
-> **Effort:** 9–13 days · **Prereqs:** A-11 ✅ · Angular Meta-Layer Phases 1–4 ✅ · DOTNET_META_LAYER.md Phase 2 ✅
-> **Roadmap items:** R-23 (NgRx) ✅ · R-24 (RxJS) ✅ · R-25 (Signals + Routing + cross-layer graph) ✅
-> **Audit status:** Hardened through Round-5 → Round-11 FAANG audits (Round-11 = comment/string-aware extraction guards). 2,263 tests passing (5 ignored), 0 clippy warnings.
+> **Owner:** RxJS / NgRx / Signals / Routing meta-layer design · **Status:** Living per-layer reference (shipped)
+> **Version:** 0.3.0 (shipped 2026-08-11, R-23/R-24/R-25)
 >
-> **Post-implementation audit hardening (Round-5 → Round-11):** the four extraction layers were iteratively hardened through FAANG audits. Round-8 centralized all string/depth-aware parsing into `src/meta_util.rs` (no per-layer hand-rolled scanners). Round-9 fixed type-annotated assignment names + false-positive guards. Round-10 added string-aware `@Component` scanning + comment-skip guards. Round-11 added the layer-agnostic `is_inside_comment_or_string` primitive threaded through every scan site, plus the `is_routes_context` gate so a `path:` in an unrelated object literal is not treated as a route. See `docs/CHANGELOG.md` [0.3.0] 2026-08-12.
->
+> **Ship status:** see `docs/ROADMAP.md` (R-23/R-24/R-25 ✅). **Test counts / audit rounds:** see `docs/CHANGELOG.md` `[0.3.0]` — this document does not duplicate them.
 
 ---
 
@@ -91,28 +88,28 @@ Purely **additive** meta-layers. They never modify existing TS compression outpu
 `src/angular_meta/rx.rs` — `RxShape`, `extract_rx_shape()`, `shape.render(fidelity)`.
 **Detection:** import gate `from 'rxjs'` / `from 'rxjs/operators'`. Observable fields (`Observable<T>` / `$` suffix), subject instantiations, pipe chains (`.pipe(`), static combinators, creation functions.
 **Fidelity:** Low = names only. Medium = + operator sequence. High = + args, ms values, buffer sizes.
-**Tests:** `src/tests/angular_meta/rx.rs` — 26 tests. Fixtures in `src/test_files/angular/rx/`.
+**Fixtures:** `src/test_files/angular/rx/`.
 
 ## Phase 2 — NgRx (2–3 days)
 
 `src/angular_meta/ngrx.rs` — `NgRxShape`, `extract_ngrx_shape()`, `shape.render(fidelity)`.
 **Detection:** gate `from '@ngrx/store'` / `@ngrx/effects` / `@ngrx/entity` / `@ngrx/data`. Actions, reducers (incl. `createFeature` inline), effects (source → service → result), selectors, entity adapters, Store DI, dispatch/select sites. NgRx Data `EntityCollectionServiceBase<T>` (emits `Φentity:T (data-layer)`) + `{ dispatch: false }` handling.
-**Tests:** `src/tests/angular_meta/ngrx.rs` — 24 tests. Fixtures in `src/test_files/angular/ngrx/`.
+**Fixtures:** `src/test_files/angular/ngrx/`.
 
 ## Phase 3 — Signals (1–2 days)
 
 `src/angular_meta/signals.rs` — `SignalShape`, `extract_signal_shape()`, `shape.render(fidelity)`.
 **Detection:** gate `@angular/core`. `signal()`, `computed()`, `effect()`, `toSignal()`, `toObservable()`, `linkedSignal()`.
 **Cross-ref:** emits `Φsig-effect:` to disambiguate from NgRx `Φeffect:`.
-**Tests:** `src/tests/angular_meta/signals.rs` — 21 tests. Fixtures in `src/test_files/angular/signals/`.
+**Fixtures:** `src/test_files/angular/signals/`.
 
 ## Phase 4 — Routing (1 day)
 
 `src/angular_meta/routing.rs` — `RouteShape`, `extract_route_shape()`, `shape.render(fidelity)`.
 **Detection:** gate `@angular/router`. `Routes` arrays, `RouterModule.forRoot/forChild`, lazy `loadComponent`/`loadChildren`, guards, resolvers. Field-order-agnostic parsing.
-**Tests:** `src/tests/angular_meta/routing.rs` — 23 tests. Fixtures in `src/test_files/angular/routing/`.
+**Fixtures:** `src/test_files/angular/routing/`.
 
-## Phase 5 — Cross-Layer CBM Edges (2 days)
+## Phase 5 — Cross-Layer CBM Edges
 
 **Integration:** `src/cbm/bridge.rs` — add one method `resolve_cross_language_endpoint(&mut self, method_name) -> Option<String>` using the existing `query_graph` (Cypher) + TTL/disk cache. **No new tool.**
 
@@ -142,19 +139,13 @@ pub fn resolve_cross_language_endpoint(&mut self, method_name: &str) -> Option<S
 
 CBM resolution is best-effort + incremental. Zero candidates → silent skip, no error, no graph line.
 
-**Tests:** `src/tests/angular_meta/graph_ngrx.rs` — 7 tests (incl. CBM-absent graceful skip).
-
-## Phase 6 — Config + Prompts + Tests + Docs + Audit (1–2 days)
+## Phase 6 — Config + Prompts
 
 **Config (`src/config.rs`):** Extend `MetaLayerConfig` with `rxjs`, `ngrx`, `signals`, `routing` sub-configs — all `Option`/`#[serde(default)]`, backward-compatible. `RxJsConfig.min_pipe_operators` (default 2), `NgRxConfig.include_dispatch_sites/include_select_sites/entity_selectors/cross_layer_cbm`, `SignalsConfig.enabled`, `RoutingConfig.enabled`.
 
 **SYSTEM_PROMPT (`src/mcp/prompts.rs`):** one consolidated "Angular Ecosystem Deepening Meta Markers" section covering all four namespaces.
 
-**Non-regression:** all 2,263 workspace tests pass (5 ignored); `cargo clippy --all-targets -- -D warnings` clean; non-matching `.ts`/`.cs` files byte-identical.
-
-**Test totals:** 101 new tests (RxJS 26, NgRx 24, Signals 21, Routing 23, Graph 7).
-
-**Docs:** this document + `docs/ROADMAP.md` (R-23/R-24 🚧→✅) + `docs/CHANGELOG.md` (test count delta) + `docs/DOTNET_META_LAYER.md` reconciliation note.
+**Non-regression:** non-matching `.ts`/`.cs` files byte-identical. Current test count lives in `CHANGELOG.md`.
 
 ---
 
@@ -173,7 +164,7 @@ CBM resolution is best-effort + incremental. Zero candidates → silent skip, no
 
 ---
 
-## Token Savings Estimate (validated with pilot data post-implementation)
+## Token Savings Estimate
 
 | File type | Raw tokens | Compressed (Medium) | Savings |
 |-----------|-----------|--------------------|---------|

@@ -1,6 +1,7 @@
 # Clean-CTX — Performance Guide
 
-**Last updated:** 2026-06-12
+> **Owner:** Compression/benchmark data (**50-edit simulation summary is the canonical cross-fidelity table; per-edit detail lives in `docs/EDIT_TYPE.md`**) · **Status:** Living reference
+> **Last updated:** 2026-06-12
 
 ---
 

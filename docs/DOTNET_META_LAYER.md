@@ -1,8 +1,9 @@
 # .NET / C# Meta-Layer
 
-> **Status:** ✅ Complete · **Last updated:** 2026-07-03
+> **Owner:** .NET/C# Meta-Layer design (R-35, R-41/R-42) · **Status:** Living per-layer reference (shipped)
 >
 > **Implementation:** Phase 1 (C# Core) complete with full ASP.NET Core, EF Core, SignalR, AutoMapper, and DI support. The .NET meta-layer is now integrated and available via the dotnet Cargo feature flag (enabled by default).
+> **Ship status:** see `docs/ROADMAP.md`. **Test counts / audit rounds:** see `docs/CHANGELOG.md`. This document does not duplicate them.
 
 ---
 
@@ -238,70 +239,7 @@ You will know Phase 1 is complete when **all** of the following are true:
 
 ## Phase 2: Angular Ecosystem Deepening (4-6 days)
 
-### Goal
-
-Extend the existing Angular Meta-Layer with deep support for NgRx, RxJS, modern Signals, and routing. Enable cross-layer awareness (Angular frontend ↔ .NET backend via CBM).
-
-### Scope
-
-**Enhancements to `src/angular_meta/`:**
-
-| Action | File | Purpose |
-|--------|------|---------|
-| Create | `src/angular_meta/rx.rs` | Observable/subject/operator detection: `Observable<T>`, `Subject`, `BehaviorSubject`, `pipe(map, filter, switchMap)`, `combineLatest`, `forkJoin` |
-| Create | `src/angular_meta/ngrx.rs` | NgRx detection: `createAction`, `createReducer`, `createEffect`, `createSelector`, `createEntityAdapter`, `Store` DI, state shape |
-| Create | `src/angular_meta/signals.rs` | Deeper signal analysis: `computed()`, `effect()`, `toSignal()`, `toObservable()`, `linkedSignal()`, signal interop patterns |
-| Create | `src/angular_meta/routing.rs` | Angular Router: `Routes` config, lazy loading `loadComponent`/`loadChildren`, guards, resolvers, `RouterModule.forRoot` |
-| Modify | `src/angular_meta/mod.rs` | Run new subsystems as additional Φ block sections |
-| Modify | `src/angular_meta/graph.rs` | Add NgRx store → selector → effect edges, router → component edges |
-| Modify | `src/angular_meta/markers.rs` | Add new Φ markers: Φrx, Φngrx (Φaction, Φreducer, Φeffect, Φselector, Φentity), Φsignal (Φcomputed, Φeffect), Φroute |
-
-**New Φ Markers for Angular Ecosystem:**
-
-| Marker | Expansion | Description |
-|--------|-----------|-------------|
-| `Φrx:` | `Observable<T>` | Observable/subject declarations |
-| `Φpipe:` | `pipe()` | RxJS operator chains |
-| `Φngrx:` | NgRx store | NgRx store class |
-| `Φaction:` | `createAction` | NgRx action definitions |
-| `Φreducer:` | `createReducer` | NgRx reducer shape |
-| `Φeffect:` | `createEffect` | NgRx side effects |
-| `Φselector:` | `createSelector` | NgRx selectors |
-| `Φentity:` | `createEntityAdapter` | NgRx entity state |
-| `Φsignal:` | `signal()` / `computed()` | Angular signal declarations |
-| `Φcomputed:` | `computed()` | Computed signals |
-| `Φeffect:` | `effect()` | Effect registrations |
-| `Φroute:` | `Routes` | Route configuration |
-
-**Example Output:**
-
-```
-Φngrx:UserStore
-  Φaction:loadUsers, loadUsersSuccess, loadUsersFailure
-  Φreducer:users → loading|loaded|error
-  Φeffect:loadUsers$ → UserService.getUsers()
-  Φselector:selectAllUsers, selectUserById
-
-Φrx:UserService
-  Φobservable:users$, loading$
-  Φsubject:refreshTrigger
-  Φpipe:switchMap, map, catchError
-
-Φsignal:UserComponent
-  Φcomputed:fullName
-  Φeffect:logUserChanges
-```
-
-**Test files:**
-
-| Action | File | Purpose |
-|--------|------|---------|
-| Create | `src/tests/angular_meta/rx.rs` | RxJS extraction tests |
-| Create | `src/tests/angular_meta/ngrx.rs` | NgRx extraction tests |
-| Create | `src/tests/angular_meta/signals.rs` | Signal extraction tests |
-| Create | `src/tests/angular_meta/routing.rs` | Router extraction tests |
-
-**Effort:** 4-6 days. **Risk:** Low-Medium (additive on existing Angular Meta-Layer).
+> **Status:** shipped as R-23/R-24/R-25 — see `docs/ANGULAR_ECOSYSTEM_DEEPENING.md` (the living owner of the Angular RxJS/NgRx/Signals/Routing marker vocabulary) and `docs/ANGULAR_META_LAYER.md`. This phase's planning content is superseded by those documents.
 
 ---
 

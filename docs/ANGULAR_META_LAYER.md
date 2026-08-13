@@ -1,8 +1,8 @@
-# Angular Meta-Layer Plan
+# Angular Meta-Layer — Design & Marker Vocabulary
 
-> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 2.5 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (Ecosystem Deepening) ✅ · **Last updated:** 2026-08-12
+> **Owner:** Angular Meta-Layer design (Phases 1–4) · **Status:** Living per-layer reference (shipped)
 >
-> **Phase 5 (Angular Ecosystem Deepening)** — RxJS, NgRx, Signals, and Routing meta-layers shipped 2026-08-11 as R-23/R-24/R-25, hardened through Round-5 → Round-11 FAANG audits. See `docs/ANGULAR_ECOSYSTEM_DEEPENING.md`.
+> **Ship status:** see `docs/ROADMAP.md` (R-22 ✅). **Test counts / audit rounds:** see `docs/CHANGELOG.md`. **Ecosystem Deepening (RxJS/NgRx/Signals/Routing):** see `docs/ANGULAR_ECOSYSTEM_DEEPENING.md`.
 >
 
 ---

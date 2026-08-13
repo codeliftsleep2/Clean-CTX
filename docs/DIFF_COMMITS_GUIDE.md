@@ -1,6 +1,8 @@
 # `diff_commits` — Multi-File Git Diff
 
-> **R-12 (v0.3.0)** — Diff an entire workspace between two git refs in a single MCP tool call. Emits per-file **AST-level change-sets** (not raw file contents), so the LLM sees *what changed semantically* with a fraction of the tokens.
+> **Owner:** Git-combined diff engine (`fromRef`/`toRef`/`fidelity`) · **Status:** Living reference
+>
+> **R-12 (v0.3.0)** — Diff an entire workspace between two git refs in a single MCP tool call. Emits per-file **AST-level change-sets** (not raw file contents), so the LLM sees *what changed* with a fraction of the tokens.
 
 ## What it does
 
@@ -147,4 +149,4 @@ A skipped file is counted in `skipped` **only** — it is never double-counted i
 
 ---
 
-*See also: `docs/R12_MULTI_FILE_GIT_DIFF_PLAN.md` (implementation plan), `docs/CONFIGURATION.md` (resource limits + security posture), `docs/ROADMAP.md` (R-12 status).*
+*See also: `docs/CONFIGURATION.md` (resource limits + security posture), `docs/ROADMAP.md` (R-12 status).*

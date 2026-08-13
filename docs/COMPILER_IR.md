@@ -1,9 +1,11 @@
 # Clean-CTX — Compiler IR: Structured State Protocol
 
-**Version:** 1.0.0 (Implemented)
-**Last updated:** 2026-06-18
-**Status:** All phases A–H implemented and deployed in production. 530 IR-specific tests pass.
-
+> **Owner:** Compiler IR spec + delta transport · **Status:** Living reference
+> **Version:** 1.0.0 (Implemented) · **Last updated:** 2026-06-18
+> **Status:** All phases A–H implemented and deployed in production.
+>
+> **Test coverage:** see `docs/CHANGELOG.md` for the current workspace test count (this document does not duplicate it).
+>
 > **Living document.** This document describes the Compiler IR subsystem as implemented. It replaces the original proposal/spec with accurate details about the actual wire formats, module structure, MCP integration, and test coverage.
 
 ---
@@ -556,4 +558,4 @@ The state machine supports:
 | MCP regression | `tests/mcp/tool_handlers.rs` | ~40 | Handler smoke tests, relative paths, IR-first format |
 | CBM integration | `tests/cbm/integration.rs` | 5 | CBM enrichment compression |
 
-**Total: 530+ IR-specific tests. All 1,277 library tests pass with 0 failures.**
+**Total: 530+ IR-specific tests. See `docs/CHANGELOG.md` for the current workspace test count.**
