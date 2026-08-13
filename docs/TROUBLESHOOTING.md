@@ -1,5 +1,7 @@
 # Clean-CTX — Troubleshooting Guide
 
+> **Owner:** Problem-solving + error codes + diagnostic commands · **Status:** Living reference
+
 **Last updated:** 2026-06-07
 
 ---
@@ -197,8 +199,8 @@ cargo test parse_typo_rejected
 
 If none of the above resolves your issue:
 
-1. Check the [FAANG audit](FAANG_AUDIT.md) for known edge cases and their fixes
-2. Check the [Architecture Overview](ARCHITECTURE_OVERVIEW.md) for system design context
+1. Check the [Architecture Overview](ARCHITECTURE_OVERVIEW.md) for system design context
+2. Check the [Changelog](CHANGELOG.md) for known edge cases and their fixes
 3. Check the [Developer Documentation](DEVELOPER_DOCUMENTATION.md) for build and test instructions
 4. Open an issue with:
    - Binary version (build date or commit hash)

@@ -1,6 +1,7 @@
 # Clean-CTX — Security Guide
 
-**Last updated:** 2026-06-30
+> **Owner:** Security model + hardening + compliance · **Status:** Living reference
+> **Last updated:** 2026-06-30
 
 ---
 

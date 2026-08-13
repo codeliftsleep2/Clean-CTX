@@ -1,5 +1,7 @@
 # Clean-CTX Proxy
 
+> **Owner:** Proxy what-it-does + how-to-use · **Status:** Living reference · single source of truth for proxy operation. Auto-start lifecycle lives here (also summarized in `docs/CONFIGURATION.md`).
+
 A Rust HTTP proxy that sits between your LLM client and any AI API (Anthropic, OpenAI, DeepSeek, etc.), automatically injecting prompt-cache breakpoints, compressing verbose tool output, scrubbing secrets, and applying TOML-based filters to reduce token usage by 70-90%.
 
 Works with any client that sends Anthropic-format `POST /v1/messages` or OpenAI-format `POST /v1/chat/completions` requests: Cline, Cursor, Aider, Continue.dev, GitHub Copilot (BYOK), and custom clients.

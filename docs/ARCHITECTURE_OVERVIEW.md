@@ -1,7 +1,10 @@
 # Clean-CTX — Architecture Overview
 
-**Version:** 0.3.0
-**Last updated:** 2026-08-07 (R-44 complete: Angular HTML template compression, PrimeNG markers, GitDiff integration)
+> **Owner:** System + module architecture · **Status:** Living reference
+> **Version:** 0.3.0
+> **Last updated:** 2026-08-07 (R-44 complete: Angular HTML template compression, PrimeNG markers, GitDiff integration)
+>
+> **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
 
 ---
 
@@ -71,16 +74,20 @@ stdin reader thread           Dispatcher thread pool (N workers)
 ┌──────────────────┐           ┌───────────────────────────────────┐
 │  read_line()     │           │  Worker 1: compress file          │
 │  parse JSON-RPC  │  enqueue  │  Worker 2: context_stats (read)   │
-│  → dispatcher    │──────────→│  Worker 3: CBM query (wait)      │
-│  → read next     │           │  Worker 4: workspace compress    │
+│  → dispatcher    │──────────→│  Worker 3: CBM query (wait)       │
+│  → read next     │           │  Worker 4: workspace compress     │
 └──────────────────┘           └───────────────────────────────────┘
-                                        │
-                                   ┌────▼──────────┐
-                                   │  RwLock<McpState>  │  Parallel reads, serial writes
-                                   └────┬──────────┘
-                                        │
-                                   ┌────▼──────────┐
-                                   │  Stdout writer │  Dedicated thread, no interleaving
+                                               │
+                                   ┌───────────▼─────────────┐
+                                   │     RwLock<McpState>    │  
+                                   │     Parallel reads,     │  
+                                   │     Serial writes       │ 
+                                   └────────────┬────────────┘
+                                                │
+                                   ┌────────────▼────────┐
+                                   │  Stdout writer      │ │
+                                      Dedicated thread, 
+                                      no interleaving    
                                    └────────────────┘
 ```
 
@@ -837,7 +844,7 @@ See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for full per-edit breakdown and the 
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks
-- 2,141 tests passing (unit + integration + E2E + proxy regression tests)
+- Current test count owned by `CHANGELOG.md`
 
 > **ℹ️ Cache System Separation:** Clean-CTX has **two independent cache systems** with different scopes and configuration paths:
 > 1. **MCP Server `CacheConfig`** (in `.clean-ctx.json`) — Controls `_meta.cache_hints` annotations in JSON-RPC responses. These annotations tell the LLM which parts of compressed output are cacheable (stable vocabulary, tool definitions, persisted baselines). Configuration is via the `cache` key in `.clean-ctx.json`.

@@ -1,6 +1,6 @@
 # Clean-CTX — Token Waste Reducer & Structured Transport Protocol
 
-> **🚀 Version 0.3.0** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot/.NET meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, **CBM filter-first architecture** (symbol importance filtering before compression), Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, **streaming workspace walk (walkdir)**, **Rayon-parallelized workspace compression**, **deterministic alias assignment**, **workspace compression result caching**, **R-43a Execution Semantics** (DataFlow/ControlFlow/SideEffect/ExecutionContext across Rust/C#/TypeScript), **R-43b Program Graph + Inference Layer + Pass Pipeline + Validator + Query Engine + Semantic Delta**, **R-44 Angular HTML Template Compression** (fidelity-gated `.component.html` compression, PrimeNG markers, GitDiff integration), and all **2,141 tests passing** with **zero clippy warnings**.
+> **🚀 Version 0.3.0** — Zero-touch workflow (`provide_code_context`), SQLite persistence layer, Angular/Spring Boot/.NET meta-layers, IR-level delta compression, text-level delta transport, cross-file dependency graph, modern Angular 17–21 syntax support, **CBM filter-first architecture** (symbol importance filtering before compression), Rust and Java language support, multi-platform proxy (Anthropic/OpenAI/Generic), **26 built-in tool output filters**, secret scrubbing, **streaming workspace walk (walkdir)**, **Rayon-parallelized workspace compression**, **deterministic alias assignment**, **workspace compression result caching**, **R-43a Execution Semantics** (DataFlow/ControlFlow/SideEffect/ExecutionContext across Rust/C#/TypeScript), **R-43b Program Graph + Inference Layer + Pass Pipeline + Validator + Query Engine + Semantic Delta**, **R-44 Angular HTML Template Compression** (fidelity-gated `.component.html` compression, PrimeNG markers, GitDiff integration), and all **2,263 tests passing** with **zero clippy warnings**.
 
 A local-first, air-gapped code context optimizer that reduces LLM token waste through four independent mechanisms: CBM symbol filtering (drops low-importance symbols before compression), compression (75–97% token savings), tool output filtering (70–90% savings), and intelligent prompt caching (~90% API cost savings).
 
@@ -666,7 +666,7 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — **0 warnings, 0 errors** |
-| Tests | ✅ **2,141 tests, all passing, including 130+ integration/e2e tests** |
+| Tests | ✅ **2,263 tests, all passing, including 130+ integration/e2e tests** |
 | Audit | ✅ FAANG-level audit — all 11 findings resolved (A-09 through A-15, F-19 through F-22); CBM audit — all findings resolved; Compiler-IR audit — all findings resolved; R-43a + R-43b FAANG audit — zero critical/high findings |
 | Languages | ✅ TypeScript, C#, Rust, Java with Angular/Spring Boot/.NET meta-layers, execution semantics across all 3 language layers |
 | IR Transport Protocol | ✅ Stateful instruction-level delta transport — compile once, send deltas thereafter |
@@ -699,8 +699,8 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 | [`docs/DEVELOPER_DOCUMENTATION.md`](docs/DEVELOPER_DOCUMENTATION.md) | Contributors | Building, testing, adding languages/tools/opcodes, code quality gates |
 | [`docs/COMPILER_IR.md`](docs/COMPILER_IR.md) | Architects | Compiler IR protocol, delta state transport, wire format, phase implementation |
 | [`docs/ANGULAR_META_LAYER.md`](docs/ANGULAR_META_LAYER.md) | Developers | Angular Meta-Layer design, marker vocabulary, template extraction, graph |
+| [`docs/ANGULAR_ECOSYSTEM_DEEPENING.md`](docs/ANGULAR_ECOSYSTEM_DEEPENING.md) | Developers | Angular Ecosystem Deepening — RxJS/NgRx/Signals/Routing meta-layers, cross-layer graph |
 | [`docs/DOTNET_META_LAYER.md`](docs/DOTNET_META_LAYER.md) | Developers | .NET/C# Meta-Layer design, marker vocabulary, ASP.NET/EF Core/SignalR |
-| [`docs/HEURISTICS_ENGINE_V2.md`](docs/HEURISTICS_ENGINE_V2.md) | Developers | Heuristics engine V2 — auto-classification, fidelity resolution, session-aware fidelity |
 | [`docs/EDIT_TYPE.md`](docs/EDIT_TYPE.md) | Developers | Edit categorization vocabulary for delta transport annotation |
 | [`docs/DIFF_COMMITS_GUIDE.md`](docs/DIFF_COMMITS_GUIDE.md) | Users | `diff_commits` tool usage, ref validation, security posture |
 | [`docs/PROXY.md`](docs/PROXY.md) | Users | Multi-platform proxy, tool output filtering, secret scrubbing, IDE integration |
@@ -708,10 +708,6 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Architects | Benchmarks, caching, memory profile, optimization checklist |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Administrators | Compliance checklist, hardening, SBOM, air-gap deployment |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | All | Version history with all additions, fixes, and deferrals |
-| [`docs/INTELLIGENCE_LAYER_PLAN.md`](docs/INTELLIGENCE_LAYER_PLAN.md) | Architects | Intelligence Layer: PageRank scoring, blast radius, token budget packing |
-| [`docs/CBM_INTEGRATION_PLAN.md`](docs/CBM_INTEGRATION_PLAN.md) | Architects | CBM filter-first architecture, pipe-level proxy, domain-tagged stats |
-| [`docs/IR_EVOLUTION_PLAN.md`](docs/IR_EVOLUTION_PLAN.md) | Architects | IR Evolution: execution semantics, program graph, inference layer, validation, query |
-| [`docs/TYPE_AWARE_COMPRESSION_PLAN.md`](docs/TYPE_AWARE_COMPRESSION_PLAN.md) | Architects | Type-aware compression: `type_aliases`, token-boundary matching, `§TA` footer |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Contributors | Future plans, prioritized items, carry-over from audit |
 
 ---
