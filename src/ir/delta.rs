@@ -414,6 +414,8 @@ fn primary_key(op: &CoreOp) -> String {
         CoreOp::Pattern(name, args) => {
             format!("PAT:{}:{}", name, args.first().map(|s| s.as_str()).unwrap_or("?"))
         }
+        // Edit Mode: Verbatim Method Bodies
+        CoreOp::Body(mid, _) => format!("BODY:{}", mid),
         // R-43a: Execution Semantics
         CoreOp::DataFlow(mid, _, _) => format!("DATAFLOW:{}", mid),
         CoreOp::ControlFlow(mid, _, _) => format!("CTRL:{}", mid),
@@ -447,6 +449,8 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
             }
             v
         }
+        // Edit Mode: Verbatim Method Bodies
+        CoreOp::Body(mid, _) => vec!["BODY".into(), mid.clone()],
         // R-43a: Execution Semantics
         CoreOp::DataFlow(mid, _, _) => vec!["DATAFLOW".into(), mid.clone()],
         CoreOp::ControlFlow(mid, _, _) => vec!["CTRL".into(), mid.clone()],
@@ -548,6 +552,8 @@ fn abbreviate_opcode(opcode: &str) -> &str {
         "IMP" => "IP",
         "TYPE" => "T",
         "PAT" => "P",
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => "BD",
         // R-43a: compact abbreviations
         "DATAFLOW" => "DF",
         "CTRL" => "CT",
@@ -575,6 +581,8 @@ fn expand_opcode(abbrev: &str) -> &str {
         "IP" => "IMP",
         "T" => "TYPE",
         "P" => "PAT",
+        // Edit Mode: Verbatim Method Bodies
+        "BD" => "BODY",
         // R-43a: compact abbreviations
         "DF" => "DATAFLOW",
         "CT" => "CTRL",
@@ -749,6 +757,8 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         "INJECTS" => format!("INJECTS:{}", tuple.get(1).unwrap_or(&String::new())),
         "IMP" => format!("IMP:{}", tuple.get(1).unwrap_or(&String::new())),
         "TYPE" => format!("TYPE:{}", tuple.get(1).unwrap_or(&String::new())),
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => format!("BODY:{}", tuple.get(1).unwrap_or(&String::new())),
         // R-43a: Execution Semantics
         "DATAFLOW" => format!("DATAFLOW:{}", tuple.get(1).unwrap_or(&String::new())),
         "CTRL" => format!("CTRL:{}", tuple.get(1).unwrap_or(&String::new())),
@@ -801,6 +811,8 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
         "INJECTS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "IMP" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "TYPE" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         // R-43a: Execution Semantics
         "DATAFLOW" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "CTRL" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],

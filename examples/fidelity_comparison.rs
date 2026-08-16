@@ -343,6 +343,8 @@ fn run_simulation(fidelity: Fidelity) -> FidelityRun {
         Fidelity::Low => "Low",
         Fidelity::Medium => "Medium",
         Fidelity::High => "High",
+        Fidelity::Edit => "Edit",
+        Fidelity::Verbatim => "Verbatim",
     };
 
     FidelityRun { name, fidelity, total_raw, total_recomp, total_delta, records, elapsed_secs }

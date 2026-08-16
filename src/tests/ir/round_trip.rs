@@ -22,7 +22,7 @@ use crate::ir::wire::{ir_to_wire, op_to_tuple, tuple_to_op, wire_to_ir};
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-/// Build a CompiledIR containing every CoreOp variant (all 19).
+/// Build a CompiledIR containing every CoreOp variant (all 20).
 fn all_variants_ir() -> CompiledIR {
     CompiledIR {
         file_id: "all.ts".to_string(),
@@ -44,6 +44,8 @@ fn all_variants_ir() -> CompiledIR {
             CoreOp::Import("IM1".into(), "fs".into(), "readFile".into()),
             CoreOp::TypeAlias("T1".into(), "string".into()),
             CoreOp::Pattern("CTOR".into(), vec!["C1".into(), "M1".into(), "S1".into()]),
+            // Edit Mode: verbatim method body
+            CoreOp::Body("M1".into(), "{\n  let x = 1;\n  return x;\n}".into()),
             // R-43a: 4 new execution semantics variants
             CoreOp::DataFlow("M1".into(), "reads".into(), "userRepo".into()),
             CoreOp::ControlFlow("M1".into(), "if".into(), "condition".into()),
@@ -111,7 +113,7 @@ fn round_trip_execution_context() {
     assert_eq!(original, restored);
 }
 
-// ── 2. Named Wire Format: Full IR Round-Trip (All 19 Variants) ──
+// ── 2. Named Wire Format: Full IR Round-Trip (All 20 Variants) ──
 
 #[test]
 fn round_trip_named_wire_all_variants() {
@@ -160,8 +162,9 @@ fn round_trip_binary_wire_all_variants() {
                     i
                 );
             }
-            // R-43a execution semantics ops have all data preserved
-            (CoreOp::DataFlow(..), CoreOp::DataFlow(..))
+            // Edit Mode + R-43a execution semantics ops have all data preserved
+            (CoreOp::Body(..), CoreOp::Body(..))
+            | (CoreOp::DataFlow(..), CoreOp::DataFlow(..))
             | (CoreOp::ControlFlow(..), CoreOp::ControlFlow(..))
             | (CoreOp::SideEffect(..), CoreOp::SideEffect(..))
             | (CoreOp::ExecutionContext(..), CoreOp::ExecutionContext(..))
@@ -335,7 +338,7 @@ fn round_trip_compact_delta_intent_absent_when_none() {
 
 /// Generate a random CoreOp for property testing.
 fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
-    let variant = rng() % 19;
+    let variant = rng() % 20;
     match variant {
         0 => CoreOp::DefClass(format!("C{}", rng() % 10), format!("Class{}", rng() % 100)),
         1 => CoreOp::DefMethod(
@@ -428,6 +431,12 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
                 0 => "sync", 1 => "async", 2 => "thread_bound", 3 => "transaction_scope", _ => "realtime"
             }.to_string(),
         ),
+        19 => CoreOp::Body(
+            format!("M{}", rng() % 10),
+            format!("{{
+  let x = {};
+}}", rng() % 100),
+        ),
         _ => unreachable!(),
     }
 }
@@ -518,7 +527,8 @@ fn property_binary_wire_round_trip() {
                     );
                 }
                 // Data-preserving ops
-                (CoreOp::DataFlow(..), CoreOp::DataFlow(..))
+                (CoreOp::Body(..), CoreOp::Body(..))
+                | (CoreOp::DataFlow(..), CoreOp::DataFlow(..))
                 | (CoreOp::ControlFlow(..), CoreOp::ControlFlow(..))
                 | (CoreOp::SideEffect(..), CoreOp::SideEffect(..))
                 | (CoreOp::ExecutionContext(..), CoreOp::ExecutionContext(..))

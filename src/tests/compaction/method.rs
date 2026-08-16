@@ -21,3 +21,21 @@ fn high_fidelity_preserves_everything() {
     let sig = "public async getUserById(id: string): Promise<User>";
     assert_eq!(extract_method_sig(sig, Fidelity::High), sig);
 }
+
+#[test]
+fn edit_fidelity_carries_verbatim_body() {
+    let raw = "public async getUserById(id: string): Promise<User> {\n  return this.users.find(u => u.id === id)!;\n}";
+    assert_eq!(extract_method_sig(raw, Fidelity::Edit), raw);
+}
+
+#[test]
+fn verbatim_fidelity_carries_verbatim_body() {
+    let raw = "public async getUserById(id: string): Promise<User> {\n  return this.users.find(u => u.id === id)!;\n}";
+    assert_eq!(extract_method_sig(raw, Fidelity::Verbatim), raw);
+}
+
+#[test]
+fn high_fidelity_still_strips_body() {
+    let raw = "public async getUserById(id: string): Promise<User> {\n  return this.users.find(u => u.id === id)!;\n}";
+    assert_eq!(extract_method_sig(raw, Fidelity::High), "public async getUserById(id: string): Promise<User>");
+}

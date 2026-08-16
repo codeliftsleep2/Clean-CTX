@@ -106,6 +106,31 @@ pub struct MethodNode {
     /// Method-level pattern ops
     #[serde(rename = "pa", default, skip_serializing_if = "Vec::is_empty")]
     pub patterns: Vec<PatternEntry>,
+
+    /// Verbatim method body text — byte-exact copy from source.
+    /// Only present when `Fidelity::Edit` was used to compile.
+    #[serde(rename = "b", default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+
+    /// Control-flow metadata: [kind, target] tuples (R-43a).
+    /// kind: "if" | "loop" | "match" | "try" | "await" | "return"
+    #[serde(rename = "cf", default, skip_serializing_if = "Vec::is_empty")]
+    pub control_flow: Vec<Vec<String>>,
+
+    /// Data-flow metadata: [direction, target] tuples (R-43a).
+    /// direction: "reads" | "writes"
+    #[serde(rename = "df", default, skip_serializing_if = "Vec::is_empty")]
+    pub data_flow: Vec<Vec<String>>,
+
+    /// Side-effect annotation (R-43a).
+    /// effect_type: "pure" | "io" | "mutation" | "async" | "transaction"
+    #[serde(rename = "se", default, skip_serializing_if = "Option::is_none")]
+    pub side_effect: Option<String>,
+
+    /// Execution context annotation (R-43a).
+    /// context_type: "sync" | "async" | "thread_bound" | "transaction_scope" | "realtime"
+    #[serde(rename = "ec", default, skip_serializing_if = "Option::is_none")]
+    pub execution_context: Option<String>,
 }
 
 /// A single field node — nested inside a class.
@@ -192,6 +217,11 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                         return_type: None,
                         flags: None,
                         patterns: Vec::new(),
+                        body: None,
+                        control_flow: Vec::new(),
+                        data_flow: Vec::new(),
+                        side_effect: None,
+                        execution_context: None,
                     });
                     current_class_idx = Some(class_idx);
                     current_method_idx = Some(classes[class_idx].methods.len() - 1);
@@ -207,6 +237,11 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                             return_type: None,
                             flags: None,
                             patterns: Vec::new(),
+                            body: None,
+                            control_flow: Vec::new(),
+                            data_flow: Vec::new(),
+                            side_effect: None,
+                            execution_context: None,
                         }],
                         fields: Vec::new(),
                         class_flags: None,
@@ -358,9 +393,69 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                 type_aliases.push(vec![alias.clone(), original.clone()]);
             }
 
-            // R-43a: Execution semantics — ignored in hierarchical format
-            // (these are method-level annotations, not structural)
-            CoreOp::DataFlow(..) | CoreOp::ControlFlow(..) | CoreOp::SideEffect(..) | CoreOp::ExecutionContext(..) => {}
+            // Edit Mode: verbatim method body
+            CoreOp::Body(mid, text) => {
+                if let Some(c_idx) = current_class_idx {
+                    for mi in 0..classes[c_idx].methods.len() {
+                        if classes[c_idx].methods[mi].id == *mid {
+                            classes[c_idx].methods[mi].body = Some(text.clone());
+                            current_method_idx = Some(mi);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // R-43a: Execution semantics — stored as method-level metadata.
+            CoreOp::ControlFlow(mid, kind, target) => {
+                if let Some(c_idx) = current_class_idx {
+                    for mi in 0..classes[c_idx].methods.len() {
+                        if classes[c_idx].methods[mi].id == *mid {
+                            classes[c_idx].methods[mi].control_flow
+                                .push(vec![kind.clone(), target.clone()]);
+                            current_method_idx = Some(mi);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            CoreOp::DataFlow(mid, direction, target) => {
+                if let Some(c_idx) = current_class_idx {
+                    for mi in 0..classes[c_idx].methods.len() {
+                        if classes[c_idx].methods[mi].id == *mid {
+                            classes[c_idx].methods[mi].data_flow
+                                .push(vec![direction.clone(), target.clone()]);
+                            current_method_idx = Some(mi);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            CoreOp::SideEffect(mid, effect_type) => {
+                if let Some(c_idx) = current_class_idx {
+                    for mi in 0..classes[c_idx].methods.len() {
+                        if classes[c_idx].methods[mi].id == *mid {
+                            classes[c_idx].methods[mi].side_effect = Some(effect_type.clone());
+                            current_method_idx = Some(mi);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            CoreOp::ExecutionContext(mid, context_type) => {
+                if let Some(c_idx) = current_class_idx {
+                    for mi in 0..classes[c_idx].methods.len() {
+                        if classes[c_idx].methods[mi].id == *mid {
+                            classes[c_idx].methods[mi].execution_context = Some(context_type.clone());
+                            current_method_idx = Some(mi);
+                            break;
+                        }
+                    }
+                }
+            }
 
             CoreOp::Pattern(name, args) => {
                 // Parse pattern args to find the correct parent by class/method ID.
@@ -487,6 +582,43 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
             // Method flags
             if let Some(flags) = &method.flags {
                 instructions.push(CoreOp::Flags(method.id.clone(), flags.clone()));
+            }
+
+            // Verbatim body
+            if let Some(body) = &method.body {
+                instructions.push(CoreOp::Body(method.id.clone(), body.clone()));
+            }
+
+            // Control-flow metadata
+            for cf in &method.control_flow {
+                if cf.len() >= 2 {
+                    instructions.push(CoreOp::ControlFlow(
+                        method.id.clone(),
+                        cf[0].clone(),
+                        cf[1].clone(),
+                    ));
+                }
+            }
+
+            // Data-flow metadata
+            for df in &method.data_flow {
+                if df.len() >= 2 {
+                    instructions.push(CoreOp::DataFlow(
+                        method.id.clone(),
+                        df[0].clone(),
+                        df[1].clone(),
+                    ));
+                }
+            }
+
+            // Side-effect annotation
+            if let Some(se) = &method.side_effect {
+                instructions.push(CoreOp::SideEffect(method.id.clone(), se.clone()));
+            }
+
+            // Execution context annotation
+            if let Some(ec) = &method.execution_context {
+                instructions.push(CoreOp::ExecutionContext(method.id.clone(), ec.clone()));
             }
 
             // Method-level patterns (args stored as-is)

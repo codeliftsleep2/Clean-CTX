@@ -8,13 +8,13 @@
 // Encoding spec:
 // ┌─────────────────────────────────────────────────────────┐
 // │ Header: magic(2) + version(1)                           │
-// │ String Table: [count(varint), (len(varint), bytes)*]   │
+// │ String Table: [count(varint), (len(varint), bytes)*]    │
 // │ Instructions: [count(varint), instruction*]             │
-// │                                                          │
-// │ Instruction:                                             │
+// │                                                         │
+// │ Instruction:                                            │
 // │   opcode_idx: u8 (0-14 for 15 core opcodes + patterns)  │
-// │   operands: [varint]* (string table indices)             │
-// │   For variadic ops: operand_count as varint prefix       │
+// │   operands: [varint]* (string table indices)            │
+// │   For variadic ops: operand_count as varint prefix      │
 // └─────────────────────────────────────────────────────────┘
 //
 // Varint encoding: 7-bit groups with MSB continuation flag.
@@ -42,7 +42,7 @@ const VERSION: u8 = 0x02;
 /// Legacy version 0x01 (long TYPE op names) — still supported for decode.
 const VERSION_LEGACY: u8 = 0x01;
 
-/// Opcode index assignment (0-18)
+/// Opcode index assignment (0-19)
 const OP_DEF_C: u8 = 0;
 const OP_DEF_M: u8 = 1;
 const OP_DEF_F: u8 = 2;
@@ -63,6 +63,8 @@ const OP_DATAFLOW: u8 = 15;
 const OP_CTRL: u8 = 16;
 const OP_EFFECT: u8 = 17;
 const OP_CTX: u8 = 18;
+// Edit Mode: Verbatim Method Bodies
+const OP_BODY: u8 = 19;
 
 /// Opcodes that have a variable number of operands (beyond the first one).
 fn is_variadic(op_idx: u8) -> bool {
@@ -87,6 +89,8 @@ fn op_to_index(op: &CoreOp) -> u8 {
         CoreOp::Import(..) => OP_IMP,
         CoreOp::TypeAlias(..) => OP_TYPE,
         CoreOp::Pattern(..) => OP_PAT,
+        // Edit Mode: Verbatim Method Bodies
+        CoreOp::Body(..) => OP_BODY,
         // R-43a: Execution Semantics
         CoreOp::DataFlow(..) => OP_DATAFLOW,
         CoreOp::ControlFlow(..) => OP_CTRL,
@@ -291,6 +295,11 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
                     encode_operand(&mut buf, a);
                 }
             }
+            // Edit Mode: Verbatim Method Bodies
+            CoreOp::Body(mid, text) => {
+                encode_operand(&mut buf, mid);
+                encode_operand(&mut buf, text);
+            }
             // R-43a: Execution Semantics
             CoreOp::DataFlow(mid, direction, target) => {
                 encode_operand(&mut buf, mid);
@@ -435,7 +444,7 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
         let op_idx = data[pos];
         pos += 1;
 
-        if op_idx > 18 {
+        if op_idx > OP_BODY {
             return Err(BinaryDecodeError::UnknownOpcode(op_idx));
         }
 
@@ -546,6 +555,12 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                 OP_TYPE => {
                     let original = read_operand(&data[pos..], &mut pos)?;
                     CoreOp::TypeAlias(String::new(), original)
+                }
+                // Edit Mode: Verbatim Method Bodies
+                OP_BODY => {
+                    let mid = read_operand(&data[pos..], &mut pos)?;
+                    let text = read_operand(&data[pos..], &mut pos)?;
+                    CoreOp::Body(mid, text)
                 }
                 // R-43a: Execution Semantics
                 OP_DATAFLOW => {
