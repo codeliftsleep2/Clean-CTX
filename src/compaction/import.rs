@@ -28,6 +28,10 @@ pub fn compact_import(text: &str, fidelity: Fidelity) -> String {
                 .replace(" }", "}")
                 .replace(", ", ",")
         }
+        // C-12 (FAANG audit): At Edit/Verbatim the import must be byte-exact
+        // (including the trailing semicolon and any multi-line form) so
+        // `replace_in_file` SEARCH blocks match. High keeps the stripped form.
+        Fidelity::Edit | Fidelity::Verbatim => text.to_string(),
         Fidelity::High => line.to_string(),
     }
 }

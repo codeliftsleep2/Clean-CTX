@@ -62,7 +62,8 @@ fn provide_code_context_cbm_skipped_when_intelligence_disabled() {
         source,
         None,           // path_alias
         None,           // stored_fidelity
-    );
+    )
+    .unwrap();
 
     // When intelligence is disabled, cbm_informed should stay false
     assert!(!decision.cbm_informed,
@@ -92,7 +93,8 @@ fn provide_code_context_cbm_informed_false_when_no_bridge() {
         &crate::ir::replay::ContextState::new(),
         source,
         None, None,
-    );
+    )
+    .unwrap();
 
     assert!(!decision.cbm_informed,
         "cbm_informed should be false when no bridge available");
@@ -117,7 +119,8 @@ fn provide_code_context_cbm_informed_false_on_explicit_fidelity() {
         &crate::ir::replay::ContextState::new(),
         source,
         None, None,
-    );
+    )
+    .unwrap();
 
     // explicit fidelity should be honored, cbm_informed stays false
     assert!(!decision.cbm_informed,

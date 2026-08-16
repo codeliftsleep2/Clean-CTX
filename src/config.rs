@@ -49,7 +49,7 @@ impl Default for SmartDefaults {
 fn default_sd_refactor() -> Fidelity { Fidelity::High }
 fn default_sd_overview() -> Fidelity { Fidelity::Low }
 fn default_sd_debug() -> Fidelity { Fidelity::Medium }
-fn default_sd_edit() -> Fidelity { Fidelity::Low }
+fn default_sd_edit() -> Fidelity { Fidelity::Edit }
 fn default_sd_implement() -> Fidelity { Fidelity::Medium }
 
 // ── Heuristics configuration ───────────────────────────────────────
@@ -98,6 +98,18 @@ pub struct HeuristicsConfig {
     /// Whether to check DB for prior fidelity on file re-visits.
     #[serde(default = "default_true")]
     pub session_aware_fidelity: bool,
+    /// Auto-select Edit fidelity for implementation/service files
+    /// when no explicit intent/fidelity is given. When true, files
+    /// classified as Service or Implementation get `Fidelity::Edit`
+    /// so method bodies are carried verbatim for safe edits.
+    #[serde(default = "default_true")]
+    pub auto_edit_mode: bool,
+    /// File classes that auto-select Edit fidelity when `auto_edit_mode`
+    /// is on and no explicit intent/fidelity is given. Class names match
+    /// the `FileClass` variants as lowercase strings ("service",
+    /// "implementation", etc.). Defaults to ["service", "implementation"].
+    #[serde(default = "default_edit_auto_classifications")]
+    pub edit_auto_classifications: Vec<String>,
 }
 
 impl Default for HeuristicsConfig {
@@ -112,8 +124,14 @@ impl Default for HeuristicsConfig {
             high_lines: default_high_lines(),
             auto_classify: default_true(),
             session_aware_fidelity: default_true(),
+            auto_edit_mode: default_true(),
+            edit_auto_classifications: default_edit_auto_classifications(),
         }
     }
+}
+
+fn default_edit_auto_classifications() -> Vec<String> {
+    vec!["service".to_string(), "implementation".to_string()]
 }
 
 fn default_large_file_threshold() -> usize { 300 }

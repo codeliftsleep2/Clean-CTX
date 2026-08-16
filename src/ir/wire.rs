@@ -108,6 +108,10 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             v.extend(args.iter().cloned());
             v
         }
+        // Edit Mode: Verbatim Method Bodies
+        CoreOp::Body(mid, text) => {
+            vec!["BODY".into(), mid.clone(), text.clone()]
+        }
         // R-43a: Execution Semantics
         CoreOp::DataFlow(mid, direction, target) => {
             vec![
@@ -279,6 +283,14 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
                     tuple[1].clone(),
                     tuple[2..].to_vec(),
                 ))
+            } else {
+                None
+            }
+        }
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => {
+            if tuple.len() >= 3 {
+                Some(CoreOp::Body(tuple[1].clone(), tuple[2].clone()))
             } else {
                 None
             }

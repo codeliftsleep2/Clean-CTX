@@ -24,7 +24,11 @@ pub fn format_compacted_body(
     let layout_header = match fidelity {
         Fidelity::Low => format!("// --- Compacted Layout (Low Fidelity): {} ---", path_alias),
         Fidelity::Medium => format!("// --- Enhanced Layout (Medium Fidelity): {} ---", path_alias),
+        // H-6 (FAANG audit): Edit/Verbatim were mislabeled as "High Fidelity".
+        // Edit carries byte-exact method bodies; Verbatim is the full raw source.
         Fidelity::High => format!("// --- Full Layout (High Fidelity): {} ---", path_alias),
+        Fidelity::Edit => format!("// --- Edit Layout (Structural + Verbatim Bodies): {} ---", path_alias),
+        Fidelity::Verbatim => format!("// --- Verbatim Layout (Full Source): {} ---", path_alias),
     };
     if sym_footer.is_empty() {
         format!("{}\n{}\n", layout_header, display_body)
@@ -62,6 +66,12 @@ pub fn format_final_output(
             method_count,
             import_count,
         );
+    }
+    // H-7 (FAANG audit): At Edit/Verbatim the verbose "Token Optimization
+    // Report" header would break byte-exactness expectations. Emit the
+    // compacted body as-is (the layout header already identifies the mode).
+    if fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim {
+        return compacted_body.to_string();
     }
     let meta = calculate_savings(source_code, compacted_body, None);
     let ratio_report = format!(

@@ -137,7 +137,7 @@ fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
             }).collect();
             output.push_str(&format!("F {}\n", field_strs.join(" ")));
         }
-        Fidelity::Medium | Fidelity::High => {
+        Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
             // One per line
             for field in &class.fields {
                 if let Some(ft) = &field.field_type {
@@ -217,6 +217,32 @@ fn render_methods(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
             if let Some(flags) = &method.flags {
                 if !flags.is_empty() {
                     output.push_str(&format!(" fl:{}", flags.join(",")));
+                }
+            }
+        }
+
+        // Control-flow metadata at High fidelity (Gap 1 fix)
+        if fidelity == Fidelity::High && !method.control_flow.is_empty() {
+            let cf_strs: Vec<String> = method.control_flow.iter()
+                .map(|cf| {
+                    if cf.len() >= 2 {
+                        format!("{}:{}", cf[0], cf[1])
+                    } else {
+                        cf.join(":")
+                    }
+                })
+                .collect();
+            output.push_str(&format!(" cf:{}", cf_strs.join(",")));
+        }
+
+        // Verbatim method body at Edit fidelity (byte-exact for replace_in_file)
+        if fidelity == Fidelity::Edit {
+            if let Some(body) = &method.body {
+                output.push('\n');
+                output.push_str(body);
+                // Ensure trailing newline before next method
+                if !body.ends_with('\n') {
+                    output.push('\n');
                 }
             }
         }
