@@ -259,7 +259,19 @@ impl super::compiler::IRCompiler {
         // verbatim body flows through `CoreOp::Body` separately.
         let sig_text = match find_body_start(raw_sig) {
             Some(i) => raw_sig[..i].trim_end().to_string(),
-            None => raw_sig.to_string(),
+            None => {
+                // Expression-bodied arrow: `const foo = () => bar()`.
+                // No block brace exists, so strip everything from the
+                // `=>` — the arrow expression flows through `CoreOp::Body`
+                // via `extract_method_body` (which returns the text after
+                // `=>`). Without this strip the arrow expression would be
+                // swallowed into `return_type` and double-rendered.
+                if let Some(arrow_idx) = raw_sig.rfind("=>") {
+                    raw_sig[..arrow_idx].trim_end().to_string()
+                } else {
+                    raw_sig.to_string()
+                }
+            }
         };
         let sig = parse_method_sig(&sig_text);
         let name = sig.name;

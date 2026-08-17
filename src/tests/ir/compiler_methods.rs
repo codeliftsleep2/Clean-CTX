@@ -187,3 +187,31 @@ fn emit_method_ir_strips_body_from_sig() {
     assert!(!ty.contains('{'));
     assert!(!ty.contains("return"));
 }
+
+/// Edit Mode FAANG audit: expression-bodied arrows have no block brace,
+/// so `find_body_start` returns None. The arrow expression must NOT be
+/// swallowed into `return_type` — `emit_method_ir` must strip at `=>`.
+#[test]
+fn emit_method_ir_strips_arrow_expression_from_sig() {
+    use crate::ir::compiler::IRCompiler;
+    use crate::ir::opcodes::CoreOp;
+
+    let mut compiler = IRCompiler::new();
+    let mut instructions = Vec::new();
+    // Full raw arrow text as produced by extract_method_sig at Edit.
+    let raw = "private getLabel = (id: string) => this.labels[id] ?? 'default';";
+    compiler.emit_method_ir(&mut instructions, "C1", "M2", raw);
+
+    // The arrow expression must NOT appear in the Return op.
+    let return_op = instructions.iter().find_map(|op| {
+        if let CoreOp::Return(mid, ty) = op {
+            Some((mid.clone(), ty.clone()))
+        } else {
+            None
+        }
+    });
+    let (mid, ty) = return_op.expect("should emit Return");
+    assert_eq!(mid, "M2");
+    assert!(!ty.contains("=>"), "arrow expression leaked into return type: {}", ty);
+    assert!(!ty.contains("labels"), "arrow expression leaked into return type: {}", ty);
+}
