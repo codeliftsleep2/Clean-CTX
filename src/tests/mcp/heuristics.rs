@@ -10,6 +10,21 @@ use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::ir::replay::ContextState;
 
+#[allow(clippy::too_many_arguments)]
+fn decide_ok(
+    file_path: &str,
+    explicit_fidelity: Option<&str>,
+    explicit_intent: Option<&str>,
+    config: &CleanCtxConfig,
+    text_delta: &TextDeltaComputer,
+    ir_ctx: &ContextState,
+    source: &str,
+    path_alias: Option<&str>,
+    stored_fidelity: Option<Fidelity>,
+) -> heuristics::ContextDecision {
+    heuristics::decide(file_path, explicit_fidelity, explicit_intent, config, text_delta, ir_ctx, source, path_alias, stored_fidelity).expect("decide should succeed")
+}
+
 fn empty_source() -> &'static str { "" }
 
 // ── V1 Strategy Tests (unchanged) ──────────────────────────────────
@@ -19,7 +34,7 @@ fn test_first_call_full_compress() {
     let config = CleanCtxConfig::default();
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/test/file.ts",
         None,
         None,
@@ -42,7 +57,7 @@ fn test_delta_after_baseline() {
     // Store a baseline first
     text_delta.store_snapshot("alpha1", vec!["line1".to_string()]);
 
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "alpha1",
         None,
         None,
@@ -63,7 +78,7 @@ fn test_intent_refactor_high_fidelity() {
     let config = CleanCtxConfig::default();
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/test/file.ts",
         None,
         Some("refactor"),
@@ -82,7 +97,7 @@ fn test_intent_overview_low_fidelity() {
     let config = CleanCtxConfig::default();
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/test/file.ts",
         None,
         Some("overview"),
@@ -104,7 +119,7 @@ fn test_large_file_v2_complexity_medium() {
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let large_source: String = (0..500).map(|i| format!("line {}\n", i)).collect();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/unknown.rs",
         None,
         None,
@@ -126,7 +141,7 @@ fn test_small_file_v2_complexity_low() {
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let small_source: String = (0..150).map(|i| format!("line {}\n", i)).collect();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/unknown.rs",
         None,
         None,
@@ -153,7 +168,7 @@ fn test_angular_detection() {
         @Component({ selector: 'app-test' })
         export class TestComponent {}
     "#;
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/test/test.component.ts",
         None,
         None,
@@ -172,7 +187,7 @@ fn test_non_angular_not_detected() {
     let config = CleanCtxConfig::default();
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/test/file.ts",
         None,
         None,
@@ -191,7 +206,7 @@ fn test_decision_summary_includes_details() {
     let config = CleanCtxConfig::default();
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/test/file.ts",
         None,
         Some("edit"),
@@ -220,7 +235,7 @@ fn test_v2_classify_test_file() {
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let test_source = "#[test]\nfn test_foo() { assert!(true); }";
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/test/file.rs",
         None,
         None,
@@ -240,7 +255,7 @@ fn test_v2_classify_test_path() {
     let config = CleanCtxConfig::default();
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/src/__tests__/utils.ts",
         None,
         None,
@@ -260,7 +275,7 @@ fn test_v2_classify_config_file() {
     let config = CleanCtxConfig::default();
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/config.rs",
         None,
         None,
@@ -281,7 +296,7 @@ fn test_v2_m3_configure_not_config() {
     let config = CleanCtxConfig::default();
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/configure.rs",
         None,
         None,
@@ -308,7 +323,7 @@ pub struct Post { pub title: String, pub body: String }
 pub enum Status { Active, Inactive }
 pub trait Displayable { fn display(&self) -> String; }
 "#;
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/models.rs",
         None,
         None,
@@ -346,7 +361,7 @@ impl std::fmt::Display for User {
     }
 }
 "#;
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/user.rs",
         None,
         None,
@@ -369,7 +384,7 @@ fn test_v2_m2_test_helper_not_test_file() {
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let source = "fn test_connection() -> bool { true }\npub fn connect() { }";
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/db.rs",
         None,
         None,
@@ -392,7 +407,7 @@ fn test_v2_c1_stored_fidelity_reused() {
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let source = "pub fn do_stuff() { }";
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/utils.rs",
         None,
         None,
@@ -414,7 +429,7 @@ fn test_v2_c1_explicit_overrides_stored() {
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let source = "pub fn do_stuff() { }";
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/utils.rs",
         Some("low"),
         None,
@@ -437,7 +452,7 @@ fn test_v2_c1_disabled_ignores_stored() {
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let source = "pub fn do_stuff() { }";
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/utils.rs",
         None,
         None,
@@ -456,7 +471,10 @@ fn test_v2_c1_disabled_ignores_stored() {
 
 #[test]
 fn test_v2_classify_service_file() {
-    let config = CleanCtxConfig::default();
+    let mut config = CleanCtxConfig::default();
+    // Isolate the classifier's native Service→High mapping from the
+    // auto-edit override (which is covered by its own tests).
+    config.heuristics.auto_edit_mode = false;
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let mut source = String::new();
@@ -466,7 +484,7 @@ fn test_v2_classify_service_file() {
     for i in 0..11 {
         source.push_str(&format!("pub fn func{}(x: i32) -> i32 {{ x + {} }}\n", i, i));
     }
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/services/user_service.rs",
         None,
         None,
@@ -483,7 +501,10 @@ fn test_v2_classify_service_file() {
 
 #[test]
 fn test_v2_classify_implementation_file() {
-    let config = CleanCtxConfig::default();
+    let mut config = CleanCtxConfig::default();
+    // Isolate the classifier's native Implementation→Medium mapping from
+    // the auto-edit override (which is covered by its own tests).
+    config.heuristics.auto_edit_mode = false;
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let impl_source = r#"
@@ -498,7 +519,7 @@ pub fn list_users() -> Vec<User> {
     vec![]
 }
 "#;
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/user.handler.rs",
         None,
         None,
@@ -522,7 +543,7 @@ fn test_v2_complexity_very_small_low() {
     let config = CleanCtxConfig::default();
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/lib.rs",
         None,
         None,
@@ -546,7 +567,7 @@ fn test_v2_complexity_medium_imports() {
         source.push_str(&format!("use crate::module{}::Thing{};\n", i, i));
     }
     source.push_str("pub fn process() -> bool { true }\n");
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/processor.rs",
         None,
         None,
@@ -563,7 +584,10 @@ fn test_v2_complexity_medium_imports() {
 
 #[test]
 fn test_v2_complexity_high() {
-    let config = CleanCtxConfig::default();
+    let mut config = CleanCtxConfig::default();
+    // Isolate the complexity classifier's native High mapping from
+    // the auto-edit override.
+    config.heuristics.auto_edit_mode = false;
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let mut source = String::new();
@@ -576,7 +600,7 @@ fn test_v2_complexity_high() {
     for i in 0..500 {
         source.push_str(&format!("// line {}\n", i));
     }
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/massive.rs",
         None,
         None,
@@ -603,7 +627,7 @@ fn test_v2_explicit_fidelity_overrides_classifier() {
     for i in 0..15 {
         source.push_str(&format!("pub fn f{}(x: i32) -> i32 {{ x + {} }}\n", i, i));
     }
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/service.rs",
         Some("low"),
         None,
@@ -625,7 +649,7 @@ fn test_v2_auto_classify_disabled_v1_fallback() {
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let large_source: String = (0..500).map(|i| format!("line {}\n", i)).collect();
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/unknown.rs",
         None,
         None,
@@ -647,11 +671,14 @@ fn test_v2_auto_classify_disabled_v1_fallback() {
 
 #[test]
 fn test_v2_classify_component_html_implementation() {
-    let config = CleanCtxConfig::default();
+    let mut config = CleanCtxConfig::default();
+    // Isolate the classifier's native Implementation→Medium mapping from
+    // the auto-edit override.
+    config.heuristics.auto_edit_mode = false;
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let html = r#"<div class="container"><app-card [data]="cardData"></app-card></div>"#;
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/app/user-card.component.html",
         None,
         None,
@@ -673,7 +700,7 @@ fn test_v2_component_html_edit_intent_high_fidelity() {
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let html = r#"<div><span>{{ name }}</span></div>"#;
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/app/user-card.component.html",
         None,
         Some("edit"),
@@ -689,13 +716,193 @@ fn test_v2_component_html_edit_intent_high_fidelity() {
     assert_eq!(decision.file_class, heuristics::FileClass::Implementation);
 }
 
+// ── Edit Mode tests (Phase 4) ─────────────────────────────────────
+
+/// Gap 2 fix: an invalid explicit fidelity must surface as an error,
+/// not silently degrade to the default.
+#[test]
+fn test_invalid_explicit_fidelity_returns_error() {
+    let config = CleanCtxConfig::default();
+    let text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+    let result = heuristics::decide(
+        "/project/src/service.ts",
+        Some("full"),  // invalid — not a recognized fidelity
+        None,
+        &config,
+        &text_delta,
+        &ir_ctx,
+        "export class Foo {}",
+        None,
+        None,
+    );
+    assert!(result.is_err(), "invalid explicit fidelity should return an error");
+    assert!(result.unwrap_err().contains("full"), "error should mention the bad value");
+}
+
+/// Gap 2 fix: a valid explicit fidelity still succeeds.
+#[test]
+fn test_valid_explicit_fidelity_succeeds() {
+    let config = CleanCtxConfig::default();
+    let text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+    let result = heuristics::decide(
+        "/project/src/service.ts",
+        Some("edit"),
+        None,
+        &config,
+        &text_delta,
+        &ir_ctx,
+        "export class Foo {}",
+        None,
+        None,
+    );
+    assert!(result.is_ok(), "valid explicit fidelity should succeed");
+    assert_eq!(result.unwrap().fidelity, Fidelity::Edit);
+}
+
+/// Gap 2.1 fix: intent="edit" maps to Fidelity::Edit via smart_defaults.
+#[test]
+fn test_intent_edit_maps_to_edit_fidelity() {
+    let config = CleanCtxConfig::default();
+    let text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+    let decision = decide_ok(
+        "/project/src/service.ts",
+        None,
+        Some("edit"),
+        &config,
+        &text_delta,
+        &ir_ctx,
+        "export class Foo {}",
+        None,
+        None,
+    );
+    assert_eq!(decision.fidelity, Fidelity::Edit,
+        "intent=edit should map to Edit fidelity via smart_defaults");
+}
+
+/// Gap 2.1 fix: auto-edit mode maps Service files to Edit when no
+/// explicit intent/fidelity is given.
+#[test]
+fn test_auto_edit_mode_service_file() {
+    let config = CleanCtxConfig::default();
+    let text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+    let mut source = String::new();
+    for i in 0..16 {
+        source.push_str(&format!("use crate::module{}::Thing{};\n", i, i));
+    }
+    for i in 0..11 {
+        source.push_str(&format!("pub fn func{}(x: i32) -> i32 {{ x + {} }}\n", i, i));
+    }
+    let decision = decide_ok(
+        "/project/src/services/user_service.ts",
+        None,
+        None,
+        &config,
+        &text_delta,
+        &ir_ctx,
+        &source,
+        None,
+        None,
+    );
+    assert_eq!(decision.fidelity, Fidelity::Edit,
+        "auto_edit_mode should map Service files to Edit");
+}
+
+/// Gap 2.1 fix: auto-edit mode maps Implementation files to Edit.
+#[test]
+fn test_auto_edit_mode_implementation_file() {
+    let config = CleanCtxConfig::default();
+    let text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+    let impl_source = r#"
+use std::collections::HashMap;
+use crate::models::User;
+
+pub fn get_user(id: u32) -> Option<User> {
+    None
+}
+"#;
+    let decision = decide_ok(
+        "/project/src/user.handler.ts",
+        None,
+        None,
+        &config,
+        &text_delta,
+        &ir_ctx,
+        impl_source,
+        None,
+        None,
+    );
+    assert_eq!(decision.fidelity, Fidelity::Edit,
+        "auto_edit_mode should map Implementation files to Edit");
+}
+
+/// Gap 2.1 fix: disabling auto_edit_mode leaves Service files at High.
+#[test]
+fn test_auto_edit_mode_disabled_keeps_high() {
+    let mut config = CleanCtxConfig::default();
+    config.heuristics.auto_edit_mode = false;
+    let text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+    let mut source = String::new();
+    for i in 0..16 {
+        source.push_str(&format!("use crate::module{}::Thing{};\n", i, i));
+    }
+    for i in 0..11 {
+        source.push_str(&format!("pub fn func{}(x: i32) -> i32 {{ x + {} }}\n", i, i));
+    }
+    let decision = decide_ok(
+        "/project/src/services/user_service.ts",
+        None,
+        None,
+        &config,
+        &text_delta,
+        &ir_ctx,
+        &source,
+        None,
+        None,
+    );
+    assert_eq!(decision.fidelity, Fidelity::High,
+        "with auto_edit_mode off, Service files should stay High");
+}
+
+/// Gap 2.1 fix: custom edit_auto_classifications can include Model files.
+#[test]
+fn test_auto_edit_mode_custom_classifications() {
+    let mut config = CleanCtxConfig::default();
+    config.heuristics.edit_auto_classifications = vec!["model".to_string()];
+    let text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+    let model_source = r#"
+pub struct User { pub name: String, pub age: u32 }
+pub struct Post { pub title: String, pub body: String }
+pub enum Status { Active, Inactive }
+"#;
+    let decision = decide_ok(
+        "/project/src/models.rs",
+        None,
+        None,
+        &config,
+        &text_delta,
+        &ir_ctx,
+        model_source,
+        None,
+        None,
+    );
+    assert_eq!(decision.fidelity, Fidelity::Edit,
+        "custom edit_auto_classifications should map Model files to Edit");
+}
+
 #[test]
 fn test_v2_component_html_explicit_fidelity_overrides() {
     let config = CleanCtxConfig::default();
     let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let html = r#"<div><span>{{ name }}</span></div>"#;
-    let decision = heuristics::decide(
+    let decision = decide_ok(
         "/project/src/app/user-card.component.html",
         Some("low"),
         None,

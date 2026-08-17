@@ -49,10 +49,29 @@ fn core_op_type_alias_display() {
 }
 
 #[test]
+fn core_op_body_display() {
+    let op = CoreOp::Body("M1".into(), "{\n  return 42;\n}".into());
+    assert_eq!(format!("{}", op), "BODY M1 {\n  return 42;\n}");
+}
+
+#[test]
+fn core_op_body_round_trips_through_wire() {
+    use crate::ir::wire::{op_to_tuple, tuple_to_op};
+    let op = CoreOp::Body("M1".into(), "{\n  return 42;\n}".into());
+    let tuple = op_to_tuple(&op);
+    assert_eq!(tuple[0], "BODY");
+    assert_eq!(tuple[1], "M1");
+    assert_eq!(tuple[2], "{\n  return 42;\n}");
+    let restored = tuple_to_op(&tuple).unwrap();
+    assert_eq!(restored, op);
+}
+
+#[test]
 fn arity_table_covers_all_opcodes() {
     let all_opcodes = [
         "DEF_C", "DEF_M", "DEF_F", "DEF_I", "SIG", "RET", "FIELD_T",
         "FLAGS", "FLAGS_C", "EXT", "IMPL", "INJECTS", "IMP", "TYPE",
+        "BODY", "DATAFLOW", "CTRL", "EFFECT", "CTX",
     ];
     for opcode in &all_opcodes {
         assert!(
@@ -78,6 +97,12 @@ fn arity_table_fixed_opcodes() {
     assert_eq!(arity("SIG"), Some(5));
     assert_eq!(arity("RET"), Some(3));
     assert_eq!(arity("IMP"), Some(4));
+    assert_eq!(arity("BODY"), Some(3));
+}
+
+#[test]
+fn opcode_name_body() {
+    assert_eq!(opcode_name(&CoreOp::Body("M1".into(), "{}".into())), "BODY");
 }
 
 #[test]

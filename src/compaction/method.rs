@@ -20,6 +20,10 @@ pub fn extract_method_sig(text: &str, fidelity: Fidelity) -> String {
     match fidelity {
         Fidelity::Low => compact_method_low(sig_line),
         Fidelity::Medium => compact_method_medium(sig_line),
+        // Edit/Verbatim: return the FULL raw method text (signature + body)
+        // so the legacy pipeline carries byte-exact bodies for safe
+        // `replace_in_file` SEARCH blocks. High keeps the signature only.
+        Fidelity::Edit | Fidelity::Verbatim => text.to_string(),
         Fidelity::High => sig_line.to_string(),
     }
 }

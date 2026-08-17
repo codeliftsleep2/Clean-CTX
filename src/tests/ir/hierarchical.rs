@@ -525,6 +525,58 @@ fn test_wire_round_trip_with_synthetic() {
         "Synthetic class wire round-trip must preserve ops without DefClass");
 }
 
+// ── Edit Mode & R-43a Round-Trip Tests (Phase 4) ──────────────────
+
+/// Edit Mode: verbatim method body must survive a hierarchical round-trip.
+#[test]
+fn test_body_round_trip() {
+    let ir = CompiledIR {
+        file_id: "α1".to_string(),
+        version: 1,
+        instructions: vec![
+            CoreOp::DefClass("C1".to_string(), "MyService".to_string()),
+            CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "doWork".to_string()),
+            CoreOp::Return("M1".to_string(), "$v".to_string()),
+            CoreOp::Body("M1".to_string(), "{\n  let x = 1;\n  println!(\"{}\", x);\n}".to_string()),
+        ],
+    };
+    let hir = ir_to_hierarchical(&ir);
+    let c1 = hir.classes.iter().find(|c| c.id == "C1").unwrap();
+    assert_eq!(c1.methods[0].body.as_deref(), Some("{\n  let x = 1;\n  println!(\"{}\", x);\n}"));
+
+    let restored = hierarchical_to_ir(&hir);
+    assert_eq!(ir.instructions, restored, "Body op must survive hierarchical round-trip");
+}
+
+/// R-43a: ControlFlow, DataFlow, SideEffect, and ExecutionContext ops
+/// must NOT be silently discarded during hierarchical conversion.
+#[test]
+fn test_r43a_metadata_round_trip() {
+    let ir = CompiledIR {
+        file_id: "α1".to_string(),
+        version: 1,
+        instructions: vec![
+            CoreOp::DefClass("C1".to_string(), "MyService".to_string()),
+            CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "process".to_string()),
+            CoreOp::Return("M1".to_string(), "$v".to_string()),
+            CoreOp::ControlFlow("M1".to_string(), "if".to_string(), "x > 0".to_string()),
+            CoreOp::DataFlow("M1".to_string(), "reads".to_string(), "config".to_string()),
+            CoreOp::SideEffect("M1".to_string(), "mutation".to_string()),
+            CoreOp::ExecutionContext("M1".to_string(), "async".to_string()),
+        ],
+    };
+    let hir = ir_to_hierarchical(&ir);
+    let c1 = hir.classes.iter().find(|c| c.id == "C1").unwrap();
+    let m1 = &c1.methods[0];
+    assert_eq!(m1.control_flow, vec![vec!["if".to_string(), "x > 0".to_string()]]);
+    assert_eq!(m1.data_flow, vec![vec!["reads".to_string(), "config".to_string()]]);
+    assert_eq!(m1.side_effect.as_deref(), Some("mutation"));
+    assert_eq!(m1.execution_context.as_deref(), Some("async"));
+
+    let restored = hierarchical_to_ir(&hir);
+    assert_eq!(ir.instructions, restored, "R-43a metadata must survive hierarchical round-trip");
+}
+
 #[test]
 fn test_class_patterns_at_class_level() {
     // Class-level pattern (no current_method)

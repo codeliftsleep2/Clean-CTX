@@ -222,7 +222,7 @@ impl TemplateShape {
         match fidelity {
             Fidelity::Low => vec![self.to_marker_line()],
             Fidelity::Medium => self.to_medium_lines(),
-            Fidelity::High => self.to_high_lines(),
+            Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => self.to_high_lines(),
         }
     }
 

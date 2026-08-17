@@ -15,6 +15,11 @@ pub fn extract_field(text: &str, fidelity: Fidelity) -> String {
     match fidelity {
         Fidelity::Low => String::new(),
         Fidelity::Medium => compact_field_medium(text),
+        // C-12 (FAANG audit): At Edit/Verbatim the field text must be
+        // byte-exact (including the initializer and trailing semicolon)
+        // so `replace_in_file` SEARCH blocks match. High keeps the
+        // stripped form.
+        Fidelity::Edit | Fidelity::Verbatim => text.to_string(),
         Fidelity::High => compact_field_high(text),
     }
 }

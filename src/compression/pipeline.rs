@@ -147,6 +147,13 @@ pub fn compress_file_with_source(
     let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
     let is_modified = cache.update_and_verify(&cache_key, &current_hash);
     if !is_modified {
+        // C-8 (FAANG audit): At Edit/Verbatim the cache-hit path must NOT
+        // return the token-report notice — the Edit contract requires
+        // byte-exact method bodies for `replace_in_file` SEARCH blocks.
+        // Return the raw source as-is (byte-exact entire document).
+        if fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim {
+            return Ok(source_code);
+        }
         // P1-10: Use unified compute_token_metadata for both cache-hit paths
         // to ensure consistent token counting. Previously the cache-hit path
         // manually computed tokens inline while the miss path used calculate_savings(),
@@ -228,26 +235,35 @@ pub fn compress_file_with_source(
     // F-04: `build_output_lines` now returns real counts.
     let built = build_output_lines(&all_captures, &source_code, fidelity, None);
     let mut body_content = assemble_body(&built.output_lines, fidelity);
-    // Angular Meta-Layer (Phase 1): inject the Φ block into the body
-    // BEFORE symbol compression so the `Φ` markers stay untouched.
-    if let Some(block) = &built.meta_block {
-        body_content.push_str(&block.render());
-    }
-    // Spring Boot Meta-Layer (Phase 1): inject the Φ block into the body
-    // BEFORE symbol compression so the `Φ` markers stay untouched.
-    if let Some(block) = &built.spring_meta_block {
-        body_content.push_str(&block.render());
-    }
-    // .NET / C# Meta-Layer: inject the Φ block into the body
-    // BEFORE symbol compression so the `Φ` markers stay untouched.
-    if let Some(block) = &built.dotnet_meta_block {
-        body_content.push_str(&block.render());
+    // C-11 (FAANG audit): At Edit/Verbatim the method bodies are byte-exact.
+    // Injecting the Φ meta block would corrupt the byte-exact contract, so
+    // meta-layers are skipped at Edit/Verbatim.
+    if fidelity != Fidelity::Edit && fidelity != Fidelity::Verbatim {
+        // Angular Meta-Layer (Phase 1): inject the Φ block into the body
+        // BEFORE symbol compression so the `Φ` markers stay untouched.
+        if let Some(block) = &built.meta_block {
+            body_content.push_str(&block.render());
+        }
+        // Spring Boot Meta-Layer (Phase 1): inject the Φ block into the body
+        // BEFORE symbol compression so the `Φ` markers stay untouched.
+        if let Some(block) = &built.spring_meta_block {
+            body_content.push_str(&block.render());
+        }
+        // .NET / C# Meta-Layer: inject the Φ block into the body
+        // BEFORE symbol compression so the `Φ` markers stay untouched.
+        if let Some(block) = &built.dotnet_meta_block {
+            body_content.push_str(&block.render());
+        }
     }
     // R-02: Apply type aliases before micro-opcodes and symbol
     // compression so `$uid` tokens are preserved. At Low fidelity types
-    // are already stripped, so this is a natural no-op.
+    // are already stripped, so this is a natural no-op. At Edit/Verbatim
+    // the method bodies are byte-exact — type substitution would corrupt
+    // them, so it is skipped.
     let ta_footer = if let Some(cfg) = config
         && !cfg.type_aliases.is_empty()
+        && fidelity != Fidelity::Edit
+        && fidelity != Fidelity::Verbatim
     {
         let (substituted, footer) = apply_type_aliases(&body_content, &cfg.type_aliases);
         body_content = substituted;
@@ -330,19 +346,28 @@ pub fn compress_text(
 
     let built = build_output_lines(&all_captures, source_code, fidelity, None);
     let mut body_content = assemble_body(&built.output_lines, fidelity);
-    if let Some(block) = &built.meta_block {
-        body_content.push_str(&block.render());
-    }
-    if let Some(block) = &built.spring_meta_block {
-        body_content.push_str(&block.render());
-    }
-    if let Some(block) = &built.dotnet_meta_block {
-        body_content.push_str(&block.render());
+    // C-11 (FAANG audit): At Edit/Verbatim the method bodies are byte-exact.
+    // Injecting the Φ meta block would corrupt the byte-exact contract, so
+    // meta-layers are skipped at Edit/Verbatim.
+    if fidelity != Fidelity::Edit && fidelity != Fidelity::Verbatim {
+        if let Some(block) = &built.meta_block {
+            body_content.push_str(&block.render());
+        }
+        if let Some(block) = &built.spring_meta_block {
+            body_content.push_str(&block.render());
+        }
+        if let Some(block) = &built.dotnet_meta_block {
+            body_content.push_str(&block.render());
+        }
     }
     // R-02: Apply type aliases before micro-opcodes and symbol
-    // compression so `$uid` tokens are preserved.
+    // compression so `$uid` tokens are preserved. At Edit/Verbatim the
+    // method bodies are byte-exact — type substitution would corrupt
+    // them, so it is skipped.
     let ta_footer = if let Some(aliases) = aliases
         && !aliases.is_empty()
+        && fidelity != Fidelity::Edit
+        && fidelity != Fidelity::Verbatim
     {
         let (substituted, footer) = apply_type_aliases(&body_content, aliases);
         body_content = substituted;
@@ -417,7 +442,7 @@ pub fn build_output_lines(
                 }
             }
             "class.root" => {
-                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium) {
+                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium || fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim) {
                     output_lines.push(String::new());
                 }
                 output_lines.push(format_class_entry(&cap.text, &fields, fidelity));
@@ -429,7 +454,7 @@ pub fn build_output_lines(
             // Rust type declarations: struct, enum, trait, impl
             // Use Rust-specific formatting (no "class" prefix)
             "struct.root" | "trait.root" | "impl.root" => {
-                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium) {
+                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium || fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim) {
                     output_lines.push(String::new());
                 }
                 output_lines.push(format_rust_type_entry(&cap.text, &fields, fidelity));
@@ -441,7 +466,7 @@ pub fn build_output_lines(
             // Java type declarations: interface, enum, record
             // Use Java-specific formatting (preserves type keyword)
             "interface.root" | "enum.root" | "record.root" => {
-                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium) {
+                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium || fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim) {
                     output_lines.push(String::new());
                 }
                 output_lines.push(format_java_type_entry(&cap.text, &cap.name, &fields, fidelity));
@@ -454,7 +479,11 @@ pub fn build_output_lines(
                 let sig = &cap.text;
                 if !markers.is_empty() {
                     let marker_str = markers.join(" ");
-                    if fidelity == Fidelity::High {
+                    if fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim {
+                        // Full method text is byte-exact — emit as-is.
+                        // Markers are redundant when the body is present.
+                        output_lines.push(sig.clone());
+                    } else if fidelity == Fidelity::High {
                         output_lines.push(format!("  {} {{ {} }}", sig, marker_str));
                     } else if fidelity == Fidelity::Medium {
                         output_lines.push(format!("{} {}", sig, marker_str));
@@ -462,7 +491,10 @@ pub fn build_output_lines(
                         output_lines.push(sig.clone());
                     }
                 } else {
-                    if fidelity == Fidelity::High {
+                    if fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim {
+                        // Full method text is byte-exact — emit as-is (no indent).
+                        output_lines.push(sig.clone());
+                    } else if fidelity == Fidelity::High {
                         output_lines.push(format!("  {}", sig));
                     } else {
                         output_lines.push(sig.clone());
@@ -493,12 +525,18 @@ pub fn build_output_lines(
         output_lines.push(format!("⊕fields {{ {} }}", fields.join("; ")));
     }
 
-    // Raw fallback when nothing was captured
+    // Raw fallback when nothing was captured.
+    // C-8 (FAANG audit): at Edit/Verbatim `simple_compact` would collapse
+    // whitespace and break byte-exactness. Emit the first line as-is.
     if output_lines.is_empty()
         && let Some(first_line) = source_code.lines().next() {
             let trimmed = first_line.trim().to_string();
             if !trimmed.is_empty() {
-                output_lines.push(simple_compact(&trimmed, fidelity));
+                if fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim {
+                    output_lines.push(trimmed);
+                } else {
+                    output_lines.push(simple_compact(&trimmed, fidelity));
+                }
             }
         }
 
@@ -585,6 +623,13 @@ pub fn compress_source(
     let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
     let is_modified = cache.update_and_verify(&cache_key, &current_hash);
     if !is_modified {
+        // C-8 (FAANG audit): At Edit/Verbatim the cache-hit path must NOT
+        // return the token-report notice — the Edit contract requires
+        // byte-exact method bodies for `replace_in_file` SEARCH blocks.
+        // Return the raw source as-is (byte-exact entire document).
+        if fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim {
+            return Ok(source_code.to_string());
+        }
         if fidelity == Fidelity::Low {
             let meta = if let Some(raw_tokens) = cache.get_raw_token_count(&current_hash) {
                 let bpe = crate::analytics::bpe();
@@ -694,15 +739,24 @@ pub fn compress_source(
      let mut body_content = assemble_body(&built.output_lines, fidelity);
      #[cfg(debug_assertions)]
      eprintln!("[compress_source] assemble_body done");
-     if let Some(block) = &built.meta_block {
-         body_content.push_str(&block.render());
+     // C-11 (FAANG audit): At Edit/Verbatim the method bodies are byte-exact.
+     // Injecting the Φ meta block would corrupt the byte-exact contract, so
+     // meta-layers are skipped at Edit/Verbatim.
+     if fidelity != Fidelity::Edit && fidelity != Fidelity::Verbatim {
+         if let Some(block) = &built.meta_block {
+             body_content.push_str(&block.render());
+         }
      }
      #[cfg(debug_assertions)]
      eprintln!("[compress_source] meta_block rendered");
      // R-02: Apply type aliases before micro-opcodes so `$uid` tokens
-     // are preserved. At Low fidelity types are already stripped.
+     // are preserved. At Low fidelity types are already stripped. At
+     // Edit/Verbatim the method bodies are byte-exact — type
+     // substitution would corrupt them, so it is skipped.
      let ta_footer = if let Some(aliases) = aliases
         && !aliases.is_empty()
+        && fidelity != Fidelity::Edit
+        && fidelity != Fidelity::Verbatim
     {
         let (substituted, footer) = apply_type_aliases(&body_content, aliases);
         body_content = substituted;
@@ -770,24 +824,47 @@ pub(crate) fn should_skip_capture(cap: &crate::compression::CapEntry, skip_set: 
         return skip_set.contains(cap.text.trim());
     }
 
-    // Method captures: check the signature (first word is usually the method name)
+    // Method captures: check the signature (first word is usually the method name).
+    // C-8 (FAANG audit): at Edit/Verbatim `cap.text` is the FULL method body
+    // (e.g. "public async getUser..."), so the first word is the access
+    // modifier, not the method name. Extract the actual method name by
+    // scanning for the identifier that precedes the first `(`.
     if matches!(cap.name.as_str(), "method.root" | "constructor.root" | "func.root" | "arrow.root") {
-        if let Some(first_word) = cap.text.split_whitespace().next() {
-            return skip_set.contains(first_word);
+        if let Some(name) = extract_method_name_for_skip(&cap.text) {
+            return skip_set.contains(name);
         }
         return skip_set.contains(cap.text.trim());
     }
 
-    // Field captures: check the field name
+    // Field captures: check the field name.
+    // C-8 (FAANG audit): at Edit/Verbatim `cap.text` is the full field text
+    // (e.g. "private readonly userId: string = '';"). The `:` split still
+    // yields the leading modifiers + name, so we take the LAST whitespace
+    // token before the `:` to get the actual field name.
     if cap.name == "field.root" {
-        // Fields are typically "name: type" — take part before ":"
-        if let Some(field_name) = cap.text.split(':').next() {
-            return skip_set.contains(field_name.trim());
-        }
-        return skip_set.contains(cap.text.trim());
+        let before_colon = cap.text.split(':').next().unwrap_or(cap.text.as_str());
+        let field_name = before_colon.split_whitespace().last().unwrap_or(before_colon);
+        return skip_set.contains(field_name.trim());
     }
 
     false
+}
+
+/// Extract the method name from a method capture's text for CBM skip-set
+/// matching. At Edit/Verbatim the text is the full method body, so we scan
+/// for the identifier immediately preceding the first `(` (the method name).
+/// At lower fidelities the text is already the compact signature, so the
+/// same scan works. Returns `None` if no `(` is found.
+fn extract_method_name_for_skip(text: &str) -> Option<&str> {
+    let open = text.find('(')?;
+    let before = &text[..open];
+    // Take the last whitespace-delimited token before the `(`.
+    // Handles "public async getUser" → "getUser", "getUser" → "getUser",
+    // "async getUser<T>" → "getUser<T>".
+    let name = before.split_whitespace().last()?;
+    // Strip generic parameters for matching (skip sets use bare names).
+    let bare = name.split('<').next().unwrap_or(name);
+    Some(bare.trim())
 }
 
 /// Combine the symbol-dictionary footer and the type-alias footer into
@@ -809,7 +886,7 @@ pub fn assemble_body(output_lines: &[String], fidelity: Fidelity) -> String {
     match fidelity {
         Fidelity::Low => output_lines.join(";"),
         Fidelity::Medium => output_lines.join("\n"),
-        Fidelity::High => output_lines.join("\n"),
+        Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => output_lines.join("\n"),
     }
 }
 

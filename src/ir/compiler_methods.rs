@@ -84,6 +84,79 @@ pub(super) fn parse_method_sig(sig: &str) -> MethodSig {
     }
 }
 
+/// Extract the verbatim method body from a raw method capture.
+///
+/// The `raw_text` for a `method.root` capture contains the full method
+/// including the signature and body. This function locates the brace
+/// that opens the **body** (not a parameter default-value object
+/// literal, e.g. `function foo(x = {a:1}) { ... }`) and returns
+/// everything from that brace to the end of the string (inclusive).
+///
+/// Expression-bodied arrows (`const foo = () => bar()`) have no block
+/// body; the expression following `=>` (with its line prefix) is
+/// returned as the body so edit mode still carries the implementation.
+///
+/// The returned text is byte-exact — no trimming, no normalization.
+/// This is the text that `replace_in_file` SEARCH blocks can safely
+/// match against.
+pub(super) fn extract_method_body(raw_method: &str) -> Option<String> {
+    // Track paren depth so a `{` inside a parameter default (e.g.
+    // `x = {a:1}`) is not mistaken for the body opening brace.
+    let mut paren_depth = 0i32;
+    // Track brace depth for return-type object literals (TS):
+    // `function foo(): { a: number } { ... }` — the first `{` after
+    // the `:` is a return type, not the body.
+    let mut brace_depth = 0i32;
+    // Set when we see `:` at paren depth 0 (a return type follows).
+    // Cleared when the next non-whitespace char is not `{`.
+    let mut pending_return_brace = false;
+    for (i, ch) in raw_method.char_indices() {
+        match ch {
+            '(' => paren_depth += 1,
+            ')' => {
+                paren_depth = (paren_depth - 1).max(0);
+                if paren_depth == 0 {
+                    pending_return_brace = false;
+                }
+            }
+            ':' if paren_depth == 0 && brace_depth == 0 => {
+                pending_return_brace = true;
+            }
+            '{' if paren_depth == 0 && brace_depth == 0 && !pending_return_brace => {
+                return Some(raw_method[i..].to_string());
+            }
+            '{' if paren_depth == 0 && pending_return_brace => {
+                // Return-type object literal — track its brace depth.
+                brace_depth += 1;
+                pending_return_brace = false;
+            }
+            '}' if paren_depth == 0 && brace_depth > 0 => {
+                brace_depth -= 1;
+            }
+            // Any other non-whitespace char at paren 0 clears the
+            // pending return-type flag (e.g. `: void { ... }`).
+            _ if paren_depth == 0 && pending_return_brace && !ch.is_whitespace() => {
+                pending_return_brace = false;
+            }
+            _ => {}
+        }
+    }
+
+    // No block body — check for an expression-bodied arrow function.
+    // The capture for TS/JS `const foo = () => bar()` ends with the
+    // expression (optionally `;`). Return the arrow expression so the
+    // body is not silently dropped in edit mode.
+    if let Some(arrow_idx) = raw_method.rfind("=>") {
+        let expr = &raw_method[arrow_idx + 2..];
+        let trimmed = expr.trim();
+        if !trimmed.is_empty() && trimmed != ";" {
+            return Some(expr.to_string());
+        }
+    }
+
+    None
+}
+
 /// F-FULL-08: Post-process the IR stream to resolve forward-declared class
 /// aliases. When class B extends class A, but A is defined later in the file,
 /// the TypeScript layer emits `Extends("C2", "A")` where "A" is a raw class
@@ -232,3 +305,7 @@ impl super::compiler::IRCompiler {
         instructions.push(CoreOp::Import(alias, String::new(), trimmed.to_string()));
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/ir/compiler_methods.rs"]
+mod tests;
