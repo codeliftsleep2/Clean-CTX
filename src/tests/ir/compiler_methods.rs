@@ -129,3 +129,61 @@ fn parse_sig_no_parens_treats_whole_as_name() {
     assert_eq!(sig.params_str, "");
     assert_eq!(sig.return_type, "$v");
 }
+
+// ── Edit Mode regression tests (F-32) ──────────────────────────────
+
+/// Edit Mode: a multiline signature with the `{` on its own line must
+/// preserve the brace's leading indentation (byte-exact body). The
+/// previous implementation started at the `{` itself, dropping the
+/// indentation so the opening brace was column 0 while nested braces
+/// kept their indentation.
+#[test]
+fn extract_body_preserves_own_line_brace_indentation() {
+    let raw = "function foo()\n    {\n        let x = 1;\n    }";
+    let body = extract_method_body(raw).expect("should extract body");
+    assert_eq!(body, "    {\n        let x = 1;\n    }");
+}
+
+/// Edit Mode: a same-line brace still starts at the `{` (the signature
+/// is emitted separately by the renderer — including it would duplicate
+/// the method declaration).
+#[test]
+fn extract_body_same_line_brace_starts_at_brace() {
+    let raw = "function foo() {\n  let x = 1;\n}";
+    let body = extract_method_body(raw).expect("should extract body");
+    assert_eq!(body, "{\n  let x = 1;\n}");
+}
+
+/// Edit Mode: `emit_method_ir` must NOT swallow the body as the return
+/// type when given the full raw method text (the legacy pipeline's
+/// `extract_method_sig` returns full text at Edit fidelity). The body
+/// flows through `CoreOp::Body` separately; the Return op must carry
+/// only the real return type. This guards the double-render bug where
+/// the renderer emitted a garbled `→ ... { body }` immediately followed
+/// by the verbatim body.
+#[test]
+fn emit_method_ir_strips_body_from_sig() {
+    use crate::ir::compiler::IRCompiler;
+    use crate::ir::opcodes::CoreOp;
+
+    let mut compiler = IRCompiler::new();
+    let mut instructions = Vec::new();
+    // Full raw method text as produced by extract_method_sig at Edit.
+    let raw = "public async getUser(id: string): Promise<User> {\n  return this.users[id];\n}";
+    compiler.emit_method_ir(&mut instructions, "C1", "M1", raw);
+
+    // DefMethod + Param + Return — no body in the Return op.
+    let return_op = instructions.iter().find_map(|op| {
+        if let CoreOp::Return(mid, ty) = op {
+            Some((mid.clone(), ty.clone()))
+        } else {
+            None
+        }
+    });
+    let (mid, ty) = return_op.expect("should emit Return");
+    assert_eq!(mid, "M1");
+    assert_eq!(ty, "Promise<User>");
+    // The body must NOT appear in the return type.
+    assert!(!ty.contains('{'));
+    assert!(!ty.contains("return"));
+}
