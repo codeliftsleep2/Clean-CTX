@@ -10,7 +10,7 @@
 // meta-layer abbreviation in compiled output.
 
 use crate::mcp::tools::{parse_fidelity_arg, resolve_fidelity, dispatch_tools_call};
-use crate::mcp::tool_handlers::core::handle_compress_code_context;
+use crate::mcp::tool_handlers::core::{handle_compress_code_context, contract_fields};
 use crate::compression::Fidelity;
 use serde_json::json;
 
@@ -711,6 +711,48 @@ fn handle_provide_code_context_accepts_relative_path() {
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
+// ── Edit Mode response contract field tests (Gap 5/3/6 fixes) ─────
+
+/// Gap 5 fix: structural-only fidelities report `content_kind == "skeleton"`
+/// and no byte-exact regions.
+#[test]
+fn contract_fields_low_is_skeleton() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Low);
+    assert_eq!(kind, "skeleton");
+    assert!(byte_exact.is_empty(), "Low must not claim byte-exact regions");
+}
+
+#[test]
+fn contract_fields_medium_is_skeleton() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Medium);
+    assert_eq!(kind, "skeleton");
+    assert!(byte_exact.is_empty());
+}
+
+#[test]
+fn contract_fields_high_is_skeleton() {
+    let (kind, byte_exact) = contract_fields(Fidelity::High);
+    assert_eq!(kind, "skeleton");
+    assert!(byte_exact.is_empty());
+}
+
+/// Gap 3/Gap 5 fix: Edit reports verbatim method bodies as the byte-exact
+/// region, matching the `byte_exact` promise in the SYSTEM_PROMPT.
+#[test]
+fn contract_fields_edit_reports_method_bodies() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Edit);
+    assert_eq!(kind, "skeleton_with_verbatim_bodies");
+    assert_eq!(byte_exact, vec!["method_bodies"]);
+}
+
+/// Gap 3/Gap 5 fix: Verbatim reports the entire document as byte-exact.
+#[test]
+fn contract_fields_verbatim_is_document() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Verbatim);
+    assert_eq!(kind, "verbatim_document");
+    assert_eq!(byte_exact, vec!["document"]);
+}
+
 // ── Edit Mode response contract smoke tests (Phase 4) ──────────────
 
 /// Gap 5/3 fix: `provide_code_context` with `intent="edit"` must not panic
@@ -746,6 +788,28 @@ fn provide_code_context_invalid_fidelity_does_not_panic() {
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "full" } });
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Gap 3 fix: `fidelity="verbatim"` must not panic and must bypass
+/// compression entirely (raw source byte-exact). Exercises the new
+/// Verbatim short-circuit in `handle_provide_code_context`.
+#[test]
+fn provide_code_context_verbatim_fidelity_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Verbatim short-circuit in `handle_compress_code_context` must not panic.
+#[test]
+fn compress_code_context_verbatim_fidelity_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
+    dispatch_tools_call(&id, "compress_code_context", &params, &state);
 }
 
 // ── Blast radius integration regression tests ──────────────────────

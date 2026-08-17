@@ -30,15 +30,15 @@ use super::hierarchical::{HierarchicalIR, ClassNode, PatternEntry};
 ///
 /// # Fidelity behavior
 ///
-/// | Aspect | Low | Medium | High |
-/// |--------|-----|--------|------|
-/// | Fields | Space-separated, same line | One per line | One per line |
-/// | Methods | Minimal (name + flags) | Params shown | Params shown |
-/// | Meta `@` | Always | Always | Always |
-/// | `X`/`I` | Always | Always | Always |
-/// | Patterns | Always | Always | Always |
-/// | Imports | Always | Always | Always |
-/// | Type aliases | Always | Always | Always |
+/// | Aspect | Low | Medium | High | Edit | Verbatim |
+/// |--------|-----|--------|------|------|----------|
+/// | Fields | Space-separated, same line | One per line | One per line | One per line | One per line |
+/// | Methods | Minimal (name + flags) | Params shown | Params shown | Params shown + verbatim bodies | Full raw source |
+/// | Meta `@` | Always | Always | Always | Always | Always |
+/// | `X`/`I` | Always | Always | Always | Always | Always |
+/// | Patterns | Always | Always | Always | Always | Always |
+/// | Imports | Always | Always | Always | Always | Always |
+/// | Type aliases | Always | Always | Always | Always | Always |
 ///
 /// # Overloaded method disambiguation
 ///
@@ -233,6 +233,40 @@ fn render_methods(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
                 })
                 .collect();
             output.push_str(&format!(" cf:{}", cf_strs.join(",")));
+        }
+
+        // Data-flow metadata at High fidelity (Gap 1 fix).
+        // Rendered as `df:reads:config,writes:users` — same inline pattern
+        // as control-flow so the LLM sees semantic read/write pairs.
+        if fidelity == Fidelity::High && !method.data_flow.is_empty() {
+            let df_strs: Vec<String> = method.data_flow.iter()
+                .map(|df| {
+                    if df.len() >= 2 {
+                        format!("{}:{}", df[0], df[1])
+                    } else {
+                        df.join(":")
+                    }
+                })
+                .collect();
+            output.push_str(&format!(" df:{}", df_strs.join(",")));
+        }
+
+        // Side-effect annotation at High fidelity (Gap 1 fix).
+        // e.g. `se:mutation` — quickly tells the LLM whether a method is
+        // pure, performs I/O, mutates state, is async, or is transactional.
+        if fidelity == Fidelity::High {
+            if let Some(se) = &method.side_effect {
+                output.push_str(&format!(" se:{}", se));
+            }
+        }
+
+        // Execution-context annotation at High fidelity (Gap 1 fix).
+        // e.g. `ec:async` — tells the agent the runtime context without
+        // a full body read.
+        if fidelity == Fidelity::High {
+            if let Some(ec) = &method.execution_context {
+                output.push_str(&format!(" ec:{}", ec));
+            }
         }
 
         // Verbatim method body at Edit fidelity (byte-exact for replace_in_file)

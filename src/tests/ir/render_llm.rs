@@ -698,6 +698,93 @@ fn test_low_fidelity_no_control_flow() {
     assert!(!result.contains("cf:"), "Low fidelity should not render control-flow markers");
 }
 
+/// High Fidelity: data-flow metadata should render as inline markers (Gap 1).
+#[test]
+fn test_high_fidelity_renders_data_flow() {
+    let mut hir = empty_hir();
+    let mut class = make_class("MyService");
+    let mut method = make_method("process");
+    method.data_flow = vec![
+        vec!["reads".to_string(), "config".to_string()],
+        vec!["writes".to_string(), "users".to_string()],
+    ];
+    class.methods.push(method);
+    hir.classes.push(class);
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::High);
+    assert!(result.contains("df:reads:config,writes:users"),
+        "High fidelity should render data-flow markers: {}", result);
+}
+
+/// High Fidelity: side-effect annotation should render (Gap 1).
+#[test]
+fn test_high_fidelity_renders_side_effect() {
+    let mut hir = empty_hir();
+    let mut class = make_class("MyService");
+    let mut method = make_method("save");
+    method.side_effect = Some("mutation".to_string());
+    class.methods.push(method);
+    hir.classes.push(class);
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::High);
+    assert!(result.contains(" se:mutation"),
+        "High fidelity should render the side-effect annotation: {}", result);
+}
+
+/// High Fidelity: execution-context annotation should render (Gap 1).
+#[test]
+fn test_high_fidelity_renders_execution_context() {
+    let mut hir = empty_hir();
+    let mut class = make_class("MyService");
+    let mut method = make_method("poll");
+    method.execution_context = Some("async".to_string());
+    class.methods.push(method);
+    hir.classes.push(class);
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::High);
+    assert!(result.contains(" ec:async"),
+        "High fidelity should render the execution-context annotation: {}", result);
+}
+
+/// Low fidelity: data-flow / side-effect / execution-context must not render.
+#[test]
+fn test_low_fidelity_no_execution_metadata() {
+    let mut hir = empty_hir();
+    let mut class = make_class("MyService");
+    let mut method = make_method("process");
+    method.data_flow = vec![vec!["reads".to_string(), "config".to_string()]];
+    method.side_effect = Some("io".to_string());
+    method.execution_context = Some("sync".to_string());
+    class.methods.push(method);
+    hir.classes.push(class);
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
+    assert!(!result.contains("df:"), "Low fidelity should not render data-flow markers");
+    assert!(!result.contains(" se:"), "Low fidelity should not render side-effect annotations");
+    assert!(!result.contains(" ec:"), "Low fidelity should not render execution-context annotations");
+}
+
+/// Edit fidelity: execution metadata stays compact (only bodies are verbatim).
+#[test]
+fn test_edit_fidelity_no_execution_metadata() {
+    let mut hir = empty_hir();
+    let mut class = make_class("MyService");
+    let mut method = make_method("doWork");
+    method.body = Some("{\n  let x = 1;\n}".to_string());
+    method.data_flow = vec![vec!["reads".to_string(), "config".to_string()]];
+    method.side_effect = Some("io".to_string());
+    class.methods.push(method);
+    hir.classes.push(class);
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Edit);
+    // The body must still be byte-exact and present.
+    assert!(result.contains("{\n  let x = 1;\n}"));
+    // Runtime metadata is NOT emitted at Edit — it would pollute the
+    // byte-exact body region with non-source markers.
+    assert!(!result.contains("df:"));
+    assert!(!result.contains(" se:"));
+}
+
 #[test]
 fn test_synthetic_class_is_rendered() {
     let mut hir = empty_hir();

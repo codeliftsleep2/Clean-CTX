@@ -51,7 +51,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, .rs, or .java file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%), 'edit' (structural skeleton + verbatim method bodies for safe replace_in_file), 'verbatim' (full raw source, zero compression). Default: 'low'." },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%), 'edit' (structural skeleton + verbatim method bodies for safe replace_in_file), 'verbatim' (full raw source, zero compression). Default: 'low'." },
                     "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." },
                     "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." },
                     "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
@@ -90,7 +90,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: 'low'." },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: 'low'." },
                     "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
@@ -142,7 +142,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "properties": {
                     "filePath": { "type": "string" },
                     "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"], "description": "edit: byte-exact method bodies for safe replace_in_file. refactor: full structural detail. overview: max compression. debug: balanced. implement: moderate detail." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high', 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: config default." },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: config default." },
                     "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." },
                     "tokenizer": { "type": "string" }
                 },
