@@ -152,6 +152,18 @@ pub struct GraphBridge {
     /// Multi-repo: keyed by project name so switching projects doesn't
     /// corrupt another project's indexing state.
     pub(crate) indexing_state: Arc<Mutex<HashMap<String, IndexingState>>>,
+    /// Last error from the most recent user-facing graph query
+    /// (`search`, `trace_path`, `query_graph`, `get_architecture`).
+    ///
+    /// These methods historically returned empty/default results on failure
+    /// (e.g. "indexing in progress"), which made the graph tools report
+    /// "0 nodes, 0 edges" — a confidently wrong answer. The handlers now
+    /// check this after each call via `take_last_error()` and surface the
+    /// error to the agent instead of the empty result.
+    ///
+    /// Cleared on every successful query so a stale error is never
+    /// re-reported.
+    last_error: Option<CbmError>,
 }
 
 impl GraphBridge {
@@ -208,6 +220,7 @@ impl GraphBridge {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(HashMap::new())),
+            last_error: None,
         }
     }
 
@@ -276,6 +289,29 @@ impl GraphBridge {
     }
     pub fn graph_version(&self) -> &str { &self.graph_version }
     pub fn set_graph_version(&mut self, v: &str) { self.graph_version = v.to_string(); }
+
+    /// Take (and clear) the last error from a user-facing graph query.
+    ///
+    /// The `search`, `trace_path`, `query_graph`, and `get_architecture`
+    /// methods return empty/default results on failure for backward
+    /// compatibility with the intelligence layer. The MCP handlers call
+    /// this after each query: when it returns `Some`, they respond with
+    /// the error message instead of the confident "0 nodes, 0 edges".
+    pub fn take_last_error(&mut self) -> Option<CbmError> {
+        self.last_error.take()
+    }
+
+    /// Record a query error for `take_last_error()`, or clear it on success.
+    fn set_last_error(&mut self, err: Option<CbmError>) {
+        self.last_error = err;
+    }
+
+    /// Test-only: inject a stale error directly so tests can verify the
+    /// cache-hit path clears it.
+    #[cfg(test)]
+    pub fn set_last_error_for_test(&mut self, err: CbmError) {
+        self.set_last_error(Some(err));
+    }
 
     /// Trigger indexing of the current project in CBM.
     /// Called automatically on startup when CBM is available.
@@ -589,7 +625,9 @@ impl GraphBridge {
         let key = "architecture".to_string();
         let project = self.project_str();
         if self.check_cache(&key) {
-            return serde_json::from_value(
+            // Cache hit is a successful query — clear any stale error so a
+            // prior failure is never re-surfaced after a good result.
+            let result = serde_json::from_value(
                 self.cache
                     .get(&key)
                     .expect("cache entry should exist after check_cache() returned true")
@@ -598,10 +636,13 @@ impl GraphBridge {
                     .clone(),
             )
             .ok();
+            self.set_last_error(None);
+            return result;
         }
         let result = self.query(move |c| c.get_architecture(&project));
         match result {
             Ok(arch) => {
+                self.set_last_error(None);
                 let modules = arch["modules"].as_array().map(|ms| {
                     ms.iter().filter_map(|m| Some(ArchitectureModule {
                         name: m["name"].as_str()?.to_string(),
@@ -620,7 +661,12 @@ impl GraphBridge {
                 self.cache_insert(&key, &ov);
                 Some(ov)
             }
-            Err(_) => None,
+            Err(e) => {
+                // Surface the failure so handlers don't report "0 modules,
+                // 0 deps" when CBM is still indexing or unavailable.
+                self.set_last_error(Some(e));
+                None
+            }
         }
     }
 
@@ -629,7 +675,8 @@ impl GraphBridge {
         let project = self.project_str();
         let q = cypher.to_string();
         if self.check_cache(&key) {
-            return serde_json::from_value(
+            // Cache hit is a successful query — clear any stale error.
+            let result = serde_json::from_value(
                 self.cache
                     .get(&key)
                     .expect("cache entry should exist after check_cache() returned true")
@@ -638,10 +685,13 @@ impl GraphBridge {
                     .clone(),
             )
             .unwrap_or(QueryResult { nodes: vec![], edges: vec![] });
+            self.set_last_error(None);
+            return result;
         }
         let result = self.query(move |c| c.query_graph(&q, &project));
         match result {
             Ok(rows) => {
+                self.set_last_error(None);
                 // CBM Cypher returns {columns, rows} — rows are Vec<Vec<Value>>.
                 // We try to interpret each row as either node or edge data.
                 let mut nodes = vec![]; let edges = vec![];
@@ -662,7 +712,10 @@ impl GraphBridge {
                 self.cache_insert(&key, &r);
                 r
             }
-            Err(_) => QueryResult { nodes: vec![], edges: vec![] },
+            Err(e) => {
+                self.set_last_error(Some(e));
+                QueryResult { nodes: vec![], edges: vec![] }
+            }
         }
     }
 
@@ -671,7 +724,8 @@ impl GraphBridge {
         let project = self.project_str();
         let q = query.to_string();
         if self.check_cache(&key) {
-            return serde_json::from_value(
+            // Cache hit is a successful query — clear any stale error.
+            let result = serde_json::from_value(
                 self.cache
                     .get(&key)
                     .expect("cache entry should exist after check_cache() returned true")
@@ -680,6 +734,8 @@ impl GraphBridge {
                     .clone(),
             )
             .unwrap_or_default();
+            self.set_last_error(None);
+            return result;
         }
         // H-01 fix: build a proper regex name_pattern from the query string.
         // If the query already contains regex metacharacters (., *, +, [, etc.)
@@ -689,6 +745,7 @@ impl GraphBridge {
         let result = self.query(move |c| c.search_graph(&name_pattern, &project, Some("Function")));
         match result {
             Ok(nodes) => {
+                self.set_last_error(None);
                 let gn: Vec<GraphNode> = nodes.iter().filter_map(|n| {
                     Some(GraphNode {
                         id: n["id"].as_str()?.to_string(),
@@ -701,7 +758,10 @@ impl GraphBridge {
                 self.cache_insert(&key, &gn);
                 gn
             }
-            Err(_) => vec![],
+            Err(e) => {
+                self.set_last_error(Some(e));
+                vec![]
+            }
         }
     }
 
@@ -712,6 +772,8 @@ impl GraphBridge {
     /// results to only include edges reaching the target symbol.
     pub fn trace_path(&mut self, from: &str, to: &str) -> Vec<GraphEdge> {
         if from == to {
+            // Trivially successful (no path needed) — clear stale error.
+            self.set_last_error(None);
             return vec![];
         }
         // Determine direction: if we have a target, trace outbound; otherwise both
@@ -724,7 +786,8 @@ impl GraphBridge {
         let project = self.project_str();
         let f = from.to_string();
         if self.check_cache(&key) {
-            return serde_json::from_value(
+            // Cache hit is a successful query — clear any stale error.
+            let result = serde_json::from_value(
                 self.cache
                     .get(&key)
                     .expect("cache entry should exist after check_cache() returned true")
@@ -733,10 +796,13 @@ impl GraphBridge {
                     .clone(),
             )
             .unwrap_or_default();
+            self.set_last_error(None);
+            return result;
         }
         let result = self.query(move |c| c.trace_path(&f, direction, &project, Some(3)));
         match result {
             Ok(edges) => {
+                self.set_last_error(None);
                 let ge: Vec<GraphEdge> = edges.iter().filter_map(|e| {
                     let ge = GraphEdge {
                         from: e["from"].as_str()?.to_string(),
@@ -754,7 +820,10 @@ impl GraphBridge {
                 self.cache_insert(&key, &ge);
                 ge
             }
-            Err(_) => vec![],
+            Err(e) => {
+                self.set_last_error(Some(e));
+                vec![]
+            }
         }
     }
 
@@ -1110,6 +1179,7 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(states)),
+            last_error: None,
         };
         // Pre-seed the symbol_importance cache entry
         let key = "symbol_importance".to_string();
@@ -1152,6 +1222,7 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(states)),
+            last_error: None,
         };
         let ttl = Duration::from_secs(3600);
         let call_json = serde_json::to_value(&call_edges).unwrap_or_default();
