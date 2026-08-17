@@ -71,6 +71,62 @@ fn test_delta_after_baseline() {
     assert_eq!(decision.strategy, heuristics::ContextStrategy::DeltaTransport);
 }
 
+// ── F-32: Delta fidelity-change guard ──────────────────────────────
+
+/// Delta transport must NOT be selected when the caller explicitly
+/// changes `fidelity` between calls on the same file. The prior
+/// baseline was compiled at a different fidelity; its wire format is
+/// incompatible with `apply_delta`, which would produce a bare summary
+/// line with no structured delta payload. Force a full compress.
+#[test]
+fn test_explicit_fidelity_change_forces_full_compress() {
+    let config = CleanCtxConfig::default();
+    let mut text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+
+    // Store a baseline first (as if a prior call compressed this file).
+    text_delta.store_snapshot("alpha1", vec!["line1".to_string()]);
+
+    // Explicit fidelity change → delta would be incompatible.
+    let decision = decide_ok(
+        "alpha1",
+        Some("edit"),
+        None,
+        &config,
+        &text_delta,
+        &ir_ctx,
+        empty_source(),
+        Some("alpha1"),
+        None,
+    );
+    assert_eq!(decision.strategy, heuristics::ContextStrategy::FullCompress);
+}
+
+/// Same guard for an explicit `intent` change (which maps to a
+/// fidelity via `config.smart_defaults`).
+#[test]
+fn test_explicit_intent_change_forces_full_compress() {
+    let config = CleanCtxConfig::default();
+    let mut text_delta = TextDeltaComputer::new();
+    let ir_ctx = ContextState::new();
+
+    // Store a baseline first (as if a baseline was compressed earlier).
+    text_delta.store_snapshot("alpha1", vec!["line1".to_string()]);
+
+    let decision = decide_ok(
+        "alpha1",
+        None,
+        Some("edit"),
+        &config,
+        &text_delta,
+        &ir_ctx,
+        empty_source(),
+        Some("alpha1"),
+        None,
+    );
+    assert_eq!(decision.strategy, heuristics::ContextStrategy::FullCompress);
+}
+
 // ── V1 Fidelity Tests (unchanged) ──────────────────────────────────
 
 #[test]
