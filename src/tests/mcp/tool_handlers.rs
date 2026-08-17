@@ -10,7 +10,7 @@
 // meta-layer abbreviation in compiled output.
 
 use crate::mcp::tools::{parse_fidelity_arg, resolve_fidelity, dispatch_tools_call};
-use crate::mcp::tool_handlers::core::handle_compress_code_context;
+use crate::mcp::tool_handlers::core::{handle_compress_code_context, contract_fields};
 use crate::compression::Fidelity;
 use serde_json::json;
 
@@ -320,6 +320,11 @@ fn render_hierarchical_for_llm_typescript_class() {
         return_type: None,
         flags: Some(vec!["IF".into()]),
         patterns: vec![],
+        body: None,
+        control_flow: vec![],
+        data_flow: vec![],
+        side_effect: None,
+        execution_context: None,
     });
     let hir = HierarchicalIR {
         classes: vec![class],
@@ -365,6 +370,11 @@ fn render_hierarchical_for_llm_spring_boot_class() {
         return_type: None,
         flags: Some(vec!["RET".into()]),
         patterns: vec![],
+        body: None,
+        control_flow: vec![],
+        data_flow: vec![],
+        side_effect: None,
+        execution_context: None,
     };
     let m2 = MethodNode {
         id: "M2".into(),
@@ -376,6 +386,11 @@ fn render_hierarchical_for_llm_spring_boot_class() {
         return_type: None,
         flags: Some(vec!["RET".into(), "IF".into()]),
         patterns: vec![],
+        body: None,
+        control_flow: vec![],
+        data_flow: vec![],
+        side_effect: None,
+        execution_context: None,
     };
     class.methods.push(m1);
     class.methods.push(m2);
@@ -629,6 +644,28 @@ fn handle_compress_code_context_accepts_relative_path() {
     handle_compress_code_context(&id, &params, &state);
 }
 
+// ── M-8 regression: compress_workspace honors workspaceRoot ─────────
+// The schema advertises `workspaceRoot`; the dispatch handler must pass
+// it through to `resolve_file_path_checked` (not pin to CWD). This smoke
+// test exercises the dispatch path with a workspaceRoot arg to ensure
+// the handler reads it without panicking.
+#[test]
+fn handle_compress_workspace_accepts_workspace_root() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({
+        "arguments": {
+            "directoryPath": "src",
+            "workspaceRoot": ".",
+            "fidelity": "low"
+        }
+    });
+    // Should not panic — the handler reads workspaceRoot and resolves
+    // directoryPath against it (M-8 regression).
+    dispatch_tools_call(&id, "compress_workspace", &params, &state);
+}
+
 #[test]
 fn handle_delta_code_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
@@ -672,6 +709,107 @@ fn handle_provide_code_context_accepts_relative_path() {
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "overview" } });
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+// ── Edit Mode response contract field tests (Gap 5/3/6 fixes) ─────
+
+/// Gap 5 fix: structural-only fidelities report `content_kind == "skeleton"`
+/// and no byte-exact regions.
+#[test]
+fn contract_fields_low_is_skeleton() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Low);
+    assert_eq!(kind, "skeleton");
+    assert!(byte_exact.is_empty(), "Low must not claim byte-exact regions");
+}
+
+#[test]
+fn contract_fields_medium_is_skeleton() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Medium);
+    assert_eq!(kind, "skeleton");
+    assert!(byte_exact.is_empty());
+}
+
+#[test]
+fn contract_fields_high_is_skeleton() {
+    let (kind, byte_exact) = contract_fields(Fidelity::High);
+    assert_eq!(kind, "skeleton");
+    assert!(byte_exact.is_empty());
+}
+
+/// Gap 3/Gap 5 fix: Edit reports verbatim method bodies as the byte-exact
+/// region, matching the `byte_exact` promise in the SYSTEM_PROMPT.
+#[test]
+fn contract_fields_edit_reports_method_bodies() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Edit);
+    assert_eq!(kind, "skeleton_with_verbatim_bodies");
+    assert_eq!(byte_exact, vec!["method_bodies"]);
+}
+
+/// Gap 3/Gap 5 fix: Verbatim reports the entire document as byte-exact.
+#[test]
+fn contract_fields_verbatim_is_document() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Verbatim);
+    assert_eq!(kind, "verbatim_document");
+    assert_eq!(byte_exact, vec!["document"]);
+}
+
+// ── Edit Mode response contract smoke tests (Phase 4) ──────────────
+
+/// Gap 5/3 fix: `provide_code_context` with `intent="edit"` must not panic
+/// and must produce a response carrying the self-reporting contract fields
+/// (`content_kind`, `byte_exact`, `degradation`). Since handlers write to
+/// stdout, we verify the handler path is exercised without panic.
+#[test]
+fn provide_code_context_edit_intent_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "edit" } });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Gap 5/3 fix: `provide_code_context` with explicit `fidelity="edit"` must
+/// not panic (the edit-mode IR path with verbatim bodies).
+#[test]
+fn provide_code_context_explicit_edit_fidelity_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "edit" } });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Gap 2 fix: `provide_code_context` with an invalid explicit fidelity must
+/// not panic (the handler should return -32602, not crash).
+#[test]
+fn provide_code_context_invalid_fidelity_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "full" } });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Gap 3 fix: `fidelity="verbatim"` must not panic and must bypass
+/// compression entirely (raw source byte-exact). Exercises the new
+/// Verbatim short-circuit in `handle_provide_code_context`.
+#[test]
+fn provide_code_context_verbatim_fidelity_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Verbatim short-circuit in `handle_compress_code_context` must not panic.
+#[test]
+fn compress_code_context_verbatim_fidelity_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
+    dispatch_tools_call(&id, "compress_code_context", &params, &state);
 }
 
 // ── Blast radius integration regression tests ──────────────────────

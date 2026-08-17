@@ -346,11 +346,14 @@ fn resolve_fidelity(
     config: &CleanCtxConfig,
     // C-1 fix: previous fidelity from the persistence DB
     stored_fidelity: Option<Fidelity>,
-) -> (Fidelity, FileClass) {
+) -> Result<(Fidelity, FileClass), String> {
     // Priority 1: explicit fidelity arg
+    // Gap 2 fix: if an explicit fidelity is provided but fails to parse,
+    // return an error instead of silently falling back to the default.
     if let Some(s) = explicit_fidelity {
-        if let Ok(f) = Fidelity::parse(s) {
-            return (f, FileClass::General);
+        match Fidelity::parse(s) {
+            Ok(f) => return Ok((f, FileClass::General)),
+            Err(e) => return Err(e.to_string()),
         }
     }
 
@@ -368,9 +371,9 @@ fn resolve_fidelity(
         // (intent = "edit" on a `.component.html` file) triggers High
         // fidelity so the LLM sees the full semantic template.
         if intent == "edit" && is_angular_template_path(file_path) {
-            return (Fidelity::High, FileClass::Implementation);
+            return Ok((Fidelity::High, FileClass::Implementation));
         }
-        return (*mapped, FileClass::General);
+        return Ok((*mapped, FileClass::General));
     }
 
     // Priority 3: file name matches force_high_fidelity patterns
@@ -378,7 +381,7 @@ fn resolve_fidelity(
     if let Some(fname) = file_name {
         for pattern in &config.heuristics.force_high_fidelity {
             if crate::config::glob_match(pattern, fname) {
-                return (Fidelity::High, FileClass::Service);
+                return Ok((Fidelity::High, FileClass::Service));
             }
         }
     }
@@ -391,9 +394,9 @@ fn resolve_fidelity(
             // here to populate the decision summary).
             if config.heuristics.auto_classify {
                 let (class, _) = classify_file(file_path, source, config);
-                return (db_fidelity, class);
+                return Ok((db_fidelity, class));
             }
-            return (db_fidelity, FileClass::General);
+            return Ok((db_fidelity, FileClass::General));
         }
     }
 
@@ -401,23 +404,23 @@ fn resolve_fidelity(
     if config.heuristics.auto_classify {
         let (class, fidelity) = classify_file(file_path, source, config);
         if class != FileClass::General {
-            return (fidelity, class);
+            return Ok((fidelity, class));
         }
     }
 
     // Priority 5: complexity-based fallback (V2 — reversed from V1)
     if config.heuristics.auto_classify {
         let fidelity = fidelity_from_complexity(source, source_line_count, config);
-        return (fidelity, FileClass::General);
+        return Ok((fidelity, FileClass::General));
     }
 
     // V1 fallback (when auto_classify is disabled)
     if source_line_count > config.heuristics.large_file_threshold {
-        return (Fidelity::Low, FileClass::General);
+        return Ok((Fidelity::Low, FileClass::General));
     }
 
     // Priority 6: config default
-    (config.default_fidelity, FileClass::General)
+    Ok((config.default_fidelity, FileClass::General))
 }
 
 /// Check if a file is likely an Angular file by scanning its source.
@@ -479,7 +482,7 @@ pub fn decide(
     path_alias: Option<&str>,
     // C-1: Previously persisted fidelity from the DB, if available.
     stored_fidelity: Option<Fidelity>,
-) -> ContextDecision {
+) -> Result<ContextDecision, String> {
     let path = Path::new(file_path);
 
     // Count lines from the source
@@ -488,8 +491,12 @@ pub fn decide(
     // Get file name for force_high_fidelity matching
     let file_name = path.file_name().and_then(|n| n.to_str());
 
-    // C-2 fix: resolve_fidelity now returns (Fidelity, FileClass)
-    let (fidelity, file_class) = resolve_fidelity(
+    // C-2 fix: resolve_fidelity now returns Result<(Fidelity, FileClass), String>
+    // Gap 2 fix: propagate the error to the caller so it can return -32602.
+    // The previous sentinel approach (returning Low/General and relying on the
+    // caller to re-parse explicit_fidelity) was fragile and duplicated parse
+    // logic. Now the error is propagated directly via `?`.
+    let (mut fidelity, file_class) = resolve_fidelity(
         explicit_fidelity,
         explicit_intent,
         file_path,
@@ -498,7 +505,31 @@ pub fn decide(
         line_count,
         config,
         stored_fidelity,
-    );
+    )?;
+
+    // Auto-edit mode: when enabled and no explicit intent/fidelity was
+    // provided, Service and Implementation files get Fidelity::Edit so
+    // method bodies are carried verbatim for safe edits.
+    if config.heuristics.auto_edit_mode
+        && explicit_fidelity.is_none()
+        && explicit_intent.is_none()
+    {
+        // M-4 (Gap 2.1 fix): the class → Edit mapping is now configurable
+        // via `edit_auto_classifications` instead of being hardcoded.
+        let class_key = match file_class {
+            FileClass::Test => Some("test"),
+            FileClass::Config => Some("config"),
+            FileClass::Model => Some("model"),
+            FileClass::Service => Some("service"),
+            FileClass::Implementation => Some("implementation"),
+            FileClass::General => None,
+        };
+        if let Some(key) = class_key {
+            if config.heuristics.edit_auto_classifications.iter().any(|c| c == key) {
+                fidelity = Fidelity::Edit;
+            }
+        }
+    }
 
     // Determine strategy: check for baselines using the dict alias
     // (where they're actually stored), falling back to raw path.
@@ -519,14 +550,14 @@ pub fn decide(
         false
     };
 
-    ContextDecision {
+    Ok(ContextDecision {
         fidelity,
         strategy,
         is_angular,
         source_line_count: line_count,
         file_class,
         cbm_informed: false,
-    }
+    })
 }
 
 #[cfg(test)]

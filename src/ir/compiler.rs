@@ -23,7 +23,7 @@ use crate::compression::Fidelity;
 use super::layers::{LanguageLayer, LayerContext, PatternRecognizer};
 use super::opcodes::*;
 use super::symbol_table::SymbolKind;
-use super::compiler_methods::resolve_forward_aliases;
+use super::compiler_methods::{extract_method_body, resolve_forward_aliases};
 
 /// The compiled IR for a single file.
 #[derive(Debug, Clone)]
@@ -292,6 +292,16 @@ impl IRCompiler {
                         &method_id,
                         &cap.text,
                     );
+
+                    // Edit Mode: emit verbatim method body when fidelity is Edit.
+                    // The raw_text for method.root captures the full method
+                    // including the body. We extract everything from the first
+                    // '{' to the end (inclusive) as the byte-exact body.
+                    if fidelity == Fidelity::Edit {
+                        if let Some(body) = extract_method_body(&cap.raw_text) {
+                            instructions.push(CoreOp::Body(method_id.clone(), body));
+                        }
+                    }
 
                     // Invoke language layers for method-like captures.
                     for ll in self.language_layers.iter_mut() {

@@ -76,7 +76,7 @@ pub fn format_class_entry(name: &str, fields: &[String], fidelity: Fidelity) -> 
                 format!("class {} {{ {} }}", name, fields.join("; "))
             }
         }
-        Fidelity::High => {
+        Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
             if fields.is_empty() {
                 format!("class {} {{", name)
             } else {
@@ -289,7 +289,7 @@ pub fn format_rust_type_entry(name: &str, fields: &[String], fidelity: Fidelity)
                 format!("{} {{ {} }}", name, fields.join("; "))
             }
         }
-        Fidelity::High => {
+        Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
             if fields.is_empty() {
                 format!("{} {{", name)
             } else {

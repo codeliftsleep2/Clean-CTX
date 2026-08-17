@@ -56,6 +56,65 @@ fn parse_fidelity_arg_rejects_typo() {
     assert!(result.is_err());
 }
 
+// ── Gap 4 fix: workspaceRoot schema presence (Phase 4) ─────────────
+
+/// Every compression tool that resolves paths must advertise `workspaceRoot`
+/// in its schema so clients (and the LLM) can pass a multi-repo root.
+#[test]
+fn schema_includes_workspace_root_on_path_resolving_tools() {
+    let tools = tool_list();
+    let tools_by_name: std::collections::HashMap<&str, &serde_json::Value> = tools
+        .iter()
+        .map(|t| (t["name"].as_str().unwrap_or(""), t))
+        .collect();
+
+    // Tools that accept absolute file paths should expose workspaceRoot.
+    for name in [
+        "compress_code_context",
+        "diff_code_context",
+        "delta_code_context",
+        "delta_text_context",
+        "restore_context",
+        "provide_code_context",
+        "compress_workspace",
+    ] {
+        let tool = tools_by_name
+            .get(name)
+            .unwrap_or_else(|| panic!("missing tool {} in tool_list", name));
+        let has_root = tool["inputSchema"]["properties"]["workspaceRoot"].is_object();
+        assert!(
+            has_root,
+            "tool '{}' schema is missing workspaceRoot (Gap 4)",
+            name
+        );
+    }
+}
+
+/// Gap 4 fix: fidelity enums include edit/verbatim where applicable.
+#[test]
+fn schema_fidelity_enums_include_edit_and_verbatim() {
+    let tools = tool_list();
+    for tool in &tools {
+        let name = tool["name"].as_str().unwrap_or("");
+        let Some(fid) = tool["inputSchema"]["properties"]["fidelity"].as_object() else {
+            continue; // tool has no fidelity arg
+        };
+        let Some(enum_vals) = fid.get("enum").and_then(|e| e.as_array()) else {
+            continue; // no enum constraint — skip (not all tools need it)
+        };
+        let vals: Vec<&str> = enum_vals
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect();
+        assert!(
+            vals.contains(&"edit") && vals.contains(&"verbatim"),
+            "tool '{}' fidelity enum must include 'edit' and 'verbatim', got: {:?}",
+            name,
+            vals
+        );
+    }
+}
+
 // ---------- F-21: diff_code_context cache-hit fast path ----------
 
 /// F-21: calling `diff_code_context` on an unchanged file should

@@ -21,6 +21,29 @@ fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Vec<CoreOp> {
     tuples.into_iter().filter_map(|t| tuple_to_op(&t)).collect()
 }
 
+/// Self-reporting contract fields (Gap 5/3/6 fixes).
+///
+/// Returns `(content_kind, byte_exact_regions)` describing what the
+/// response contains so the LLM can tell structural-only output from
+/// body-inclusive output without re-parsing the text.
+///
+/// - `content_kind`: `"skeleton"` (structural-only), `"skeleton_with_verbatim_bodies"`
+///   (Edit — method bodies are byte-exact), or `"verbatim_document"`
+///   (Verbatim — entire document byte-exact).
+/// - `byte_exact`: which regions are safe for `replace_in_file` SEARCH
+///   blocks. Edit → `["method_bodies"]`; Verbatim → `["document"]`;
+///   others → `[]`.
+pub(crate) fn contract_fields(fidelity: crate::compression::Fidelity) -> (&'static str, Vec<&'static str>) {
+    match fidelity {
+        crate::compression::Fidelity::Verbatim => ("verbatim_document", vec!["document"]),
+        crate::compression::Fidelity::Edit => (
+            "skeleton_with_verbatim_bodies",
+            vec!["method_bodies"],
+        ),
+        _ => ("skeleton", Vec::new()),
+    }
+}
+
 // ── Handler: compress_code_context ───────────────────────────────
 
 /// P3-2: Main handler for compress_code_context tool.
@@ -69,15 +92,41 @@ pub(crate) fn handle_compress_code_context(
     }
 
     let effective_fidelity = fidelity;
+    // Gap 5/3/6 fixes: self-reporting contract fields so the LLM knows
+    // whether the response contains byte-exact regions (Edit/Verbatim)
+    // or is structural-only, without re-parsing the output text.
+    let (content_kind, byte_exact) = contract_fields(effective_fidelity);
     let source_arc = state.read_source(&resolved_path).ok();
     let source_ref = source_arc.as_ref().map(|s| s.as_str());
     let source_text = source_ref.unwrap_or("");
 
-    let ir_result = compile_file_ir(&resolved_path, effective_fidelity, state);
-
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
+
+    // Verbatim fidelity: return the full raw source byte-exact, as the
+    // plan's fidelity table promises ("Full raw source, byte-exact entire
+    // document"). The IR and legacy compressors both compress, so bypass
+    // them — otherwise `contract_fields` would report `["document"]` while
+    // the payload is a structural skeleton (self-reporting contract leak).
+    if effective_fidelity == crate::compression::Fidelity::Verbatim {
+        let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
+        state.record_compression(&resolved_path, raw_tokens, raw_tokens,
+            "verbatim", false, "full", None, "verbatim");
+        let mut response = serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "result": {
+                "content": [{ "type": "text", "text": source_text }],
+                "content_kind": "verbatim_document", "byte_exact": ["document"],
+                "verbatim": true
+            }
+        });
+        inject_baseline_breakpoint(&mut response, state, source_text);
+        send_response(&response);
+        return;
+    }
+
+    let ir_result = compile_file_ir(&resolved_path, effective_fidelity, state);
 
     // P3-2: Build response using extracted helpers
     // If IR compilation fails, fall back to legacy compression but log
@@ -128,7 +177,8 @@ pub(crate) fn handle_compress_code_context(
             "result": {
                 "content": [{ "type": "text", "text": llm_text_with_footer }],
                 "ir": crate::ir::hierarchical::ir_to_hierarchical_wire(&ir),
-                "pretty": ir_value, "v": ir.version, "file": ir.file_id
+                "pretty": ir_value, "v": ir.version, "file": ir.file_id,
+                "content_kind": content_kind, "byte_exact": byte_exact
             }
         })
     } else {
@@ -165,7 +215,10 @@ pub(crate) fn handle_compress_code_context(
 
                 serde_json::json!({
                     "jsonrpc": "2.0", "id": id,
-                    "result": { "content": [{ "type": "text", "text": compressed_text }] }
+                    "result": {
+                        "content": [{ "type": "text", "text": compressed_text }],
+                        "content_kind": content_kind, "byte_exact": byte_exact
+                    }
                 })
             }
             Err(e) => {
@@ -325,11 +378,14 @@ pub(crate) fn handle_delta_code_context(
     match delta {
         Some(d) => {
             let wire_delta = serde_json::to_value(&d).unwrap_or_default();
+            let (content_kind, byte_exact) = contract_fields(fidelity);
             let mut response = serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "result": {
-                    "content": [{ "type": "text", "text": serde_json::to_string_pretty(&wire_delta).unwrap_or_default() }],
-                    "delta": wire_delta, "from_version": prev_version, "to_version": compiled.version
+                "jsonrpc": "2.0", "id": id, "result": {
+                    "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): +{} ~{} -{} ops", compiled.file_id, d.from, d.to, d.ops.adds.len(), d.ops.mods.len(), d.ops.dels.len()) }],
+                    "delta": wire_delta, "from_version": d.from, "to_version": d.to,
+                    "strategy": "delta", "fidelity": format!("{:?}", fidelity).to_lowercase(),
+                    "content_kind": content_kind, "byte_exact": byte_exact,
+                    "degradation": null
                 }
             });
             // Delta output is rolling dynamic content — mark as tail (ephemeral).
@@ -563,6 +619,25 @@ pub(crate) fn handle_provide_code_context(
                 }
             }
         };
+        // Verbatim fidelity: return the raw template source byte-exact.
+        // The plan's fidelity table promises "Full raw source, byte-exact
+        // entire document" — the template compressor would otherwise
+        // produce a compressed skeleton while `contract_fields` reports
+        // `verbatim_document`/`["document"]` (self-reporting contract leak).
+        if fidelity == crate::compression::Fidelity::Verbatim {
+            let mut response = serde_json::json!({
+                "jsonrpc": "2.0", "id": id, "result": {
+                    "content": [{ "type": "text", "text": source }],
+                    "strategy": "full", "fidelity": "verbatim",
+                    "is_angular": true, "template_compressed": false,
+                    "content_kind": "verbatim_document", "byte_exact": ["document"],
+                    "degradation": null
+                }
+            });
+            inject_baseline_breakpoint(&mut response, state, source);
+            send_response(&response);
+            return;
+        }
         let lines = crate::angular_meta::template_compress::compress_template_with_prime_ng(source, fidelity);
         let body = lines.join("\n");
         let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
@@ -588,11 +663,14 @@ pub(crate) fn handle_provide_code_context(
         }
         state.flush_persistence();
 
+        let (content_kind, byte_exact) = contract_fields(fidelity);
         let mut response = serde_json::json!({
             "jsonrpc": "2.0", "id": id, "result": {
                 "content": [{ "type": "text", "text": body }],
                 "strategy": "full", "fidelity": format!("{:?}", fidelity).to_lowercase(),
-                "is_angular": true, "template_compressed": true
+                "is_angular": true, "template_compressed": true,
+                "content_kind": content_kind, "byte_exact": byte_exact,
+                "degradation": null
             }
         });
         inject_baseline_breakpoint(&mut response, state, &body);
@@ -607,22 +685,57 @@ pub(crate) fn handle_provide_code_context(
     let heuristics_start = Instant::now();
     let td_guard = state.text_delta_lock();
     let ir_read = state.ir_context_read();
-    let decision = crate::mcp::heuristics::decide(
+    let decision = match crate::mcp::heuristics::decide(
         &resolved_path, explicit_fidelity, explicit_intent,
         &state.config, &td_guard,
         &ir_read,
         source, Some(&alias), None,
-    );
+    ) {
+        Ok(d) => d,
+        Err(e) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": { "code": -32602, "message": e }
+            }));
+            return;
+        }
+    };
     drop(td_guard);
     drop(ir_read);
     let heuristics_ms = heuristics_start.elapsed().as_millis() as u64;
 
     let effective_fidelity = decision.fidelity;
+    // Gap 5/3/6 fixes: self-reporting contract fields (content_kind,
+    // byte_exact) plus a degradation signal for the legacy fallback.
+    let (content_kind, byte_exact) = contract_fields(effective_fidelity);
     let strategy = decision.strategy;
     let is_angular = decision.is_angular;
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
+
+    // Verbatim fidelity: return the full raw source byte-exact, exactly as
+    // the plan's fidelity table promises ("Full raw source, byte-exact
+    // entire document"). Bypasses IR/legacy compression entirely so the
+    // `verbatim_document`/`["document"]` contract fields match the payload.
+    if effective_fidelity == crate::compression::Fidelity::Verbatim {
+        let full = source.to_string();
+        let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
+        state.record_compression(&resolved_path, raw_tokens, raw_tokens,
+            "verbatim", is_angular, "full", None, "verbatim");
+        let mut response = serde_json::json!({
+            "jsonrpc": "2.0", "id": id, "result": {
+                "content": [{ "type": "text", "text": full }],
+                "strategy": "full", "fidelity": "verbatim",
+                "decision_summary": decision.summary(),
+                "content_kind": "verbatim_document", "byte_exact": ["document"],
+                "degradation": null, "verbatim": true
+            }
+        });
+        inject_baseline_breakpoint(&mut response, state, &full);
+        send_response(&response);
+        return;
+    }
 
     // A-04: Create tracing span for this call
     let _span = tracing::info_span!(
@@ -684,7 +797,9 @@ pub(crate) fn handle_provide_code_context(
                             "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): +{} ~{} -{} ops", compiled.file_id, d.from, d.to, d.ops.adds.len(), d.ops.mods.len(), d.ops.dels.len()) }],
                             "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                             "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                            "decision_summary": decision.summary()
+                            "decision_summary": decision.summary(),
+                            "content_kind": content_kind, "byte_exact": byte_exact,
+                            "degradation": null
                         }
                     });
                     // Delta output is rolling dynamic content — mark as tail (ephemeral).
@@ -709,7 +824,9 @@ pub(crate) fn handle_provide_code_context(
                         "jsonrpc": "2.0", "id": id, "result": {
                             "content": [{ "type": "text", "text": full }], "version": compiled.version,
                             "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                            "decision_summary": decision.summary()
+                            "decision_summary": decision.summary(),
+                            "content_kind": content_kind, "byte_exact": byte_exact,
+                            "degradation": null
                         }
                     });
                     // Inject baseline cache breakpoint for the stable full-compression output.
@@ -757,7 +874,9 @@ pub(crate) fn handle_provide_code_context(
                     "jsonrpc": "2.0", "id": id, "result": {
                         "content": [{ "type": "text", "text": full }], "version": ir.version,
                         "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                        "is_angular": is_angular, "decision_summary": decision.summary()
+                        "is_angular": is_angular, "decision_summary": decision.summary(),
+                        "content_kind": content_kind, "byte_exact": byte_exact,
+                        "degradation": null
                     }
                 });
                 // Inject baseline cache breakpoint for the stable full-compression output.
@@ -779,6 +898,11 @@ pub(crate) fn handle_provide_code_context(
                 if let Err(ref e) = ir_result {
                     tracing::warn!(error = %e, path = %resolved_path, "IR compilation failed in provide_code_context, falling back to legacy compression");
                 }
+                // Gap 6 fix: capture the CompileError so the response's
+                // `degradation.ir_compiler` signal tells the agent why this
+                // output is the legacy fallback (not IR-rendered).
+                let degraded_ir = ir_result.as_ref().err()
+                    .map(|e| serde_json::json!({ "ir_compiler": e.to_string() }));
                 let fallback_start = Instant::now();
                 match crate::compression::pipeline::compress_file_with_source(
                     PathBuf::from(&resolved_path), Some(source),
@@ -794,7 +918,9 @@ pub(crate) fn handle_provide_code_context(
                             "jsonrpc": "2.0", "id": id, "result": {
                                 "content": [{ "type": "text", "text": compressed_text }],
                                 "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                                "decision_summary": decision.summary()
+                                "decision_summary": decision.summary(),
+                                "content_kind": content_kind, "byte_exact": byte_exact,
+                                "degradation": degraded_ir
                             }
                         });
                         // Fallback compression output is a stable full snapshot — inject baseline breakpoint.
