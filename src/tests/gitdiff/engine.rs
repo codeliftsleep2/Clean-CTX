@@ -286,6 +286,54 @@ fn gitdiff_workspace_invalid_ref_rejected() {
 // ANGULAR_HTML_COMPRESSION_PLAN Phase 2: `.component.html` tests
 // ══════════════════════════════════════════════════════════════════
 
+/// Create a temp git repo where commit 2 changes ONLY a method body
+/// (same signature) — the critical false-negative regression for
+/// `diff_commits`.
+fn init_body_only_repo() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().to_str().unwrap();
+
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .expect("git command");
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {:?}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "test@example.com"]);
+    git(&["config", "user.name", "Test"]);
+
+    // Commit 1: a method with body `return api.get(id);`
+    std::fs::create_dir_all(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/app.ts"),
+        "class UserService {\n  getUser(id: string): Promise<User> {\n    return api.get(id);\n  }\n}\n",
+    )
+    .unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "commit1"]);
+
+    // Commit 2: same signature, body changed to `return api.fetch(id);`
+    std::fs::write(
+        dir.path().join("src/app.ts"),
+        "class UserService {\n  getUser(id: string): Promise<User> {\n    return api.fetch(id);\n  }\n}\n",
+    )
+    .unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "commit2"]);
+
+    dir
+}
+
 /// Create a temp git repo with a `.component.html` file that changes
 /// between two commits.
 fn init_html_repo() -> tempfile::TempDir {
@@ -331,6 +379,34 @@ fn init_html_repo() -> tempfile::TempDir {
     git(&["commit", "-q", "-m", "commit2"]);
 
     dir
+}
+
+/// Regression: a body-only change (same method signature) must be
+/// detected. Previously `diff_snapshots` compared only sig + markers,
+/// so this scenario produced `= class Foo (unchanged)` — a false
+/// negative.
+#[test]
+fn gitdiff_workspace_body_only_change_emits_ast_diff() {
+    let dir = init_body_only_repo();
+    let root = dir.path().to_str().unwrap();
+
+    let summary = gitdiff_workspace(root, "HEAD~1", Some("HEAD"), Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+
+    assert_eq!(summary.file_count, 1, "exactly 1 file changed");
+    assert_eq!(summary.counts, (0, 0, 1, 0), "1 modified file");
+
+    // The manifest must contain the body-change marker, not `= (unchanged)`.
+    assert!(
+        summary.manifest.contains("~ method getUser (body changed)"),
+        "expected body-change marker, got:\n{}",
+        summary.manifest
+    );
+    assert!(
+        !summary.manifest.contains("= class UserService (unchanged)"),
+        "class with body-changed method must not be reported unchanged, got:\n{}",
+        summary.manifest
+    );
 }
 
 #[test]
