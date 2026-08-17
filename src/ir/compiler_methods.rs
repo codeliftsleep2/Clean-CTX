@@ -84,22 +84,17 @@ pub(super) fn parse_method_sig(sig: &str) -> MethodSig {
     }
 }
 
-/// Extract the verbatim method body from a raw method capture.
+/// Locate the byte index of the brace that opens a method **body**.
 ///
 /// The `raw_text` for a `method.root` capture contains the full method
 /// including the signature and body. This function locates the brace
 /// that opens the **body** (not a parameter default-value object
-/// literal, e.g. `function foo(x = {a:1}) { ... }`) and returns
-/// everything from that brace to the end of the string (inclusive).
+/// literal, e.g. `function foo(x = {a:1}) { ... }`, and not a
+/// return-type object literal, e.g. `function foo(): { a: number }`).
 ///
-/// Expression-bodied arrows (`const foo = () => bar()`) have no block
-/// body; the expression following `=>` (with its line prefix) is
-/// returned as the body so edit mode still carries the implementation.
-///
-/// The returned text is byte-exact — no trimming, no normalization.
-/// This is the text that `replace_in_file` SEARCH blocks can safely
-/// match against.
-pub(super) fn extract_method_body(raw_method: &str) -> Option<String> {
+/// Returns `Some(index)` pointing at the `{` character, or `None` when
+/// the method has no block body (expression-bodied arrow functions).
+pub(super) fn find_body_start(raw_method: &str) -> Option<usize> {
     // Track paren depth so a `{` inside a parameter default (e.g.
     // `x = {a:1}`) is not mistaken for the body opening brace.
     let mut paren_depth = 0i32;
@@ -123,7 +118,7 @@ pub(super) fn extract_method_body(raw_method: &str) -> Option<String> {
                 pending_return_brace = true;
             }
             '{' if paren_depth == 0 && brace_depth == 0 && !pending_return_brace => {
-                return Some(raw_method[i..].to_string());
+                return Some(i);
             }
             '{' if paren_depth == 0 && pending_return_brace => {
                 // Return-type object literal — track its brace depth.
@@ -140,6 +135,44 @@ pub(super) fn extract_method_body(raw_method: &str) -> Option<String> {
             }
             _ => {}
         }
+    }
+    None
+}
+
+/// Extract the verbatim method body from a raw method capture.
+///
+/// The `raw_text` for a `method.root` capture contains the full method
+/// including the signature and body. This function locates the brace
+/// that opens the **body** (not a parameter default-value object
+/// literal, e.g. `function foo(x = {a:1}) { ... }`) and returns
+/// everything from the **start of the line containing that brace** to
+/// the end of the string (inclusive). Starting at the line start
+/// preserves the brace's original leading indentation so the body is
+/// byte-exact for `replace_in_file` SEARCH blocks.
+///
+/// Expression-bodied arrows (`const foo = () => bar()`) have no block
+/// body; the expression following `=>` (with its line prefix) is
+/// returned as the body so edit mode still carries the implementation.
+///
+/// The returned text is byte-exact — no trimming, no normalization.
+/// This is the text that `replace_in_file` SEARCH blocks can safely
+/// match against.
+pub(super) fn extract_method_body(raw_method: &str) -> Option<String> {
+    if let Some(i) = find_body_start(raw_method) {
+        // If the `{` is the first non-whitespace character on its line
+        // (multiline signature like `foo()\n    {`), start at the LINE
+        // START so the opening brace keeps its original leading
+        // indentation (the user-visible bug: nested braces were
+        // indented but the first `{` was column 0). If the brace is on
+        // the same line as the signature (`foo() {`), start at the
+        // brace itself — the signature is emitted separately by the
+        // renderer, so including it here would duplicate it.
+        let line_start = raw_method[..i].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let prefix = &raw_method[line_start..i];
+        if prefix.trim().is_empty() {
+            return Some(raw_method[line_start..].to_string());
+        }
+        return Some(raw_method[i..].to_string());
     }
 
     // No block body — check for an expression-bodied arrow function.
@@ -213,7 +246,34 @@ impl super::compiler::IRCompiler {
         raw_sig: &str,
     ) {
         // Parse the method signature: "name(params):return_type"
-        let sig = parse_method_sig(raw_sig);
+        //
+        // At Edit/Verbatim fidelity, `extract_method_sig` (in
+        // `compaction/method.rs`) intentionally returns the FULL raw
+        // method text so the legacy text pipeline can emit bodies
+        // byte-exact. The IR compiler must NOT pass that full text to
+        // `parse_method_sig`, otherwise the body becomes part of the
+        // `return_type` (everything after the closing `)`) and the
+        // renderer duplicates it (garbled `→ ... { body }` immediately
+        // followed by the verbatim body). Strip the body here so the
+        // signature is parsed from the signature-only portion; the
+        // verbatim body flows through `CoreOp::Body` separately.
+        let sig_text = match find_body_start(raw_sig) {
+            Some(i) => raw_sig[..i].trim_end().to_string(),
+            None => {
+                // Expression-bodied arrow: `const foo = () => bar()`.
+                // No block brace exists, so strip everything from the
+                // `=>` — the arrow expression flows through `CoreOp::Body`
+                // via `extract_method_body` (which returns the text after
+                // `=>`). Without this strip the arrow expression would be
+                // swallowed into `return_type` and double-rendered.
+                if let Some(arrow_idx) = raw_sig.rfind("=>") {
+                    raw_sig[..arrow_idx].trim_end().to_string()
+                } else {
+                    raw_sig.to_string()
+                }
+            }
+        };
+        let sig = parse_method_sig(&sig_text);
         let name = sig.name;
         let params_str = sig.params_str;
         let return_type = sig.return_type;

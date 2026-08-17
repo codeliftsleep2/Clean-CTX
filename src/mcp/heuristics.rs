@@ -537,7 +537,18 @@ pub fn decide(
     let has_delta_baseline = text_delta_state.has_baseline(check_key);
     let has_ir_baseline = ir_context.has_file(check_key);
 
-    let strategy = if config.auto_delta && (has_delta_baseline || has_ir_baseline) {
+    // Delta transport only makes sense when the prior baseline was
+    // compiled at the SAME fidelity. When the caller explicitly changes
+    // `fidelity` (or `intent`, which maps to a fidelity), the prior
+    // baseline's wire format is incompatible with `apply_delta` — the
+    // delta would reference ops that never existed at the new fidelity,
+    // producing a bare summary line with no structured payload. Force a
+    // full compress in that case so the response is always consumable.
+    let explicit_fidelity_or_intent = explicit_fidelity.is_some() || explicit_intent.is_some();
+    let strategy = if config.auto_delta
+        && !explicit_fidelity_or_intent
+        && (has_delta_baseline || has_ir_baseline)
+    {
         ContextStrategy::DeltaTransport
     } else {
         ContextStrategy::FullCompress
