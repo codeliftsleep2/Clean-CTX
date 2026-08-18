@@ -4,6 +4,8 @@
 // Tests that compress_cbm_response properly handles various JSON inputs,
 // and that the intelligence layer integrates correctly.
 
+use serde_json::json;
+
 #[test]
 fn compress_cbm_response_envelope_stripping() {
     use crate::cbm::json_compress::compress_cbm_response;
@@ -134,4 +136,70 @@ fn intelligence_config_defaults_to_enabled() {
     let config = crate::config::CleanCtxConfig::default();
     assert!(config.intelligence.enabled,
         "IntelligenceConfig::enabled should default to true");
+}
+
+// ── last_error regression: query failures are surfaced, not hidden ──
+
+/// A bridge with CBM disabled must surface a query error via
+/// `take_last_error()` instead of silently returning empty data.
+#[test]
+fn bridge_surfaces_query_error_on_unavailable() {
+    use crate::cbm::GraphBridge;
+    use crate::cbm::config::CbmConfig;
+
+    let config = CbmConfig { enabled: false, ..Default::default() };
+    let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
+
+    // search without CBM → empty result BUT last_error must be populated.
+    let nodes = bridge.search("UserService");
+    assert!(nodes.is_empty(), "search returns empty without CBM");
+    let err = bridge.take_last_error();
+    assert!(
+        err.is_some(),
+        "search failure must be surfaced via take_last_error (not silently dropped)"
+    );
+    if let Some(e) = &err {
+        assert!(
+            e.to_string().contains("CBM not available"),
+            "expected 'CBM not available' error, got: {e}"
+        );
+    }
+}
+
+/// A successful cached query clears any stale error.
+#[test]
+fn cached_query_clears_stale_error() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use crate::cbm::SymbolImportance;
+    use std::collections::HashMap;
+
+    let mut data = HashMap::new();
+    data.insert("UserService".to_string(), SymbolImportance {
+        symbol: "UserService".to_string(),
+        score: 0.9,
+        file: "user.rs".to_string(),
+    });
+    let mut bridge = new_mock(data);
+
+    // Seed a search cache entry so search() takes the cache-hit path.
+    use crate::cbm::bridge::CachedGraphData;
+    let ttl = std::time::Instant::now() + std::time::Duration::from_secs(3600);
+    bridge.cache.insert("search:UserService".to_string(), CachedGraphData {
+        data: json!([]),
+        expires_at: ttl,
+    });
+
+    // First simulate a fresh-error state by forcing one (mock has no client,
+    // so a MISS would error — but we want the cache-HIT path).
+    // Manually inject a stale error:
+    bridge.set_last_error_for_test(crate::cbm::client::CbmError::LaunchError("stale".into()));
+    assert!(bridge.take_last_error().is_some(), "precondition: stale error present");
+
+    // Inject again (take cleared it) then run a cache-hit search:
+    bridge.set_last_error_for_test(crate::cbm::client::CbmError::LaunchError("stale".into()));
+    let _ = bridge.search("UserService"); // cache hit
+    assert!(
+        bridge.take_last_error().is_none(),
+        "cache-hit query must clear any stale error"
+    );
 }
