@@ -267,15 +267,34 @@ fn audit8_state_new_is_fast() {
 #[test]
 fn audit9_ensure_indexed_idempotent() {
     // FAANG audit P0: ensure_indexed() should be a no-op if already indexed.
+    // When CBM is unavailable, BOTH calls must return the SAME error and the
+    // indexing state must remain untouched — proving no doomed background
+    // indexing thread was spawned (regression: the first call used to spawn
+    // a thread that flipped state to Failed, making the second call Err).
     let config = crate::cbm::config::CbmConfig { enabled: false, ..Default::default() };
     let mut bridge = crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
-    // First call -- should not panic (CBM disabled)
+
+    // First call -- should error (CBM unavailable), not spawn a thread.
     let result1 = bridge.ensure_indexed();
-    // Second call -- should be a no-op
+    // Second call -- should be identical (idempotent, no state mutation).
     let result2 = bridge.ensure_indexed();
-    // Both should return same result (idempotent)
-    assert_eq!(result1.is_ok(), result2.is_ok(),
-        "AUDIT-9: ensure_indexed should be idempotent -- 1st={:?}, 2nd={:?}", result1, result2);
+
+    // Both must be Err — never Ok(StillIndexing) for a doomed thread.
+    assert!(result1.is_err() && result2.is_err(),
+        "AUDIT-9: ensure_indexed should error when CBM unavailable -- 1st={:?}, 2nd={:?}", result1, result2);
+
+    // Both must carry the SAME deterministic error message.
+    let msg1 = match &result1 { Err(e) => e.to_string(), Ok(s) => format!("{:?}", s) };
+    let msg2 = match &result2 { Err(e) => e.to_string(), Ok(s) => format!("{:?}", s) };
+    assert_eq!(msg1, msg2,
+        "AUDIT-9: ensure_indexed should return the same error both calls -- 1st={}, 2nd={}", msg1, msg2);
+    assert!(msg1.contains("CBM not available"),
+        "AUDIT-9: expected 'CBM not available' error, got: {}", msg1);
+
+    // The guard must prevent ANY indexing-state mutation (no doomed thread).
+    let states = bridge.indexing_state();
+    assert!(states.is_empty(),
+        "AUDIT-9: ensure_indexed must not mutate indexing state when CBM unavailable -- got {:?}", states);
 }
 
 // ══════════════════════════════════════════════════════════════════
