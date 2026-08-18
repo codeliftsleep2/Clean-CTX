@@ -4,9 +4,10 @@
 // Covers: all class types (TS, Rust, Java, Angular, Spring),
 // all fidelity levels, edge cases, overloaded methods, patterns.
 
+use std::collections::HashSet;
 use crate::compression::Fidelity;
 use crate::ir::{HierarchicalIR, ClassNode, MethodNode, FieldNode, PatternEntry};
-use crate::ir::render_hierarchical_for_llm;
+use crate::ir::{render_hierarchical_for_llm, render_hierarchical_for_llm_focused};
 
 // ── Helpers ──
 
@@ -797,4 +798,128 @@ fn test_synthetic_class_is_rendered() {
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     assert!(result.contains("// ── __synthetic_C1 ──"));
     assert!(result.contains("F orphan:$n"));
+}
+
+// ── Focused Edit Rendering Tests (Symbol Targeting) ───────────────
+
+fn make_class_with_bodies(names: &[(&str, &str)]) -> HierarchicalIR {
+    let mut hir = empty_hir();
+    let mut class = make_class("MyService");
+    for (name, body) in names {
+        let mut method = make_method(name);
+        method.body = Some(body.to_string());
+        class.methods.push(method);
+    }
+    hir.classes.push(class);
+    hir
+}
+
+/// Focused Edit: only the named method gets its full verbatim body.
+#[test]
+fn test_edit_focused_renders_only_named_method_bodies() {
+    let hir = make_class_with_bodies(&[
+        ("methodA", "{\n  let a = 1;\n}"),
+        ("methodB", "{\n  let b = 2;\n}"),
+        ("methodC", "{\n  let c = 3;\n}"),
+    ]);
+    let focus: HashSet<String> = ["methodB".to_string()].into_iter().collect();
+
+    let result = render_hierarchical_for_llm_focused(&hir, Fidelity::Edit, Some(&focus));
+
+    // All method signatures present
+    assert!(result.contains("M methodA"));
+    assert!(result.contains("M methodB"));
+    assert!(result.contains("M methodC"));
+    // Only methodB gets its body
+    assert!(!result.contains("let a = 1"), "unfocused method body must not render");
+    assert!(result.contains("let b = 2"), "focused method body must render verbatim");
+    assert!(!result.contains("let c = 3"), "unfocused method body must not render");
+}
+
+/// Focused rendering: `None` focus is identical to the unfocused function.
+#[test]
+fn test_edit_focused_none_renders_all_bodies() {
+    let hir = make_class_with_bodies(&[
+        ("methodA", "{\n  let a = 1;\n}"),
+        ("methodB", "{\n  let b = 2;\n}"),
+    ]);
+
+    let focused = render_hierarchical_for_llm_focused(&hir, Fidelity::Edit, None);
+    let unfocused = render_hierarchical_for_llm(&hir, Fidelity::Edit);
+
+    assert_eq!(focused, unfocused);
+    assert!(focused.contains("let a = 1"));
+    assert!(focused.contains("let b = 2"));
+}
+
+/// Focused rendering: a focus name that doesn't exist degrades gracefully
+/// to all-signatures (no bodies), no crash.
+#[test]
+fn test_edit_focused_no_match_renders_all_signatures() {
+    let hir = make_class_with_bodies(&[
+        ("methodA", "{\n  let a = 1;\n}"),
+        ("methodB", "{\n  let b = 2;\n}"),
+    ]);
+    let focus = HashSet::from(["NoSuchMethod".to_string()]);
+
+    let result = render_hierarchical_for_llm_focused(&hir, Fidelity::Edit, Some(&focus));
+
+    assert!(result.contains("M methodA"));
+    assert!(result.contains("M methodB"));
+    assert!(!result.contains("let a = 1"));
+    assert!(!result.contains("let b = 2"));
+}
+
+/// Focused rendering: multiple named methods all get bodies, only those.
+#[test]
+fn test_edit_focused_multiple_names() {
+    let hir = make_class_with_bodies(&[
+        ("methodA", "{\n  let a = 1;\n}"),
+        ("methodB", "{\n  let b = 2;\n}"),
+        ("methodC", "{\n  let c = 3;\n}"),
+    ]);
+    let focus = HashSet::from(["methodA".to_string(), "methodC".to_string()]);
+
+    let result = render_hierarchical_for_llm_focused(&hir, Fidelity::Edit, Some(&focus));
+
+    assert!(result.contains("let a = 1"));
+    assert!(!result.contains("let b = 2"));
+    assert!(result.contains("let c = 3"));
+}
+
+/// Focus has no effect at non-Edit fidelities.
+#[test]
+fn test_edit_focused_non_edit_fidelity_ignores_focus() {
+    let hir = make_class_with_bodies(&[
+        ("methodA", "{\n  let a = 1;\n}"),
+        ("methodB", "{\n  let b = 2;\n}"),
+    ]);
+    let focus = HashSet::from(["methodB".to_string()]);
+
+    // Low fidelity ignores focus entirely — bodies never render.
+    let result_low = render_hierarchical_for_llm_focused(&hir, Fidelity::Low, Some(&focus));
+    assert!(!result_low.contains("let a = 1"));
+    assert!(!result_low.contains("let b = 2"));
+
+    // High fidelity also ignores focus — bodies never render at High.
+    let result_high = render_hierarchical_for_llm_focused(&hir, Fidelity::High, Some(&focus));
+    assert!(!result_high.contains("let a = 1"));
+    assert!(!result_high.contains("let b = 2"));
+}
+
+/// Focused rendering: empty set renders all signatures (no bodies).
+#[test]
+fn test_edit_focused_empty_set_renders_all_signatures() {
+    let hir = make_class_with_bodies(&[
+        ("methodA", "{\n  let a = 1;\n}"),
+        ("methodB", "{\n  let b = 2;\n}"),
+    ]);
+    let focus = HashSet::new();
+
+    let result = render_hierarchical_for_llm_focused(&hir, Fidelity::Edit, Some(&focus));
+
+    assert!(result.contains("M methodA"));
+    assert!(result.contains("M methodB"));
+    assert!(!result.contains("let a = 1"));
+    assert!(!result.contains("let b = 2"));
 }

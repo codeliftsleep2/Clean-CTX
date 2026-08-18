@@ -10,7 +10,7 @@
 // meta-layer abbreviation in compiled output.
 
 use crate::mcp::tools::{parse_fidelity_arg, resolve_fidelity, dispatch_tools_call};
-use crate::mcp::tool_handlers::core::{handle_compress_code_context, contract_fields};
+use crate::mcp::tool_handlers::core::{handle_compress_code_context, contract_fields, contract_fields_focused};
 use crate::compression::Fidelity;
 use serde_json::json;
 
@@ -753,6 +753,64 @@ fn contract_fields_verbatim_is_document() {
     assert_eq!(byte_exact, vec!["document"]);
 }
 
+// ── contract_fields_focused tests (Symbol Targeting) ──────────────
+
+/// None focus at Edit → identical to unfocused (every body byte-exact).
+#[test]
+fn contract_fields_focused_none_edit_is_all_bodies() {
+    let (kind, byte_exact) = contract_fields_focused(Fidelity::Edit, None);
+    assert_eq!(kind, "skeleton_with_verbatim_bodies");
+    assert_eq!(byte_exact, vec!["method_bodies"]);
+}
+
+/// Empty focus set at Edit → zero method bodies are byte-exact.
+/// Must report `"skeleton"` with no byte-exact regions, otherwise the
+/// LLM would attempt replace_in_file SEARCH on bodies that don't exist.
+#[test]
+fn contract_fields_focused_empty_set_edit_is_skeleton() {
+    let focus = std::collections::HashSet::new();
+    let (kind, byte_exact) = contract_fields_focused(Fidelity::Edit, Some(&focus));
+    assert_eq!(kind, "skeleton");
+    assert!(byte_exact.is_empty());
+}
+
+/// Non-empty focus set at Edit → only focused method bodies are byte-exact.
+#[test]
+fn contract_fields_focused_some_edit_is_focused_bodies() {
+    let focus = std::collections::HashSet::from(["GetOrgUnitDic".to_string()]);
+    let (kind, byte_exact) = contract_fields_focused(Fidelity::Edit, Some(&focus));
+    assert_eq!(kind, "skeleton_with_focused_verbatim_bodies");
+    assert_eq!(byte_exact, vec!["focused_method_bodies"]);
+}
+
+/// Focus is silently ignored at non-Edit fidelities — structural only.
+#[test]
+fn contract_fields_focused_non_edit_ignores_focus() {
+    let focus = std::collections::HashSet::from(["doWork".to_string()]);
+    for fidelity in [Fidelity::Low, Fidelity::Medium, Fidelity::High] {
+        let (kind, byte_exact) = contract_fields_focused(fidelity, Some(&focus));
+        assert_eq!(kind, "skeleton");
+        assert!(byte_exact.is_empty());
+    }
+}
+
+/// Verbatim always reports the entire document as byte-exact.
+#[test]
+fn contract_fields_focused_verbatim_is_document() {
+    let focus = std::collections::HashSet::from(["doWork".to_string()]);
+    let (kind, byte_exact) = contract_fields_focused(Fidelity::Verbatim, Some(&focus));
+    assert_eq!(kind, "verbatim_document");
+    assert_eq!(byte_exact, vec!["document"]);
+}
+
+/// `contract_fields` is the None-focus specialization of `contract_fields_focused`.
+#[test]
+fn contract_fields_delegates_to_focused_none() {
+    for fidelity in [Fidelity::Low, Fidelity::Medium, Fidelity::High, Fidelity::Edit, Fidelity::Verbatim] {
+        assert_eq!(contract_fields(fidelity), contract_fields_focused(fidelity, None));
+    }
+}
+
 // ── Edit Mode response contract smoke tests (Phase 4) ──────────────
 
 /// Gap 5/3 fix: `provide_code_context` with `intent="edit"` must not panic
@@ -810,6 +868,40 @@ fn compress_code_context_verbatim_fidelity_does_not_panic() {
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
     dispatch_tools_call(&id, "compress_code_context", &params, &state);
+}
+
+/// Symbol targeting: `provide_code_context` with `focusMethods` at edit
+/// fidelity must not panic (the new focused-render path).
+#[test]
+fn provide_code_context_focus_methods_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({
+        "arguments": {
+            "filePath": "src/lib.rs",
+            "fidelity": "edit",
+            "focusMethods": ["test_method", "another_method"]
+        }
+    });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Symbol targeting: `focusMethods` with an empty array must not panic
+/// and should degrade gracefully.
+#[test]
+fn provide_code_context_focus_methods_empty_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({
+        "arguments": {
+            "filePath": "src/lib.rs",
+            "fidelity": "edit",
+            "focusMethods": []
+        }
+    });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
 // ── Blast radius integration regression tests ──────────────────────

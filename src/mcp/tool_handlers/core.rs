@@ -2,6 +2,7 @@
 //
 // Core MCP tool handlers: compression, IR, delta, and unified entry point.
 use std::path::PathBuf;
+use std::collections::HashSet;
 use serde_json::Value;
 use sha2::{Sha256, Digest};
 use crate::ir::wire::ir_to_wire;
@@ -15,7 +16,7 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 
 use super::super::tools::{parse_fidelity_arg, parse_tokenizer_arg};
-use super::super::tool_helpers::{compress_text_body, compile_file_ir, resolve_file_path_checked, diff_code_context_handler, count_tokens_with_tokenizer, inject_baseline_breakpoint, inject_tail_breakpoint};
+use super::super::tool_helpers::{compress_text_body, compile_file_ir, compile_file_ir_focused, resolve_file_path_checked, diff_code_context_handler, count_tokens_with_tokenizer, inject_baseline_breakpoint, inject_tail_breakpoint};
 
 fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Vec<CoreOp> {
     tuples.into_iter().filter_map(|t| tuple_to_op(&t)).collect()
@@ -34,11 +35,44 @@ fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Vec<CoreOp> {
 ///   blocks. Edit → `["method_bodies"]`; Verbatim → `["document"]`;
 ///   others → `[]`.
 pub(crate) fn contract_fields(fidelity: crate::compression::Fidelity) -> (&'static str, Vec<&'static str>) {
+    contract_fields_focused(fidelity, None)
+}
+
+/// Self-reporting contract fields for `provide_code_context`, accounting for
+/// symbol targeting via `focusMethods`.
+///
+/// When `focus` is `None` (no `focusMethods` supplied), `Edit` fidelity reports
+/// `"skeleton_with_verbatim_bodies"`/`["method_bodies"]` — every method's body
+/// is byte-exact (legacy behavior).
+///
+/// When `focus` is `Some(_)` (silently ignored unless the effective fidelity is
+/// `Edit`), only the focused method bodies are byte-exact. The contract reports
+/// `"skeleton_with_focused_verbatim_bodies"`/`["focused_method_bodies"]` so the
+/// LLM knows NOT to attempt `replace_in_file` SEARCH on unfocused method bodies.
+pub(crate) fn contract_fields_focused(
+    fidelity: crate::compression::Fidelity,
+    focus: Option<&HashSet<String>>,
+) -> (&'static str, Vec<&'static str>) {
     match fidelity {
         crate::compression::Fidelity::Verbatim => ("verbatim_document", vec!["document"]),
-        crate::compression::Fidelity::Edit => (
+        // No focus set → every method body is byte-exact (legacy behavior).
+        crate::compression::Fidelity::Edit if focus.is_none() => (
             "skeleton_with_verbatim_bodies",
             vec!["method_bodies"],
+        ),
+        // Focus set but EMPTY → ZERO method bodies are byte-exact. The
+        // output is effectively all-signatures, so report `"skeleton"`
+        // with no byte-exact regions (otherwise the LLM would attempt
+        // replace_in_file SEARCH on bodies that don't exist).
+        crate::compression::Fidelity::Edit if focus.is_some_and(HashSet::is_empty) => (
+            "skeleton",
+            Vec::new(),
+        ),
+        // Focus set with names → only the focused method bodies are
+        // byte-exact. The LLM must NOT attempt SEARCH on unfocused bodies.
+        crate::compression::Fidelity::Edit => (
+            "skeleton_with_focused_verbatim_bodies",
+            vec!["focused_method_bodies"],
         ),
         _ => ("skeleton", Vec::new()),
     }
@@ -546,6 +580,14 @@ pub(crate) fn handle_provide_code_context(
     use std::time::Instant;
     let overall_start = Instant::now();
 
+    // Symbol targeting: optional set of method names that should receive
+    // full verbatim bodies at Edit fidelity. All other methods are rendered
+    // signature-only. When omitted (None), every method's body is rendered
+    // (current default behavior).
+    let focus_methods: Option<HashSet<String>> = params["arguments"]["focusMethods"]
+        .as_array()
+        .map(|arr| arr.iter().filter_map(|s| s.as_str().map(String::from)).collect());
+
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     if file_path_str.is_empty() {
         send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }));
@@ -663,7 +705,12 @@ pub(crate) fn handle_provide_code_context(
         }
         state.flush_persistence();
 
-        let (content_kind, byte_exact) = contract_fields(fidelity);
+        // The Angular template compressor emits structural markers, never
+        // verbatim method bodies — so the self-reporting contract must not
+        // claim `["method_bodies"]` even at Edit fidelity (it would be a
+        // Gap 5/3/6 contract leak: the LLM would attempt replace_in_file
+        // SEARCH against bodies that don't exist in template output).
+        let (content_kind, byte_exact) = ("skeleton", Vec::<&'static str>::new());
         let mut response = serde_json::json!({
             "jsonrpc": "2.0", "id": id, "result": {
                 "content": [{ "type": "text", "text": body }],
@@ -707,7 +754,9 @@ pub(crate) fn handle_provide_code_context(
     let effective_fidelity = decision.fidelity;
     // Gap 5/3/6 fixes: self-reporting contract fields (content_kind,
     // byte_exact) plus a degradation signal for the legacy fallback.
-    let (content_kind, byte_exact) = contract_fields(effective_fidelity);
+    // When `focusMethods` is supplied, only the focused method bodies are
+    // byte-exact — the contract must reflect that (not claim every body).
+    let (content_kind, byte_exact) = contract_fields_focused(effective_fidelity, focus_methods.as_ref());
     let strategy = decision.strategy;
     let is_angular = decision.is_angular;
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
@@ -750,7 +799,7 @@ pub(crate) fn handle_provide_code_context(
     match strategy {
         crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
             let compile_start = Instant::now();
-            let (compiled, _source_hash) = match compile_file_ir(&resolved_path, effective_fidelity, state) {
+            let (compiled, _source_hash) = match compile_file_ir_focused(&resolved_path, effective_fidelity, state, focus_methods.as_ref()) {
                 Ok(c) => c,
                 Err(e) => { send_response(&to_jsonrpc_error(id, &e)); return; }
             };
@@ -814,7 +863,7 @@ pub(crate) fn handle_provide_code_context(
                 None => {
                     let render_start = Instant::now();
                     let hir = crate::ir::hierarchical::ir_to_hierarchical(&compiled);
-                    let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
+                    let llm_text = crate::ir::render_hierarchical_for_llm_focused(&hir, effective_fidelity, focus_methods.as_ref());
                     let full = format!("{}\n// ── {} ({}) ──\n{}", llm_text.trim(), compiled.file_id, resolved_path, state.format_dict_footer().trim());
                     let render_ms = render_start.elapsed().as_millis() as u64;
                     raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
@@ -855,7 +904,7 @@ pub(crate) fn handle_provide_code_context(
         }
         crate::mcp::heuristics::ContextStrategy::FullCompress => {
             let compile_start = Instant::now();
-            let ir_result = compile_file_ir(&resolved_path, effective_fidelity, state);
+            let ir_result = compile_file_ir_focused(&resolved_path, effective_fidelity, state, focus_methods.as_ref());
             let compile_ms = compile_start.elapsed().as_millis() as u64;
 
             if let Ok((ir, _source_hash)) = ir_result {
@@ -863,7 +912,7 @@ pub(crate) fn handle_provide_code_context(
                 // Note: IR error is logged below in the else branch (4.4 audit fix)
                 state.ir_context_lock().load_ir(ir.clone(), None);
                 let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
-                let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
+                let llm_text = crate::ir::render_hierarchical_for_llm_focused(&hir, effective_fidelity, focus_methods.as_ref());
                 let full = format!("{}\n// ── {} ({}) ──\n{}", llm_text.trim(), ir.file_id, resolved_path, state.format_dict_footer().trim());
                 state.llm_text_cache_lock().insert(ir.file_id.clone(), full.clone());
                 let render_ms = render_start.elapsed().as_millis() as u64;

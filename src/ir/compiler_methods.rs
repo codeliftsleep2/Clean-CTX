@@ -8,6 +8,7 @@
 //   - resolve_forward_aliases() post-processor
 //   - IRCompiler::emit_method_ir() and emit_import_ir() methods
 
+use crate::compaction::modifiers::{strip_csharp_attributes, strip_modifiers, MODIFIERS_LOW};
 use super::opcodes::*;
 
 /// Parsed method signature — the result of parsing the string returned
@@ -34,11 +35,21 @@ pub struct MethodSig {
 ///
 /// Input: "processComplexData(payload:$s[],payload2:$n):$b"
 /// Output: MethodSig { name: "processComplexData", params_str: "payload:$s[],payload2:$n", return_type: "$b" }
+///
+/// C# return-type-first syntax ("ActionResult<UserDto> GetAll(int id)")
+/// is handled by taking the LAST whitespace-delimited token before `(` as
+/// the method name — in TS/Java name-first syntax that token is the name
+/// already, so the same rule works for both.
 pub(super) fn parse_method_sig(sig: &str) -> MethodSig {
     let sig = sig.trim();
 
-    // Find the return type separator "):"
-    // We need to handle nested parens in param types like "items:string[]"
+    // Find the parameter list bounds. Track paren depth so generic
+    // return types like "ActionResult<IEnumerable<UserDto>>" (which
+    // close with `>>` before the method name) do not confuse the scan —
+    // the first `(` at depth 0 that is followed by a balanced closing
+    // `)` IS the method's parameter list. Parens inside the return type
+    // generics or attributes appear at depth 0 only if unbalanced, which
+    // they are not (they're argument lists, not the method's own parens).
     let mut paren_depth = 0i32;
     let mut params_start = None;
     let mut params_end = None;
@@ -61,7 +72,14 @@ pub(super) fn parse_method_sig(sig: &str) -> MethodSig {
     }
 
     let (name, params_str, return_type) = if let (Some(ps), Some(pe)) = (params_start, params_end) {
-        let name = sig[..ps].trim().to_string();
+        // The part before `(` may be:
+        //   - "processComplexData"                       (TS/Java, name first)
+        //   - "ActionResult<UserDto> GetAll"             (C#, return type first)
+        //   - "public async ActionResult<UserDto> GetAll" (C# with modifiers)
+        // Taking the last whitespace-delimited token handles all three.
+        let raw_name = sig[..ps].trim();
+        let last_token = raw_name.split_whitespace().last().unwrap_or(raw_name);
+        let name = last_token.trim().to_string();
         let params = sig[ps + 1..pe].trim().to_string();
         let rt = sig[pe + 1..].trim();
         let rt = if let Some(stripped) = rt.strip_prefix(':') {
@@ -158,7 +176,13 @@ pub(super) fn find_body_start(raw_method: &str) -> Option<usize> {
 /// This is the text that `replace_in_file` SEARCH blocks can safely
 /// match against.
 pub(super) fn extract_method_body(raw_method: &str) -> Option<String> {
-    if let Some(i) = find_body_start(raw_method) {
+    // C# captures may start with attribute lines (`[HttpGet]`,
+    // `[Route("api/[controller]")]`). The attribute's `{` (inside the
+    // string literal) would otherwise be mistaken for the body opening
+    // brace. Strip attributes so `find_body_start` / the line-start
+    // detection operate on the actual declaration.
+    let stripped = strip_csharp_attributes(raw_method);
+    if let Some(i) = find_body_start(stripped) {
         // If the `{` is the first non-whitespace character on its line
         // (multiline signature like `foo()\n    {`), start at the LINE
         // START so the opening brace keeps its original leading
@@ -167,12 +191,12 @@ pub(super) fn extract_method_body(raw_method: &str) -> Option<String> {
         // the same line as the signature (`foo() {`), start at the
         // brace itself — the signature is emitted separately by the
         // renderer, so including it here would duplicate it.
-        let line_start = raw_method[..i].rfind('\n').map(|p| p + 1).unwrap_or(0);
-        let prefix = &raw_method[line_start..i];
+        let line_start = stripped[..i].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let prefix = &stripped[line_start..i];
         if prefix.trim().is_empty() {
-            return Some(raw_method[line_start..].to_string());
+            return Some(stripped[line_start..].to_string());
         }
-        return Some(raw_method[i..].to_string());
+        return Some(stripped[i..].to_string());
     }
 
     // No block body — check for an expression-bodied arrow function.
@@ -238,13 +262,17 @@ impl super::compiler::IRCompiler {
     /// Accepts signatures in the format produced by `extract_method_sig`:
     ///   - `methodName(param1:$t,param2:$t):$t`
     ///   - `methodName():$t`
+    ///
+    /// Returns the parsed method name so the caller can apply symbol-targeting
+    /// (`focus`) gates at compile time (e.g. skipping body extraction for
+    /// non-focused methods) using the exact same name the renderer matches on.
     pub(super) fn emit_method_ir(
         &mut self,
         instructions: &mut Vec<CoreOp>,
         class_id: &str,
         method_id: &str,
         raw_sig: &str,
-    ) {
+    ) -> String {
         // Parse the method signature: "name(params):return_type"
         //
         // At Edit/Verbatim fidelity, `extract_method_sig` (in
@@ -257,8 +285,15 @@ impl super::compiler::IRCompiler {
         // followed by the verbatim body). Strip the body here so the
         // signature is parsed from the signature-only portion; the
         // verbatim body flows through `CoreOp::Body` separately.
-        let sig_text = match find_body_start(raw_sig) {
-            Some(i) => raw_sig[..i].trim_end().to_string(),
+        //
+        // C# captures also start with attribute lines (`[HttpGet]`,
+        // `[HttpGet("{id}")]`, `[Route("api/[controller]")]`). Strip
+        // them so `find_body_start` / `parse_method_sig` operate on the
+        // actual declaration — without this the attribute's `(`/`{`
+        // mangles the parsed name and body extraction.
+        let stripped = strip_csharp_attributes(raw_sig);
+        let sig_text = match find_body_start(stripped) {
+            Some(i) => stripped[..i].trim_end().to_string(),
             None => {
                 // Expression-bodied arrow: `const foo = () => bar()`.
                 // No block brace exists, so strip everything from the
@@ -266,15 +301,22 @@ impl super::compiler::IRCompiler {
                 // via `extract_method_body` (which returns the text after
                 // `=>`). Without this strip the arrow expression would be
                 // swallowed into `return_type` and double-rendered.
-                if let Some(arrow_idx) = raw_sig.rfind("=>") {
-                    raw_sig[..arrow_idx].trim_end().to_string()
+                if let Some(arrow_idx) = stripped.rfind("=>") {
+                    stripped[..arrow_idx].trim_end().to_string()
                 } else {
-                    raw_sig.to_string()
+                    stripped.to_string()
                 }
             }
         };
         let sig = parse_method_sig(&sig_text);
-        let name = sig.name;
+        // Strip access/async/static modifiers from the parsed name so the
+        // `DefMethod` name matches the clean symbol name (e.g. `processComplexData`,
+        // not `public async processComplexData`). At Edit/Verbatim fidelity
+        // `extract_method_sig` returns the FULL raw method text, so the name
+        // parsed from it carries modifiers. The render-time `focus` gate and
+        // the compile-time `focus` gate both match against the clean name, so
+        // the name must be normalized here for symbol targeting to work.
+        let name = strip_modifiers(&sig.name, MODIFIERS_LOW);
         let params_str = sig.params_str;
         let return_type = sig.return_type;
 
@@ -282,7 +324,7 @@ impl super::compiler::IRCompiler {
         instructions.push(CoreOp::DefMethod(
             class_id.to_string(),
             method_id.to_string(),
-            name,
+            name.clone(),
         ));
 
         // Emit Param instructions for each parameter
@@ -316,6 +358,9 @@ impl super::compiler::IRCompiler {
             method_id.to_string(),
             return_type,
         ));
+
+        // Return the parsed method name for symbol-targeting gates.
+        name
     }
 
     /// Emit import IR from a raw import line.

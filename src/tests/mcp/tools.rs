@@ -90,6 +90,31 @@ fn schema_includes_workspace_root_on_path_resolving_tools() {
     }
 }
 
+/// Symbol targeting: `provide_code_context` schema advertises the optional
+/// `focusMethods` array parameter for targeted Edit-fidelity rendering.
+#[test]
+fn schema_provide_code_context_includes_focus_methods() {
+    let tools = tool_list();
+    let provide = tools
+        .iter()
+        .find(|t| t["name"] == "provide_code_context")
+        .unwrap_or_else(|| panic!("missing provide_code_context in tool_list"));
+
+    let focus_methods = &provide["inputSchema"]["properties"]["focusMethods"];
+    assert!(
+        focus_methods.is_object(),
+        "provide_code_context schema is missing focusMethods"
+    );
+    assert_eq!(
+        focus_methods["type"], "array",
+        "focusMethods should be an array"
+    );
+    assert_eq!(
+        focus_methods["items"]["type"], "string",
+        "focusMethods items should be strings"
+    );
+}
+
 /// Gap 4 fix: fidelity enums include edit/verbatim where applicable.
 #[test]
 fn schema_fidelity_enums_include_edit_and_verbatim() {

@@ -3,7 +3,9 @@
 // Class-level extraction and formatting helpers.
 // Extended to support Rust structs, enums, and traits.
 
-use crate::compaction::modifiers::{strip_modifiers, MODIFIERS_CLASS, MODIFIERS_STRUCT_RS};
+use crate::compaction::modifiers::{
+    strip_csharp_attributes, strip_modifiers, MODIFIERS_CLASS, MODIFIERS_STRUCT_RS,
+};
 use crate::compression::Fidelity;
 
 /// Extract just the class name (and optional base/interface list) from the
@@ -19,8 +21,12 @@ use crate::compression::Fidelity;
 /// Output examples (Medium): "FooService:BaseService"
 /// Output examples (High):   "FooService:BaseService,IFoo"
 pub fn extract_class_name(text: &str) -> String {
+    // C# captures may start with attribute lines
+    // (`[ApiController]`, `[Route("api/[controller]")]`); strip them so
+    // the declaration line is the actual `class` keyword line.
+    let stripped = strip_csharp_attributes(text);
     // Take only the declaration line (everything before the first `{`)
-    let decl = text.lines().next().unwrap_or(text);
+    let decl = stripped.lines().next().unwrap_or(stripped);
     let decl = decl.split('{').next().unwrap_or(decl).trim();
 
     // Strip leading modifiers: export, default, abstract, public, sealed, …
