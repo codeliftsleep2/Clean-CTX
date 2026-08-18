@@ -177,7 +177,7 @@ fn diff_class(baseline: &CapturedClass, current: &CapturedClass) -> Vec<DiffActi
                 for i in 0..n {
                     match (base_group.get(i), cur_group.get(i)) {
                         (Some(b), Some(c)) => {
-                            if b.sig == c.sig && b.markers == c.markers {
+                            if b.sig == c.sig && b.markers == c.markers && b.body == c.body {
                                 actions.push(DiffAction {
                                     kind: DiffKind::Unchanged,
                                     target: DiffTarget::Method,
