@@ -10,6 +10,26 @@ fn make_class(name: &str, methods: &[&str], fields: &[&str]) -> CapturedClass {
             .map(|s| CapturedMethod {
                 sig: s.to_string(),
                 markers: vec![],
+                body: None,
+            })
+            .collect(),
+    }
+}
+
+/// Build a class with methods that carry explicit body fingerprints.
+fn make_class_with_bodies(
+    name: &str,
+    methods: &[(&str, Option<&str>)],
+) -> CapturedClass {
+    CapturedClass {
+        name: name.to_string(),
+        fields: vec![],
+        methods: methods
+            .iter()
+            .map(|(sig, body)| CapturedMethod {
+                sig: sig.to_string(),
+                markers: vec![],
+                body: body.map(|b| b.to_string()),
             })
             .collect(),
     }
@@ -79,6 +99,86 @@ fn detects_modified_method() {
     let m = modified.unwrap();
     assert!(m.detail.contains("number"));
     assert!(m.previous_detail.contains("string"));
+}
+
+/// Regression: body-only changes (logic fixes with unchanged signatures)
+/// must be reported as Modified, not Unchanged.
+#[test]
+fn body_only_change_is_detected() {
+    let baseline = CapturedStructure {
+        imports: vec![],
+        classes: vec![make_class_with_bodies(
+            "Foo",
+            &[("process(id):void", Some("return id + 1;"))],
+        )],
+        orphan_fields: vec![],
+    };
+    let current = CapturedStructure {
+        imports: vec![],
+        classes: vec![make_class_with_bodies(
+            "Foo",
+            // Same signature — logic fix only.
+            &[("process(id):void", Some("return id + 2;"))],
+        )],
+        orphan_fields: vec![],
+    };
+    let actions = diff_snapshots(&baseline, &current);
+    let modified = actions
+        .iter()
+        .find(|a| a.kind == DiffKind::Modified && a.target == DiffTarget::Method);
+    assert!(
+        modified.is_some(),
+        "body-only change must produce a Modified action, got {:?}",
+        actions
+    );
+    // The class itself must be Modified too — not `= class Foo (unchanged)`.
+    let class_modified = actions
+        .iter()
+        .any(|a| a.kind == DiffKind::Modified && a.target == DiffTarget::Class);
+    assert!(
+        class_modified,
+        "class must be marked Modified when a method body changes, got {:?}",
+        actions
+    );
+}
+
+/// Identical signatures AND bodies → Unchanged (no false positive).
+#[test]
+fn identical_method_with_same_body_is_unchanged() {
+    let baseline = CapturedStructure {
+        imports: vec![],
+        classes: vec![make_class_with_bodies(
+            "Foo",
+            &[("process(id):void", Some("return id + 1;"))],
+        )],
+        orphan_fields: vec![],
+    };
+    let current = baseline.clone();
+    let actions = diff_snapshots(&baseline, &current);
+    let unchanged = actions
+        .iter()
+        .any(|a| a.kind == DiffKind::Unchanged && a.target == DiffTarget::Class);
+    assert!(unchanged, "identical snapshots should emit Unchanged");
+}
+
+/// When both bodies are None (abstract methods / test fixtures), equality
+/// still holds — `None == None` so this pair is Unchanged.
+#[test]
+fn abstract_methods_without_bodies_unchanged() {
+    let baseline = CapturedStructure {
+        imports: vec![],
+        classes: vec![make_class_with_bodies(
+            "Foo",
+            &[("abstract doWork(): void;", None)],
+        )],
+        orphan_fields: vec![],
+    };
+    let current = baseline.clone();
+    let actions = diff_snapshots(&baseline, &current);
+    let unchanged = actions
+        .iter()
+        .any(|a| a.kind == DiffKind::Unchanged && a.target == DiffTarget::Class);
+    assert!(unchanged, "abstract methods with None bodies are unchanged");
 }
 
 #[test]
