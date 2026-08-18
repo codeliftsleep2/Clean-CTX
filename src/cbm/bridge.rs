@@ -350,6 +350,15 @@ impl GraphBridge {
     /// respond to the agent with a "retry later" message instead of
     /// blocking the entire dispatcher thread.
     pub fn ensure_indexed(&mut self) -> Result<IndexingStatus, CbmError> {
+        // Guard before touching any state: when CBM is unavailable (disabled,
+        // binary missing, launch failed), return the same error on every call.
+        // Without this guard the first call would spawn a doomed background
+        // indexing thread (returning Ok(StillIndexing)) whose failure then
+        // flips the state to `Failed`, so the second call returns Err — a
+        // non-idempotent, thread-wasting bug (AUDIT-9 regression).
+        if !self.is_available() {
+            return Err(CbmError::LaunchError("CBM not available".into()));
+        }
         let project = self.project_str();
         let mut states = self.indexing_state.lock().unwrap_or_else(|p| p.into_inner());
         let state = states.entry(project.clone()).or_insert(IndexingState::NotStarted);
