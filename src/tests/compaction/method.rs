@@ -39,3 +39,29 @@ fn high_fidelity_still_strips_body() {
     let raw = "public async getUserById(id: string): Promise<User> {\n  return this.users.find(u => u.id === id)!;\n}";
     assert_eq!(extract_method_sig(raw, Fidelity::High), "public async getUserById(id: string): Promise<User>");
 }
+
+// ── C# attribute handling ─────────────────────────────────────────
+
+#[test]
+fn low_fidelity_strips_csharp_attributes() {
+    let raw = "[HttpGet]\npublic IActionResult Get()";
+    assert_eq!(extract_method_sig(raw, Fidelity::Low), "Get()");
+}
+
+#[test]
+fn medium_fidelity_strips_csharp_attributes() {
+    let raw = "[HttpGet(\"{id}\")]\npublic IActionResult GetById(int id)";
+    let out = extract_method_sig(raw, Fidelity::Medium);
+    // C# return-type-first is normalized to name-first; params keep their
+    // C# form ("int id").
+    assert!(out.starts_with("GetById("), "got: {}", out);
+    assert!(out.contains("int id"), "got: {}", out);
+    assert!(!out.contains("IActionResult"), "return type should not appear in name position: {}", out);
+    assert!(!out.contains("HttpGet"), "attribute should be stripped: {}", out);
+}
+
+#[test]
+fn high_fidelity_strips_csharp_attributes() {
+    let raw = "[HttpGet]\npublic IActionResult Get()";
+    assert_eq!(extract_method_sig(raw, Fidelity::High), "public IActionResult Get()");
+}

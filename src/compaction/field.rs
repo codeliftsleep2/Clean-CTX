@@ -2,7 +2,7 @@
 //
 // Field/property compaction across fidelity levels.
 
-use crate::compaction::modifiers::{strip_modifiers, MODIFIERS_FIELD};
+use crate::compaction::modifiers::{strip_csharp_attributes, strip_modifiers, MODIFIERS_FIELD};
 use crate::compression::Fidelity;
 
 /// Extract a compact field/property signature.
@@ -26,7 +26,11 @@ pub fn extract_field(text: &str, fidelity: Fidelity) -> String {
 
 /// Medium-fidelity field: "name:type"
 fn compact_field_medium(text: &str) -> String {
-    let line = text.lines().next().unwrap_or(text).trim();
+    // C# field captures may start with attribute lines (`[Key]`,
+    // `[JsonPropertyName("id")]`); strip them so the declaration line
+    // is the actual field, not the attribute.
+    let stripped = strip_csharp_attributes(text);
+    let line = stripped.lines().next().unwrap_or(stripped).trim();
     // F-16: use the shared `strip_modifiers` helper.
     let s = strip_modifiers(line, MODIFIERS_FIELD);
     // Drop initialiser (everything from `=` onwards) and trailing `;`
@@ -40,7 +44,9 @@ fn compact_field_medium(text: &str) -> String {
 
 /// High-fidelity field: preserve modifiers, strip only the initialiser.
 fn compact_field_high(text: &str) -> String {
-    let line = text.lines().next().unwrap_or(text).trim();
+    // Strip leading C# attribute lines before taking the declaration line.
+    let stripped = strip_csharp_attributes(text);
+    let line = stripped.lines().next().unwrap_or(stripped).trim();
     // Drop initialiser and trailing semicolon
     let s = line.split('=').next().unwrap_or(line).trim();
     s.trim_end_matches(';').trim().to_string()

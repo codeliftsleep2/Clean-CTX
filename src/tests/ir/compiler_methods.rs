@@ -130,6 +130,30 @@ fn parse_sig_no_parens_treats_whole_as_name() {
     assert_eq!(sig.return_type, "$v");
 }
 
+// ── C# return-type-first syntax ───────────────────────────────────
+
+#[test]
+fn parse_sig_csharp_return_type_first() {
+    let sig = parse_method_sig("ActionResult<UserDto> GetAll(int id)");
+    assert_eq!(sig.name, "GetAll");
+    assert_eq!(sig.params_str, "int id");
+    assert_eq!(sig.return_type, "$v");
+}
+
+#[test]
+fn parse_sig_csharp_generic_return_type_first() {
+    let sig = parse_method_sig("ActionResult<IEnumerable<UserDto>> GetAll()");
+    assert_eq!(sig.name, "GetAll");
+    assert_eq!(sig.params_str, "");
+}
+
+#[test]
+fn parse_sig_csharp_with_modifiers() {
+    let sig = parse_method_sig("public async Task<IActionResult> Create([FromBody] CreateUserRequest request)");
+    assert_eq!(sig.name, "Create");
+    assert!(sig.params_str.contains("request"));
+}
+
 // ── Edit Mode regression tests (F-32) ──────────────────────────────
 
 /// Edit Mode: a multiline signature with the `{` on its own line must
@@ -214,4 +238,41 @@ fn emit_method_ir_strips_arrow_expression_from_sig() {
     assert_eq!(mid, "M2");
     assert!(!ty.contains("=>"), "arrow expression leaked into return type: {}", ty);
     assert!(!ty.contains("labels"), "arrow expression leaked into return type: {}", ty);
+}
+
+/// C# attribute handling: `extract_method_body` must strip leading
+/// attribute lines from the raw Edit-fidelity text so the body starts
+/// at the actual declaration brace (not the attribute's `{`), and
+/// `emit_method_ir` must produce a clean DefMethod name.
+#[test]
+fn extract_method_body_and_emit_ir_strip_csharp_attributes() {
+    use crate::ir::compiler::IRCompiler;
+    use crate::ir::opcodes::CoreOp;
+
+    // Full raw C# method text as produced by extract_method_sig at Edit.
+    let raw = "[HttpGet(\"{id}\")]\npublic ActionResult<UserDto> GetById(int id)\n{\n    return Ok(_userService.GetUserById(id));\n}";
+
+    // Body extraction must ignore the attribute's `{` inside the string
+    // literal and start at the real declaration brace.
+    let body = extract_method_body(raw).expect("should extract body");
+    assert!(body.contains("GetUserById"), "body should contain the real method body: {}", body);
+    assert!(!body.contains("HttpGet"), "body should not contain the attribute: {}", body);
+
+    // emit_method_ir must produce a clean name (not `[HttpGet`).
+    let mut compiler = IRCompiler::new();
+    let mut instructions = Vec::new();
+    let name = compiler.emit_method_ir(&mut instructions, "C1", "M3", raw);
+    assert_eq!(name, "GetById");
+
+    let def = instructions.iter().find_map(|op| {
+        if let CoreOp::DefMethod(cid, mid, n) = op {
+            Some((cid.clone(), mid.clone(), n.clone()))
+        } else {
+            None
+        }
+    });
+    let (cid, mid, n) = def.expect("should emit DefMethod");
+    assert_eq!(cid, "C1");
+    assert_eq!(mid, "M3");
+    assert_eq!(n, "GetById");
 }

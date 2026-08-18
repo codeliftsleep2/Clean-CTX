@@ -210,6 +210,25 @@ pub(super) fn compile_file_ir(
     fidelity: Fidelity,
     state: &McpState,
 ) -> Result<(crate::ir::compiler::CompiledIR, String), crate::error::CleanCtxError> {
+    compile_file_ir_focused(file_path, fidelity, state, None)
+}
+
+/// Compile a file to IR with symbol targeting (`focus`).
+///
+/// `focus`: optional set of method names that should receive full verbatim
+/// bodies at `Edit` fidelity. When `Some(set)`, only those methods get their
+/// body extracted into the IR (`CoreOp::Body`); all other methods are emitted
+/// signature-only. This is the compile-time counterpart to the render-time
+/// `focus` gate in `render_llm.rs` — it avoids extracting/storing body text
+/// for methods that will be filtered out at render time (memory/CPU
+/// optimization). When `None`, every method's body is extracted (legacy
+/// behavior, byte-identical to `compile_file_ir`).
+pub(super) fn compile_file_ir_focused(
+    file_path: &str,
+    fidelity: Fidelity,
+    state: &McpState,
+    focus: Option<&std::collections::HashSet<String>>,
+) -> Result<(crate::ir::compiler::CompiledIR, String), crate::error::CleanCtxError> {
     use crate::ir::compiler::IRCompiler;
     use crate::ir::layers::typescript::TypeScriptLayer;
     use crate::ir::layers::csharp::CSharpLayer;
@@ -289,13 +308,14 @@ pub(super) fn compile_file_ir(
     // CBM filter-first: pass the skip set so low-importance symbols
     // are excluded from IR output entirely.
     let skip_set = state.get_skip_set(file_path);
-    let mut compiled = compiler.compile(
+    let mut compiled = compiler.compile_focused(
         source,
         &path_alias,
         language,
         query_string,
         fidelity,
         skip_set.as_ref(),
+        focus,
     )?;
 
     // R-02 Phase 3: Apply type aliases to the IR instruction stream.

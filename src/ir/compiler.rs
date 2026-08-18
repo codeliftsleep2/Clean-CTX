@@ -127,6 +127,53 @@ impl IRCompiler {
         fidelity: Fidelity,
         skip_set: Option<&std::collections::HashSet<String>>,
     ) -> Result<CompiledIR, CompileError> {
+        self.compile_inner(source, file_id, language, query_string, fidelity, skip_set, None)
+    }
+
+    /// Compile with symbol targeting (`focus`).
+    ///
+    /// `focus`: optional set of method names that should receive full
+    /// verbatim bodies at `Edit` fidelity. When `Some(set)`, only methods
+    /// whose parsed name is in the set get their body extracted into the IR
+    /// (`CoreOp::Body`); all other methods are emitted signature-only. This
+    /// mirrors the render-time gate in `render_llm.rs` and avoids extracting
+    /// and storing body text for methods that will be filtered out at render
+    /// time — a memory/CPU optimization. When `None`, every method's body is
+    /// extracted (legacy behavior, byte-identical to `compile`).
+    ///
+    /// `#[allow(clippy::too_many_arguments)]`: mirrors the existing `compile`
+    /// signature (7 args) plus the `focus` set (8 total). Grouping the
+    /// compile inputs into a struct would churn every call site; the allow is
+    /// scoped to this one symbol-targeting entry point.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compile_focused(
+        &mut self,
+        source: &str,
+        file_id: &str,
+        language: tree_sitter::Language,
+        query_string: &str,
+        fidelity: Fidelity,
+        skip_set: Option<&std::collections::HashSet<String>>,
+        focus: Option<&std::collections::HashSet<String>>,
+    ) -> Result<CompiledIR, CompileError> {
+        self.compile_inner(source, file_id, language, query_string, fidelity, skip_set, focus)
+    }
+
+    /// Shared implementation for `compile` and `compile_focused`.
+    ///
+    /// `#[allow(clippy::too_many_arguments)]`: same rationale as
+    /// `compile_focused` — the 7-arg `compile` signature plus `focus`.
+    #[allow(clippy::too_many_arguments)]
+    fn compile_inner(
+        &mut self,
+        source: &str,
+        file_id: &str,
+        language: tree_sitter::Language,
+        query_string: &str,
+        fidelity: Fidelity,
+        skip_set: Option<&std::collections::HashSet<String>>,
+        focus: Option<&std::collections::HashSet<String>>,
+    ) -> Result<CompiledIR, CompileError> {
         // Reset per-compilation state
         self.current_method = None;
         self.current_method_flags = Vec::new();
@@ -286,7 +333,7 @@ impl IRCompiler {
                     layer_context.current_method = Some(method_id.clone());
                     layer_context.current_method_name = Some(cap.text.clone());
 
-                    self.emit_method_ir(
+                    let method_name = self.emit_method_ir(
                         &mut instructions,
                         &class_id,
                         &method_id,
@@ -297,7 +344,13 @@ impl IRCompiler {
                     // The raw_text for method.root captures the full method
                     // including the body. We extract everything from the first
                     // '{' to the end (inclusive) as the byte-exact body.
-                    if fidelity == Fidelity::Edit {
+                    // When `focus` is Some(set), only named methods get bodies
+                    // extracted (mirrors the render-time gate in render_llm.rs);
+                    // this avoids extracting/storing body text for methods that
+                    // will be filtered out at render time.
+                    if fidelity == Fidelity::Edit
+                        && focus.is_none_or(|f| f.contains(&method_name))
+                    {
                         if let Some(body) = extract_method_body(&cap.raw_text) {
                             instructions.push(CoreOp::Body(method_id.clone(), body));
                         }

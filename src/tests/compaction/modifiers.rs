@@ -34,3 +34,57 @@ fn strip_modifiers_handles_low_fidelity_method() {
     let out = strip_modifiers("public async getUserById(id: string)", MODIFIERS_LOW);
     assert_eq!(out, "getUserById(id: string)");
 }
+
+// ── strip_csharp_attributes ───────────────────────────────────────
+
+#[test]
+fn strip_csharp_attributes_basic() {
+    assert_eq!(
+        strip_csharp_attributes("[HttpGet]\npublic IActionResult Get()"),
+        "public IActionResult Get()"
+    );
+}
+
+#[test]
+fn strip_csharp_attributes_with_parens() {
+    assert_eq!(
+        strip_csharp_attributes("[HttpGet(\"{id}\")]\npublic IActionResult GetById(int id)"),
+        "public IActionResult GetById(int id)"
+    );
+}
+
+#[test]
+fn strip_csharp_attributes_with_route_brace() {
+    // The `{controller}` inside the attribute would otherwise confuse
+    // find_body_start — this asserts it is fully stripped.
+    assert_eq!(
+        strip_csharp_attributes("[Route(\"api/[controller]\")]\npublic class UserController"),
+        "public class UserController"
+    );
+}
+
+#[test]
+fn strip_csharp_attributes_multiple_lines() {
+    assert_eq!(
+        strip_csharp_attributes("[ApiController]\n[Route(\"api/[controller]\")]\npublic class UserController"),
+        "public class UserController"
+    );
+}
+
+#[test]
+fn strip_csharp_attributes_guards_ts_index_signature() {
+    // A TS index signature starts with `[` but is NOT an attribute.
+    // The remainder after `]` is `:` — not an identifier start.
+    assert_eq!(
+        strip_csharp_attributes("[key: string]: number"),
+        "[key: string]: number"
+    );
+}
+
+#[test]
+fn strip_csharp_attributes_no_leading_bracket() {
+    assert_eq!(
+        strip_csharp_attributes("public class Foo"),
+        "public class Foo"
+    );
+}

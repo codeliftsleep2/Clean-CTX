@@ -19,7 +19,7 @@
 //   @=meta  X=extends  I=implements  F=field  M=method
 //   $=import  →=scope  fl:=flags  cl:=class-flags  P=pattern  T=type-alias
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::compression::Fidelity;
 use super::hierarchical::{HierarchicalIR, ClassNode, PatternEntry};
 
@@ -45,6 +45,25 @@ use super::hierarchical::{HierarchicalIR, ClassNode, PatternEntry};
 /// When a class has multiple methods with the same name, `+N` is appended
 /// where N is the parameter count (e.g., `M find(+1)`, `M find(+3)`).
 pub fn render_hierarchical_for_llm(hir: &HierarchicalIR, fidelity: Fidelity) -> String {
+    render_hierarchical_for_llm_focused(hir, fidelity, None)
+}
+
+/// Render a `HierarchicalIR` into compact LLM-optimized text, optionally
+/// restricting which methods get full verbatim bodies at `Fidelity::Edit`.
+///
+/// When `focus` is `Some(set)`, only methods whose names appear in the set
+/// receive their full byte-exact body at Edit fidelity; all other methods
+/// are rendered signature-only (the same path used for non-Edit fidelities).
+/// When `focus` is `None`, every method's body is rendered — identical to
+/// [`render_hierarchical_for_llm`].
+///
+/// This is strictly additive: callers that don't need symbol targeting can
+/// keep using [`render_hierarchical_for_llm`] unchanged.
+pub fn render_hierarchical_for_llm_focused(
+    hir: &HierarchicalIR,
+    fidelity: Fidelity,
+    focus: Option<&HashSet<String>>,
+) -> String {
     let mut output = String::new();
 
     // ── SCHEMA v2 header ──
@@ -52,7 +71,7 @@ pub fn render_hierarchical_for_llm(hir: &HierarchicalIR, fidelity: Fidelity) -> 
 
     // ── Classes ──
     for class in &hir.classes {
-        render_class(&mut output, class, fidelity);
+        render_class(&mut output, class, fidelity, focus);
     }
 
     // ── Imports ──
@@ -83,7 +102,12 @@ pub fn render_hierarchical_for_llm(hir: &HierarchicalIR, fidelity: Fidelity) -> 
 }
 
 /// Render a single class node.
-fn render_class(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
+fn render_class(
+    output: &mut String,
+    class: &ClassNode,
+    fidelity: Fidelity,
+    focus: Option<&HashSet<String>>,
+) {
     // Class boundary
     output.push_str(&format!("// ── {} ──\n", class.name));
 
@@ -113,7 +137,7 @@ fn render_class(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
     render_fields(output, class, fidelity);
 
     // Methods — with overload disambiguation
-    render_methods(output, class, fidelity);
+    render_methods(output, class, fidelity, focus);
 }
 
 /// Render fields for a class.
@@ -154,7 +178,16 @@ fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
 ///
 /// First pass: count occurrences of each method name.
 /// Second pass: emit with `+N` for duplicates.
-fn render_methods(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
+///
+/// At `Fidelity::Edit`, a method's full verbatim body is appended only when
+/// `focus` is `None` (every method) or the method's name is in the focus set.
+/// Non-focused methods fall through to the signature-only rendering path.
+fn render_methods(
+    output: &mut String,
+    class: &ClassNode,
+    fidelity: Fidelity,
+    focus: Option<&HashSet<String>>,
+) {
     if class.methods.is_empty() {
         return;
     }
@@ -269,8 +302,12 @@ fn render_methods(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
             }
         }
 
-        // Verbatim method body at Edit fidelity (byte-exact for replace_in_file)
-        if fidelity == Fidelity::Edit {
+        // Verbatim method body at Edit fidelity (byte-exact for replace_in_file).
+        // When `focus` is `Some(set)`, only methods whose names are in the
+        // set get their full body; all others are signature-only.
+        if fidelity == Fidelity::Edit
+            && focus.is_none_or(|f| f.contains(&method.name))
+        {
             if let Some(body) = &method.body {
                 output.push('\n');
                 output.push_str(body);
