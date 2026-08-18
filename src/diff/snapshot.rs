@@ -26,4 +26,14 @@ pub struct CapturedMethod {
     pub sig: String,
     /// Behavior markers attached to the method (⊕guard, ⊕loop, etc.).
     pub markers: Vec<String>,
+    /// Normalized method body text (whitespace-collapsed). `None` when the
+    /// body could not be extracted (e.g. abstract/interface methods, or
+    /// test fixtures that don't set it).
+    ///
+    /// This field exists so the diff comparator can detect **body-only**
+    /// changes (logic fixes) that leave the signature and markers
+    /// untouched. Previously `diff_snapshots` compared only `sig` and
+    /// `markers`, so a method whose body changed was reported as
+    /// `Unchanged` — a false negative for `diff_commits`.
+    pub body: Option<String>,
 }

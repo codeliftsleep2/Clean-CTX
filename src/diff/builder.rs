@@ -155,6 +155,7 @@ fn try_build_with(
                     last.methods.push(CapturedMethod {
                         sig: cap.text.clone(),
                         markers: std::mem::take(&mut pending_markers),
+                        body: extract_method_body(&cap.raw_text),
                     });
                 }
             }
@@ -189,6 +190,57 @@ fn try_build_with(
         classes,
         orphan_fields,
     })
+}
+
+/// Extract a normalized body fingerprint from a method's raw source text.
+///
+/// Tree-sitter's `method.root` capture includes the full method declaration
+/// (signature + body). From that raw text we take everything after the
+/// closing `)` of the parameter list, collapse whitespace, and trim. The
+/// result is compared in `diff_snapshots` so **body-only** changes (logic
+/// fixes with unchanged signatures) are no longer reported as `Unchanged`.
+///
+/// Returns `None` when no body follows the signature (e.g. abstract
+/// methods ending in `;`, or malformed input).
+fn extract_method_body(raw: &str) -> Option<String> {
+    // Locate the first `(` (start of the parameter list).
+    let open = raw.find('(')?;
+    // Scan forward tracking bracket depth to find the matching `)`.
+    let mut depth = 0u32;
+    let mut close = None;
+    for (i, ch) in raw[open..].char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(open + i);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let close = close?;
+    let after = &raw[close + 1..];
+    // If nothing follows the signature (or it's just a `;`), there's no
+    // body — abstract/interface methods.
+    let trimmed = after.trim();
+    if trimmed.is_empty() || trimmed == ";" {
+        return None;
+    }
+    // Collapse all whitespace runs to a single space so cosmetic
+    // reformatting doesn't produce a spurious diff, but real
+    // body-content changes still do.
+    let normalized = trimmed
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
+    }
 }
 
 #[cfg(all(test, feature = "rust"))]
