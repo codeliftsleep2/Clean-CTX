@@ -20,6 +20,16 @@ pub const TS_QUERY: &str = r#"
     (method_definition) @method.root
     (function_declaration) @func.root
     (property_signature) @field.root
+    ; --- TypeScript class property captures ---
+    ; Class properties are distinct AST nodes from interface property
+    ; signatures. Without these captures, adding a property to a class
+    ; produced a false negative in diff_commits. F-01 diff audit.
+    ; NOTE: `public_field_definition` is a valid node type in
+    ; tree-sitter-typescript v0.23. `property_definition` and
+    ; `method_signature` were NOT — including them caused the entire
+    ; TS query to fail to compile, which broke the diff path for every
+    ; TypeScript file.
+    (public_field_definition) @field.root
     ; --- TypeScript-specific type declarations ---
     (interface_declaration) @interface.root
     (enum_declaration) @enum.root
@@ -47,6 +57,17 @@ pub const CS_QUERY: &str = r#"
     (record_declaration) @record.root
     (field_declaration) @field.root
     (constructor_declaration) @constructor.root
+    ; --- C# property/event/indexer/operator captures ---
+    ; Properties are a distinct AST node from fields in C#. Without this
+    ; capture, adding a property to a class produced a false negative in
+    ; diff_commits (the class appeared unchanged). F-01 diff audit.
+    (property_declaration) @field.root
+    (event_declaration) @field.root
+    (event_field_declaration) @field.root
+    (indexer_declaration) @field.root
+    (operator_declaration) @field.root
+    (destructor_declaration) @field.root
+    (conversion_operator_declaration) @field.root
     ; --- Control flow captures ---
     (throw_statement) @throw.root
     (for_statement) @for.root
@@ -73,6 +94,10 @@ pub const RS_QUERY: &str = r#"
     (function_item) @method.root
     (type_item) @type.root
     (field_declaration) @field.root
+    ; Enum variants are distinct AST nodes. Without this capture, adding
+    ; or removing a variant produced a false negative in diff_commits.
+    ; F-01 diff audit.
+    (enum_variant) @field.root
     ; Import and module captures
     (use_declaration) @import.root
     (mod_item) @mod.root

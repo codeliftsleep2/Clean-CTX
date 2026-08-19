@@ -327,6 +327,18 @@ fn compress_added_file(content: &str, path: &str, fidelity: Fidelity) -> String 
             }
             for class in &snap.classes {
                 out.push_str(&format!("+ class {}\n", class.name));
+                for field in &class.fields {
+                    out.push_str(&format!("  + field {field}\n"));
+                }
+                for method in &class.methods {
+                    out.push_str(&format!("  + method {}\n", method.sig));
+                }
+            }
+            for field in &snap.orphan_fields {
+                out.push_str(&format!("+ field {field}\n"));
+            }
+            for method in &snap.orphan_methods {
+                out.push_str(&format!("+ method {}\n", method.sig));
             }
             if out.is_empty() {
                 // No classes/imports — just a line count.
@@ -355,11 +367,30 @@ fn count_change_markers(body: &str) -> (usize, usize, usize) {
     for line in body.lines() {
         let t = line.trim_start();
         if let Some(rest) = t.strip_prefix('+') {
-            if !rest.trim_start().starts_with("import") && !rest.trim_start().is_empty() {
+            let after = rest.trim_start();
+            // G2-7 audit: the old `starts_with("import")` also skipped
+            // identifiers like `importData` or `implementation`. Only skip
+            // actual import lines (`import Foo` / `import<end>`).
+            let is_import_line = after.starts_with("import")
+                && after[6..]
+                    .chars()
+                    .next()
+                    .is_none_or(|c| c.is_whitespace() || c == '\n');
+            if !after.is_empty() && !is_import_line {
                 adds += 1;
             }
         } else if let Some(rest) = t.strip_prefix('-') {
-            if !rest.trim_start().is_empty() {
+            let after = rest.trim_start();
+            // G3-1 audit: mirror the `+` branch — skip `- import` removal
+            // lines so the header counts are symmetric. The old code only
+            // skipped `+ import` (G2-7), so a file that removed an import
+            // reported a spurious `-1` in the header.
+            let is_import_line = after.starts_with("import")
+                && after[6..]
+                    .chars()
+                    .next()
+                    .is_none_or(|c| c.is_whitespace() || c == '\n');
+            if !after.is_empty() && !is_import_line {
                 dels += 1;
             }
         } else if t.starts_with('~') {
@@ -369,12 +400,31 @@ fn count_change_markers(body: &str) -> (usize, usize, usize) {
     (adds, dels, mods)
 }
 
-/// Whether a file path has a compressible extension (ts/js/cs).
+/// Whether a file path has a compressible extension.
+///
+/// F-05 diff audit: previously only `ts`/`js`/`cs` were compressible.
+/// Rust (`.rs`) and Java (`.java`) files fell back to line-count deltas
+/// even though the codebase has full tree-sitter support for both —
+/// a significant gap for a Rust project. TSX/JSX are also added since
+/// the TypeScript grammar handles them.
+///
+/// `rs` and `java` are gated on their Cargo features — when the feature
+/// is disabled, `safe_rust_language()`/`safe_java_language()` return
+/// `None`, so routing the file into `build_snapshot` would panic on the
+/// `Language must be Some` expect. Feature-gating keeps the fallback to
+/// a line-count delta for unsupported languages.
 fn is_compressible(path: &str) -> bool {
     let Some(ext) = path.rsplit('.').next() else {
         return false;
     };
-    matches!(ext, "ts" | "js" | "cs")
+    match ext {
+        "ts" | "js" | "tsx" | "jsx" | "cs" => true,
+        #[cfg(feature = "rust")]
+        "rs" => true,
+        #[cfg(feature = "java")]
+        "java" => true,
+        _ => false,
+    }
 }
 
 /// Whether a file path is an Angular `.component.html` template.

@@ -103,3 +103,37 @@ fn find_method_params_skips_tuple_return() {
 fn find_method_params_unbalanced_returns_none() {
     assert!(find_method_params("foo((bar").is_none());
 }
+
+// ── Multi-line C# signatures (F-03 diff audit) ────────────────────
+
+/// Regression: multi-line C# signatures (parameter list spanning multiple
+/// lines) must produce a correct compact signature. Previously
+/// `extract_method_sig` only took the first line, producing unbalanced-paren
+/// garbage like `ValidateRow(()`. F-03 diff audit.
+#[test]
+fn low_fidelity_multi_line_csharp_signature() {
+    let raw = "private void ValidateRow(\n    DataRow data,\n    string extra)\n{\n    // body\n}";
+    let out = extract_method_sig(raw, Fidelity::Low);
+    assert_eq!(out, "ValidateRow(data,extra)");
+}
+
+#[test]
+fn medium_fidelity_multi_line_csharp_signature() {
+    let raw = "private void ValidateRow(\n    DataRow data,\n    string extra)\n{\n    // body\n}";
+    let out = extract_method_sig(raw, Fidelity::Medium);
+    assert!(out.starts_with("ValidateRow("), "got: {}", out);
+    assert!(out.contains("DataRow data"), "got: {}", out);
+    assert!(out.contains("string extra"), "got: {}", out);
+}
+
+/// Multi-line C# signature with a tuple return type — the method's own
+/// parameter list (LAST depth-0 group) must be found, not the tuple.
+#[test]
+fn medium_fidelity_multi_line_csharp_tuple_return() {
+    let raw = "Task<(Dictionary<string, Guid> Exact, Dictionary<string, Guid> IgnoreCase)> GetOrgUnitDlc(\n    int id,\n    string name)\n{\n    // body\n}";
+    let out = extract_method_sig(raw, Fidelity::Medium);
+    assert!(out.starts_with("GetOrgUnitDlc("), "got: {}", out);
+    assert!(out.contains("int id"), "got: {}", out);
+    assert!(out.contains("string name"), "got: {}", out);
+    assert!(!out.contains("Dictionary"), "tuple contents leaked into params: {}", out);
+}
