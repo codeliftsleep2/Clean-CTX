@@ -8,6 +8,7 @@
 //   - resolve_forward_aliases() post-processor
 //   - IRCompiler::emit_method_ir() and emit_import_ir() methods
 
+use crate::compaction::method::find_method_params;
 use crate::compaction::modifiers::{strip_csharp_attributes, strip_modifiers, MODIFIERS_LOW};
 use super::opcodes::*;
 
@@ -43,35 +44,17 @@ pub struct MethodSig {
 pub(super) fn parse_method_sig(sig: &str) -> MethodSig {
     let sig = sig.trim();
 
-    // Find the parameter list bounds. Track paren depth so generic
-    // return types like "ActionResult<IEnumerable<UserDto>>" (which
-    // close with `>>` before the method name) do not confuse the scan —
-    // the first `(` at depth 0 that is followed by a balanced closing
-    // `)` IS the method's parameter list. Parens inside the return type
-    // generics or attributes appear at depth 0 only if unbalanced, which
-    // they are not (they're argument lists, not the method's own parens).
-    let mut paren_depth = 0i32;
-    let mut params_start = None;
-    let mut params_end = None;
-
-    for (i, ch) in sig.char_indices() {
-        match ch {
-            '(' if params_start.is_none() => {
-                params_start = Some(i);
-                paren_depth = 1;
-            }
-            '(' => paren_depth += 1,
-            ')' => {
-                paren_depth -= 1;
-                if paren_depth == 0 {
-                    params_end = Some(i);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    let (name, params_str, return_type) = if let (Some(ps), Some(pe)) = (params_start, params_end) {
+    // Find the parameter list bounds. The method's parameter list is the
+    // LAST balanced paren group at depth 0 — its closing `)` is followed
+    // by the end of the signature (or a `:` return annotation for TS). A
+    // C# tuple return type like
+    //   `Task<(Dictionary<string, Guid> Exact, Dictionary<string, Guid> IgnoreCase)> GetOrgUnitDlc(int id)`
+    // opens a top-level `(` for the tuple; taking the FIRST such group
+    // would mis-tokenize the tuple as the parameter list and the method
+    // name as `Task<` (silently breaking focusMethods matching). The
+    // shared `find_method_params` helper lands on the method's own
+    // `(int id)`, not the tuple.
+    let (name, params_str, return_type) = if let Some((ps, pe)) = find_method_params(sig) {
         // The part before `(` may be:
         //   - "processComplexData"                       (TS/Java, name first)
         //   - "ActionResult<UserDto> GetAll"             (C#, return type first)
