@@ -4,18 +4,30 @@
 
 /// Per-file structural snapshot. Two snapshots can be diffed to produce
 /// an AST-level change-set.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CapturedStructure {
     pub imports: Vec<String>,
     pub classes: Vec<CapturedClass>,
     /// Fields that appeared outside of any class context.
     pub orphan_fields: Vec<String>,
+    /// Methods/functions declared at top level (outside any class).
+    /// Without this, TypeScript files with only top-level functions
+    /// produced zero methods — any change to them was a false negative.
+    pub orphan_methods: Vec<CapturedMethod>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapturedClass {
     /// Display name (e.g. "FooService" or "FooService:BaseService,IFoo").
     pub name: String,
+    /// Class-level metadata: base class / interface list (e.g.
+    /// `: BaseService, IFoo`). Captured separately from `name` so a
+    /// change to the inheritance list is detected even when the class
+    /// name itself is unchanged. F-04 diff audit: previously the base
+    /// class / interface list was stripped by `extract_class_name` and
+    /// lost before the diff ran, so changing `class Foo : BaseA` to
+    /// `class Foo : BaseB` reported the class as unchanged.
+    pub class_meta: String,
     pub fields: Vec<String>,
     pub methods: Vec<CapturedMethod>,
 }

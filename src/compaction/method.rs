@@ -19,18 +19,24 @@ pub fn extract_method_sig(text: &str, fidelity: Fidelity) -> String {
     // `[HttpGet("{id}")]`); strip them so the signature line is the
     // actual method declaration, not the attribute.
     let stripped = strip_csharp_attributes(text);
-    // Work only with the first line (the signature line)
-    let sig_line = stripped.lines().next().unwrap_or(stripped);
-    let sig_line = sig_line.split('{').next().unwrap_or(sig_line).trim();
+    // Take everything before the first `{` (the body start). This
+    // handles multi-line C# signatures where the parameter list spans
+    // multiple lines — the previous implementation only took the first
+    // line, producing unbalanced-paren garbage for signatures like:
+    //   private void ValidateRow(
+    //       DataRow data,
+    //       string extra)
+    // F-03 diff audit.
+    let sig = stripped.split('{').next().unwrap_or(stripped).trim();
 
     match fidelity {
-        Fidelity::Low => compact_method_low(sig_line),
-        Fidelity::Medium => compact_method_medium(sig_line),
+        Fidelity::Low => compact_method_low(sig),
+        Fidelity::Medium => compact_method_medium(sig),
         // Edit/Verbatim: return the FULL raw method text (signature + body)
         // so the legacy pipeline carries byte-exact bodies for safe
         // `replace_in_file` SEARCH blocks. High keeps the signature only.
         Fidelity::Edit | Fidelity::Verbatim => text.to_string(),
-        Fidelity::High => sig_line.to_string(),
+        Fidelity::High => sig.to_string(),
     }
 }
 
@@ -84,7 +90,12 @@ pub(crate) fn find_method_params(sig: &str) -> Option<(usize, usize)> {
 /// TS/Java modifier that survives `strip_modifiers` is `async` (lowercase,
 /// not a type). We distinguish by: primitive C# keyword, generic `<`, or
 /// capitalized type name (C# convention).
-fn is_csharp_return_type(token: &str) -> bool {
+///
+/// `pub(crate)` so `src/diff/keys.rs` can reuse it for C#-aware method
+/// key extraction (F-02 diff audit: `method_key` was taking the return
+/// type as the key for C# return-type-first signatures, producing
+/// doubled tokens like `+ method bool bool Resolve(...)`).
+pub(crate) fn is_csharp_return_type(token: &str) -> bool {
     let t = token.trim();
     if t.is_empty() {
         return false;

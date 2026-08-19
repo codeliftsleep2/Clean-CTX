@@ -37,8 +37,14 @@ pub fn extract_class_name(text: &str) -> String {
     // then returned, leaving "static abstract class Foo" behind).
     // The shared `strip_modifiers` helper loops until stable.
     let rest = strip_modifiers(decl, MODIFIERS_CLASS);
-    // Strip "class " keyword
-    let rest = rest.strip_prefix("class ").unwrap_or(&rest).trim();
+    // Strip "class " / "interface " / "record " keyword (C# interfaces and
+    // records are distinct AST nodes but share the same class-like shape).
+    let rest = rest
+        .strip_prefix("class ")
+        .or_else(|| rest.strip_prefix("interface "))
+        .or_else(|| rest.strip_prefix("record "))
+        .unwrap_or(rest.as_str())
+        .trim();
 
     // Split on whitespace: first token is "Name<T>" or "Name"
     let name_token = rest.split_whitespace().next().unwrap_or(rest);
@@ -59,6 +65,63 @@ pub fn extract_class_name(text: &str) -> String {
         (true, false) => format!("{}:{}", bare_name, implements.join(",")),
         (false, false) => format!("{}:{},{}", bare_name, extends.join(","), implements.join(",")),
     }
+}
+
+/// Extract just the base class / interface list from a class declaration.
+///
+/// Input:  "public class FooService : BaseService, IFoo { ... }"
+/// Output: ":BaseService,IFoo"
+///
+/// Input:  "class Bar { ... }"
+/// Output: ""
+///
+/// The result is stored in `CapturedClass::class_meta` so a change to
+/// the inheritance list is detected even when the class name is
+/// unchanged. F-04 diff audit.
+pub fn extract_class_meta(text: &str) -> String {
+    let stripped = strip_csharp_attributes(text);
+    let decl = stripped.lines().next().unwrap_or(stripped);
+    let decl = decl.split('{').next().unwrap_or(decl).trim();
+    let rest = strip_modifiers(decl, MODIFIERS_CLASS);
+    let rest = rest
+        .strip_prefix("class ")
+        .or_else(|| rest.strip_prefix("interface "))
+        .or_else(|| rest.strip_prefix("record "))
+        .unwrap_or(rest.as_str())
+        .trim();
+
+    // Find the `:` that separates the class name from the base list.
+    // C# uses `: Base, IFoo`; TS uses `extends Base implements IFoo`.
+    let mut meta = String::new();
+    if let Some((_, after)) = rest.split_once(':') {
+        // C# base list: everything after the first `:` up to the next
+        // keyword or end of string.
+        let after = after
+            .split_once("where")
+            .map(|(l, _)| l)
+            .unwrap_or(after)
+            .trim();
+        if !after.is_empty() {
+            meta.push(':');
+            meta.push_str(after);
+        }
+    }
+    // TS extends/implements
+    let extends = extract_base_types(rest, "extends");
+    let implements = extract_base_types(rest, "implements");
+    if !extends.is_empty() {
+        if !meta.is_empty() {
+            meta.push(',');
+        }
+        meta.push_str(&extends.join(","));
+    }
+    if !implements.is_empty() {
+        if !meta.is_empty() {
+            meta.push(',');
+        }
+        meta.push_str(&implements.join(","));
+    }
+    meta
 }
 
 /// Format a class entry line, embedding any accumulated field signatures.

@@ -5,6 +5,7 @@ use crate::diff::differ::diff_snapshots;
 fn make_class(name: &str, methods: &[&str], fields: &[&str]) -> CapturedClass {
     CapturedClass {
         name: name.to_string(),
+        class_meta: String::new(),
         fields: fields.iter().map(|s| s.to_string()).collect(),
         methods: methods
             .iter()
@@ -24,6 +25,7 @@ fn make_class_with_bodies(
 ) -> CapturedClass {
     CapturedClass {
         name: name.to_string(),
+        class_meta: String::new(),
         fields: vec![],
         methods: methods
             .iter()
@@ -42,6 +44,7 @@ fn format_diff_renders_markers() {
         imports: vec![],
         classes: vec![make_class("Foo", &["foo()"], &[])],
         orphan_fields: vec![],
+orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
@@ -50,6 +53,7 @@ fn format_diff_renders_markers() {
             make_class("Bar", &["bar()"], &[]),
         ],
         orphan_fields: vec![],
+orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let rendered = format_diff(&actions, Fidelity::Low);
@@ -68,6 +72,7 @@ fn format_diff_renders_body_only_change_marker() {
             &[("process(id):void", Some("return id + 1;"))],
         )],
         orphan_fields: vec![],
+orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
@@ -76,6 +81,7 @@ fn format_diff_renders_body_only_change_marker() {
             &[("process(id):void", Some("return id + 2;"))],
         )],
         orphan_fields: vec![],
+orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let rendered = format_diff(&actions, Fidelity::Low);

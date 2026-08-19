@@ -23,7 +23,10 @@ pub(crate) mod java;
 pub(crate) mod method;
 pub(crate) mod modifiers;
 
-pub use class::{extract_class_name, extract_rust_struct_name, format_class_entry, format_rust_type_entry};
+pub use class::{
+    extract_class_meta, extract_class_name, extract_rust_struct_name, format_class_entry,
+    format_rust_type_entry,
+};
 pub use expression::{compact_expression, simple_compact};
 pub use field::extract_field;
 pub use import::{compact_import, extract_import_names};

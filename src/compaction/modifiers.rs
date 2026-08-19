@@ -30,11 +30,13 @@ pub(crate) const MODIFIERS_MEDIUM: &[&str] = &[
 ];
 
 /// Modifiers stripped from fields at Medium fidelity. Includes `readonly`
-/// and `required` which are field-specific.
+/// and `required` which are field-specific, plus Rust's `pub` visibility
+/// modifier (F-01 diff audit: Rust struct fields like `pub name: String`
+/// were previously rendered as `pub name:String` instead of `name:String`).
 pub(crate) const MODIFIERS_FIELD: &[&str] = &[
     "public ", "private ", "protected ", "readonly ",
     "static ", "abstract ", "override ", "virtual ",
-    "sealed ", "new ", "required ",
+    "sealed ", "new ", "required ", "pub ",
 ];
 
 /// Modifiers stripped from class declarations before extracting the

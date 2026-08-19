@@ -9,12 +9,6 @@ use crate::compression::Fidelity;
 
 use super::action::{DiffAction, DiffKind, DiffTarget};
 
-/// True when two methods share the same signature and markers but differ
-/// in body content — i.e. a body-only change (logic fix, no API change).
-fn is_body_only_change(before: &str, after: &str) -> bool {
-    before == after
-}
-
 /// Format a sequence of diff actions into the canonical compact change-set.
 /// The output is grouped by class and only emits `=` for unchanged classes
 /// at the top level (one line per untouched class) so the reader can see
@@ -48,14 +42,25 @@ pub fn format_diff(actions: &[DiffAction], fidelity: Fidelity) -> String {
             let indent = if fidelity == Fidelity::Low { "" } else { "  " };
             match action.kind {
                 DiffKind::Modified => {
-                    // Body-only change? The previous_detail and detail carry
-                    // signatures which are identical in that case. Emit a
-                    // clear "(body changed)" marker so the reader knows the
-                    // method's logic changed even though its signature didn't.
-                    if action.target == DiffTarget::Method
-                        && is_body_only_change(&action.previous_detail, &action.detail)
-                    {
-                        let _ = writeln!(out, "{}{} {} (body changed)", indent, action.kind.symbol(), action.label);
+                    // G2-5 audit: use the differ's reason_hint to label the
+                    // change correctly. A markers-only change (same sig)
+                    // is now "(markers changed)" — previously it was
+                    // mislabeled "(body changed)".
+                    if action.target == DiffTarget::Method && !action.reason_hint.is_empty() {
+                        match action.reason_hint.as_str() {
+                            "body" => {
+                                let _ = writeln!(out, "{}{} {} (body changed)", indent, action.kind.symbol(), action.label);
+                            }
+                            "markers" => {
+                                let _ = writeln!(out, "{}{} {} (markers changed)", indent, action.kind.symbol(), action.label);
+                            }
+                            _ => {
+                                let _ = writeln!(out, "{}{} {} ~ {}", indent, action.kind.symbol(), action.label, action.detail);
+                                if !action.previous_detail.is_empty() {
+                                    let _ = writeln!(out, "{}    was: {}", indent, action.previous_detail);
+                                }
+                            }
+                        }
                     } else {
                         let _ = writeln!(out, "{}{} {} ~ {}", indent, action.kind.symbol(), action.label, action.detail);
                         if !action.previous_detail.is_empty() {
