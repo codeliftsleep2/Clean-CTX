@@ -154,6 +154,35 @@ fn parse_sig_csharp_with_modifiers() {
     assert!(sig.params_str.contains("request"));
 }
 
+/// C# tuple return type: the method's parameter list is the LAST balanced
+/// paren group at depth 0, NOT the first. A tuple return like
+/// `Task<(Dictionary<string, Guid> Exact, Dictionary<string, Guid> IgnoreCase)>`
+/// opens a top-level `(` for the tuple; taking the first such group would
+/// mis-tokenize the tuple as the parameter list and the method name as
+/// `Task<` — silently breaking `focusMethods` matching (the user asked for
+/// `GetOrgUnitDlc` by its real name and got zero bodies back).
+#[test]
+fn parse_sig_csharp_tuple_return_type() {
+    let sig = parse_method_sig(
+        "Task<(Dictionary<string, Guid> Exact, Dictionary<string, Guid> IgnoreCase)> GetOrgUnitDlc(int id)",
+    );
+    assert_eq!(sig.name, "GetOrgUnitDlc");
+    assert_eq!(sig.params_str, "int id");
+    assert_eq!(sig.return_type, "$v");
+}
+
+/// C# tuple return with a TS-style `:` return annotation (defensive —
+/// the tuple's closing `)` is followed by `:`, not end-of-string).
+#[test]
+fn parse_sig_csharp_tuple_return_with_colon_annotation() {
+    let sig = parse_method_sig(
+        "Task<(string A, string B)> GetPair():$v",
+    );
+    assert_eq!(sig.name, "GetPair");
+    assert_eq!(sig.params_str, "");
+    assert_eq!(sig.return_type, "$v");
+}
+
 // ── Edit Mode regression tests (F-32) ──────────────────────────────
 
 /// Edit Mode: a multiline signature with the `{` on its own line must
