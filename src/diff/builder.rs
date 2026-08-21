@@ -102,8 +102,8 @@ pub fn build_snapshot(
     // `switch_statement` not recognised by the Java grammar) must not crash
     // the entire fallback chain.
     //
-    // LinguaForge audit Issue 6 fix: only `Ok` results are stored as
-    // `last_ok_result`; `Err` results are logged and skipped. This ensures
+    // Audit fix: only `Ok` results are stored as `last_ok_result`;
+    // `Err` results are logged and skipped. This ensures
     // that when all parsers fail to produce captures and the final parser
     // also fails with a compilation error, we return a valid empty
     // CapturedStructure instead of propagating the error.
