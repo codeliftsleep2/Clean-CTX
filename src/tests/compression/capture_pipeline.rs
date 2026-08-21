@@ -108,15 +108,14 @@ fn fidelity_medium_is_passed_through_to_closure() {
 #[cfg(all(test, feature = "rust"))]
 type LanguageQueryTestCase = (&'static str, fn() -> Option<tree_sitter::Language>, &'static str);
 
-/// LinguaForge audit Issue 6 regression test: verify that each enabled
-/// language query compiles successfully against its grammar. A query with
-/// an unrecognised node type (e.g., `switch_statement` not recognised by
-/// the Java grammar) will fail at `Query::new` time, which previously
-/// caused a CI-blocking panic in the fallback chain. This test catches
-/// such node-type mismatches before they reach production.
+/// Regression test: verify that each enabled language query compiles
+/// successfully against its grammar. A query with an unrecognised node
+/// type will fail at `Query::new` time, which previously caused a
+/// CI-blocking panic in the fallback chain. This test catches such
+/// node-type mismatches before they reach production.
 ///
-/// Languages whose Cargo feature is disabled are silently skipped, so this
-/// test passes in any configuration.
+/// Languages whose Cargo feature is disabled are silently skipped, so
+/// this test passes in any configuration.
 #[cfg(all(test, feature = "rust"))]
 #[test]
 fn all_language_queries_compile_successfully() {
@@ -137,7 +136,7 @@ fn all_language_queries_compile_successfully() {
         let result = Query::new(&lang, query_str);
         assert!(
             result.is_ok(),
-            "LinguaForge audit regression: {name} query failed to compile: {}",
+            "query compilation regression: {name} query failed to compile: {}",
             result.err().unwrap(),
         );
     }

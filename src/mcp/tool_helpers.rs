@@ -119,10 +119,9 @@ pub(super) fn resolve_file_path_checked(
             }
         }
     }
-    // LinguaForge audit Issues 1/2/7: include the effective workspace roots
-    // in the error message so the caller knows which roots were checked and
-    // can take corrective action (pass `workspaceRoot` or configure
-    // `additional_roots` in `.clean-ctx.json`).
+    // Audit fix: include the effective workspace roots in the error message
+    // so the caller knows which roots were checked and can take corrective
+    // action (pass `workspaceRoot` or configure `additional_roots`).
     let extra_roots_str = if additional_roots.is_empty() {
         String::new()
     } else {

@@ -80,10 +80,10 @@ fn estimate_tokens_whitespace_only() {
     assert!(count <= 5, "whitespace-only should produce few tokens, got {}", count);
 }
 
-// ── LinguaForge audit regression tests ─────────────────────────────
+// ── Path resolution regression tests ──────────────────────────────
 
-/// LinguaForge audit Issue 1/7 regression: `resolve_file_path_checked`
-/// error messages for a non-existent path should still be informative.
+/// `resolve_file_path_checked` error messages for a non-existent path
+/// should still be informative.
 /// The canonicalization step fails first (before the boundary check),
 /// so the error is "path does not exist" — but it includes the resolved
 /// path so the caller can see what was attempted.
@@ -106,9 +106,9 @@ fn resolve_file_path_checked_nonexistent_path_shows_informative_error() {
     );
 }
 
-/// LinguaForge audit Issue 1/7 regression: when a path exists but is
-/// outside the workspace root boundary, the error must include the
-/// effective workspace root so the caller can diagnose configuration.
+/// Regression: when a path exists but is outside the workspace root
+/// boundary, the error must include the effective workspace root so the
+/// caller can diagnose configuration.
 #[test]
 fn resolve_file_path_checked_outside_boundary_shows_workspace_root() {
     // Create a temporary directory that will serve as the "outside" path
@@ -147,9 +147,9 @@ fn resolve_file_path_checked_outside_boundary_shows_workspace_root() {
     let _ = std::fs::remove_dir(&outside_dir);
 }
 
-/// LinguaForge audit Issue 7 regression: `resolve_file_path_checked`
-/// must list configured `additional_roots` in its error message when
-/// all boundary checks fail and additional_roots are configured.
+/// Regression: `resolve_file_path_checked` must list configured
+/// `additional_roots` in its error message when all boundary checks
+/// fail and additional_roots are configured.
 #[test]
 fn resolve_file_path_checked_outside_includes_additional_roots_in_error() {
     let tmp_dir = std::env::temp_dir();
@@ -179,9 +179,9 @@ fn resolve_file_path_checked_outside_includes_additional_roots_in_error() {
     let _ = std::fs::remove_dir(&outside_dir);
 }
 
-/// LinguaForge audit Issue 1/7 regression: when `additional_roots` are
-/// supplied and one of them contains the file path, the path should be
-/// accepted (not rejected as outside the boundary).
+/// Regression: when `additional_roots` are supplied and one of them
+/// contains the file path, the path should be accepted (not rejected as
+/// outside the boundary).
 #[test]
 fn resolve_file_path_checked_with_valid_additional_root() {
 

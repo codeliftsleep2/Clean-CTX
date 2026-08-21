@@ -56,9 +56,9 @@ pub const CS_QUERY: &str = r#"
     (enum_declaration) @enum.root
     (record_declaration) @record.root
     (field_declaration) @field.root
-    ; LinguaForge audit Issue 4 fix: capture enum variant members so the
-    ; diff snapshot can detect additions/removals of enum values. Without
-    ; this capture, enum variant changes are a false negative in diff_commits.
+    ; Audit fix: capture enum variant members so the diff snapshot can
+    ; detect additions/removals of enum values. Without this capture, enum
+    ; variant changes are a false negative in diff_commits.
     (enum_member_declaration) @field.root
     (constructor_declaration) @constructor.root
     ; --- C# property/event/indexer/operator captures ---
@@ -147,7 +147,7 @@ pub const JAVA_QUERY: &str = r#"
     (return_statement) @return.root
     (throw_statement) @throw.root
     (try_statement) @try.root
-    ; LinguaForge audit Issue 6: tree-sitter-java uses `switch_expression`
-    ; (not `switch_statement`) since Java 14 unified switch expression syntax.
+    ; Audit fix: tree-sitter-java uses `switch_expression` (not
+    ; `switch_statement`) since Java 14 unified switch expression syntax.
     (switch_expression) @switch.root
 "#;
