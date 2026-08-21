@@ -19,28 +19,26 @@
 use super::{LanguageLayer, LayerContext};
 use crate::compression::Fidelity;
 use crate::ir::opcodes::{
-    CoreOp, FLAG_ASYNC, FLAG_EXPORT, FLAG_PRIVATE, FLAG_UNSAFE,
-    CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN,
-    EFFECT_ASYNC, EFFECT_IO, EFFECT_MUTATION,
-    CTX_ASYNC,
+    CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTX_ASYNC, CoreOp, EFFECT_ASYNC, EFFECT_IO,
+    EFFECT_MUTATION, FLAG_ASYNC, FLAG_EXPORT, FLAG_PRIVATE, FLAG_UNSAFE,
 };
 
 /// Rust visibility enum
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RustVisibility {
-    Public,   // pub
-    Crate,    // pub(crate)
-    Super,    // pub(super)
-    Private,  // (default)
+    Public,  // pub
+    Crate,   // pub(crate)
+    Super,   // pub(super)
+    Private, // (default)
 }
 
 /// Self kind for methods
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SelfKind {
-    None,    // associated function (no self)
-    Ref,     // &self
-    RefMut,  // &mut self
-    Owned,   // self (by value)
+    None,   // associated function (no self)
+    Ref,    // &self
+    RefMut, // &mut self
+    Owned,  // self (by value)
 }
 
 /// Rust type kind
@@ -125,7 +123,7 @@ impl RustLayer {
 
             // Extract trait (after "impl<T>" or "impl")
             let after_impl = trait_part.strip_prefix("impl").unwrap_or(trait_part).trim();
-            
+
             // Strategy: skip all generic parameters <...> (which may be nested),
             // then take the next identifier as the trait name.
             let mut depth = 0i32;
@@ -143,19 +141,19 @@ impl RustLayer {
                     _ => {}
                 }
             }
-            
+
             // If depth > 0, we never closed all generics - just use the whole thing
             if depth > 0 {
                 past_generics = after_impl;
             }
-            
+
             // Now extract the trait name: it's the identifier (up to < or whitespace or end)
             let trait_name = past_generics
                 .split(|c: char| c == '<' || c.is_whitespace())
                 .next()
                 .unwrap_or(past_generics)
                 .trim();
-            
+
             if !trait_name.is_empty() {
                 traits.push(trait_name.to_string());
             }
@@ -186,15 +184,25 @@ impl RustLayer {
 
         // SideEffect: detect unsafe keyword
         if body.contains("unsafe ") || body.contains("unsafe{") || body.contains("unsafe\n") {
-            ops.push(CoreOp::SideEffect(method_id.to_string(), EFFECT_MUTATION.to_string()));
+            ops.push(CoreOp::SideEffect(
+                method_id.to_string(),
+                EFFECT_MUTATION.to_string(),
+            ));
         }
 
         // SideEffect: detect I/O patterns (stdout, file operations, network)
-        if body.contains("std::io") || body.contains("std::fs") || body.contains("std::net")
-            || body.contains("println!") || body.contains("eprintln!")
-            || body.contains("File::") || body.contains("TcpStream")
+        if body.contains("std::io")
+            || body.contains("std::fs")
+            || body.contains("std::net")
+            || body.contains("println!")
+            || body.contains("eprintln!")
+            || body.contains("File::")
+            || body.contains("TcpStream")
         {
-            ops.push(CoreOp::SideEffect(method_id.to_string(), EFFECT_IO.to_string()));
+            ops.push(CoreOp::SideEffect(
+                method_id.to_string(),
+                EFFECT_IO.to_string(),
+            ));
         }
 
         // ControlFlow: detect match expressions
@@ -207,8 +215,10 @@ impl RustLayer {
         }
 
         // ControlFlow: detect loops
-        let has_loop = body.contains("loop ") || body.contains("loop {")
-            || body.contains("while ") || body.contains("for ");
+        let has_loop = body.contains("loop ")
+            || body.contains("loop {")
+            || body.contains("while ")
+            || body.contains("for ");
         if has_loop {
             ops.push(CoreOp::ControlFlow(
                 method_id.to_string(),
@@ -362,7 +372,9 @@ impl LanguageLayer for RustLayer {
                     }
 
                     // Check for unsafe trait specifically
-                    if raw_text.contains("unsafe trait") && !flags.contains(&FLAG_UNSAFE.to_string()) {
+                    if raw_text.contains("unsafe trait")
+                        && !flags.contains(&FLAG_UNSAFE.to_string())
+                    {
                         flags.push(FLAG_UNSAFE.to_string());
                     }
 
@@ -407,7 +419,8 @@ impl LanguageLayer for RustLayer {
 
                     // Emit class-level flags for unsafe impl
                     let mut flags = Self::extract_method_flags(raw_text);
-                    if raw_text.contains("unsafe impl") && !flags.contains(&FLAG_UNSAFE.to_string()) {
+                    if raw_text.contains("unsafe impl") && !flags.contains(&FLAG_UNSAFE.to_string())
+                    {
                         flags.push(FLAG_UNSAFE.to_string());
                     }
                     if !flags.is_empty() {
@@ -428,8 +441,14 @@ impl LanguageLayer for RustLayer {
                     // The raw_text here is the method signature + body.
                     // We detect async to emit SideEffect + ExecutionContext.
                     if is_async {
-                        ops.push(CoreOp::SideEffect(method_id.clone(), EFFECT_ASYNC.to_string()));
-                        ops.push(CoreOp::ExecutionContext(method_id.clone(), CTX_ASYNC.to_string()));
+                        ops.push(CoreOp::SideEffect(
+                            method_id.clone(),
+                            EFFECT_ASYNC.to_string(),
+                        ));
+                        ops.push(CoreOp::ExecutionContext(
+                            method_id.clone(),
+                            CTX_ASYNC.to_string(),
+                        ));
                     }
 
                     // Extract additional execution semantics from the signature+body text

@@ -58,7 +58,11 @@ fn parse_preserves_offending_value_in_error() {
     // The display impl surfaces the bad value so the operator can fix it.
     let err = Fidelity::parse("hihg").unwrap_err();
     let msg = err.to_string();
-    assert!(msg.contains("hihg"), "error must include the bad value: {}", msg);
+    assert!(
+        msg.contains("hihg"),
+        "error must include the bad value: {}",
+        msg
+    );
     assert!(
         msg.contains("low") && msg.contains("medium") && msg.contains("high"),
         "error must list valid options: {}",

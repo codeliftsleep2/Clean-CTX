@@ -16,17 +16,33 @@
 /// Modifiers stripped at Low fidelity. Includes `async` and `readonly` —
 /// everything not strictly required to identify the symbol.
 pub(crate) const MODIFIERS_LOW: &[&str] = &[
-    "public ", "private ", "protected ", "static ", "async ",
-    "abstract ", "override ", "readonly ", "virtual ",
-    "sealed ", "new ", "extern ",
+    "public ",
+    "private ",
+    "protected ",
+    "static ",
+    "async ",
+    "abstract ",
+    "override ",
+    "readonly ",
+    "virtual ",
+    "sealed ",
+    "new ",
+    "extern ",
 ];
 
 /// Modifiers stripped at Medium fidelity. Keeps `async` and `readonly`
 /// because they carry semantic information (concurrency model).
 pub(crate) const MODIFIERS_MEDIUM: &[&str] = &[
-    "public ", "private ", "protected ", "static ",
-    "abstract ", "override ", "virtual ", "sealed ",
-    "new ", "extern ",
+    "public ",
+    "private ",
+    "protected ",
+    "static ",
+    "abstract ",
+    "override ",
+    "virtual ",
+    "sealed ",
+    "new ",
+    "extern ",
 ];
 
 /// Modifiers stripped from fields at Medium fidelity. Includes `readonly`
@@ -34,9 +50,18 @@ pub(crate) const MODIFIERS_MEDIUM: &[&str] = &[
 /// modifier (F-01 diff audit: Rust struct fields like `pub name: String`
 /// were previously rendered as `pub name:String` instead of `name:String`).
 pub(crate) const MODIFIERS_FIELD: &[&str] = &[
-    "public ", "private ", "protected ", "readonly ",
-    "static ", "abstract ", "override ", "virtual ",
-    "sealed ", "new ", "required ", "pub ",
+    "public ",
+    "private ",
+    "protected ",
+    "readonly ",
+    "static ",
+    "abstract ",
+    "override ",
+    "virtual ",
+    "sealed ",
+    "new ",
+    "required ",
+    "pub ",
 ];
 
 /// Modifiers stripped from class declarations before extracting the
@@ -57,9 +82,7 @@ pub(crate) const MODIFIERS_CLASS: &[&str] = &[
 ];
 
 /// Modifiers stripped from Rust struct/trait/enum declarations.
-pub(crate) const MODIFIERS_STRUCT_RS: &[&str] = &[
-    "pub ", "pub(crate) ", "pub(super) ",
-];
+pub(crate) const MODIFIERS_STRUCT_RS: &[&str] = &["pub ", "pub(crate) ", "pub(super) "];
 
 /// Repeatedly strip any of `modifiers` from the start of `s`, trimming
 /// whitespace between prefixes. Loops until a pass removes nothing,

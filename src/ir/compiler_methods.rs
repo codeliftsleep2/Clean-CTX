@@ -8,9 +8,9 @@
 //   - resolve_forward_aliases() post-processor
 //   - IRCompiler::emit_method_ir() and emit_import_ir() methods
 
-use crate::compaction::method::find_method_params;
-use crate::compaction::modifiers::{strip_csharp_attributes, strip_modifiers, MODIFIERS_LOW};
 use super::opcodes::*;
+use crate::compaction::method::find_method_params;
+use crate::compaction::modifiers::{MODIFIERS_LOW, strip_csharp_attributes, strip_modifiers};
 
 /// Parsed method signature — the result of parsing the string returned
 /// by `compaction::extract_method_sig`.
@@ -81,7 +81,11 @@ pub(super) fn parse_method_sig(sig: &str) -> MethodSig {
     MethodSig {
         name,
         params_str,
-        return_type: if return_type.is_empty() { TYPE_VOID.to_string() } else { return_type },
+        return_type: if return_type.is_empty() {
+            TYPE_VOID.to_string()
+        } else {
+            return_type
+        },
     }
 }
 
@@ -205,7 +209,8 @@ pub(super) fn extract_method_body(raw_method: &str) -> Option<String> {
 /// `Extends`/`Implements` ops that reference a raw class name.
 pub(super) fn resolve_forward_aliases(instructions: &mut [CoreOp]) {
     // First pass: build the class-name → alias-id mapping from DefClass ops.
-    let mut name_to_alias: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut name_to_alias: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
     for op in instructions.iter() {
         if let CoreOp::DefClass(alias_id, name) = op {
             // name is the extracted class name like "FooService" (no modifiers).
@@ -228,12 +233,11 @@ pub(super) fn resolve_forward_aliases(instructions: &mut [CoreOp]) {
                     }
                 }
             }
-            CoreOp::Implements(_, target)
-                if !target.starts_with('C') => {
-                    if let Some(alias) = name_to_alias.get(target.as_str()) {
-                        *target = alias.clone();
-                    }
+            CoreOp::Implements(_, target) if !target.starts_with('C') => {
+                if let Some(alias) = name_to_alias.get(target.as_str()) {
+                    *target = alias.clone();
                 }
+            }
             _ => {}
         }
     }
@@ -337,10 +341,7 @@ impl super::compiler::IRCompiler {
         }
 
         // Emit Return
-        instructions.push(CoreOp::Return(
-            method_id.to_string(),
-            return_type,
-        ));
+        instructions.push(CoreOp::Return(method_id.to_string(), return_type));
 
         // Return the parsed method name for symbol-targeting gates.
         name
@@ -372,7 +373,10 @@ impl super::compiler::IRCompiler {
         // Try to parse standard ES import: "import { X } from 'module'"
         if let Some(from_pos) = trimmed.find(" from ") {
             let named_part = trimmed[..from_pos].trim();
-            let module_part = trimmed[from_pos + 6..].trim().trim_matches('\'').trim_matches('"');
+            let module_part = trimmed[from_pos + 6..]
+                .trim()
+                .trim_matches('\'')
+                .trim_matches('"');
             // Extract named imports: "import { Foo, Bar } from ..."
             let named = if let Some(start) = named_part.find('{') {
                 if let Some(end) = named_part.find('}') {

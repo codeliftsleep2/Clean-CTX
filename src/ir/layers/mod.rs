@@ -17,11 +17,11 @@ use super::opcodes::CoreOp;
 use super::symbol_table::GlobalSymbolTable;
 use crate::compression::Fidelity;
 
-pub mod typescript;
 pub mod csharp;
-pub mod rust;
 pub mod java;
 pub mod patterns;
+pub mod rust;
+pub mod typescript;
 
 /// Context passed to layer processing functions.
 /// Provides current class/method context and symbol table access.

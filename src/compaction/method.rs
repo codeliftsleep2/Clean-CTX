@@ -3,7 +3,7 @@
 // Method/function signature compaction across fidelity levels.
 
 use crate::compaction::modifiers::{
-    strip_csharp_attributes, strip_modifiers, MODIFIERS_LOW, MODIFIERS_MEDIUM,
+    MODIFIERS_LOW, MODIFIERS_MEDIUM, strip_csharp_attributes, strip_modifiers,
 };
 use crate::compression::Fidelity;
 
@@ -101,9 +101,8 @@ pub(crate) fn is_csharp_return_type(token: &str) -> bool {
         return false;
     }
     const PRIMITIVES: &[&str] = &[
-        "void", "int", "string", "bool", "double", "decimal", "long",
-        "short", "byte", "char", "object", "var", "dynamic", "float",
-        "uint", "ulong", "ushort", "sbyte",
+        "void", "int", "string", "bool", "double", "decimal", "long", "short", "byte", "char",
+        "object", "var", "dynamic", "float", "uint", "ulong", "ushort", "sbyte",
     ];
     if PRIMITIVES.contains(&t) {
         return true;
@@ -124,7 +123,11 @@ pub(crate) fn is_csharp_return_type(token: &str) -> bool {
 fn split_params_ret(s: &str) -> (String, String) {
     if let Some((open, close)) = find_method_params(s) {
         let params = s[open + 1..close].trim().to_string();
-        let ret = s[close + 1..].trim().trim_start_matches(':').trim().to_string();
+        let ret = s[close + 1..]
+            .trim()
+            .trim_start_matches(':')
+            .trim()
+            .to_string();
         (params, ret)
     } else {
         (String::new(), String::new())
@@ -156,7 +159,12 @@ fn compact_method_low(sig: &str) -> String {
     };
     let tokens: Vec<&str> = before_paren.split_whitespace().collect();
     let name = if tokens.len() >= 2 && is_csharp_return_type(tokens[tokens.len() - 2]) {
-        tokens.last().unwrap().split('<').next().unwrap_or(tokens.last().unwrap())
+        tokens
+            .last()
+            .unwrap()
+            .split('<')
+            .next()
+            .unwrap_or(tokens.last().unwrap())
     } else {
         s.split(['(', '<']).next().unwrap_or(&s)
     };
@@ -199,10 +207,10 @@ fn compact_method_medium(sig: &str) -> String {
     } else {
         // TS/Java name-first: collapse spaces around punctuation.
         s.replace(": ", ":")
-         .replace(" | ", "|")
-         .replace(", ", ",")
-         .replace(" >", ">")
-         .replace("< ", "<")
+            .replace(" | ", "|")
+            .replace(", ", ",")
+            .replace(" >", ">")
+            .replace("< ", "<")
     }
 }
 
@@ -211,10 +219,14 @@ fn compact_method_medium(sig: &str) -> String {
 fn extract_param_names(sig: &str) -> Vec<String> {
     // Use the method's own `(` (LAST balanced depth-0 group) so a C#
     // tuple return type is not mis-tokenized as the parameter list.
-    let Some((open, close)) = find_method_params(sig) else { return Vec::new(); };
+    let Some((open, close)) = find_method_params(sig) else {
+        return Vec::new();
+    };
 
     let params_str = &sig[open + 1..close];
-    if params_str.trim().is_empty() { return Vec::new(); }
+    if params_str.trim().is_empty() {
+        return Vec::new();
+    }
 
     params_str
         .split(',')

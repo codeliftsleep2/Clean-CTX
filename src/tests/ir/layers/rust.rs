@@ -92,7 +92,10 @@ pub enum Status {
 }"#;
         let type_start = source.find("pub enum").unwrap();
         let derives = RustLayer::extract_derives(source, type_start);
-        assert_eq!(derives, vec!["Serialize", "Deserialize", "Clone", "Debug", "PartialEq"]);
+        assert_eq!(
+            derives,
+            vec!["Serialize", "Deserialize", "Clone", "Debug", "PartialEq"]
+        );
     }
 
     #[test]

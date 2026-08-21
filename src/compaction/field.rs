@@ -2,7 +2,7 @@
 //
 // Field/property compaction across fidelity levels.
 
-use crate::compaction::modifiers::{strip_csharp_attributes, strip_modifiers, MODIFIERS_FIELD};
+use crate::compaction::modifiers::{MODIFIERS_FIELD, strip_csharp_attributes, strip_modifiers};
 use crate::compression::Fidelity;
 
 /// Extract a compact field/property signature.
@@ -80,8 +80,7 @@ fn compact_field_medium(text: &str) -> String {
     // compacted form matches the TS convention.
     let s = normalize_csharp_type(s);
     // Collapse spaces around `:` and `?:`
-    s.replace(" : ", ":")
-     .replace(": ", ":")
+    s.replace(" : ", ":").replace(": ", ":")
 }
 
 /// Normalise a C# type-first field declaration to name-first,

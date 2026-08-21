@@ -71,7 +71,12 @@ pub fn expand_marker(token: &str) -> Option<&'static str> {
 pub fn expand_markers_in_line(line: &str) -> String {
     // We only operate on a small fixed set, so a per-marker replace is fine.
     let mut s = line.to_string();
-    for (from, to) in &[("⊕guard", ""), ("⊕loop", ""), ("⊕⇒", "→ "), ("⊕!", "throws: ")] {
+    for (from, to) in &[
+        ("⊕guard", ""),
+        ("⊕loop", ""),
+        ("⊕⇒", "→ "),
+        ("⊕!", "throws: "),
+    ] {
         s = s.replace(from, to);
     }
     s

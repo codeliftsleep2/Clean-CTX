@@ -209,28 +209,28 @@ pub const TYPE_UNDEFINED: &str = "$ud";
 /// Used for schema validation and positional decoding.
 pub fn arity(opcode: &str) -> Option<i32> {
     match opcode {
-        "DEF_C" => Some(3),           // id, name
-        "DEF_M" => Some(4),           // class_id, id, name
-        "DEF_F" => Some(4),           // class_id, id, name
-        "DEF_I" => Some(3),           // id, name
-        "SIG" => Some(5),             // method_id, param_id, type, name
-        "RET" => Some(3),             // method_id, type
-        "FIELD_T" => Some(3),         // field_id, type
-        "FLAGS" => Some(-1),          // target_id, flags...
-        "FLAGS_C" => Some(-1),        // class_id, flags...
-        "EXT" => Some(3),             // child_id, parent_id
-        "IMPL" => Some(3),            // class_id, iface_id
-        "INJECTS" => Some(-1),        // class_id, deps...
-        "IMP" => Some(4),             // alias, module, named
-        "TYPE" => Some(3),            // alias, original
-        "PAT" => Some(-1),            // pattern_name, args...
+        "DEF_C" => Some(3),    // id, name
+        "DEF_M" => Some(4),    // class_id, id, name
+        "DEF_F" => Some(4),    // class_id, id, name
+        "DEF_I" => Some(3),    // id, name
+        "SIG" => Some(5),      // method_id, param_id, type, name
+        "RET" => Some(3),      // method_id, type
+        "FIELD_T" => Some(3),  // field_id, type
+        "FLAGS" => Some(-1),   // target_id, flags...
+        "FLAGS_C" => Some(-1), // class_id, flags...
+        "EXT" => Some(3),      // child_id, parent_id
+        "IMPL" => Some(3),     // class_id, iface_id
+        "INJECTS" => Some(-1), // class_id, deps...
+        "IMP" => Some(4),      // alias, module, named
+        "TYPE" => Some(3),     // alias, original
+        "PAT" => Some(-1),     // pattern_name, args...
         // Edit Mode: Verbatim Method Bodies
-        "BODY" => Some(3),            // method_id, verbatim_text
+        "BODY" => Some(3), // method_id, verbatim_text
         // R-43a: Execution Semantics
-        "DATAFLOW" => Some(4),        // method_id, direction, target
-        "CTRL" => Some(4),            // method_id, kind, target
-        "EFFECT" => Some(3),          // method_id, effect_type
-        "CTX" => Some(3),             // method_id, context_type
+        "DATAFLOW" => Some(4), // method_id, direction, target
+        "CTRL" => Some(4),     // method_id, kind, target
+        "EFFECT" => Some(3),   // method_id, effect_type
+        "CTX" => Some(3),      // method_id, context_type
         _ => None,
     }
 }

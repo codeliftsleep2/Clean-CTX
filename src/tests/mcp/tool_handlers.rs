@@ -9,9 +9,11 @@
 // "pretty" = fallback), cache invalidation, and angular/spring
 // meta-layer abbreviation in compiled output.
 
-use crate::mcp::tools::{parse_fidelity_arg, resolve_fidelity, dispatch_tools_call};
-use crate::mcp::tool_handlers::core::{handle_compress_code_context, contract_fields, contract_fields_focused};
 use crate::compression::Fidelity;
+use crate::mcp::tool_handlers::core::{
+    contract_fields, contract_fields_focused, handle_compress_code_context,
+};
+use crate::mcp::tools::{dispatch_tools_call, parse_fidelity_arg, resolve_fidelity};
 use serde_json::json;
 
 // ── resolve_fidelity tests ──
@@ -25,13 +27,21 @@ fn resolve_fidelity_explicit_low() {
 
 #[test]
 fn resolve_fidelity_explicit_medium() {
-    let result = resolve_fidelity(Some("medium"), None, &crate::config::CleanCtxConfig::default());
+    let result = resolve_fidelity(
+        Some("medium"),
+        None,
+        &crate::config::CleanCtxConfig::default(),
+    );
     assert_eq!(result, Fidelity::Medium);
 }
 
 #[test]
 fn resolve_fidelity_explicit_high() {
-    let result = resolve_fidelity(Some("high"), None, &crate::config::CleanCtxConfig::default());
+    let result = resolve_fidelity(
+        Some("high"),
+        None,
+        &crate::config::CleanCtxConfig::default(),
+    );
     assert_eq!(result, Fidelity::High);
 }
 
@@ -44,14 +54,20 @@ fn resolve_fidelity_none_uses_default() {
 
 #[test]
 fn resolve_fidelity_invalid_string_falls_back_to_default() {
-    let result = resolve_fidelity(Some("bogus"), None, &crate::config::CleanCtxConfig::default());
+    let result = resolve_fidelity(
+        Some("bogus"),
+        None,
+        &crate::config::CleanCtxConfig::default(),
+    );
     assert_eq!(result, Fidelity::Low);
 }
 
 #[test]
 fn resolve_fidelity_extension_override() {
     let mut config = crate::config::CleanCtxConfig::default();
-    config.fidelity_overrides.insert("ts".to_string(), crate::compression::Fidelity::High);
+    config
+        .fidelity_overrides
+        .insert("ts".to_string(), crate::compression::Fidelity::High);
     let result = resolve_fidelity(None, Some("ts"), &config);
     assert_eq!(result, Fidelity::High);
 }
@@ -184,13 +200,21 @@ fn inject_baseline_breakpoint_helper_injects_hint() {
 
     inject_baseline_breakpoint(&mut response, &state, "compressed output");
 
-    assert!(response.get("_meta").is_none(), "_meta should NOT be at response root");
+    assert!(
+        response.get("_meta").is_none(),
+        "_meta should NOT be at response root"
+    );
     let hints = &response["result"]["_meta"]["cache_hints"];
     let breakpoints = hints["breakpoints"].as_array().unwrap();
     assert_eq!(breakpoints.len(), 1);
     assert_eq!(breakpoints[0]["region"], "baseline");
     assert_eq!(breakpoints[0]["ttl"], "1h");
-    assert!(breakpoints[0]["breaker"].as_str().unwrap().starts_with("bl_"));
+    assert!(
+        breakpoints[0]["breaker"]
+            .as_str()
+            .unwrap()
+            .starts_with("bl_")
+    );
     assert_eq!(state.cache_metrics_lock().misses, 1);
 }
 
@@ -206,14 +230,20 @@ fn inject_tail_breakpoint_helper_injects_hint() {
 
     inject_tail_breakpoint(&mut response, &state);
 
-    assert!(response.get("_meta").is_none(), "_meta should NOT be at response root");
+    assert!(
+        response.get("_meta").is_none(),
+        "_meta should NOT be at response root"
+    );
     let hints = &response["result"]["_meta"]["cache_hints"];
     let breakpoints = hints["breakpoints"].as_array().unwrap();
     assert_eq!(breakpoints.len(), 1);
     assert_eq!(breakpoints[0]["region"], "tail");
     assert_eq!(breakpoints[0]["ttl"], "5m");
     assert_eq!(breakpoints[0]["breaker"], "rolling");
-    assert_eq!(state.cache_metrics_lock().breakpoints.get("tail").unwrap(), "ephemeral");
+    assert_eq!(
+        state.cache_metrics_lock().breakpoints.get("tail").unwrap(),
+        "ephemeral"
+    );
 }
 
 #[test]
@@ -256,7 +286,8 @@ fn delta_code_context_cached_ir_path_does_not_panic() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }
@@ -267,7 +298,8 @@ fn delta_text_context_no_changes_path_does_not_panic() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "delta_text_context", &params, &state);
     dispatch_tools_call(&id, "delta_text_context", &params, &state);
 }
@@ -396,7 +428,11 @@ fn render_hierarchical_for_llm_spring_boot_class() {
     class.methods.push(m2);
     let hir = HierarchicalIR {
         classes: vec![class],
-        imports: vec![vec!["IM1".into(), "org.springframework.web".into(), "*".into()]],
+        imports: vec![vec![
+            "IM1".into(),
+            "org.springframework.web".into(),
+            "*".into(),
+        ]],
         type_aliases: vec![
             vec!["@rest".into(), "UserController".into()],
             vec!["@map".into(), "GET /users".into()],
@@ -464,9 +500,21 @@ fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
         name: "Data".into(),
         methods: vec![],
         fields: vec![
-            FieldNode { id: "F1".into(), name: "x".into(), field_type: Some("$n".into()) },
-            FieldNode { id: "F2".into(), name: "y".into(), field_type: Some("$n".into()) },
-            FieldNode { id: "F3".into(), name: "label".into(), field_type: Some("$s".into()) },
+            FieldNode {
+                id: "F1".into(),
+                name: "x".into(),
+                field_type: Some("$n".into()),
+            },
+            FieldNode {
+                id: "F2".into(),
+                name: "y".into(),
+                field_type: Some("$n".into()),
+            },
+            FieldNode {
+                id: "F3".into(),
+                name: "label".into(),
+                field_type: Some("$s".into()),
+            },
         ],
         class_flags: None,
         extends: None,
@@ -475,7 +523,11 @@ fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
         patterns: vec![],
         synthetic: false,
     };
-    let hir = HierarchicalIR { classes: vec![class], imports: vec![], type_aliases: vec![] };
+    let hir = HierarchicalIR {
+        classes: vec![class],
+        imports: vec![],
+        type_aliases: vec![],
+    };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Low fidelity: space-separated fields on one line
     assert!(result.contains("F x:$n y:$n label:$s"));
@@ -490,8 +542,16 @@ fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
         name: "Data".into(),
         methods: vec![],
         fields: vec![
-            FieldNode { id: "F1".into(), name: "x".into(), field_type: Some("$n".into()) },
-            FieldNode { id: "F2".into(), name: "y".into(), field_type: Some("$n".into()) },
+            FieldNode {
+                id: "F1".into(),
+                name: "x".into(),
+                field_type: Some("$n".into()),
+            },
+            FieldNode {
+                id: "F2".into(),
+                name: "y".into(),
+                field_type: Some("$n".into()),
+            },
         ],
         class_flags: None,
         extends: None,
@@ -500,7 +560,11 @@ fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
         patterns: vec![],
         synthetic: false,
     };
-    let hir = HierarchicalIR { classes: vec![class], imports: vec![], type_aliases: vec![] };
+    let hir = HierarchicalIR {
+        classes: vec![class],
+        imports: vec![],
+        type_aliases: vec![],
+    };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
     // Medium fidelity: one field per line
     assert!(result.contains("F x:$n\n"));
@@ -523,7 +587,11 @@ fn render_hierarchical_for_llm_injects_do_not_panic() {
         patterns: vec![],
         synthetic: false,
     };
-    let hir = HierarchicalIR { classes: vec![class], imports: vec![], type_aliases: vec![] };
+    let hir = HierarchicalIR {
+        classes: vec![class],
+        imports: vec![],
+        type_aliases: vec![],
+    };
     // Should not panic — injects are structural (pattern-level), not rendered
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     assert!(result.contains("// ── Service ──"));
@@ -536,7 +604,9 @@ fn mcp_state_llm_text_cache_insert_and_read() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     // Insert into cache
-    state.llm_text_cache_lock().insert("α1".to_string(), "// SCHEMA v2\n// ── Foo ──\n".to_string());
+    state
+        .llm_text_cache_lock()
+        .insert("α1".to_string(), "// SCHEMA v2\n// ── Foo ──\n".to_string());
     // Read from cache
     let cache_guard = state.llm_text_cache_lock();
     let cached = cache_guard.get("α1");
@@ -559,7 +629,6 @@ fn mcp_state_llm_text_cache_clear_on_new() {
     // Fresh state should have empty cache
     assert!(state.llm_text_cache_lock().is_empty());
 }
-
 
 // ── Micro-opcode expanded table verification (Phase 8) ──
 
@@ -587,12 +656,24 @@ fn micro_opcode_apply_expand_roundtrip_with_new_markers() {
     let original = "Foo{field1};⊕guard check() ⊕loop iterate() ⊕⇒result ⊕!err";
     let compressed = apply_micro_opcodes(original, Fidelity::Low);
     let expanded = expand_micro_opcodes(&compressed);
-    assert_eq!(expanded, original, "Round-trip must preserve original content");
+    assert_eq!(
+        expanded, original,
+        "Round-trip must preserve original content"
+    );
     // Verify compression replaces markers
-    assert!(compressed.contains("§I"), "⊕guard should be compressed to §I");
-    assert!(compressed.contains("§L"), "⊕loop should be compressed to §L");
+    assert!(
+        compressed.contains("§I"),
+        "⊕guard should be compressed to §I"
+    );
+    assert!(
+        compressed.contains("§L"),
+        "⊕loop should be compressed to §L"
+    );
     assert!(compressed.contains("§E"), "⊕⇒ should be compressed to §E");
-    assert!(compressed.contains("§C"), "{{ and }} should be compressed to §C");
+    assert!(
+        compressed.contains("§C"),
+        "{{ and }} should be compressed to §C"
+    );
 }
 
 // ── Regression: relative path resolution ─────────────────────────
@@ -625,7 +706,11 @@ fn resolve_file_path_relative_joins_cwd() {
 #[test]
 fn resolve_file_path_with_workspace_root() {
     use crate::mcp::tool_helpers::resolve_file_path;
-    let abs_root = if cfg!(windows) { "D:\\myproject" } else { "/home/user/myproject" };
+    let abs_root = if cfg!(windows) {
+        "D:\\myproject"
+    } else {
+        "/home/user/myproject"
+    };
     let result = resolve_file_path("src/main.ts", Some(abs_root));
     let expected = if cfg!(windows) {
         "D:\\myproject\\src\\main.ts"
@@ -640,7 +725,8 @@ fn handle_compress_code_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     handle_compress_code_context(&id, &params, &state);
 }
 
@@ -671,7 +757,8 @@ fn handle_delta_code_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }
 
@@ -680,7 +767,8 @@ fn handle_delta_text_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "delta_text_context", &params, &state);
 }
 
@@ -689,7 +777,8 @@ fn handle_diff_code_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "diff_code_context", &params, &state);
 }
 
@@ -698,7 +787,8 @@ fn handle_restore_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "restore_context", &params, &state);
 }
 
@@ -707,7 +797,8 @@ fn handle_provide_code_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "overview" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "overview" } });
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
@@ -719,7 +810,10 @@ fn handle_provide_code_context_accepts_relative_path() {
 fn contract_fields_low_is_skeleton() {
     let (kind, byte_exact) = contract_fields(Fidelity::Low);
     assert_eq!(kind, "skeleton");
-    assert!(byte_exact.is_empty(), "Low must not claim byte-exact regions");
+    assert!(
+        byte_exact.is_empty(),
+        "Low must not claim byte-exact regions"
+    );
 }
 
 #[test]
@@ -806,8 +900,17 @@ fn contract_fields_focused_verbatim_is_document() {
 /// `contract_fields` is the None-focus specialization of `contract_fields_focused`.
 #[test]
 fn contract_fields_delegates_to_focused_none() {
-    for fidelity in [Fidelity::Low, Fidelity::Medium, Fidelity::High, Fidelity::Edit, Fidelity::Verbatim] {
-        assert_eq!(contract_fields(fidelity), contract_fields_focused(fidelity, None));
+    for fidelity in [
+        Fidelity::Low,
+        Fidelity::Medium,
+        Fidelity::High,
+        Fidelity::Edit,
+        Fidelity::Verbatim,
+    ] {
+        assert_eq!(
+            contract_fields(fidelity),
+            contract_fields_focused(fidelity, None)
+        );
     }
 }
 
@@ -833,7 +936,8 @@ fn provide_code_context_explicit_edit_fidelity_does_not_panic() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "edit" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "edit" } });
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
@@ -844,7 +948,8 @@ fn provide_code_context_invalid_fidelity_does_not_panic() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "full" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "full" } });
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
@@ -856,7 +961,8 @@ fn provide_code_context_verbatim_fidelity_does_not_panic() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
@@ -866,7 +972,8 @@ fn compress_code_context_verbatim_fidelity_does_not_panic() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
     dispatch_tools_call(&id, "compress_code_context", &params, &state);
 }
 
@@ -913,7 +1020,8 @@ fn blast_radius_disabled_by_default_does_not_panic() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     // Should not panic when blast radius is disabled (default)
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
@@ -924,7 +1032,8 @@ fn blast_radius_enabled_does_not_panic_without_cbm() {
     config.intelligence.blast_radius_enabled = true;
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     // Should not panic when blast radius is enabled but CBM is unavailable
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
@@ -935,7 +1044,8 @@ fn blast_radius_delta_mode_does_not_panic() {
     config.intelligence.blast_radius_enabled = true;
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     // Should not panic in delta mode with blast radius enabled
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }

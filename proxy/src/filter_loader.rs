@@ -8,7 +8,7 @@ use std::path::Path;
 use tracing::info;
 
 use crate::filter_registry::FilterRegistry;
-use crate::filter_rules::{FilterFile, compile_filter_file};
+use crate::filter_rules::{compile_filter_file, FilterFile};
 
 /// Error loading filters.
 #[derive(Debug)]
@@ -34,8 +34,8 @@ impl std::fmt::Display for FilterLoaderError {
 /// Candidate paths to search for built-in filter files.
 const BUILTIN_FILTER_PATHS: &[&str] = &[
     "../filters",    // Development: filters/ at repo root
-    "filters",        // Production: filters/ relative to binary
-    "proxy/filters",  // Submodule: proxy/filters/
+    "filters",       // Production: filters/ relative to binary
+    "proxy/filters", // Submodule: proxy/filters/
 ];
 
 /// Load all built-in filters from the first available filter directory.
@@ -51,7 +51,10 @@ pub fn load_builtin_filters() -> FilterRegistry {
     let mut registry = FilterRegistry::new();
 
     if let Some(filter_dir) = filter_dir {
-        info!("[filter_loader] Loading built-in filters from {:?}", filter_dir);
+        info!(
+            "[filter_loader] Loading built-in filters from {:?}",
+            filter_dir
+        );
 
         let entries = match std::fs::read_dir(filter_dir) {
             Ok(e) => e,
@@ -70,7 +73,10 @@ pub fn load_builtin_filters() -> FilterRegistry {
             match load_single_filter_file(&path) {
                 Ok(filters) => {
                     for filter in filters {
-                        info!("[filter_loader] Loaded filter: {} ({})", filter.name, filter.description);
+                        info!(
+                            "[filter_loader] Loaded filter: {} ({})",
+                            filter.name, filter.description
+                        );
                         registry.add_builtin(filter);
                     }
                 }
@@ -80,17 +86,26 @@ pub fn load_builtin_filters() -> FilterRegistry {
             }
         }
     } else {
-        info!("[filter_loader] No built-in filter directory found (tried: {:?})", BUILTIN_FILTER_PATHS);
+        info!(
+            "[filter_loader] No built-in filter directory found (tried: {:?})",
+            BUILTIN_FILTER_PATHS
+        );
     }
 
     // Load community filters from .clean-ctx/filters/
     let community_dir = crate::community_filters::default_community_dir();
     if community_dir.exists() {
-        info!("[filter_loader] Loading community filters from {:?}", community_dir);
+        info!(
+            "[filter_loader] Loading community filters from {:?}",
+            community_dir
+        );
         crate::community_filters::merge_community_filters(&mut registry, &community_dir);
     }
 
-    info!("[filter_loader] Loaded {} total filters (builtin + community)", registry.count());
+    info!(
+        "[filter_loader] Loaded {} total filters (builtin + community)",
+        registry.count()
+    );
     registry
 }
 
@@ -125,7 +140,9 @@ pub fn validate_filters(registry: &FilterRegistry) -> (usize, usize, Vec<String>
 
 /// Validate a single filter's tests.
 #[allow(dead_code)]
-fn validate_single_filter(_filter: &crate::filter_rules::CompiledFilter) -> (usize, usize, Vec<String>) {
+fn validate_single_filter(
+    _filter: &crate::filter_rules::CompiledFilter,
+) -> (usize, usize, Vec<String>) {
     let passed = 0;
     let failed = 0;
     let errors = Vec::new();
@@ -139,22 +156,22 @@ fn validate_single_filter(_filter: &crate::filter_rules::CompiledFilter) -> (usi
 }
 
 /// Load and compile filters from a single TOML file.
-fn load_single_filter_file(path: &Path) -> Result<Vec<crate::filter_rules::CompiledFilter>, FilterLoaderError> {
-    let content = std::fs::read_to_string(path)
-        .map_err(FilterLoaderError::IoError)?;
+fn load_single_filter_file(
+    path: &Path,
+) -> Result<Vec<crate::filter_rules::CompiledFilter>, FilterLoaderError> {
+    let content = std::fs::read_to_string(path).map_err(FilterLoaderError::IoError)?;
 
     let file: FilterFile = toml::from_str(&content)
         .map_err(|e| FilterLoaderError::ParseError(format!("{}: {e}", path.display())))?;
 
-    let compiled = compile_filter_file(&file)
-        .map_err(|errs| {
-            let msg = errs
-                .iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-                .join("; ");
-            FilterLoaderError::CompileError(msg)
-        })?;
+    let compiled = compile_filter_file(&file).map_err(|errs| {
+        let msg = errs
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join("; ");
+        FilterLoaderError::CompileError(msg)
+    })?;
 
     Ok(compiled.into_iter().map(|(f, _)| f).collect())
 }
@@ -209,7 +226,10 @@ match_command = "^test"
 
         let result = load_single_filter_file(&file_path);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), FilterLoaderError::ParseError(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            FilterLoaderError::ParseError(_)
+        ));
 
         let _ = std::fs::remove_dir_all(&dir);
     }

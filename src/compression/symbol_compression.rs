@@ -6,8 +6,8 @@
 // skip this pass because structural markers already keep density high.
 
 use crate::compression::Fidelity;
-use crate::dictionary::symbol::tokenize_for_symbols;
 use crate::dictionary::SymbolDictionary;
+use crate::dictionary::symbol::tokenize_for_symbols;
 
 /// Apply the symbol-dictionary opcode pass (Low fidelity only). Higher
 /// fidelities don't need it — the structural markers already provide
@@ -23,9 +23,10 @@ pub fn apply_symbol_compression(body_content: &str, fidelity: Fidelity) -> (Stri
             sym_dict.register(clean);
         }
         if let Some(rest) = token.strip_prefix('⊕')
-            && !rest.is_empty() {
-                sym_dict.register(rest);
-            }
+            && !rest.is_empty()
+        {
+            sym_dict.register(rest);
+        }
     }
     let encoded = sym_dict.encode(body_content);
     let footer = sym_dict.format_footer();

@@ -5,8 +5,8 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod tests {
-    use crate::dotnet_meta::automapper::extract_automapper;
     use crate::compression::Fidelity;
+    use crate::dotnet_meta::automapper::extract_automapper;
 
     #[test]
     fn test_extracts_profile() {
@@ -22,7 +22,12 @@ mod tests {
         assert!(result.is_some());
         let block = result.unwrap();
         assert!(block.lines.iter().any(|l| l.contains("Φmap:UserProfile")));
-        assert!(block.lines.iter().any(|l| l.contains("Φmapfrom:User → UserDto")));
+        assert!(
+            block
+                .lines
+                .iter()
+                .any(|l| l.contains("Φmapfrom:User → UserDto"))
+        );
     }
 
     #[test]

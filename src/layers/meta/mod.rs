@@ -17,9 +17,9 @@
 // in this file for historical reasons. New meta-layers should NOT follow
 // this pattern.
 
-use std::path::Path;
 use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
+use std::path::Path;
 
 /// A meta-layer that enriches compressed output with framework-specific
 /// context (e.g. Angular decorators, Spring Boot annotations).
@@ -76,7 +76,8 @@ impl MetaLayer for AngularMetaLayer {
 
     fn enrich(&self, output: &mut String, source: &str, ir: &CompiledIR, fidelity: Fidelity) {
         // Extract class names from the IR for compatibility
-        let class_captures: Vec<String> = ir.instructions
+        let class_captures: Vec<String> = ir
+            .instructions
             .iter()
             .filter_map(|op| {
                 if let crate::ir::opcodes::CoreOp::DefClass(_, name) = op {
@@ -86,8 +87,9 @@ impl MetaLayer for AngularMetaLayer {
                 }
             })
             .collect();
-        
-        if let Some(block) = crate::angular_meta::run_meta_layer(source, &class_captures, fidelity) {
+
+        if let Some(block) = crate::angular_meta::run_meta_layer(source, &class_captures, fidelity)
+        {
             output.push_str(&block.render());
         }
     }
@@ -157,7 +159,8 @@ impl MetaLayer for SpringBootMetaLayer {
 
     fn enrich(&self, output: &mut String, source: &str, ir: &CompiledIR, fidelity: Fidelity) {
         // Extract class names from the IR for compatibility
-        let class_captures: Vec<String> = ir.instructions
+        let class_captures: Vec<String> = ir
+            .instructions
             .iter()
             .filter_map(|op| {
                 if let crate::ir::opcodes::CoreOp::DefClass(_, name) = op {
@@ -167,7 +170,7 @@ impl MetaLayer for SpringBootMetaLayer {
                 }
             })
             .collect();
-        
+
         if let Some(block) = crate::spring_meta::run_meta_layer(source, &class_captures, fidelity) {
             output.push_str(&block.render());
         }

@@ -8,8 +8,8 @@
 // - Property-level serialization attributes
 
 use super::markers::{build_json_line, build_property_line};
-use crate::dotnet_meta::MetaBlock;
 use crate::compression::Fidelity;
+use crate::dotnet_meta::MetaBlock;
 
 /// Extract serialization markers from a single class capture.
 ///

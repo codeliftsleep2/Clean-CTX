@@ -68,7 +68,10 @@ fn rejects_comment_with_decorator_name() {
             private isReady: boolean = false;
         }
     "#;
-    assert!(!is_angular_file(src), "Comment with @Component should not trigger detection");
+    assert!(
+        !is_angular_file(src),
+        "Comment with @Component should not trigger detection"
+    );
 }
 
 #[test]
@@ -80,7 +83,10 @@ fn rejects_string_literal_with_decorator_name() {
             private isReady: boolean = false;
         }
     "#;
-    assert!(!is_angular_file(src), "String literal with @Component should not trigger detection");
+    assert!(
+        !is_angular_file(src),
+        "String literal with @Component should not trigger detection"
+    );
 }
 
 #[test]

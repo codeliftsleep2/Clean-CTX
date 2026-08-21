@@ -82,16 +82,22 @@ fn test_e2e_tools_list() {
     let (response, mut child) = spawn_and_send(request, 10);
 
     // Validate response
-    let parsed: serde_json::Value = serde_json::from_str(&response)
-        .expect("Response should be valid JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&response).expect("Response should be valid JSON");
     assert_eq!(parsed["jsonrpc"], "2.0", "Should be JSON-RPC 2.0");
     assert_eq!(parsed["id"], 1, "Should echo request ID");
     assert!(parsed.get("result").is_some(), "Should have a result field");
-    assert!(parsed.get("error").is_none(), "Should not have an error field");
+    assert!(
+        parsed.get("error").is_none(),
+        "Should not have an error field"
+    );
 
     // The result should contain a tools list
     let result = parsed.get("result").unwrap();
-    assert!(result.get("tools").is_some(), "Result should have tools array");
+    assert!(
+        result.get("tools").is_some(),
+        "Result should have tools array"
+    );
     let tools = result["tools"].as_array().unwrap();
     assert!(!tools.is_empty(), "Should have at least one tool");
 
@@ -107,11 +113,14 @@ fn test_e2e_unknown_method() {
     let request = r#"{"jsonrpc":"2.0","id":2,"method":"nonexistent_tool"}"#;
     let (response, mut child) = spawn_and_send(request, 5);
 
-    let parsed: serde_json::Value = serde_json::from_str(&response)
-        .expect("Response should be valid JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&response).expect("Response should be valid JSON");
     assert_eq!(parsed["jsonrpc"], "2.0");
     assert_eq!(parsed["id"], 2);
-    assert!(parsed.get("error").is_some(), "Should have an error for unknown tool");
+    assert!(
+        parsed.get("error").is_some(),
+        "Should have an error for unknown tool"
+    );
 
     // Clean shutdown
     let _ = child.kill();
@@ -184,7 +193,10 @@ fn test_e2e_diff_commits() {
     }
 
     let result = parsed.get("result").expect("Should have a result field");
-    let content = result.get("content").and_then(|c| c.as_array()).expect("content array");
+    let content = result
+        .get("content")
+        .and_then(|c| c.as_array())
+        .expect("content array");
     let text = content[0]["text"].as_str().expect("text field");
 
     // Header + per-file change entry.
@@ -225,7 +237,10 @@ fn test_e2e_init_subcommand() {
     assert!(output.status.success(), "init subcommand should succeed");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("Created config"), "Should indicate config was created");
+    assert!(
+        stderr.contains("Created config"),
+        "Should indicate config was created"
+    );
 
     // Verify the config file was created
     let config_path = dir.path().join(".clean-ctx.json");
@@ -262,9 +277,14 @@ fn test_e2e_config_dump() {
         .spawn()
         .expect("Failed to spawn config-dump");
 
-    let output = child.wait_with_output().expect("Failed to wait for config-dump");
+    let output = child
+        .wait_with_output()
+        .expect("Failed to wait for config-dump");
     assert!(output.status.success(), "config-dump should succeed");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("Resolved Configuration"), "Should show config dump");
+    assert!(
+        stderr.contains("Resolved Configuration"),
+        "Should show config dump"
+    );
 }

@@ -10,7 +10,7 @@
 
 use crate::compression::Fidelity;
 use crate::compression::language::detect_language;
-use crate::ir::compiler::{IRCompiler, CompiledIR};
+use crate::ir::compiler::{CompiledIR, IRCompiler};
 use crate::ir::layers::typescript::TypeScriptLayer;
 // P0-4: Meta-layers use LayerRegistry::global() instead of manual add_meta_layer().
 // The compiler calls LayerRegistry internally during compile().
@@ -56,11 +56,19 @@ fn ts_language_layer_produces_extra_ops_via_compiler() {
     let ir = compile_ts(source);
 
     // Verify EXT op exists (proves TypeScriptLayer::process_capture was called)
-    let has_ext = ir.instructions.iter().any(|op| matches!(op, CoreOp::Extends(..)));
-    assert!(has_ext, "TypeScript layer should emit EXT op via IRCompiler");
+    let has_ext = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Extends(..)));
+    assert!(
+        has_ext,
+        "TypeScript layer should emit EXT op via IRCompiler"
+    );
 
     // Verify IMPL ops exist
-    let impl_count = ir.instructions.iter()
+    let impl_count = ir
+        .instructions
+        .iter()
         .filter(|op| matches!(op, CoreOp::Implements(..)))
         .count();
     assert_eq!(impl_count, 2, "Should emit 2 IMPL ops for 2 interfaces");
@@ -85,10 +93,18 @@ fn ts_language_layer_produces_extra_ops_via_compiler_with_class_flags() {
     let ir = compile_ts(source);
 
     // Verify EXT, IMPL, and IMP are all present through the pipeline
-    let has_ext = ir.instructions.iter().any(|op| matches!(op, CoreOp::Extends(..)));
-    assert!(has_ext, "TypeScript layer should emit EXT op via IRCompiler");
+    let has_ext = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Extends(..)));
+    assert!(
+        has_ext,
+        "TypeScript layer should emit EXT op via IRCompiler"
+    );
 
-    let impl_count = ir.instructions.iter()
+    let impl_count = ir
+        .instructions
+        .iter()
         .filter(|op| matches!(op, CoreOp::Implements(..)))
         .count();
     assert_eq!(impl_count, 2, "Should emit 2 IMPL ops for 2 interfaces");
@@ -106,10 +122,14 @@ fn ts_language_layer_extracts_method_flags_via_compiler_for_async() {
     let ir = compile_ts(source);
 
     // Verify ASYNC flag exists (proves method flags from raw_text are extracted)
-    let has_async = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"ASYNC".to_string()))
-    });
-    assert!(has_async, "TypeScript layer should emit ASYNC flag via IRCompiler");
+    let has_async = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"ASYNC".to_string())));
+    assert!(
+        has_async,
+        "TypeScript layer should emit ASYNC flag via IRCompiler"
+    );
 }
 
 #[test]
@@ -126,10 +146,14 @@ fn ts_language_layer_extracts_method_flags_via_compiler() {
     let ir = compile_ts(source);
 
     // Verify ASYNC flag exists (proves method flags are extracted)
-    let has_async = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"ASYNC".to_string()))
-    });
-    assert!(has_async, "TypeScript layer should emit ASYNC flag via IRCompiler");
+    let has_async = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"ASYNC".to_string())));
+    assert!(
+        has_async,
+        "TypeScript layer should emit ASYNC flag via IRCompiler"
+    );
 }
 
 #[test]
@@ -157,7 +181,9 @@ fn control_flow_flags_emitted_via_compiler() {
     let ir = compile_ts(source);
 
     // Find the FLAGS op for the processItems method
-    let flags_ops: Vec<_> = ir.instructions.iter()
+    let flags_ops: Vec<_> = ir
+        .instructions
+        .iter()
         .filter_map(|op| {
             if let CoreOp::Flags(mid, flags) = op {
                 Some((mid.clone(), flags.clone()))
@@ -229,18 +255,33 @@ fn basic_core_ir_still_produced() {
     let ir = compile_ts(source);
 
     // Verify DefClass exists
-    let has_def_class = ir.instructions.iter().any(|op| matches!(op, CoreOp::DefClass(..)));
+    let has_def_class = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::DefClass(..)));
     assert!(has_def_class, "Core IR should include DefClass");
 
     // Verify DefMethod exists
-    let method_count = ir.instructions.iter()
+    let method_count = ir
+        .instructions
+        .iter()
         .filter(|op| matches!(op, CoreOp::DefMethod(..)))
         .count();
-    assert!(method_count >= 2, "Should have at least 2 methods, got {}", method_count);
+    assert!(
+        method_count >= 2,
+        "Should have at least 2 methods, got {}",
+        method_count
+    );
 
     // Verify Param and Return exist
-    let has_param = ir.instructions.iter().any(|op| matches!(op, CoreOp::Param(..)));
-    let has_return = ir.instructions.iter().any(|op| matches!(op, CoreOp::Return(..)));
+    let has_param = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Param(..)));
+    let has_return = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Return(..)));
     assert!(has_param, "Should have Param instructions");
     assert!(has_return, "Should have Return instructions");
 }
@@ -260,11 +301,15 @@ fn ir_without_layers_produces_deterministic_output() {
 
     // Compile without layers
     let mut c1 = IRCompiler::new();
-    let ir1 = c1.compile(source, "test", language.clone(), query, Fidelity::Low, None).unwrap();
+    let ir1 = c1
+        .compile(source, "test", language.clone(), query, Fidelity::Low, None)
+        .unwrap();
 
     // Compile again without layers
     let mut c2 = IRCompiler::new();
-    let ir2 = c2.compile(source, "test", language, query, Fidelity::Low, None).unwrap();
+    let ir2 = c2
+        .compile(source, "test", language, query, Fidelity::Low, None)
+        .unwrap();
 
     assert_eq!(ir1.instructions.len(), ir2.instructions.len());
     for (a, b) in ir1.instructions.iter().zip(ir2.instructions.iter()) {
@@ -290,7 +335,10 @@ fn meta_layer_produces_ops_via_compiler() {
     // The key test is that the code doesn't crash and the layer
     // is actually invoked (we verify via the EXT/IMPL ops above
     // that the pipeline ran fully).
-    let has_def = ir.instructions.iter().any(|op| matches!(op, CoreOp::DefClass(..)));
+    let has_def = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::DefClass(..)));
     assert!(has_def, "Non-Angular source should still produce Core IR");
 }
 
@@ -315,11 +363,17 @@ fn compiler_resets_state_between_compilations() {
     let (lang, query) = detect_language(source1);
 
     let mut compiler = ts_compiler();
-    compiler.compile(source1, "f1", lang.clone(), query, Fidelity::Low, None).unwrap();
-    let ir2 = compiler.compile(source2, "f2", lang, query, Fidelity::Low, None).unwrap();
+    compiler
+        .compile(source1, "f1", lang.clone(), query, Fidelity::Low, None)
+        .unwrap();
+    let ir2 = compiler
+        .compile(source2, "f2", lang, query, Fidelity::Low, None)
+        .unwrap();
 
     // Verify the second compilation is clean (no flags left over from first)
-    let class_ids: Vec<_> = ir2.instructions.iter()
+    let class_ids: Vec<_> = ir2
+        .instructions
+        .iter()
         .filter_map(|op| {
             if let CoreOp::DefMethod(cid, _, _) = op {
                 Some(cid.clone())
@@ -328,7 +382,10 @@ fn compiler_resets_state_between_compilations() {
             }
         })
         .collect();
-    assert!(!class_ids.is_empty(), "Second compilation should have methods");
+    assert!(
+        !class_ids.is_empty(),
+        "Second compilation should have methods"
+    );
     // All method class IDs should reference the second class
     assert!(
         class_ids.iter().all(|id| !id.is_empty()),

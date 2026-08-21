@@ -19,9 +19,9 @@
 //   @=meta  X=extends  I=implements  F=field  M=method
 //   $=import  →=scope  fl:=flags  cl:=class-flags  P=pattern  T=type-alias
 
-use std::collections::{HashMap, HashSet};
+use super::hierarchical::{ClassNode, HierarchicalIR, PatternEntry};
 use crate::compression::Fidelity;
-use super::hierarchical::{HierarchicalIR, ClassNode, PatternEntry};
+use std::collections::{HashMap, HashSet};
 
 /// Render a `HierarchicalIR` into compact LLM-optimized text.
 ///
@@ -152,13 +152,17 @@ fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
     match fidelity {
         Fidelity::Low => {
             // Space-separated on one line
-            let field_strs: Vec<String> = class.fields.iter().map(|f| {
-                if let Some(ft) = &f.field_type {
-                    format!("{}:{}", f.name, ft)
-                } else {
-                    f.name.clone()
-                }
-            }).collect();
+            let field_strs: Vec<String> = class
+                .fields
+                .iter()
+                .map(|f| {
+                    if let Some(ft) = &f.field_type {
+                        format!("{}:{}", f.name, ft)
+                    } else {
+                        f.name.clone()
+                    }
+                })
+                .collect();
             output.push_str(&format!("F {}\n", field_strs.join(" ")));
         }
         Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
@@ -229,15 +233,19 @@ fn render_methods(
 
             // Params (shown in Medium/High, hidden in Low unless overloaded)
             if has_params && (fidelity != Fidelity::Low || count > 1) {
-                let param_strs: Vec<String> = method.params.iter().map(|p| {
-                    if p.len() >= 3 {
-                        format!("{}:{}", p[2], p[1])
-                    } else if p.len() >= 2 {
-                        format!("{}:{}", p[0], p[1])
-                    } else {
-                        p[0].clone()
-                    }
-                }).collect();
+                let param_strs: Vec<String> = method
+                    .params
+                    .iter()
+                    .map(|p| {
+                        if p.len() >= 3 {
+                            format!("{}:{}", p[2], p[1])
+                        } else if p.len() >= 2 {
+                            format!("{}:{}", p[0], p[1])
+                        } else {
+                            p[0].clone()
+                        }
+                    })
+                    .collect();
                 output.push_str(&format!(" p:{}", param_strs.join(" ")));
             }
 
@@ -256,7 +264,9 @@ fn render_methods(
 
         // Control-flow metadata at High fidelity (Gap 1 fix)
         if fidelity == Fidelity::High && !method.control_flow.is_empty() {
-            let cf_strs: Vec<String> = method.control_flow.iter()
+            let cf_strs: Vec<String> = method
+                .control_flow
+                .iter()
                 .map(|cf| {
                     if cf.len() >= 2 {
                         format!("{}:{}", cf[0], cf[1])
@@ -272,7 +282,9 @@ fn render_methods(
         // Rendered as `df:reads:config,writes:users` — same inline pattern
         // as control-flow so the LLM sees semantic read/write pairs.
         if fidelity == Fidelity::High && !method.data_flow.is_empty() {
-            let df_strs: Vec<String> = method.data_flow.iter()
+            let df_strs: Vec<String> = method
+                .data_flow
+                .iter()
                 .map(|df| {
                     if df.len() >= 2 {
                         format!("{}:{}", df[0], df[1])
@@ -305,9 +317,7 @@ fn render_methods(
         // Verbatim method body at Edit fidelity (byte-exact for replace_in_file).
         // When `focus` is `Some(set)`, only methods whose names are in the
         // set get their full body; all others are signature-only.
-        if fidelity == Fidelity::Edit
-            && focus.is_none_or(|f| f.contains(&method.name))
-        {
+        if fidelity == Fidelity::Edit && focus.is_none_or(|f| f.contains(&method.name)) {
             if let Some(body) = &method.body {
                 output.push('\n');
                 output.push_str(body);

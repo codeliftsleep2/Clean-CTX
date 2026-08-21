@@ -102,32 +102,37 @@ impl InferenceLayer {
 
     /// Get all edges with confidence above a threshold.
     pub fn edges_with_confidence(&self, min_confidence: f64) -> Vec<&InferenceEdge> {
-        self.inferred_edges.iter()
+        self.inferred_edges
+            .iter()
             .filter(|e| e.confidence >= min_confidence)
             .collect()
     }
 
     /// Get annotations for a symbol with confidence above a threshold.
-    pub fn annotations_for(
-        &self,
-        symbol: &str,
-        min_confidence: f64,
-    ) -> Vec<&InferenceAnnotation> {
-        self.annotations.get(symbol)
-            .map(|anns| anns.iter().filter(|a| a.confidence >= min_confidence).collect())
+    pub fn annotations_for(&self, symbol: &str, min_confidence: f64) -> Vec<&InferenceAnnotation> {
+        self.annotations
+            .get(symbol)
+            .map(|anns| {
+                anns.iter()
+                    .filter(|a| a.confidence >= min_confidence)
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
     /// Get all annotations for a symbol (all confidence levels).
     pub fn all_annotations_for(&self, symbol: &str) -> Vec<&InferenceAnnotation> {
-        self.annotations.get(symbol)
+        self.annotations
+            .get(symbol)
             .map(|anns| anns.iter().collect())
             .unwrap_or_default()
     }
 
     /// Check if there are any annotations with a given key.
     pub fn has_annotation_key(&self, key: &str) -> bool {
-        self.annotations.values().any(|anns| anns.iter().any(|a| a.key == key))
+        self.annotations
+            .values()
+            .any(|anns| anns.iter().any(|a| a.key == key))
     }
 
     /// Enrich this layer with CBM knowledge-graph data.
@@ -183,26 +188,28 @@ impl InferenceLayer {
 
         // Symbol importance (confidence = 0.75)
         for (name, info) in bridge.get_symbol_importance_mut() {
-            self.annotations.entry(name).or_default().push(
-                InferenceAnnotation {
+            self.annotations
+                .entry(name)
+                .or_default()
+                .push(InferenceAnnotation {
                     key: "importance".into(),
                     value: info.score.to_string(),
                     confidence: 0.75,
                     source: InferenceSource::Cbm,
-                }
-            );
+                });
         }
 
         // Dead code (confidence = 0.75)
         for entry in bridge.get_dead_code() {
-            self.annotations.entry(entry.symbol.clone()).or_default().push(
-                InferenceAnnotation {
+            self.annotations
+                .entry(entry.symbol.clone())
+                .or_default()
+                .push(InferenceAnnotation {
                     key: "dead_code".into(),
                     value: entry.reason.clone(),
                     confidence: 0.75,
                     source: InferenceSource::Cbm,
-                }
-            );
+                });
         }
     }
 }

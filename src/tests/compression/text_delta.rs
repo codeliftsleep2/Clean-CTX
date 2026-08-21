@@ -38,7 +38,10 @@ fn test_text_delta_wire_format_round_trip() {
     assert_eq!(parsed.to, 4);
     assert_eq!(parsed.adds, vec!["$ctor C1 M5 $s data"]);
     assert_eq!(parsed.dels, vec!["FLAGS M2 IF"]);
-    assert_eq!(parsed.mods, vec![("$r M1 $b".to_string(), "$r M1 $v".to_string())]);
+    assert_eq!(
+        parsed.mods,
+        vec![("$r M1 $b".to_string(), "$r M1 $v".to_string())]
+    );
 }
 
 #[test]
@@ -111,7 +114,7 @@ fn test_delta_computer_with_baseline() {
         "$ctor C1 M1 $s payload".into(),
         "$r M1 $b".into(),
         // "FLAGS M1 IF" removed
-        "$ctor C1 M2 $s data".into(),  // new method
+        "$ctor C1 M2 $s data".into(), // new method
     ];
     let delta = computer.compute_and_store("α1", modified).unwrap();
     assert_eq!(delta.from, 1);
@@ -193,11 +196,10 @@ fn test_apply_text_delta_combined() {
         mods: vec![("$r M1 $b".into(), "$r M1 $v".into())],
     };
     let result = apply_text_delta(&baseline, &delta).unwrap();
-    assert_eq!(result, vec![
-        "$ctor C1 M1 $s payload",
-        "$r M1 $v",
-        "$ctor C1 M2 $s data",
-    ]);
+    assert_eq!(
+        result,
+        vec!["$ctor C1 M1 $s payload", "$r M1 $v", "$ctor C1 M2 $s data",]
+    );
 }
 
 #[test]
@@ -228,7 +230,9 @@ fn test_delta_computer_multiple_files() {
     assert_eq!(computer.file_version("α2"), 1);
 
     // Modify α1
-    let delta = computer.compute_and_store("α1", vec!["a1_line1".into(), "a1_line2".into()]).unwrap();
+    let delta = computer
+        .compute_and_store("α1", vec!["a1_line1".into(), "a1_line2".into()])
+        .unwrap();
     assert_eq!(delta.from, 1);
     assert_eq!(delta.to, 2);
     assert!(delta.adds.contains(&"a1_line2".to_string()));

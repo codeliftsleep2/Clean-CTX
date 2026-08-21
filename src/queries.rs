@@ -1,9 +1,9 @@
 // src/queries.rs
-// TypeScript AST node types: class_declaration, method_definition, 
-//   function_declaration, property_signature, throw_statement, 
+// TypeScript AST node types: class_declaration, method_definition,
+//   function_declaration, property_signature, throw_statement,
 //   if_statement, for_statement, while_statement, return_statement,
 //   import_statement, import_declaration
-// C# AST node types: class_declaration, method_declaration, 
+// C# AST node types: class_declaration, method_declaration,
 //   interface_declaration, field_declaration, throw_statement,
 //   for_statement, if_statement, while_statement,
 //   return_statement, using_directive

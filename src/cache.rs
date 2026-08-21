@@ -77,11 +77,13 @@ impl LocalStateCache {
     /// the last seen version.
     pub fn update_and_verify(&mut self, absolute_path: &str, current_hash: &str) -> bool {
         if let Some(existing_hash) = self.registry.get(absolute_path)
-            && *existing_hash == current_hash {
-                return false;
-            }
+            && *existing_hash == current_hash
+        {
+            return false;
+        }
         // F-41: only insert if the hash actually changed.
-        self.registry.insert(absolute_path.to_string(), current_hash.to_string());
+        self.registry
+            .insert(absolute_path.to_string(), current_hash.to_string());
         true
     }
 
@@ -94,7 +96,8 @@ impl LocalStateCache {
     /// F-21: Persist the content hash alongside the baseline so
     /// `diff_code_context` can short-circuit when the file hasn't changed.
     pub fn store_baseline_hash(&mut self, key: &str, hash: &str) {
-        self.baseline_hashes.insert(key.to_string(), hash.to_string());
+        self.baseline_hashes
+            .insert(key.to_string(), hash.to_string());
     }
 
     /// F-21: Retrieve the stored content hash for a baseline.
@@ -137,7 +140,8 @@ impl LocalStateCache {
         self.raw_token_clock += 1;
         self.raw_token_gen.insert(content_hash.to_string(), clock);
         self.raw_token_order.insert(clock, content_hash.to_string());
-        self.raw_token_counts.insert(content_hash.to_string(), count);
+        self.raw_token_counts
+            .insert(content_hash.to_string(), count);
     }
 
     /// F-14: Retrieve a previously-stored raw-token count for the given

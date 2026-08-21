@@ -103,7 +103,7 @@ fn ast_based_angular_detect(source: &str) -> bool {
         Some(lang) => lang,
         None => return false, // TypeScript feature not enabled
     };
-    
+
     if parser.set_language(&language).is_err() {
         return false;
     }
@@ -130,7 +130,7 @@ fn ast_based_angular_detect(source: &str) -> bool {
                         return true;
                     }
                 }
-                
+
                 // Check for weak decorators (need @angular/core import too)
                 for weak_deco in WEAK_DECORATORS {
                     if decorator_text.starts_with(weak_deco) {

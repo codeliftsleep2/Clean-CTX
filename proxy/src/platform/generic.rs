@@ -5,8 +5,8 @@
 // Handles unknown or custom API formats with best-effort detection.
 // Uses heuristics to find tool results in any message format.
 
-use serde_json::Value;
 use super::PlatformAdapter;
+use serde_json::Value;
 
 /// Generic/fallback adapter for unknown platforms.
 pub struct GenericAdapter;
@@ -34,7 +34,8 @@ impl PlatformAdapter for GenericAdapter {
         };
 
         // Try multiple name field locations
-        let name = block["name"].as_str()
+        let name = block["name"]
+            .as_str()
             .or_else(|| block["tool_call_id"].as_str())
             .or_else(|| block["tool_use_id"].as_str())
             .or_else(|| block["function_name"].as_str())
@@ -51,8 +52,8 @@ impl PlatformAdapter for GenericAdapter {
             || block["output"].is_string()
             || block["result"].is_string();
 
-        let not_user = block["role"].as_str() != Some("user")
-            && block["role"].as_str() != Some("system");
+        let not_user =
+            block["role"].as_str() != Some("user") && block["role"].as_str() != Some("system");
 
         let has_tool_indicator = block["role"].as_str() == Some("tool")
             || block["type"].as_str() == Some("tool_result")

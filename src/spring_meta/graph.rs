@@ -96,7 +96,8 @@ impl SpringGraphBuilder {
         // Register endpoints for controller.
         if let ClassKind::Controller = kind {
             for endpoint in endpoints {
-                self.endpoints.insert(endpoint.path.clone(), class_name.to_string());
+                self.endpoints
+                    .insert(endpoint.path.clone(), class_name.to_string());
             }
         }
     }
@@ -160,9 +161,9 @@ impl SpringGraph {
     /// graph. Returns `None` if the type is not found (unresolved or
     /// external dependency).
     pub fn resolve_inject_type(&self, type_name: &str) -> Option<String> {
-        self.classes.get(type_name).map(|entry| {
-            format!("{}@{}", entry.class_name, entry.file_alias)
-        })
+        self.classes
+            .get(type_name)
+            .map(|entry| format!("{}@{}", entry.class_name, entry.file_alias))
     }
 
     /// Resolve a REST endpoint path to its controller file-aliased
@@ -288,10 +289,7 @@ impl SpringGraph {
                 ClassKind::Repository => "Φrepo:",
                 ClassKind::Configuration => "Φconf:",
             };
-            s.push_str(&format!(
-                "    {}injects=[",
-                dep_marker
-            ));
+            s.push_str(&format!("    {}injects=[", dep_marker));
             let resolved_injects: Vec<String> = entry
                 .injects
                 .iter()
@@ -327,7 +325,9 @@ impl SpringGraph {
     /// Uses three-color DFS (white/gray/black) for O(V+E) performance.
     pub fn has_cycle(&self) -> bool {
         let class_names: Vec<String> = self.classes.keys().cloned().collect();
-        let name_to_idx: HashMap<&str, usize> = class_names.iter().enumerate()
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
             .map(|(i, name)| (name.as_str(), i))
             .collect();
 
@@ -339,7 +339,9 @@ impl SpringGraph {
         let adj_fn = |i: usize| {
             let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
             if let Some(entry) = self.classes.get(name) {
-                entry.injects.iter()
+                entry
+                    .injects
+                    .iter()
                     .filter_map(|injected| name_to_idx.get(injected.as_str()))
                     .copied()
                     .collect::<Vec<_>>()
@@ -357,7 +359,9 @@ impl SpringGraph {
     /// If no cycles exist, returns an empty `Vec`.
     pub fn find_cycles(&self) -> Vec<Vec<String>> {
         let class_names: Vec<String> = self.classes.keys().cloned().collect();
-        let name_to_idx: HashMap<&str, usize> = class_names.iter().enumerate()
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
             .map(|(i, name)| (name.as_str(), i))
             .collect();
 
@@ -369,7 +373,9 @@ impl SpringGraph {
         let adj_fn = |i: usize| {
             let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
             if let Some(entry) = self.classes.get(name) {
-                entry.injects.iter()
+                entry
+                    .injects
+                    .iter()
                     .filter_map(|injected| name_to_idx.get(injected.as_str()))
                     .copied()
                     .collect::<Vec<_>>()
@@ -379,7 +385,8 @@ impl SpringGraph {
         };
 
         let label_fn = |i: usize| {
-            class_names.get(i)
+            class_names
+                .get(i)
                 .cloned()
                 .unwrap_or_else(|| format!("unknown_{}", i))
         };
@@ -399,7 +406,9 @@ impl SpringGraph {
         }
 
         let class_names: Vec<String> = self.classes.keys().cloned().collect();
-        let name_to_idx: HashMap<&str, usize> = class_names.iter().enumerate()
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
             .map(|(i, name)| (name.as_str(), i))
             .collect();
 
@@ -409,7 +418,9 @@ impl SpringGraph {
         let adj_fn = |i: usize| {
             let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
             if let Some(entry) = self.classes.get(name) {
-                entry.injects.iter()
+                entry
+                    .injects
+                    .iter()
                     .filter_map(|injected| name_to_idx.get(injected.as_str()))
                     .copied()
                     .collect::<Vec<_>>()
@@ -419,7 +430,8 @@ impl SpringGraph {
         };
 
         let indices = transitive_dependencies(start_idx, depth, node_count, adj_fn);
-        indices.into_iter()
+        indices
+            .into_iter()
             .filter_map(|i| class_names.get(i))
             .cloned()
             .collect()
@@ -455,7 +467,9 @@ pub struct GraphEntry {
 
 impl GraphCollector {
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     /// Register a class for later graph building.
@@ -501,4 +515,3 @@ impl GraphCollector {
         self.entries.len()
     }
 }
-

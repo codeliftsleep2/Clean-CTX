@@ -10,9 +10,9 @@
 // P0-1: Updated handler chain to use &McpState (interior mutability) —
 // no &mut needed anywhere. The McpState handles its own locking internally.
 
+use crate::mcp::McpState;
 use crate::mcp::handlers;
 use crate::mcp::tools;
-use crate::mcp::McpState;
 use crate::protocol::send_response;
 
 /// Dispatch an incoming JSON-RPC request to the appropriate handler.
@@ -20,10 +20,7 @@ use crate::protocol::send_response;
 /// A-09: Takes an owned `JsonRpcRequest` so the caller can move it
 /// into a closure (required for thread-pool dispatch).
 /// P0-1: Uses &McpState (interior mutability) — shared across workers.
-pub(crate) fn dispatch(
-    req: crate::protocol::JsonRpcRequest,
-    state: &McpState,
-) {
+pub(crate) fn dispatch(req: crate::protocol::JsonRpcRequest, state: &McpState) {
     match req.method.as_str() {
         "initialize" => {
             if let Some(ref id) = req.id {

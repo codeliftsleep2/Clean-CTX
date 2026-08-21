@@ -20,16 +20,16 @@
 // - `footer`     : `§ΦMAP` workspace footer formatter
 // - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
 
+pub mod bundler;
 pub(crate) mod decorators;
 pub(crate) mod detect;
-pub(crate) mod markers;
-pub mod bundler;
-pub mod template;
-pub mod template_compress;
-pub mod style;
 pub mod footer;
 pub mod graph;
 pub mod graph_state;
+pub(crate) mod markers;
+pub mod style;
+pub mod template;
+pub mod template_compress;
 
 use crate::compression::Fidelity;
 

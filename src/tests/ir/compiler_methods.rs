@@ -149,7 +149,9 @@ fn parse_sig_csharp_generic_return_type_first() {
 
 #[test]
 fn parse_sig_csharp_with_modifiers() {
-    let sig = parse_method_sig("public async Task<IActionResult> Create([FromBody] CreateUserRequest request)");
+    let sig = parse_method_sig(
+        "public async Task<IActionResult> Create([FromBody] CreateUserRequest request)",
+    );
     assert_eq!(sig.name, "Create");
     assert!(sig.params_str.contains("request"));
 }
@@ -175,9 +177,7 @@ fn parse_sig_csharp_tuple_return_type() {
 /// the tuple's closing `)` is followed by `:`, not end-of-string).
 #[test]
 fn parse_sig_csharp_tuple_return_with_colon_annotation() {
-    let sig = parse_method_sig(
-        "Task<(string A, string B)> GetPair():$v",
-    );
+    let sig = parse_method_sig("Task<(string A, string B)> GetPair():$v");
     assert_eq!(sig.name, "GetPair");
     assert_eq!(sig.params_str, "");
     assert_eq!(sig.return_type, "$v");
@@ -265,8 +265,16 @@ fn emit_method_ir_strips_arrow_expression_from_sig() {
     });
     let (mid, ty) = return_op.expect("should emit Return");
     assert_eq!(mid, "M2");
-    assert!(!ty.contains("=>"), "arrow expression leaked into return type: {}", ty);
-    assert!(!ty.contains("labels"), "arrow expression leaked into return type: {}", ty);
+    assert!(
+        !ty.contains("=>"),
+        "arrow expression leaked into return type: {}",
+        ty
+    );
+    assert!(
+        !ty.contains("labels"),
+        "arrow expression leaked into return type: {}",
+        ty
+    );
 }
 
 /// C# attribute handling: `extract_method_body` must strip leading
@@ -284,8 +292,16 @@ fn extract_method_body_and_emit_ir_strip_csharp_attributes() {
     // Body extraction must ignore the attribute's `{` inside the string
     // literal and start at the real declaration brace.
     let body = extract_method_body(raw).expect("should extract body");
-    assert!(body.contains("GetUserById"), "body should contain the real method body: {}", body);
-    assert!(!body.contains("HttpGet"), "body should not contain the attribute: {}", body);
+    assert!(
+        body.contains("GetUserById"),
+        "body should contain the real method body: {}",
+        body
+    );
+    assert!(
+        !body.contains("HttpGet"),
+        "body should not contain the attribute: {}",
+        body
+    );
 
     // emit_method_ir must produce a clean name (not `[HttpGet`).
     let mut compiler = IRCompiler::new();

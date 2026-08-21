@@ -1,4 +1,4 @@
-﻿// src/tests/cbm/e2e.rs
+// src/tests/cbm/e2e.rs
 //
 // End-to-end tests for the full CBM integration pipeline.
 // These tests exercise the complete flow:
@@ -12,11 +12,13 @@ use serde_json::json;
 /// Check if CBM binary exists on PATH without launching it.
 /// This avoids double-launching CBM when `McpState::new()` also launches it.
 fn cbm_binary_exists() -> bool {
-    let name = if cfg!(windows) { "codebase-memory-mcp.exe" } else { "codebase-memory-mcp" };
+    let name = if cfg!(windows) {
+        "codebase-memory-mcp.exe"
+    } else {
+        "codebase-memory-mcp"
+    };
     std::env::var_os("PATH")
-        .map(|path| {
-            std::env::split_paths(&path).any(|dir| dir.join(name).is_file())
-        })
+        .map(|path| std::env::split_paths(&path).any(|dir| dir.join(name).is_file()))
         .unwrap_or(false)
 }
 
@@ -41,23 +43,39 @@ fn e2e_proxy_search_graph_compresses_response() {
     let state = crate::mcp::McpState::new(config);
 
     // Verify bridge is available
-    assert!(state.graph_bridge.lock().unwrap().as_ref().is_some_and(|b| b.is_available()),
-        "Bridge should be available when CBM is installed and enabled");
+    assert!(
+        state
+            .graph_bridge
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|b| b.is_available()),
+        "Bridge should be available when CBM is installed and enabled"
+    );
 
     // Call the proxy with a real search_graph query
     // Test proxy response format
     let mut binding = state.graph_bridge.lock().unwrap();
     let bridge = binding.as_mut().unwrap();
-    let raw = bridge.proxy_call("search_graph", json!({
-        "name_pattern": ".*compress.*",
-        "label": "Function",
-        "limit": 5
-    }));
+    let raw = bridge.proxy_call(
+        "search_graph",
+        json!({
+            "name_pattern": ".*compress.*",
+            "label": "Function",
+            "limit": 5
+        }),
+    );
 
     match raw {
         Ok(text) => {
-            assert!(!text.is_empty(), "CBM proxy should return non-empty response");
-            assert!(text.contains("jsonrpc"), "Response should be valid JSON-RPC");
+            assert!(
+                !text.is_empty(),
+                "CBM proxy should return non-empty response"
+            );
+            assert!(
+                text.contains("jsonrpc"),
+                "Response should be valid JSON-RPC"
+            );
         }
         Err(e) => {
             // CBM might not have indexed this project — that's OK for E2E
@@ -65,7 +83,6 @@ fn e2e_proxy_search_graph_compresses_response() {
         }
     }
 }
-
 
 /// Test that the full proxy compression pipeline works end-to-end.
 /// Uses cbm_proxy handler directly.
@@ -111,14 +128,24 @@ fn e2e_proxy_handler_returns_compressed_result() {
 /// Test that GraphBridge gracefully handles all queries when CBM is unavailable.
 #[test]
 fn e2e_bridge_graceful_degradation_all_queries() {
-    let config = crate::cbm::config::CbmConfig { enabled: false, ..Default::default() };
-    let mut bridge = crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
+    let config = crate::cbm::config::CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge =
+        crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
 
-    assert!(!bridge.is_available(), "Bridge should be unavailable when CBM disabled");
+    assert!(
+        !bridge.is_available(),
+        "Bridge should be unavailable when CBM disabled"
+    );
 
     // All queries should return empty/default results, NOT panic
     let importance = bridge.get_symbol_importance_mut();
-    assert!(importance.is_empty(), "Symbol importance should be empty without CBM");
+    assert!(
+        importance.is_empty(),
+        "Symbol importance should be empty without CBM"
+    );
 
     let dead = bridge.get_dead_code();
     assert!(dead.is_empty(), "Dead code should be empty without CBM");
@@ -137,13 +164,17 @@ fn e2e_bridge_graceful_degradation_all_queries() {
 
     // query_graph should return empty QueryResult
     let qr = bridge.query_graph("MATCH (n) RETURN n");
-    assert!(qr.nodes.is_empty() && qr.edges.is_empty(),
-        "Query graph should return empty without CBM");
+    assert!(
+        qr.nodes.is_empty() && qr.edges.is_empty(),
+        "Query graph should return empty without CBM"
+    );
 
     // detect_changes should return Ok(None)
     let changes = bridge.detect_changes();
-    assert!(changes.is_ok() && changes.unwrap().is_none(),
-        "Detect changes should return None without CBM");
+    assert!(
+        changes.is_ok() && changes.unwrap().is_none(),
+        "Detect changes should return None without CBM"
+    );
 
     // cache operations should not panic
     bridge.invalidate_symbol("test");
@@ -156,8 +187,12 @@ fn e2e_bridge_graceful_degradation_all_queries() {
 fn e2e_bridge_status_lifecycle() {
     use crate::cbm::config::CbmStatus;
 
-    let config = crate::cbm::config::CbmConfig { enabled: false, ..Default::default() };
-    let mut bridge = crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
+    let config = crate::cbm::config::CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge =
+        crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
 
     assert_eq!(bridge.status(), &CbmStatus::Unavailable);
     assert!(!bridge.is_available());
@@ -181,9 +216,11 @@ fn e2e_bridge_status_lifecycle() {
 /// Test the full intelligence layer pipeline: PageRank → fidelity → recommendation.
 #[test]
 fn e2e_intelligence_layer_full_pipeline() {
-    use crate::intelligence::compute_pagerank;
-    use crate::intelligence::fidelity::{cbm_informed_fidelity, apply_recommendation, FidelityRecommendation};
     use crate::cbm::SymbolImportance;
+    use crate::intelligence::compute_pagerank;
+    use crate::intelligence::fidelity::{
+        FidelityRecommendation, apply_recommendation, cbm_informed_fidelity,
+    };
     use std::collections::HashMap;
 
     // Build IR scores
@@ -194,21 +231,30 @@ fn e2e_intelligence_layer_full_pipeline() {
 
     // Build CBM importance scores
     let mut cbm_scores = HashMap::new();
-    cbm_scores.insert("critical_handler".to_string(), SymbolImportance {
-        symbol: "critical_handler".into(),
-        score: 0.95,
-        file: "src/handler.rs".into(),
-    });
-    cbm_scores.insert("helper_func".to_string(), SymbolImportance {
-        symbol: "helper_func".into(),
-        score: 0.5,
-        file: "src/handler.rs".into(),
-    });
-    cbm_scores.insert("unused_util".to_string(), SymbolImportance {
-        symbol: "unused_util".into(),
-        score: 0.1,
-        file: "src/utils.rs".into(),
-    });
+    cbm_scores.insert(
+        "critical_handler".to_string(),
+        SymbolImportance {
+            symbol: "critical_handler".into(),
+            score: 0.95,
+            file: "src/handler.rs".into(),
+        },
+    );
+    cbm_scores.insert(
+        "helper_func".to_string(),
+        SymbolImportance {
+            symbol: "helper_func".into(),
+            score: 0.5,
+            file: "src/handler.rs".into(),
+        },
+    );
+    cbm_scores.insert(
+        "unused_util".to_string(),
+        SymbolImportance {
+            symbol: "unused_util".into(),
+            score: 0.1,
+            file: "src/utils.rs".into(),
+        },
+    );
 
     // Step 1: Compute PageRank
     let scores = compute_pagerank(ir_scores, cbm_scores, Some(0.6));
@@ -216,18 +262,28 @@ fn e2e_intelligence_layer_full_pipeline() {
 
     // Step 2: Verify high-importance symbol gets ForceHigh
     let critical_score = scores.get("critical_handler").unwrap();
-    assert!(critical_score.combined_score > 0.7,
-        "Critical handler should have high combined score: {}", critical_score.combined_score);
+    assert!(
+        critical_score.combined_score > 0.7,
+        "Critical handler should have high combined score: {}",
+        critical_score.combined_score
+    );
 
     // Step 3: Test fidelity recommendation pipeline
     let mut importance_map = HashMap::new();
-    importance_map.insert("critical_handler".to_string(), SymbolImportance {
-        symbol: "critical_handler".into(),
-        score: critical_score.combined_score,
-        file: "src/handler.rs".into(),
-    });
+    importance_map.insert(
+        "critical_handler".to_string(),
+        SymbolImportance {
+            symbol: "critical_handler".into(),
+            score: critical_score.combined_score,
+            file: "src/handler.rs".into(),
+        },
+    );
 
-    let rec = cbm_informed_fidelity("src/handler.rs", &importance_map, FidelityRecommendation::NoRecommendation);
+    let rec = cbm_informed_fidelity(
+        "src/handler.rs",
+        &importance_map,
+        FidelityRecommendation::NoRecommendation,
+    );
 
     // Step 4: Apply recommendation
     let fidelity = apply_recommendation(&rec);
@@ -235,4 +291,3 @@ fn e2e_intelligence_layer_full_pipeline() {
         assert_eq!(fidelity, Some(crate::compressor::Fidelity::High));
     }
 }
-

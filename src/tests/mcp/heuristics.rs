@@ -4,11 +4,11 @@
 // Covers V1 backward compatibility + V2 content classification
 // + regression tests for FAANG audit findings
 
-use crate::mcp::heuristics;
-use crate::compression::text_delta::TextDeltaComputer;
 use crate::compression::Fidelity;
+use crate::compression::text_delta::TextDeltaComputer;
 use crate::config::CleanCtxConfig;
 use crate::ir::replay::ContextState;
+use crate::mcp::heuristics;
 
 #[allow(clippy::too_many_arguments)]
 fn decide_ok(
@@ -22,10 +22,23 @@ fn decide_ok(
     path_alias: Option<&str>,
     stored_fidelity: Option<Fidelity>,
 ) -> heuristics::ContextDecision {
-    heuristics::decide(file_path, explicit_fidelity, explicit_intent, config, text_delta, ir_ctx, source, path_alias, stored_fidelity).expect("decide should succeed")
+    heuristics::decide(
+        file_path,
+        explicit_fidelity,
+        explicit_intent,
+        config,
+        text_delta,
+        ir_ctx,
+        source,
+        path_alias,
+        stored_fidelity,
+    )
+    .expect("decide should succeed")
 }
 
-fn empty_source() -> &'static str { "" }
+fn empty_source() -> &'static str {
+    ""
+}
 
 // ── V1 Strategy Tests (unchanged) ──────────────────────────────────
 
@@ -68,7 +81,10 @@ fn test_delta_after_baseline() {
         Some("alpha1"),
         None,
     );
-    assert_eq!(decision.strategy, heuristics::ContextStrategy::DeltaTransport);
+    assert_eq!(
+        decision.strategy,
+        heuristics::ContextStrategy::DeltaTransport
+    );
 }
 
 // ── F-32: Delta fidelity-change guard ──────────────────────────────
@@ -186,8 +202,11 @@ fn test_large_file_v2_complexity_medium() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Medium,
-        "V2: 500-line file without content patterns -> complexity Medium");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Medium,
+        "V2: 500-line file without content patterns -> complexity Medium"
+    );
 }
 
 // V2: Small files (<=150 lines) still get Low via complexity fallback
@@ -208,8 +227,11 @@ fn test_small_file_v2_complexity_low() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Low,
-        "V2: 150-line file without content patterns -> complexity Low");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Low,
+        "V2: 150-line file without content patterns -> complexity Low"
+    );
 }
 
 // ── V1 Angular Detection (unchanged) ───────────────────────────────
@@ -278,7 +300,10 @@ fn test_decision_summary_includes_details() {
     assert!(summary.contains("strategy="));
     assert!(summary.contains("angular="));
     assert!(summary.contains("lines="));
-    assert!(summary.contains("class="), "V2: summary should include class= field");
+    assert!(
+        summary.contains("class="),
+        "V2: summary should include class= field"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -302,7 +327,11 @@ fn test_v2_classify_test_file() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Low, "test files should get Low fidelity");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Low,
+        "test files should get Low fidelity"
+    );
     assert_eq!(decision.file_class, heuristics::FileClass::Test);
 }
 
@@ -322,7 +351,11 @@ fn test_v2_classify_test_path() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Low, "test path files should get Low fidelity");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Low,
+        "test path files should get Low fidelity"
+    );
     assert_eq!(decision.file_class, heuristics::FileClass::Test);
 }
 
@@ -342,7 +375,11 @@ fn test_v2_classify_config_file() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Low, "config files should get Low fidelity");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Low,
+        "config files should get Low fidelity"
+    );
     assert_eq!(decision.file_class, heuristics::FileClass::Config);
 }
 
@@ -364,8 +401,11 @@ fn test_v2_m3_configure_not_config() {
         None,
     );
     // configure.rs does NOT match "config" as a path segment, so it should NOT be FileClass::Config
-    assert_ne!(decision.file_class, heuristics::FileClass::Config,
-        "M-3 regression: configure.rs should NOT be classified as config");
+    assert_ne!(
+        decision.file_class,
+        heuristics::FileClass::Config,
+        "M-3 regression: configure.rs should NOT be classified as config"
+    );
 }
 
 #[test]
@@ -390,7 +430,11 @@ pub trait Displayable { fn display(&self) -> String; }
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Medium, "model files should get Medium fidelity");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Medium,
+        "model files should get Medium fidelity"
+    );
     assert_eq!(decision.file_class, heuristics::FileClass::Model);
 }
 
@@ -429,8 +473,11 @@ impl std::fmt::Display for User {
         None,
     );
     // Should NOT be Model (1 struct with 5 fn is not > 3:1 ratio with fns present)
-    assert_ne!(decision.file_class, heuristics::FileClass::Model,
-        "M-1 regression: file with 1 struct + impl blocks should NOT be classified as Model");
+    assert_ne!(
+        decision.file_class,
+        heuristics::FileClass::Model,
+        "M-1 regression: file with 1 struct + impl blocks should NOT be classified as Model"
+    );
 }
 
 /// M-2 regression: fn test_ functions should NOT trigger test classification
@@ -452,8 +499,11 @@ fn test_v2_m2_test_helper_not_test_file() {
         None,
     );
     // fn test_connection is a test helper, not a test file
-    assert_ne!(decision.file_class, heuristics::FileClass::Test,
-        "M-2 regression: fn test_ helper should NOT trigger test classification");
+    assert_ne!(
+        decision.file_class,
+        heuristics::FileClass::Test,
+        "M-2 regression: fn test_ helper should NOT trigger test classification"
+    );
 }
 
 /// C-1 regression: stored_fidelity from DB should be used when no explicit args
@@ -472,10 +522,13 @@ fn test_v2_c1_stored_fidelity_reused() {
         &ir_ctx,
         source,
         None,
-        Some(Fidelity::High),  // C-1: DB says this was High before
+        Some(Fidelity::High), // C-1: DB says this was High before
     );
-    assert_eq!(decision.fidelity, Fidelity::High,
-        "C-1 regression: stored_fidelity=High should be reused when no explicit args");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::High,
+        "C-1 regression: stored_fidelity=High should be reused when no explicit args"
+    );
 }
 
 /// C-1 regression: explicit fidelity still overrides stored_fidelity
@@ -496,8 +549,11 @@ fn test_v2_c1_explicit_overrides_stored() {
         None,
         Some(Fidelity::High),
     );
-    assert_eq!(decision.fidelity, Fidelity::Low,
-        "C-1 regression: explicit fidelity=low should override stored_fidelity=High");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Low,
+        "C-1 regression: explicit fidelity=low should override stored_fidelity=High"
+    );
 }
 
 /// C-1 regression: session_aware_fidelity=false ignores stored_fidelity
@@ -521,8 +577,11 @@ fn test_v2_c1_disabled_ignores_stored() {
     );
     // With session_aware_fidelity off, stored_fidelity is ignored.
     // The file is small (1 fn, 1 line) -> config default Low
-    assert_eq!(decision.fidelity, Fidelity::Low,
-        "C-1 regression: stored_fidelity should be ignored when session_aware_fidelity=false");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Low,
+        "C-1 regression: stored_fidelity should be ignored when session_aware_fidelity=false"
+    );
 }
 
 #[test]
@@ -538,7 +597,10 @@ fn test_v2_classify_service_file() {
         source.push_str(&format!("use crate::module{}::Thing{};\n", i, i));
     }
     for i in 0..11 {
-        source.push_str(&format!("pub fn func{}(x: i32) -> i32 {{ x + {} }}\n", i, i));
+        source.push_str(&format!(
+            "pub fn func{}(x: i32) -> i32 {{ x + {} }}\n",
+            i, i
+        ));
     }
     let decision = decide_ok(
         "/project/src/services/user_service.rs",
@@ -551,7 +613,11 @@ fn test_v2_classify_service_file() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::High, "service files should get High fidelity");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::High,
+        "service files should get High fidelity"
+    );
     assert_eq!(decision.file_class, heuristics::FileClass::Service);
 }
 
@@ -586,7 +652,11 @@ pub fn list_users() -> Vec<User> {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Medium, "implementation files should get Medium fidelity");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Medium,
+        "implementation files should get Medium fidelity"
+    );
     assert_eq!(decision.file_class, heuristics::FileClass::Implementation);
 }
 
@@ -610,7 +680,11 @@ fn test_v2_complexity_very_small_low() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Low, "very small files should get Low");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Low,
+        "very small files should get Low"
+    );
 }
 
 #[test]
@@ -634,8 +708,11 @@ fn test_v2_complexity_medium_imports() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Medium,
-        "12 imports + 1 function should get Medium via complexity");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Medium,
+        "12 imports + 1 function should get Medium via complexity"
+    );
 }
 
 #[test]
@@ -651,7 +728,10 @@ fn test_v2_complexity_high() {
         source.push_str(&format!("use crate::module{}::Thing{};\n", i, i));
     }
     for i in 0..20 {
-        source.push_str(&format!("pub fn func{}(x: i32) -> i32 {{ x + {} }}\n", i, i));
+        source.push_str(&format!(
+            "pub fn func{}(x: i32) -> i32 {{ x + {} }}\n",
+            i, i
+        ));
     }
     for i in 0..500 {
         source.push_str(&format!("// line {}\n", i));
@@ -667,8 +747,11 @@ fn test_v2_complexity_high() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::High,
-        "25 imports + 20 functions should get High via service classifier");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::High,
+        "25 imports + 20 functions should get High via service classifier"
+    );
 }
 
 #[test]
@@ -694,8 +777,11 @@ fn test_v2_explicit_fidelity_overrides_classifier() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Low,
-        "explicit fidelity=low should override service classification");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Low,
+        "explicit fidelity=low should override service classification"
+    );
 }
 
 #[test]
@@ -716,8 +802,11 @@ fn test_v2_auto_classify_disabled_v1_fallback() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Low,
-        "V1 fallback: large file -> Low when auto_classify is disabled");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Low,
+        "V1 fallback: large file -> Low when auto_classify is disabled"
+    );
     assert_eq!(decision.file_class, heuristics::FileClass::General);
 }
 
@@ -745,8 +834,11 @@ fn test_v2_classify_component_html_implementation() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Medium,
-        ".component.html files should get Medium fidelity by default");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Medium,
+        ".component.html files should get Medium fidelity by default"
+    );
     assert_eq!(decision.file_class, heuristics::FileClass::Implementation);
 }
 
@@ -767,8 +859,11 @@ fn test_v2_component_html_edit_intent_high_fidelity() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::High,
-        "template editing intent on .component.html should get High fidelity");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::High,
+        "template editing intent on .component.html should get High fidelity"
+    );
     assert_eq!(decision.file_class, heuristics::FileClass::Implementation);
 }
 
@@ -783,7 +878,7 @@ fn test_invalid_explicit_fidelity_returns_error() {
     let ir_ctx = ContextState::new();
     let result = heuristics::decide(
         "/project/src/service.ts",
-        Some("full"),  // invalid — not a recognized fidelity
+        Some("full"), // invalid — not a recognized fidelity
         None,
         &config,
         &text_delta,
@@ -792,8 +887,14 @@ fn test_invalid_explicit_fidelity_returns_error() {
         None,
         None,
     );
-    assert!(result.is_err(), "invalid explicit fidelity should return an error");
-    assert!(result.unwrap_err().contains("full"), "error should mention the bad value");
+    assert!(
+        result.is_err(),
+        "invalid explicit fidelity should return an error"
+    );
+    assert!(
+        result.unwrap_err().contains("full"),
+        "error should mention the bad value"
+    );
 }
 
 /// Gap 2 fix: a valid explicit fidelity still succeeds.
@@ -834,8 +935,11 @@ fn test_intent_edit_maps_to_edit_fidelity() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Edit,
-        "intent=edit should map to Edit fidelity via smart_defaults");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Edit,
+        "intent=edit should map to Edit fidelity via smart_defaults"
+    );
 }
 
 /// Gap 2.1 fix: auto-edit mode maps Service files to Edit when no
@@ -850,7 +954,10 @@ fn test_auto_edit_mode_service_file() {
         source.push_str(&format!("use crate::module{}::Thing{};\n", i, i));
     }
     for i in 0..11 {
-        source.push_str(&format!("pub fn func{}(x: i32) -> i32 {{ x + {} }}\n", i, i));
+        source.push_str(&format!(
+            "pub fn func{}(x: i32) -> i32 {{ x + {} }}\n",
+            i, i
+        ));
     }
     let decision = decide_ok(
         "/project/src/services/user_service.ts",
@@ -863,8 +970,11 @@ fn test_auto_edit_mode_service_file() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Edit,
-        "auto_edit_mode should map Service files to Edit");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Edit,
+        "auto_edit_mode should map Service files to Edit"
+    );
 }
 
 /// Gap 2.1 fix: auto-edit mode maps Implementation files to Edit.
@@ -892,8 +1002,11 @@ pub fn get_user(id: u32) -> Option<User> {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Edit,
-        "auto_edit_mode should map Implementation files to Edit");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Edit,
+        "auto_edit_mode should map Implementation files to Edit"
+    );
 }
 
 /// Gap 2.1 fix: disabling auto_edit_mode leaves Service files at High.
@@ -908,7 +1021,10 @@ fn test_auto_edit_mode_disabled_keeps_high() {
         source.push_str(&format!("use crate::module{}::Thing{};\n", i, i));
     }
     for i in 0..11 {
-        source.push_str(&format!("pub fn func{}(x: i32) -> i32 {{ x + {} }}\n", i, i));
+        source.push_str(&format!(
+            "pub fn func{}(x: i32) -> i32 {{ x + {} }}\n",
+            i, i
+        ));
     }
     let decision = decide_ok(
         "/project/src/services/user_service.ts",
@@ -921,8 +1037,11 @@ fn test_auto_edit_mode_disabled_keeps_high() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::High,
-        "with auto_edit_mode off, Service files should stay High");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::High,
+        "with auto_edit_mode off, Service files should stay High"
+    );
 }
 
 /// Gap 2.1 fix: custom edit_auto_classifications can include Model files.
@@ -948,8 +1067,11 @@ pub enum Status { Active, Inactive }
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Edit,
-        "custom edit_auto_classifications should map Model files to Edit");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Edit,
+        "custom edit_auto_classifications should map Model files to Edit"
+    );
 }
 
 #[test]
@@ -969,6 +1091,9 @@ fn test_v2_component_html_explicit_fidelity_overrides() {
         None,
         None,
     );
-    assert_eq!(decision.fidelity, Fidelity::Low,
-        "explicit fidelity=low should override .component.html default");
+    assert_eq!(
+        decision.fidelity,
+        Fidelity::Low,
+        "explicit fidelity=low should override .component.html default"
+    );
 }

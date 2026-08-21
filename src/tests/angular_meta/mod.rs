@@ -21,7 +21,8 @@ fn meta_layer_extracts_inline_template_shape() {
             show = true;
         }
     "#;
-    let class_captures = vec![r#"
+    let class_captures = vec![
+        r#"
         @Component({
             selector: 'app-hello',
             template: '<div *ngIf="show"><span>{{ name }}</span></div>'
@@ -30,20 +31,38 @@ fn meta_layer_extracts_inline_template_shape() {
             name = 'World';
             show = true;
         }
-    "#.to_string()];
-    let block = run_meta_layer(source, &class_captures, Fidelity::Medium).expect("should detect Angular");
+    "#
+        .to_string(),
+    ];
+    let block =
+        run_meta_layer(source, &class_captures, Fidelity::Medium).expect("should detect Angular");
     let rendered = block.render();
     // Should contain the Φcmp: marker
-    assert!(rendered.contains("Φcmp:HelloComponent"), "missing Φcmp marker: {}", rendered);
+    assert!(
+        rendered.contains("Φcmp:HelloComponent"),
+        "missing Φcmp marker: {}",
+        rendered
+    );
     // Should contain the inline template shape extraction
-    assert!(rendered.contains("Φtpl:"), "missing Φtpl marker for inline template: {}", rendered);
+    assert!(
+        rendered.contains("Φtpl:"),
+        "missing Φtpl marker for inline template: {}",
+        rendered
+    );
     // Medium fidelity = multi-line structural output. The `Φtpl:` header
     // line is bare; the structural lines follow it. The template has
     // *ngIf (condition captured), and the div/span are HTML scaffolding
     // (stripped at Medium fidelity).
-    let tpl_block: Vec<&str> = rendered.lines().filter(|l| l.starts_with("Φtpl:") || l.starts_with('@') || l.starts_with('*') || l.starts_with('<')).collect();
+    let tpl_block: Vec<&str> = rendered
+        .lines()
+        .filter(|l| {
+            l.starts_with("Φtpl:") || l.starts_with('@') || l.starts_with('*') || l.starts_with('<')
+        })
+        .collect();
     assert!(
-        tpl_block.iter().any(|l| l.contains("[ngIf]") || l.contains("*ngIf")),
+        tpl_block
+            .iter()
+            .any(|l| l.contains("[ngIf]") || l.contains("*ngIf")),
         "missing [ngIf] directive in template output: {:?}",
         tpl_block
     );

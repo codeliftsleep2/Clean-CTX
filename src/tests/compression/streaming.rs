@@ -30,10 +30,17 @@ fn streaming_callback_receives_initial_phase() {
             Ok(())
         },
     );
-    assert!(result.is_ok(), "streaming compress should succeed, got: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "streaming compress should succeed, got: {:?}",
+        result
+    );
 
     let recorded = phases.lock().unwrap();
-    assert!(!recorded.is_empty(), "should have emitted at least one progress event");
+    assert!(
+        !recorded.is_empty(),
+        "should have emitted at least one progress event"
+    );
     assert_eq!(recorded[0], "reading", "first phase should be 'reading'");
 }
 
@@ -60,7 +67,9 @@ fn streaming_callback_sees_done_phase_at_end() {
 
     assert!(result.is_ok(), "streaming compress should succeed");
     let recorded = phases.lock().unwrap();
-    let last = recorded.last().expect("should have at least one progress event");
+    let last = recorded
+        .last()
+        .expect("should have at least one progress event");
     assert_eq!(last, "done", "last phase should be 'done', got: {}", last);
 }
 
@@ -119,7 +128,10 @@ fn streaming_callback_error_stops_pipeline() {
         |_: CompressionProgress| Err("user-aborted".into()),
     );
 
-    assert!(result.is_err(), "streaming compress should propagate callback error");
+    assert!(
+        result.is_err(),
+        "streaming compress should propagate callback error"
+    );
     let err = result.unwrap_err();
     assert!(
         format!("{:?}", err).contains("user-aborted"),
@@ -157,7 +169,10 @@ fn streaming_cache_hit_receives_cache_hit_phase() {
         },
     );
 
-    assert!(result.is_ok(), "streaming compress (cache hit) should succeed");
+    assert!(
+        result.is_ok(),
+        "streaming compress (cache hit) should succeed"
+    );
     let recorded = phases2.lock().unwrap();
     assert!(
         recorded.contains(&"cache-hit".to_string()),

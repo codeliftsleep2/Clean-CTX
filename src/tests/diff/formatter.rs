@@ -1,6 +1,6 @@
 use super::*;
-use crate::diff::snapshot::{CapturedClass, CapturedMethod, CapturedStructure};
 use crate::diff::differ::diff_snapshots;
+use crate::diff::snapshot::{CapturedClass, CapturedMethod, CapturedStructure};
 
 fn make_class(name: &str, methods: &[&str], fields: &[&str]) -> CapturedClass {
     CapturedClass {
@@ -19,10 +19,7 @@ fn make_class(name: &str, methods: &[&str], fields: &[&str]) -> CapturedClass {
 }
 
 /// Build a class with methods that carry explicit body fingerprints.
-fn make_class_with_bodies(
-    name: &str,
-    methods: &[(&str, Option<&str>)],
-) -> CapturedClass {
+fn make_class_with_bodies(name: &str, methods: &[(&str, Option<&str>)]) -> CapturedClass {
     CapturedClass {
         name: name.to_string(),
         class_meta: String::new(),
@@ -44,7 +41,7 @@ fn format_diff_renders_markers() {
         imports: vec![],
         classes: vec![make_class("Foo", &["foo()"], &[])],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
@@ -53,7 +50,7 @@ orphan_methods: vec![],
             make_class("Bar", &["bar()"], &[]),
         ],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let rendered = format_diff(&actions, Fidelity::Low);
@@ -72,7 +69,7 @@ fn format_diff_renders_body_only_change_marker() {
             &[("process(id):void", Some("return id + 1;"))],
         )],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
@@ -81,7 +78,7 @@ orphan_methods: vec![],
             &[("process(id):void", Some("return id + 2;"))],
         )],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let rendered = format_diff(&actions, Fidelity::Low);

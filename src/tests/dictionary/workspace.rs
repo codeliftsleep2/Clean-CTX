@@ -26,13 +26,29 @@ fn global_symbol_table_build_codes_assigns_by_frequency() {
     // Service (3) should get the first available code ($d, since
     // $a=async, $b=boolean, $c=class are taken by primitives).
     // HttpClient (2) gets the next, Observable (1) the one after.
-    let svc = table.get_opcode("Service").expect("Service should have a code");
-    let http = table.get_opcode("HttpClient").expect("HttpClient should have a code");
-    let obs = table.get_opcode("Observable").expect("Observable should have a code");
+    let svc = table
+        .get_opcode("Service")
+        .expect("Service should have a code");
+    let http = table
+        .get_opcode("HttpClient")
+        .expect("HttpClient should have a code");
+    let obs = table
+        .get_opcode("Observable")
+        .expect("Observable should have a code");
     // Service should have a lower (earlier) code than HttpClient
-    assert!(svc < http, "Service ({}) should rank before HttpClient ({})", svc, http);
+    assert!(
+        svc < http,
+        "Service ({}) should rank before HttpClient ({})",
+        svc,
+        http
+    );
     // HttpClient should have a lower code than Observable
-    assert!(http < obs, "HttpClient ({}) should rank before Observable ({})", http, obs);
+    assert!(
+        http < obs,
+        "HttpClient ({}) should rank before Observable ({})",
+        http,
+        obs
+    );
 }
 
 #[test]
@@ -45,8 +61,14 @@ fn global_symbol_table_encode_body() {
     let encoded = table.encode_body("Service Observable HttpClient");
     // All three tokens should be replaced by global opcodes
     assert!(!encoded.contains("Service"), "Service should be encoded");
-    assert!(!encoded.contains("Observable"), "Observable should be encoded");
-    assert!(!encoded.contains("HttpClient"), "HttpClient should be encoded");
+    assert!(
+        !encoded.contains("Observable"),
+        "Observable should be encoded"
+    );
+    assert!(
+        !encoded.contains("HttpClient"),
+        "HttpClient should be encoded"
+    );
     // At least 3 distinct global opcodes should appear
     let svc = table.get_opcode("Service").unwrap();
     let http = table.get_opcode("HttpClient").unwrap();

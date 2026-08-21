@@ -42,5 +42,4 @@ pub enum ProxyError {
     /// Invalid proxy configuration.
     #[error("Configuration error: {0}")]
     Config(String),
-
 }

@@ -8,8 +8,8 @@
 // - No cache_control breakpoints (OpenAI doesn't support them)
 // - No special headers needed
 
-use serde_json::Value;
 use super::PlatformAdapter;
+use serde_json::Value;
 
 /// OpenAI API adapter.
 pub struct OpenAIAdapter;
@@ -20,11 +20,10 @@ impl PlatformAdapter for OpenAIAdapter {
             return None;
         }
 
-        let content = block["content"].as_str()
-            .unwrap_or("")
-            .to_string();
+        let content = block["content"].as_str().unwrap_or("").to_string();
 
-        let name = block["tool_call_id"].as_str()
+        let name = block["tool_call_id"]
+            .as_str()
             .unwrap_or("unknown")
             .to_string();
 

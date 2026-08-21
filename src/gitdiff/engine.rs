@@ -24,7 +24,7 @@
 
 use crate::compression::Fidelity;
 use crate::diff::{build_snapshot, diff_snapshots, format_diff};
-use crate::gitdiff::workspace::{collect_changed_files, show_file, FileChange};
+use crate::gitdiff::workspace::{FileChange, collect_changed_files, show_file};
 // ANGULAR_HTML_COMPRESSION_PLAN Phase 2: HTML template compression
 // in the diff path. Only available when the `angular` feature is enabled.
 #[cfg(feature = "angular")]
@@ -75,7 +75,10 @@ pub fn gitdiff_workspace(
     let mut manifest = String::new();
     // Header line: `§GITDIFF <from>..<to> (N files)`
     let to_label = to.unwrap_or("working-tree");
-    manifest.push_str(&format!("§GITDIFF {from}..{to_label} ({} files)\n", changes.len()));
+    manifest.push_str(&format!(
+        "§GITDIFF {from}..{to_label} ({} files)\n",
+        changes.len()
+    ));
 
     let (mut added, mut deleted, mut modified, mut renamed) = (0usize, 0usize, 0usize, 0usize);
 
@@ -121,14 +124,11 @@ pub fn gitdiff_workspace(
                 manifest.push_str(&format!("- FILE α{alias}: {path} (deleted)\n"));
             }
             FileChange::Modified(path) => {
-                let (body, err) =
-                    diff_modified_file(root, from, to, path, fidelity, max_file_size);
+                let (body, err) = diff_modified_file(root, from, to, path, fidelity, max_file_size);
                 match err {
                     Some(msg) => {
                         skipped += 1;
-                        manifest.push_str(&format!(
-                            "┌ FILE α{alias}: {path} (~0 -0 +0 — {msg})\n"
-                        ));
+                        manifest.push_str(&format!("┌ FILE α{alias}: {path} (~0 -0 +0 — {msg})\n"));
                     }
                     None => {
                         modified += 1;
@@ -141,8 +141,7 @@ pub fn gitdiff_workspace(
                 }
             }
             FileChange::Renamed(old, new) => {
-                let diff =
-                    diff_renamed_file(root, from, to, old, new, fidelity, max_file_size);
+                let diff = diff_renamed_file(root, from, to, old, new, fidelity, max_file_size);
                 match diff {
                     Ok(body) => {
                         renamed += 1;
@@ -268,8 +267,7 @@ fn diff_two_contents(
             Ok(base_snap) => match build_snapshot(to_content, fidelity) {
                 Ok(cur_snap) => {
                     let actions = diff_snapshots(&base_snap, &cur_snap);
-                    let body =
-                        format_diff(&actions, fidelity).trim_end().to_string();
+                    let body = format_diff(&actions, fidelity).trim_end().to_string();
                     (body, None)
                 }
                 Err(e) => (String::new(), Some(e.to_string())),
@@ -285,7 +283,14 @@ fn diff_two_contents(
         let from_compressed = compress_template_to_string(from_content, fidelity);
         let to_compressed = compress_template_to_string(to_content, fidelity);
         if from_compressed == to_compressed {
-            (format!("  ~ template unchanged ({} lines → {} lines)", from_content.lines().count(), to_content.lines().count()), None)
+            (
+                format!(
+                    "  ~ template unchanged ({} lines → {} lines)",
+                    from_content.lines().count(),
+                    to_content.lines().count()
+                ),
+                None,
+            )
         } else {
             let mut body = String::new();
             body.push_str("  - template (old):\n");
@@ -304,7 +309,10 @@ fn diff_two_contents(
         let to_lines = to_content.lines().count();
         let delta = to_lines.abs_diff(from_lines);
         let marker = if to_lines > from_lines { "+" } else { "-" };
-        (format!("  {marker}{delta} lines ({from_lines} → {to_lines})"), None)
+        (
+            format!("  {marker}{delta} lines ({from_lines} → {to_lines})"),
+            None,
+        )
     }
 }
 

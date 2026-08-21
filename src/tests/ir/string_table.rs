@@ -2,11 +2,11 @@
 //
 // Phase I: Ultra-Compact IR — String Table + Relative Referencing tests.
 
-use crate::ir::string_table::{
-    self, StringTable, encode_op, decode_op, ir_to_string_table_wire, wire_to_ir,
-};
 use crate::ir::compiler::CompiledIR;
 use crate::ir::opcodes::CoreOp;
+use crate::ir::string_table::{
+    self, StringTable, decode_op, encode_op, ir_to_string_table_wire, wire_to_ir,
+};
 use serde_json::json;
 
 /// Helper to create a simple CompiledIR for testing.
@@ -132,7 +132,10 @@ fn test_wire_format_structure() {
     let ir = make_test_ir(sample_instructions());
     let wire = ir_to_string_table_wire(&ir);
 
-    assert_eq!(wire.get("encoding").and_then(|v| v.as_str()), Some("string_table"));
+    assert_eq!(
+        wire.get("encoding").and_then(|v| v.as_str()),
+        Some("string_table")
+    );
     assert!(wire.get("t").and_then(|v| v.as_array()).is_some());
     assert!(wire.get("ir").and_then(|v| v.as_array()).is_some());
     assert_eq!(wire.get("file").and_then(|v| v.as_str()), Some("test"));
@@ -201,7 +204,11 @@ fn test_string_table_deduplicates() {
     ];
     let table = StringTable::from_instructions(&instructions);
     // "C1" should appear exactly once in the table
-    let c1_count = table.strings().iter().filter(|s| s.as_str() == "C1").count();
+    let c1_count = table
+        .strings()
+        .iter()
+        .filter(|s| s.as_str() == "C1")
+        .count();
     assert_eq!(c1_count, 1, "C1 should appear exactly once in the table");
 }
 

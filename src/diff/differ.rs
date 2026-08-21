@@ -17,24 +17,30 @@ pub fn diff_snapshots(
     let mut actions: Vec<DiffAction> = Vec::new();
 
     // ---- Imports ---------------------------------------------------------
-    let base_imports: BTreeMap<&str, ()> = baseline
-        .imports
-        .iter()
-        .map(|s| (s.as_str(), ()))
-        .collect();
-    let cur_imports: BTreeMap<&str, ()> = current
-        .imports
-        .iter()
-        .map(|s| (s.as_str(), ()))
-        .collect();
+    let base_imports: BTreeMap<&str, ()> =
+        baseline.imports.iter().map(|s| (s.as_str(), ())).collect();
+    let cur_imports: BTreeMap<&str, ()> =
+        current.imports.iter().map(|s| (s.as_str(), ())).collect();
     for imp in &current.imports {
         if !base_imports.contains_key(imp.as_str()) {
-            actions.push(new_action(DiffKind::Added, DiffTarget::Import, "import", imp.clone(), String::new()));
+            actions.push(new_action(
+                DiffKind::Added,
+                DiffTarget::Import,
+                "import",
+                imp.clone(),
+                String::new(),
+            ));
         }
     }
     for imp in &baseline.imports {
         if !cur_imports.contains_key(imp.as_str()) {
-            actions.push(new_action(DiffKind::Removed, DiffTarget::Import, "import", imp.clone(), String::new()));
+            actions.push(new_action(
+                DiffKind::Removed,
+                DiffTarget::Import,
+                "import",
+                imp.clone(),
+                String::new(),
+            ));
         }
     }
 
@@ -66,9 +72,7 @@ pub fn diff_snapshots(
                 // audit: previously a change to `class Foo : BaseA` →
                 // `class Foo : BaseB` reported the class as unchanged.
                 let class_meta_changed = base_cls.class_meta != cur_cls.class_meta;
-                let has_child_changes = child_actions
-                    .iter()
-                    .any(|a| a.kind != DiffKind::Unchanged);
+                let has_child_changes = child_actions.iter().any(|a| a.kind != DiffKind::Unchanged);
                 if class_meta_changed && !has_child_changes {
                     actions.push(new_action(
                         DiffKind::Modified,
@@ -111,20 +115,34 @@ pub fn diff_snapshots(
     }
 
     // ---- Orphan fields ---------------------------------------------------
-    diff_orphan_fields(&baseline.orphan_fields, &current.orphan_fields, &mut actions);
+    diff_orphan_fields(
+        &baseline.orphan_fields,
+        &current.orphan_fields,
+        &mut actions,
+    );
 
     // ---- Orphan methods (top-level functions) ----------------------------
     // G2-2 diff audit: files with only top-level functions (TS `function`,
     // C# top-level statements) previously produced zero methods and any
     // change to them was a false negative for `diff_commits`. Diff them
     // with the same method-grouping logic used inside classes.
-    diff_methods(&baseline.orphan_methods, &current.orphan_methods, &mut actions);
+    diff_methods(
+        &baseline.orphan_methods,
+        &current.orphan_methods,
+        &mut actions,
+    );
 
     actions
 }
 
 /// Construct a `DiffAction` with an empty reason hint.
-fn new_action(kind: DiffKind, target: DiffTarget, label: &str, detail: String, previous: String) -> DiffAction {
+fn new_action(
+    kind: DiffKind,
+    target: DiffTarget,
+    label: &str,
+    detail: String,
+    previous: String,
+) -> DiffAction {
     DiffAction {
         kind,
         target,
@@ -136,21 +154,29 @@ fn new_action(kind: DiffKind, target: DiffTarget, label: &str, detail: String, p
 }
 
 /// Diff two collections of orphan/top-level field strings as Added/Removed.
-fn diff_orphan_fields(
-    baseline: &[String],
-    current: &[String],
-    actions: &mut Vec<DiffAction>,
-) {
+fn diff_orphan_fields(baseline: &[String], current: &[String], actions: &mut Vec<DiffAction>) {
     let base: BTreeMap<&str, ()> = baseline.iter().map(|s| (s.as_str(), ())).collect();
     let cur: BTreeMap<&str, ()> = current.iter().map(|s| (s.as_str(), ())).collect();
     for f in current {
         if !base.contains_key(f.as_str()) {
-            actions.push(new_action(DiffKind::Added, DiffTarget::Field, "field", f.clone(), String::new()));
+            actions.push(new_action(
+                DiffKind::Added,
+                DiffTarget::Field,
+                "field",
+                f.clone(),
+                String::new(),
+            ));
         }
     }
     for f in baseline {
         if !cur.contains_key(f.as_str()) {
-            actions.push(new_action(DiffKind::Removed, DiffTarget::Field, "field", f.clone(), String::new()));
+            actions.push(new_action(
+                DiffKind::Removed,
+                DiffTarget::Field,
+                "field",
+                f.clone(),
+                String::new(),
+            ));
         }
     }
 }
@@ -159,11 +185,7 @@ fn diff_orphan_fields(
 /// method name, emitting Unchanged/Added/Removed/Modified per method.
 /// G2-2 audit: extracted from `diff_class` so top-level functions reuse
 /// the same grouping logic.
-fn diff_methods(
-    base: &[CapturedMethod],
-    cur: &[CapturedMethod],
-    actions: &mut Vec<DiffAction>,
-) {
+fn diff_methods(base: &[CapturedMethod], cur: &[CapturedMethod], actions: &mut Vec<DiffAction>) {
     let bg = group_by_key(base, |m| method_key(&m.sig));
     let cg = group_by_key(cur, |m| method_key(&m.sig));
     let mut keys: BTreeSet<String> = bg.keys().cloned().collect();
@@ -195,11 +217,21 @@ fn diff_methods(
                                 } else {
                                     "body"
                                 };
-                                actions.push(method_action(DiffKind::Modified, &key, c, &b.sig, reason));
+                                actions.push(method_action(
+                                    DiffKind::Modified,
+                                    &key,
+                                    c,
+                                    &b.sig,
+                                    reason,
+                                ));
                             }
                         }
-                        (Some(b), None) => actions.push(method_action(DiffKind::Removed, &key, b, "", "")),
-                        (None, Some(c)) => actions.push(method_action(DiffKind::Added, &key, c, "", "")),
+                        (Some(b), None) => {
+                            actions.push(method_action(DiffKind::Removed, &key, b, "", ""))
+                        }
+                        (None, Some(c)) => {
+                            actions.push(method_action(DiffKind::Added, &key, c, "", ""))
+                        }
                         _ => {}
                     }
                 }
@@ -240,7 +272,13 @@ fn diff_class(baseline: &CapturedClass, current: &CapturedClass) -> Vec<DiffActi
         match cur_fields.get(key) {
             None => {
                 for f in base_group {
-                    actions.push(new_action(DiffKind::Removed, DiffTarget::Field, &format!("field {}", key), f.clone(), String::new()));
+                    actions.push(new_action(
+                        DiffKind::Removed,
+                        DiffTarget::Field,
+                        &format!("field {}", key),
+                        f.clone(),
+                        String::new(),
+                    ));
                 }
             }
             Some(cur_group) => {
@@ -249,13 +287,37 @@ fn diff_class(baseline: &CapturedClass, current: &CapturedClass) -> Vec<DiffActi
                     match (base_group.get(i), cur_group.get(i)) {
                         (Some(b), Some(c)) => {
                             if b == c {
-                                actions.push(new_action(DiffKind::Unchanged, DiffTarget::Field, &format!("field {}", key), c.clone(), String::new()));
+                                actions.push(new_action(
+                                    DiffKind::Unchanged,
+                                    DiffTarget::Field,
+                                    &format!("field {}", key),
+                                    c.clone(),
+                                    String::new(),
+                                ));
                             } else {
-                                actions.push(new_action(DiffKind::Modified, DiffTarget::Field, &format!("field {}", key), c.clone(), b.clone()));
+                                actions.push(new_action(
+                                    DiffKind::Modified,
+                                    DiffTarget::Field,
+                                    &format!("field {}", key),
+                                    c.clone(),
+                                    b.clone(),
+                                ));
                             }
                         }
-                        (Some(b), None) => actions.push(new_action(DiffKind::Removed, DiffTarget::Field, &format!("field {}", key), b.clone(), String::new())),
-                        (None, Some(c)) => actions.push(new_action(DiffKind::Added, DiffTarget::Field, &format!("field {}", key), c.clone(), String::new())),
+                        (Some(b), None) => actions.push(new_action(
+                            DiffKind::Removed,
+                            DiffTarget::Field,
+                            &format!("field {}", key),
+                            b.clone(),
+                            String::new(),
+                        )),
+                        (None, Some(c)) => actions.push(new_action(
+                            DiffKind::Added,
+                            DiffTarget::Field,
+                            &format!("field {}", key),
+                            c.clone(),
+                            String::new(),
+                        )),
                         _ => {}
                     }
                 }
@@ -265,7 +327,13 @@ fn diff_class(baseline: &CapturedClass, current: &CapturedClass) -> Vec<DiffActi
     for (key, cur_group) in &cur_fields {
         if !base_fields.contains_key(key) {
             for f in cur_group {
-                actions.push(new_action(DiffKind::Added, DiffTarget::Field, &format!("field {}", key), f.clone(), String::new()));
+                actions.push(new_action(
+                    DiffKind::Added,
+                    DiffTarget::Field,
+                    &format!("field {}", key),
+                    f.clone(),
+                    String::new(),
+                ));
             }
         }
     }

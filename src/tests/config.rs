@@ -76,7 +76,7 @@ fn test_find_config_caches_result() {
 fn test_is_ci_environment_detects_ci_var() {
     // Save original env vars
     let original_ci = std::env::var("CI").ok();
-    
+
     unsafe {
         // Clear all CI vars first
         std::env::remove_var("CI");
@@ -86,12 +86,12 @@ fn test_is_ci_environment_detects_ci_var() {
         std::env::remove_var("JENKINS_URL");
         std::env::remove_var("CIRCLECI");
         std::env::remove_var("TRAVIS");
-        
+
         // Test CI=true
         std::env::set_var("CI", "true");
     }
     assert!(CleanCtxConfig::is_ci_environment(), "Should detect CI=true");
-    
+
     // Cleanup
     unsafe {
         std::env::remove_var("CI");
@@ -105,14 +105,17 @@ fn test_is_ci_environment_detects_ci_var() {
 #[test]
 fn test_is_ci_environment_detects_github_actions() {
     let original_gha = std::env::var("GITHUB_ACTIONS").ok();
-    
+
     unsafe {
         std::env::remove_var("GITHUB_ACTIONS");
         std::env::remove_var("CI");
         std::env::set_var("GITHUB_ACTIONS", "true");
     }
-    assert!(CleanCtxConfig::is_ci_environment(), "Should detect GITHUB_ACTIONS");
-    
+    assert!(
+        CleanCtxConfig::is_ci_environment(),
+        "Should detect GITHUB_ACTIONS"
+    );
+
     unsafe {
         std::env::remove_var("GITHUB_ACTIONS");
         if let Some(val) = original_gha {
@@ -125,14 +128,17 @@ fn test_is_ci_environment_detects_github_actions() {
 #[test]
 fn test_is_ci_environment_detects_tf_build() {
     let original_tf = std::env::var("TF_BUILD").ok();
-    
+
     unsafe {
         std::env::remove_var("TF_BUILD");
         std::env::remove_var("CI");
         std::env::set_var("TF_BUILD", "true");
     }
-    assert!(CleanCtxConfig::is_ci_environment(), "Should detect TF_BUILD");
-    
+    assert!(
+        CleanCtxConfig::is_ci_environment(),
+        "Should detect TF_BUILD"
+    );
+
     unsafe {
         std::env::remove_var("TF_BUILD");
         if let Some(val) = original_tf {
@@ -145,19 +151,31 @@ fn test_is_ci_environment_detects_tf_build() {
 #[test]
 fn test_is_ci_environment_returns_false_when_not_in_ci() {
     // Save and clear all CI env vars
-    let vars_to_clear = ["CI", "TF_BUILD", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "CIRCLECI", "TRAVIS"];
-    let originals: Vec<Option<String>> = vars_to_clear.iter()
+    let vars_to_clear = [
+        "CI",
+        "TF_BUILD",
+        "GITHUB_ACTIONS",
+        "GITLAB_CI",
+        "JENKINS_URL",
+        "CIRCLECI",
+        "TRAVIS",
+    ];
+    let originals: Vec<Option<String>> = vars_to_clear
+        .iter()
         .map(|var| std::env::var(var).ok())
         .collect();
-    
+
     unsafe {
         for var in &vars_to_clear {
             std::env::remove_var(var);
         }
     }
-    
-    assert!(!CleanCtxConfig::is_ci_environment(), "Should return false when no CI env vars are set");
-    
+
+    assert!(
+        !CleanCtxConfig::is_ci_environment(),
+        "Should return false when no CI env vars are set"
+    );
+
     // Restore original env vars
     unsafe {
         for (var, original) in vars_to_clear.iter().zip(originals) {
@@ -238,10 +256,16 @@ fn proxy_config_parses_all_fields() {
     assert_eq!(config.proxy.drop_tools, vec!["NotebookEdit", "CronCreate"]);
     assert!(config.proxy.strip_ansi);
     assert!(config.proxy.trim_bash_git);
-    assert_eq!(config.proxy.model_override.as_deref(), Some("claude-opus-4-6"));
+    assert_eq!(
+        config.proxy.model_override.as_deref(),
+        Some("claude-opus-4-6")
+    );
     assert!(config.proxy.scrub_secrets);
     assert!(config.proxy.tool_filters);
-    assert_eq!(config.proxy.upstream_url.as_deref(), Some("http://127.0.0.1:4141"));
+    assert_eq!(
+        config.proxy.upstream_url.as_deref(),
+        Some("http://127.0.0.1:4141")
+    );
     assert_eq!(config.proxy.api_key.as_deref(), Some("secret-key"));
     assert_eq!(config.proxy.rate_limit_rps, 30.0);
     assert_eq!(config.proxy.rate_limit_burst, 5.0);
@@ -251,32 +275,47 @@ fn proxy_config_parses_all_fields() {
 #[test]
 fn test_ci_detection_integration() {
     // Test that CI detection works correctly with different env var combinations
-    let vars_to_clear = ["CI", "TF_BUILD", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "CIRCLECI", "TRAVIS"];
-    let originals: Vec<Option<String>> = vars_to_clear.iter()
+    let vars_to_clear = [
+        "CI",
+        "TF_BUILD",
+        "GITHUB_ACTIONS",
+        "GITLAB_CI",
+        "JENKINS_URL",
+        "CIRCLECI",
+        "TRAVIS",
+    ];
+    let originals: Vec<Option<String>> = vars_to_clear
+        .iter()
         .map(|var| std::env::var(var).ok())
         .collect();
-    
+
     unsafe {
         // Clear all CI vars
         for var in &vars_to_clear {
             std::env::remove_var(var);
         }
-        
+
         // Test 1: No CI vars set → not CI
-        assert!(!CleanCtxConfig::is_ci_environment(), "Should not detect CI when no vars set");
-        
+        assert!(
+            !CleanCtxConfig::is_ci_environment(),
+            "Should not detect CI when no vars set"
+        );
+
         // Test 2: CI=true → CI detected
         std::env::set_var("CI", "true");
         assert!(CleanCtxConfig::is_ci_environment(), "Should detect CI=true");
-        
+
         // Test 3: CI=false → not CI (only "true" counts)
         std::env::set_var("CI", "false");
-        assert!(!CleanCtxConfig::is_ci_environment(), "CI=false should not trigger CI detection");
-        
+        assert!(
+            !CleanCtxConfig::is_ci_environment(),
+            "CI=false should not trigger CI detection"
+        );
+
         // Cleanup
         std::env::remove_var("CI");
     }
-    
+
     // Restore original env vars
     unsafe {
         for (var, original) in vars_to_clear.iter().zip(originals) {
@@ -314,10 +353,16 @@ fn proxy_config_serializes_roundtrip() {
     assert_eq!(roundtrip.proxy.drop_tools, vec!["NotebookEdit"]);
     assert!(roundtrip.proxy.strip_ansi);
     assert!(roundtrip.proxy.trim_bash_git);
-    assert_eq!(roundtrip.proxy.model_override.as_deref(), Some("claude-opus-4-6"));
+    assert_eq!(
+        roundtrip.proxy.model_override.as_deref(),
+        Some("claude-opus-4-6")
+    );
     assert!(roundtrip.proxy.scrub_secrets);
     assert!(roundtrip.proxy.tool_filters);
-    assert_eq!(roundtrip.proxy.upstream_url.as_deref(), Some("http://127.0.0.1:4141"));
+    assert_eq!(
+        roundtrip.proxy.upstream_url.as_deref(),
+        Some("http://127.0.0.1:4141")
+    );
     assert_eq!(roundtrip.proxy.api_key.as_deref(), Some("secret-key"));
     assert_eq!(roundtrip.proxy.rate_limit_rps, 30.0);
     assert_eq!(roundtrip.proxy.rate_limit_burst, 5.0);

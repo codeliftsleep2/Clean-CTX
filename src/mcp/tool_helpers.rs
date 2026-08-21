@@ -3,9 +3,9 @@
 // Shared helper functions used by multiple tool handlers.
 // Extracted from tools.rs during the Phase 1 module split.
 
-use std::path::PathBuf;
 use crate::compressor::Fidelity;
 use crate::mcp::McpState;
+use std::path::PathBuf;
 
 /// Compress a file and extract the body lines (without header) for
 /// delta comparison. Returns `(body_lines, full_output)`.
@@ -32,7 +32,6 @@ pub(super) fn compress_text_body(
         Some(&state.config.type_aliases),
     )
 }
-
 
 /// Resolve a file path, handling relative paths with optional workspace root.
 pub(super) fn resolve_file_path(path: &str, workspace_root: Option<&str>) -> String {
@@ -89,8 +88,9 @@ pub(super) fn resolve_file_path_checked(
                 std::env::current_dir().unwrap_or_default().join(root)
             }
         }
-        None => std::env::current_dir()
-            .map_err(|e| format!("cannot determine workspace root: {e}"))?,
+        None => {
+            std::env::current_dir().map_err(|e| format!("cannot determine workspace root: {e}"))?
+        }
     };
     let trusted_root_canon = trusted_root
         .canonicalize()
@@ -125,10 +125,7 @@ pub(super) fn resolve_file_path_checked(
     let extra_roots_str = if additional_roots.is_empty() {
         String::new()
     } else {
-        format!(
-            " (additional_roots: {})",
-            additional_roots.join(", ")
-        )
+        format!(" (additional_roots: {})", additional_roots.join(", "))
     };
     Err(format!(
         "path outside workspace root: {resolved} (workspace root: {trusted_root}){extra_roots_str}",
@@ -153,9 +150,11 @@ pub(crate) fn inject_baseline_breakpoint(
     }
     let ttl = state.config.cache.baseline_ttl.clone();
     let breaker = crate::mcp::cache_hints::compute_baseline_breaker(compressed_text);
-    let tok_box = crate::tokenizer::create_tokenizer(
-        crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
-    ).ok();
+    let tok_box = crate::tokenizer::create_tokenizer(crate::tokenizer::resolve_tokenizer_kind(
+        None,
+        Some(&state.config.tokenizer.to_string()),
+    ))
+    .ok();
     let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
     if let Some(result_obj) = response.get_mut("result") {
         crate::mcp::cache_hints::inject_cache_breakpoints(
@@ -171,17 +170,16 @@ pub(crate) fn inject_baseline_breakpoint(
 /// across turns. Marks the tail as ephemeral in cache metrics.
 ///
 /// No-op when cache is disabled in config.
-pub(crate) fn inject_tail_breakpoint(
-    response: &mut serde_json::Value,
-    state: &McpState,
-) {
+pub(crate) fn inject_tail_breakpoint(response: &mut serde_json::Value, state: &McpState) {
     if !state.config.cache.enabled {
         return;
     }
     let ttl = state.config.cache.tail_ttl.clone();
-    let tok_box = crate::tokenizer::create_tokenizer(
-        crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
-    ).ok();
+    let tok_box = crate::tokenizer::create_tokenizer(crate::tokenizer::resolve_tokenizer_kind(
+        None,
+        Some(&state.config.tokenizer.to_string()),
+    ))
+    .ok();
     let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
     if let Some(result_obj) = response.get_mut("result") {
         crate::mcp::cache_hints::inject_cache_breakpoints(
@@ -256,10 +254,10 @@ pub(super) fn compile_file_ir_focused(
     focus: Option<&std::collections::HashSet<String>>,
 ) -> Result<(crate::ir::compiler::CompiledIR, String), crate::error::CleanCtxError> {
     use crate::ir::compiler::IRCompiler;
-    use crate::ir::layers::typescript::TypeScriptLayer;
     use crate::ir::layers::csharp::CSharpLayer;
-    use crate::ir::layers::rust::RustLayer;
     use crate::ir::layers::java::JavaLayer;
+    use crate::ir::layers::rust::RustLayer;
+    use crate::ir::layers::typescript::TypeScriptLayer;
     // P0-4: Meta-layers are now handled by LayerRegistry::global() inside IRCompiler.
     // The old ir::layers::angular/spring/dotnet modules have been removed.
     use crate::compression::language::language_for_extension;
@@ -268,12 +266,11 @@ pub(super) fn compile_file_ir_focused(
     let source_arc = state.read_source(file_path)?;
     let source = source_arc.as_str();
     let path_buf = PathBuf::from(file_path);
-    let extension = path_buf.extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("");
+    let extension = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
 
-    let (language, query_string) = language_for_extension(extension)
-        .ok_or_else(|| crate::error::CleanCtxError::Ir(format!("Unsupported file extension: .{}", extension)))?;
+    let (language, query_string) = language_for_extension(extension).ok_or_else(|| {
+        crate::error::CleanCtxError::Ir(format!("Unsupported file extension: .{}", extension))
+    })?;
 
     // F-FULL-10: Use raw path for alias key for deterministic results.
     // Canonicalize is still performed for the `α alias: <path>` footer
@@ -377,7 +374,7 @@ pub(crate) fn diff_code_context_handler(
     cache: &mut crate::cache::LocalStateCache,
     fidelity: Fidelity,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    use crate::diff::{build_snapshot, diff_snapshots, format_diff, diff_summary};
+    use crate::diff::{build_snapshot, diff_snapshots, diff_summary, format_diff};
 
     let absolute_path = match std::fs::canonicalize(&file) {
         Ok(p) => p.to_string_lossy().into_owned(),
@@ -397,7 +394,8 @@ pub(crate) fn diff_code_context_handler(
         let class_count = baseline_snap.classes.len();
         return Ok(format!(
             "// --- AST Diff ---\n// No changes since last snapshot ({} classes).\n// Hash: {}",
-            class_count, &source_hash[..12],
+            class_count,
+            &source_hash[..12],
         ));
     }
 

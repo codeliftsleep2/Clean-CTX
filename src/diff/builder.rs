@@ -10,21 +10,25 @@
 //   2. Driving the SHARED capture pipeline
 //   3. Assembling the `CapturedStructure` from the resulting `CapEntry`s
 
+use crate::compaction::method::find_method_params;
 use crate::compaction::{
     compact_expression, compact_import, extract_class_meta, extract_class_name, extract_field,
     extract_method_sig, extract_rust_struct_name,
 };
-use crate::compaction::method::find_method_params;
+use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::language::detect_language;
 use crate::compression::markers::build_marker;
-use crate::compression::Fidelity;
 use crate::queries;
 
 use super::snapshot::{CapturedClass, CapturedMethod, CapturedStructure};
 
 /// A parser configuration: language factory, query string, and label.
-type ParserConfig = (fn() -> Option<tree_sitter::Language>, &'static str, &'static str);
+type ParserConfig = (
+    fn() -> Option<tree_sitter::Language>,
+    &'static str,
+    &'static str,
+);
 
 /// All supported parser configurations, in the order they should be tried.
 /// G2-3 diff audit: Java was previously missing from this list entirely,
@@ -32,10 +36,26 @@ type ParserConfig = (fn() -> Option<tree_sitter::Language>, &'static str, &'stat
 /// parsers and Java classes were never captured — a false negative for
 /// `diff_commits`. `JAVA_QUERY` is now included.
 const ALL_PARSERS: &[ParserConfig] = &[
-    (crate::compression::language::safe_rust_language, queries::RS_QUERY, "rust"),
-    (crate::compression::language::safe_csharp_language, queries::CS_QUERY, "csharp"),
-    (crate::compression::language::safe_typescript_language, queries::TS_QUERY, "typescript"),
-    (crate::compression::language::safe_java_language, queries::JAVA_QUERY, "java"),
+    (
+        crate::compression::language::safe_rust_language,
+        queries::RS_QUERY,
+        "rust",
+    ),
+    (
+        crate::compression::language::safe_csharp_language,
+        queries::CS_QUERY,
+        "csharp",
+    ),
+    (
+        crate::compression::language::safe_typescript_language,
+        queries::TS_QUERY,
+        "typescript",
+    ),
+    (
+        crate::compression::language::safe_java_language,
+        queries::JAVA_QUERY,
+        "java",
+    ),
 ];
 
 /// Build a structural snapshot by parsing the source with tree-sitter and
@@ -114,7 +134,8 @@ pub fn build_snapshot(
             Err(e) => {
                 tracing::warn!(
                     "build_snapshot: parser {} failed, trying next: {}",
-                    _label, e,
+                    _label,
+                    e,
                 );
                 continue;
             }
@@ -241,9 +262,10 @@ fn try_build_with(
                 }
                 // Delegate marker construction to the SHARED module.
                 if let Some(marker) = build_marker(&cap.name, &cap.text)
-                    && pending_markers.last().map(|m| m != &marker).unwrap_or(true) {
-                        pending_markers.push(marker);
-                    }
+                    && pending_markers.last().map(|m| m != &marker).unwrap_or(true)
+                {
+                    pending_markers.push(marker);
+                }
             }
         }
     }
@@ -295,10 +317,7 @@ fn extract_method_body(raw: &str) -> Option<String> {
     // Collapse all whitespace runs to a single space so cosmetic
     // reformatting doesn't produce a spurious diff, but real
     // body-content changes still do.
-    let normalized = trimmed
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
+    let normalized = trimmed.split_whitespace().collect::<Vec<_>>().join(" ");
     if normalized.is_empty() {
         None
     } else {

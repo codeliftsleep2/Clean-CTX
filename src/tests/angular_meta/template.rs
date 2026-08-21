@@ -3,7 +3,9 @@
 // Tests for the Angular-syntax template extractor.
 // Includes both legacy (Tier 2) and modern (Phase 2.5) syntax.
 
-use crate::angular_meta::template::{extract_template_shape, extract_template_shape_with_depth, TemplateShape};
+use crate::angular_meta::template::{
+    TemplateShape, extract_template_shape, extract_template_shape_with_depth,
+};
 
 /// Debug: dump tree-sitter-html AST to understand node types.
 #[test]
@@ -15,14 +17,8 @@ fn dump_html_ast() {
     let tree = parser.parse(html.as_bytes(), None).unwrap();
     let root = tree.root_node();
     fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
-        let text = node
-            .utf8_text(source.as_bytes())
-            .unwrap_or("<error>");
-        let truncated = if text.len() > 40 {
-            &text[..40]
-        } else {
-            text
-        };
+        let text = node.utf8_text(source.as_bytes()).unwrap_or("<error>");
+        let truncated = if text.len() > 40 { &text[..40] } else { text };
         eprintln!(
             "{}{:?} [named={}] \"{}\"",
             " ".repeat(indent),
@@ -41,21 +37,16 @@ fn dump_html_ast() {
 /// Debug: dump AST for Angular template with bindings.
 #[test]
 fn dump_angular_template_ast() {
-    let html = r#"<div *ngIf="show"><app-card [title]="name" (click)="handler()"></app-card></div>"#;
+    let html =
+        r#"<div *ngIf="show"><app-card [title]="name" (click)="handler()"></app-card></div>"#;
     let language = tree_sitter_html::LANGUAGE.into();
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&language).unwrap();
     let tree = parser.parse(html.as_bytes(), None).unwrap();
     let root = tree.root_node();
     fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
-        let text = node
-            .utf8_text(source.as_bytes())
-            .unwrap_or("<error>");
-        let truncated = if text.len() > 50 {
-            &text[..50]
-        } else {
-            text
-        };
+        let text = node.utf8_text(source.as_bytes()).unwrap_or("<error>");
+        let truncated = if text.len() > 50 { &text[..50] } else { text };
         eprintln!(
             "{}{:?} [named={}] \"{}\"",
             " ".repeat(indent),
@@ -534,7 +525,9 @@ fn at_if_for_blocks_captured() {
         shape.if_conditions
     );
     assert!(
-        shape.for_loops.contains(&("item".to_string(), "items".to_string())),
+        shape
+            .for_loops
+            .contains(&("item".to_string(), "items".to_string())),
         "real @for loop should be captured: {:?}",
         shape.for_loops
     );

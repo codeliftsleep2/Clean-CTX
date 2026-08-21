@@ -79,7 +79,8 @@ pub fn resolve_bundle(path: &Path, source: &str) -> Option<LayerBundle> {
         return None;
     }
 
-    let name = path.file_stem()
+    let name = path
+        .file_stem()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown")
         .to_string();
@@ -92,4 +93,3 @@ pub fn resolve_bundle(path: &Path, source: &str) -> Option<LayerBundle> {
         layer,
     })
 }
-

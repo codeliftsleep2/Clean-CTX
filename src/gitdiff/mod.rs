@@ -13,12 +13,12 @@
 //   - `workspace`: collect_changed_files + show_file + FileChange
 //   - `engine`   : gitdiff_workspace orchestrator (Phase 2)
 
+pub(crate) mod engine;
 pub(crate) mod refs;
 pub(crate) mod runner;
 pub(crate) mod workspace;
-pub(crate) mod engine;
 
+pub use engine::{GitDiffSummary, gitdiff_workspace};
 pub use refs::{resolve_ref, validate_ref};
 pub use runner::{is_git_repo, run_git};
-pub use workspace::{collect_changed_files, show_file, FileChange};
-pub use engine::{gitdiff_workspace, GitDiffSummary};
+pub use workspace::{FileChange, collect_changed_files, show_file};

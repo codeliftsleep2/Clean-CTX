@@ -37,10 +37,7 @@ pub struct RankedSymbol {
 ///
 /// Returns the subset of symbols that fit within the budget, in rank order.
 /// Symbols that don't fit are recorded in `budget` via `record_dropped`.
-pub fn pack_to_budget(
-    symbols: Vec<RankedSymbol>,
-    budget: &mut TokenBudget,
-) -> Vec<RankedSymbol> {
+pub fn pack_to_budget(symbols: Vec<RankedSymbol>, budget: &mut TokenBudget) -> Vec<RankedSymbol> {
     if symbols.is_empty() {
         return symbols;
     }
@@ -62,7 +59,11 @@ pub fn pack_to_budget(
 /// Sort symbols by rank descending (highest first).
 /// This is a convenience function for callers that haven't pre-sorted.
 pub fn sort_by_rank(mut symbols: Vec<RankedSymbol>) -> Vec<RankedSymbol> {
-    symbols.sort_by(|a, b| b.rank.partial_cmp(&a.rank).unwrap_or(std::cmp::Ordering::Equal));
+    symbols.sort_by(|a, b| {
+        b.rank
+            .partial_cmp(&a.rank)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     symbols
 }
 

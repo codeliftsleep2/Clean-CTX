@@ -9,9 +9,9 @@
 // This produces output that is byte-identical (or close) to the existing
 // `compress_code_context` tool, enabling backward compatibility.
 
-use crate::compression::Fidelity;
 use super::opcodes::CoreOp;
 use super::wire::op_to_tuple;
+use crate::compression::Fidelity;
 
 /// Render IR instructions (as canonical `CoreOp`s) to human-readable text.
 ///
@@ -101,10 +101,7 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                         output.push_str(&format!("$im {}.$fm{};", named, module));
                     }
                     Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
-                        output.push_str(&format!(
-                            "import {{ {} }} from '{}';\n",
-                            named, module
-                        ));
+                        output.push_str(&format!("import {{ {} }} from '{}';\n", named, module));
                     }
                 }
             }

@@ -9,9 +9,9 @@
 // - Navigation properties (ICollection<T>, T? foreign key)
 // - `OnModelCreating` Fluent API configuration
 
-use super::markers::{build_config_line, build_dbset_line, build_entity_line, build_ef_line};
-use crate::dotnet_meta::MetaBlock;
+use super::markers::{build_config_line, build_dbset_line, build_ef_line, build_entity_line};
 use crate::compression::Fidelity;
+use crate::dotnet_meta::MetaBlock;
 
 /// Extract EF Core markers from a single class capture.
 ///

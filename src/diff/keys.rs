@@ -84,9 +84,7 @@ pub(crate) fn method_key(sig: &str) -> String {
 }
 
 pub(crate) fn field_key(field: &str) -> String {
-    let end = field
-        .find([':', '?', '=', ';'])
-        .unwrap_or(field.len());
+    let end = field.find([':', '?', '=', ';']).unwrap_or(field.len());
     field[..end].trim().to_string()
 }
 
@@ -104,4 +102,3 @@ pub(crate) fn summarize_class(cls: &CapturedClass) -> String {
         parts.join(", ")
     }
 }
-

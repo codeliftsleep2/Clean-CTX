@@ -101,9 +101,9 @@ fn parse_ta_footer(footer: &str) -> Vec<(String, String)> {
     };
     rest.split(' ')
         .filter_map(|entry| {
-            entry.split_once('→').map(|(alias, original)| {
-                (alias.to_string(), original.to_string())
-            })
+            entry
+                .split_once('→')
+                .map(|(alias, original)| (alias.to_string(), original.to_string()))
         })
         .collect()
 }

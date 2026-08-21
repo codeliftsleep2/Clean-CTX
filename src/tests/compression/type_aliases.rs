@@ -6,10 +6,8 @@
 // optional/array types, collision avoidance, longest-key-first
 // ordering, footer emission, and determinism.
 
+use crate::compression::type_aliases::{apply_type_aliases, is_valid_alias, substitute_type_token};
 use std::collections::BTreeMap;
-use crate::compression::type_aliases::{
-    apply_type_aliases, is_valid_alias, substitute_type_token,
-};
 
 fn aliases(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
@@ -58,7 +56,11 @@ fn footer_no_duplicates_when_type_appears_multiple_times() {
     assert_eq!(out, "a:$uid b:$uid c:Promise<$uid>");
     // Footer should have exactly 1 entry for $uid→User (not 3)
     let count = footer.matches("$uid→User").count();
-    assert_eq!(count, 1, "footer should list $uid→User exactly once, got: {}", footer);
+    assert_eq!(
+        count, 1,
+        "footer should list $uid→User exactly once, got: {}",
+        footer
+    );
 }
 
 #[test]
@@ -144,10 +146,8 @@ fn longest_key_matched_first() {
     // Both "User" and "UserService" configured. "UserService" must win
     // at "UserService" positions; "User" still applies elsewhere.
     let body = "a:UserService b:User";
-    let (out, footer) = apply_type_aliases(
-        body,
-        &aliases(&[("User", "$u"), ("UserService", "$usvc")]),
-    );
+    let (out, footer) =
+        apply_type_aliases(body, &aliases(&[("User", "$u"), ("UserService", "$usvc")]));
     assert_eq!(out, "a:$usvc b:$u");
     assert!(footer.contains("$usvc→UserService"));
     assert!(footer.contains("$u→User"));
@@ -158,10 +158,7 @@ fn no_double_substitution() {
     // After "User" → "$uid", the emitted "$uid" must not be re-scanned
     // by another original that happens to match its text.
     let body = "x:User";
-    let (out, _footer) = apply_type_aliases(
-        body,
-        &aliases(&[("User", "$uid"), ("$uid", "$z")]),
-    );
+    let (out, _footer) = apply_type_aliases(body, &aliases(&[("User", "$uid"), ("$uid", "$z")]));
     assert_eq!(out, "x:$uid");
 }
 
@@ -170,10 +167,8 @@ fn no_double_substitution() {
 #[test]
 fn footer_only_includes_used_aliases() {
     let body = "a:User";
-    let (_, footer) = apply_type_aliases(
-        body,
-        &aliases(&[("User", "$uid"), ("JsonObject", "$jo")]),
-    );
+    let (_, footer) =
+        apply_type_aliases(body, &aliases(&[("User", "$uid"), ("JsonObject", "$jo")]));
     assert!(footer.contains("$uid→User"));
     assert!(!footer.contains("$jo")); // unused → not emitted
 }
@@ -210,19 +205,13 @@ fn deterministic_output() {
 
 #[test]
 fn substitute_type_token_single_pair() {
-    assert_eq!(
-        substitute_type_token("id:User", "User", "$uid"),
-        "id:$uid"
-    );
+    assert_eq!(substitute_type_token("id:User", "User", "$uid"), "id:$uid");
     assert_eq!(
         substitute_type_token("id:UserService", "User", "$uid"),
         "id:UserService"
     );
     // Invalid alias → no-op
-    assert_eq!(
-        substitute_type_token("id:User", "User", "$1"),
-        "id:User"
-    );
+    assert_eq!(substitute_type_token("id:User", "User", "$1"), "id:User");
 }
 
 // ── UTF-8 safety ──────────────────────────────────────────────────

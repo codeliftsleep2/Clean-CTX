@@ -47,17 +47,17 @@ const OP_DEF_C: u8 = 0;
 const OP_DEF_M: u8 = 1;
 const OP_DEF_F: u8 = 2;
 const OP_DEF_I: u8 = 3;
-const OP_SIG: u8 = 4;     // Param
-const OP_RET: u8 = 5;     // Return
+const OP_SIG: u8 = 4; // Param
+const OP_RET: u8 = 5; // Return
 const OP_FIELD_T: u8 = 6; // FieldType
 const OP_FLAGS: u8 = 7;
 const OP_FLAGS_C: u8 = 8; // ClassFlags
-const OP_EXT: u8 = 9;     // Extends
-const OP_IMPL: u8 = 10;   // Implements
+const OP_EXT: u8 = 9; // Extends
+const OP_IMPL: u8 = 10; // Implements
 const OP_INJECTS: u8 = 11;
-const OP_IMP: u8 = 12;    // Import
-const OP_TYPE: u8 = 13;   // TypeAlias
-const OP_PAT: u8 = 14;    // Pattern
+const OP_IMP: u8 = 12; // Import
+const OP_TYPE: u8 = 13; // TypeAlias
+const OP_PAT: u8 = 14; // Pattern
 // R-43a: Execution Semantics
 const OP_DATAFLOW: u8 = 15;
 const OP_CTRL: u8 = 16;
@@ -98,7 +98,6 @@ fn op_to_index(op: &CoreOp) -> u8 {
         CoreOp::ExecutionContext(..) => OP_CTX,
     }
 }
-
 
 // ── Varint Encoding ──────────────────────────────────────────────
 
@@ -424,9 +423,8 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
 
     // Helper: read a string table index varint and return the string
     let read_operand = |data: &[u8], pos: &mut usize| -> Result<String, BinaryDecodeError> {
-        let (idx, consumed) = read_varint(data).ok_or_else(|| {
-            BinaryDecodeError::TruncatedData("operand index".into())
-        })?;
+        let (idx, consumed) = read_varint(data)
+            .ok_or_else(|| BinaryDecodeError::TruncatedData("operand index".into()))?;
         *pos += consumed;
         let idx_usize = idx as usize;
         if idx_usize >= strings.len() {
@@ -450,9 +448,8 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
 
         let op = if is_variadic(op_idx) {
             // Read variadic count prefix
-            let (var_count, consumed) = read_varint(&data[pos..]).ok_or_else(|| {
-                BinaryDecodeError::TruncatedData("variadic operand count".into())
-            })?;
+            let (var_count, consumed) = read_varint(&data[pos..])
+                .ok_or_else(|| BinaryDecodeError::TruncatedData("variadic operand count".into()))?;
             pos += consumed;
 
             let mut operands: Vec<String> = Vec::with_capacity(var_count as usize);

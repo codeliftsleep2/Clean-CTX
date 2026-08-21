@@ -1,22 +1,26 @@
 // src/mcp/tool_handlers/core.rs
 //
 // Core MCP tool handlers: compression, IR, delta, and unified entry point.
-use std::path::PathBuf;
-use std::collections::HashSet;
-use serde_json::Value;
-use sha2::{Sha256, Digest};
+use crate::error::to_jsonrpc_error;
+use crate::ir::compiler::CompiledIR;
+use crate::ir::delta::{DeltaComputer, IRDelta};
+use crate::ir::opcodes::CoreOp;
 use crate::ir::wire::ir_to_wire;
 use crate::ir::wire::tuple_to_op;
-use crate::ir::delta::{IRDelta, DeltaComputer};
-use crate::ir::compiler::CompiledIR;
-use crate::ir::opcodes::CoreOp;
-use crate::error::to_jsonrpc_error;
-use crate::mcp::context_store::ContextStore;
 use crate::mcp::McpState;
+use crate::mcp::context_store::ContextStore;
 use crate::protocol::send_response;
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::collections::HashSet;
+use std::path::PathBuf;
 
+use super::super::tool_helpers::{
+    compile_file_ir, compile_file_ir_focused, compress_text_body, count_tokens_with_tokenizer,
+    diff_code_context_handler, inject_baseline_breakpoint, inject_tail_breakpoint,
+    resolve_file_path_checked,
+};
 use super::super::tools::{parse_fidelity_arg, parse_tokenizer_arg};
-use super::super::tool_helpers::{compress_text_body, compile_file_ir, compile_file_ir_focused, resolve_file_path_checked, diff_code_context_handler, count_tokens_with_tokenizer, inject_baseline_breakpoint, inject_tail_breakpoint};
 
 fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Vec<CoreOp> {
     tuples.into_iter().filter_map(|t| tuple_to_op(&t)).collect()
@@ -34,7 +38,9 @@ fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Vec<CoreOp> {
 /// - `byte_exact`: which regions are safe for `replace_in_file` SEARCH
 ///   blocks. Edit → `["method_bodies"]`; Verbatim → `["document"]`;
 ///   others → `[]`.
-pub(crate) fn contract_fields(fidelity: crate::compression::Fidelity) -> (&'static str, Vec<&'static str>) {
+pub(crate) fn contract_fields(
+    fidelity: crate::compression::Fidelity,
+) -> (&'static str, Vec<&'static str>) {
     contract_fields_focused(fidelity, None)
 }
 
@@ -56,18 +62,16 @@ pub(crate) fn contract_fields_focused(
     match fidelity {
         crate::compression::Fidelity::Verbatim => ("verbatim_document", vec!["document"]),
         // No focus set → every method body is byte-exact (legacy behavior).
-        crate::compression::Fidelity::Edit if focus.is_none() => (
-            "skeleton_with_verbatim_bodies",
-            vec!["method_bodies"],
-        ),
+        crate::compression::Fidelity::Edit if focus.is_none() => {
+            ("skeleton_with_verbatim_bodies", vec!["method_bodies"])
+        }
         // Focus set but EMPTY → ZERO method bodies are byte-exact. The
         // output is effectively all-signatures, so report `"skeleton"`
         // with no byte-exact regions (otherwise the LLM would attempt
         // replace_in_file SEARCH on bodies that don't exist).
-        crate::compression::Fidelity::Edit if focus.is_some_and(HashSet::is_empty) => (
-            "skeleton",
-            Vec::new(),
-        ),
+        crate::compression::Fidelity::Edit if focus.is_some_and(HashSet::is_empty) => {
+            ("skeleton", Vec::new())
+        }
         // Focus set with names → only the focused method bodies are
         // byte-exact. The LLM must NOT attempt SEARCH on unfocused bodies.
         crate::compression::Fidelity::Edit => (
@@ -82,15 +86,15 @@ pub(crate) fn contract_fields_focused(
 
 /// P3-2: Main handler for compress_code_context tool.
 /// Orchestrates validation, compilation, and response building.
-pub(crate) fn handle_compress_code_context(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &McpState) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let encoding = params["arguments"]["encoding"].as_str().unwrap_or("named");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
+    let resolved_path = match resolve_file_path_checked(
+        file_path_str,
+        workspace_root,
+        &state.config.additional_roots,
+    ) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -145,8 +149,16 @@ pub(crate) fn handle_compress_code_context(
     // the payload is a structural skeleton (self-reporting contract leak).
     if effective_fidelity == crate::compression::Fidelity::Verbatim {
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
-        state.record_compression(&resolved_path, raw_tokens, raw_tokens,
-            "verbatim", false, "full", None, "verbatim");
+        state.record_compression(
+            &resolved_path,
+            raw_tokens,
+            raw_tokens,
+            "verbatim",
+            false,
+            "full",
+            None,
+            "verbatim",
+        );
         let mut response = serde_json::json!({
             "jsonrpc": "2.0", "id": id,
             "result": {
@@ -170,14 +182,29 @@ pub(crate) fn handle_compress_code_context(
         let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
         let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
         let footer = state.format_dict_footer();
-        let llm_text_with_footer = format!("{}\n// ── {} ({}) ──\n{}",
-            llm_text.trim(), ir.file_id, resolved_path, footer.trim());
-        state.llm_text_cache_lock().insert(ir.file_id.clone(), llm_text_with_footer.clone());
+        let llm_text_with_footer = format!(
+            "{}\n// ── {} ({}) ──\n{}",
+            llm_text.trim(),
+            ir.file_id,
+            resolved_path,
+            footer.trim()
+        );
+        state
+            .llm_text_cache_lock()
+            .insert(ir.file_id.clone(), llm_text_with_footer.clone());
 
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
         let compressed_tokens = count_tokens_with_tokenizer(&llm_text_with_footer, tokenizer_ref);
-        state.record_compression(&resolved_path, raw_tokens, compressed_tokens,
-            &format!("{:?}", effective_fidelity).to_lowercase(), false, "full", None, "ir_compression");
+        state.record_compression(
+            &resolved_path,
+            raw_tokens,
+            compressed_tokens,
+            &format!("{:?}", effective_fidelity).to_lowercase(),
+            false,
+            "full",
+            None,
+            "ir_compression",
+        );
 
         // Persist to DB
         {
@@ -185,10 +212,15 @@ pub(crate) fn handle_compress_code_context(
                 let mut hasher = Sha256::new();
                 hasher.update(source_text.as_bytes());
                 let source_hash = format!("{:x}", hasher.finalize());
-                
+
                 store.queue_save_context(
-                    &resolved_path, effective_fidelity, &llm_text_with_footer,
-                    &[], &source_hash, raw_tokens as u64, compressed_tokens as u64,
+                    &resolved_path,
+                    effective_fidelity,
+                    &llm_text_with_footer,
+                    &[],
+                    &source_hash,
+                    raw_tokens as u64,
+                    compressed_tokens as u64,
                 );
             }
         }
@@ -197,11 +229,21 @@ pub(crate) fn handle_compress_code_context(
         let ir_value = match encoding {
             "positional" => {
                 let config = crate::ir::positional::PositionalConfig::stripped();
-                crate::ir::positional::ir_to_positional_wire(&ir.file_id, ir.version, &ir.instructions, config)
+                crate::ir::positional::ir_to_positional_wire(
+                    &ir.file_id,
+                    ir.version,
+                    &ir.instructions,
+                    config,
+                )
             }
             "tagged" => {
                 let config = crate::ir::positional::PositionalConfig::tagged();
-                crate::ir::positional::ir_to_positional_wire(&ir.file_id, ir.version, &ir.instructions, config)
+                crate::ir::positional::ir_to_positional_wire(
+                    &ir.file_id,
+                    ir.version,
+                    &ir.instructions,
+                    config,
+                )
             }
             _ => ir_to_wire(&ir),
         };
@@ -221,16 +263,27 @@ pub(crate) fn handle_compress_code_context(
             tracing::warn!(error = %e, path = %resolved_path, "IR compilation failed, falling back to legacy compression");
         }
         match crate::compression::pipeline::compress_file_with_source(
-            PathBuf::from(&resolved_path), source_ref,
-            &mut state.dict_lock(), &mut state.cache_write(), effective_fidelity,
+            PathBuf::from(&resolved_path),
+            source_ref,
+            &mut state.dict_lock(),
+            &mut state.cache_write(),
+            effective_fidelity,
             Some(&state.config),
         ) {
             Ok(mut compressed_text) => {
                 compressed_text.push_str(&state.format_dict_footer());
                 let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
                 let comp_tokens = count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
-                state.record_compression(&resolved_path, raw_tokens, comp_tokens,
-                    &format!("{:?}", effective_fidelity).to_lowercase(), false, "full", None, "ir_compression");
+                state.record_compression(
+                    &resolved_path,
+                    raw_tokens,
+                    comp_tokens,
+                    &format!("{:?}", effective_fidelity).to_lowercase(),
+                    false,
+                    "full",
+                    None,
+                    "ir_compression",
+                );
 
                 // Persist to DB
                 {
@@ -238,10 +291,15 @@ pub(crate) fn handle_compress_code_context(
                         let mut hasher = Sha256::new();
                         hasher.update(source_text.as_bytes());
                         let source_hash = format!("{:x}", hasher.finalize());
-                        
+
                         store.queue_save_context(
-                            &resolved_path, effective_fidelity, &compressed_text,
-                            &[], &source_hash, raw_tokens as u64, comp_tokens as u64,
+                            &resolved_path,
+                            effective_fidelity,
+                            &compressed_text,
+                            &[],
+                            &source_hash,
+                            raw_tokens as u64,
+                            comp_tokens as u64,
                         );
                     }
                 }
@@ -276,14 +334,14 @@ pub(crate) fn handle_compress_code_context(
 
 // ── Handler: diff_code_context ────────────────────────────────────
 
-pub(crate) fn handle_diff_code_context(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_diff_code_context(id: &Value, params: &Value, state: &McpState) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
+    let resolved_path = match resolve_file_path_checked(
+        file_path_str,
+        workspace_root,
+        &state.config.additional_roots,
+    ) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -300,9 +358,19 @@ pub(crate) fn handle_diff_code_context(
     // A-08: Use source_cache via state.read_source() instead of direct disk read
     let source = match state.read_source(&resolved_path) {
         Ok(s) => s.as_str().to_string(),
-        Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } })); return; }
+        Err(e) => {
+            send_response(
+                &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } }),
+            );
+            return;
+        }
     };
-    match diff_code_context_handler(PathBuf::from(&resolved_path), &source, &mut state.cache_write(), fidelity) {
+    match diff_code_context_handler(
+        PathBuf::from(&resolved_path),
+        &source,
+        &mut state.cache_write(),
+        fidelity,
+    ) {
         Ok(body) => {
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
@@ -321,14 +389,14 @@ pub(crate) fn handle_diff_code_context(
 
 // ── Handler: delta_code_context ───────────────────────────────────
 
-pub(crate) fn handle_delta_code_context(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpState) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
+    let resolved_path = match resolve_file_path_checked(
+        file_path_str,
+        workspace_root,
+        &state.config.additional_roots,
+    ) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -342,11 +410,11 @@ pub(crate) fn handle_delta_code_context(
         Ok(f) => f,
         Err(()) => return,
     };
-    
+
     // A-08: Check if source has changed before compiling
     let path_alias = state.get_or_create_alias(resolved_path.clone());
     let prev_version = state.file_version(&path_alias).unwrap_or(0);
-    
+
     // Try to skip compilation if source is unchanged
     // P0-4: Hold lock during entire check to prevent TOCTOU race
     let ir_ctx = state.ir_context_lock();
@@ -356,7 +424,7 @@ pub(crate) fn handle_delta_code_context(
                 let cache = state.cache_read();
                 cache.compute_hash(source_arc.as_bytes())
             };
-            
+
             if ir_ctx.is_source_unchanged(&path_alias, &source_hash) {
                 // Source unchanged - return cached IR without recompiling
                 // P0-4: Lock still held, ensuring consistent state
@@ -383,26 +451,32 @@ pub(crate) fn handle_delta_code_context(
             }
         }
     }
-    drop(ir_ctx);  // Release lock before expensive compile
-    
+    drop(ir_ctx); // Release lock before expensive compile
+
     // Source changed or no baseline - compile
     let (compiled, source_hash) = match compile_file_ir(&resolved_path, fidelity, state) {
         Ok(c) => c,
-        Err(e) => { send_response(&to_jsonrpc_error(id, &e)); return; }
+        Err(e) => {
+            send_response(&to_jsonrpc_error(id, &e));
+            return;
+        }
     };
-    
+
     // P0-4: Re-acquire lock atomically for delta computation
     // This ensures no other worker modified ir_context between our check and delta computation
     let mut ir_ctx = state.ir_context_lock();
     let delta = if prev_version > 0 && ir_ctx.has_file(&path_alias) {
-        ir_ctx.get_ir(&path_alias).cloned().and_then(|prev_instructions| {
-            let prev_compiled = CompiledIR {
-                file_id: path_alias.clone(),
-                version: prev_version,
-                instructions: tuples_to_coreops(prev_instructions),
-            };
-            DeltaComputer::new().compute(&prev_compiled, &compiled)
-        })
+        ir_ctx
+            .get_ir(&path_alias)
+            .cloned()
+            .and_then(|prev_instructions| {
+                let prev_compiled = CompiledIR {
+                    file_id: path_alias.clone(),
+                    version: prev_version,
+                    instructions: tuples_to_coreops(prev_instructions),
+                };
+                DeltaComputer::new().compute(&prev_compiled, &compiled)
+            })
     } else {
         ir_ctx.load_ir(compiled.clone(), Some(source_hash));
         None
@@ -446,14 +520,14 @@ pub(crate) fn handle_delta_code_context(
 
 // ── Handler: delta_text_context ───────────────────────────────────
 
-pub(crate) fn handle_delta_text_context(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_delta_text_context(id: &Value, params: &Value, state: &McpState) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
+    let resolved_path = match resolve_file_path_checked(
+        file_path_str,
+        workspace_root,
+        &state.config.additional_roots,
+    ) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -532,21 +606,24 @@ pub(crate) fn handle_delta_text_context(
 
 // ── Handler: apply_delta ──────────────────────────────────────────
 
-pub(crate) fn handle_apply_delta(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
     let delta_value = &params["arguments"]["delta"];
     let current_version = params["arguments"]["currentVersion"].as_i64();
 
     let delta: IRDelta = match serde_json::from_value(delta_value.clone()) {
         Ok(d) => d,
-        Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": format!("Invalid delta: {}", e) } })); return; }
+        Err(e) => {
+            send_response(
+                &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": format!("Invalid delta: {}", e) } }),
+            );
+            return;
+        }
     };
 
     if current_version != Some(delta.from as i64) {
-        send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": format!("Version mismatch: client has v{:?}, delta expects from v{}", current_version, delta.from) } }));
+        send_response(
+            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": format!("Version mismatch: client has v{:?}, delta expects from v{}", current_version, delta.from) } }),
+        );
         return;
     }
 
@@ -572,11 +649,7 @@ pub(crate) fn handle_apply_delta(
 
 // ── Handler: provide_code_context ─────────────────────────────────
 
-pub(crate) fn handle_provide_code_context(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &McpState) {
     use std::time::Instant;
     let overall_start = Instant::now();
 
@@ -584,18 +657,27 @@ pub(crate) fn handle_provide_code_context(
     // full verbatim bodies at Edit fidelity. All other methods are rendered
     // signature-only. When omitted (None), every method's body is rendered
     // (current default behavior).
-    let focus_methods: Option<HashSet<String>> = params["arguments"]["focusMethods"]
-        .as_array()
-        .map(|arr| arr.iter().filter_map(|s| s.as_str().map(String::from)).collect());
+    let focus_methods: Option<HashSet<String>> =
+        params["arguments"]["focusMethods"].as_array().map(|arr| {
+            arr.iter()
+                .filter_map(|s| s.as_str().map(String::from))
+                .collect()
+        });
 
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     if file_path_str.is_empty() {
-        send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }));
+        send_response(
+            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }),
+        );
         return;
     }
 
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
+    let resolved_path = match resolve_file_path_checked(
+        file_path_str,
+        workspace_root,
+        &state.config.additional_roots,
+    ) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -607,13 +689,15 @@ pub(crate) fn handle_provide_code_context(
     };
 
     if state.config.is_excluded(&resolved_path) {
-        send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("File excluded by config: {}", file_path_str) } }));
+        send_response(
+            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("File excluded by config: {}", file_path_str) } }),
+        );
         return;
     }
 
     // A-13: Check resource limits before processing
     let limits = &state.config.resource_limits;
-    
+
     // Check file size if we can read it
     if let Ok(metadata) = std::fs::metadata(&resolved_path) {
         if let Err(e) = limits.check_file_size(metadata.len()) {
@@ -627,7 +711,12 @@ pub(crate) fn handle_provide_code_context(
 
     let source_arc = match state.read_source(&resolved_path) {
         Ok(s) => s,
-        Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } })); return; }
+        Err(e) => {
+            send_response(
+                &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } }),
+            );
+            return;
+        }
     };
     let source = source_arc.as_str();
     let alias = state.get_or_create_alias(resolved_path.clone());
@@ -680,15 +769,25 @@ pub(crate) fn handle_provide_code_context(
             send_response(&response);
             return;
         }
-        let lines = crate::angular_meta::template_compress::compress_template_with_prime_ng(source, fidelity);
+        let lines = crate::angular_meta::template_compress::compress_template_with_prime_ng(
+            source, fidelity,
+        );
         let body = lines.join("\n");
         let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
         let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
         let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
         let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
         let comp_tokens = count_tokens_with_tokenizer(&body, tokenizer_ref);
-        state.record_compression(&resolved_path, raw_tokens, comp_tokens,
-            &format!("{:?}", fidelity).to_lowercase(), true, "full", None, "angular_template");
+        state.record_compression(
+            &resolved_path,
+            raw_tokens,
+            comp_tokens,
+            &format!("{:?}", fidelity).to_lowercase(),
+            true,
+            "full",
+            None,
+            "angular_template",
+        );
 
         // Persist to DB so `context_stats` and cross-session dashboards
         // can report Angular template compression savings.
@@ -698,8 +797,13 @@ pub(crate) fn handle_provide_code_context(
                 hasher.update(source.as_bytes());
                 let source_hash = format!("{:x}", hasher.finalize());
                 store.queue_save_context(
-                    &resolved_path, fidelity, &body,
-                    &[], &source_hash, raw_tokens as u64, comp_tokens as u64,
+                    &resolved_path,
+                    fidelity,
+                    &body,
+                    &[],
+                    &source_hash,
+                    raw_tokens as u64,
+                    comp_tokens as u64,
                 );
             }
         }
@@ -733,10 +837,15 @@ pub(crate) fn handle_provide_code_context(
     let td_guard = state.text_delta_lock();
     let ir_read = state.ir_context_read();
     let decision = match crate::mcp::heuristics::decide(
-        &resolved_path, explicit_fidelity, explicit_intent,
-        &state.config, &td_guard,
+        &resolved_path,
+        explicit_fidelity,
+        explicit_intent,
+        &state.config,
+        &td_guard,
         &ir_read,
-        source, Some(&alias), None,
+        source,
+        Some(&alias),
+        None,
     ) {
         Ok(d) => d,
         Err(e) => {
@@ -756,7 +865,8 @@ pub(crate) fn handle_provide_code_context(
     // byte_exact) plus a degradation signal for the legacy fallback.
     // When `focusMethods` is supplied, only the focused method bodies are
     // byte-exact — the contract must reflect that (not claim every body).
-    let (content_kind, byte_exact) = contract_fields_focused(effective_fidelity, focus_methods.as_ref());
+    let (content_kind, byte_exact) =
+        contract_fields_focused(effective_fidelity, focus_methods.as_ref());
     let strategy = decision.strategy;
     let is_angular = decision.is_angular;
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
@@ -770,8 +880,16 @@ pub(crate) fn handle_provide_code_context(
     if effective_fidelity == crate::compression::Fidelity::Verbatim {
         let full = source.to_string();
         let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
-        state.record_compression(&resolved_path, raw_tokens, raw_tokens,
-            "verbatim", is_angular, "full", None, "verbatim");
+        state.record_compression(
+            &resolved_path,
+            raw_tokens,
+            raw_tokens,
+            "verbatim",
+            is_angular,
+            "full",
+            None,
+            "verbatim",
+        );
         let mut response = serde_json::json!({
             "jsonrpc": "2.0", "id": id, "result": {
                 "content": [{ "type": "text", "text": full }],
@@ -794,14 +912,23 @@ pub(crate) fn handle_provide_code_context(
         strategy = %format!("{:?}", strategy),
         cbm_status = %state.cbm_status.summary(),
         is_angular = %is_angular,
-    ).entered();
+    )
+    .entered();
 
     match strategy {
         crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
             let compile_start = Instant::now();
-            let (compiled, _source_hash) = match compile_file_ir_focused(&resolved_path, effective_fidelity, state, focus_methods.as_ref()) {
+            let (compiled, _source_hash) = match compile_file_ir_focused(
+                &resolved_path,
+                effective_fidelity,
+                state,
+                focus_methods.as_ref(),
+            ) {
                 Ok(c) => c,
-                Err(e) => { send_response(&to_jsonrpc_error(id, &e)); return; }
+                Err(e) => {
+                    send_response(&to_jsonrpc_error(id, &e));
+                    return;
+                }
             };
             let compile_ms = compile_start.elapsed().as_millis() as u64;
 
@@ -809,13 +936,17 @@ pub(crate) fn handle_provide_code_context(
             let prev_version = state.file_version(&alias).unwrap_or(0);
             let mut ir_ctx = state.ir_context_lock();
             let delta = if prev_version > 0 && ir_ctx.has_file(&alias) {
-                ir_ctx.get_ir(&alias).cloned().and_then(|prev_instructions| {
-                    let prev_compiled = CompiledIR {
-                        file_id: alias.clone(), version: prev_version,
-                        instructions: tuples_to_coreops(prev_instructions),
-                    };
-                    DeltaComputer::new().compute(&prev_compiled, &compiled)
-                })
+                ir_ctx
+                    .get_ir(&alias)
+                    .cloned()
+                    .and_then(|prev_instructions| {
+                        let prev_compiled = CompiledIR {
+                            file_id: alias.clone(),
+                            version: prev_version,
+                            instructions: tuples_to_coreops(prev_instructions),
+                        };
+                        DeltaComputer::new().compute(&prev_compiled, &compiled)
+                    })
             } else {
                 ir_ctx.load_ir(compiled.clone(), None);
                 None
@@ -838,7 +969,8 @@ pub(crate) fn handle_provide_code_context(
                     let delta_text = serde_json::to_string(&wire_delta).unwrap_or_default();
                     raw_tokens = count_tokens_with_tokenizer(&delta_text, tokenizer_ref);
                     comp_tokens = raw_tokens; // delta is the payload itself
-                    let prev_full_compressed = state.session_stats_lock()
+                    let prev_full_compressed = state
+                        .session_stats_lock()
                         .file_stats(&resolved_path)
                         .map(|f| f.compressed_tokens);
                     let mut response = serde_json::json!({
@@ -856,19 +988,45 @@ pub(crate) fn handle_provide_code_context(
                     send_response(&response);
                     // Record the delta with the previous full compressed token
                     // count for delta efficiency computation.
-                    state.record_compression(&resolved_path, raw_tokens, comp_tokens,
-                        &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "delta",
-                        prev_full_compressed, "ir_compression");
+                    state.record_compression(
+                        &resolved_path,
+                        raw_tokens,
+                        comp_tokens,
+                        &format!("{:?}", effective_fidelity).to_lowercase(),
+                        is_angular,
+                        "delta",
+                        prev_full_compressed,
+                        "ir_compression",
+                    );
                 }
                 None => {
                     let render_start = Instant::now();
                     let hir = crate::ir::hierarchical::ir_to_hierarchical(&compiled);
-                    let llm_text = crate::ir::render_hierarchical_for_llm_focused(&hir, effective_fidelity, focus_methods.as_ref());
-                    let full = format!("{}\n// ── {} ({}) ──\n{}", llm_text.trim(), compiled.file_id, resolved_path, state.format_dict_footer().trim());
+                    let llm_text = crate::ir::render_hierarchical_for_llm_focused(
+                        &hir,
+                        effective_fidelity,
+                        focus_methods.as_ref(),
+                    );
+                    let full = format!(
+                        "{}\n// ── {} ({}) ──\n{}",
+                        llm_text.trim(),
+                        compiled.file_id,
+                        resolved_path,
+                        state.format_dict_footer().trim()
+                    );
                     let render_ms = render_start.elapsed().as_millis() as u64;
                     raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                     comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
-                    state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "full", None, "ir_compression");
+                    state.record_compression(
+                        &resolved_path,
+                        raw_tokens,
+                        comp_tokens,
+                        &format!("{:?}", effective_fidelity).to_lowercase(),
+                        is_angular,
+                        "full",
+                        None,
+                        "ir_compression",
+                    );
                     let mut response = serde_json::json!({
                         "jsonrpc": "2.0", "id": id, "result": {
                             "content": [{ "type": "text", "text": full }], "version": compiled.version,
@@ -888,7 +1046,11 @@ pub(crate) fn handle_provide_code_context(
                         render_ms = render_ms,
                         raw_tokens = raw_tokens,
                         comp_tokens = comp_tokens,
-                        savings_pct = if raw_tokens > 0 { ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0) as u64 } else { 0 },
+                        savings_pct = if raw_tokens > 0 {
+                            ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0) as u64
+                        } else {
+                            0
+                        },
                         "provide_code_context delta full complete"
                     );
                 }
@@ -899,12 +1061,26 @@ pub(crate) fn handle_provide_code_context(
             // below. This trailing call is now a no-op for the delta case
             // (it would double-record), so we only record for the None branch.
             if delta.is_none() {
-                state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "delta", None, "ir_compression");
+                state.record_compression(
+                    &resolved_path,
+                    raw_tokens,
+                    comp_tokens,
+                    &format!("{:?}", effective_fidelity).to_lowercase(),
+                    is_angular,
+                    "delta",
+                    None,
+                    "ir_compression",
+                );
             }
         }
         crate::mcp::heuristics::ContextStrategy::FullCompress => {
             let compile_start = Instant::now();
-            let ir_result = compile_file_ir_focused(&resolved_path, effective_fidelity, state, focus_methods.as_ref());
+            let ir_result = compile_file_ir_focused(
+                &resolved_path,
+                effective_fidelity,
+                state,
+                focus_methods.as_ref(),
+            );
             let compile_ms = compile_start.elapsed().as_millis() as u64;
 
             if let Ok((ir, _source_hash)) = ir_result {
@@ -912,13 +1088,34 @@ pub(crate) fn handle_provide_code_context(
                 // Note: IR error is logged below in the else branch (4.4 audit fix)
                 state.ir_context_lock().load_ir(ir.clone(), None);
                 let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
-                let llm_text = crate::ir::render_hierarchical_for_llm_focused(&hir, effective_fidelity, focus_methods.as_ref());
-                let full = format!("{}\n// ── {} ({}) ──\n{}", llm_text.trim(), ir.file_id, resolved_path, state.format_dict_footer().trim());
-                state.llm_text_cache_lock().insert(ir.file_id.clone(), full.clone());
+                let llm_text = crate::ir::render_hierarchical_for_llm_focused(
+                    &hir,
+                    effective_fidelity,
+                    focus_methods.as_ref(),
+                );
+                let full = format!(
+                    "{}\n// ── {} ({}) ──\n{}",
+                    llm_text.trim(),
+                    ir.file_id,
+                    resolved_path,
+                    state.format_dict_footer().trim()
+                );
+                state
+                    .llm_text_cache_lock()
+                    .insert(ir.file_id.clone(), full.clone());
                 let render_ms = render_start.elapsed().as_millis() as u64;
                 let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                 let comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
-                state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "full", None, "ir_compression");
+                state.record_compression(
+                    &resolved_path,
+                    raw_tokens,
+                    comp_tokens,
+                    &format!("{:?}", effective_fidelity).to_lowercase(),
+                    is_angular,
+                    "full",
+                    None,
+                    "ir_compression",
+                );
                 let mut response = serde_json::json!({
                     "jsonrpc": "2.0", "id": id, "result": {
                         "content": [{ "type": "text", "text": full }], "version": ir.version,
@@ -939,7 +1136,11 @@ pub(crate) fn handle_provide_code_context(
                     total_ms = total_ms,
                     raw_tokens = raw_tokens,
                     comp_tokens = comp_tokens,
-                    savings_pct = if raw_tokens > 0 { ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0) as u64 } else { 0 },
+                    savings_pct = if raw_tokens > 0 {
+                        ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0) as u64
+                    } else {
+                        0
+                    },
                     "provide_code_context full complete"
                 );
             } else {
@@ -950,19 +1151,34 @@ pub(crate) fn handle_provide_code_context(
                 // Gap 6 fix: capture the CompileError so the response's
                 // `degradation.ir_compiler` signal tells the agent why this
                 // output is the legacy fallback (not IR-rendered).
-                let degraded_ir = ir_result.as_ref().err()
+                let degraded_ir = ir_result
+                    .as_ref()
+                    .err()
                     .map(|e| serde_json::json!({ "ir_compiler": e.to_string() }));
                 let fallback_start = Instant::now();
                 match crate::compression::pipeline::compress_file_with_source(
-                    PathBuf::from(&resolved_path), Some(source),
-                    &mut state.dict_lock(), &mut state.cache_write(), effective_fidelity,
+                    PathBuf::from(&resolved_path),
+                    Some(source),
+                    &mut state.dict_lock(),
+                    &mut state.cache_write(),
+                    effective_fidelity,
                     Some(&state.config),
                 ) {
                     Ok(mut compressed_text) => {
                         compressed_text.push_str(&state.format_dict_footer());
                         let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
-                        let comp_tokens = count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
-                        state.record_compression(&resolved_path, raw_tokens, comp_tokens, &format!("{:?}", effective_fidelity).to_lowercase(), is_angular, "full", None, "ir_compression");
+                        let comp_tokens =
+                            count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
+                        state.record_compression(
+                            &resolved_path,
+                            raw_tokens,
+                            comp_tokens,
+                            &format!("{:?}", effective_fidelity).to_lowercase(),
+                            is_angular,
+                            "full",
+                            None,
+                            "ir_compression",
+                        );
                         let mut response = serde_json::json!({
                             "jsonrpc": "2.0", "id": id, "result": {
                                 "content": [{ "type": "text", "text": compressed_text }],
@@ -982,11 +1198,18 @@ pub(crate) fn handle_provide_code_context(
                             fallback_ms = fallback_ms,
                             raw_tokens = raw_tokens,
                             comp_tokens = comp_tokens,
-                            savings_pct = if raw_tokens > 0 { ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0) as u64 } else { 0 },
+                            savings_pct = if raw_tokens > 0 {
+                                ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0)
+                                    as u64
+                            } else {
+                                0
+                            },
                             "provide_code_context fallback complete"
                         );
                     }
-                    Err(e) => send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } })),
+                    Err(e) => send_response(
+                        &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } }),
+                    ),
                 }
             }
         }
@@ -995,18 +1218,20 @@ pub(crate) fn handle_provide_code_context(
 
 // ── Handler: restore_context ───────────────────────────────────────
 
-pub(crate) fn handle_restore_context(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpState) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     if file_path_str.is_empty() {
-        send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }));
+        send_response(
+            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }),
+        );
         return;
     }
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
+    let resolved_path = match resolve_file_path_checked(
+        file_path_str,
+        workspace_root,
+        &state.config.additional_roots,
+    ) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -1023,7 +1248,7 @@ pub(crate) fn handle_restore_context(
 
     // A-13: Check resource limits before processing
     let limits = &state.config.resource_limits;
-    
+
     // Check file size if we can read it
     if let Ok(metadata) = std::fs::metadata(&resolved_path) {
         if let Err(e) = limits.check_file_size(metadata.len()) {
@@ -1046,7 +1271,12 @@ pub(crate) fn handle_restore_context(
 
     let source_arc = match state.read_source(&resolved_path) {
         Ok(s) => s,
-        Err(e) => { send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } })); return; }
+        Err(e) => {
+            send_response(
+                &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } }),
+            );
+            return;
+        }
     };
     let source_text = source_arc.as_str();
 
@@ -1054,8 +1284,16 @@ pub(crate) fn handle_restore_context(
         Ok((ir, _source_hash)) => {
             let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
             let llm_text = crate::ir::render_hierarchical_for_llm(&hir, fidelity);
-            let full = format!("{}\n// ── {} ({}) ──\n{}", llm_text.trim(), ir.file_id, resolved_path, state.format_dict_footer().trim());
-            state.llm_text_cache_lock().insert(ir.file_id.clone(), full.clone());
+            let full = format!(
+                "{}\n// ── {} ({}) ──\n{}",
+                llm_text.trim(),
+                ir.file_id,
+                resolved_path,
+                state.format_dict_footer().trim()
+            );
+            state
+                .llm_text_cache_lock()
+                .insert(ir.file_id.clone(), full.clone());
             let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": full }], "version": ir.version, "restored": true } });
             // Restored context is a stable full snapshot — inject baseline breakpoint.
             inject_baseline_breakpoint(&mut response, state, &full);
@@ -1065,8 +1303,11 @@ pub(crate) fn handle_restore_context(
             // Log the structured IR error before falling back (4.4 audit fix)
             tracing::warn!(error = %e, path = %resolved_path, "IR compilation failed in restore_context, falling back to legacy compression");
             match crate::compression::pipeline::compress_file_with_source(
-                PathBuf::from(&resolved_path), Some(source_text),
-                &mut state.dict_lock(), &mut state.cache_write(), fidelity,
+                PathBuf::from(&resolved_path),
+                Some(source_text),
+                &mut state.dict_lock(),
+                &mut state.cache_write(),
+                fidelity,
                 Some(&state.config),
             ) {
                 Ok(mut compressed_text) => {
@@ -1076,7 +1317,9 @@ pub(crate) fn handle_restore_context(
                     inject_baseline_breakpoint(&mut response, state, &compressed_text);
                     send_response(&response);
                 }
-                Err(e) => send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } })),
+                Err(e) => send_response(
+                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } }),
+                ),
             }
         }
     }

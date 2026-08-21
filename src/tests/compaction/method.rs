@@ -37,7 +37,10 @@ fn verbatim_fidelity_carries_verbatim_body() {
 #[test]
 fn high_fidelity_still_strips_body() {
     let raw = "public async getUserById(id: string): Promise<User> {\n  return this.users.find(u => u.id === id)!;\n}";
-    assert_eq!(extract_method_sig(raw, Fidelity::High), "public async getUserById(id: string): Promise<User>");
+    assert_eq!(
+        extract_method_sig(raw, Fidelity::High),
+        "public async getUserById(id: string): Promise<User>"
+    );
 }
 
 // ── C# attribute handling ─────────────────────────────────────────
@@ -56,14 +59,25 @@ fn medium_fidelity_strips_csharp_attributes() {
     // C# form ("int id").
     assert!(out.starts_with("GetById("), "got: {}", out);
     assert!(out.contains("int id"), "got: {}", out);
-    assert!(!out.contains("IActionResult"), "return type should not appear in name position: {}", out);
-    assert!(!out.contains("HttpGet"), "attribute should be stripped: {}", out);
+    assert!(
+        !out.contains("IActionResult"),
+        "return type should not appear in name position: {}",
+        out
+    );
+    assert!(
+        !out.contains("HttpGet"),
+        "attribute should be stripped: {}",
+        out
+    );
 }
 
 #[test]
 fn high_fidelity_strips_csharp_attributes() {
     let raw = "[HttpGet]\npublic IActionResult Get()";
-    assert_eq!(extract_method_sig(raw, Fidelity::High), "public IActionResult Get()");
+    assert_eq!(
+        extract_method_sig(raw, Fidelity::High),
+        "public IActionResult Get()"
+    );
 }
 
 // ── C# tuple return type (legacy pipeline) ────────────────────────
@@ -85,9 +99,21 @@ fn medium_fidelity_csharp_tuple_return_type() {
     let out = extract_method_sig(sig, Fidelity::Medium);
     assert!(out.starts_with("GetOrgUnitDlc("), "got: {}", out);
     assert!(out.contains("int id"), "got: {}", out);
-    assert!(!out.contains("Dictionary"), "tuple contents leaked into params: {}", out);
-    assert!(!out.contains("Exact"), "tuple contents leaked into params: {}", out);
-    assert!(!out.contains("Task<"), "return type leaked into name: {}", out);
+    assert!(
+        !out.contains("Dictionary"),
+        "tuple contents leaked into params: {}",
+        out
+    );
+    assert!(
+        !out.contains("Exact"),
+        "tuple contents leaked into params: {}",
+        out
+    );
+    assert!(
+        !out.contains("Task<"),
+        "return type leaked into name: {}",
+        out
+    );
 }
 
 /// `find_method_params` returns the LAST balanced depth-0 paren group.
@@ -135,5 +161,9 @@ fn medium_fidelity_multi_line_csharp_tuple_return() {
     assert!(out.starts_with("GetOrgUnitDlc("), "got: {}", out);
     assert!(out.contains("int id"), "got: {}", out);
     assert!(out.contains("string name"), "got: {}", out);
-    assert!(!out.contains("Dictionary"), "tuple contents leaked into params: {}", out);
+    assert!(
+        !out.contains("Dictionary"),
+        "tuple contents leaked into params: {}",
+        out
+    );
 }

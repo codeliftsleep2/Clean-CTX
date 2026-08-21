@@ -30,8 +30,16 @@ fn test_graph_build_from_ir() {
     let symbol_table = GlobalSymbolTable::new();
     let graph = GraphBuilder::build(&[ir], &symbol_table);
 
-    assert_eq!(graph.nodes.len(), 4, "should have 4 nodes (class, method, field, interface)");
-    assert_eq!(graph.edges.len(), 4, "should have 4 edges (extends, implements, injects, dataflow)");
+    assert_eq!(
+        graph.nodes.len(),
+        4,
+        "should have 4 nodes (class, method, field, interface)"
+    );
+    assert_eq!(
+        graph.edges.len(),
+        4,
+        "should have 4 edges (extends, implements, injects, dataflow)"
+    );
 }
 
 #[test]

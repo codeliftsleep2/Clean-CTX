@@ -8,8 +8,8 @@
 // - Uses `cache_control` breakpoints for prompt caching
 // - Uses `anthropic-beta` header for extended cache TTL
 
-use serde_json::Value;
 use super::PlatformAdapter;
+use serde_json::Value;
 
 /// Anthropic API adapter.
 pub struct AnthropicAdapter;
@@ -34,7 +34,8 @@ impl PlatformAdapter for AnthropicAdapter {
 
         // Tool name is on the preceding tool_use block, not here
         // We use "unknown" as fallback — the filter system uses first-line matching
-        let name = block["tool_use_id"].as_str()
+        let name = block["tool_use_id"]
+            .as_str()
             .unwrap_or("unknown")
             .to_string();
 
@@ -50,9 +51,10 @@ impl PlatformAdapter for AnthropicAdapter {
     }
 
     fn platform_headers(&self) -> Vec<(String, String)> {
-        vec![
-            ("anthropic-beta".into(), "extended-cache-ttl-2025-04-11".into()),
-        ]
+        vec![(
+            "anthropic-beta".into(),
+            "extended-cache-ttl-2025-04-11".into(),
+        )]
     }
 
     fn is_platform_model(&self, model: &str) -> bool {

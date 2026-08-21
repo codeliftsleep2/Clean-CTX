@@ -7,9 +7,9 @@ use regex::Regex;
 use serde_json::Value;
 use tracing::debug;
 
-use crate::filters::{apply_filter, build_filtered_marker, json_guard};
 use crate::filter_registry::FilterRegistry;
 use crate::filter_stats::FilterStats;
+use crate::filters::{apply_filter, build_filtered_marker, json_guard};
 use crate::platform::PlatformAdapter;
 use crate::scrub;
 
@@ -100,28 +100,30 @@ impl TransformStats {
         self.model_overrides += other.model_overrides;
         self.secrets_scrubbed += other.secrets_scrubbed;
         self.tool_filters_applied += other.tool_filters_applied;
-        self.sliding_window.cumulative_bytes_removed += other.sliding_window.cumulative_bytes_removed;
+        self.sliding_window.cumulative_bytes_removed +=
+            other.sliding_window.cumulative_bytes_removed;
     }
 }
 
 /// Lazy-initialized ANSI escape regex.
 fn ansi_regex() -> &'static Regex {
     static ANSI_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    ANSI_RE.get_or_init(|| {
-        Regex::new(r"\x1B\[[0-9;]*[a-zA-Z]").expect("Invalid ANSI regex")
-    })
+    ANSI_RE.get_or_init(|| Regex::new(r"\x1B\[[0-9;]*[a-zA-Z]").expect("Invalid ANSI regex"))
 }
 
 /// Lazy-initialized regex for matching Claude model names in text.
 fn model_regex() -> &'static Regex {
     static MODEL_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    MODEL_RE.get_or_init(|| {
-        Regex::new(r"claude-[a-z]+-\d[\d.-]+[a-z\d]").expect("Invalid model regex")
-    })
+    MODEL_RE
+        .get_or_init(|| Regex::new(r"claude-[a-z]+-\d[\d.-]+[a-z\d]").expect("Invalid model regex"))
 }
 
 /// Drop tools from body.tools[] that match the provided exclusion set.
-pub fn drop_tools(body: &mut Value, drop_set: &std::collections::HashSet<String>, stats: &mut TransformStats) -> usize {
+pub fn drop_tools(
+    body: &mut Value,
+    drop_set: &std::collections::HashSet<String>,
+    stats: &mut TransformStats,
+) -> usize {
     if drop_set.is_empty() {
         return 0;
     }
@@ -154,7 +156,11 @@ pub fn drop_tools(body: &mut Value, drop_set: &std::collections::HashSet<String>
 ///
 /// Uses the platform adapter to detect tool result blocks across different
 /// API formats (Anthropic's `type: "tool_result"`, OpenAI's `role: "tool"`, etc.).
-pub fn strip_ansi(body: &mut Value, stats: &mut TransformStats, adapter: &dyn PlatformAdapter) -> usize {
+pub fn strip_ansi(
+    body: &mut Value,
+    stats: &mut TransformStats,
+    adapter: &dyn PlatformAdapter,
+) -> usize {
     let re = ansi_regex();
     let mut total_sequences: usize = 0;
 
@@ -267,7 +273,11 @@ pub fn override_model(body: &mut Value, model: &str, stats: &mut TransformStats)
 ///
 /// Uses the platform adapter to detect tool result blocks across different
 /// API formats (Anthropic's `type: "tool_result"`, OpenAI's `role: "tool"`, etc.).
-pub fn scrub_secrets(body: &mut Value, stats: &mut TransformStats, adapter: &dyn PlatformAdapter) -> u64 {
+pub fn scrub_secrets(
+    body: &mut Value,
+    stats: &mut TransformStats,
+    adapter: &dyn PlatformAdapter,
+) -> u64 {
     let mut total_hits: u64 = 0;
 
     if let Some(messages) = body["messages"].as_array_mut() {
@@ -383,7 +393,10 @@ pub fn age_tool_results(
 
         // Now we need mutable access to modify tool result blocks
         // Get the content array length first
-        let content_len = messages[i]["content"].as_array().map(|a| a.len()).unwrap_or(0);
+        let content_len = messages[i]["content"]
+            .as_array()
+            .map(|a| a.len())
+            .unwrap_or(0);
         if content_len == 0 {
             i += 1;
             continue;
@@ -432,12 +445,15 @@ pub fn age_tool_results(
             // Path cross-reference check
             let mut content_paths = Vec::new();
             extract_path_strings_from_text(&original_text, &mut content_paths);
-            let has_cross_ref = content_paths.iter().any(|p| {
-                recent_paths.iter().any(|rp| rp.contains(p))
-            });
+            let has_cross_ref = content_paths
+                .iter()
+                .any(|p| recent_paths.iter().any(|rp| rp.contains(p)));
 
             if has_cross_ref {
-                debug!("[sliding_window] Preserved aged item {} (cross-reference)", tool_name);
+                debug!(
+                    "[sliding_window] Preserved aged item {} (cross-reference)",
+                    tool_name
+                );
                 j += 1;
                 continue;
             }
@@ -531,8 +547,12 @@ fn extract_path_strings_from_text(text: &str, paths: &mut Vec<String>) {
     for word in text.split_whitespace() {
         // Simple heuristic: looks like a file path
         if word.contains('/') || word.contains('\\') {
-            let trimmed = word.trim_matches(|c: char| c == '"' || c == '\'' || c == '`' || c == ',' || c == ')' || c == ']' || c == '}');
-            if !trimmed.is_empty() && (trimmed.contains('.') || trimmed.contains('/') || trimmed.contains('\\')) {
+            let trimmed = word.trim_matches(|c: char| {
+                c == '"' || c == '\'' || c == '`' || c == ',' || c == ')' || c == ']' || c == '}'
+            });
+            if !trimmed.is_empty()
+                && (trimmed.contains('.') || trimmed.contains('/') || trimmed.contains('\\'))
+            {
                 paths.push(trimmed.to_string());
             }
         }
@@ -581,7 +601,8 @@ pub fn apply_tool_filters(
                         .find(|l| !l.trim().is_empty())
                         .unwrap_or("");
 
-                    let filter = registry.select_for_command(first_line)
+                    let filter = registry
+                        .select_for_command(first_line)
                         .or_else(|| registry.select_for_command(&original_text));
 
                     if let Some(filter) = filter {
@@ -681,7 +702,9 @@ mod tests {
 
         let text = body["messages"][0]["content"][0]["text"].as_str().unwrap();
         assert_eq!(text, "Hello world!");
-        let result = body["messages"][0]["content"][1]["content"].as_str().unwrap();
+        let result = body["messages"][0]["content"][1]["content"]
+            .as_str()
+            .unwrap();
         assert_eq!(result, "Line 1\nLine 2");
         assert!(stats.ansi_sequences_stripped >= 3);
     }
@@ -742,7 +765,9 @@ mod tests {
 
         assert!(hits > 0);
         assert!(stats.secrets_scrubbed > 0);
-        let content = body["messages"][0]["content"][0]["content"].as_str().unwrap();
+        let content = body["messages"][0]["content"][0]["content"]
+            .as_str()
+            .unwrap();
         assert!(content.contains("[REDACTED]"));
         assert!(!content.contains("AKIAIOSFODNN7EXAMPLE"));
     }
@@ -777,7 +802,9 @@ mod tests {
         let hits = scrub_secrets(&mut body, &mut stats, &adapter);
 
         assert_eq!(hits, 0);
-        let content = body["messages"][0]["content"][0]["content"].as_str().unwrap();
+        let content = body["messages"][0]["content"][0]["content"]
+            .as_str()
+            .unwrap();
         assert_eq!(content, "Hello world, no secrets here.");
     }
 
@@ -849,13 +876,23 @@ mod tests {
         assert_eq!(stats.sliding_window.items_aged, 1);
 
         // Verify message 0 was stubbed
-        let content = body["messages"][0]["content"][0]["content"].as_str().unwrap();
+        let content = body["messages"][0]["content"][0]["content"]
+            .as_str()
+            .unwrap();
         assert!(content.contains("[aged:"), "aged content should have stub");
-        assert!(content.contains("turn 0"), "stub should contain turn number");
+        assert!(
+            content.contains("turn 0"),
+            "stub should contain turn number"
+        );
 
         // Verify message 9 was NOT aged
-        let content9 = body["messages"][9]["content"][0]["content"].as_str().unwrap();
-        assert!(content9.contains("src/main.rs"), "recent content should be preserved");
+        let content9 = body["messages"][9]["content"][0]["content"]
+            .as_str()
+            .unwrap();
+        assert!(
+            content9.contains("src/main.rs"),
+            "recent content should be preserved"
+        );
     }
 
     #[test]
@@ -883,16 +920,18 @@ mod tests {
 
     #[test]
     fn test_age_tool_results_force_preserve_floor() {
-        let mut messages: Vec<serde_json::Value> = (0..20).map(|i| {
-            serde_json::json!({
-                "role": "user",
-                "content": [{
-                    "type": "tool_result",
-                    "tool_use_id": format!("tool_{}", i),
-                    "content": format!("output_{}", i)
-                }]
+        let mut messages: Vec<serde_json::Value> = (0..20)
+            .map(|i| {
+                serde_json::json!({
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": format!("tool_{}", i),
+                        "content": format!("output_{}", i)
+                    }]
+                })
             })
-        }).collect();
+            .collect();
         messages.push(serde_json::json!({
             "role": "user", "content": [{"type": "text", "text": "latest"}]
         }));

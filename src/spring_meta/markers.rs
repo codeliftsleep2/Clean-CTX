@@ -116,20 +116,20 @@ impl PhiLineKind {
     #[cfg_attr(not(feature = "spring_boot"), allow(dead_code))]
     pub fn all_in_expand_order() -> &'static [PhiLineKind] {
         &[
-            Self::RestController, // Φrest:   (6 chars)
-            Self::Controller,     // Φctrl:   (6 chars)
-            Self::Repository,     // Φrepo:   (6 chars)
-            Self::Configuration,  // Φconf:   (6 chars)
-            Self::RequestMapping, // Φmap:    (5 chars)
-            Self::Service,        // Φsvc:    (5 chars)
-            Self::Autowired,      // Φaut:    (5 chars)
-            Self::Value,          // Φval:    (5 chars)
-            Self::Bean,           // Φbean:   (6 chars)
+            Self::RestController,          // Φrest:   (6 chars)
+            Self::Controller,              // Φctrl:   (6 chars)
+            Self::Repository,              // Φrepo:   (6 chars)
+            Self::Configuration,           // Φconf:   (6 chars)
+            Self::RequestMapping,          // Φmap:    (5 chars)
+            Self::Service,                 // Φsvc:    (5 chars)
+            Self::Autowired,               // Φaut:    (5 chars)
+            Self::Value,                   // Φval:    (5 chars)
+            Self::Bean,                    // Φbean:   (6 chars)
             Self::ConfigurationProperties, // Φprop: (6 chars)
-            Self::Graph,          // Φgraph:  (7 chars)
-            Self::PropertiesFile, // Φpropf:  (7 chars)
-            Self::Bundle,         // ΦBUNDLE  (8 chars)
-            Self::Map,            // ΦMAP     (5 chars)
+            Self::Graph,                   // Φgraph:  (7 chars)
+            Self::PropertiesFile,          // Φpropf:  (7 chars)
+            Self::Bundle,                  // ΦBUNDLE  (8 chars)
+            Self::Map,                     // ΦMAP     (5 chars)
         ]
     }
 
@@ -397,12 +397,20 @@ impl std::fmt::Display for RequestMappingMapping {
 
 /// Build a `Φrest:<ClassName> [map=…]` marker line.
 pub fn build_rest_controller_line(class_name: &str, mappings: &[RequestMappingMapping]) -> String {
-    RestControllerLine { class_name, mappings }.render()
+    RestControllerLine {
+        class_name,
+        mappings,
+    }
+    .render()
 }
 
 /// Build a `Φctrl:<ClassName> [map=…]` marker line.
 pub fn build_controller_line(class_name: &str, mappings: &[RequestMappingMapping]) -> String {
-    ControllerLine { class_name, mappings }.render()
+    ControllerLine {
+        class_name,
+        mappings,
+    }
+    .render()
 }
 
 /// Build a `Φsvc:<ClassName>` marker line.
@@ -422,7 +430,11 @@ pub fn build_configuration_line(class_name: &str) -> String {
 
 /// Build a `Φmap:<ClassName> map=[…]` marker line.
 pub fn build_request_mapping_line(class_name: &str, mappings: &[RequestMappingMapping]) -> String {
-    RequestMappingLine { class_name, mappings }.render()
+    RequestMappingLine {
+        class_name,
+        mappings,
+    }
+    .render()
 }
 
 /// Build a `Φaut:<fieldName>` marker line.
@@ -490,4 +502,3 @@ pub fn expand_phi_in_line(line: &str) -> String {
 pub fn expand_phi(token: &str) -> Option<&'static str> {
     PhiLineKind::from_token(token).map(|k| k.expansion())
 }
-

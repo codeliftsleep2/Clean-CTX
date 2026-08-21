@@ -35,7 +35,6 @@ pub enum TokenizerKind {
     Llama3,
 }
 
-
 impl fmt::Display for TokenizerKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -110,7 +109,8 @@ impl Tokenizer for BpeTokenizer {
     }
 
     fn encode(&self, text: &str) -> Vec<u64> {
-        self.bpe.encode_with_special_tokens(text)
+        self.bpe
+            .encode_with_special_tokens(text)
             .into_iter()
             .map(|t| t as u64)
             .collect()
@@ -127,15 +127,13 @@ static O200K_BPE: OnceLock<CoreBPE> = OnceLock::new();
 
 fn cl100k_engine() -> Result<&'static CoreBPE, TokenizerError> {
     Ok(CL100K_BPE.get_or_init(|| {
-        tiktoken_rs::cl100k_base()
-            .expect("cl100k BPE data must be loadable at startup")
+        tiktoken_rs::cl100k_base().expect("cl100k BPE data must be loadable at startup")
     }))
 }
 
 fn o200k_engine() -> Result<&'static CoreBPE, TokenizerError> {
     Ok(O200K_BPE.get_or_init(|| {
-        tiktoken_rs::o200k_base()
-            .expect("o200k BPE data must be loadable at startup")
+        tiktoken_rs::o200k_base().expect("o200k BPE data must be loadable at startup")
     }))
 }
 

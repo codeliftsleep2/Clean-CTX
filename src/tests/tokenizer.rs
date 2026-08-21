@@ -4,43 +4,100 @@ use crate::tokenizer::*;
 
 #[test]
 fn tokenizer_kind_from_str_cl100k() {
-    assert_eq!(TokenizerKind::from_str_opt("cl100k"), Some(TokenizerKind::Cl100k));
-    assert_eq!(TokenizerKind::from_str_opt("cl100k_base"), Some(TokenizerKind::Cl100k));
-    assert_eq!(TokenizerKind::from_str_opt("gpt4"), Some(TokenizerKind::Cl100k));
-    assert_eq!(TokenizerKind::from_str_opt("gpt-4"), Some(TokenizerKind::Cl100k));
-    assert_eq!(TokenizerKind::from_str_opt("gpt35"), Some(TokenizerKind::Cl100k));
-    assert_eq!(TokenizerKind::from_str_opt("gpt-3.5"), Some(TokenizerKind::Cl100k));
+    assert_eq!(
+        TokenizerKind::from_str_opt("cl100k"),
+        Some(TokenizerKind::Cl100k)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("cl100k_base"),
+        Some(TokenizerKind::Cl100k)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("gpt4"),
+        Some(TokenizerKind::Cl100k)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("gpt-4"),
+        Some(TokenizerKind::Cl100k)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("gpt35"),
+        Some(TokenizerKind::Cl100k)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("gpt-3.5"),
+        Some(TokenizerKind::Cl100k)
+    );
 }
 
 #[test]
 fn tokenizer_kind_from_str_o200k() {
-    assert_eq!(TokenizerKind::from_str_opt("o200k"), Some(TokenizerKind::O200k));
-    assert_eq!(TokenizerKind::from_str_opt("o200k_base"), Some(TokenizerKind::O200k));
-    assert_eq!(TokenizerKind::from_str_opt("gpt4o"), Some(TokenizerKind::O200k));
-    assert_eq!(TokenizerKind::from_str_opt("gpt-4o"), Some(TokenizerKind::O200k));
+    assert_eq!(
+        TokenizerKind::from_str_opt("o200k"),
+        Some(TokenizerKind::O200k)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("o200k_base"),
+        Some(TokenizerKind::O200k)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("gpt4o"),
+        Some(TokenizerKind::O200k)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("gpt-4o"),
+        Some(TokenizerKind::O200k)
+    );
 }
 
 #[test]
 fn tokenizer_kind_from_str_claude() {
-    assert_eq!(TokenizerKind::from_str_opt("claude"), Some(TokenizerKind::Claude));
-    assert_eq!(TokenizerKind::from_str_opt("anthropic"), Some(TokenizerKind::Claude));
-    assert_eq!(TokenizerKind::from_str_opt("claude3"), Some(TokenizerKind::Claude));
-    assert_eq!(TokenizerKind::from_str_opt("claude-3"), Some(TokenizerKind::Claude));
+    assert_eq!(
+        TokenizerKind::from_str_opt("claude"),
+        Some(TokenizerKind::Claude)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("anthropic"),
+        Some(TokenizerKind::Claude)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("claude3"),
+        Some(TokenizerKind::Claude)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("claude-3"),
+        Some(TokenizerKind::Claude)
+    );
 }
 
 #[test]
 fn tokenizer_kind_from_str_llama3() {
-    assert_eq!(TokenizerKind::from_str_opt("llama3"), Some(TokenizerKind::Llama3));
-    assert_eq!(TokenizerKind::from_str_opt("llama-3"), Some(TokenizerKind::Llama3));
-    assert_eq!(TokenizerKind::from_str_opt("llama"), Some(TokenizerKind::Llama3));
-    assert_eq!(TokenizerKind::from_str_opt("meta"), Some(TokenizerKind::Llama3));
+    assert_eq!(
+        TokenizerKind::from_str_opt("llama3"),
+        Some(TokenizerKind::Llama3)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("llama-3"),
+        Some(TokenizerKind::Llama3)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("llama"),
+        Some(TokenizerKind::Llama3)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("meta"),
+        Some(TokenizerKind::Llama3)
+    );
 }
 
 #[test]
 fn tokenizer_kind_from_str_unknown() {
     assert_eq!(TokenizerKind::from_str_opt("unknown"), None);
     assert_eq!(TokenizerKind::from_str_opt(""), None);
-    assert_eq!(TokenizerKind::from_str_opt("CL100K"), Some(TokenizerKind::Cl100k));
+    assert_eq!(
+        TokenizerKind::from_str_opt("CL100K"),
+        Some(TokenizerKind::Cl100k)
+    );
 }
 
 #[test]
@@ -158,10 +215,22 @@ fn tokenizer_kind_aliases_via_from_str_opt() {
     // Aliases like "gpt-4o" are handled by from_str_opt, not serde.
     // Config files should use canonical names ("o200k"), but tool
     // arguments support aliases via from_str_opt.
-    assert_eq!(TokenizerKind::from_str_opt("gpt-4o"), Some(TokenizerKind::O200k));
-    assert_eq!(TokenizerKind::from_str_opt("gpt-4"), Some(TokenizerKind::Cl100k));
-    assert_eq!(TokenizerKind::from_str_opt("anthropic"), Some(TokenizerKind::Claude));
-    assert_eq!(TokenizerKind::from_str_opt("meta"), Some(TokenizerKind::Llama3));
+    assert_eq!(
+        TokenizerKind::from_str_opt("gpt-4o"),
+        Some(TokenizerKind::O200k)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("gpt-4"),
+        Some(TokenizerKind::Cl100k)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("anthropic"),
+        Some(TokenizerKind::Claude)
+    );
+    assert_eq!(
+        TokenizerKind::from_str_opt("meta"),
+        Some(TokenizerKind::Llama3)
+    );
 }
 
 #[test]
@@ -173,5 +242,10 @@ fn llama3_ratio_adjustment() {
     let o200k_count = o200k.count_tokens(text);
     let llama3_count = llama3.count_tokens(text);
     // Llama-3 should have more tokens due to ratio adjustment
-    assert!(llama3_count >= o200k_count, "llama3 ({}) should be >= o200k ({})", llama3_count, o200k_count);
+    assert!(
+        llama3_count >= o200k_count,
+        "llama3 ({}) should be >= o200k ({})",
+        llama3_count,
+        o200k_count
+    );
 }

@@ -5,8 +5,8 @@
 // Note: `init_tracing` uses `try_init()` so it's safe to call
 // multiple times in tests (subsequent calls are no-ops).
 
+use crate::observability::tracing::{StderrWriter, init_tracing};
 use tracing_subscriber::fmt::MakeWriter;
-use crate::observability::tracing::{init_tracing, StderrWriter};
 
 #[test]
 fn test_init_tracing_default() {
@@ -31,24 +31,36 @@ fn test_tracing_writer_is_stderr() {
 #[test]
 fn test_init_tracing_json_format() {
     // Set JSON format env var
-    unsafe { std::env::set_var("CLEAN_CTX_LOG_FORMAT", "json"); }
+    unsafe {
+        std::env::set_var("CLEAN_CTX_LOG_FORMAT", "json");
+    }
     init_tracing();
     // Clean up
-    unsafe { std::env::remove_var("CLEAN_CTX_LOG_FORMAT"); }
+    unsafe {
+        std::env::remove_var("CLEAN_CTX_LOG_FORMAT");
+    }
 }
 
 #[test]
 fn test_init_tracing_custom_filter() {
-    unsafe { std::env::set_var("CLEAN_CTX_LOG_FILTER", "warn,clean_ctx=debug"); }
+    unsafe {
+        std::env::set_var("CLEAN_CTX_LOG_FILTER", "warn,clean_ctx=debug");
+    }
     init_tracing();
-    unsafe { std::env::remove_var("CLEAN_CTX_LOG_FILTER"); }
+    unsafe {
+        std::env::remove_var("CLEAN_CTX_LOG_FILTER");
+    }
 }
 
 #[test]
 fn test_init_tracing_custom_level() {
-    unsafe { std::env::set_var("CLEAN_CTX_LOG", "debug"); }
+    unsafe {
+        std::env::set_var("CLEAN_CTX_LOG", "debug");
+    }
     init_tracing();
-    unsafe { std::env::remove_var("CLEAN_CTX_LOG"); }
+    unsafe {
+        std::env::remove_var("CLEAN_CTX_LOG");
+    }
 }
 
 #[test]

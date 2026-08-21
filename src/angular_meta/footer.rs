@@ -132,9 +132,7 @@ impl FooterBuilder {
         // same Φ prefix and monotonically increasing integer suffix).
         // Use natural sort via a stable comparator on the trailing
         // number.
-        entries.sort_by(|a, b| {
-            natural_cmp(&a.alias, &b.alias)
-        });
+        entries.sort_by(|a, b| natural_cmp(&a.alias, &b.alias));
         format_bundle_footer(&entries)
     }
 
@@ -148,12 +146,8 @@ impl FooterBuilder {
 
 /// Natural-order comparator that sorts `"Φ2"` before `"Φ10"`.
 fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
-    let num_a: Option<usize> = a
-        .strip_prefix('Φ')
-        .and_then(|s| s.parse().ok());
-    let num_b: Option<usize> = b
-        .strip_prefix('Φ')
-        .and_then(|s| s.parse().ok());
+    let num_a: Option<usize> = a.strip_prefix('Φ').and_then(|s| s.parse().ok());
+    let num_b: Option<usize> = b.strip_prefix('Φ').and_then(|s| s.parse().ok());
     match (num_a, num_b) {
         (Some(na), Some(nb)) => na.cmp(&nb),
         _ => a.cmp(b),
