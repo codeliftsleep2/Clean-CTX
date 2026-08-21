@@ -456,6 +456,26 @@ println!("{:#?}", config);
 }
 ```
 
+### Additional Workspace Roots (Multi-Repo Support)
+
+Clean-CTX normally rejects file paths outside a single trusted workspace root (the project root or the caller-supplied `workspaceRoot`). For multi-repo setups — where a central `.clean-ctx.json` manages access to several sibling repos — list additional roots here so calls referencing files in those repos succeed.
+
+```json
+{
+  "additional_roots": [
+    "C:\\Users\\me\\source\\repos\\LinguaForge",
+    "C:\\Users\\me\\source\\repos\\Outcomes"
+  ]
+}
+```
+
+**How it works:**
+- The boundary check in `resolve_file_path_checked` compares the requested file path against the primary workspace root first (fast path), then against each entry in `additional_roots`.
+- Each additional root is canonicalized lazily at check time (not config load time), so a path that doesn't exist on the current machine is silently skipped rather than erroring the whole config.
+- When a path fails all boundary checks, the error message now shows the effective workspace root(s) checked, helping you diagnose configuration issues.
+
+**Use case:** A container repo whose `.clean-ctx.json` lives at `C:\containers\fe` but whose source code lives in sibling repos like `C:\containers\api\src`. Without `additional_roots`, the boundary check rejects files in `C:\containers\api\src` because they're outside the primary root (`C:\containers\fe`).
+
 ### Exclude directories from compression
 
 ```json

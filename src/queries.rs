@@ -56,6 +56,10 @@ pub const CS_QUERY: &str = r#"
     (enum_declaration) @enum.root
     (record_declaration) @record.root
     (field_declaration) @field.root
+    ; LinguaForge audit Issue 4 fix: capture enum variant members so the
+    ; diff snapshot can detect additions/removals of enum values. Without
+    ; this capture, enum variant changes are a false negative in diff_commits.
+    (enum_member_declaration) @field.root
     (constructor_declaration) @constructor.root
     ; --- C# property/event/indexer/operator captures ---
     ; Properties are a distinct AST node from fields in C#. Without this
