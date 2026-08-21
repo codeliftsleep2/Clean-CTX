@@ -318,6 +318,26 @@ pub struct CleanCtxConfig {
     #[serde(default)]
     pub exclude_patterns: Vec<String>,
 
+    /// Additional trusted workspace roots, beyond the primary project root
+    /// (or caller-supplied `workspaceRoot` argument).
+    ///
+    /// The compression-tool boundary check (`resolve_file_path_checked`)
+    /// normally rejects any file outside a single trusted root. For a
+    /// multi-repo setup — e.g. a container repo whose per-project
+    /// `.clean-ctx.json` lives at the container root, but whose actual
+    /// source code lives in sibling repos — list those sibling repo roots
+    /// here (absolute paths) so calls against them succeed without needing
+    /// `workspaceRoot` passed on every call. Each entry is canonicalized at
+    /// check time; a path that doesn't exist is silently skipped rather than
+    /// erroring the whole config.
+    ///
+    /// Example `.clean-ctx.json`:
+    /// ```json
+    /// { "additional_roots": ["C:\\Users\\me\\source\\repos\\Outcomes"] }
+    /// ```
+    #[serde(default)]
+    pub additional_roots: Vec<String>,
+
     /// Custom behavior markers: marker → description
     #[serde(default)]
     pub custom_markers: BTreeMap<String, String>,
@@ -615,6 +635,7 @@ impl Default for CleanCtxConfig {
             type_aliases: BTreeMap::new(),
             fidelity_overrides: BTreeMap::new(),
             exclude_patterns: Vec::new(),
+            additional_roots: Vec::new(),
             custom_markers: BTreeMap::new(),
             default_fidelity: default_fidelity(),
             diff_compression: default_true(),

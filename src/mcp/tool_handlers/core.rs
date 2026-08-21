@@ -90,7 +90,7 @@ pub(crate) fn handle_compress_code_context(
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let encoding = params["arguments"]["encoding"].as_str().unwrap_or("named");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -283,7 +283,7 @@ pub(crate) fn handle_diff_code_context(
 ) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -328,7 +328,7 @@ pub(crate) fn handle_delta_code_context(
 ) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -453,7 +453,7 @@ pub(crate) fn handle_delta_text_context(
 ) {
     let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -595,7 +595,7 @@ pub(crate) fn handle_provide_code_context(
     }
 
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({
@@ -1006,7 +1006,7 @@ pub(crate) fn handle_restore_context(
         return;
     }
     let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root) {
+    let resolved_path = match resolve_file_path_checked(file_path_str, workspace_root, &state.config.additional_roots) {
         Ok(p) => p,
         Err(msg) => {
             send_response(&serde_json::json!({

@@ -397,7 +397,7 @@ pub(crate) fn dispatch_tools_call(
             // Pass the caller-supplied workspaceRoot through so the boundary check
             // honors it (multi-repo support) instead of pinning to CWD.
             let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-            let dir_path = match super::tool_helpers::resolve_file_path_checked(dir_path, workspace_root) {
+            let dir_path = match super::tool_helpers::resolve_file_path_checked(dir_path, workspace_root, &state.config.additional_roots) {
                 Ok(p) => p,
                 Err(msg) => {
                     send_response(&serde_json::json!({
@@ -457,6 +457,7 @@ pub(crate) fn dispatch_tools_call(
             let root = match super::tool_helpers::resolve_file_path_checked(
                 root_arg.unwrap_or("."),
                 root_arg,
+                &state.config.additional_roots,
             ) {
                 Ok(p) => p,
                 Err(msg) => {
