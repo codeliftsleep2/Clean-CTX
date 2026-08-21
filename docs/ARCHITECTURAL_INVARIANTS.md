@@ -15,6 +15,7 @@
 | **DOCUMENTED** | Architectural convention currently not machine-enforced. Violation is possible but should trigger a design discussion. |
 | **DEFERRED** | Important architectural decision intentionally postponed. |
 | **PROPOSED** | Under consideration but not yet accepted. |
+| **RESOLVED** | Previously documented architectural debt that has been completed. |
 
 ## Architectural Gate
 
@@ -97,35 +98,37 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### PIPELINE-001 — Compilation Pipeline Ordering (Deferred)
+### PIPELINE-001 — Compilation Pipeline Ordering
 
 | Property | Value |
 |----------|-------|
-| **Intent** | Compilation stages should execute in a known architectural order. |
-| **Invariant** | (Not currently enforced — see ARCH-DEBT-001.) |
-| **Enforcement** | None currently. |
-| **Authority** | Not applicable. |
-| **Type** | DEFERRED |
-| **Gate** | None |
+| **Intent** | Compilation stages must execute in a known architectural order. |
+| **Invariant** | The production `PassPipeline` must register passes in the required order: `CoreIRPass` → `LanguageLayerPass` → `MetaLayerPass` → `PatternRecognitionPass` → `AliasResolutionPass` → `ValidationPass`. This ordering reflects the data and semantic dependencies between stages. |
+| **Enforcement** | `production_pipeline_preserves_architectural_order` test in `src/tests/ir/pipeline.rs` asserts the exact pass sequence via `PassPipeline::pass_names()`. |
+| **Authority** | `src/ir/pipeline.rs` (`PassPipeline::default_production()`), `src/tests/ir/pipeline.rs` (ordering test) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
 
-**Why this is deferred:** The current production pipeline is `IRCompiler::compile_inner()`. `PassPipeline` is the intended composable replacement, and the migration to it is planned (see ARCH-DEBT-001). Pipeline-ordering fitness enforcement should be added **after** `PassPipeline` becomes the production pipeline — the future invariant must test the actual production pipeline, not the currently unused abstraction.
+**Rationale for ordering:**
+- **CoreIR** must precede **Language Finalize**: The core capture/emission phase must process all captures before language-layer finalization occurs.
+- **Language Finalize** must precede **Meta Layer**: Meta layers depend on the instruction stream after language-layer processing.
+- **Meta Layer** must precede **Pattern Recognition**: Pattern recognition operates on the complete instruction stream including meta-layer output.
+- **Pattern Recognition** must precede **Alias Resolution**: Alias resolution must see all relevant `Extends`/`Implements` instructions after pattern processing.
+- **Alias Resolution** must precede **Validation**: Validation must inspect the final canonical instruction stream after all transformations.
 
 ---
 
 ## Architectural Debt
 
-### ARCH-DEBT-001 — PassPipeline Migration Incomplete
+### ARCH-DEBT-001 — PassPipeline Migration (RESOLVED)
 
 | Property | Value |
 |----------|-------|
-| **Description** | `PassPipeline` in `src/ir/pipeline.rs` implements the intended composable 7-pass compilation architecture (Core IR → Language Layer → Meta Layer → Execution Semantics → Program Graph → Inference → Validation). It was created as part of R-43b as the intended replacement for the monolithic compiler orchestration, but it is NOT currently wired into production compilation — the migration was never completed. This is an incomplete architectural migration, not accidental dead code. The decision has been made to complete the migration as a separate follow-up architectural refactoring, so that the current architectural baseline can be captured first. |
-| **Origin** | R-43b (IR Evolution Phases 2-6). The IR Evolution Plan explicitly identified "monolithic compile function" as a gap and `PassPipeline` as the planned replacement. |
-| **Why it exists** | The composable pass architecture was designed to replace the monolithic `IRCompiler::compile_inner()` function, making it mechanical to add new passes for new languages, meta-layers, or analysis. |
-| **Current state** | Production compilation occurs in `IRCompiler::compile_inner()` (`src/ir/compiler.rs`). `PassPipeline` remains as infrastructure awaiting migration. The `IRPass` trait and built-in passes (`CoreIRPass`, `ProgramGraphPass`, `InferenceLayerPass`, `ValidationPass`) are functional and tested, but the production code path never instantiates `PassPipeline`. The decision to complete the migration has been made; `PassPipeline` must not be deleted. |
-| **Tradeoff** | **Current:** `IRCompiler::compile_inner()` is the production compilation orchestrator. Its compilation stages are implemented directly in its control flow, making stage ordering implicit and requiring changes to the central compiler when new stages are introduced. **Intended:** `PassPipeline` provides the composable pass architecture originally introduced by R-43b to address this monolithic orchestration. **Decision:** Migration to `PassPipeline` is planned as follow-up architectural work. The migration should preserve existing compiler behavior while progressively moving the current compilation stages into the corresponding pipeline passes. |
-| **Migration trigger / plan** | Migration is planned as a separate architectural refactoring after the current invariant baseline has been documented. The migration should be behavior-preserving and should progressively move the existing compilation stages from `IRCompiler::compile_inner()` into the corresponding `PassPipeline` passes. Existing tests should establish behavioral equivalence throughout the migration before the old orchestration is removed. |
-| **See also** | `src/ir/pipeline.rs` (module-level comment), `docs/ARCHITECTURE_OVERVIEW.md` (pipeline architecture diagram) |
-| **Tracking** | `src/ir/pipeline.rs` lines 1-122 |
+| **Description** | The `PassPipeline` migration from the monolithic `IRCompiler::compile_inner()` has been completed. `PassPipeline` is now the active production compilation path. |
+| **Resolution** | `IRCompiler::compile_inner()` is now an orchestration boundary that constructs a `PassContext`, configures the `PassPipeline`, and delegates compilation to `PassPipeline::run()`. Individual compilation stages are implemented in their corresponding `IRPass` implementations in `src/ir/pipeline.rs`. |
+| **Production pipeline order** | `CoreIRPass` → `LanguageLayerPass` → `MetaLayerPass` → `PatternRecognitionPass` → `AliasResolutionPass` → `ValidationPass` |
+| **Optional passes** | `ExecutionSemanticsPass`, `ProgramGraphPass`, `InferenceLayerPass` remain outside the default production pipeline. |
+| **See also** | `src/ir/pipeline.rs`, `src/ir/compiler.rs`, `docs/ARCHITECTURAL_INVARIANTS.md` (PIPELINE-001) |
 
 ---
 
@@ -148,4 +151,3 @@ The following are important architectural properties but are **not** formalized 
 
 - **Module dependency direction:** Currently enforced by Rust's module and visibility system within a single crate. The existing dependency patterns (MCP → IR, IR → compression, no reverse dependencies) are healthy but not independently tested. If a dependency becomes important enough to require hard enforcement, the appropriate mechanism is splitting into separate crates.
 - **Meta-layer additivity:** Meta-layers currently append to compressed output rather than modifying it. However, the `MetaLayer::enrich()` trait signature permits modification, and "additivity" has not been established as a formal architectural contract. This is a candidate for future formalization if the contract is explicitly defined.
-- **Pipeline ordering:** Deferred pending the planned `PassPipeline` migration — see ARCH-DEBT-001 above.
