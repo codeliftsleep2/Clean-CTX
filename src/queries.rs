@@ -126,7 +126,7 @@ pub const RS_QUERY: &str = r#"
 //   enum_declaration, record_declaration, import_declaration,
 //   package_declaration, if_statement, for_statement, while_statement,
 //   do_statement, return_statement, throw_statement, try_statement,
-//   switch_statement
+//   switch_expression
 pub const JAVA_QUERY: &str = r#"
     ; Core structural captures
     (class_declaration) @class.root
@@ -147,5 +147,7 @@ pub const JAVA_QUERY: &str = r#"
     (return_statement) @return.root
     (throw_statement) @throw.root
     (try_statement) @try.root
-    (switch_statement) @switch.root
+    ; LinguaForge audit Issue 6: tree-sitter-java uses `switch_expression`
+    ; (not `switch_statement`) since Java 14 unified switch expression syntax.
+    (switch_expression) @switch.root
 "#;
