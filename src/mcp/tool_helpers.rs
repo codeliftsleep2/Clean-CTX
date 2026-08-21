@@ -74,6 +74,7 @@ pub(super) fn resolve_file_path(path: &str, workspace_root: Option<&str>) -> Str
 pub(super) fn resolve_file_path_checked(
     path: &str,
     workspace_root: Option<&str>,
+    additional_roots: &[String],
 ) -> Result<String, String> {
     // 1. Resolve to absolute using the existing logic
     let resolved = resolve_file_path(path, workspace_root);
@@ -102,12 +103,23 @@ pub(super) fn resolve_file_path_checked(
     let resolved_canon = std::path::Path::new(&resolved)
         .canonicalize()
         .map_err(|_| format!("path does not exist: {resolved}"))?;
-    // 4. Boundary check: resolved must be within trusted root
+    // 4. Boundary check: resolved must be within the trusted root, OR within
+    //    one of the config-declared `additional_roots` (multi-repo support —
+    //    see `CleanCtxConfig::additional_roots`). Each additional root is
+    //    canonicalized here rather than at config-load time, since it must
+    //    tolerate a repo that doesn't exist on this machine without erroring
+    //    the whole config; such an entry is simply skipped.
     if resolved_canon.starts_with(&trusted_root_canon) {
-        Ok(resolved)
-    } else {
-        Err(format!("path outside workspace root: {resolved}"))
+        return Ok(resolved);
     }
+    for extra_root in additional_roots {
+        if let Ok(extra_root_canon) = std::path::Path::new(extra_root).canonicalize() {
+            if resolved_canon.starts_with(&extra_root_canon) {
+                return Ok(resolved);
+            }
+        }
+    }
+    Err(format!("path outside workspace root: {resolved}"))
 }
 
 /// Inject a `"baseline"` cache breakpoint into a JSON-RPC response.
