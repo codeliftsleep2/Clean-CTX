@@ -3,15 +3,15 @@
 // Tool definitions and dispatch for the MCP server.
 // v0.3.0: Registry-based dispatch for modular handlers, fallback to legacy.
 
-use serde_json::Value;
+use crate::cbm;
 use crate::compressor::Fidelity;
 use crate::decompression::Decompressor;
 use crate::mcp::McpState;
+use crate::mcp::cache_hints::{compute_workspace_breaker, inject_cache_breakpoints};
 use crate::mcp::workspace;
-use crate::mcp::cache_hints::{inject_cache_breakpoints, compute_workspace_breaker};
 use crate::protocol::send_response;
 use crate::tokenizer::{TokenizerKind, resolve_tokenizer_kind};
-use crate::cbm;
+use serde_json::Value;
 
 use super::tool_handlers;
 
@@ -23,10 +23,18 @@ pub(crate) use super::tool_helpers::diff_code_context_handler;
 /// process, avoiding "unsupported extension" errors for unbuilt grammars.
 fn supported_languages() -> Vec<&'static str> {
     let mut langs = Vec::new();
-    if cfg!(feature = "typescript") { langs.push("typescript"); }
-    if cfg!(feature = "csharp") { langs.push("csharp"); }
-    if cfg!(feature = "rust") { langs.push("rust"); }
-    if cfg!(feature = "java") { langs.push("java"); }
+    if cfg!(feature = "typescript") {
+        langs.push("typescript");
+    }
+    if cfg!(feature = "csharp") {
+        langs.push("csharp");
+    }
+    if cfg!(feature = "rust") {
+        langs.push("rust");
+    }
+    if cfg!(feature = "java") {
+        langs.push("java");
+    }
     langs
 }
 
@@ -36,7 +44,10 @@ fn inject_supported_languages(mut tools: Vec<serde_json::Value>) -> Vec<serde_js
     let supported = supported_languages();
     for tool in &mut tools {
         if let Some(obj) = tool.as_object_mut() {
-            obj.insert("supportedLanguages".to_string(), serde_json::json!(supported));
+            obj.insert(
+                "supportedLanguages".to_string(),
+                serde_json::json!(supported),
+            );
         }
     }
     tools
@@ -253,21 +264,25 @@ pub(crate) fn parse_fidelity_arg(
     params: &Value,
     config: &crate::config::CleanCtxConfig,
 ) -> Result<Fidelity, ()> {
-    let fidelity_str = params["arguments"]["fidelity"]
-        .as_str()
-        .unwrap_or(match config.default_fidelity {
-            Fidelity::Low => "low",
-            Fidelity::Medium => "medium",
-            Fidelity::High => "high",
-            Fidelity::Edit => "edit",
-            Fidelity::Verbatim => "verbatim",
-        });
-    
+    let fidelity_str =
+        params["arguments"]["fidelity"]
+            .as_str()
+            .unwrap_or(match config.default_fidelity {
+                Fidelity::Low => "low",
+                Fidelity::Medium => "medium",
+                Fidelity::High => "high",
+                Fidelity::Edit => "edit",
+                Fidelity::Verbatim => "verbatim",
+            });
+
     // Log when using default
     if params["arguments"]["fidelity"].is_null() {
-        eprintln!("[clean-ctx] fidelity not specified, using default: {} (from config)", fidelity_str);
+        eprintln!(
+            "[clean-ctx] fidelity not specified, using default: {} (from config)",
+            fidelity_str
+        );
     }
-    
+
     match Fidelity::parse(fidelity_str) {
         Ok(f) => Ok(f),
         Err(e) => {
@@ -281,7 +296,10 @@ pub(crate) fn parse_fidelity_arg(
     }
 }
 
-pub(crate) fn parse_tokenizer_arg(params: &Value, config: &crate::config::CleanCtxConfig) -> TokenizerKind {
+pub(crate) fn parse_tokenizer_arg(
+    params: &Value,
+    config: &crate::config::CleanCtxConfig,
+) -> TokenizerKind {
     let tool_arg = params["arguments"]["tokenizer"].as_str();
     resolve_tokenizer_kind(tool_arg, Some(&config.tokenizer.to_string()))
 }
@@ -309,12 +327,11 @@ pub(crate) fn resolve_fidelity(
     config.default_fidelity
 }
 
-static HANDLER_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> = std::sync::OnceLock::new();
+static HANDLER_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> =
+    std::sync::OnceLock::new();
 
 fn get_registry() -> &'static tool_handlers::registry::HandlerRegistry {
-    HANDLER_REGISTRY.get_or_init(|| {
-        tool_handlers::registry::create_default_registry()
-    })
+    HANDLER_REGISTRY.get_or_init(tool_handlers::registry::create_default_registry)
 }
 
 // P3-3: Handler registry initialization.
@@ -361,12 +378,7 @@ pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
 /// P1-6: All inline-handled tools have early returns. The remaining tools
 /// fall through to the registry. The `inline_tool_names()` function above
 /// enables test-time verification that no tool name appears in both paths.
-pub(crate) fn dispatch_tools_call(
-    id: &Value,
-    tool_name: &str,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, state: &McpState) {
     // Inline dispatch for tools that have special handling requirements
     // (decompress, compress_workspace, and all CBM tools).
     // Each arm returns to prevent double-fire if a tool is also registered.
@@ -397,7 +409,11 @@ pub(crate) fn dispatch_tools_call(
             // Pass the caller-supplied workspaceRoot through so the boundary check
             // honors it (multi-repo support) instead of pinning to CWD.
             let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-            let dir_path = match super::tool_helpers::resolve_file_path_checked(dir_path, workspace_root, &state.config.additional_roots) {
+            let dir_path = match super::tool_helpers::resolve_file_path_checked(
+                dir_path,
+                workspace_root,
+                &state.config.additional_roots,
+            ) {
                 Ok(p) => p,
                 Err(msg) => {
                     send_response(&serde_json::json!({
@@ -428,13 +444,20 @@ pub(crate) fn dispatch_tools_call(
                     });
                     if state.config.cache.enabled {
                         let ttl = state.config.cache.baseline_ttl.clone();
-                        let breaker = compute_workspace_breaker(std::slice::from_ref(&result.manifest));
+                        let breaker =
+                            compute_workspace_breaker(std::slice::from_ref(&result.manifest));
                         let tok_box = crate::tokenizer::create_tokenizer(
-                            crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
-                        ).ok();
+                            crate::tokenizer::resolve_tokenizer_kind(
+                                None,
+                                Some(&state.config.tokenizer.to_string()),
+                            ),
+                        )
+                        .ok();
                         let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
                         if let Some(result_obj) = response.get_mut("result") {
-                            inject_cache_breakpoints(result_obj, state, "baseline", &ttl, &breaker, tok_ref);
+                            inject_cache_breakpoints(
+                                result_obj, state, "baseline", &ttl, &breaker, tok_ref,
+                            );
                         }
                     }
                     send_response(&response);
@@ -551,13 +574,20 @@ pub(crate) fn dispatch_tools_call(
                     });
                     if state.config.cache.enabled {
                         let ttl = state.config.cache.baseline_ttl.clone();
-                        let breaker = compute_workspace_breaker(std::slice::from_ref(&summary.manifest));
+                        let breaker =
+                            compute_workspace_breaker(std::slice::from_ref(&summary.manifest));
                         let tok_box = crate::tokenizer::create_tokenizer(
-                            crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
-                        ).ok();
+                            crate::tokenizer::resolve_tokenizer_kind(
+                                None,
+                                Some(&state.config.tokenizer.to_string()),
+                            ),
+                        )
+                        .ok();
                         let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
                         if let Some(result_obj) = response.get_mut("result") {
-                            inject_cache_breakpoints(result_obj, state, "baseline", &ttl, &breaker, tok_ref);
+                            inject_cache_breakpoints(
+                                result_obj, state, "baseline", &ttl, &breaker, tok_ref,
+                            );
                         }
                     }
                     send_response(&response);
@@ -573,12 +603,30 @@ pub(crate) fn dispatch_tools_call(
             return;
         }
         // CBM tools
-        "graph_search" => { crate::cbm::handlers::handle_graph_search(id, params, state); return; }
-        "graph_query" => { crate::cbm::handlers::handle_graph_query(id, params, state); return; }
-        "graph_trace" => { crate::cbm::handlers::handle_graph_trace(id, params, state); return; }
-        "get_architecture" => { crate::cbm::handlers::handle_get_architecture(id, params, state); return; }
-        "get_cbm_status" => { crate::cbm::handlers::handle_get_cbm_status(id, params, state); return; }
-        "cbm_proxy" => { crate::cbm::proxy::handle_cbm_proxy(id, params, state); return; }
+        "graph_search" => {
+            crate::cbm::handlers::handle_graph_search(id, params, state);
+            return;
+        }
+        "graph_query" => {
+            crate::cbm::handlers::handle_graph_query(id, params, state);
+            return;
+        }
+        "graph_trace" => {
+            crate::cbm::handlers::handle_graph_trace(id, params, state);
+            return;
+        }
+        "get_architecture" => {
+            crate::cbm::handlers::handle_get_architecture(id, params, state);
+            return;
+        }
+        "get_cbm_status" => {
+            crate::cbm::handlers::handle_get_cbm_status(id, params, state);
+            return;
+        }
+        "cbm_proxy" => {
+            crate::cbm::proxy::handle_cbm_proxy(id, params, state);
+            return;
+        }
         // Unknown — fall through to registry
         _ => {}
     }

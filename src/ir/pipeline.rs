@@ -2,12 +2,19 @@
 //
 // R-43b: Explicit Pass Pipeline
 //
-// The composable pass pipeline replaces the monolithic `compile()` function
-// with a sequence of composable `IRPass` implementations. Each pass has a
-// clear input/output contract. Adding new languages, meta-layers, or analysis
-// passes becomes mechanical.
+// NOTE: This pipeline is the INTENDED composable compilation architecture
+// but is NOT YET ACTIVATED in production code. Production compilation
+// currently occurs through IRCompiler::compile_inner() in compiler.rs.
 //
-// Pipeline order:
+// The composable pass pipeline was designed to replace the monolithic
+// `compile()` function with a sequence of composable IRPass implementations.
+// Each pass has a clear input/output contract. Adding new languages,
+// meta-layers, or analysis passes becomes mechanical.
+//
+// Status: DEFERRED — see ARCH-DEBT-001 in docs/ARCHITECTURAL_INVARIANTS.md
+// for the full rationale and criteria for future activation.
+//
+// Pipeline order (intended):
 //   Pass 1: Core IR      (tree-sitter → CoreOp stream)
 //   Pass 2: Language     (language-specific ops)
 //   Pass 3: Meta Layer   (framework-specific markers)
@@ -19,9 +26,9 @@
 use std::sync::Mutex;
 
 use super::inference_layer::InferenceLayer;
-use super::opcodes::CoreOp;
-use super::program_graph::{ProgramGraph, GraphBuilder};
 use super::layers::LayerContext;
+use super::opcodes::CoreOp;
+use super::program_graph::{GraphBuilder, ProgramGraph};
 use crate::cbm::bridge::GraphBridge;
 use crate::compression::Fidelity;
 
@@ -138,7 +145,9 @@ impl Default for CoreIRPass {
 }
 
 impl IRPass for CoreIRPass {
-    fn name(&self) -> &str { "core_ir" }
+    fn name(&self) -> &str {
+        "core_ir"
+    }
     fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
         if state.source.is_empty() {
             return Err(PassError {
@@ -166,7 +175,9 @@ impl Default for LanguageLayerPass {
 }
 
 impl IRPass for LanguageLayerPass {
-    fn name(&self) -> &str { "language_layer" }
+    fn name(&self) -> &str {
+        "language_layer"
+    }
     fn run(&self, _state: &mut PassContext) -> Result<(), PassError> {
         Ok(())
     }
@@ -188,7 +199,9 @@ impl Default for MetaLayerPass {
 }
 
 impl IRPass for MetaLayerPass {
-    fn name(&self) -> &str { "meta_layer" }
+    fn name(&self) -> &str {
+        "meta_layer"
+    }
     fn run(&self, _state: &mut PassContext) -> Result<(), PassError> {
         Ok(())
     }
@@ -210,7 +223,9 @@ impl Default for ExecutionSemanticsPass {
 }
 
 impl IRPass for ExecutionSemanticsPass {
-    fn name(&self) -> &str { "execution_semantics" }
+    fn name(&self) -> &str {
+        "execution_semantics"
+    }
     fn run(&self, _state: &mut PassContext) -> Result<(), PassError> {
         Ok(())
     }
@@ -232,7 +247,9 @@ impl Default for ProgramGraphPass {
 }
 
 impl IRPass for ProgramGraphPass {
-    fn name(&self) -> &str { "program_graph" }
+    fn name(&self) -> &str {
+        "program_graph"
+    }
     fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
         let graph = GraphBuilder::build_from_instructions(&state.instructions);
         state.program_graph = Some(graph);
@@ -252,12 +269,16 @@ pub struct InferenceLayerPass {
 
 impl InferenceLayerPass {
     pub fn new() -> Self {
-        Self { cbm_bridge: Mutex::new(None) }
+        Self {
+            cbm_bridge: Mutex::new(None),
+        }
     }
 
     /// Create a pass with an optional CBM bridge for enrichment.
     pub fn with_cbm(bridge: Option<GraphBridge>) -> Self {
-        Self { cbm_bridge: Mutex::new(bridge) }
+        Self {
+            cbm_bridge: Mutex::new(bridge),
+        }
     }
 }
 
@@ -268,7 +289,9 @@ impl Default for InferenceLayerPass {
 }
 
 impl IRPass for InferenceLayerPass {
-    fn name(&self) -> &str { "inference_layer" }
+    fn name(&self) -> &str {
+        "inference_layer"
+    }
     fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
         let mut layer = InferenceLayer::new();
         let mut guard = self.cbm_bridge.lock().unwrap_or_else(|p| p.into_inner());
@@ -294,7 +317,9 @@ impl Default for ValidationPass {
 }
 
 impl IRPass for ValidationPass {
-    fn name(&self) -> &str { "validation" }
+    fn name(&self) -> &str {
+        "validation"
+    }
     fn run(&self, _state: &mut PassContext) -> Result<(), PassError> {
         Ok(())
     }
