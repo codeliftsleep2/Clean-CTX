@@ -119,7 +119,22 @@ pub(super) fn resolve_file_path_checked(
             }
         }
     }
-    Err(format!("path outside workspace root: {resolved}"))
+    // LinguaForge audit Issues 1/2/7: include the effective workspace roots
+    // in the error message so the caller knows which roots were checked and
+    // can take corrective action (pass `workspaceRoot` or configure
+    // `additional_roots` in `.clean-ctx.json`).
+    let extra_roots_str = if additional_roots.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " (additional_roots: {})",
+            additional_roots.join(", ")
+        )
+    };
+    Err(format!(
+        "path outside workspace root: {resolved} (workspace root: {trusted_root}){extra_roots_str}",
+        trusted_root = trusted_root_canon.display(),
+    ))
 }
 
 /// Inject a `"baseline"` cache breakpoint into a JSON-RPC response.

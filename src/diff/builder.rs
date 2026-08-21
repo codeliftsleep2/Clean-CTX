@@ -96,35 +96,54 @@ pub fn build_snapshot(
     // Drop candidates whose language feature is disabled.
     candidates.retain(|(_, lang, _)| lang.is_some());
 
-    // Try each parser in order. Return the first one that produces captures,
-    // or the last result (even if empty).
-    let mut last_result: Option<Result<CapturedStructure, Box<dyn std::error::Error>>> = None;
+    // Try each parser in order. Return the first one that produces captures.
+    // On error, log a warning and continue to the next parser rather than
+    // propagating the error — a single query compilation failure (e.g.,
+    // `switch_statement` not recognised by the Java grammar) must not crash
+    // the entire fallback chain.
+    //
+    // LinguaForge audit Issue 6 fix: only `Ok` results are stored as
+    // `last_ok_result`; `Err` results are logged and skipped. This ensures
+    // that when all parsers fail to produce captures and the final parser
+    // also fails with a compilation error, we return a valid empty
+    // CapturedStructure instead of propagating the error.
+    let mut last_ok_result: Option<CapturedStructure> = None;
     for (_label, lang, query) in &candidates {
-        let result = try_build_with(lang.clone(), query, source, fidelity);
-        match &result {
-            // G2-2 audit: include orphan_fields and orphan_methods in the
-            // success check — a file with only top-level functions or
-            // top-level fields previously fell through to the wrong parser.
-            Ok(snap)
-                if !snap.classes.is_empty()
-                    || !snap.imports.is_empty()
-                    || !snap.orphan_fields.is_empty()
-                    || !snap.orphan_methods.is_empty() =>
-            {
-                return result;
+        let result = match try_build_with(lang.clone(), query, source, fidelity) {
+            Ok(snap) => snap,
+            Err(e) => {
+                tracing::warn!(
+                    "build_snapshot: parser {} failed, trying next: {}",
+                    _label, e,
+                );
+                continue;
             }
-            _ => {
-                last_result = Some(result);
-            }
+        };
+        // G2-2 audit: include orphan_fields and orphan_methods in the
+        // success check — a file with only top-level functions or
+        // top-level fields previously fell through to the wrong parser.
+        if !result.classes.is_empty()
+            || !result.imports.is_empty()
+            || !result.orphan_fields.is_empty()
+            || !result.orphan_methods.is_empty()
+        {
+            return Ok(result);
+        }
+        // Empty result — save as fallback and try next parser
+        if last_ok_result.is_none() {
+            last_ok_result = Some(result);
         }
     }
 
-    // If none produced meaningful captures, return the last attempt's result
-    // (even if empty, so callers get a valid CapturedStructure).
-    last_result.unwrap_or_else(|| {
-        // Safety net: should never reach here since we always push candidates
-        try_build_with(Some(first_lang), first_query, source, fidelity)
-    })
+    // If none produced meaningful captures, return the last non-error result
+    // (even if empty, so callers get a valid CapturedStructure), or construct
+    // a new empty one as a safety net.
+    Ok(last_ok_result.unwrap_or(CapturedStructure {
+        imports: Vec::new(),
+        classes: Vec::new(),
+        orphan_fields: Vec::new(),
+        orphan_methods: Vec::new(),
+    }))
 }
 
 fn try_build_with(
