@@ -17,64 +17,61 @@
 // Phase G: Integration & MCP Tools — wire IR into the MCP tool surface.
 // Phase H: Positional Encoding & Advanced Compression — key stripping + pattern compression.
 
-pub mod opcodes;
+pub mod binary_wire;
 pub mod compiler;
 pub(crate) mod compiler_methods;
-pub mod render;
-pub mod wire;
-pub mod symbol_table;
 pub mod delta;
-pub mod replay;
-pub mod layers;
-pub mod positional;
-pub mod patterns;
-pub mod string_table;
 pub mod hierarchical;
-pub mod binary_wire;
+pub mod layers;
+pub mod opcodes;
+pub mod patterns;
+pub mod positional;
+pub mod render;
 pub mod render_llm;
+pub mod replay;
+pub mod string_table;
+pub mod symbol_table;
+pub mod wire;
 // R-43b: IR Evolution Phases 2-6
-pub mod program_graph;
 pub mod inference_layer;
 pub mod pipeline;
-pub mod validator;
+pub mod program_graph;
 pub mod query;
+pub mod validator;
 // R-02 Phase 3: Type-aware compression for the IR path.
 pub mod type_aliases;
 
 // Re-export public types for downstream consumers.
-pub use opcodes::CoreOp;
-pub use compiler::{CompiledIR, CompileError, IRCompiler};
+pub use binary_wire::{
+    BinaryDecodeError, binary_wire_json_to_ir, decode, encode, estimate_savings as binary_savings,
+    ir_to_binary_wire_json, is_binary_wire,
+};
+pub use compiler::{CompileError, CompiledIR, IRCompiler};
 pub use compiler_methods::MethodSig;
-pub use render::{ir_to_text, ir_to_text_ops};
-pub use wire::{ir_to_wire, op_to_tuple};
-pub use symbol_table::{GlobalSymbolTable, SymbolEntry, SymbolKind};
 pub use delta::{
-    IRDelta, DeltaOps, ModOp, FieldPatch, DeltaComputer, SemanticIntent,
-    compute_field_patches, primary_key_from_tuple, key_tuple_from_tuple,
-    CompactDelta, CompactOps, compact_encode, compact_decode,
-};
-pub use replay::{ContextState, FileState, DeltaError};
-pub use positional::{
-    PositionalConfig, encode_op, decode_op, encode_stream, ir_to_positional_wire,
-    estimate_savings, positional_char_count, verify_round_trip,
-};
-pub use patterns::{
-    PatternOp, CompressingPatternRecognizer, CompressionStats, MergeItem,
-};
-pub use string_table::{
-    StringTable, ir_to_string_table_wire, estimate_savings as string_table_savings,
+    CompactDelta, CompactOps, DeltaComputer, DeltaOps, FieldPatch, IRDelta, ModOp, SemanticIntent,
+    compact_decode, compact_encode, compute_field_patches, key_tuple_from_tuple,
+    primary_key_from_tuple,
 };
 pub use hierarchical::{
-    HierarchicalIR, ClassNode, MethodNode, FieldNode, PatternEntry,
-    ir_to_hierarchical, hierarchical_to_ir,
+    ClassNode, FieldNode, HierarchicalIR, MethodNode, PatternEntry,
+    estimate_savings as hierarchical_savings, hierarchical_to_ir, ir_to_hierarchical,
     ir_to_hierarchical_wire, wire_to_ir as hierarchical_wire_to_ir,
-    estimate_savings as hierarchical_savings,
 };
+pub use opcodes::CoreOp;
+pub use patterns::{CompressingPatternRecognizer, CompressionStats, MergeItem, PatternOp};
+pub use positional::{
+    PositionalConfig, decode_op, encode_op, encode_stream, estimate_savings, ir_to_positional_wire,
+    positional_char_count, verify_round_trip,
+};
+pub use render::{ir_to_text, ir_to_text_ops};
 pub use render_llm::{render_hierarchical_for_llm, render_hierarchical_for_llm_focused};
-pub use binary_wire::{
-    BinaryDecodeError, encode, decode, estimate_savings as binary_savings,
-    is_binary_wire, ir_to_binary_wire_json, binary_wire_json_to_ir,
+pub use replay::{ContextState, DeltaError, FileState};
+pub use string_table::{
+    StringTable, estimate_savings as string_table_savings, ir_to_string_table_wire,
 };
+pub use symbol_table::{GlobalSymbolTable, SymbolEntry, SymbolKind};
+pub use wire::{ir_to_wire, op_to_tuple};
 
 #[cfg(test)]
 #[path = "../tests/ir/mod.rs"]

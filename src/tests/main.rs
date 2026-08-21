@@ -16,8 +16,8 @@
 //      for a no-arg invocation of a subcommand-style enum. `main()` must
 //      intercept the correct kind to default to running the MCP server.
 
-use clap::Parser;
 use clap::CommandFactory;
+use clap::Parser;
 
 use crate::Cli;
 

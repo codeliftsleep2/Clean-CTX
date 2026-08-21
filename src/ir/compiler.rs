@@ -17,13 +17,15 @@
 //   - F-31: `id_counter` is `u64` (not `u32`) to avoid arithmetic overflow
 //           after 4,294,967,295 instructions.
 
-use crate::compaction::{extract_class_name, extract_field, extract_method_sig, extract_rust_struct_name};
-use crate::compression::capture_pipeline::run_capture_pipeline;
-use crate::compression::Fidelity;
+use super::compiler_methods::{extract_method_body, resolve_forward_aliases};
 use super::layers::{LanguageLayer, LayerContext, PatternRecognizer};
 use super::opcodes::*;
 use super::symbol_table::SymbolKind;
-use super::compiler_methods::{extract_method_body, resolve_forward_aliases};
+use crate::compaction::{
+    extract_class_name, extract_field, extract_method_sig, extract_rust_struct_name,
+};
+use crate::compression::Fidelity;
+use crate::compression::capture_pipeline::run_capture_pipeline;
 
 /// The compiled IR for a single file.
 #[derive(Debug, Clone)]
@@ -127,7 +129,15 @@ impl IRCompiler {
         fidelity: Fidelity,
         skip_set: Option<&std::collections::HashSet<String>>,
     ) -> Result<CompiledIR, CompileError> {
-        self.compile_inner(source, file_id, language, query_string, fidelity, skip_set, None)
+        self.compile_inner(
+            source,
+            file_id,
+            language,
+            query_string,
+            fidelity,
+            skip_set,
+            None,
+        )
     }
 
     /// Compile with symbol targeting (`focus`).
@@ -156,7 +166,15 @@ impl IRCompiler {
         skip_set: Option<&std::collections::HashSet<String>>,
         focus: Option<&std::collections::HashSet<String>>,
     ) -> Result<CompiledIR, CompileError> {
-        self.compile_inner(source, file_id, language, query_string, fidelity, skip_set, focus)
+        self.compile_inner(
+            source,
+            file_id,
+            language,
+            query_string,
+            fidelity,
+            skip_set,
+            focus,
+        )
     }
 
     /// Shared implementation for `compile` and `compile_focused`.
@@ -213,7 +231,8 @@ impl IRCompiler {
             // any IR ops. Uses the same should_skip_capture logic as the
             // text compression pipeline for consistent behavior.
             if let Some(skip) = skip_set {
-                if !skip.is_empty() && crate::compression::pipeline::should_skip_capture(cap, skip) {
+                if !skip.is_empty() && crate::compression::pipeline::should_skip_capture(cap, skip)
+                {
                     continue;
                 }
             }
@@ -242,12 +261,10 @@ impl IRCompiler {
                 //   arrow.root        - TS/JS arrow functions
 
                 // ── Type-like: DefClass + class context setup ────────
-                "class.root" | "interface.root" | "struct.root" | "enum.root" | "trait.root" | "record.root" => {
+                "class.root" | "interface.root" | "struct.root" | "enum.root" | "trait.root"
+                | "record.root" => {
                     let class_id = self.next_id("C");
-                    instructions.push(CoreOp::DefClass(
-                        class_id.clone(),
-                        cap.text.clone(),
-                    ));
+                    instructions.push(CoreOp::DefClass(class_id.clone(), cap.text.clone()));
                     self.current_class = Some(class_id.clone());
                     layer_context.current_class = Some(class_id.clone());
                     layer_context.current_class_name = Some(cap.raw_text.clone());
@@ -262,11 +279,8 @@ impl IRCompiler {
 
                     // Invoke language layers for type-like captures.
                     for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.raw_text,
-                            &mut layer_context,
-                        );
+                        let layer_ops =
+                            ll.process_capture(&cap.name, &cap.raw_text, &mut layer_context);
                         instructions.extend(layer_ops);
                     }
                 }
@@ -274,15 +288,11 @@ impl IRCompiler {
                 // If no current class exists, emit a DefClass for the self-type.
                 "impl.root" => {
                     if self.current_class.is_none() {
-                        let self_type = cap.text.split(':').next()
-                            .unwrap_or(&cap.text)
-                            .to_string();
+                        let self_type = cap.text.split(':').next().unwrap_or(&cap.text).to_string();
                         if !self_type.is_empty() {
                             let class_id = self.next_id("C");
-                            instructions.push(CoreOp::DefClass(
-                                class_id.clone(),
-                                self_type.clone(),
-                            ));
+                            instructions
+                                .push(CoreOp::DefClass(class_id.clone(), self_type.clone()));
                             self.current_class = Some(class_id.clone());
                             layer_context.current_class = Some(class_id);
                             layer_context.current_class_name = Some(cap.raw_text.clone());
@@ -291,11 +301,8 @@ impl IRCompiler {
                     }
 
                     for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.raw_text,
-                            &mut layer_context,
-                        );
+                        let layer_ops =
+                            ll.process_capture(&cap.name, &cap.raw_text, &mut layer_context);
                         instructions.extend(layer_ops);
                     }
                 }
@@ -315,8 +322,10 @@ impl IRCompiler {
                                 ));
                                 self.current_class = Some(synt_id.clone());
                                 layer_context.current_class = Some(synt_id.clone());
-                                layer_context.current_class_name = Some(format!("__file_{}", file_id));
-                                layer_context.current_class_bare_name = Some(format!("__file_{}", file_id));
+                                layer_context.current_class_name =
+                                    Some(format!("__file_{}", file_id));
+                                layer_context.current_class_bare_name =
+                                    Some(format!("__file_{}", file_id));
                                 synt_id
                             } else {
                                 // F-29: Skip method captures outside a class
@@ -333,12 +342,8 @@ impl IRCompiler {
                     layer_context.current_method = Some(method_id.clone());
                     layer_context.current_method_name = Some(cap.text.clone());
 
-                    let method_name = self.emit_method_ir(
-                        &mut instructions,
-                        &class_id,
-                        &method_id,
-                        &cap.text,
-                    );
+                    let method_name =
+                        self.emit_method_ir(&mut instructions, &class_id, &method_id, &cap.text);
 
                     // Edit Mode: emit verbatim method body when fidelity is Edit.
                     // The raw_text for method.root captures the full method
@@ -348,8 +353,7 @@ impl IRCompiler {
                     // extracted (mirrors the render-time gate in render_llm.rs);
                     // this avoids extracting/storing body text for methods that
                     // will be filtered out at render time.
-                    if fidelity == Fidelity::Edit
-                        && focus.is_none_or(|f| f.contains(&method_name))
+                    if fidelity == Fidelity::Edit && focus.is_none_or(|f| f.contains(&method_name))
                     {
                         if let Some(body) = extract_method_body(&cap.raw_text) {
                             instructions.push(CoreOp::Body(method_id.clone(), body));
@@ -358,11 +362,8 @@ impl IRCompiler {
 
                     // Invoke language layers for method-like captures.
                     for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.raw_text,
-                            &mut layer_context,
-                        );
+                        let layer_ops =
+                            ll.process_capture(&cap.name, &cap.raw_text, &mut layer_context);
                         instructions.extend(layer_ops);
                     }
                 }
@@ -383,11 +384,8 @@ impl IRCompiler {
                     ));
 
                     for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.text,
-                            &mut layer_context,
-                        );
+                        let layer_ops =
+                            ll.process_capture(&cap.name, &cap.text, &mut layer_context);
                         instructions.extend(layer_ops);
                     }
                 }
@@ -396,39 +394,27 @@ impl IRCompiler {
                     self.emit_import_ir(&mut instructions, &cap.text);
 
                     for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.text,
-                            &mut layer_context,
-                        );
+                        let layer_ops =
+                            ll.process_capture(&cap.name, &cap.text, &mut layer_context);
                         instructions.extend(layer_ops);
                     }
                 }
                 // ── Type alias captures (Rust `type Foo = Bar` and TS `type Foo = ...`) ──
                 "type.root" => {
                     let alias_id = self.next_id("T");
-                    instructions.push(CoreOp::TypeAlias(
-                        alias_id,
-                        cap.text.clone(),
-                    ));
+                    instructions.push(CoreOp::TypeAlias(alias_id, cap.text.clone()));
 
                     for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.text,
-                            &mut layer_context,
-                        );
+                        let layer_ops =
+                            ll.process_capture(&cap.name, &cap.text, &mut layer_context);
                         instructions.extend(layer_ops);
                     }
                 }
                 // ── Rust mod declarations: structural pass-through ──
                 "mod.root" => {
                     for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.text,
-                            &mut layer_context,
-                        );
+                        let layer_ops =
+                            ll.process_capture(&cap.name, &cap.text, &mut layer_context);
                         instructions.extend(layer_ops);
                     }
                 }
@@ -474,11 +460,8 @@ impl IRCompiler {
                 // ── Pass-through to language layers for any other capture ──
                 _ => {
                     for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.text,
-                            &mut layer_context,
-                        );
+                        let layer_ops =
+                            ll.process_capture(&cap.name, &cap.text, &mut layer_context);
                         instructions.extend(layer_ops);
                     }
                 }
@@ -509,8 +492,11 @@ impl IRCompiler {
 
         // P0-4: Use canonical LayerRegistry instead of removed ir::layers::MetaLayer trait.
         // Meta-layers are registered in src/layers/meta/ and wired via McpState -> LayerRegistry.
-        let meta_results = crate::layers::LayerRegistry::global()
-            .run_meta_layers_pipeline(source, &class_names, fidelity);
+        let meta_results = crate::layers::LayerRegistry::global().run_meta_layers_pipeline(
+            source,
+            &class_names,
+            fidelity,
+        );
         for (_layer_name, block_text) in &meta_results {
             // Parse Φ marker lines into CoreOp instructions for IR enrichment.
             for line in block_text.lines() {
@@ -567,7 +553,6 @@ impl IRCompiler {
         self.id_counter += 1;
         format!("{}{}", prefix, self.id_counter)
     }
-
 }
 
 impl Default for IRCompiler {

@@ -88,17 +88,30 @@ impl Default for CbmConfig {
     }
 }
 
-fn default_auto_launch() -> bool { true }
-fn default_cache_ttl() -> u64 { 300 }
-fn default_enabled() -> bool { true }
-fn default_query_timeout_ms() -> u64 { 30000 }
-fn default_log_dir() -> String { ".clean-ctx/cbm-logs".to_string() }
-fn default_max_retries() -> u32 { 3 }
-fn default_circuit_cooldown_secs() -> u64 { 30 }
+fn default_auto_launch() -> bool {
+    true
+}
+fn default_cache_ttl() -> u64 {
+    300
+}
+fn default_enabled() -> bool {
+    true
+}
+fn default_query_timeout_ms() -> u64 {
+    30000
+}
+fn default_log_dir() -> String {
+    ".clean-ctx/cbm-logs".to_string()
+}
+fn default_max_retries() -> u32 {
+    3
+}
+fn default_circuit_cooldown_secs() -> u64 {
+    30
+}
 
 /// Status of the CBM integration, surfaced via `get_cbm_status` and `context_stats`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum CbmStatus {
     Available,
     Degraded(String),
@@ -119,4 +132,3 @@ impl CbmStatus {
         }
     }
 }
-

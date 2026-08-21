@@ -17,10 +17,10 @@
 // stores metrics in-memory and exposes them via the `context_stats`
 // MCP tool and a `metrics_snapshot()` method.
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::Instant;
 use dashmap::DashMap;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 
 /// A histogram bucket for latency/ size measurements.
 /// Uses a fixed set of buckets (in milliseconds or bytes) for
@@ -58,12 +58,16 @@ impl Histogram {
     /// Exponential latency buckets (ms): powers of 2 from 1 to 16384.
     /// Provides better tail resolution for large file compression.
     pub fn latency_exponential() -> Self {
-        Self::new(vec![1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384])
+        Self::new(vec![
+            1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384,
+        ])
     }
 
     /// Default size buckets (bytes): 1K, 10K, 100K, 500K, 1M, 5M, 10M
     pub fn size_default() -> Self {
-        Self::new(vec![1024, 10_240, 102_400, 512_000, 1_048_576, 5_242_880, 10_485_760])
+        Self::new(vec![
+            1024, 10_240, 102_400, 512_000, 1_048_576, 5_242_880, 10_485_760,
+        ])
     }
 
     /// Record a value into the histogram.
@@ -90,14 +94,22 @@ impl Histogram {
     /// Snapshot the current histogram state.
     #[must_use]
     pub fn snapshot(&self) -> HistogramSnapshot {
-        let counts: Vec<u64> = self.counts.iter().map(|c| c.load(Ordering::Relaxed)).collect();
+        let counts: Vec<u64> = self
+            .counts
+            .iter()
+            .map(|c| c.load(Ordering::Relaxed))
+            .collect();
         let total = self.total.load(Ordering::Relaxed);
         let sum = self.sum.load(Ordering::Relaxed);
         HistogramSnapshot {
             bounds: self.bounds.clone(),
             counts,
             total,
-            mean: if total > 0 { sum as f64 / total as f64 } else { 0.0 },
+            mean: if total > 0 {
+                sum as f64 / total as f64
+            } else {
+                0.0
+            },
         }
     }
 }
@@ -163,7 +175,9 @@ pub struct Counter {
 
 impl Counter {
     pub fn new() -> Self {
-        Self { value: Arc::new(AtomicU64::new(0)) }
+        Self {
+            value: Arc::new(AtomicU64::new(0)),
+        }
     }
 
     pub fn increment(&self, delta: u64) {
@@ -190,7 +204,9 @@ pub struct Gauge {
 
 impl Gauge {
     pub fn new(initial: u64) -> Self {
-        Self { value: Arc::new(AtomicU64::new(initial)) }
+        Self {
+            value: Arc::new(AtomicU64::new(initial)),
+        }
     }
 
     pub fn set(&self, value: u64) {
@@ -201,7 +217,8 @@ impl Gauge {
         if delta >= 0 {
             self.value.fetch_add(delta as u64, Ordering::Relaxed);
         } else {
-            self.value.fetch_sub(delta.unsigned_abs(), Ordering::Relaxed);
+            self.value
+                .fetch_sub(delta.unsigned_abs(), Ordering::Relaxed);
         }
     }
 
@@ -274,10 +291,7 @@ impl MetricsRegistry {
     /// Record an error under the given category.
     pub fn record_error(&self, category: ErrorCategory) {
         let key = category.as_str().to_string();
-        self.errors
-            .entry(key)
-            .or_default()
-            .increment(1);
+        self.errors.entry(key).or_default().increment(1);
     }
 
     /// Time a closure and record its duration in the given histogram.
@@ -291,7 +305,8 @@ impl MetricsRegistry {
 
     /// Take a snapshot of all metrics.
     pub fn snapshot(&self) -> MetricsSnapshot {
-        let mut error_counts: Vec<(String, u64)> = self.errors
+        let mut error_counts: Vec<(String, u64)> = self
+            .errors
             .iter()
             .map(|entry| (entry.key().clone(), entry.value().snapshot()))
             .collect();
@@ -376,29 +391,50 @@ impl MetricsSnapshot {
         out.push_str("═══════════════════════════════════════════════════════════════\n\n");
 
         // Operations summary
-        out.push_str(&format!("  Compressions:      {}\n", self.total_compressions));
-        out.push_str(&format!("  Deltas:            {} (hits: {}, misses: {})\n",
-            self.total_deltas, self.delta_hits, self.delta_misses));
-        out.push_str(&format!("  CBM Queries:       {}\n", self.total_cbm_queries));
-        out.push_str(&format!("  Workspace Scans:   {}\n", self.total_workspace_scans));
-        out.push_str(&format!("  Cache:             {} hits, {} misses\n",
-            self.cache_hits, self.cache_misses));
+        out.push_str(&format!(
+            "  Compressions:      {}\n",
+            self.total_compressions
+        ));
+        out.push_str(&format!(
+            "  Deltas:            {} (hits: {}, misses: {})\n",
+            self.total_deltas, self.delta_hits, self.delta_misses
+        ));
+        out.push_str(&format!(
+            "  CBM Queries:       {}\n",
+            self.total_cbm_queries
+        ));
+        out.push_str(&format!(
+            "  Workspace Scans:   {}\n",
+            self.total_workspace_scans
+        ));
+        out.push_str(&format!(
+            "  Cache:             {} hits, {} misses\n",
+            self.cache_hits, self.cache_misses
+        ));
         out.push('\n');
 
         // Latency histograms
         out.push_str("── Latency (ms) ──\n");
-        out.push_str(&format!("  Compression:       mean={:.1}ms  total={}\n",
-            self.compression_latency.mean, self.compression_latency.total));
-        out.push_str(&format!("  Delta:             mean={:.1}ms  total={}\n",
-            self.delta_latency.mean, self.delta_latency.total));
-        out.push_str(&format!("  CBM:               mean={:.1}ms  total={}\n",
-            self.cbm_latency.mean, self.cbm_latency.total));
+        out.push_str(&format!(
+            "  Compression:       mean={:.1}ms  total={}\n",
+            self.compression_latency.mean, self.compression_latency.total
+        ));
+        out.push_str(&format!(
+            "  Delta:             mean={:.1}ms  total={}\n",
+            self.delta_latency.mean, self.delta_latency.total
+        ));
+        out.push_str(&format!(
+            "  CBM:               mean={:.1}ms  total={}\n",
+            self.cbm_latency.mean, self.cbm_latency.total
+        ));
         out.push('\n');
 
         // File size distribution
         out.push_str("── File Sizes (bytes) ──\n");
-        out.push_str(&format!("  Mean:              {:.0} bytes  total={}\n",
-            self.file_size.mean, self.file_size.total));
+        out.push_str(&format!(
+            "  Mean:              {:.0} bytes  total={}\n",
+            self.file_size.mean, self.file_size.total
+        ));
         out.push('\n');
 
         // Resource gauges

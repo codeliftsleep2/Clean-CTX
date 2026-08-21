@@ -23,11 +23,17 @@ pub fn format_compacted_body(
 ) -> String {
     let layout_header = match fidelity {
         Fidelity::Low => format!("// --- Compacted Layout (Low Fidelity): {} ---", path_alias),
-        Fidelity::Medium => format!("// --- Enhanced Layout (Medium Fidelity): {} ---", path_alias),
+        Fidelity::Medium => format!(
+            "// --- Enhanced Layout (Medium Fidelity): {} ---",
+            path_alias
+        ),
         // H-6 (FAANG audit): Edit/Verbatim were mislabeled as "High Fidelity".
         // Edit carries byte-exact method bodies; Verbatim is the full raw source.
         Fidelity::High => format!("// --- Full Layout (High Fidelity): {} ---", path_alias),
-        Fidelity::Edit => format!("// --- Edit Layout (Structural + Verbatim Bodies): {} ---", path_alias),
+        Fidelity::Edit => format!(
+            "// --- Edit Layout (Structural + Verbatim Bodies): {} ---",
+            path_alias
+        ),
         Fidelity::Verbatim => format!("// --- Verbatim Layout (Full Source): {} ---", path_alias),
     };
     if sym_footer.is_empty() {
@@ -76,15 +82,16 @@ pub fn format_final_output(
     let meta = calculate_savings(source_code, compacted_body, None);
     let ratio_report = format!(
         "// Structures: {} classes, {} methods, {} imports | {}/{} tokens",
-        class_count,
-        method_count,
-        import_count,
-        meta.raw_tokens,
-        meta.compressed_tokens,
+        class_count, method_count, import_count, meta.raw_tokens, meta.compressed_tokens,
     );
     format!(
         "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
-        meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, ratio_report, compacted_body
+        meta.raw_tokens,
+        meta.compressed_tokens,
+        meta.savings_percentage,
+        fidelity,
+        ratio_report,
+        compacted_body
     )
 }
 
@@ -136,9 +143,7 @@ fn format_savings_pct(pct: f64) -> String {
 /// Note: `§` (U+00A7) is a multi-byte UTF-8 character (2 bytes). All
 /// slicing below uses char-boundary-aware logic, not raw byte indices.
 #[allow(dead_code)]
-pub fn parse_compact_header(
-    header: &str,
-) -> Option<(usize, usize, f64, usize, usize, usize)> {
+pub fn parse_compact_header(header: &str) -> Option<(usize, usize, f64, usize, usize, usize)> {
     let header = header.trim();
     // Match §raw:compressed:savings_pct|L|classes:methods:imports§
     if !header.starts_with('§') || !header.ends_with('§') || header.len() < 6 {
@@ -176,7 +181,14 @@ pub fn parse_compact_header(
     let class_count: usize = counts[0].parse().ok()?;
     let method_count: usize = counts[1].parse().ok()?;
     let import_count: usize = counts[2].parse().ok()?;
-    Some((raw_tokens, compressed_tokens, savings_pct, class_count, method_count, import_count))
+    Some((
+        raw_tokens,
+        compressed_tokens,
+        savings_pct,
+        class_count,
+        method_count,
+        import_count,
+    ))
 }
 
 /// Build a compact cache-hit notice (~2-3 tokens vs ~5 tokens for verbose).

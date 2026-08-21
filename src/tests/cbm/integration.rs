@@ -1,4 +1,4 @@
-﻿// src/tests/cbm/integration.rs
+// src/tests/cbm/integration.rs
 //
 // Integration tests for CBM compression pipeline and intelligence layer.
 // Tests that compress_cbm_response properly handles various JSON inputs,
@@ -13,12 +13,20 @@ fn compress_cbm_response_envelope_stripping() {
     // Simulate a full CBM MCP response
     let raw = r#"{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"CBM graph data: found 42 nodes, 15 edges"}]}}"#;
     let result = compress_cbm_response(raw);
-    assert!(result.is_some(), "Should compress properly formatted response");
+    assert!(
+        result.is_some(),
+        "Should compress properly formatted response"
+    );
     let comp = result.unwrap();
     assert!(comp.cbm_error.is_none(), "No error should be present");
-    assert!(comp.compressed_text.len() < raw.len(), "Should achieve compression");
-    assert!(comp.compressed_text.contains("CBM graph data"),
-        "Should preserve meaningful content");
+    assert!(
+        comp.compressed_text.len() < raw.len(),
+        "Should achieve compression"
+    );
+    assert!(
+        comp.compressed_text.contains("CBM graph data"),
+        "Should preserve meaningful content"
+    );
 }
 
 #[test]
@@ -49,31 +57,37 @@ fn provide_code_context_cbm_skipped_when_intelligence_disabled() {
 
     // Verify the config default: intelligence is enabled by default,
     // and our manual disable took effect.
-    assert!(!config.intelligence.enabled,
-        "intelligence should be disabled for this test");
+    assert!(
+        !config.intelligence.enabled,
+        "intelligence should be disabled for this test"
+    );
 
     // Run the heuristics engine with a typical file
     let source = "pub struct User { name: String }\npub fn get_user() -> User { unimplemented!() }";
     let decision = heuristics::decide(
         "/project/src/user.rs",
-        None,           // explicit_fidelity
-        None,           // explicit_intent
+        None, // explicit_fidelity
+        None, // explicit_intent
         &config,
         &crate::compression::text_delta::TextDeltaComputer::new(),
         &crate::ir::replay::ContextState::new(),
         source,
-        None,           // path_alias
-        None,           // stored_fidelity
+        None, // path_alias
+        None, // stored_fidelity
     )
     .unwrap();
 
     // When intelligence is disabled, cbm_informed should stay false
-    assert!(!decision.cbm_informed,
-        "cbm_informed should be false when intelligence is disabled");
+    assert!(
+        !decision.cbm_informed,
+        "cbm_informed should be false when intelligence is disabled"
+    );
 
     // The decision summary should reflect no_cbm
-    assert!(decision.summary().contains("no_cbm"),
-        "summary should contain no_cbm when intelligence is disabled");
+    assert!(
+        decision.summary().contains("no_cbm"),
+        "summary should contain no_cbm when intelligence is disabled"
+    );
 }
 
 #[test]
@@ -83,25 +97,34 @@ fn provide_code_context_cbm_informed_false_when_no_bridge() {
     use crate::mcp::heuristics;
 
     let config = crate::config::CleanCtxConfig::default();
-    assert!(config.intelligence.enabled,
-        "intelligence should be enabled by default");
+    assert!(
+        config.intelligence.enabled,
+        "intelligence should be enabled by default"
+    );
 
     // Run heuristics without any bridge — cbm_informed stays false
     let source = "pub struct Config { port: u16 }";
     let decision = heuristics::decide(
         "/project/src/config.rs",
-        None, None, &config,
+        None,
+        None,
+        &config,
         &crate::compression::text_delta::TextDeltaComputer::new(),
         &crate::ir::replay::ContextState::new(),
         source,
-        None, None,
+        None,
+        None,
     )
     .unwrap();
 
-    assert!(!decision.cbm_informed,
-        "cbm_informed should be false when no bridge available");
-    assert!(decision.summary().contains("no_cbm"),
-        "summary should contain no_cbm when no bridge");
+    assert!(
+        !decision.cbm_informed,
+        "cbm_informed should be false when no bridge available"
+    );
+    assert!(
+        decision.summary().contains("no_cbm"),
+        "summary should contain no_cbm when no bridge"
+    );
 }
 
 #[test]
@@ -114,28 +137,36 @@ fn provide_code_context_cbm_informed_false_on_explicit_fidelity() {
     let source = "pub fn main() { println!(\"hello\"); }";
     let decision = heuristics::decide(
         "/project/src/main.rs",
-        Some("high"),   // explicit_fidelity
-        None,           // explicit_intent
+        Some("high"), // explicit_fidelity
+        None,         // explicit_intent
         &config,
         &crate::compression::text_delta::TextDeltaComputer::new(),
         &crate::ir::replay::ContextState::new(),
         source,
-        None, None,
+        None,
+        None,
     )
     .unwrap();
 
     // explicit fidelity should be honored, cbm_informed stays false
-    assert!(!decision.cbm_informed,
-        "cbm_informed should be false when explicit fidelity provided");
-    assert_eq!(format!("{:?}", decision.fidelity), "High",
-        "explicit fidelity High should be honored");
+    assert!(
+        !decision.cbm_informed,
+        "cbm_informed should be false when explicit fidelity provided"
+    );
+    assert_eq!(
+        format!("{:?}", decision.fidelity),
+        "High",
+        "explicit fidelity High should be honored"
+    );
 }
 
 #[test]
 fn intelligence_config_defaults_to_enabled() {
     let config = crate::config::CleanCtxConfig::default();
-    assert!(config.intelligence.enabled,
-        "IntelligenceConfig::enabled should default to true");
+    assert!(
+        config.intelligence.enabled,
+        "IntelligenceConfig::enabled should default to true"
+    );
 }
 
 // ── last_error regression: query failures are surfaced, not hidden ──
@@ -147,7 +178,10 @@ fn bridge_surfaces_query_error_on_unavailable() {
     use crate::cbm::GraphBridge;
     use crate::cbm::config::CbmConfig;
 
-    let config = CbmConfig { enabled: false, ..Default::default() };
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
     let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
 
     // search without CBM → empty result BUT last_error must be populated.
@@ -169,31 +203,40 @@ fn bridge_surfaces_query_error_on_unavailable() {
 /// A successful cached query clears any stale error.
 #[test]
 fn cached_query_clears_stale_error() {
-    use crate::cbm::bridge::test_helpers::new_mock;
     use crate::cbm::SymbolImportance;
+    use crate::cbm::bridge::test_helpers::new_mock;
     use std::collections::HashMap;
 
     let mut data = HashMap::new();
-    data.insert("UserService".to_string(), SymbolImportance {
-        symbol: "UserService".to_string(),
-        score: 0.9,
-        file: "user.rs".to_string(),
-    });
+    data.insert(
+        "UserService".to_string(),
+        SymbolImportance {
+            symbol: "UserService".to_string(),
+            score: 0.9,
+            file: "user.rs".to_string(),
+        },
+    );
     let mut bridge = new_mock(data);
 
     // Seed a search cache entry so search() takes the cache-hit path.
     use crate::cbm::bridge::CachedGraphData;
     let ttl = std::time::Instant::now() + std::time::Duration::from_secs(3600);
-    bridge.cache.insert("search:UserService".to_string(), CachedGraphData {
-        data: json!([]),
-        expires_at: ttl,
-    });
+    bridge.cache.insert(
+        "search:UserService".to_string(),
+        CachedGraphData {
+            data: json!([]),
+            expires_at: ttl,
+        },
+    );
 
     // First simulate a fresh-error state by forcing one (mock has no client,
     // so a MISS would error — but we want the cache-HIT path).
     // Manually inject a stale error:
     bridge.set_last_error_for_test(crate::cbm::client::CbmError::LaunchError("stale".into()));
-    assert!(bridge.take_last_error().is_some(), "precondition: stale error present");
+    assert!(
+        bridge.take_last_error().is_some(),
+        "precondition: stale error present"
+    );
 
     // Inject again (take cleared it) then run a cache-hit search:
     bridge.set_last_error_for_test(crate::cbm::client::CbmError::LaunchError("stale".into()));

@@ -11,9 +11,11 @@
 // - `[FromBody]`, `[FromRoute]`, `[FromQuery]` parameter bindings
 // - Input/output model DTOs
 
-use super::markers::{build_action_line, build_api_controller_line, build_auth_line, build_controller_line};
-use crate::dotnet_meta::MetaBlock;
+use super::markers::{
+    build_action_line, build_api_controller_line, build_auth_line, build_controller_line,
+};
 use crate::compression::Fidelity;
+use crate::dotnet_meta::MetaBlock;
 
 /// Extract ASP.NET Core markers from a single class capture.
 ///

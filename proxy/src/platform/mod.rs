@@ -10,8 +10,8 @@
 // - Model detection (which models belong to this platform)
 
 pub mod anthropic;
-pub mod openai;
 pub mod generic;
+pub mod openai;
 
 use serde_json::Value;
 

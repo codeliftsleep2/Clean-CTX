@@ -5,7 +5,7 @@
 use crate::compression::Fidelity;
 use crate::ir::opcodes::CoreOp;
 use crate::ir::pipeline::{
-    CoreIRPass, ExecutionSemanticsPass, InferenceLayerPass, IRPass, LanguageLayerPass,
+    CoreIRPass, ExecutionSemanticsPass, IRPass, InferenceLayerPass, LanguageLayerPass,
     MetaLayerPass, PassContext, PassPipeline, ProgramGraphPass, ValidationPass,
 };
 
@@ -70,8 +70,13 @@ fn test_pass_names() {
 #[test]
 fn test_program_graph_pass_builds_graph() {
     let mut ctx = PassContext::new("source".to_string(), "file.ts".to_string(), Fidelity::Low);
-    ctx.instructions.push(CoreOp::DefClass("C1".into(), "TestClass".into()));
-    ctx.instructions.push(CoreOp::DefMethod("C1".into(), "M1".into(), "testMethod".into()));
+    ctx.instructions
+        .push(CoreOp::DefClass("C1".into(), "TestClass".into()));
+    ctx.instructions.push(CoreOp::DefMethod(
+        "C1".into(),
+        "M1".into(),
+        "testMethod".into(),
+    ));
 
     let pass = ProgramGraphPass::new();
     let result = pass.run(&mut ctx);
@@ -96,20 +101,27 @@ fn test_inference_layer_pass_builds_layer() {
 
 #[test]
 fn test_inference_layer_pass_with_cbm_enriches_layer() {
-    use std::collections::HashMap;
-    use crate::cbm::bridge::test_helpers::new_mock_with_edges;
     use crate::cbm::bridge::SymbolImportance;
+    use crate::cbm::bridge::test_helpers::new_mock_with_edges;
+    use std::collections::HashMap;
 
     let bridge = new_mock_with_edges(
         vec![("CallerA".to_string(), "CalleeB".to_string())],
-        vec![("MethodX".to_string(), "TargetY".to_string(), "reads".to_string())],
+        vec![(
+            "MethodX".to_string(),
+            "TargetY".to_string(),
+            "reads".to_string(),
+        )],
         {
             let mut m = HashMap::new();
-            m.insert("Sym1".to_string(), SymbolImportance {
-                symbol: "Sym1".to_string(),
-                score: 0.9,
-                file: "a.ts".to_string(),
-            });
+            m.insert(
+                "Sym1".to_string(),
+                SymbolImportance {
+                    symbol: "Sym1".to_string(),
+                    score: 0.9,
+                    file: "a.ts".to_string(),
+                },
+            );
             m
         },
         vec![],

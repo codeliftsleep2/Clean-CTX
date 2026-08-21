@@ -3,11 +3,11 @@
 // Tests for the fidelity-gated Angular template compression
 // (ANGULAR_HTML_COMPRESSION_PLAN Phase 1 + Phase 4).
 
+use crate::angular_meta::template::extract_template_shape;
 use crate::angular_meta::template_compress::{
     compress_template, compress_template_to_string, compress_template_with_prime_ng,
     extract_prime_ng_markers, is_prime_ng_component,
 };
-use crate::angular_meta::template::extract_template_shape;
 use crate::compression::Fidelity;
 
 // ── Low fidelity: single-line shape summary (current behavior) ─────
@@ -24,10 +24,15 @@ fn low_fidelity_single_line() {
 
 #[test]
 fn low_fidelity_byte_identical_to_marker_line() {
-    let html = r#"<div *ngIf="show"><app-card [title]="name" (click)="handler()"></app-card></div>"#;
+    let html =
+        r#"<div *ngIf="show"><app-card [title]="name" (click)="handler()"></app-card></div>"#;
     let shape = extract_template_shape(html);
     let lines = compress_template(html, Fidelity::Low);
-    assert_eq!(lines[0], shape.to_marker_line(), "Low fidelity must match to_marker_line");
+    assert_eq!(
+        lines[0],
+        shape.to_marker_line(),
+        "Low fidelity must match to_marker_line"
+    );
 }
 
 // ── Medium fidelity: multi-line structural Angular semantics ───────
@@ -36,7 +41,10 @@ fn low_fidelity_byte_identical_to_marker_line() {
 fn medium_fidelity_multi_line() {
     let html = r#"<div><span>{{ name }}</span></div>"#;
     let lines = compress_template(html, Fidelity::Medium);
-    assert!(lines.len() > 1, "Medium fidelity should produce multiple lines");
+    assert!(
+        lines.len() > 1,
+        "Medium fidelity should produce multiple lines"
+    );
     assert!(lines[0].starts_with("Φtpl:"));
 }
 
@@ -67,7 +75,9 @@ fn medium_fidelity_preserves_custom_element_bindings() {
     let html = r#"<app-user-card [user]="user" (select)="onSelect($event)"></app-user-card>"#;
     let lines = compress_template(html, Fidelity::Medium);
     assert!(
-        lines.iter().any(|l| l.contains("app-user-card") && l.contains("[user]=\"user\"")),
+        lines
+            .iter()
+            .any(|l| l.contains("app-user-card") && l.contains("[user]=\"user\"")),
         "Medium fidelity should preserve custom element bindings, got: {:?}",
         lines
     );
@@ -101,9 +111,14 @@ fn medium_fidelity_preserves_ng_for_loop() {
 fn high_fidelity_preserves_all_elements() {
     let html = r#"<div class="container"><h1>{{ title }}</h1><app-card [data]="cardData"></app-card></div>"#;
     let lines = compress_template(html, Fidelity::High);
-    assert!(lines.len() > 1, "High fidelity should produce multiple lines");
     assert!(
-        lines.iter().any(|l| l.contains("app-card") && l.contains("[data]=\"cardData\"")),
+        lines.len() > 1,
+        "High fidelity should produce multiple lines"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.contains("app-card") && l.contains("[data]=\"cardData\"")),
         "High fidelity should preserve all custom elements, got: {:?}",
         lines
     );

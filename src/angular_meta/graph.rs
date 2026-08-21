@@ -286,9 +286,9 @@ impl AngularGraph {
         if !self.resolved {
             return None;
         }
-        self.classes.get(type_name).map(|entry| {
-            format!("{}@{}", entry.class_name, entry.file_alias)
-        })
+        self.classes
+            .get(type_name)
+            .map(|entry| format!("{}@{}", entry.class_name, entry.file_alias))
     }
 
     /// Resolve a custom-element tag name to its component file-aliased
@@ -377,7 +377,9 @@ impl AngularGraph {
     /// Uses three-color DFS (white/gray/black) for O(V+E) performance.
     pub fn has_cycle(&self) -> bool {
         let class_names: Vec<String> = self.classes.keys().cloned().collect();
-        let name_to_idx: HashMap<&str, usize> = class_names.iter().enumerate()
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
             .map(|(i, name)| (name.as_str(), i))
             .collect();
 
@@ -389,7 +391,9 @@ impl AngularGraph {
         let adj_fn = |i: usize| {
             let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
             if let Some(entry) = self.classes.get(name) {
-                entry.injects.iter()
+                entry
+                    .injects
+                    .iter()
                     .filter_map(|injected| name_to_idx.get(injected.as_str()))
                     .copied()
                     .collect::<Vec<_>>()
@@ -407,7 +411,9 @@ impl AngularGraph {
     /// If no cycles exist, returns an empty `Vec`.
     pub fn find_cycles(&self) -> Vec<Vec<String>> {
         let class_names: Vec<String> = self.classes.keys().cloned().collect();
-        let name_to_idx: HashMap<&str, usize> = class_names.iter().enumerate()
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
             .map(|(i, name)| (name.as_str(), i))
             .collect();
 
@@ -419,7 +425,9 @@ impl AngularGraph {
         let adj_fn = |i: usize| {
             let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
             if let Some(entry) = self.classes.get(name) {
-                entry.injects.iter()
+                entry
+                    .injects
+                    .iter()
                     .filter_map(|injected| name_to_idx.get(injected.as_str()))
                     .copied()
                     .collect::<Vec<_>>()
@@ -429,7 +437,8 @@ impl AngularGraph {
         };
 
         let label_fn = |i: usize| {
-            class_names.get(i)
+            class_names
+                .get(i)
                 .cloned()
                 .unwrap_or_else(|| format!("unknown_{}", i))
         };
@@ -449,7 +458,9 @@ impl AngularGraph {
         }
 
         let class_names: Vec<String> = self.classes.keys().cloned().collect();
-        let name_to_idx: HashMap<&str, usize> = class_names.iter().enumerate()
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
             .map(|(i, name)| (name.as_str(), i))
             .collect();
 
@@ -459,7 +470,9 @@ impl AngularGraph {
         let adj_fn = |i: usize| {
             let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
             if let Some(entry) = self.classes.get(name) {
-                entry.injects.iter()
+                entry
+                    .injects
+                    .iter()
                     .filter_map(|injected| name_to_idx.get(injected.as_str()))
                     .copied()
                     .collect::<Vec<_>>()
@@ -469,7 +482,8 @@ impl AngularGraph {
         };
 
         let indices = transitive_dependencies(start_idx, depth, node_count, adj_fn);
-        indices.into_iter()
+        indices
+            .into_iter()
             .filter_map(|i| class_names.get(i))
             .cloned()
             .collect()
@@ -506,10 +520,7 @@ impl AngularGraph {
                 ClassKind::Pipe => "Φpipe:",
                 ClassKind::Module => "Φmod:",
             };
-            s.push_str(&format!(
-                "    {}injects=[",
-                dep_marker
-            ));
+            s.push_str(&format!("    {}injects=[", dep_marker));
             let resolved_injects: Vec<String> = entry
                 .injects
                 .iter()
@@ -570,7 +581,9 @@ pub struct GraphEntry {
 
 impl GraphCollector {
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     /// Register a class for later graph building.

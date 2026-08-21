@@ -17,7 +17,7 @@
 //   - `CompressionProgress`    → `crate::compression::streaming::CompressionProgress`
 //   - `Fidelity`               → `crate::compression::fidelity::Fidelity`
 
-pub use crate::compression::compress_file;
-pub use crate::compression::compress_file_streaming;
 pub use crate::compression::CompressionProgress;
 pub use crate::compression::Fidelity;
+pub use crate::compression::compress_file;
+pub use crate::compression::compress_file_streaming;

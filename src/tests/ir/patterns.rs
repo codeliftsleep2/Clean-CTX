@@ -3,9 +3,7 @@
 // Tests for Phase H: Pattern Compression (Consumptive Recognizer).
 
 use crate::ir::opcodes::CoreOp;
-use crate::ir::patterns::{
-    PatternOp, CompressingPatternRecognizer, MergeItem,
-};
+use crate::ir::patterns::{CompressingPatternRecognizer, MergeItem, PatternOp};
 
 fn defclass(id: &str, name: &str) -> CoreOp {
     CoreOp::DefClass(id.into(), name.into())
@@ -144,19 +142,45 @@ fn pattern_op_from_invalid_tuple_returns_none() {
 
 #[test]
 fn pattern_op_name() {
-    let c = PatternOp::Constructor { class_id: "C1".into(), method_id: "M1".into(), deps: vec![] };
+    let c = PatternOp::Constructor {
+        class_id: "C1".into(),
+        method_id: "M1".into(),
+        deps: vec![],
+    };
     assert_eq!(c.name(), "CTOR");
-    let g = PatternOp::Getter { class_id: "C1".into(), method_id: "M1".into(), property: "x".into() };
+    let g = PatternOp::Getter {
+        class_id: "C1".into(),
+        method_id: "M1".into(),
+        property: "x".into(),
+    };
     assert_eq!(g.name(), "GETTER");
-    let s = PatternOp::Setter { class_id: "C1".into(), method_id: "M1".into(), property: "x".into() };
+    let s = PatternOp::Setter {
+        class_id: "C1".into(),
+        method_id: "M1".into(),
+        property: "x".into(),
+    };
     assert_eq!(s.name(), "SETTER");
-    let o = PatternOp::Observable { class_id: "C1".into(), method_id: "M1".into(), return_type: "$P".into() };
+    let o = PatternOp::Observable {
+        class_id: "C1".into(),
+        method_id: "M1".into(),
+        return_type: "$P".into(),
+    };
     assert_eq!(o.name(), "OBSERVABLE");
-    let p = PatternOp::Promise { class_id: "C1".into(), method_id: "M1".into(), return_type: "$P".into() };
+    let p = PatternOp::Promise {
+        class_id: "C1".into(),
+        method_id: "M1".into(),
+        return_type: "$P".into(),
+    };
     assert_eq!(p.name(), "PROMISE");
-    let ov = PatternOp::Override { class_id: "C1".into(), method_id: "M1".into() };
+    let ov = PatternOp::Override {
+        class_id: "C1".into(),
+        method_id: "M1".into(),
+    };
     assert_eq!(ov.name(), "OVERRIDE");
-    let ec = PatternOp::EmptyConstructor { class_id: "C1".into(), method_id: "M1".into() };
+    let ec = PatternOp::EmptyConstructor {
+        class_id: "C1".into(),
+        method_id: "M1".into(),
+    };
     assert_eq!(ec.name(), "EMPTY_CTOR");
 }
 
@@ -177,7 +201,12 @@ fn compress_constructor_with_injects() {
     assert_eq!(pats.len(), 1);
     let ctor = &pats[0];
     assert!(matches!(ctor, PatternOp::Constructor { .. }));
-    if let PatternOp::Constructor { class_id, method_id, deps } = ctor {
+    if let PatternOp::Constructor {
+        class_id,
+        method_id,
+        deps,
+    } = ctor
+    {
         assert_eq!(class_id, "C1");
         assert_eq!(method_id, "M1");
         assert_eq!(deps, &vec!["S1".to_string(), "S2".to_string()]);
@@ -266,7 +295,10 @@ fn compress_non_constructor_name_does_not_match() {
     ];
     let rec = CompressingPatternRecognizer::new();
     let (pats, _) = rec.compress(&ops);
-    assert!(pats.is_empty(), "init without underscores should not match as constructor");
+    assert!(
+        pats.is_empty(),
+        "init without underscores should not match as constructor"
+    );
 }
 
 #[test]
@@ -287,10 +319,7 @@ fn compress_new_constructor_name() {
 #[test]
 fn compress_empty_constructor_python() {
     // Empty constructor with __init__ name
-    let ops = vec![
-        defmethod("C1", "M1", "__init__"),
-        ret("M1", "$v"),
-    ];
+    let ops = vec![defmethod("C1", "M1", "__init__"), ret("M1", "$v")];
     let rec = CompressingPatternRecognizer::new();
     let (pats, _) = rec.compress(&ops);
     assert_eq!(pats.len(), 1);
@@ -299,10 +328,7 @@ fn compress_empty_constructor_python() {
 
 #[test]
 fn compress_empty_constructor() {
-    let ops = vec![
-        defmethod("C1", "M1", "constructor"),
-        ret("M1", "$v"),
-    ];
+    let ops = vec![defmethod("C1", "M1", "constructor"), ret("M1", "$v")];
     let rec = CompressingPatternRecognizer::new();
     let (pats, _) = rec.compress(&ops);
     assert_eq!(pats.len(), 1);
@@ -343,10 +369,7 @@ fn compress_observable_with_observable_type() {
 
 #[test]
 fn compress_observable_requires_async_flag() {
-    let ops = vec![
-        defmethod("C1", "M1", "fetchData"),
-        ret("M1", "$P"),
-    ];
+    let ops = vec![defmethod("C1", "M1", "fetchData"), ret("M1", "$P")];
     let rec = CompressingPatternRecognizer::new();
     let (pats, _) = rec.compress(&ops);
     assert_eq!(pats.len(), 1);
@@ -357,10 +380,7 @@ fn compress_observable_requires_async_flag() {
 
 #[test]
 fn compress_promise_without_async() {
-    let ops = vec![
-        defmethod("C1", "M1", "fetchData"),
-        ret("M1", "$P"),
-    ];
+    let ops = vec![defmethod("C1", "M1", "fetchData"), ret("M1", "$P")];
     let rec = CompressingPatternRecognizer::new();
     let (pats, _) = rec.compress(&ops);
     assert_eq!(pats.len(), 1);
@@ -369,10 +389,7 @@ fn compress_promise_without_async() {
 
 #[test]
 fn compress_does_not_match_promise_for_non_promise_type() {
-    let ops = vec![
-        defmethod("C1", "M1", "doWork"),
-        ret("M1", "$v"),
-    ];
+    let ops = vec![defmethod("C1", "M1", "doWork"), ret("M1", "$v")];
     let rec = CompressingPatternRecognizer::new();
     let (pats, _) = rec.compress(&ops);
     assert!(pats.is_empty());
@@ -382,10 +399,7 @@ fn compress_does_not_match_promise_for_non_promise_type() {
 
 #[test]
 fn compress_getter() {
-    let ops = vec![
-        defmethod("C1", "M1", "get fullName"),
-        ret("M1", "$s"),
-    ];
+    let ops = vec![defmethod("C1", "M1", "get fullName"), ret("M1", "$s")];
     let rec = CompressingPatternRecognizer::new();
     let (pats, _) = rec.compress(&ops);
     assert_eq!(pats.len(), 1);
@@ -511,10 +525,12 @@ fn compress_merged_preserves_passthroughs() {
     ];
     let rec = CompressingPatternRecognizer::new();
     let merged = rec.compress_merged(&ops);
-    let has_class = merged.iter().any(|i|
-        matches!(i, MergeItem::Passthrough(CoreOp::DefClass(_, _))));
-    let has_ctor = merged.iter().any(|i|
-        matches!(i, MergeItem::Pattern(PatternOp::Constructor { .. })));
+    let has_class = merged
+        .iter()
+        .any(|i| matches!(i, MergeItem::Passthrough(CoreOp::DefClass(_, _))));
+    let has_ctor = merged
+        .iter()
+        .any(|i| matches!(i, MergeItem::Pattern(PatternOp::Constructor { .. })));
     assert!(has_class, "DEF_C should pass through");
     assert!(has_ctor, "constructor should compress to Pattern");
 }
@@ -528,7 +544,11 @@ fn compress_merged_no_patterns_means_all_passthrough() {
     ];
     let rec = CompressingPatternRecognizer::new();
     let merged = rec.compress_merged(&ops);
-    assert!(merged.iter().all(|i| matches!(i, MergeItem::Passthrough(_))));
+    assert!(
+        merged
+            .iter()
+            .all(|i| matches!(i, MergeItem::Passthrough(_)))
+    );
     assert_eq!(merged.len(), 3);
 }
 
@@ -553,11 +573,22 @@ fn compress_multiple_patterns_in_stream() {
 
 #[test]
 fn pattern_consumed_counts() {
-    let c = PatternOp::Constructor { class_id: "C1".into(), method_id: "M1".into(), deps: vec![] };
+    let c = PatternOp::Constructor {
+        class_id: "C1".into(),
+        method_id: "M1".into(),
+        deps: vec![],
+    };
     assert!(c.consumed() >= 3);
-    let g = PatternOp::Getter { class_id: "C1".into(), method_id: "M1".into(), property: "x".into() };
+    let g = PatternOp::Getter {
+        class_id: "C1".into(),
+        method_id: "M1".into(),
+        property: "x".into(),
+    };
     assert!(g.consumed() >= 2);
-    let o = PatternOp::Override { class_id: "C1".into(), method_id: "M1".into() };
+    let o = PatternOp::Override {
+        class_id: "C1".into(),
+        method_id: "M1".into(),
+    };
     assert!(o.consumed() >= 2);
 }
 

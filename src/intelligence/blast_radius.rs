@@ -126,7 +126,10 @@ mod tests {
         let result = compute_blast_radius("UserService", 2, cbm_files, &ir_deps);
         assert_eq!(result.len(), 2);
         // IR-only file should have impact 0.3
-        let ir_file = result.iter().find(|f| f.file_path == "src/logger.rs").unwrap();
+        let ir_file = result
+            .iter()
+            .find(|f| f.file_path == "src/logger.rs")
+            .unwrap();
         assert_eq!(ir_file.impact_score, 0.3);
         assert!(!ir_file.affected_symbols.is_empty());
     }

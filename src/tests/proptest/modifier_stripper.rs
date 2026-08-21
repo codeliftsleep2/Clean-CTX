@@ -13,11 +13,11 @@
 // 5. strip_modifiers handles overlapping prefixes correctly
 // 6. strip_modifiers with MODIFIERS_CLASS on already-clean input is a no-op
 
-use proptest::prelude::*;
 use crate::compaction::modifiers::{
-    strip_modifiers, MODIFIERS_LOW, MODIFIERS_MEDIUM,
-    MODIFIERS_CLASS, MODIFIERS_FIELD, MODIFIERS_STRUCT_RS,
+    MODIFIERS_CLASS, MODIFIERS_FIELD, MODIFIERS_LOW, MODIFIERS_MEDIUM, MODIFIERS_STRUCT_RS,
+    strip_modifiers,
 };
+use proptest::prelude::*;
 
 proptest! {
     /// Invariant: strip_modifiers never panics on any input.

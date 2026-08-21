@@ -214,45 +214,45 @@ impl PhiLineKind {
     /// replacement.
     pub fn all_in_expand_order() -> &'static [PhiLineKind] {
         &[
-            Self::ApiController,  // Φapi:     (5 chars)
-            Self::Action,         // Φaction:  (8 chars)
-            Self::Authorize,      // Φauth:    (6 chars)
-            Self::Controller,     // Φctrl:    (6 chars)
-            Self::Model,          // Φmodel:   (7 chars)
-            Self::DbContext,      // Φef:      (4 chars)
-            Self::DbSet,          // Φdbset:   (7 chars)
-            Self::Entity,         // Φentity:  (8 chars)
-            Self::Relationship,   // Φrel:     (5 chars)
-            Self::Config,         // Φcfg:     (5 chars)
-            Self::Mapper,         // Φmap:     (5 chars)
-            Self::MapFrom,        // Φmapfrom: (9 chars)
-            Self::Ignore,         // Φignore:  (8 chars)
-            Self::Projection,     // Φproj:    (6 chars)
-            Self::Hub,            // Φhub:     (5 chars)
-            Self::HubMethod,      // Φmethod:  (8 chars)
-            Self::Client,         // Φclient:  (8 chars)
-            Self::Group,          // Φgroup:   (7 chars)
-            Self::User,           // Φuser:    (6 chars)
-            Self::Stream,         // Φstream:  (8 chars)
-            Self::Connection,     // Φconn:    (6 chars)
-            Self::Json,           // Φjson:    (6 chars)
-            Self::Property,       // Φprop:    (6 chars)
-            Self::Service,        // Φsvc:     (5 chars)
-            Self::Di,             // Φdi:      (4 chars)
-            Self::Common,         // Φcommon:  (8 chars)
-            Self::Validator,      // Φvalid:   (7 chars)
-            Self::Rule,           // Φrule:    (6 chars)
-            Self::Custom,         // Φcustom:  (8 chars)
-            Self::Identity,       // Φidentity:(10 chars)
-            Self::Jwt,            // Φjwt:     (5 chars)
-            Self::Cache,          // Φcache:   (7 chars)
-            Self::Output,         // Φoutput:  (8 chars)
-            Self::Job,            // Φjob:     (5 chars)
-            Self::Log,            // Φlog:     (5 chars)
-            Self::Metric,         // Φmetric:  (8 chars)
-            Self::Graph,          // Φgraph:   (7 chars)
-            Self::Bundle,         // ΦBUNDLE   (8 chars)
-            Self::Map,            // ΦMAP      (5 chars)
+            Self::ApiController, // Φapi:     (5 chars)
+            Self::Action,        // Φaction:  (8 chars)
+            Self::Authorize,     // Φauth:    (6 chars)
+            Self::Controller,    // Φctrl:    (6 chars)
+            Self::Model,         // Φmodel:   (7 chars)
+            Self::DbContext,     // Φef:      (4 chars)
+            Self::DbSet,         // Φdbset:   (7 chars)
+            Self::Entity,        // Φentity:  (8 chars)
+            Self::Relationship,  // Φrel:     (5 chars)
+            Self::Config,        // Φcfg:     (5 chars)
+            Self::Mapper,        // Φmap:     (5 chars)
+            Self::MapFrom,       // Φmapfrom: (9 chars)
+            Self::Ignore,        // Φignore:  (8 chars)
+            Self::Projection,    // Φproj:    (6 chars)
+            Self::Hub,           // Φhub:     (5 chars)
+            Self::HubMethod,     // Φmethod:  (8 chars)
+            Self::Client,        // Φclient:  (8 chars)
+            Self::Group,         // Φgroup:   (7 chars)
+            Self::User,          // Φuser:    (6 chars)
+            Self::Stream,        // Φstream:  (8 chars)
+            Self::Connection,    // Φconn:    (6 chars)
+            Self::Json,          // Φjson:    (6 chars)
+            Self::Property,      // Φprop:    (6 chars)
+            Self::Service,       // Φsvc:     (5 chars)
+            Self::Di,            // Φdi:      (4 chars)
+            Self::Common,        // Φcommon:  (8 chars)
+            Self::Validator,     // Φvalid:   (7 chars)
+            Self::Rule,          // Φrule:    (6 chars)
+            Self::Custom,        // Φcustom:  (8 chars)
+            Self::Identity,      // Φidentity:(10 chars)
+            Self::Jwt,           // Φjwt:     (5 chars)
+            Self::Cache,         // Φcache:   (7 chars)
+            Self::Output,        // Φoutput:  (8 chars)
+            Self::Job,           // Φjob:     (5 chars)
+            Self::Log,           // Φlog:     (5 chars)
+            Self::Metric,        // Φmetric:  (8 chars)
+            Self::Graph,         // Φgraph:   (7 chars)
+            Self::Bundle,        // ΦBUNDLE   (8 chars)
+            Self::Map,           // ΦMAP      (5 chars)
         ]
     }
 
@@ -384,7 +384,12 @@ pub fn build_api_controller_line(class_name: &str) -> String {
 }
 
 /// Build a `Φaction:<Verb> <Name>(<params>) → <return>` marker line.
-pub fn build_action_line(verb: &str, name: &str, params: &str, return_type: Option<&str>) -> String {
+pub fn build_action_line(
+    verb: &str,
+    name: &str,
+    params: &str,
+    return_type: Option<&str>,
+) -> String {
     match return_type {
         Some(rt) => format!("Φaction:{} {}({}) → {}", verb, name, params, rt),
         None => format!("Φaction:{} {}({})", verb, name, params),

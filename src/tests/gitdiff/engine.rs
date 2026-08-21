@@ -75,12 +75,18 @@ fn gitdiff_workspace_header_and_counts() {
         .expect("gitdiff_workspace");
 
     assert_eq!(summary.file_count, 4, "4 files changed");
-    assert_eq!(summary.counts, (1, 1, 2, 0), "1 added, 1 deleted, 2 modified");
+    assert_eq!(
+        summary.counts,
+        (1, 1, 2, 0),
+        "1 added, 1 deleted, 2 modified"
+    );
     assert_eq!(summary.skipped, 0, "no skipped files");
 
     // Header line format.
     assert!(
-        summary.manifest.starts_with("§GITDIFF HEAD~1..HEAD (4 files)"),
+        summary
+            .manifest
+            .starts_with("§GITDIFF HEAD~1..HEAD (4 files)"),
         "unexpected header: {}",
         summary.manifest.lines().next().unwrap_or("")
     );
@@ -243,14 +249,28 @@ fn gitdiff_workspace_size_limit_skip_not_double_counted() {
     // read) so old.ts remains a processed deletion. The critical invariant
     // is: `counts + skipped == file_count` — a skipped file must NOT also
     // appear in `counts` (double-counting bug).
-    let summary = gitdiff_workspace(root, "HEAD~1", Some("HEAD"), Fidelity::Medium, Some(100), Some(10))
-        .expect("gitdiff_workspace");
+    let summary = gitdiff_workspace(
+        root,
+        "HEAD~1",
+        Some("HEAD"),
+        Fidelity::Medium,
+        Some(100),
+        Some(10),
+    )
+    .expect("gitdiff_workspace");
 
     assert_eq!(summary.file_count, 4, "4 files changed");
-    assert_eq!(summary.counts, (0, 1, 0, 0), "only the deletion is processed");
+    assert_eq!(
+        summary.counts,
+        (0, 1, 0, 0),
+        "only the deletion is processed"
+    );
     // new.ts (added), src/app.ts (modified), notes.md (modified) all
     // exceed 10 bytes → skipped. Deletions are never size-checked.
-    assert_eq!(summary.skipped, 3, "3 files skipped (size limit): added + 2 modified");
+    assert_eq!(
+        summary.skipped, 3,
+        "3 files skipped (size limit): added + 2 modified"
+    );
     assert_eq!(
         summary.counts.0 + summary.counts.1 + summary.counts.2 + summary.counts.3 + summary.skipped,
         summary.file_count,
@@ -274,8 +294,15 @@ fn gitdiff_workspace_invalid_ref_rejected() {
     let dir = init_repo();
     let root = dir.path().to_str().unwrap();
 
-    let err = gitdiff_workspace(root, "--upload-pack", Some("HEAD"), Fidelity::Low, None, None)
-        .unwrap_err();
+    let err = gitdiff_workspace(
+        root,
+        "--upload-pack",
+        Some("HEAD"),
+        Fidelity::Low,
+        None,
+        None,
+    )
+    .unwrap_err();
     assert!(
         err.to_string().contains("invalid git ref"),
         "expected ref validation error, got: {err}"
@@ -683,7 +710,9 @@ fn gitdiff_workspace_top_level_function_change_emits_ast_diff() {
     // The manifest must contain the body-change marker keyed on the
     // actual function name (not "export").
     assert!(
-        summary.manifest.contains("~ method formatName (body changed)"),
+        summary
+            .manifest
+            .contains("~ method formatName (body changed)"),
         "expected ~ method formatName (body changed), got:\n{}",
         summary.manifest
     );

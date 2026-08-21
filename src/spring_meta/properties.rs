@@ -68,7 +68,11 @@ pub fn extract_properties_shape(content: &str) -> PropertiesShape {
         return shape;
     }
 
-    let is_yaml = content.contains(":") && (content.contains("---") || content.lines().any(|l| !l.starts_with("#") && l.contains(":")));
+    let is_yaml = content.contains(":")
+        && (content.contains("---")
+            || content
+                .lines()
+                .any(|l| !l.starts_with("#") && l.contains(":")));
 
     if is_yaml {
         extract_yaml_shape(content, &mut shape);
@@ -102,7 +106,12 @@ fn extract_properties_shape_impl(content: &str, shape: &mut PropertiesShape) {
 
         // Extract property key (before = or :).
         let key_start = i;
-        while i < len && bytes[i] != b'=' && bytes[i] != b':' && bytes[i] != b'\n' && bytes[i] != b'\r' {
+        while i < len
+            && bytes[i] != b'='
+            && bytes[i] != b':'
+            && bytes[i] != b'\n'
+            && bytes[i] != b'\r'
+        {
             i += 1;
         }
         let key = content[key_start..i].trim();
@@ -113,20 +122,22 @@ fn extract_properties_shape_impl(content: &str, shape: &mut PropertiesShape) {
 
             // Check for active profiles.
             if (key == "spring.profiles.active" || key == "spring.profiles.include")
-                && i < len && (bytes[i] == b'=' || bytes[i] == b':') {
+                && i < len
+                && (bytes[i] == b'=' || bytes[i] == b':')
+            {
+                i += 1;
+                let value_start = i;
+                while i < len && bytes[i] != b'\n' && bytes[i] != b'\r' {
                     i += 1;
-                    let value_start = i;
-                    while i < len && bytes[i] != b'\n' && bytes[i] != b'\r' {
-                        i += 1;
-                    }
-                    let value = content[value_start..i].trim();
-                    for profile in value.split(',') {
-                        let profile = profile.trim();
-                        if !profile.is_empty() {
-                            shape.profiles.push(profile.to_string());
-                        }
+                }
+                let value = content[value_start..i].trim();
+                for profile in value.split(',') {
+                    let profile = profile.trim();
+                    if !profile.is_empty() {
+                        shape.profiles.push(profile.to_string());
                     }
                 }
+            }
         }
 
         // Skip to next line.
@@ -159,7 +170,10 @@ fn extract_yaml_shape(content: &str, shape: &mut PropertiesShape) {
         }
 
         // Skip blank lines and document markers.
-        if bytes[i] == b'\n' || bytes[i] == b'\r' || (bytes[i] == b'-' && i + 2 < len && bytes[i + 1] == b'-' && bytes[i + 2] == b'-') {
+        if bytes[i] == b'\n'
+            || bytes[i] == b'\r'
+            || (bytes[i] == b'-' && i + 2 < len && bytes[i + 1] == b'-' && bytes[i + 2] == b'-')
+        {
             i += 1;
             continue;
         }
@@ -183,7 +197,12 @@ fn extract_yaml_shape(content: &str, shape: &mut PropertiesShape) {
 
         // Extract key (before : or =).
         let key_start = i;
-        while i < len && bytes[i] != b':' && bytes[i] != b'=' && bytes[i] != b'\n' && bytes[i] != b'\r' {
+        while i < len
+            && bytes[i] != b':'
+            && bytes[i] != b'='
+            && bytes[i] != b'\n'
+            && bytes[i] != b'\r'
+        {
             i += 1;
         }
         let key = content[key_start..i].trim();
@@ -197,25 +216,27 @@ fn extract_yaml_shape(content: &str, shape: &mut PropertiesShape) {
 
             // Check for active profiles using full path.
             if (full_key == "spring.profiles.active" || full_key == "spring.profiles.include")
-                && i < len && (bytes[i] == b':' || bytes[i] == b'=') {
+                && i < len
+                && (bytes[i] == b':' || bytes[i] == b'=')
+            {
+                i += 1;
+                // Skip whitespace.
+                while i < len && (bytes[i] == b' ' || bytes[i] == b'\t') {
                     i += 1;
-                    // Skip whitespace.
-                    while i < len && (bytes[i] == b' ' || bytes[i] == b'\t') {
-                        i += 1;
-                    }
-                    let value_start = i;
-                    // Read until newline or comment.
-                    while i < len && bytes[i] != b'\n' && bytes[i] != b'#' {
-                        i += 1;
-                    }
-                    let value = content[value_start..i].trim();
-                    for profile in value.split(',') {
-                        let profile = profile.trim();
-                        if !profile.is_empty() {
-                            shape.profiles.push(profile.to_string());
-                        }
+                }
+                let value_start = i;
+                // Read until newline or comment.
+                while i < len && bytes[i] != b'\n' && bytes[i] != b'#' {
+                    i += 1;
+                }
+                let value = content[value_start..i].trim();
+                for profile in value.split(',') {
+                    let profile = profile.trim();
+                    if !profile.is_empty() {
+                        shape.profiles.push(profile.to_string());
                     }
                 }
+            }
 
             // If this is a leaf value (line ends after value), pop from path.
             if i < len && (bytes[i] == b':' || bytes[i] == b'=') {
@@ -237,4 +258,3 @@ fn extract_yaml_shape(content: &str, shape: &mut PropertiesShape) {
     shape.profiles.sort();
     shape.profiles.dedup();
 }
-

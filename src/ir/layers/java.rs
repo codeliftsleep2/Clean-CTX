@@ -35,12 +35,18 @@ impl JavaLayer {
         if let Some(ext_pos) = class_head.find("extends") {
             let after_ext = class_head[ext_pos + 7..].trim_start();
             // Take up to next keyword or opening brace
-            let base_name = after_ext.split_once("implements")
+            let base_name = after_ext
+                .split_once("implements")
                 .map(|(name, _)| name.trim())
                 .or_else(|| after_ext.split_once('{').map(|(name, _)| name.trim()))
                 .unwrap_or(after_ext.trim());
             // Strip generic parameters
-            let bare = base_name.split('<').next().unwrap_or(base_name).trim().to_string();
+            let bare = base_name
+                .split('<')
+                .next()
+                .unwrap_or(base_name)
+                .trim()
+                .to_string();
             if !bare.is_empty() {
                 base = Some(bare);
             }
@@ -54,7 +60,14 @@ impl JavaLayer {
                 if ch == ',' {
                     let trimmed = current.trim().to_string();
                     if !trimmed.is_empty() {
-                        interfaces.push(trimmed.split('<').next().unwrap_or(&trimmed).trim().to_string());
+                        interfaces.push(
+                            trimmed
+                                .split('<')
+                                .next()
+                                .unwrap_or(&trimmed)
+                                .trim()
+                                .to_string(),
+                        );
                     }
                     current.clear();
                 } else if ch == '{' {
@@ -65,7 +78,14 @@ impl JavaLayer {
             }
             let trimmed = current.trim().to_string();
             if !trimmed.is_empty() {
-                interfaces.push(trimmed.split('<').next().unwrap_or(&trimmed).trim().to_string());
+                interfaces.push(
+                    trimmed
+                        .split('<')
+                        .next()
+                        .unwrap_or(&trimmed)
+                        .trim()
+                        .to_string(),
+                );
             }
         }
 

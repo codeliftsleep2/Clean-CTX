@@ -8,11 +8,11 @@
 //
 // Estimated savings: 40-60% reduction in wire bytes vs. positional encoding.
 
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
 use super::wire::DecodeError;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 
 /// Top-level hierarchical IR container.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -289,14 +289,20 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
             CoreOp::Param(mid, pid, ty, name) => {
                 if let (Some(c_idx), Some(m_idx)) = (current_class_idx, current_method_idx) {
                     if classes[c_idx].methods[m_idx].id == *mid {
-                        classes[c_idx].methods[m_idx].params
-                            .push(vec![pid.clone(), ty.clone(), name.clone()]);
+                        classes[c_idx].methods[m_idx].params.push(vec![
+                            pid.clone(),
+                            ty.clone(),
+                            name.clone(),
+                        ]);
                     } else {
                         // Method ID mismatch — search
                         for mi in 0..classes[c_idx].methods.len() {
                             if classes[c_idx].methods[mi].id == *mid {
-                                classes[c_idx].methods[mi].params
-                                    .push(vec![pid.clone(), ty.clone(), name.clone()]);
+                                classes[c_idx].methods[mi].params.push(vec![
+                                    pid.clone(),
+                                    ty.clone(),
+                                    name.clone(),
+                                ]);
                                 current_method_idx = Some(mi);
                                 break;
                             }
@@ -411,7 +417,8 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                 if let Some(c_idx) = current_class_idx {
                     for mi in 0..classes[c_idx].methods.len() {
                         if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].control_flow
+                            classes[c_idx].methods[mi]
+                                .control_flow
                                 .push(vec![kind.clone(), target.clone()]);
                             current_method_idx = Some(mi);
                             break;
@@ -424,7 +431,8 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                 if let Some(c_idx) = current_class_idx {
                     for mi in 0..classes[c_idx].methods.len() {
                         if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].data_flow
+                            classes[c_idx].methods[mi]
+                                .data_flow
                                 .push(vec![direction.clone(), target.clone()]);
                             current_method_idx = Some(mi);
                             break;
@@ -449,7 +457,8 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                 if let Some(c_idx) = current_class_idx {
                     for mi in 0..classes[c_idx].methods.len() {
                         if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].execution_context = Some(context_type.clone());
+                            classes[c_idx].methods[mi].execution_context =
+                                Some(context_type.clone());
                             current_method_idx = Some(mi);
                             break;
                         }
@@ -471,7 +480,9 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                     if let Some(c_idx) = find_class_by_id(&classes, &cid) {
                         if let Some(mid) = method_id {
                             // Method-level pattern: find the method by ID within this class
-                            if let Some(m_idx) = classes[c_idx].methods.iter().position(|m| m.id == mid) {
+                            if let Some(m_idx) =
+                                classes[c_idx].methods.iter().position(|m| m.id == mid)
+                            {
                                 classes[c_idx].methods[m_idx].patterns.push(PatternEntry {
                                     name: name.clone(),
                                     args: args.clone(),

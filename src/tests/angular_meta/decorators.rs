@@ -73,7 +73,11 @@ fn extracts_injectable_decorator() {
         export class UserService {}
     "#;
     let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
-    assert!(lines.iter().any(|l| l.starts_with("Φsvc:UserService scope=root")));
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("Φsvc:UserService scope=root"))
+    );
 }
 
 #[test]
@@ -138,7 +142,11 @@ fn extracts_input_and_output_decorators() {
     "#;
     let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     assert!(lines.iter().any(|l| l == "Φin:?" || l.starts_with("Φin:")));
-    assert!(lines.iter().any(|l| l == "Φout:?" || l.starts_with("Φout:")));
+    assert!(
+        lines
+            .iter()
+            .any(|l| l == "Φout:?" || l.starts_with("Φout:"))
+    );
 }
 
 #[test]
@@ -255,7 +263,11 @@ fn high_fidelity_emits_phi_injects() {
     "#;
     let lines = lines_to_vec(extract_decorators(raw, Fidelity::High));
     // F-ANG-23: Φinjects: is High-fidelity only.
-    assert!(lines.iter().any(|l| l.starts_with("Φinjects:") && l.contains("HttpClient")));
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("Φinjects:") && l.contains("HttpClient"))
+    );
 }
 
 #[test]
@@ -337,7 +349,9 @@ fn extract_decorators_substitutes_question_mark_for_anonymous_class() {
     let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     // The class name shows up as `?` in the marker line.
     assert!(
-        lines.iter().any(|l| l.contains("Φcmp:?") || l.contains("Φcmp:?")),
+        lines
+            .iter()
+            .any(|l| l.contains("Φcmp:?") || l.contains("Φcmp:?")),
         "expected Φcmp:? in {:?}",
         lines
     );
@@ -369,5 +383,8 @@ fn extract_decorators_handles_unterminated_decorator_call() {
     // (`consume_call_expression` returns `None`). The function
     // should not panic and should still emit a marker line.
     let result = std::panic::catch_unwind(|| extract_decorators(raw, Fidelity::Medium).is_some());
-    assert!(result.is_ok(), "extract_decorators panicked on malformed input");
+    assert!(
+        result.is_ok(),
+        "extract_decorators panicked on malformed input"
+    );
 }

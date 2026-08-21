@@ -8,13 +8,13 @@
 //   2. Add it to the `build_pipeline` function
 //   3. Done — existing transforms are unchanged
 
+use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::Arc;
-use serde_json::Value;
 
 use crate::filter_registry::FilterRegistry;
 use crate::platform::PlatformAdapter;
-use crate::transform::{TransformStats, self as transform};
+use crate::transform::{self as transform, TransformStats};
 
 /// Pipeline configuration extracted from ProxyConfig at request time.
 #[derive(Clone, Default)]
@@ -36,7 +36,9 @@ pub struct PipelineConfig {
 
 /// A callable transform step. Each step receives the body, stats, config,
 /// and a platform adapter for format-aware operations.
-pub type TransformFn = Box<dyn Fn(&mut Value, &mut TransformStats, &PipelineConfig, &dyn PlatformAdapter) + Send + Sync>;
+pub type TransformFn = Box<
+    dyn Fn(&mut Value, &mut TransformStats, &PipelineConfig, &dyn PlatformAdapter) + Send + Sync,
+>;
 
 /// A composed pipeline of transform functions.
 pub struct Pipeline {
@@ -101,7 +103,13 @@ impl Pipeline {
     }
 
     /// Run all transforms in order.
-    pub fn run(&self, body: &mut Value, stats: &mut TransformStats, config: &PipelineConfig, adapter: &dyn PlatformAdapter) {
+    pub fn run(
+        &self,
+        body: &mut Value,
+        stats: &mut TransformStats,
+        config: &PipelineConfig,
+        adapter: &dyn PlatformAdapter,
+    ) {
         for transform in &self.transforms {
             transform(body, stats, config, adapter);
         }

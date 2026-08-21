@@ -1,4 +1,4 @@
-﻿// src/tests/cbm/regression.rs
+// src/tests/cbm/regression.rs
 //
 // Regression tests for CBM audit fixes.
 // Tests pure functions: is_retryable, check_cache behavior,
@@ -28,7 +28,10 @@ fn is_retryable_timeout_is_true() {
 fn is_retryable_rpc_internal_is_true() {
     use crate::cbm::client::CbmError;
     use crate::cbm::client::is_retryable;
-    let err = CbmError::RpcError { code: -32603, message: "Internal".into() };
+    let err = CbmError::RpcError {
+        code: -32603,
+        message: "Internal".into(),
+    };
     assert!(is_retryable(&err));
 }
 
@@ -50,7 +53,10 @@ fn is_retryable_parse_is_false() {
 fn is_retryable_method_not_found_is_false() {
     use crate::cbm::client::CbmError;
     use crate::cbm::client::is_retryable;
-    let err = CbmError::RpcError { code: -32601, message: "Method".into() };
+    let err = CbmError::RpcError {
+        code: -32601,
+        message: "Method".into(),
+    };
     assert!(!is_retryable(&err));
 }
 
@@ -59,29 +65,36 @@ fn is_retryable_method_not_found_is_false() {
 #[test]
 fn expired_cache_entry_is_evicted() {
     use crate::cbm::GraphBridge;
+    use crate::cbm::bridge::CachedGraphData;
     use crate::cbm::config::CbmConfig;
     use std::path::Path;
-    use crate::cbm::bridge::CachedGraphData;
-    
 
-    let config = CbmConfig { enabled: false, ..Default::default() };
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
     let mut bridge = GraphBridge::try_create(&config, Path::new("."));
 
     // Insert expired entry under "symbol_importance" so get_symbol_importance_mut
     // finds it via check_cache, evicts it, then the query fails (no CBM),
     // returning an empty map — but the expired entry should be gone.
-    bridge.cache.insert("symbol_importance".into(), CachedGraphData {
-        data: json!("value"),
-        expires_at: std::time::Instant::now() - std::time::Duration::from_secs(1),
-    });
+    bridge.cache.insert(
+        "symbol_importance".into(),
+        CachedGraphData {
+            data: json!("value"),
+            expires_at: std::time::Instant::now() - std::time::Duration::from_secs(1),
+        },
+    );
 
     // get_symbol_importance_mut calls check_cache("symbol_importance")
     // which finds the expired entry, evicts it, then fails the query
     let result = bridge.get_symbol_importance_mut();
     assert!(result.is_empty(), "Should return empty map with no CBM");
     // The expired entry must be gone from cache
-    assert!(bridge.cache.get("symbol_importance").is_none(),
-        "Expired cache entry should be evicted after check_cache");
+    assert!(
+        bridge.cache.get("symbol_importance").is_none(),
+        "Expired cache entry should be evicted after check_cache"
+    );
 }
 
 // ── Fix 1: compress_cbm_response on enrichment-shaped data ──
@@ -96,7 +109,8 @@ fn compress_enrichment_data_produces_savings() {
             {"sy": "PaymentGateway", "sc": 0.87, "f": "src/payment.rs"},
             {"sy": "AuthService", "sc": 0.72, "f": "src/auth.rs"},
         ]
-    }).to_string();
+    })
+    .to_string();
 
     let raw_len = enrichment.len();
     let result = compress_cbm_response(&enrichment);
@@ -117,7 +131,8 @@ fn compress_empty_enrichment_ok() {
 #[test]
 fn compress_preserves_key_values() {
     use crate::cbm::json_compress::compress_cbm_response;
-    let data = json!({"symbols": [{"sy": "UserService", "sc": 1.0, "f": "src/user.rs"}]}).to_string();
+    let data =
+        json!({"symbols": [{"sy": "UserService", "sc": 1.0, "f": "src/user.rs"}]}).to_string();
     let result = compress_cbm_response(&data).unwrap();
     assert!(result.compressed_text.contains("UserService"));
 }
@@ -141,11 +156,28 @@ fn enrichment_50_symbols_savings_above_30pct() {
 #[test]
 fn shorten_key_covers_all_cbm_keys() {
     use crate::cbm::json_compress::shorten_key;
-    let keys = ["results","symbols","edges","nodes","name","file","label","id",
-        "score","importance","reason","symbol","change_type"];
+    let keys = [
+        "results",
+        "symbols",
+        "edges",
+        "nodes",
+        "name",
+        "file",
+        "label",
+        "id",
+        "score",
+        "importance",
+        "reason",
+        "symbol",
+        "change_type",
+    ];
     for key in &keys {
         let s = shorten_key(key);
-        assert!(s.len() <= key.len() && s != *key, "Key '{}' not shortened", key);
+        assert!(
+            s.len() <= key.len() && s != *key,
+            "Key '{}' not shortened",
+            key
+        );
     }
 }
 
@@ -192,7 +224,10 @@ fn min_compression_non_json_strips_whitespace() {
 fn bridge_disabled_is_unavailable() {
     use crate::cbm::GraphBridge;
     use crate::cbm::config::CbmConfig;
-    let config = CbmConfig { enabled: false, ..Default::default() };
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
     let bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
     assert!(!bridge.is_available());
 }
@@ -201,7 +236,10 @@ fn bridge_disabled_is_unavailable() {
 fn bridge_detect_changes_returns_none_when_no_client() {
     use crate::cbm::GraphBridge;
     use crate::cbm::config::CbmConfig;
-    let config = CbmConfig { enabled: false, ..Default::default() };
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
     let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
     assert_eq!(bridge.detect_changes().unwrap(), None);
 }
@@ -227,16 +265,37 @@ fn cbm_error_timeout_has_seconds() {
 #[test]
 fn invalidate_symbol_removes_matching_keys() {
     use crate::cbm::GraphBridge;
-    use crate::cbm::config::CbmConfig;
     use crate::cbm::bridge::CachedGraphData;
+    use crate::cbm::config::CbmConfig;
 
-    let config = CbmConfig { enabled: false, ..Default::default() };
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
     let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
     let t = std::time::Instant::now() + std::time::Duration::from_secs(300);
 
-    bridge.cache.insert("blast:UserService".into(), CachedGraphData { data: json!("d1"), expires_at: t });
-    bridge.cache.insert("blast:Payment".into(), CachedGraphData { data: json!("d2"), expires_at: t });
-    bridge.cache.insert("arch".into(), CachedGraphData { data: json!("d3"), expires_at: t });
+    bridge.cache.insert(
+        "blast:UserService".into(),
+        CachedGraphData {
+            data: json!("d1"),
+            expires_at: t,
+        },
+    );
+    bridge.cache.insert(
+        "blast:Payment".into(),
+        CachedGraphData {
+            data: json!("d2"),
+            expires_at: t,
+        },
+    );
+    bridge.cache.insert(
+        "arch".into(),
+        CachedGraphData {
+            data: json!("d3"),
+            expires_at: t,
+        },
+    );
 
     bridge.invalidate_symbol("UserService");
     assert!(bridge.cache.get("blast:UserService").is_none());
@@ -257,23 +316,41 @@ fn circuit_breaker_allows_when_under_threshold() {
 
     // We can't construct CbmClient without a real subprocess, so we test
     // the constants and is_retryable which form the circuit breaker contract.
-    use crate::cbm::client::{is_retryable, CbmError};
+    use crate::cbm::client::{CbmError, is_retryable};
 
     // Verify error classification drives the circuit breaker
     let timeout = CbmError::Timeout(Duration::from_secs(30));
-    assert!(is_retryable(&timeout), "Timeout should be retryable (increments failure counter)");
+    assert!(
+        is_retryable(&timeout),
+        "Timeout should be retryable (increments failure counter)"
+    );
 
     let conn_lost = CbmError::ConnectionLost("pipe broke".into());
-    assert!(is_retryable(&conn_lost), "ConnectionLost should be retryable");
+    assert!(
+        is_retryable(&conn_lost),
+        "ConnectionLost should be retryable"
+    );
 
-    let internal = CbmError::RpcError { code: -32603, message: "Internal".into() };
+    let internal = CbmError::RpcError {
+        code: -32603,
+        message: "Internal".into(),
+    };
     assert!(is_retryable(&internal), "RPC -32603 should be retryable");
 
-    let method_not_found = CbmError::RpcError { code: -32601, message: "Method not found".into() };
-    assert!(!is_retryable(&method_not_found), "RPC -32601 should NOT be retryable");
+    let method_not_found = CbmError::RpcError {
+        code: -32601,
+        message: "Method not found".into(),
+    };
+    assert!(
+        !is_retryable(&method_not_found),
+        "RPC -32601 should NOT be retryable"
+    );
 
     let launch = CbmError::LaunchError("bin not found".into());
-    assert!(!is_retryable(&launch), "LaunchError should NOT be retryable");
+    assert!(
+        !is_retryable(&launch),
+        "LaunchError should NOT be retryable"
+    );
 
     let parse = CbmError::ParseError("bad json".into());
     assert!(!is_retryable(&parse), "ParseError should NOT be retryable");
@@ -284,10 +361,17 @@ fn circuit_breaker_opens_after_three_failures() {
     // Test the circuit breaker contract via bridge degradation.
     // When CBM is disabled, all queries gracefully degrade — proving
     // the circuit breaker's "open" path works end-to-end.
-    let config = crate::cbm::config::CbmConfig { enabled: false, ..Default::default() };
-    let mut bridge = crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
+    let config = crate::cbm::config::CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge =
+        crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
 
-    assert!(!bridge.is_available(), "Bridge should mimic circuit-open state when CBM disabled");
+    assert!(
+        !bridge.is_available(),
+        "Bridge should mimic circuit-open state when CBM disabled"
+    );
 
     // All queries should return empty (graceful degradation)
     assert!(bridge.get_symbol_importance_mut().is_empty());
@@ -309,20 +393,25 @@ fn circuit_breaker_opens_after_three_failures() {
 /// pre-seeded cache entries are considered available.
 #[test]
 fn p0_2_regression_mock_is_available_with_cached_data() {
+    use crate::cbm::SymbolImportance;
     use crate::cbm::bridge::test_helpers::new_mock;
     use std::collections::HashMap;
-    use crate::cbm::SymbolImportance;
 
     let mut data = HashMap::new();
-    data.insert("UserService".to_string(), SymbolImportance {
-        symbol: "UserService".to_string(),
-        score: 0.9,
-        file: "user.rs".to_string(),
-    });
+    data.insert(
+        "UserService".to_string(),
+        SymbolImportance {
+            symbol: "UserService".to_string(),
+            score: 0.9,
+            file: "user.rs".to_string(),
+        },
+    );
 
     let bridge = new_mock(data);
-    assert!(bridge.is_available(),
-        "P0-2 REGRESSION: Mock with pre-seeded cache should be available");
+    assert!(
+        bridge.is_available(),
+        "P0-2 REGRESSION: Mock with pre-seeded cache should be available"
+    );
 }
 
 /// P0-2 REGRESSION: Mock with empty cache should still be available.
@@ -330,8 +419,10 @@ fn p0_2_regression_mock_is_available_with_cached_data() {
 fn p0_2_regression_mock_empty_is_available() {
     use crate::cbm::bridge::test_helpers::new_mock_empty;
     let bridge = new_mock_empty();
-    assert!(bridge.is_available(),
-        "P0-2 REGRESSION: Mock with empty cache should be available (status=Available)");
+    assert!(
+        bridge.is_available(),
+        "P0-2 REGRESSION: Mock with empty cache should be available (status=Available)"
+    );
 }
 
 /// P0-2 REGRESSION: Mock's get_symbol_importance_mut returns cached data.
@@ -341,30 +432,43 @@ fn p0_2_regression_mock_empty_is_available() {
 /// After the fix, the cache is checked first and pre-seeded data is returned.
 #[test]
 fn p0_2_regression_mock_returns_cached_data() {
+    use crate::cbm::SymbolImportance;
     use crate::cbm::bridge::test_helpers::new_mock;
     use std::collections::HashMap;
-    use crate::cbm::SymbolImportance;
 
     let mut data = HashMap::new();
-    data.insert("UserService".to_string(), SymbolImportance {
-        symbol: "UserService".to_string(),
-        score: 0.9,
-        file: "user.rs".to_string(),
-    });
+    data.insert(
+        "UserService".to_string(),
+        SymbolImportance {
+            symbol: "UserService".to_string(),
+            score: 0.9,
+            file: "user.rs".to_string(),
+        },
+    );
 
     let mut bridge = new_mock(data);
     let result = bridge.get_symbol_importance_mut();
     assert_eq!(result.len(), 1, "Should return 1 cached symbol");
-    assert!(result.contains_key("UserService"), "Should contain UserService");
-    assert_eq!(result["UserService"].score, 0.9, "Score should be preserved");
+    assert!(
+        result.contains_key("UserService"),
+        "Should contain UserService"
+    );
+    assert_eq!(
+        result["UserService"].score, 0.9,
+        "Score should be preserved"
+    );
 }
 
 #[test]
 fn circuit_breaker_recovery_logs_transition() {
     // When a bridge is unavailable and remains unavailable,
     // update_status should handle the Degraded→Unavailable transition gracefully.
-    let config = crate::cbm::config::CbmConfig { enabled: false, ..Default::default() };
-    let mut bridge = crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
+    let config = crate::cbm::config::CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge =
+        crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
 
     use crate::cbm::config::CbmStatus;
     assert_eq!(bridge.status(), &CbmStatus::Unavailable);

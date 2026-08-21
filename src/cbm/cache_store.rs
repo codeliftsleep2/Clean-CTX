@@ -19,8 +19,8 @@
 //   - `expires_at` is stored as unix epoch milliseconds; expired entries are
 //     treated as misses and lazily purged.
 
-use std::path::Path;
 use rusqlite::{Connection, params};
+use std::path::Path;
 
 /// SQLite-backed disk cache for CBM graph query results.
 pub struct GraphCacheStore {
@@ -49,20 +49,26 @@ impl GraphCacheStore {
 
     /// Run schema migrations. Idempotent.
     fn migrate(&self) -> Result<(), Box<dyn std::error::Error>> {
-        self.conn.execute_batch("
+        self.conn.execute_batch(
+            "
             CREATE TABLE IF NOT EXISTS _schema_version (
                 version INTEGER PRIMARY KEY
             );
-        ")?;
+        ",
+        )?;
 
-        let current_version: i32 = self.conn
-            .query_row("SELECT COALESCE(MAX(version), 0) FROM _schema_version", [], |row| {
-                row.get(0)
-            })
+        let current_version: i32 = self
+            .conn
+            .query_row(
+                "SELECT COALESCE(MAX(version), 0) FROM _schema_version",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or(0);
 
         if current_version < 1 {
-            self.conn.execute_batch("
+            self.conn.execute_batch(
+                "
                 CREATE TABLE IF NOT EXISTS cbm_graph_cache (
                     project_root TEXT NOT NULL,
                     cache_key   TEXT NOT NULL,
@@ -74,7 +80,8 @@ impl GraphCacheStore {
                 CREATE INDEX IF NOT EXISTS idx_cbm_cache_project ON cbm_graph_cache(project_root);
 
                 INSERT INTO _schema_version (version) VALUES (1);
-            ")?;
+            ",
+            )?;
         }
 
         Ok(())
@@ -146,7 +153,10 @@ impl GraphCacheStore {
     pub fn purge_expired(&self) -> usize {
         let now_ms = now_epoch_ms();
         self.conn
-            .execute("DELETE FROM cbm_graph_cache WHERE expires_at <= ?1", params![now_ms])
+            .execute(
+                "DELETE FROM cbm_graph_cache WHERE expires_at <= ?1",
+                params![now_ms],
+            )
             .unwrap_or(0)
     }
 

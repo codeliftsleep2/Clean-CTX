@@ -4,10 +4,10 @@
 // Self-contained — each handler takes (id, params, state) like all other handlers.
 // Dispatched from `crate::mcp::tools::dispatch_tools_call`.
 
-use serde_json::Value;
 use crate::cbm::bridge::IndexingStatus;
 use crate::mcp::McpState;
 use crate::protocol::send_response;
+use serde_json::Value;
 
 /// Circuit breaker guard: check if CBM is healthy before proceeding.
 /// Returns `true` if CBM is available, otherwise sends error response.
@@ -35,7 +35,10 @@ fn check_cbm_healthy(id: &Value, status: &crate::cbm::CbmStatus) -> bool {
 ///
 /// The bridge guard already holds the authoritative live status — we check
 /// `bridge.status()`, not the stale `state.cbm_status` snapshot.
-fn with_bridge<'a>(id: &Value, state: &'a McpState) -> Option<std::sync::MutexGuard<'a, Option<crate::cbm::GraphBridge>>> {
+fn with_bridge<'a>(
+    id: &Value,
+    state: &'a McpState,
+) -> Option<std::sync::MutexGuard<'a, Option<crate::cbm::GraphBridge>>> {
     let bridge_opt = state.graph_bridge_lock();
     if bridge_opt.is_none() {
         send_response(&serde_json::json!({
@@ -82,7 +85,9 @@ pub(crate) fn ensure_indexed_or_error(id: &Value, bridge: &mut crate::cbm::Graph
             let msg = if elapsed_secs < 5 {
                 "CBM project indexing in progress. Retry the query in a few seconds, or use `get_cbm_status` to check when indexing completes.".to_string()
             } else {
-                format!("CBM is still indexing this project ({elapsed_secs}s elapsed). This is normal for large codebases. Retry the query shortly.")
+                format!(
+                    "CBM is still indexing this project ({elapsed_secs}s elapsed). This is normal for large codebases. Retry the query shortly."
+                )
             };
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
@@ -106,7 +111,7 @@ pub(crate) fn ensure_indexed_or_error(id: &Value, bridge: &mut crate::cbm::Graph
 
 /// Handle `graph_search` — search the CBM knowledge graph.
 ///
-/// M-02 fix: Accepts `name_pattern` (regex) or `query` (plain text substring) 
+/// M-02 fix: Accepts `name_pattern` (regex) or `query` (plain text substring)
 /// parameters matching CBM's actual search_graph tool interface.
 pub fn handle_graph_search(id: &Value, params: &Value, state: &McpState) {
     let mut bridge_guard = match with_bridge(id, state) {
@@ -115,7 +120,8 @@ pub fn handle_graph_search(id: &Value, params: &Value, state: &McpState) {
     };
     let bridge = bridge_guard.as_mut().unwrap();
     // M-02: support both `name_pattern` (regex) and `query` (plain text)
-    let query = params["arguments"]["name_pattern"].as_str()
+    let query = params["arguments"]["name_pattern"]
+        .as_str()
         .or_else(|| params["arguments"]["query"].as_str())
         .unwrap_or("");
     if query.is_empty() {
@@ -127,7 +133,9 @@ pub fn handle_graph_search(id: &Value, params: &Value, state: &McpState) {
     }
     set_project_from_params(bridge, params);
 
-    if !ensure_indexed_or_error(id, bridge) { return; }
+    if !ensure_indexed_or_error(id, bridge) {
+        return;
+    }
     let nodes = bridge.search(query);
     let status = bridge.status().clone();
     if let Some(err) = bridge.take_last_error() {
@@ -170,7 +178,9 @@ pub fn handle_graph_query(id: &Value, params: &Value, state: &McpState) {
     }
     set_project_from_params(bridge, params);
 
-    if !ensure_indexed_or_error(id, bridge) { return; }
+    if !ensure_indexed_or_error(id, bridge) {
+        return;
+    }
     let result = bridge.query_graph(query);
     let status = bridge.status().clone();
     if let Some(err) = bridge.take_last_error() {
@@ -212,7 +222,9 @@ pub fn handle_graph_trace(id: &Value, params: &Value, state: &McpState) {
     }
     set_project_from_params(bridge, params);
 
-    if !ensure_indexed_or_error(id, bridge) { return; }
+    if !ensure_indexed_or_error(id, bridge) {
+        return;
+    }
     let edges = bridge.trace_path(from, to);
     let status = bridge.status().clone();
     if let Some(err) = bridge.take_last_error() {
@@ -246,7 +258,9 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
     set_project_from_params(bridge, params);
 
     let status = bridge.status().clone();
-    if !ensure_indexed_or_error(id, bridge) { return; }
+    if !ensure_indexed_or_error(id, bridge) {
+        return;
+    }
     match bridge.get_architecture() {
         Some(arch) => {
             send_response(&serde_json::json!({
@@ -352,18 +366,25 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
                     // results until it finishes; say so.
                     Some(info) if info["status"] == "in_progress" => {
                         let secs = info["elapsed_secs"].as_u64().unwrap_or(0);
-                        format!("CBM is indexing this project ({secs}s elapsed) — graph queries will return empty or error results until indexing completes.")
+                        format!(
+                            "CBM is indexing this project ({secs}s elapsed) — graph queries will return empty or error results until indexing completes."
+                        )
                     }
                     Some(info) if info["status"] == "failed" => {
-                        format!("CBM indexing failed: {}", info["error"].as_str().unwrap_or("unknown"))
+                        format!(
+                            "CBM indexing failed: {}",
+                            info["error"].as_str().unwrap_or("unknown")
+                        )
                     }
                     // Complete, or NotStarted (no indexing attempted — still
                     // ready for queries since ensure_indexed will kick it off).
                     _ => "CBM is running and ready.".into(),
                 },
                 crate::cbm::CbmStatus::Degraded(msg) => format!("CBM degraded: {msg}"),
-                crate::cbm::CbmStatus::Unavailable =>
-                    "CBM not installed or disabled. See github.com/DeusData/codebase-memory-mcp".into(),
+                crate::cbm::CbmStatus::Unavailable => {
+                    "CBM not installed or disabled. See github.com/DeusData/codebase-memory-mcp"
+                        .into()
+                }
             };
             let v = bridge.graph_version().to_string();
             (s, d, v, idx_info)

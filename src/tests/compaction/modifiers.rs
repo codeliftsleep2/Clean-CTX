@@ -2,7 +2,10 @@ use super::*;
 
 #[test]
 fn strip_modifiers_handles_single_prefix() {
-    assert_eq!(strip_modifiers("public class Foo", MODIFIERS_CLASS), "class Foo");
+    assert_eq!(
+        strip_modifiers("public class Foo", MODIFIERS_CLASS),
+        "class Foo"
+    );
 }
 
 #[test]
@@ -66,7 +69,9 @@ fn strip_csharp_attributes_with_route_brace() {
 #[test]
 fn strip_csharp_attributes_multiple_lines() {
     assert_eq!(
-        strip_csharp_attributes("[ApiController]\n[Route(\"api/[controller]\")]\npublic class UserController"),
+        strip_csharp_attributes(
+            "[ApiController]\n[Route(\"api/[controller]\")]\npublic class UserController"
+        ),
         "public class UserController"
     );
 }

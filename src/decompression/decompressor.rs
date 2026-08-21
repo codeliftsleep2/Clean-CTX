@@ -112,17 +112,20 @@ impl Decompressor {
             let trimmed = line.trim();
             if (trimmed.starts_with('α') || trimmed.starts_with('β') || trimmed.starts_with('γ'))
                 && trimmed.contains(" = ")
-                && let Some(eq_pos) = trimmed.find(" = ") {
-                    let alias = trimmed[..eq_pos].trim().to_string();
-                    let path = trimmed[eq_pos + 3..].trim().to_string();
-                    self.path_aliases.insert(alias, path);
-                }
-            if trimmed.starts_with('$') && trimmed.contains(" = ")
-                && let Some(eq_pos) = trimmed.find(" = ") {
-                    let opcode = trimmed[..eq_pos].trim().to_string();
-                    let token = trimmed[eq_pos + 3..].trim().to_string();
-                    self.custom_symbols.insert(opcode, token);
-                }
+                && let Some(eq_pos) = trimmed.find(" = ")
+            {
+                let alias = trimmed[..eq_pos].trim().to_string();
+                let path = trimmed[eq_pos + 3..].trim().to_string();
+                self.path_aliases.insert(alias, path);
+            }
+            if trimmed.starts_with('$')
+                && trimmed.contains(" = ")
+                && let Some(eq_pos) = trimmed.find(" = ")
+            {
+                let opcode = trimmed[..eq_pos].trim().to_string();
+                let token = trimmed[eq_pos + 3..].trim().to_string();
+                self.custom_symbols.insert(opcode, token);
+            }
         }
         // F-15: rebuild the sorted opcode list once so `decompress()`
         // does not have to sort per line.
@@ -137,10 +140,12 @@ impl Decompressor {
             self.sorted_opcodes.push((opcode.clone(), token.clone()));
         }
         for (&opcode, &token) in &self.builtin_opcodes {
-            self.sorted_opcodes.push((opcode.to_string(), token.to_string()));
+            self.sorted_opcodes
+                .push((opcode.to_string(), token.to_string()));
         }
         // Longest opcode first so partial matches don't shadow longer ones.
-        self.sorted_opcodes.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
+        self.sorted_opcodes
+            .sort_by_key(|b| std::cmp::Reverse(b.0.len()));
     }
 
     pub fn decompress(&self, compressed: &str) -> String {
@@ -152,8 +157,10 @@ impl Decompressor {
             // F-FULL-18: Skip ALL comment lines (starting with //) before
             // checking section starts. This prevents accidental section
             // detection on commented-out metadata like `// §PATHMAP`.
-            if trimmed.starts_with("// ---") || trimmed.starts_with("// Raw")
-                || trimmed.starts_with("// Fidelity") || trimmed.starts_with("// [CACHE")
+            if trimmed.starts_with("// ---")
+                || trimmed.starts_with("// Raw")
+                || trimmed.starts_with("// Fidelity")
+                || trimmed.starts_with("// [CACHE")
                 || trimmed.starts_with("//")
             {
                 continue;
@@ -163,7 +170,9 @@ impl Decompressor {
                 continue;
             }
             if skip_section {
-                if trimmed.is_empty() { skip_section = false; }
+                if trimmed.is_empty() {
+                    skip_section = false;
+                }
                 continue;
             }
 
@@ -207,8 +216,10 @@ impl Decompressor {
         let mut skip = false;
         for line in text.lines() {
             let trimmed = line.trim();
-            if trimmed.starts_with("// ---") || trimmed.starts_with("// Raw")
-                || trimmed.starts_with("// Fidelity") || trimmed.starts_with("// [CACHE")
+            if trimmed.starts_with("// ---")
+                || trimmed.starts_with("// Raw")
+                || trimmed.starts_with("// Fidelity")
+                || trimmed.starts_with("// [CACHE")
             {
                 continue;
             }
@@ -216,7 +227,9 @@ impl Decompressor {
                 skip = !skip;
                 continue;
             }
-            if skip { continue; }
+            if skip {
+                continue;
+            }
             result.push_str(line);
             result.push('\n');
         }
@@ -236,5 +249,3 @@ mod integration_tests;
 #[cfg(test)]
 #[path = "../tests/proptest/decompressor.rs"]
 mod proptest_tests;
-
-

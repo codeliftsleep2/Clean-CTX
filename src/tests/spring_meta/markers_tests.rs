@@ -2,9 +2,10 @@
 // Tests for Spring Boot marker construction and expansion.
 
 use crate::spring_meta::markers::{
-    build_autowired_line, build_bean_line, build_configuration_line,
-    build_configuration_properties_line, build_controller_line, build_repository_line, build_rest_controller_line, build_service_line, build_value_line,
-    expand_phi_in_line, PhiLineKind, RequestMappingMapping,
+    PhiLineKind, RequestMappingMapping, build_autowired_line, build_bean_line,
+    build_configuration_line, build_configuration_properties_line, build_controller_line,
+    build_repository_line, build_rest_controller_line, build_service_line, build_value_line,
+    expand_phi_in_line,
 };
 
 #[test]
@@ -20,7 +21,10 @@ fn test_rest_controller_line() {
         },
     ];
     let line = build_rest_controller_line("UserController", &mappings);
-    assert_eq!(line, "Φrest:UserController map=[GET /api/users,POST /api/users]");
+    assert_eq!(
+        line,
+        "Φrest:UserController map=[GET /api/users,POST /api/users]"
+    );
 }
 
 #[test]
@@ -98,15 +102,33 @@ fn test_expand_phi_in_line_partial() {
 
 #[test]
 fn test_phi_line_kind_from_token() {
-    assert_eq!(PhiLineKind::from_token("Φrest"), Some(PhiLineKind::RestController));
+    assert_eq!(
+        PhiLineKind::from_token("Φrest"),
+        Some(PhiLineKind::RestController)
+    );
     assert_eq!(PhiLineKind::from_token("Φsvc"), Some(PhiLineKind::Service));
-    assert_eq!(PhiLineKind::from_token("Φrepo"), Some(PhiLineKind::Repository));
-    assert_eq!(PhiLineKind::from_token("Φconf"), Some(PhiLineKind::Configuration));
-    assert_eq!(PhiLineKind::from_token("Φmap"), Some(PhiLineKind::RequestMapping));
-    assert_eq!(PhiLineKind::from_token("Φaut"), Some(PhiLineKind::Autowired));
+    assert_eq!(
+        PhiLineKind::from_token("Φrepo"),
+        Some(PhiLineKind::Repository)
+    );
+    assert_eq!(
+        PhiLineKind::from_token("Φconf"),
+        Some(PhiLineKind::Configuration)
+    );
+    assert_eq!(
+        PhiLineKind::from_token("Φmap"),
+        Some(PhiLineKind::RequestMapping)
+    );
+    assert_eq!(
+        PhiLineKind::from_token("Φaut"),
+        Some(PhiLineKind::Autowired)
+    );
     assert_eq!(PhiLineKind::from_token("Φval"), Some(PhiLineKind::Value));
     assert_eq!(PhiLineKind::from_token("Φbean"), Some(PhiLineKind::Bean));
-    assert_eq!(PhiLineKind::from_token("Φprop"), Some(PhiLineKind::ConfigurationProperties));
+    assert_eq!(
+        PhiLineKind::from_token("Φprop"),
+        Some(PhiLineKind::ConfigurationProperties)
+    );
     assert_eq!(PhiLineKind::from_token("unknown"), None);
 }
 

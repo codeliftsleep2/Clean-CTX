@@ -196,7 +196,9 @@ impl DotnetGraph {
     /// Uses three-color DFS (white/gray/black) for O(V+E) performance.
     pub fn has_cycle(&self) -> bool {
         let node_ids: Vec<String> = self.nodes.keys().cloned().collect();
-        let id_to_idx: HashMap<&str, usize> = node_ids.iter().enumerate()
+        let id_to_idx: HashMap<&str, usize> = node_ids
+            .iter()
+            .enumerate()
             .map(|(i, id)| (id.as_str(), i))
             .collect();
 
@@ -215,9 +217,7 @@ impl DotnetGraph {
             }
         }
 
-        let adj_fn = |i: usize| {
-            adj_map.get(&i).cloned().unwrap_or_default()
-        };
+        let adj_fn = |i: usize| adj_map.get(&i).cloned().unwrap_or_default();
 
         has_cycle(node_count, adj_fn)
     }
@@ -225,7 +225,9 @@ impl DotnetGraph {
     /// Find all cycles in the graph using DFS.
     pub fn find_cycles(&self) -> Vec<Vec<String>> {
         let node_ids: Vec<String> = self.nodes.keys().cloned().collect();
-        let id_to_idx: HashMap<&str, usize> = node_ids.iter().enumerate()
+        let id_to_idx: HashMap<&str, usize> = node_ids
+            .iter()
+            .enumerate()
             .map(|(i, id)| (id.as_str(), i))
             .collect();
 
@@ -244,12 +246,11 @@ impl DotnetGraph {
             }
         }
 
-        let adj_fn = |i: usize| {
-            adj_map.get(&i).cloned().unwrap_or_default()
-        };
+        let adj_fn = |i: usize| adj_map.get(&i).cloned().unwrap_or_default();
 
         let label_fn = |i: usize| {
-            node_ids.get(i)
+            node_ids
+                .get(i)
                 .cloned()
                 .unwrap_or_else(|| format!("unknown_{}", i))
         };
@@ -269,7 +270,9 @@ impl DotnetGraph {
         }
 
         let node_ids: Vec<String> = self.nodes.keys().cloned().collect();
-        let id_to_idx: HashMap<&str, usize> = node_ids.iter().enumerate()
+        let id_to_idx: HashMap<&str, usize> = node_ids
+            .iter()
+            .enumerate()
             .map(|(i, id)| (id.as_str(), i))
             .collect();
 
@@ -286,12 +289,11 @@ impl DotnetGraph {
             }
         }
 
-        let adj_fn = |i: usize| {
-            adj_map.get(&i).cloned().unwrap_or_default()
-        };
+        let adj_fn = |i: usize| adj_map.get(&i).cloned().unwrap_or_default();
 
         let indices = transitive_dependencies(start_idx, depth, node_count, adj_fn);
-        indices.into_iter()
+        indices
+            .into_iter()
             .filter_map(|i| node_ids.get(i))
             .cloned()
             .collect()
@@ -301,9 +303,7 @@ impl DotnetGraph {
     ///
     /// This is called after all files in a workspace have been processed.
     /// Uses the builder internally, then returns the resolved graph.
-    pub fn build_from_markers(
-        markers: &[(String, Vec<String>)],
-    ) -> Self {
+    pub fn build_from_markers(markers: &[(String, Vec<String>)]) -> Self {
         let mut builder = DotnetGraphBuilder::new();
 
         for (file, lines) in markers {
@@ -348,7 +348,12 @@ impl DotnetGraph {
     ) {
         if let Some((kind_str, rest)) = line.split_once(':') {
             if kind_str == "Φdi" {
-                if let Some((from, to)) = rest.split("→").map(|s| s.trim()).collect::<Vec<_>>().split_first() {
+                if let Some((from, to)) = rest
+                    .split("→")
+                    .map(|s| s.trim())
+                    .collect::<Vec<_>>()
+                    .split_first()
+                {
                     if let Some(target) = to.first() {
                         builder.add_edge(GraphEdge {
                             from: from.to_string(),
@@ -380,7 +385,8 @@ impl DotnetGraph {
                 if let Some(bracket_start) = rest.find('[') {
                     if let Some(bracket_end) = rest[bracket_start..].find(']') {
                         let class_name = rest[..bracket_start].trim();
-                        let client_iface = rest[bracket_start + 1..bracket_start + bracket_end].trim();
+                        let client_iface =
+                            rest[bracket_start + 1..bracket_start + bracket_end].trim();
                         builder.add_edge(GraphEdge {
                             from: class_name.to_string(),
                             to: client_iface.to_string(),
@@ -393,7 +399,12 @@ impl DotnetGraph {
 
         if let Some((kind_str, rest)) = line.split_once(':') {
             if kind_str == "Φrel" {
-                if let Some((from, to)) = rest.split("→").map(|s| s.trim()).collect::<Vec<_>>().split_first() {
+                if let Some((from, to)) = rest
+                    .split("→")
+                    .map(|s| s.trim())
+                    .collect::<Vec<_>>()
+                    .split_first()
+                {
                     if let Some(target) = to.first() {
                         builder.add_edge(GraphEdge {
                             from: from.to_string(),
@@ -448,7 +459,9 @@ pub struct GraphCollector {
 
 impl GraphCollector {
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     /// Push marker lines for a single file.

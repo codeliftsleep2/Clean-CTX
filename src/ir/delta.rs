@@ -20,10 +20,10 @@
 // }
 // ```
 
-use std::collections::BTreeMap;
 use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
 use super::wire::op_to_tuple;
+use std::collections::BTreeMap;
 
 /// R-43a: High-level semantic intent of a delta operation.
 /// Provides human-readable context for what changed, beyond the structural diff.
@@ -155,11 +155,7 @@ impl DeltaComputer {
 
     /// Compute the delta between baseline and current IR.
     /// Returns None if both IRs are identical.
-    pub fn compute(
-        &self,
-        baseline: &CompiledIR,
-        current: &CompiledIR,
-    ) -> Option<IRDelta> {
+    pub fn compute(&self, baseline: &CompiledIR, current: &CompiledIR) -> Option<IRDelta> {
         let base_indexed = index_instructions(&baseline.instructions);
         let cur_indexed = index_instructions(&current.instructions);
 
@@ -412,7 +408,11 @@ fn primary_key(op: &CoreOp) -> String {
         CoreOp::Import(alias, _, _) => format!("IMP:{}", alias),
         CoreOp::TypeAlias(alias, _) => format!("TYPE:{}", alias),
         CoreOp::Pattern(name, args) => {
-            format!("PAT:{}:{}", name, args.first().map(|s| s.as_str()).unwrap_or("?"))
+            format!(
+                "PAT:{}:{}",
+                name,
+                args.first().map(|s| s.as_str()).unwrap_or("?")
+            )
         }
         // Edit Mode: Verbatim Method Bodies
         CoreOp::Body(mid, _) => format!("BODY:{}", mid),
@@ -464,7 +464,10 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
 /// Returns None if the tuples have different opcodes or the same full content.
 /// Returns Some(patches) with an empty vec if the tuples are identical.
 /// Only non-identical fields are included, skipping the opcode (index 0).
-pub fn compute_field_patches(base_tuple: &[String], cur_tuple: &[String]) -> Option<Vec<FieldPatch>> {
+pub fn compute_field_patches(
+    base_tuple: &[String],
+    cur_tuple: &[String],
+) -> Option<Vec<FieldPatch>> {
     if base_tuple.is_empty() || cur_tuple.is_empty() {
         return None;
     }
@@ -767,7 +770,10 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         _ => {
             // F-16: Unknown opcode — fallback produces a key from the full tuple.
             if cfg!(debug_assertions) {
-                eprintln!("[warn] primary_key_from_tuple: unknown opcode '{}'", tuple[0]);
+                eprintln!(
+                    "[warn] primary_key_from_tuple: unknown opcode '{}'",
+                    tuple[0]
+                );
             }
             tuple.join(":")
         }

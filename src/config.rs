@@ -1,11 +1,11 @@
 // src/config.rs — Project-level configuration for Clean-CTX
 // Reads .clean-ctx.json from the project root for custom settings
 
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use crate::compression::Fidelity;
 use crate::tokenizer::TokenizerKind;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 // ── Smart defaults for intent-based fidelity selection ──────────────
 
@@ -46,11 +46,21 @@ impl Default for SmartDefaults {
     }
 }
 
-fn default_sd_refactor() -> Fidelity { Fidelity::High }
-fn default_sd_overview() -> Fidelity { Fidelity::Low }
-fn default_sd_debug() -> Fidelity { Fidelity::Medium }
-fn default_sd_edit() -> Fidelity { Fidelity::Edit }
-fn default_sd_implement() -> Fidelity { Fidelity::Medium }
+fn default_sd_refactor() -> Fidelity {
+    Fidelity::High
+}
+fn default_sd_overview() -> Fidelity {
+    Fidelity::Low
+}
+fn default_sd_debug() -> Fidelity {
+    Fidelity::Medium
+}
+fn default_sd_edit() -> Fidelity {
+    Fidelity::Edit
+}
+fn default_sd_implement() -> Fidelity {
+    Fidelity::Medium
+}
 
 // ── Heuristics configuration ───────────────────────────────────────
 
@@ -78,7 +88,6 @@ pub struct HeuristicsConfig {
     pub use_angular_meta: bool,
 
     // ── V2: Auto-classify thresholds ──────────────────────────────
-
     /// Min imports to classify as "service/complex" (High fidelity).
     #[serde(default = "default_complex_import_threshold")]
     pub complex_import_threshold: usize,
@@ -134,11 +143,21 @@ fn default_edit_auto_classifications() -> Vec<String> {
     vec!["service".to_string(), "implementation".to_string()]
 }
 
-fn default_large_file_threshold() -> usize { 300 }
-fn default_complex_import_threshold() -> usize { 15 }
-fn default_complex_fn_threshold() -> usize { 10 }
-fn default_medium_lines() -> usize { 300 }
-fn default_high_lines() -> usize { 500 }
+fn default_large_file_threshold() -> usize {
+    300
+}
+fn default_complex_import_threshold() -> usize {
+    15
+}
+fn default_complex_fn_threshold() -> usize {
+    10
+}
+fn default_medium_lines() -> usize {
+    300
+}
+fn default_high_lines() -> usize {
+    500
+}
 
 // ── Resource limits ───────────────────────────────────────────────
 
@@ -175,9 +194,15 @@ impl Default for ResourceLimits {
     }
 }
 
-fn default_max_file_size() -> usize { 10 * 1024 * 1024 } // 10 MB
-fn default_max_workspace_files() -> usize { 10_000 }
-fn default_max_memory_bytes() -> usize { 512 * 1024 * 1024 } // 512 MB
+fn default_max_file_size() -> usize {
+    10 * 1024 * 1024
+} // 10 MB
+fn default_max_workspace_files() -> usize {
+    10_000
+}
+fn default_max_memory_bytes() -> usize {
+    512 * 1024 * 1024
+} // 512 MB
 
 // ── Cache configuration ──────────────────────────────────────────
 
@@ -247,11 +272,21 @@ impl Default for CacheConfig {
     }
 }
 
-fn default_cache_enabled() -> bool { true }
-fn default_stable_ttl() -> String { "1h".to_string() }
-fn default_tail_ttl() -> String { "5m".to_string() }
-fn default_vocab_version() -> String { "v1".to_string() }
-fn default_tool_version() -> String { "v1".to_string() }
+fn default_cache_enabled() -> bool {
+    true
+}
+fn default_stable_ttl() -> String {
+    "1h".to_string()
+}
+fn default_tail_ttl() -> String {
+    "5m".to_string()
+}
+fn default_vocab_version() -> String {
+    "v1".to_string()
+}
+fn default_tool_version() -> String {
+    "v1".to_string()
+}
 
 // ── Persistence configuration (placeholder) ────────────────────────
 
@@ -291,8 +326,12 @@ impl Default for PersistenceConfig {
     }
 }
 
-fn default_max_history_days() -> u32 { 30 }
-fn default_db_path() -> String { ".clean-ctx/persistence.db".to_string() }
+fn default_max_history_days() -> u32 {
+    30
+}
+fn default_db_path() -> String {
+    ".clean-ctx/persistence.db".to_string()
+}
 
 // ── Main config struct ─────────────────────────────────────────────
 
@@ -494,7 +533,9 @@ impl Default for ObservabilityConfig {
     }
 }
 
-fn default_export_interval() -> u64 { 60 }
+fn default_export_interval() -> u64 {
+    60
+}
 
 // ── Proxy auto-start configuration ────────────────────────────────
 
@@ -592,11 +633,21 @@ impl Default for ProxyAutoStartConfig {
     }
 }
 
-fn default_proxy_port() -> u16 { 8787 }
-fn default_proxy_tail_ttl() -> String { "5m".to_string() }
-fn default_proxy_rate_limit_rps() -> f64 { 60.0 }
-fn default_proxy_rate_limit_burst() -> f64 { 10.0 }
-fn default_proxy_start_grace_ms() -> u64 { 300 }
+fn default_proxy_port() -> u16 {
+    8787
+}
+fn default_proxy_tail_ttl() -> String {
+    "5m".to_string()
+}
+fn default_proxy_rate_limit_rps() -> f64 {
+    60.0
+}
+fn default_proxy_rate_limit_burst() -> f64 {
+    10.0
+}
+fn default_proxy_start_grace_ms() -> u64 {
+    300
+}
 
 /// Per-framework Meta-Layer configuration.
 ///
@@ -720,20 +771,26 @@ impl CleanCtxConfig {
     pub fn load(start_dir: &Path) -> Self {
         let mut config = if let Some(config_path) = Self::find_config(start_dir) {
             match std::fs::read_to_string(&config_path) {
-                Ok(content) => {
-                    match serde_json::from_str(&content) {
-                        Ok(config) => {
-                            eprintln!("[clean-ctx] Loaded config from: {}", config_path.display());
-                            config
-                        }
-                        Err(e) => {
-                            eprintln!("[clean-ctx] Warning: Failed to parse {}: {}", config_path.display(), e);
-                            Self::default()
-                        }
+                Ok(content) => match serde_json::from_str(&content) {
+                    Ok(config) => {
+                        eprintln!("[clean-ctx] Loaded config from: {}", config_path.display());
+                        config
                     }
-                }
+                    Err(e) => {
+                        eprintln!(
+                            "[clean-ctx] Warning: Failed to parse {}: {}",
+                            config_path.display(),
+                            e
+                        );
+                        Self::default()
+                    }
+                },
                 Err(e) => {
-                    eprintln!("[clean-ctx] Warning: Failed to read {}: {}", config_path.display(), e);
+                    eprintln!(
+                        "[clean-ctx] Warning: Failed to read {}: {}",
+                        config_path.display(),
+                        e
+                    );
                     Self::default()
                 }
             }
@@ -745,7 +802,9 @@ impl CleanCtxConfig {
         // stale persistence.db from leaking between CI builds.
         // Checks common CI environment variables: CI, TF_BUILD, GITHUB_ACTIONS, GITLAB_CI
         if config.persistence.enabled && Self::is_ci_environment() {
-            eprintln!("[clean-ctx] CI environment detected — disabling persistence to prevent stale database issues");
+            eprintln!(
+                "[clean-ctx] CI environment detected — disabling persistence to prevent stale database issues"
+            );
             config.persistence.enabled = false;
         }
 
@@ -850,7 +909,8 @@ impl CleanCtxConfig {
                 {
                     tier2_matched = true;
                 }
-                if !pattern.contains('*') && !pattern.contains('?')
+                if !pattern.contains('*')
+                    && !pattern.contains('?')
                     && file_name.contains(pattern.as_str())
                 {
                     tier2_matched = true;
@@ -895,7 +955,7 @@ fn glob_match_impl(pattern: &[u8], text: &[u8]) -> bool {
     let mut pi = 0;
     let mut ti = 0;
     let mut star_pi = None; // pattern position after last '*'
-    let mut star_ti = 0;    // text position when '*' was matched
+    let mut star_ti = 0; // text position when '*' was matched
 
     while ti < text.len() {
         if pi < pattern.len() && pattern[pi] == b'*' {

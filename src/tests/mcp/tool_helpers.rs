@@ -24,7 +24,8 @@ fn resolve_file_path_without_workspace_root() {
     // When no workspace root is provided, it should still produce a valid path
     let result = resolve_file_path("src/main.rs", None);
     assert!(!result.is_empty());
-    assert!(result.contains("src/main.rs") || result.contains("src\\main.rs"),
+    assert!(
+        result.contains("src/main.rs") || result.contains("src\\main.rs"),
         "expected path to contain src/main.rs, got: {}",
         result
     );
@@ -63,8 +64,14 @@ fn estimate_tokens_returns_nonzero() {
 #[test]
 fn estimate_tokens_scales_with_input() {
     let short = estimate_tokens("hello");
-    let long = estimate_tokens("fn main() { println!(\"hello world\"); let x = 42; return x + 1; }");
-    assert!(long > short, "longer input should produce more tokens: short={}, long={}", short, long);
+    let long =
+        estimate_tokens("fn main() { println!(\"hello world\"); let x = 42; return x + 1; }");
+    assert!(
+        long > short,
+        "longer input should produce more tokens: short={}, long={}",
+        short,
+        long
+    );
 }
 
 #[test]
@@ -77,7 +84,11 @@ fn estimate_tokens_empty_string() {
 fn estimate_tokens_whitespace_only() {
     let count = estimate_tokens("   \n\n  ");
     // Should handle whitespace gracefully — either 0 or a small number
-    assert!(count <= 5, "whitespace-only should produce few tokens, got {}", count);
+    assert!(
+        count <= 5,
+        "whitespace-only should produce few tokens, got {}",
+        count
+    );
 }
 
 // ── Path resolution regression tests ──────────────────────────────
@@ -122,7 +133,10 @@ fn resolve_file_path_checked_outside_boundary_shows_workspace_root() {
     // resolve to the CWD, then canonicalize, then fail the boundary check.
     // The outside path doesn't start with CWD → boundary error.
     let result = resolve_file_path_checked(&outside_path, None, &[]);
-    assert!(result.is_err(), "should fail for path outside workspace root");
+    assert!(
+        result.is_err(),
+        "should fail for path outside workspace root"
+    );
 
     let err_msg = result.err().unwrap();
     // Must contain the boundary error message with the workspace root.
@@ -184,7 +198,6 @@ fn resolve_file_path_checked_outside_includes_additional_roots_in_error() {
 /// outside the boundary).
 #[test]
 fn resolve_file_path_checked_with_valid_additional_root() {
-
     // Create a temporary directory to use as an additional root
     let tmp_dir = std::env::temp_dir();
     let root_dir = tmp_dir.join("clean_ctx_test_additional_root");
@@ -194,11 +207,7 @@ fn resolve_file_path_checked_with_valid_additional_root() {
     let _ = std::fs::write(&test_file, "// test");
 
     let additional = vec![root_dir.to_string_lossy().to_string()];
-    let result = resolve_file_path_checked(
-        &test_file.to_string_lossy(),
-        None,
-        &additional,
-    );
+    let result = resolve_file_path_checked(&test_file.to_string_lossy(), None, &additional);
     assert!(
         result.is_ok(),
         "path under additional_root should be accepted: {}",

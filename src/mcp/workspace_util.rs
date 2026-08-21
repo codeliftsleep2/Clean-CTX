@@ -7,12 +7,12 @@
 use std::collections::HashSet;
 use std::path::{Component, Path};
 
-use crate::compression::Fidelity;
-use crate::mcp::McpState;
 #[cfg(feature = "angular")]
 use crate::angular_meta::decorators;
 #[cfg(feature = "angular")]
 use crate::angular_meta::footer::FooterBuilder;
+use crate::compression::Fidelity;
+use crate::mcp::McpState;
 
 // F-19: Streaming directory walker (replaces recursive collect-then-sort)
 use walkdir::WalkDir;
@@ -127,9 +127,12 @@ pub(crate) fn collect_source_files(dir: &str, entries: &mut Vec<String>) {
     // mixed separators, directory names with ".", and URL-encoded variants.
     let root_canonical = {
         let components = root.components().all(|c| {
-            matches!(c, Component::Normal(_) | Component::RootDir | Component::Prefix(_))
+            matches!(
+                c,
+                Component::Normal(_) | Component::RootDir | Component::Prefix(_)
+            )
         });
-        
+
         if root.is_absolute() && components {
             root.to_path_buf()
         } else {
@@ -146,7 +149,7 @@ pub(crate) fn collect_source_files(dir: &str, entries: &mut Vec<String>) {
     // F-19: Use walkdir for streaming iteration.
     let walker = WalkDir::new(root)
         .max_depth(MAX_WALK_DEPTH)
-        .follow_links(false)  // Don't follow symlinks (prevents loops)
+        .follow_links(false) // Don't follow symlinks (prevents loops)
         .into_iter();
 
     for entry in walker.filter_entry(|e| !is_skipped_dir(e)) {
@@ -179,10 +182,7 @@ fn is_skipped_dir(entry: &walkdir::DirEntry) -> bool {
     }
 
     let name = entry.file_name().to_string_lossy();
-    name.starts_with('.')
-        || name == "node_modules"
-        || name == "target"
-        || name == "dist"
+    name.starts_with('.') || name == "node_modules" || name == "target" || name == "dist"
 }
 
 // --- F-ANG-03: extract_class_blocks rewrite ---
@@ -279,9 +279,10 @@ fn find_decorator_start(source: &str, class_pos: usize) -> usize {
                     if depth == 0 {
                         // Scan backwards through the decorator name to find '@'.
                         let mut k = j;
-                        while k > 0 && (bytes[k - 1].is_ascii_alphanumeric()
-                            || bytes[k - 1] == b'_'
-                            || bytes[k - 1] == b'$')
+                        while k > 0
+                            && (bytes[k - 1].is_ascii_alphanumeric()
+                                || bytes[k - 1] == b'_'
+                                || bytes[k - 1] == b'$')
                         {
                             k -= 1;
                         }
@@ -292,7 +293,9 @@ fn find_decorator_start(source: &str, class_pos: usize) -> usize {
                 }
                 _ => {}
             }
-            if j == 0 { break; }
+            if j == 0 {
+                break;
+            }
             j -= 1;
         }
     }

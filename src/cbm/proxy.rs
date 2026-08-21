@@ -12,12 +12,12 @@
 //   6. On compression failure: ALWAYS applies minimum compression, NEVER returns raw
 //   7. Compressed result goes back to the agent
 
-use serde_json::Value;
-use crate::mcp::McpState;
-use crate::mcp::tools::parse_tokenizer_arg;
-use crate::mcp::tool_helpers::count_tokens_with_tokenizer;
-use crate::protocol::send_response;
 use crate::cbm::json_compress::compress_cbm_response;
+use crate::mcp::McpState;
+use crate::mcp::tool_helpers::count_tokens_with_tokenizer;
+use crate::mcp::tools::parse_tokenizer_arg;
+use crate::protocol::send_response;
+use serde_json::Value;
 
 /// Handle `cbm_proxy` — forward to CBM, intercept raw response, compress it.
 ///
@@ -61,7 +61,9 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
     // NOT be passed as cbm_tool.
     // Normalize Clean-CTX wrapper names to CBM's actual tool names so the
     // proxy is resilient to either convention.
-    let raw_tool = params["arguments"]["cbm_tool"].as_str().unwrap_or("search_graph");
+    let raw_tool = params["arguments"]["cbm_tool"]
+        .as_str()
+        .unwrap_or("search_graph");
     let cbm_tool = match raw_tool {
         "graph_search" => "search_graph",
         "graph_query" => "query_graph",
@@ -93,21 +95,29 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
             match cbm_tool {
                 "search_graph" => {
                     // CBM expects `name_pattern`; accept Clean-CTX `query` shorthand.
-                    let name_pattern = params["arguments"]["name_pattern"].as_str()
+                    let name_pattern = params["arguments"]["name_pattern"]
+                        .as_str()
                         .or_else(|| params["arguments"]["query"].as_str())
                         .unwrap_or("");
                     if !name_pattern.is_empty() {
-                        default.insert("name_pattern".into(), Value::String(name_pattern.to_string()));
+                        default.insert(
+                            "name_pattern".into(),
+                            Value::String(name_pattern.to_string()),
+                        );
                     }
                 }
                 "trace_path" => {
                     // CBM expects `function_name` + `direction` (inbound|outbound|both).
                     // Accept Clean-CTX `from`/`to` shorthand: from → function_name.
-                    let function_name = params["arguments"]["function_name"].as_str()
+                    let function_name = params["arguments"]["function_name"]
+                        .as_str()
                         .or_else(|| params["arguments"]["from"].as_str())
                         .unwrap_or("");
                     if !function_name.is_empty() {
-                        default.insert("function_name".into(), Value::String(function_name.to_string()));
+                        default.insert(
+                            "function_name".into(),
+                            Value::String(function_name.to_string()),
+                        );
                     }
                     if let Some(dir) = params["arguments"]["direction"].as_str() {
                         default.insert("direction".into(), Value::String(dir.to_string()));
@@ -134,7 +144,9 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
     let args = tool_params;
 
     // Step 2: Forward to CBM via pipe — intercept the raw response text
-    if !crate::cbm::handlers::ensure_indexed_or_error(id, bridge) { return; }
+    if !crate::cbm::handlers::ensure_indexed_or_error(id, bridge) {
+        return;
+    }
     let raw_response = match bridge.proxy_call(cbm_tool, args) {
         Ok(text) => text,
         Err(e) => {
@@ -162,7 +174,8 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
         Some(compressed) => {
             // Use pluggable tokenizer for accurate counts (not byte-based estimate)
             let raw_tokens = count_tokens_with_tokenizer(&raw_response, tokenizer_ref);
-            let comp_tokens = count_tokens_with_tokenizer(&compressed.compressed_text, tokenizer_ref);
+            let comp_tokens =
+                count_tokens_with_tokenizer(&compressed.compressed_text, tokenizer_ref);
 
             // Record CBM pipe-level interception savings. This ACCUMULATES
             // across calls (unlike per-file compression which overwrites),
@@ -232,9 +245,8 @@ pub(crate) fn apply_minimum_compression(raw: &str) -> String {
                 raw.chars().filter(|c| !c.is_whitespace()).collect()
             });
         }
-        return serde_json::to_string(&val).unwrap_or_else(|_| {
-            raw.chars().filter(|c| !c.is_whitespace()).collect()
-        });
+        return serde_json::to_string(&val)
+            .unwrap_or_else(|_| raw.chars().filter(|c| !c.is_whitespace()).collect());
     }
 
     // Last resort: strip all whitespace

@@ -101,7 +101,12 @@ fn test_next_alias_increments_per_kind() {
 #[test]
 fn test_register_single_symbol() {
     let mut table = GlobalSymbolTable::new();
-    table.register("C1".into(), "SampleService".into(), SymbolKind::Class, "file1.ts");
+    table.register(
+        "C1".into(),
+        "SampleService".into(),
+        SymbolKind::Class,
+        "file1.ts",
+    );
 
     assert_eq!(table.len(), 1);
     assert!(!table.is_empty());
@@ -118,7 +123,12 @@ fn test_register_single_symbol() {
 #[test]
 fn test_register_creates_reverse_index() {
     let mut table = GlobalSymbolTable::new();
-    table.register("M1".into(), "processData".into(), SymbolKind::Method, "file1.ts");
+    table.register(
+        "M1".into(),
+        "processData".into(),
+        SymbolKind::Method,
+        "file1.ts",
+    );
 
     let by_original = table.get_by_original("processData").unwrap();
     assert_eq!(by_original.alias, "M1");
@@ -130,8 +140,18 @@ fn test_register_creates_reverse_index() {
 #[test]
 fn test_register_adds_to_file_members() {
     let mut table = GlobalSymbolTable::new();
-    table.register("C1".into(), "ServiceA".into(), SymbolKind::Class, "alpha.ts");
-    table.register("C2".into(), "ServiceB".into(), SymbolKind::Class, "alpha.ts");
+    table.register(
+        "C1".into(),
+        "ServiceA".into(),
+        SymbolKind::Class,
+        "alpha.ts",
+    );
+    table.register(
+        "C2".into(),
+        "ServiceB".into(),
+        SymbolKind::Class,
+        "alpha.ts",
+    );
     table.register("M1".into(), "helper".into(), SymbolKind::Method, "beta.ts");
 
     let alpha_symbols = table.get_file_symbols("alpha.ts");
@@ -147,16 +167,26 @@ fn test_register_adds_to_file_members() {
 #[test]
 fn test_register_overwrite_existing_alias() {
     let mut table = GlobalSymbolTable::new();
-    table.register("C1".into(), "OriginalName".into(), SymbolKind::Class, "file1.ts");
+    table.register(
+        "C1".into(),
+        "OriginalName".into(),
+        SymbolKind::Class,
+        "file1.ts",
+    );
     assert_eq!(table.len(), 1);
     assert!(table.contains_original("OriginalName"));
 
     // Re-register with same alias but different name
-    table.register("C1".into(), "RenamedName".into(), SymbolKind::Class, "file1.ts");
+    table.register(
+        "C1".into(),
+        "RenamedName".into(),
+        SymbolKind::Class,
+        "file1.ts",
+    );
 
     assert_eq!(table.len(), 1);
     assert!(!table.contains_original("OriginalName")); // old reverse entry removed
-    assert!(table.contains_original("RenamedName"));   // new reverse entry present
+    assert!(table.contains_original("RenamedName")); // new reverse entry present
 
     let entry = table.get("C1").unwrap();
     assert_eq!(entry.original, "RenamedName");
@@ -351,19 +381,54 @@ fn test_integration_10_symbols_3_files() {
     let mut table = GlobalSymbolTable::new();
 
     // File α (alpha.ts): 4 symbols
-    table.register("C1".into(), "UserService".into(), SymbolKind::Class, "alpha.ts");
-    table.register("M1".into(), "getUser".into(), SymbolKind::Method, "alpha.ts");
-    table.register("M2".into(), "setUser".into(), SymbolKind::Method, "alpha.ts");
-    table.register("F1".into(), "userName".into(), SymbolKind::Field, "alpha.ts");
+    table.register(
+        "C1".into(),
+        "UserService".into(),
+        SymbolKind::Class,
+        "alpha.ts",
+    );
+    table.register(
+        "M1".into(),
+        "getUser".into(),
+        SymbolKind::Method,
+        "alpha.ts",
+    );
+    table.register(
+        "M2".into(),
+        "setUser".into(),
+        SymbolKind::Method,
+        "alpha.ts",
+    );
+    table.register(
+        "F1".into(),
+        "userName".into(),
+        SymbolKind::Field,
+        "alpha.ts",
+    );
 
     // File β (beta.ts): 3 symbols
     table.register("C2".into(), "Logger".into(), SymbolKind::Class, "beta.ts");
     table.register("M3".into(), "logInfo".into(), SymbolKind::Method, "beta.ts");
-    table.register("I1".into(), "ILogger".into(), SymbolKind::Interface, "beta.ts");
+    table.register(
+        "I1".into(),
+        "ILogger".into(),
+        SymbolKind::Interface,
+        "beta.ts",
+    );
 
     // File γ (gamma.ts): 3 symbols
-    table.register("C3".into(), "AuthGuard".into(), SymbolKind::Class, "gamma.ts");
-    table.register("IM1".into(), "AuthModule".into(), SymbolKind::Import, "gamma.ts");
+    table.register(
+        "C3".into(),
+        "AuthGuard".into(),
+        SymbolKind::Class,
+        "gamma.ts",
+    );
+    table.register(
+        "IM1".into(),
+        "AuthModule".into(),
+        SymbolKind::Import,
+        "gamma.ts",
+    );
     table.register("P1".into(), "token".into(), SymbolKind::Param, "gamma.ts");
 
     // Total count
@@ -437,7 +502,12 @@ fn test_register_unregister_register_cycle() {
     assert_eq!(table.len(), 0);
 
     // Re-register with same alias
-    table.register("C1".into(), "ServiceV2".into(), SymbolKind::Class, "main.ts");
+    table.register(
+        "C1".into(),
+        "ServiceV2".into(),
+        SymbolKind::Class,
+        "main.ts",
+    );
     assert_eq!(table.len(), 1);
 
     let entry = table.get("C1").unwrap();
@@ -458,7 +528,12 @@ fn test_large_alias_counters() {
 fn test_import_and_type_aliases() {
     let mut table = GlobalSymbolTable::new();
 
-    table.register("IM1".into(), "Observable".into(), SymbolKind::Import, "rx.ts");
+    table.register(
+        "IM1".into(),
+        "Observable".into(),
+        SymbolKind::Import,
+        "rx.ts",
+    );
     table.register("T1".into(), "UserId".into(), SymbolKind::Type, "types.ts");
 
     assert_eq!(table.get("IM1").unwrap().kind, SymbolKind::Import);

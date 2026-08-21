@@ -109,9 +109,7 @@ pub enum IndexingState {
     /// No indexing has been attempted yet.
     NotStarted,
     /// Indexing is in progress, started at the given instant.
-    InProgress {
-        started_at: Instant,
-    },
+    InProgress { started_at: Instant },
     /// Indexing completed successfully.
     Complete,
     /// Indexing failed with an error message.
@@ -194,9 +192,15 @@ impl GraphBridge {
                         eprintln!("[clean-ctx-cbm] Launched from: {}", path.display());
                         Some(c)
                     }
-                    Ok(None) => { eprintln!("[clean-ctx-cbm] Binary not found: {}", path.display()); None }
-                    Err(e) => { eprintln!("[clean-ctx-cbm] Launch failed: {e}"); None }
-                }
+                    Ok(None) => {
+                        eprintln!("[clean-ctx-cbm] Binary not found: {}", path.display());
+                        None
+                    }
+                    Err(e) => {
+                        eprintln!("[clean-ctx-cbm] Launch failed: {e}");
+                        None
+                    }
+                },
                 None => {
                     eprintln!("[clean-ctx-cbm] Not found on PATH or common locations.");
                     eprintln!("  Install from: https://github.com/DeusData/codebase-memory-mcp");
@@ -208,10 +212,16 @@ impl GraphBridge {
         };
 
         // Canonicalize the project root for use as the disk-cache partition key.
-        let project_root_canon = project_root.canonicalize().unwrap_or_else(|_| project_root.to_path_buf());
+        let project_root_canon = project_root
+            .canonicalize()
+            .unwrap_or_else(|_| project_root.to_path_buf());
 
         Self {
-            status: if client.is_some() { CbmStatus::Available } else { CbmStatus::Unavailable },
+            status: if client.is_some() {
+                CbmStatus::Available
+            } else {
+                CbmStatus::Unavailable
+            },
             client: Arc::new(Mutex::new(client)),
             cache: DashMap::new(),
             cache_ttl: config.cache_ttl,
@@ -257,7 +267,8 @@ impl GraphBridge {
             return;
         }
         self.project_root = root_canon;
-        let name = self.project_root
+        let name = self
+            .project_root
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "default".to_string());
@@ -269,7 +280,9 @@ impl GraphBridge {
             states.remove(&name);
         }
     }
-    pub fn status(&self) -> &CbmStatus { &self.status }
+    pub fn status(&self) -> &CbmStatus {
+        &self.status
+    }
     /// Check if the bridge can serve data.
     ///
     /// Returns true when:
@@ -285,10 +298,18 @@ impl GraphBridge {
             return false;
         }
         // Real client OR pre-seeded cache (mock mode)
-        self.client.lock().unwrap_or_else(|p| p.into_inner()).is_some() || !self.cache.is_empty()
+        self.client
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .is_some()
+            || !self.cache.is_empty()
     }
-    pub fn graph_version(&self) -> &str { &self.graph_version }
-    pub fn set_graph_version(&mut self, v: &str) { self.graph_version = v.to_string(); }
+    pub fn graph_version(&self) -> &str {
+        &self.graph_version
+    }
+    pub fn set_graph_version(&mut self, v: &str) {
+        self.graph_version = v.to_string();
+    }
 
     /// Take (and clear) the last error from a user-facing graph query.
     ///
@@ -360,8 +381,13 @@ impl GraphBridge {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
         let project = self.project_str();
-        let mut states = self.indexing_state.lock().unwrap_or_else(|p| p.into_inner());
-        let state = states.entry(project.clone()).or_insert(IndexingState::NotStarted);
+        let mut states = self
+            .indexing_state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        let state = states
+            .entry(project.clone())
+            .or_insert(IndexingState::NotStarted);
 
         match state {
             IndexingState::Complete => return Ok(IndexingStatus::Ready),
@@ -371,7 +397,9 @@ impl GraphBridge {
                     *state = IndexingState::Failed("indexing timed out after 60s".into());
                     return Err(CbmError::LaunchError("indexing timed out".into()));
                 }
-                return Ok(IndexingStatus::StillIndexing { elapsed_secs: elapsed });
+                return Ok(IndexingStatus::StillIndexing {
+                    elapsed_secs: elapsed,
+                });
             }
             IndexingState::Failed(msg) => {
                 return Err(CbmError::LaunchError(msg.clone()));
@@ -400,13 +428,17 @@ impl GraphBridge {
                     let mut client_guard = match client_arc.lock() {
                         Ok(g) => g,
                         Err(poisoned) => {
-                            eprintln!("[clean-ctx-cbm] WARNING: Recovering from poisoned client lock");
+                            eprintln!(
+                                "[clean-ctx-cbm] WARNING: Recovering from poisoned client lock"
+                            );
                             poisoned.into_inner()
                         }
                     };
                     match client_guard.as_mut() {
                         Some(client) => {
-                            match client.call_tool("index_project", serde_json::json!({"project": project})) {
+                            match client
+                                .call_tool("index_project", serde_json::json!({"project": project}))
+                            {
                                 Ok(_) => {
                                     eprintln!("[clean-ctx-cbm] Project indexed successfully");
                                     Ok(())
@@ -428,7 +460,9 @@ impl GraphBridge {
                         poisoned.into_inner()
                     }
                 };
-                let s = states.entry(project.clone()).or_insert(IndexingState::NotStarted);
+                let s = states
+                    .entry(project.clone())
+                    .or_insert(IndexingState::NotStarted);
                 match result {
                     Ok(()) => {
                         *s = IndexingState::Complete;
@@ -451,12 +485,16 @@ impl GraphBridge {
 
     /// Access the indexing state map for inspection (e.g., get_cbm_status handler).
     pub fn indexing_state(&self) -> std::sync::MutexGuard<'_, HashMap<String, IndexingState>> {
-        self.indexing_state.lock().unwrap_or_else(|p| p.into_inner())
+        self.indexing_state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
     }
 
     /// Resolve project name, using explicit if set, else auto-detected.
     fn project_str(&self) -> String {
-        self.project.clone().unwrap_or_else(|| "default".to_string())
+        self.project
+            .clone()
+            .unwrap_or_else(|| "default".to_string())
     }
 
     pub fn get_symbol_importance_mut(&mut self) -> HashMap<String, SymbolImportance> {
@@ -476,13 +514,19 @@ impl GraphBridge {
         let result = self.query(move |c| c.get_symbol_importance(&project, Some(1)));
         match result {
             Ok(symbols) => {
-                let map: HashMap<_, _> = symbols.iter().filter_map(|e| {
-                    Some((e["name"].as_str()?.to_string(), SymbolImportance {
-                        symbol: e["name"].as_str()?.to_string(),
-                        score: e["importance"].as_f64().unwrap_or(0.0),
-                        file: e["file"].as_str().unwrap_or("").to_string(),
-                    }))
-                }).collect();
+                let map: HashMap<_, _> = symbols
+                    .iter()
+                    .filter_map(|e| {
+                        Some((
+                            e["name"].as_str()?.to_string(),
+                            SymbolImportance {
+                                symbol: e["name"].as_str()?.to_string(),
+                                score: e["importance"].as_f64().unwrap_or(0.0),
+                                file: e["file"].as_str().unwrap_or("").to_string(),
+                            },
+                        ))
+                    })
+                    .collect();
                 self.cache_insert(&key, &map);
                 map
             }
@@ -517,9 +561,10 @@ impl GraphBridge {
         let result = self.query(move |c| c.query_graph(&cypher, &project));
         match result {
             Ok(rows) => {
-                let files: Vec<_> = rows.iter().filter_map(|r| {
-                    r.get(1).and_then(|v| v.as_str().map(String::from))
-                }).collect();
+                let files: Vec<_> = rows
+                    .iter()
+                    .filter_map(|r| r.get(1).and_then(|v| v.as_str().map(String::from)))
+                    .collect();
                 self.cache_insert(&key, &files);
                 files
             }
@@ -544,13 +589,16 @@ impl GraphBridge {
         let result = self.query(move |c| c.get_dead_code(&project));
         match result {
             Ok(entries) => {
-                let dead: Vec<DeadCodeEntry> = entries.iter().filter_map(|e| {
-                    Some(DeadCodeEntry {
-                        symbol: e["name"].as_str()?.to_string(),
-                        file: e["file"].as_str().unwrap_or("").to_string(),
-                        reason: e["reason"].as_str().unwrap_or("unknown").to_string(),
+                let dead: Vec<DeadCodeEntry> = entries
+                    .iter()
+                    .filter_map(|e| {
+                        Some(DeadCodeEntry {
+                            symbol: e["name"].as_str()?.to_string(),
+                            file: e["file"].as_str().unwrap_or("").to_string(),
+                            reason: e["reason"].as_str().unwrap_or("unknown").to_string(),
+                        })
                     })
-                }).collect();
+                    .collect();
                 self.cache_insert(&key, &dead);
                 dead
             }
@@ -581,11 +629,14 @@ impl GraphBridge {
         let result = self.query(move |c| c.query_graph(&cypher, &project));
         match result {
             Ok(rows) => {
-                let edges: Vec<(String, String)> = rows.iter().filter_map(|r| {
-                    let from = r.first()?.as_str()?.to_string();
-                    let to = r.get(1)?.as_str()?.to_string();
-                    Some((from, to))
-                }).collect();
+                let edges: Vec<(String, String)> = rows
+                    .iter()
+                    .filter_map(|r| {
+                        let from = r.first()?.as_str()?.to_string();
+                        let to = r.get(1)?.as_str()?.to_string();
+                        Some((from, to))
+                    })
+                    .collect();
                 self.cache_insert(&key, &edges);
                 edges
             }
@@ -613,16 +664,20 @@ impl GraphBridge {
             )
             .unwrap_or_default();
         }
-        let cypher = "MATCH (m:Function)-[r:DATAFLOW]->(t) RETURN m.name, t.name, type(r)".to_string();
+        let cypher =
+            "MATCH (m:Function)-[r:DATAFLOW]->(t) RETURN m.name, t.name, type(r)".to_string();
         let result = self.query(move |c| c.query_graph(&cypher, &project));
         match result {
             Ok(rows) => {
-                let edges: Vec<(String, String, String)> = rows.iter().filter_map(|r| {
-                    let method = r.first()?.as_str()?.to_string();
-                    let target = r.get(1)?.as_str()?.to_string();
-                    let direction = r.get(2)?.as_str().unwrap_or("reads").to_string();
-                    Some((method, target, direction))
-                }).collect();
+                let edges: Vec<(String, String, String)> = rows
+                    .iter()
+                    .filter_map(|r| {
+                        let method = r.first()?.as_str()?.to_string();
+                        let target = r.get(1)?.as_str()?.to_string();
+                        let direction = r.get(2)?.as_str().unwrap_or("reads").to_string();
+                        Some((method, target, direction))
+                    })
+                    .collect();
                 self.cache_insert(&key, &edges);
                 edges
             }
@@ -652,21 +707,38 @@ impl GraphBridge {
         match result {
             Ok(arch) => {
                 self.set_last_error(None);
-                let modules = arch["modules"].as_array().map(|ms| {
-                    ms.iter().filter_map(|m| Some(ArchitectureModule {
-                        name: m["name"].as_str()?.to_string(),
-                        path: m["path"].as_str().unwrap_or("").to_string(),
-                        file_count: m["file_count"].as_u64().unwrap_or(0) as usize,
-                    })).collect()
-                }).unwrap_or_default();
-                let dependencies = arch["dependencies"].as_array().map(|ds| {
-                    ds.iter().filter_map(|d| Some(ArchitectureDependency {
-                        from: d["from"].as_str()?.to_string(),
-                        to: d["to"].as_str()?.to_string(),
-                        kind: d["kind"].as_str().unwrap_or("import").to_string(),
-                    })).collect()
-                }).unwrap_or_default();
-                let ov = ArchitectureOverview { modules, dependencies };
+                let modules = arch["modules"]
+                    .as_array()
+                    .map(|ms| {
+                        ms.iter()
+                            .filter_map(|m| {
+                                Some(ArchitectureModule {
+                                    name: m["name"].as_str()?.to_string(),
+                                    path: m["path"].as_str().unwrap_or("").to_string(),
+                                    file_count: m["file_count"].as_u64().unwrap_or(0) as usize,
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let dependencies = arch["dependencies"]
+                    .as_array()
+                    .map(|ds| {
+                        ds.iter()
+                            .filter_map(|d| {
+                                Some(ArchitectureDependency {
+                                    from: d["from"].as_str()?.to_string(),
+                                    to: d["to"].as_str()?.to_string(),
+                                    kind: d["kind"].as_str().unwrap_or("import").to_string(),
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let ov = ArchitectureOverview {
+                    modules,
+                    dependencies,
+                };
                 self.cache_insert(&key, &ov);
                 Some(ov)
             }
@@ -693,7 +765,10 @@ impl GraphBridge {
                     .data
                     .clone(),
             )
-            .unwrap_or(QueryResult { nodes: vec![], edges: vec![] });
+            .unwrap_or(QueryResult {
+                nodes: vec![],
+                edges: vec![],
+            });
             self.set_last_error(None);
             return result;
         }
@@ -703,7 +778,8 @@ impl GraphBridge {
                 self.set_last_error(None);
                 // CBM Cypher returns {columns, rows} — rows are Vec<Vec<Value>>.
                 // We try to interpret each row as either node or edge data.
-                let mut nodes = vec![]; let edges = vec![];
+                let mut nodes = vec![];
+                let edges = vec![];
                 for row in &rows {
                     // First column is typically a name or label
                     if let Some(first) = row.first() {
@@ -723,7 +799,10 @@ impl GraphBridge {
             }
             Err(e) => {
                 self.set_last_error(Some(e));
-                QueryResult { nodes: vec![], edges: vec![] }
+                QueryResult {
+                    nodes: vec![],
+                    edges: vec![],
+                }
             }
         }
     }
@@ -749,21 +828,29 @@ impl GraphBridge {
         // H-01 fix: build a proper regex name_pattern from the query string.
         // If the query already contains regex metacharacters (., *, +, [, etc.)
         // use it as-is; otherwise wrap in .*...* for substring matching.
-        let has_regex = q.chars().any(|c| matches!(c, '.' | '*' | '+' | '[' | '(' | '\\' | '^' | '$' | '{' | '|'));
+        let has_regex = q.chars().any(|c| {
+            matches!(
+                c,
+                '.' | '*' | '+' | '[' | '(' | '\\' | '^' | '$' | '{' | '|'
+            )
+        });
         let name_pattern = if has_regex { q } else { format!(".*{q}.*") };
         let result = self.query(move |c| c.search_graph(&name_pattern, &project, Some("Function")));
         match result {
             Ok(nodes) => {
                 self.set_last_error(None);
-                let gn: Vec<GraphNode> = nodes.iter().filter_map(|n| {
-                    Some(GraphNode {
-                        id: n["id"].as_str()?.to_string(),
-                        label: n["label"].as_str().unwrap_or("").into(),
-                        name: n["name"].as_str()?.to_string(),
-                        file: n["file"].as_str().unwrap_or("").into(),
-                        properties: HashMap::new(),
+                let gn: Vec<GraphNode> = nodes
+                    .iter()
+                    .filter_map(|n| {
+                        Some(GraphNode {
+                            id: n["id"].as_str()?.to_string(),
+                            label: n["label"].as_str().unwrap_or("").into(),
+                            name: n["name"].as_str()?.to_string(),
+                            file: n["file"].as_str().unwrap_or("").into(),
+                            properties: HashMap::new(),
+                        })
                     })
-                }).collect();
+                    .collect();
                 self.cache_insert(&key, &gn);
                 gn
             }
@@ -812,20 +899,27 @@ impl GraphBridge {
         match result {
             Ok(edges) => {
                 self.set_last_error(None);
-                let ge: Vec<GraphEdge> = edges.iter().filter_map(|e| {
-                    let ge = GraphEdge {
-                        from: e["from"].as_str()?.to_string(),
-                        to: e["to"].as_str()?.to_string(),
-                        label: e["label"].as_str().unwrap_or("").into(),
-                        properties: HashMap::new(),
-                    };
-                    // M-01: post-filter if target is specified
-                    if let Some(ref target) = filter_target {
-                        if ge.to == *target || ge.from == *target { Some(ge) } else { None }
-                    } else {
-                        Some(ge)
-                    }
-                }).collect();
+                let ge: Vec<GraphEdge> = edges
+                    .iter()
+                    .filter_map(|e| {
+                        let ge = GraphEdge {
+                            from: e["from"].as_str()?.to_string(),
+                            to: e["to"].as_str()?.to_string(),
+                            label: e["label"].as_str().unwrap_or("").into(),
+                            properties: HashMap::new(),
+                        };
+                        // M-01: post-filter if target is specified
+                        if let Some(ref target) = filter_target {
+                            if ge.to == *target || ge.from == *target {
+                                Some(ge)
+                            } else {
+                                None
+                            }
+                        } else {
+                            Some(ge)
+                        }
+                    })
+                    .collect();
                 self.cache_insert(&key, &ge);
                 ge
             }
@@ -836,7 +930,9 @@ impl GraphBridge {
         }
     }
 
-    pub fn invalidate_symbol(&mut self, symbol: &str) { self.cache.retain(|k, _| !k.contains(symbol)); }
+    pub fn invalidate_symbol(&mut self, symbol: &str) {
+        self.cache.retain(|k, _| !k.contains(symbol));
+    }
 
     /// Invalidate both the in-memory AND disk caches for the current project.
     ///
@@ -887,11 +983,16 @@ impl GraphBridge {
     ///
     /// CBM produces a ~5000-token structural seed → Clean-CTX catches it
     /// at the pipe level → compresses to ~1100 tokens → returns.
-    pub fn proxy_call(&mut self, tool_name: &str, args: serde_json::Value) -> Result<String, CbmError> {
+    pub fn proxy_call(
+        &mut self,
+        tool_name: &str,
+        args: serde_json::Value,
+    ) -> Result<String, CbmError> {
         let _span = tracing::info_span!(
             "cbm_proxy_call",
             tool_name = %tool_name,
-        ).entered();
+        )
+        .entered();
         let start = std::time::Instant::now();
         let result = {
             let mut client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
@@ -921,7 +1022,12 @@ impl GraphBridge {
     /// elapsed), we log the recovery.
     pub fn update_status(&mut self) {
         let previous = self.status.clone();
-        self.status = match self.client.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {
+        self.status = match self
+            .client
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .as_ref()
+        {
             Some(c) => c.status().clone(),
             None => CbmStatus::Unavailable,
         };
@@ -967,7 +1073,8 @@ impl GraphBridge {
             if let Some(data_json) = disk.get(&project_root, &disk_key) {
                 if let Ok(data) = serde_json::from_str::<Value>(&data_json) {
                     let expires_at = Instant::now() + Duration::from_secs(self.cache_ttl);
-                    self.cache.insert(key.to_string(), CachedGraphData { data, expires_at });
+                    self.cache
+                        .insert(key.to_string(), CachedGraphData { data, expires_at });
                     return true;
                 }
             }
@@ -980,10 +1087,13 @@ impl GraphBridge {
     fn cache_insert<T: Serialize>(&self, key: &str, value: &T) {
         let data = serde_json::to_value(value).unwrap_or_default();
         let expires_at = Instant::now() + Duration::from_secs(self.cache_ttl);
-        self.cache.insert(key.to_string(), CachedGraphData {
-            data: data.clone(),
-            expires_at,
-        });
+        self.cache.insert(
+            key.to_string(),
+            CachedGraphData {
+                data: data.clone(),
+                expires_at,
+            },
+        );
 
         // Write-through to disk cache (scoped by project name).
         if let Some(ref disk) = self.disk_cache {
@@ -1004,7 +1114,8 @@ impl GraphBridge {
     /// P1-9: Now acquires the Arc<Mutex<>> client instead of using
     /// a direct field reference.
     fn query<F, T>(&mut self, f: F) -> Result<T, CbmError>
-    where F: FnOnce(&mut CbmClient) -> Result<T, CbmError>,
+    where
+        F: FnOnce(&mut CbmClient) -> Result<T, CbmError>,
     {
         let mut client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
         let client = match client_guard.as_mut() {
@@ -1028,7 +1139,10 @@ fn resolve_cbm_binary(config: &CbmConfig) -> Option<PathBuf> {
             return Some(p);
         }
         // Config path doesn't exist — fall through to PATH
-        eprintln!("[clean-ctx-cbm] Config binary_path '{}' not found, trying PATH...", path);
+        eprintln!(
+            "[clean-ctx-cbm] Config binary_path '{}' not found, trying PATH...",
+            path
+        );
     }
 
     // 2. PATH search — try all candidate names (e.g. .exe, .cmd on Windows)
@@ -1164,7 +1278,9 @@ pub mod test_helpers {
     }
     // Intentionally kept simple: test access to bridge internals.
     #[allow(private_interfaces)]
-    pub fn cache_ttl(bridge: &GraphBridge) -> u64 { bridge.cache_ttl }
+    pub fn cache_ttl(bridge: &GraphBridge) -> u64 {
+        bridge.cache_ttl
+    }
 
     /// Create a mock GraphBridge with canned symbol importance data.
     ///
@@ -1193,10 +1309,13 @@ pub mod test_helpers {
         // Pre-seed the symbol_importance cache entry
         let key = "symbol_importance".to_string();
         let json = serde_json::to_value(&symbol_importance).unwrap_or_default();
-        bridge.cache.insert(key, CachedGraphData {
-            data: json,
-            expires_at: Instant::now() + Duration::from_secs(3600),
-        });
+        bridge.cache.insert(
+            key,
+            CachedGraphData {
+                data: json,
+                expires_at: Instant::now() + Duration::from_secs(3600),
+            },
+        );
         bridge
     }
 
@@ -1235,25 +1354,37 @@ pub mod test_helpers {
         };
         let ttl = Duration::from_secs(3600);
         let call_json = serde_json::to_value(&call_edges).unwrap_or_default();
-        bridge.cache.insert("call_edges".to_string(), CachedGraphData {
-            data: call_json,
-            expires_at: Instant::now() + ttl,
-        });
+        bridge.cache.insert(
+            "call_edges".to_string(),
+            CachedGraphData {
+                data: call_json,
+                expires_at: Instant::now() + ttl,
+            },
+        );
         let df_json = serde_json::to_value(&dataflow_edges).unwrap_or_default();
-        bridge.cache.insert("dataflow_edges".to_string(), CachedGraphData {
-            data: df_json,
-            expires_at: Instant::now() + ttl,
-        });
+        bridge.cache.insert(
+            "dataflow_edges".to_string(),
+            CachedGraphData {
+                data: df_json,
+                expires_at: Instant::now() + ttl,
+            },
+        );
         let si_json = serde_json::to_value(&symbol_importance).unwrap_or_default();
-        bridge.cache.insert("symbol_importance".to_string(), CachedGraphData {
-            data: si_json,
-            expires_at: Instant::now() + ttl,
-        });
+        bridge.cache.insert(
+            "symbol_importance".to_string(),
+            CachedGraphData {
+                data: si_json,
+                expires_at: Instant::now() + ttl,
+            },
+        );
         let dc_json = serde_json::to_value(&dead_code).unwrap_or_default();
-        bridge.cache.insert("dead_code".to_string(), CachedGraphData {
-            data: dc_json,
-            expires_at: Instant::now() + ttl,
-        });
+        bridge.cache.insert(
+            "dead_code".to_string(),
+            CachedGraphData {
+                data: dc_json,
+                expires_at: Instant::now() + ttl,
+            },
+        );
         bridge
     }
 }

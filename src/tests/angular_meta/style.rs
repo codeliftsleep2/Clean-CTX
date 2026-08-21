@@ -2,7 +2,7 @@
 //
 // Tests for the CSS/SCSS style extractor.
 
-use crate::angular_meta::style::{extract_style_shape, StyleShape};
+use crate::angular_meta::style::{StyleShape, extract_style_shape};
 
 #[test]
 fn extracts_class_selectors() {
@@ -144,7 +144,11 @@ fn to_marker_line_empty_when_no_content() {
 fn deduplicates_selectors() {
     let css = ".card { color: red; } .card { color: blue; }";
     let shape = extract_style_shape(css);
-    let count = shape.class_selectors.iter().filter(|s| *s == ".card").count();
+    let count = shape
+        .class_selectors
+        .iter()
+        .filter(|s| *s == ".card")
+        .count();
     assert_eq!(count, 1, "class selectors should be deduplicated");
 }
 

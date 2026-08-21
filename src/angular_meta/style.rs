@@ -128,7 +128,9 @@ pub fn extract_style_shape(css: &str) -> StyleShape {
         if c == b'.' && i + 1 < len && bytes[i + 1].is_ascii_alphabetic() {
             i += 1;
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'-' || bytes[i] == b'_') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'-' || bytes[i] == b'_')
+            {
                 i += 1;
             }
             let name = &css[start..i];
@@ -142,7 +144,9 @@ pub fn extract_style_shape(css: &str) -> StyleShape {
         if c == b'$' && i + 1 < len && bytes[i + 1].is_ascii_alphabetic() {
             i += 1;
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'-' || bytes[i] == b'_') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'-' || bytes[i] == b'_')
+            {
                 i += 1;
             }
             let name = &css[start..i];
@@ -156,7 +160,9 @@ pub fn extract_style_shape(css: &str) -> StyleShape {
         if c == b'-' && i + 1 < len && bytes[i + 1] == b'-' {
             i += 2;
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'-' || bytes[i] == b'_') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'-' || bytes[i] == b'_')
+            {
                 i += 1;
             }
             let name = &css[start..i];

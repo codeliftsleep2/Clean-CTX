@@ -23,17 +23,17 @@
 // - `footer`         : `§ΦMAP` workspace footer formatter
 // - (this file)      : Public surface, `MetaBlock` struct, `run_meta_layer`
 
-pub(crate) mod detect;
-pub(crate) mod markers;
 pub mod aspnet;
-pub mod efcore;
-pub mod signalr;
 pub mod automapper;
-pub mod serialization;
+pub(crate) mod detect;
+pub mod efcore;
+pub mod footer;
 pub mod general;
 pub mod graph;
 pub mod graph_state;
-pub mod footer;
+pub(crate) mod markers;
+pub mod serialization;
+pub mod signalr;
 
 use crate::compression::Fidelity;
 
@@ -177,9 +177,16 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         detect::is_dotnet_file(source)
     }
 
-    fn enrich(&self, output: &mut String, source: &str, ir: &crate::ir::compiler::CompiledIR, fidelity: crate::compression::Fidelity) {
+    fn enrich(
+        &self,
+        output: &mut String,
+        source: &str,
+        ir: &crate::ir::compiler::CompiledIR,
+        fidelity: crate::compression::Fidelity,
+    ) {
         // Extract class names from IR
-        let class_captures: Vec<String> = ir.instructions
+        let class_captures: Vec<String> = ir
+            .instructions
             .iter()
             .filter_map(|op| {
                 if let crate::ir::opcodes::CoreOp::DefClass(_, name) = op {
@@ -224,7 +231,13 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         false
     }
 
-    fn enrich(&self, _output: &mut String, _source: &str, _ir: &crate::ir::compiler::CompiledIR, _fidelity: crate::compression::Fidelity) {
+    fn enrich(
+        &self,
+        _output: &mut String,
+        _source: &str,
+        _ir: &crate::ir::compiler::CompiledIR,
+        _fidelity: crate::compression::Fidelity,
+    ) {
         // No-op when feature is disabled
     }
 }

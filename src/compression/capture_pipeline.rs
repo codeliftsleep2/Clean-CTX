@@ -81,7 +81,10 @@ where
             tracing::debug!("[run_capture_pipeline] capture: {}", capture_name);
             if let Ok(text_slice) = capture.node.utf8_text(source_bytes) {
                 let raw = text_slice.to_string();
-                 tracing::debug!("[run_capture_pipeline] calling process() for {}", capture_name);
+                tracing::debug!(
+                    "[run_capture_pipeline] calling process() for {}",
+                    capture_name
+                );
                 if let Some(processed) = process(&capture_name, &raw, fidelity) {
                     tracing::debug!("[run_capture_pipeline] process() returned");
                     all_captures.push(CapEntry {

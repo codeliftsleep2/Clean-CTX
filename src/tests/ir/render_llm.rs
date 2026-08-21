@@ -4,10 +4,10 @@
 // Covers: all class types (TS, Rust, Java, Angular, Spring),
 // all fidelity levels, edge cases, overloaded methods, patterns.
 
-use std::collections::HashSet;
 use crate::compression::Fidelity;
-use crate::ir::{HierarchicalIR, ClassNode, MethodNode, FieldNode, PatternEntry};
+use crate::ir::{ClassNode, FieldNode, HierarchicalIR, MethodNode, PatternEntry};
 use crate::ir::{render_hierarchical_for_llm, render_hierarchical_for_llm_focused};
+use std::collections::HashSet;
 
 // ── Helpers ──
 
@@ -178,7 +178,9 @@ fn test_method_with_params_and_flags() {
     let mut hir = empty_hir();
     let mut class = make_class("UserService");
     let mut method = make_method("getUser");
-    method.params.push(vec!["P1".into(), "$n".into(), "id".into()]);
+    method
+        .params
+        .push(vec!["P1".into(), "$n".into(), "id".into()]);
     method.return_type = Some("$s".into());
     method.flags = Some(vec!["ASYNC".into(), "RET".into()]);
     class.methods.push(method);
@@ -207,7 +209,9 @@ fn test_method_low_fidelity_hides_params() {
     let mut hir = empty_hir();
     let mut class = make_class("Test");
     let mut method = make_method("getData");
-    method.params.push(vec!["P1".into(), "$n".into(), "id".into()]);
+    method
+        .params
+        .push(vec!["P1".into(), "$n".into(), "id".into()]);
     method.return_type = Some("$s".into());
     class.methods.push(method);
     hir.classes.push(class);
@@ -232,9 +236,11 @@ fn test_overloaded_methods_disambiguation() {
 
     // find() with 3 params
     let mut m2 = make_method("find");
-    m2.params.push(vec!["P1".into(), "$n".into(), "name".into()]);
+    m2.params
+        .push(vec!["P1".into(), "$n".into(), "name".into()]);
     m2.params.push(vec!["P2".into(), "$n".into(), "age".into()]);
-    m2.params.push(vec!["P3".into(), "$s".into(), "role".into()]);
+    m2.params
+        .push(vec!["P3".into(), "$s".into(), "role".into()]);
 
     // Non-overloaded method
     let m3 = make_method("clear");
@@ -261,7 +267,8 @@ fn test_overloaded_methods_params_shown_in_low_fidelity() {
     m1.params.push(vec!["P1".into(), "$n".into(), "id".into()]);
 
     let mut m2 = make_method("find");
-    m2.params.push(vec!["P1".into(), "$n".into(), "name".into()]);
+    m2.params
+        .push(vec!["P1".into(), "$n".into(), "name".into()]);
     m2.params.push(vec!["P2".into(), "$n".into(), "age".into()]);
 
     class.methods.push(m1);
@@ -316,7 +323,9 @@ fn test_method_level_patterns() {
     let mut hir = empty_hir();
     let mut class = make_class("Service");
     let mut method = make_method("create");
-    method.patterns.push(make_pattern("CTOR", vec!["C1", "M1", "repo"]));
+    method
+        .patterns
+        .push(make_pattern("CTOR", vec!["C1", "M1", "repo"]));
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -334,7 +343,8 @@ fn test_method_level_patterns() {
 fn test_imports() {
     let mut hir = empty_hir();
     hir.imports.push(make_import("IM1", "./module", "Foo"));
-    hir.imports.push(make_import("IM2", "std::collections", "HashMap"));
+    hir.imports
+        .push(make_import("IM2", "std::collections", "HashMap"));
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     assert!(result.contains("$ IM1 ./module [Foo]\n"));
@@ -381,15 +391,18 @@ fn test_full_typescript_class() {
     class.methods.push(m1);
 
     let mut m2 = make_method("trackById");
-    m2.params.push(vec!["P1".into(), "$n".into(), "index".into()]);
-    m2.params.push(vec!["P2".into(), "$s".into(), "user".into()]);
+    m2.params
+        .push(vec!["P1".into(), "$n".into(), "index".into()]);
+    m2.params
+        .push(vec!["P2".into(), "$s".into(), "user".into()]);
     m2.flags = Some(vec!["RET".into()]);
     class.methods.push(m2);
 
     hir.classes.push(class);
 
     // Add imports
-    hir.imports.push(make_import("IM1", "./core", "OnInit, OnDestroy"));
+    hir.imports
+        .push(make_import("IM1", "./core", "OnInit, OnDestroy"));
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
     assert!(result.contains("// ── UserListComponent ──"));
@@ -455,7 +468,9 @@ fn test_spring_boot_class_with_meta() {
     // For this test, we show them in the type_aliases section
 
     class.extends = Some("BaseController".into());
-    class.fields.push(make_field("userService", Some("UserService")));
+    class
+        .fields
+        .push(make_field("userService", Some("UserService")));
 
     let mut m1 = make_method("getAll");
     m1.flags = Some(vec!["RET".into()]);
@@ -467,18 +482,26 @@ fn test_spring_boot_class_with_meta() {
     class.methods.push(m2);
 
     let mut m3 = make_method("find");
-    m3.params.push(vec!["P1".into(), "$n".into(), "name".into()]);
+    m3.params
+        .push(vec!["P1".into(), "$n".into(), "name".into()]);
     m3.params.push(vec!["P2".into(), "$n".into(), "age".into()]);
-    m3.params.push(vec!["P3".into(), "$s".into(), "role".into()]);
+    m3.params
+        .push(vec!["P3".into(), "$s".into(), "role".into()]);
     m3.flags = Some(vec!["RET".into(), "IF".into()]);
     class.methods.push(m3);
 
     hir.classes.push(class);
 
     // Spring meta type aliases
-    hir.type_aliases.push(make_type_alias("@rest", "UserController"));
-    hir.type_aliases.push(make_type_alias("@map", "GET /users POST /users"));
-    hir.imports.push(make_import("IM1", "org.springframework.web.bind.annotation", "*"));
+    hir.type_aliases
+        .push(make_type_alias("@rest", "UserController"));
+    hir.type_aliases
+        .push(make_type_alias("@map", "GET /users POST /users"));
+    hir.imports.push(make_import(
+        "IM1",
+        "org.springframework.web.bind.annotation",
+        "*",
+    ));
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
     assert!(result.contains("// ── UserController ──"));
@@ -563,8 +586,14 @@ fn test_multiple_classes_with_imports_and_type_aliases() {
     let alias_pos = result.find("T TypeA").unwrap();
 
     assert!(alpha_pos < beta_pos, "Alpha should appear before Beta");
-    assert!(beta_pos < import_pos, "Classes should appear before imports");
-    assert!(import_pos < alias_pos, "Imports should appear before type aliases");
+    assert!(
+        beta_pos < import_pos,
+        "Classes should appear before imports"
+    );
+    assert!(
+        import_pos < alias_pos,
+        "Imports should appear before type aliases"
+    );
 }
 
 #[test]
@@ -580,10 +609,18 @@ fn test_many_params_formatted_correctly() {
     let mut hir = empty_hir();
     let mut class = make_class("BigMethod");
     let mut method = make_method("processData");
-    method.params.push(vec!["P1".into(), "$n".into(), "a".into()]);
-    method.params.push(vec!["P2".into(), "$s".into(), "b".into()]);
-    method.params.push(vec!["P3".into(), "$b".into(), "c".into()]);
-    method.params.push(vec!["P4".into(), "$s[]".into(), "d".into()]);
+    method
+        .params
+        .push(vec!["P1".into(), "$n".into(), "a".into()]);
+    method
+        .params
+        .push(vec!["P2".into(), "$s".into(), "b".into()]);
+    method
+        .params
+        .push(vec!["P3".into(), "$b".into(), "c".into()]);
+    method
+        .params
+        .push(vec!["P4".into(), "$s[]".into(), "d".into()]);
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -599,11 +636,15 @@ fn test_renderer_no_panic_on_large_hir() {
         let mut class = make_class(&format!("Class{}", i));
         for j in 0..10 {
             let mut method = make_method(&format!("method{}", j));
-            method.params.push(vec!["P1".into(), "$n".into(), "x".into()]);
+            method
+                .params
+                .push(vec!["P1".into(), "$n".into(), "x".into()]);
             class.methods.push(method);
         }
         for j in 0..5 {
-            class.fields.push(make_field(&format!("field{}", j), Some("$n")));
+            class
+                .fields
+                .push(make_field(&format!("field{}", j), Some("$n")));
         }
         hir.classes.push(class);
     }
@@ -652,7 +693,10 @@ fn test_edit_mode_renders_verbatim_body() {
     // Structurally, the body should come after the method line.
     let method_pos = result.find("M doWork").unwrap();
     let body_pos = result.find("let x = 1").unwrap();
-    assert!(method_pos < body_pos, "body should render after the method signature");
+    assert!(
+        method_pos < body_pos,
+        "body should render after the method signature"
+    );
 }
 
 /// Edit Mode: a method with no body should not emit anything extra.
@@ -681,8 +725,11 @@ fn test_high_fidelity_renders_control_flow() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::High);
-    assert!(result.contains("cf:if:x > 0,loop:items"),
-        "High fidelity should render control-flow markers: {}", result);
+    assert!(
+        result.contains("cf:if:x > 0,loop:items"),
+        "High fidelity should render control-flow markers: {}",
+        result
+    );
 }
 
 /// High Fidelity: control-flow metadata not rendered at Low fidelity.
@@ -696,7 +743,10 @@ fn test_low_fidelity_no_control_flow() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(!result.contains("cf:"), "Low fidelity should not render control-flow markers");
+    assert!(
+        !result.contains("cf:"),
+        "Low fidelity should not render control-flow markers"
+    );
 }
 
 /// High Fidelity: data-flow metadata should render as inline markers (Gap 1).
@@ -713,8 +763,11 @@ fn test_high_fidelity_renders_data_flow() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::High);
-    assert!(result.contains("df:reads:config,writes:users"),
-        "High fidelity should render data-flow markers: {}", result);
+    assert!(
+        result.contains("df:reads:config,writes:users"),
+        "High fidelity should render data-flow markers: {}",
+        result
+    );
 }
 
 /// High Fidelity: side-effect annotation should render (Gap 1).
@@ -728,8 +781,11 @@ fn test_high_fidelity_renders_side_effect() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::High);
-    assert!(result.contains(" se:mutation"),
-        "High fidelity should render the side-effect annotation: {}", result);
+    assert!(
+        result.contains(" se:mutation"),
+        "High fidelity should render the side-effect annotation: {}",
+        result
+    );
 }
 
 /// High Fidelity: execution-context annotation should render (Gap 1).
@@ -743,8 +799,11 @@ fn test_high_fidelity_renders_execution_context() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::High);
-    assert!(result.contains(" ec:async"),
-        "High fidelity should render the execution-context annotation: {}", result);
+    assert!(
+        result.contains(" ec:async"),
+        "High fidelity should render the execution-context annotation: {}",
+        result
+    );
 }
 
 /// Low fidelity: data-flow / side-effect / execution-context must not render.
@@ -760,9 +819,18 @@ fn test_low_fidelity_no_execution_metadata() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(!result.contains("df:"), "Low fidelity should not render data-flow markers");
-    assert!(!result.contains(" se:"), "Low fidelity should not render side-effect annotations");
-    assert!(!result.contains(" ec:"), "Low fidelity should not render execution-context annotations");
+    assert!(
+        !result.contains("df:"),
+        "Low fidelity should not render data-flow markers"
+    );
+    assert!(
+        !result.contains(" se:"),
+        "Low fidelity should not render side-effect annotations"
+    );
+    assert!(
+        !result.contains(" ec:"),
+        "Low fidelity should not render execution-context annotations"
+    );
 }
 
 /// Edit fidelity: execution metadata stays compact (only bodies are verbatim).
@@ -831,9 +899,18 @@ fn test_edit_focused_renders_only_named_method_bodies() {
     assert!(result.contains("M methodB"));
     assert!(result.contains("M methodC"));
     // Only methodB gets its body
-    assert!(!result.contains("let a = 1"), "unfocused method body must not render");
-    assert!(result.contains("let b = 2"), "focused method body must render verbatim");
-    assert!(!result.contains("let c = 3"), "unfocused method body must not render");
+    assert!(
+        !result.contains("let a = 1"),
+        "unfocused method body must not render"
+    );
+    assert!(
+        result.contains("let b = 2"),
+        "focused method body must render verbatim"
+    );
+    assert!(
+        !result.contains("let c = 3"),
+        "unfocused method body must not render"
+    );
 }
 
 /// Focused rendering: `None` focus is identical to the unfocused function.

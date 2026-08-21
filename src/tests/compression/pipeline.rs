@@ -39,7 +39,11 @@ fn compress_file_cache_hit_returns_notice() {
     let fidelity = Fidelity::Low;
 
     let result1 = compress_file(path.clone(), &mut dict, &mut cache, fidelity, None);
-    assert!(result1.is_ok(), "compress_file (miss) should succeed, got: {:?}", result1);
+    assert!(
+        result1.is_ok(),
+        "compress_file (miss) should succeed, got: {:?}",
+        result1
+    );
 
     let result2 = compress_file(path.clone(), &mut dict, &mut cache, fidelity, None);
     assert!(result2.is_ok(), "compress_file (hit) should succeed");
@@ -157,8 +161,14 @@ fn compress_text_with_aliases_high_fidelity() {
     let result = compress_text(source, "ts", Fidelity::High, "α1", Some(&aliases));
     assert!(result.is_ok());
     let (_body_lines, full_output) = result.unwrap();
-    assert!(full_output.contains("$uid"), "output should contain $uid alias");
-    assert!(full_output.contains("§TA"), "output should contain §TA footer");
+    assert!(
+        full_output.contains("$uid"),
+        "output should contain $uid alias"
+    );
+    assert!(
+        full_output.contains("§TA"),
+        "output should contain §TA footer"
+    );
 }
 
 #[test]
@@ -238,7 +248,8 @@ fn build_output_lines_high_fidelity_still_indents_signature() {
     let built = build_output_lines(&[cap], "", Fidelity::High, None);
     assert_eq!(built.output_lines.len(), 1);
     assert_eq!(
-        built.output_lines[0], format!("  {}", sig),
+        built.output_lines[0],
+        format!("  {}", sig),
         "High fidelity should keep the 2-space indent"
     );
 }
@@ -249,7 +260,8 @@ fn build_output_lines_high_fidelity_still_indents_signature() {
 fn compress_text_edit_fidelity_skips_type_aliases() {
     // C-5 fix: at Edit fidelity the method bodies are byte-exact, so
     // type-alias substitution must be skipped (it would corrupt them).
-    let source = "class UserService { getUser(id: string): Promise<User> {\n  return new User();\n} }";
+    let source =
+        "class UserService { getUser(id: string): Promise<User> {\n  return new User();\n} }";
     let aliases = make_aliases(&[("User", "$uid")]);
     let result = compress_text(source, "ts", Fidelity::Edit, "α1", Some(&aliases));
     assert!(result.is_ok(), "compress_text at Edit should succeed");
@@ -275,7 +287,8 @@ fn compress_text_edit_fidelity_skips_type_aliases() {
 #[test]
 fn compress_text_verbatim_fidelity_skips_type_aliases() {
     // C-5 fix: same guarantee at Verbatim.
-    let source = "class UserService { getUser(id: string): Promise<User> {\n  return new User();\n} }";
+    let source =
+        "class UserService { getUser(id: string): Promise<User> {\n  return new User();\n} }";
     let aliases = make_aliases(&[("User", "$uid")]);
     let result = compress_text(source, "ts", Fidelity::Verbatim, "α1", Some(&aliases));
     assert!(result.is_ok(), "compress_text at Verbatim should succeed");
@@ -311,10 +324,16 @@ fn compress_file_edit_cache_hit_returns_raw_source() {
     let mut cache = LocalStateCache::new();
 
     let result1 = compress_file(path.clone(), &mut dict, &mut cache, Fidelity::Edit, None);
-    assert!(result1.is_ok(), "compress_file (miss) at Edit should succeed");
+    assert!(
+        result1.is_ok(),
+        "compress_file (miss) at Edit should succeed"
+    );
 
     let result2 = compress_file(path.clone(), &mut dict, &mut cache, Fidelity::Edit, None);
-    assert!(result2.is_ok(), "compress_file (hit) at Edit should succeed");
+    assert!(
+        result2.is_ok(),
+        "compress_file (hit) at Edit should succeed"
+    );
     let output2 = result2.unwrap();
     assert_eq!(
         output2, source,
@@ -337,11 +356,29 @@ fn compress_file_verbatim_cache_hit_returns_raw_source() {
     let mut dict = crate::dictionary::PathDictionary::new();
     let mut cache = LocalStateCache::new();
 
-    let result1 = compress_file(path.clone(), &mut dict, &mut cache, Fidelity::Verbatim, None);
-    assert!(result1.is_ok(), "compress_file (miss) at Verbatim should succeed");
+    let result1 = compress_file(
+        path.clone(),
+        &mut dict,
+        &mut cache,
+        Fidelity::Verbatim,
+        None,
+    );
+    assert!(
+        result1.is_ok(),
+        "compress_file (miss) at Verbatim should succeed"
+    );
 
-    let result2 = compress_file(path.clone(), &mut dict, &mut cache, Fidelity::Verbatim, None);
-    assert!(result2.is_ok(), "compress_file (hit) at Verbatim should succeed");
+    let result2 = compress_file(
+        path.clone(),
+        &mut dict,
+        &mut cache,
+        Fidelity::Verbatim,
+        None,
+    );
+    assert!(
+        result2.is_ok(),
+        "compress_file (hit) at Verbatim should succeed"
+    );
     let output2 = result2.unwrap();
     assert_eq!(
         output2, source,

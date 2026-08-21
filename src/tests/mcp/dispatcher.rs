@@ -49,24 +49,31 @@ fn dispatcher_creates_successfully() {
     // McpState uses interior mutability — no outer RwLock accessor needed
     // format_footer() always emits the §PATHMAP header, so check no path entries exist
     let footer = dispatcher.state().dict_lock().format_footer();
-    assert!(!footer.contains('='),
-        "new dispatcher should have empty dictionary footer, got: {footer:?}");
+    assert!(
+        !footer.contains('='),
+        "new dispatcher should have empty dictionary footer, got: {footer:?}"
+    );
 }
 
 #[test]
 fn dispatcher_single_spawn_mutates_state() {
     let dispatcher = make_dispatcher();
 
-    dispatcher.spawn(&test_request("1", "test"), |state| {
-        state.get_or_create_alias("test.ts".to_string());
-    }).expect("spawn should succeed");
+    dispatcher
+        .spawn(&test_request("1", "test"), |state| {
+            state.get_or_create_alias("test.ts".to_string());
+        })
+        .expect("spawn should succeed");
 
     // Wait for the task to complete
     std::thread::sleep(Duration::from_millis(100));
 
     // Verify the mutation via dict (which uses interior mutability)
     let footer = dispatcher.state().dict_lock().format_footer();
-    assert!(footer.contains("test.ts"), "spawn should have registered path alias");
+    assert!(
+        footer.contains("test.ts"),
+        "spawn should have registered path alias"
+    );
 }
 
 #[test]
@@ -76,15 +83,21 @@ fn dispatcher_multiple_spawns_work() {
 
     for _i in 0..5 {
         let counter = Arc::clone(&counter);
-        dispatcher.spawn(&test_request("test", "test"), move |_state| {
-            counter.fetch_add(1, Ordering::SeqCst);
-        }).expect("spawn should succeed");
+        dispatcher
+            .spawn(&test_request("test", "test"), move |_state| {
+                counter.fetch_add(1, Ordering::SeqCst);
+            })
+            .expect("spawn should succeed");
     }
 
     // Wait for all tasks to complete
     std::thread::sleep(Duration::from_millis(200));
 
-    assert_eq!(counter.load(Ordering::SeqCst), 5, "all 5 spawns should complete");
+    assert_eq!(
+        counter.load(Ordering::SeqCst),
+        5,
+        "all 5 spawns should complete"
+    );
 }
 
 #[test]
@@ -94,20 +107,32 @@ fn dispatcher_concurrent_no_data_race() {
 
     for i in 0..20 {
         let counter = Arc::clone(&counter);
-        dispatcher.spawn(&test_request(&i.to_string(), "test"), move |state| {
-            let _ = state.proxy_port;
-            let _ = state.config.default_fidelity;
-            state.get_or_create_alias("test.ts".to_string());
-            counter.fetch_add(1, Ordering::SeqCst);
-        }).expect("spawn should succeed");
+        dispatcher
+            .spawn(&test_request(&i.to_string(), "test"), move |state| {
+                let _ = state.proxy_port;
+                let _ = state.config.default_fidelity;
+                state.get_or_create_alias("test.ts".to_string());
+                counter.fetch_add(1, Ordering::SeqCst);
+            })
+            .expect("spawn should succeed");
     }
 
     // Wait for completion
     std::thread::sleep(Duration::from_millis(300));
 
-    assert_eq!(counter.load(Ordering::SeqCst), 20, "all 20 rapid-fire spawns should complete");
-    assert!(dispatcher.state().dict_lock().format_footer().contains("test.ts"),
-        "path alias should be registered in footer");
+    assert_eq!(
+        counter.load(Ordering::SeqCst),
+        20,
+        "all 20 rapid-fire spawns should complete"
+    );
+    assert!(
+        dispatcher
+            .state()
+            .dict_lock()
+            .format_footer()
+            .contains("test.ts"),
+        "path alias should be registered in footer"
+    );
 }
 
 #[test]
@@ -116,9 +141,11 @@ fn dispatcher_panic_recovery_continues_processing() {
     let counter = Arc::new(AtomicUsize::new(0));
 
     // Spawn a handler that panics
-    dispatcher.spawn(&test_request("panic", "test"), |_state| {
-        panic!("intentional panic");
-    }).expect("spawn should succeed");
+    dispatcher
+        .spawn(&test_request("panic", "test"), |_state| {
+            panic!("intentional panic");
+        })
+        .expect("spawn should succeed");
 
     // Wait for panic to occur
     std::thread::sleep(Duration::from_millis(100));
@@ -126,26 +153,36 @@ fn dispatcher_panic_recovery_continues_processing() {
     // Spawn more handlers - they should still work
     for i in 0..5 {
         let counter = Arc::clone(&counter);
-        dispatcher.spawn(&test_request(&i.to_string(), "test"), move |_state| {
-            counter.fetch_add(1, Ordering::SeqCst);
-        }).expect("spawn should succeed");
+        dispatcher
+            .spawn(&test_request(&i.to_string(), "test"), move |_state| {
+                counter.fetch_add(1, Ordering::SeqCst);
+            })
+            .expect("spawn should succeed");
     }
 
     std::thread::sleep(Duration::from_millis(200));
-    assert_eq!(counter.load(Ordering::SeqCst), 5, "handlers after panic should still work");
+    assert_eq!(
+        counter.load(Ordering::SeqCst),
+        5,
+        "handlers after panic should still work"
+    );
 }
 
 #[test]
 fn dispatcher_tracing_records_requests() {
     let dispatcher = make_dispatcher();
 
-    dispatcher.spawn(&test_request("trace1", "method1"), |_state| {
-        std::thread::sleep(Duration::from_millis(50));
-    }).expect("spawn should succeed");
+    dispatcher
+        .spawn(&test_request("trace1", "method1"), |_state| {
+            std::thread::sleep(Duration::from_millis(50));
+        })
+        .expect("spawn should succeed");
 
-    dispatcher.spawn(&test_request("trace2", "method2"), |_state| {
-        std::thread::sleep(Duration::from_millis(10));
-    }).expect("spawn should succeed");
+    dispatcher
+        .spawn(&test_request("trace2", "method2"), |_state| {
+            std::thread::sleep(Duration::from_millis(10));
+        })
+        .expect("spawn should succeed");
 
     std::thread::sleep(Duration::from_millis(200));
 
@@ -153,7 +190,10 @@ fn dispatcher_tracing_records_requests() {
     assert_eq!(traces.len(), 2, "should have 2 traces");
     assert_eq!(traces[0].id, "trace2"); // Most recent first
     assert_eq!(traces[0].method, "method2");
-    assert!(traces[0].latency() >= Duration::from_millis(10), "should have processing time");
+    assert!(
+        traces[0].latency() >= Duration::from_millis(10),
+        "should have processing time"
+    );
 }
 
 // ── P0-1 REGRESSION TESTS ──────────────────────────────────────────
@@ -182,22 +222,24 @@ fn p0_1_regression_requests_execute_concurrently() {
     for i in 0..4 {
         let started = Arc::clone(&started);
         let all_started = Arc::clone(&all_started);
-        dispatcher.spawn(&test_request(&i.to_string(), "slow"), move |_state| {
-            // Signal that this handler started
-            started.fetch_add(1, Ordering::SeqCst);
+        dispatcher
+            .spawn(&test_request(&i.to_string(), "slow"), move |_state| {
+                // Signal that this handler started
+                started.fetch_add(1, Ordering::SeqCst);
 
-            // Spin-wait until all 4 have started or timeout
-            let deadline = Instant::now() + Duration::from_millis(300);
-            while Instant::now() < deadline {
-                if all_started.load(Ordering::Acquire) {
-                    break;
+                // Spin-wait until all 4 have started or timeout
+                let deadline = Instant::now() + Duration::from_millis(300);
+                while Instant::now() < deadline {
+                    if all_started.load(Ordering::Acquire) {
+                        break;
+                    }
+                    std::thread::yield_now();
                 }
-                std::thread::yield_now();
-            }
 
-            // Now simulate work
-            std::thread::sleep(Duration::from_millis(200));
-        }).expect("spawn should succeed");
+                // Now simulate work
+                std::thread::sleep(Duration::from_millis(200));
+            })
+            .expect("spawn should succeed");
     }
 
     // Give workers time to spin up and start processing
@@ -205,7 +247,10 @@ fn p0_1_regression_requests_execute_concurrently() {
 
     // Check how many handlers started
     let started_count = started.load(Ordering::SeqCst);
-    eprintln!("[clean-ctx] P0-1: started_count={} before barrier release", started_count);
+    eprintln!(
+        "[clean-ctx] P0-1: started_count={} before barrier release",
+        started_count
+    );
 
     // Release all waiting handlers
     all_started.store(true, Ordering::Release);
@@ -247,8 +292,10 @@ fn p0_1_regression_no_outer_rwlock() {
 #[test]
 fn p0_3_regression_no_response_channel() {
     let dispatcher = make_dispatcher();
-    dispatcher.spawn(&test_request("test", "test"), |state| {
-        // &McpState, not &mut McpState — can read but not write plain fields
-        let _ = state.proxy_port;
-    }).unwrap();
+    dispatcher
+        .spawn(&test_request("test", "test"), |state| {
+            // &McpState, not &mut McpState — can read but not write plain fields
+            let _ = state.proxy_port;
+        })
+        .unwrap();
 }

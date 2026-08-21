@@ -20,7 +20,10 @@ const MAX_FILE_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
 
 /// P1-10: Unified token metadata computation for cache-hit paths.
 /// Ensures consistent token counting between cache-hit and cache-miss paths.
-fn compute_token_metadata(raw_tokens: usize, compressed_text: &str) -> crate::analytics::TokenMetadata {
+fn compute_token_metadata(
+    raw_tokens: usize,
+    compressed_text: &str,
+) -> crate::analytics::TokenMetadata {
     let bpe = crate::analytics::bpe();
     let compressed_tokens = bpe.encode_with_special_tokens(compressed_text).len();
     let savings_percentage = if raw_tokens > 0 {
@@ -36,23 +39,23 @@ fn compute_token_metadata(raw_tokens: usize, compressed_text: &str) -> crate::an
     }
 }
 use crate::cache::LocalStateCache;
-use crate::compaction::{
-    compact_expression, compact_import, extract_class_name, extract_field,
-    extract_method_sig, extract_rust_struct_name, format_class_entry,
-    format_java_type_entry, format_rust_type_entry, simple_compact,
-};
 use crate::compaction::java::{
     compact_java_package, extract_java_constructor_sig, extract_java_type_name,
 };
+use crate::compaction::{
+    compact_expression, compact_import, extract_class_name, extract_field, extract_method_sig,
+    extract_rust_struct_name, format_class_entry, format_java_type_entry, format_rust_type_entry,
+    simple_compact,
+};
+use crate::compression::CapEntry;
+use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::language::language_for_extension;
 use crate::compression::markers::build_marker;
-use crate::compression::report::{format_compacted_body, format_final_output};
 use crate::compression::micro_opcodes::apply_micro_opcodes;
+use crate::compression::report::{format_compacted_body, format_final_output};
 use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::compression::type_aliases::apply_type_aliases;
-use crate::compression::CapEntry;
-use crate::compression::Fidelity;
 use crate::dictionary::PathDictionary;
 
 /// Output of [`build_output_lines`]. F-04 (FAANG audit): previously
@@ -120,7 +123,7 @@ pub fn compress_file_with_source(
         // Use centralized validation from ResourceLimits (SRP compliance).
         let meta = fs::metadata(&file)?;
         let file_size = meta.len();
-        
+
         // Delegate to config validation method if available
         if let Some(cfg) = config {
             cfg.resource_limits.check_file_size(file_size)?;
@@ -132,7 +135,7 @@ pub fn compress_file_with_source(
             )
             .into());
         }
-        
+
         source_code = fs::read_to_string(&file)?;
     }
     let source_bytes = source_code.as_bytes();
@@ -191,7 +194,12 @@ pub fn compress_file_with_source(
         );
         return Ok(format!(
             "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
-            meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, ratio_report, cached_notice
+            meta.raw_tokens,
+            meta.compressed_tokens,
+            meta.savings_percentage,
+            fidelity,
+            ratio_report,
+            cached_notice
         ));
     }
 
@@ -211,13 +219,9 @@ pub fn compress_file_with_source(
             match capture_name {
                 "class.root" => Some(extract_class_name(raw)),
                 // Rust type declarations: struct, enum, trait, impl
-                "struct.root" | "trait.root" | "impl.root" => {
-                    Some(extract_rust_struct_name(raw))
-                }
+                "struct.root" | "trait.root" | "impl.root" => Some(extract_rust_struct_name(raw)),
                 // Java type declarations: interface, enum, record
-                "interface.root" | "record.root" => {
-                    Some(extract_java_type_name(raw, capture_name))
-                }
+                "interface.root" | "record.root" => Some(extract_java_type_name(raw, capture_name)),
                 "method.root" => Some(extract_method_sig(raw, f)),
                 "constructor.root" => Some(extract_java_constructor_sig(raw, f)),
                 "field.root" => Some(extract_field(raw, f)),
@@ -277,7 +281,8 @@ pub fn compress_file_with_source(
     body_content = apply_micro_opcodes(&body_content, fidelity);
     let (display_body, sym_footer) = apply_symbol_compression(&body_content, fidelity);
     let combined_footer = combine_footers(&sym_footer, &ta_footer);
-    let compacted_body = format_compacted_body(&display_body, &combined_footer, &path_alias, fidelity);
+    let compacted_body =
+        format_compacted_body(&display_body, &combined_footer, &path_alias, fidelity);
     // F-14: store the raw-token count for this content hash so the
     // cache-hit path can skip the BPE encode on subsequent calls.
     let raw_tokens = crate::analytics::bpe()
@@ -323,13 +328,9 @@ pub fn compress_text(
             match capture_name {
                 "class.root" => Some(extract_class_name(raw)),
                 // Rust type declarations: struct, enum, trait, impl
-                "struct.root" | "trait.root" | "impl.root" => {
-                    Some(extract_rust_struct_name(raw))
-                }
+                "struct.root" | "trait.root" | "impl.root" => Some(extract_rust_struct_name(raw)),
                 // Java type declarations: interface, enum, record
-                "interface.root" | "record.root" => {
-                    Some(extract_java_type_name(raw, capture_name))
-                }
+                "interface.root" | "record.root" => Some(extract_java_type_name(raw, capture_name)),
                 "method.root" => Some(extract_method_sig(raw, f)),
                 "constructor.root" => Some(extract_java_constructor_sig(raw, f)),
                 "field.root" => Some(extract_field(raw, f)),
@@ -383,7 +384,8 @@ pub fn compress_text(
 
     // Build full output (header + body + symbol footer)
     let combined_footer = combine_footers(&sym_footer, &ta_footer);
-    let compacted_body = format_compacted_body(&display_body, &combined_footer, path_alias, fidelity);
+    let compacted_body =
+        format_compacted_body(&display_body, &combined_footer, path_alias, fidelity);
     let full_output = format_final_output(
         source_code,
         &compacted_body,
@@ -442,7 +444,12 @@ pub fn build_output_lines(
                 }
             }
             "class.root" => {
-                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium || fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim) {
+                if !output_lines.is_empty()
+                    && (fidelity == Fidelity::High
+                        || fidelity == Fidelity::Medium
+                        || fidelity == Fidelity::Edit
+                        || fidelity == Fidelity::Verbatim)
+                {
                     output_lines.push(String::new());
                 }
                 output_lines.push(format_class_entry(&cap.text, &fields, fidelity));
@@ -454,7 +461,12 @@ pub fn build_output_lines(
             // Rust type declarations: struct, enum, trait, impl
             // Use Rust-specific formatting (no "class" prefix)
             "struct.root" | "trait.root" | "impl.root" => {
-                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium || fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim) {
+                if !output_lines.is_empty()
+                    && (fidelity == Fidelity::High
+                        || fidelity == Fidelity::Medium
+                        || fidelity == Fidelity::Edit
+                        || fidelity == Fidelity::Verbatim)
+                {
                     output_lines.push(String::new());
                 }
                 output_lines.push(format_rust_type_entry(&cap.text, &fields, fidelity));
@@ -466,10 +478,17 @@ pub fn build_output_lines(
             // Java type declarations: interface, enum, record
             // Use Java-specific formatting (preserves type keyword)
             "interface.root" | "enum.root" | "record.root" => {
-                if !output_lines.is_empty() && (fidelity == Fidelity::High || fidelity == Fidelity::Medium || fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim) {
+                if !output_lines.is_empty()
+                    && (fidelity == Fidelity::High
+                        || fidelity == Fidelity::Medium
+                        || fidelity == Fidelity::Edit
+                        || fidelity == Fidelity::Verbatim)
+                {
                     output_lines.push(String::new());
                 }
-                output_lines.push(format_java_type_entry(&cap.text, &cap.name, &fields, fidelity));
+                output_lines.push(format_java_type_entry(
+                    &cap.text, &cap.name, &fields, fidelity,
+                ));
                 class_captures.push(cap.text.clone());
                 class_count += 1;
                 fields.clear();
@@ -513,9 +532,10 @@ pub fn build_output_lines(
                     continue;
                 }
                 if let Some(marker) = build_marker(&cap.name, &cap.text)
-                    && markers.last().map(|m| m != &marker).unwrap_or(true) {
-                        markers.push(marker);
-                    }
+                    && markers.last().map(|m| m != &marker).unwrap_or(true)
+                {
+                    markers.push(marker);
+                }
             }
         }
     }
@@ -529,16 +549,17 @@ pub fn build_output_lines(
     // C-8 (FAANG audit): at Edit/Verbatim `simple_compact` would collapse
     // whitespace and break byte-exactness. Emit the first line as-is.
     if output_lines.is_empty()
-        && let Some(first_line) = source_code.lines().next() {
-            let trimmed = first_line.trim().to_string();
-            if !trimmed.is_empty() {
-                if fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim {
-                    output_lines.push(trimmed);
-                } else {
-                    output_lines.push(simple_compact(&trimmed, fidelity));
-                }
+        && let Some(first_line) = source_code.lines().next()
+    {
+        let trimmed = first_line.trim().to_string();
+        if !trimmed.is_empty() {
+            if fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim {
+                output_lines.push(trimmed);
+            } else {
+                output_lines.push(simple_compact(&trimmed, fidelity));
             }
         }
+    }
 
     // Prepend imports
     let mut output = output_lines;
@@ -554,8 +575,9 @@ pub fn build_output_lines(
     // registered and the tree-sitter grammar is not linked.
     let registry = crate::layers::LayerRegistry::global();
     let meta_results = registry.run_meta_layers_pipeline(source_code, &class_captures, fidelity);
-    
-    let meta_block = meta_results.iter()
+
+    let meta_block = meta_results
+        .iter()
         .find(|(name, _)| name == "angular")
         .map(|(_, text)| {
             let mut lines = Vec::new();
@@ -566,8 +588,9 @@ pub fn build_output_lines(
             }
             crate::angular_meta::MetaBlock { lines }
         });
-    
-    let spring_meta_block = meta_results.iter()
+
+    let spring_meta_block = meta_results
+        .iter()
         .find(|(name, _)| name == "spring_boot")
         .map(|(_, text)| {
             let mut lines = Vec::new();
@@ -578,19 +601,21 @@ pub fn build_output_lines(
             }
             crate::spring_meta::MetaBlock { lines }
         });
-    
-    let dotnet_meta_block = meta_results.iter()
-        .find(|(name, _)| name == "dotnet")
-        .map(|(_, text)| {
-            let mut lines = Vec::new();
-            for line in text.lines() {
-                if line.starts_with("Φ") {
-                    lines.push(line.to_string());
+
+    let dotnet_meta_block =
+        meta_results
+            .iter()
+            .find(|(name, _)| name == "dotnet")
+            .map(|(_, text)| {
+                let mut lines = Vec::new();
+                for line in text.lines() {
+                    if line.starts_with("Φ") {
+                        lines.push(line.to_string());
+                    }
                 }
-            }
-            crate::dotnet_meta::MetaBlock { lines }
-        });
-    
+                crate::dotnet_meta::MetaBlock { lines }
+            });
+
     BuildOutputResult {
         output_lines: output,
         class_count,
@@ -618,7 +643,10 @@ pub fn compress_source(
     let source_bytes = source_code.as_bytes();
     let current_hash = cache.compute_hash(source_bytes);
     let path_alias = dict.get_or_create_alias(absolute_path.to_string());
-    eprintln!("[compress_source] got alias {} for {}", path_alias, absolute_path);
+    eprintln!(
+        "[compress_source] got alias {} for {}",
+        path_alias, absolute_path
+    );
 
     let cache_key = format!("{}::{}", absolute_path, fidelity as u8);
     let is_modified = cache.update_and_verify(&cache_key, &current_hash);
@@ -688,7 +716,12 @@ pub fn compress_source(
         );
         return Ok(format!(
             "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
-            meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, ratio_report, cached_notice
+            meta.raw_tokens,
+            meta.compressed_tokens,
+            meta.savings_percentage,
+            fidelity,
+            ratio_report,
+            cached_notice
         ));
     }
 
@@ -700,60 +733,59 @@ pub fn compress_source(
     let (language, query_string) = crate::compression::language::language_for_extension(extension)
         .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
 
-     let all_captures: Vec<CapEntry> = run_capture_pipeline(
-         language,
-         query_string,
-         source_code,
-         fidelity,
-         |capture_name, raw, f| {
-             match capture_name {
-                 "class.root" => Some(extract_class_name(raw)),
-                 // Rust type declarations: struct, enum, trait, impl
-                 "struct.root" | "trait.root" | "impl.root" => {
-                     Some(extract_rust_struct_name(raw))
-                 }
-                 // Java type declarations: interface, enum, record
-                 "interface.root" | "record.root" => {
-                     Some(extract_java_type_name(raw, capture_name))
-                 }
-                 "method.root" => Some(extract_method_sig(raw, f)),
-                 "constructor.root" => Some(extract_java_constructor_sig(raw, f)),
-                 "field.root" => Some(extract_field(raw, f)),
-                 // Rust mod declarations are structural like imports
-                 "mod.root" => Some(compact_import(raw, f)),
-                 // Java package declarations
-                 "package.root" => Some(compact_java_package(raw, f)),
-                 // Rust type aliases
-                 "type.root" => Some(compact_expression(raw, f)),
-                 _ => Some(compact_expression(raw, f)),
-             }
-         },
-     )?;
+    let all_captures: Vec<CapEntry> = run_capture_pipeline(
+        language,
+        query_string,
+        source_code,
+        fidelity,
+        |capture_name, raw, f| {
+            match capture_name {
+                "class.root" => Some(extract_class_name(raw)),
+                // Rust type declarations: struct, enum, trait, impl
+                "struct.root" | "trait.root" | "impl.root" => Some(extract_rust_struct_name(raw)),
+                // Java type declarations: interface, enum, record
+                "interface.root" | "record.root" => Some(extract_java_type_name(raw, capture_name)),
+                "method.root" => Some(extract_method_sig(raw, f)),
+                "constructor.root" => Some(extract_java_constructor_sig(raw, f)),
+                "field.root" => Some(extract_field(raw, f)),
+                // Rust mod declarations are structural like imports
+                "mod.root" => Some(compact_import(raw, f)),
+                // Java package declarations
+                "package.root" => Some(compact_java_package(raw, f)),
+                // Rust type aliases
+                "type.root" => Some(compact_expression(raw, f)),
+                _ => Some(compact_expression(raw, f)),
+            }
+        },
+    )?;
 
-     #[cfg(debug_assertions)]
-     eprintln!("[compress_source] run_capture_pipeline returned {} captures", all_captures.len());
+    #[cfg(debug_assertions)]
+    eprintln!(
+        "[compress_source] run_capture_pipeline returned {} captures",
+        all_captures.len()
+    );
 
-     let built = build_output_lines(&all_captures, source_code, fidelity, None);
-     #[cfg(debug_assertions)]
-     eprintln!("[compress_source] build_output_lines done");
-     let mut body_content = assemble_body(&built.output_lines, fidelity);
-     #[cfg(debug_assertions)]
-     eprintln!("[compress_source] assemble_body done");
-     // C-11 (FAANG audit): At Edit/Verbatim the method bodies are byte-exact.
-     // Injecting the Φ meta block would corrupt the byte-exact contract, so
-     // meta-layers are skipped at Edit/Verbatim.
-     if fidelity != Fidelity::Edit && fidelity != Fidelity::Verbatim {
-         if let Some(block) = &built.meta_block {
-             body_content.push_str(&block.render());
-         }
-     }
-     #[cfg(debug_assertions)]
-     eprintln!("[compress_source] meta_block rendered");
-     // R-02: Apply type aliases before micro-opcodes so `$uid` tokens
-     // are preserved. At Low fidelity types are already stripped. At
-     // Edit/Verbatim the method bodies are byte-exact — type
-     // substitution would corrupt them, so it is skipped.
-     let ta_footer = if let Some(aliases) = aliases
+    let built = build_output_lines(&all_captures, source_code, fidelity, None);
+    #[cfg(debug_assertions)]
+    eprintln!("[compress_source] build_output_lines done");
+    let mut body_content = assemble_body(&built.output_lines, fidelity);
+    #[cfg(debug_assertions)]
+    eprintln!("[compress_source] assemble_body done");
+    // C-11 (FAANG audit): At Edit/Verbatim the method bodies are byte-exact.
+    // Injecting the Φ meta block would corrupt the byte-exact contract, so
+    // meta-layers are skipped at Edit/Verbatim.
+    if fidelity != Fidelity::Edit && fidelity != Fidelity::Verbatim {
+        if let Some(block) = &built.meta_block {
+            body_content.push_str(&block.render());
+        }
+    }
+    #[cfg(debug_assertions)]
+    eprintln!("[compress_source] meta_block rendered");
+    // R-02: Apply type aliases before micro-opcodes so `$uid` tokens
+    // are preserved. At Low fidelity types are already stripped. At
+    // Edit/Verbatim the method bodies are byte-exact — type
+    // substitution would corrupt them, so it is skipped.
+    let ta_footer = if let Some(aliases) = aliases
         && !aliases.is_empty()
         && fidelity != Fidelity::Edit
         && fidelity != Fidelity::Verbatim
@@ -764,42 +796,42 @@ pub fn compress_source(
     } else {
         String::new()
     };
-     // Phase III (Idea #11 — Micro-Opcode Table for Text):
-     // Apply micro-opcodes (§C, §P) for workspace-level compression too.
-     body_content = apply_micro_opcodes(&body_content, fidelity);
-     #[cfg(debug_assertions)]
-     eprintln!("[compress_source] apply_micro_opcodes done");
-     // NOTE: Symbol compression is NOT applied here — it will be applied
-     // by the workspace-level global symbol table instead.
-     let combined_footer = combine_footers("", &ta_footer);
-     let compacted_body = crate::compression::report::format_compacted_body(
-         &body_content,
-         &combined_footer,
-         &path_alias,
-         fidelity,
-     );
-     #[cfg(debug_assertions)]
-     eprintln!("[compress_source] format_compacted_body done");
-     let raw_tokens = crate::analytics::bpe()
-         .encode_with_special_tokens(source_code)
-         .len();
-     #[cfg(debug_assertions)]
-     eprintln!("[compress_source] bpe encode done, {} tokens", raw_tokens);
-     cache.store_raw_token_count(&current_hash, raw_tokens);
+    // Phase III (Idea #11 — Micro-Opcode Table for Text):
+    // Apply micro-opcodes (§C, §P) for workspace-level compression too.
+    body_content = apply_micro_opcodes(&body_content, fidelity);
+    #[cfg(debug_assertions)]
+    eprintln!("[compress_source] apply_micro_opcodes done");
+    // NOTE: Symbol compression is NOT applied here — it will be applied
+    // by the workspace-level global symbol table instead.
+    let combined_footer = combine_footers("", &ta_footer);
+    let compacted_body = crate::compression::report::format_compacted_body(
+        &body_content,
+        &combined_footer,
+        &path_alias,
+        fidelity,
+    );
+    #[cfg(debug_assertions)]
+    eprintln!("[compress_source] format_compacted_body done");
+    let raw_tokens = crate::analytics::bpe()
+        .encode_with_special_tokens(source_code)
+        .len();
+    #[cfg(debug_assertions)]
+    eprintln!("[compress_source] bpe encode done, {} tokens", raw_tokens);
+    cache.store_raw_token_count(&current_hash, raw_tokens);
 
-     #[cfg(debug_assertions)]
-     eprintln!("[compress_source] store_raw_token_count done");
-     let final_output = crate::compression::report::format_final_output(
-         source_code,
-         &compacted_body,
-         fidelity,
-         built.class_count,
-         built.method_count,
-         built.import_count,
-     );
-     #[cfg(debug_assertions)]
-     eprintln!("[compress_source] format_final_output done");
-     Ok(final_output)
+    #[cfg(debug_assertions)]
+    eprintln!("[compress_source] store_raw_token_count done");
+    let final_output = crate::compression::report::format_final_output(
+        source_code,
+        &compacted_body,
+        fidelity,
+        built.class_count,
+        built.method_count,
+        built.import_count,
+    );
+    #[cfg(debug_assertions)]
+    eprintln!("[compress_source] format_final_output done");
+    Ok(final_output)
 }
 
 /// Check if a capture should be skipped due to CBM filter-first rules.
@@ -813,13 +845,21 @@ pub fn compress_source(
 /// `cap.name` is the capture type (e.g. "class.root", "method.root")
 /// and `cap.text` is the processed text (e.g. the class name or method
 /// signature).
-pub(crate) fn should_skip_capture(cap: &crate::compression::CapEntry, skip_set: &HashSet<String>) -> bool {
+pub(crate) fn should_skip_capture(
+    cap: &crate::compression::CapEntry,
+    skip_set: &HashSet<String>,
+) -> bool {
     // Type-like captures (class, struct, enum, trait, impl, interface, record):
     // check the full text against the skip set
     if matches!(
         cap.name.as_str(),
-        "class.root" | "struct.root" | "enum.root" | "trait.root"
-            | "impl.root" | "interface.root" | "record.root"
+        "class.root"
+            | "struct.root"
+            | "enum.root"
+            | "trait.root"
+            | "impl.root"
+            | "interface.root"
+            | "record.root"
     ) {
         return skip_set.contains(cap.text.trim());
     }
@@ -829,7 +869,10 @@ pub(crate) fn should_skip_capture(cap: &crate::compression::CapEntry, skip_set: 
     // (e.g. "public async getUser..."), so the first word is the access
     // modifier, not the method name. Extract the actual method name by
     // scanning for the identifier that precedes the first `(`.
-    if matches!(cap.name.as_str(), "method.root" | "constructor.root" | "func.root" | "arrow.root") {
+    if matches!(
+        cap.name.as_str(),
+        "method.root" | "constructor.root" | "func.root" | "arrow.root"
+    ) {
         if let Some(name) = extract_method_name_for_skip(&cap.text) {
             return skip_set.contains(name);
         }
@@ -843,7 +886,10 @@ pub(crate) fn should_skip_capture(cap: &crate::compression::CapEntry, skip_set: 
     // token before the `:` to get the actual field name.
     if cap.name == "field.root" {
         let before_colon = cap.text.split(':').next().unwrap_or(cap.text.as_str());
-        let field_name = before_colon.split_whitespace().last().unwrap_or(before_colon);
+        let field_name = before_colon
+            .split_whitespace()
+            .last()
+            .unwrap_or(before_colon);
         return skip_set.contains(field_name.trim());
     }
 

@@ -59,7 +59,10 @@ fn put_overwrites_existing() {
     store.put("/repo/a", "search:foo", r#"["old"]"#, expires);
     store.put("/repo/a", "search:foo", r#"["new"]"#, expires);
 
-    assert_eq!(store.get("/repo/a", "search:foo").as_deref(), Some(r#"["new"]"#));
+    assert_eq!(
+        store.get("/repo/a", "search:foo").as_deref(),
+        Some(r#"["new"]"#)
+    );
 }
 
 #[test]

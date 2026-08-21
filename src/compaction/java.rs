@@ -4,7 +4,7 @@
 // Handles: class, interface, enum, record, constructor, package declarations.
 
 use crate::compaction::expression::compact_expression;
-use crate::compaction::modifiers::{strip_modifiers, MODIFIERS_CLASS};
+use crate::compaction::modifiers::{MODIFIERS_CLASS, strip_modifiers};
 use crate::compression::Fidelity;
 
 /// Extract a Java type name from interface, enum, or record declarations.
@@ -92,10 +92,7 @@ pub fn extract_java_constructor_sig(text: &str, fidelity: Fidelity) -> String {
                         .map(|p| {
                             let p = p.trim();
                             // Take first word as type name
-                            p.split_whitespace()
-                                .next()
-                                .unwrap_or(p)
-                                .to_string()
+                            p.split_whitespace().next().unwrap_or(p).to_string()
                         })
                         .filter(|s| !s.is_empty())
                         .collect();

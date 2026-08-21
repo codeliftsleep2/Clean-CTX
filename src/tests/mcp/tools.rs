@@ -22,10 +22,7 @@ fn resolve_fidelity_uses_extension_override() {
     config
         .fidelity_overrides
         .insert("ts".to_string(), crate::compression::Fidelity::High);
-    assert_eq!(
-        resolve_fidelity(None, Some("ts"), &config),
-        Fidelity::High
-    );
+    assert_eq!(resolve_fidelity(None, Some("ts"), &config), Fidelity::High);
 }
 
 #[test]
@@ -127,10 +124,7 @@ fn schema_fidelity_enums_include_edit_and_verbatim() {
         let Some(enum_vals) = fid.get("enum").and_then(|e| e.as_array()) else {
             continue; // no enum constraint — skip (not all tools need it)
         };
-        let vals: Vec<&str> = enum_vals
-            .iter()
-            .filter_map(|v| v.as_str())
-            .collect();
+        let vals: Vec<&str> = enum_vals.iter().filter_map(|v| v.as_str()).collect();
         assert!(
             vals.contains(&"edit") && vals.contains(&"verbatim"),
             "tool '{}' fidelity enum must include 'edit' and 'verbatim', got: {:?}",
@@ -160,13 +154,8 @@ fn diff_code_context_unchanged_file_skips_reparse() {
     let source1 = std::fs::read_to_string(&path).unwrap();
 
     // First call: stores baseline.
-    let result1 = diff_code_context_handler(
-        path.clone(),
-        &source1,
-        &mut cache,
-        Fidelity::Low,
-    )
-    .expect("first diff call should succeed");
+    let result1 = diff_code_context_handler(path.clone(), &source1, &mut cache, Fidelity::Low)
+        .expect("first diff call should succeed");
     assert!(
         result1.contains("No baseline snapshot"),
         "first call should store baseline, got: {}",
@@ -175,13 +164,8 @@ fn diff_code_context_unchanged_file_skips_reparse() {
 
     // Second call (unchanged file): should short-circuit.
     let source2 = std::fs::read_to_string(&path).unwrap();
-    let result2 = diff_code_context_handler(
-        path.clone(),
-        &source2,
-        &mut cache,
-        Fidelity::Low,
-    )
-    .expect("second diff call should succeed");
+    let result2 = diff_code_context_handler(path.clone(), &source2, &mut cache, Fidelity::Low)
+        .expect("second diff call should succeed");
     assert!(
         result2.contains("No changes"),
         "second call on unchanged file should say 'No changes', got: {}",
@@ -206,13 +190,8 @@ fn diff_code_context_changed_file_produces_diff() {
     let source_before = std::fs::read_to_string(&path).unwrap();
 
     // First call: stores baseline.
-    let _ = diff_code_context_handler(
-        path.clone(),
-        &source_before,
-        &mut cache,
-        Fidelity::Low,
-    )
-    .expect("first diff call should succeed");
+    let _ = diff_code_context_handler(path.clone(), &source_before, &mut cache, Fidelity::Low)
+        .expect("first diff call should succeed");
 
     // Modify the file.
     {
@@ -227,13 +206,8 @@ fn diff_code_context_changed_file_produces_diff() {
     let source_after = std::fs::read_to_string(&path).unwrap();
 
     // Second call (changed file): should produce a real diff.
-    let result = diff_code_context_handler(
-        path,
-        &source_after,
-        &mut cache,
-        Fidelity::Low,
-    )
-    .expect("diff call on changed file should succeed");
+    let result = diff_code_context_handler(path, &source_after, &mut cache, Fidelity::Low)
+        .expect("diff call on changed file should succeed");
     assert!(
         result.contains("AST Diff") && !result.contains("No changes"),
         "changed file should produce a real diff, not a no-change message, got: {}",
@@ -299,9 +273,11 @@ fn p3_21_tool_names_match_tool_list_and_registry() {
     );
 
     // Verify: union of inline + registry equals tool_list
-    let union: std::collections::HashSet<String> = inline_names.union(&registry_names).cloned().collect();
+    let union: std::collections::HashSet<String> =
+        inline_names.union(&registry_names).cloned().collect();
     assert_eq!(
-        tool_list_names, union,
+        tool_list_names,
+        union,
         "P3-21: tool_list() names don't match inline + registry union.\n\
          In tool_list but not in union: {:?}\n\
          In union but not in tool_list: {:?}",

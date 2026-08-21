@@ -48,9 +48,30 @@ fn directive_selector_resolved() {
 fn multiple_components_with_different_selectors() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("AComponent", "α1", ClassKind::Component, Some("app-a"), &empty, None);
-    collector.push("BComponent", "α2", ClassKind::Component, Some("app-b"), &empty, None);
-    collector.push("CComponent", "α3", ClassKind::Component, Some("app-c"), &empty, None);
+    collector.push(
+        "AComponent",
+        "α1",
+        ClassKind::Component,
+        Some("app-a"),
+        &empty,
+        None,
+    );
+    collector.push(
+        "BComponent",
+        "α2",
+        ClassKind::Component,
+        Some("app-b"),
+        &empty,
+        None,
+    );
+    collector.push(
+        "CComponent",
+        "α3",
+        ClassKind::Component,
+        Some("app-c"),
+        &empty,
+        None,
+    );
     let graph = collector.build_graph();
 
     assert_eq!(graph.resolve_selector("app-a").unwrap(), "AComponent@α1");
@@ -62,7 +83,14 @@ fn multiple_components_with_different_selectors() {
 fn component_without_selector_not_found() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("InternalComponent", "α4", ClassKind::Component, None, &empty, None);
+    collector.push(
+        "InternalComponent",
+        "α4",
+        ClassKind::Component,
+        None,
+        &empty,
+        None,
+    );
     let graph = collector.build_graph();
 
     // No selector was registered, so resolving any selector should fail.
@@ -74,7 +102,14 @@ fn component_without_selector_not_found() {
 fn selector_not_found_returns_none() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("AComponent", "α1", ClassKind::Component, Some("app-a"), &empty, None);
+    collector.push(
+        "AComponent",
+        "α1",
+        ClassKind::Component,
+        Some("app-a"),
+        &empty,
+        None,
+    );
     let graph = collector.build_graph();
 
     let resolved = graph.resolve_selector("app-nonexistent");
@@ -85,7 +120,14 @@ fn selector_not_found_returns_none() {
 fn format_graph_line_includes_selector() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("UserCardComponent", "α1", ClassKind::Component, Some("app-user-card"), &empty, None);
+    collector.push(
+        "UserCardComponent",
+        "α1",
+        ClassKind::Component,
+        Some("app-user-card"),
+        &empty,
+        None,
+    );
     let graph = collector.build_graph();
 
     let footer = graph.format_graph_footer();
@@ -97,7 +139,14 @@ fn format_graph_line_includes_selector() {
 fn format_graph_footer_lists_all_classes() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("AComponent", "α1", ClassKind::Component, Some("app-a"), &empty, None);
+    collector.push(
+        "AComponent",
+        "α1",
+        ClassKind::Component,
+        Some("app-a"),
+        &empty,
+        None,
+    );
     collector.push("BService", "α2", ClassKind::Service, None, &empty, None);
     let graph = collector.build_graph();
 
@@ -112,12 +161,22 @@ fn selector_resolution_works_with_injection() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
     let injects = vec!["UserService".to_string()];
-    collector.push("UserCardComponent", "α1", ClassKind::Component, Some("app-user-card"), &injects, None);
+    collector.push(
+        "UserCardComponent",
+        "α1",
+        ClassKind::Component,
+        Some("app-user-card"),
+        &injects,
+        None,
+    );
     collector.push("UserService", "α2", ClassKind::Service, None, &empty, None);
     let graph = collector.build_graph();
 
     // Selector resolution works
-    assert_eq!(graph.resolve_selector("app-user-card").unwrap(), "UserCardComponent@α1");
+    assert_eq!(
+        graph.resolve_selector("app-user-card").unwrap(),
+        "UserCardComponent@α1"
+    );
 
     // Injection resolution works
     let line = graph.format_graph_line("UserCardComponent").unwrap();
@@ -133,19 +192,46 @@ fn selector_resolution_works_with_injection() {
 fn selector_of_directive_not_confused_with_component() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("AppCardComponent", "α1", ClassKind::Component, Some("app-card"), &empty, None);
-    collector.push("CardHighlightDirective", "α2", ClassKind::Directive, Some("[appCard]"), &empty, None);
+    collector.push(
+        "AppCardComponent",
+        "α1",
+        ClassKind::Component,
+        Some("app-card"),
+        &empty,
+        None,
+    );
+    collector.push(
+        "CardHighlightDirective",
+        "α2",
+        ClassKind::Directive,
+        Some("[appCard]"),
+        &empty,
+        None,
+    );
     let graph = collector.build_graph();
 
-    assert_eq!(graph.resolve_selector("app-card").unwrap(), "AppCardComponent@α1");
-    assert_eq!(graph.resolve_selector("[appCard]").unwrap(), "CardHighlightDirective@α2");
+    assert_eq!(
+        graph.resolve_selector("app-card").unwrap(),
+        "AppCardComponent@α1"
+    );
+    assert_eq!(
+        graph.resolve_selector("[appCard]").unwrap(),
+        "CardHighlightDirective@α2"
+    );
 }
 
 #[test]
 fn pipe_does_not_have_selector() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("MyPipe", "α3", ClassKind::Pipe, None, &empty, Some("myPipe"));
+    collector.push(
+        "MyPipe",
+        "α3",
+        ClassKind::Pipe,
+        None,
+        &empty,
+        Some("myPipe"),
+    );
     let graph = collector.build_graph();
 
     // Pipes don't have selectors, so resolving any selector should return None.

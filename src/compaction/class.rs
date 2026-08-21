@@ -4,7 +4,7 @@
 // Extended to support Rust structs, enums, and traits.
 
 use crate::compaction::modifiers::{
-    strip_csharp_attributes, strip_modifiers, MODIFIERS_CLASS, MODIFIERS_STRUCT_RS,
+    MODIFIERS_CLASS, MODIFIERS_STRUCT_RS, strip_csharp_attributes, strip_modifiers,
 };
 use crate::compression::Fidelity;
 
@@ -63,7 +63,12 @@ pub fn extract_class_name(text: &str) -> String {
         (true, true) => bare_name.to_string(),
         (false, true) => format!("{}:{}", bare_name, extends.join(",")),
         (true, false) => format!("{}:{}", bare_name, implements.join(",")),
-        (false, false) => format!("{}:{},{}", bare_name, extends.join(","), implements.join(",")),
+        (false, false) => format!(
+            "{}:{},{}",
+            bare_name,
+            extends.join(","),
+            implements.join(",")
+        ),
     }
 }
 

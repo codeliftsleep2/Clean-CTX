@@ -93,10 +93,7 @@ impl Fidelity {
     /// — they should return `-32602` instead.
     pub fn parse_or_default(s: &str) -> Self {
         Self::parse(s).unwrap_or_else(|err| {
-            eprintln!(
-                "[clean-ctx] Warning: {} — defaulting to 'low'",
-                err
-            );
+            eprintln!("[clean-ctx] Warning: {} — defaulting to 'low'", err);
             Fidelity::Low
         })
     }

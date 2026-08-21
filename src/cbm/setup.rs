@@ -29,7 +29,11 @@ pub struct CbmSetupInfo {
 ///   2. If found, attempts to check its version
 ///   3. Returns a structured `CbmSetupInfo` for display / config generation
 pub fn cbm_setup_check() -> CbmSetupInfo {
-    let binary_name = if cfg!(windows) { "codebase-memory-mcp.exe" } else { "codebase-memory-mcp" };
+    let binary_name = if cfg!(windows) {
+        "codebase-memory-mcp.exe"
+    } else {
+        "codebase-memory-mcp"
+    };
 
     // Search PATH
     let from_path = search_path(binary_name);
@@ -53,15 +57,13 @@ pub fn cbm_setup_check() -> CbmSetupInfo {
                 is_ready: version_ok,
             }
         }
-        None => {
-            CbmSetupInfo {
-                binary_path: None,
-                version_compatible: false,
-                message: "CBM not found. Install from: https://github.com/DeusData/codebase-memory-mcp"
-                    .to_string(),
-                is_ready: false,
-            }
-        }
+        None => CbmSetupInfo {
+            binary_path: None,
+            version_compatible: false,
+            message: "CBM not found. Install from: https://github.com/DeusData/codebase-memory-mcp"
+                .to_string(),
+            is_ready: false,
+        },
     }
 }
 

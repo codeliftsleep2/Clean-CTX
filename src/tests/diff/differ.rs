@@ -18,10 +18,7 @@ fn make_class(name: &str, methods: &[&str], fields: &[&str]) -> CapturedClass {
 }
 
 /// Build a class with methods that carry explicit body fingerprints.
-fn make_class_with_bodies(
-    name: &str,
-    methods: &[(&str, Option<&str>)],
-) -> CapturedClass {
+fn make_class_with_bodies(name: &str, methods: &[(&str, Option<&str>)]) -> CapturedClass {
     CapturedClass {
         name: name.to_string(),
         class_meta: String::new(),
@@ -43,7 +40,7 @@ fn detects_added_class() {
         imports: vec![],
         classes: vec![make_class("Foo", &["foo()"], &[])],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
@@ -52,13 +49,17 @@ orphan_methods: vec![],
             make_class("Bar", &["bar()"], &[]),
         ],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let has_added_bar = actions.iter().any(|a| {
         a.kind == DiffKind::Added && a.target == DiffTarget::Class && a.label == "class Bar"
     });
-    assert!(has_added_bar, "expected `+ class Bar` action, got {:?}", actions);
+    assert!(
+        has_added_bar,
+        "expected `+ class Bar` action, got {:?}",
+        actions
+    );
 }
 
 #[test]
@@ -70,13 +71,13 @@ fn detects_removed_class() {
             make_class("Bar", &["bar()"], &[]),
         ],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
         classes: vec![make_class("Foo", &["foo()"], &[])],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let has_removed = actions.iter().any(|a| {
@@ -91,13 +92,13 @@ fn detects_modified_method() {
         imports: vec![],
         classes: vec![make_class("Foo", &["process(id:string):boolean"], &[])],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
         classes: vec![make_class("Foo", &["process(id:number):boolean"], &[])],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let modified = actions
@@ -120,7 +121,7 @@ fn body_only_change_is_detected() {
             &[("process(id):void", Some("return id + 1;"))],
         )],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
@@ -130,7 +131,7 @@ orphan_methods: vec![],
             &[("process(id):void", Some("return id + 2;"))],
         )],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let modified = actions
@@ -162,7 +163,7 @@ fn identical_method_with_same_body_is_unchanged() {
             &[("process(id):void", Some("return id + 1;"))],
         )],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = baseline.clone();
     let actions = diff_snapshots(&baseline, &current);
@@ -183,7 +184,7 @@ fn abstract_methods_without_bodies_unchanged() {
             &[("abstract doWork(): void;", None)],
         )],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = baseline.clone();
     let actions = diff_snapshots(&baseline, &current);
@@ -199,24 +200,20 @@ fn detects_added_removed_imports() {
         imports: vec!["OldService".to_string()],
         classes: vec![],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec!["NewService".to_string()],
         classes: vec![],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let added = actions.iter().any(|a| {
-        a.kind == DiffKind::Added
-            && a.target == DiffTarget::Import
-            && a.detail == "NewService"
+        a.kind == DiffKind::Added && a.target == DiffTarget::Import && a.detail == "NewService"
     });
     let removed = actions.iter().any(|a| {
-        a.kind == DiffKind::Removed
-            && a.target == DiffTarget::Import
-            && a.detail == "OldService"
+        a.kind == DiffKind::Removed && a.target == DiffTarget::Import && a.detail == "OldService"
     });
     assert!(added && removed);
 }
@@ -227,14 +224,17 @@ fn unchanged_class_emit_equals_marker() {
         imports: vec![],
         classes: vec![make_class("Foo", &["foo()"], &[])],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = baseline.clone();
     let actions = diff_snapshots(&baseline, &current);
     let unchanged = actions
         .iter()
         .any(|a| a.kind == DiffKind::Unchanged && a.target == DiffTarget::Class);
-    assert!(unchanged, "expected an `=` class action for unchanged snapshot");
+    assert!(
+        unchanged,
+        "expected an `=` class action for unchanged snapshot"
+    );
 }
 
 /// Regression: a C# property-only change (adding a property to a class)
@@ -247,13 +247,13 @@ fn property_only_change_is_detected() {
         imports: vec![],
         classes: vec![make_class("Foo", &["foo()"], &[])],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
         classes: vec![make_class("Foo", &["foo()"], &["Name:string"])],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let added_field = actions
@@ -302,9 +302,18 @@ fn csharp_return_type_first_method_key() {
 #[test]
 fn ts_export_function_method_key() {
     use crate::diff::keys::method_key;
-    assert_eq!(method_key("export function formatName(name:string):string"), "formatName");
-    assert_eq!(method_key("export async function loadData(id:number):Promise<void>"), "loadData");
-    assert_eq!(method_key("async function fetchUser(id:number):Promise<User>"), "fetchUser");
+    assert_eq!(
+        method_key("export function formatName(name:string):string"),
+        "formatName"
+    );
+    assert_eq!(
+        method_key("export async function loadData(id:number):Promise<void>"),
+        "loadData"
+    );
+    assert_eq!(
+        method_key("async function fetchUser(id:number):Promise<User>"),
+        "fetchUser"
+    );
     assert_eq!(method_key("function plain():void"), "plain");
     // Plain TS method (no declarator) still works.
     assert_eq!(method_key("getUser(id:string):Promise<User>"), "getUser");
@@ -318,13 +327,17 @@ fn csharp_methods_with_same_return_type_group_correctly() {
         imports: vec![],
         classes: vec![make_class("Foo", &["bool Foo()", "bool Bar()"], &[])],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
-        classes: vec![make_class("Foo", &["bool Foo()", "bool Bar()", "bool Baz()"], &[])],
+        classes: vec![make_class(
+            "Foo",
+            &["bool Foo()", "bool Bar()", "bool Baz()"],
+            &[],
+        )],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     // Only Baz should be Added — Foo and Bar must be Unchanged.
@@ -332,7 +345,12 @@ orphan_methods: vec![],
         .iter()
         .filter(|a| a.kind == DiffKind::Added && a.target == DiffTarget::Method)
         .collect::<Vec<_>>();
-    assert_eq!(added.len(), 1, "only Baz should be added, got {:?}", actions);
+    assert_eq!(
+        added.len(),
+        1,
+        "only Baz should be added, got {:?}",
+        actions
+    );
     assert!(
         added[0].label.contains("Baz"),
         "added method should be Baz, got {:?}",
@@ -353,13 +371,13 @@ fn class_meta_change_is_detected() {
         imports: vec![],
         classes: vec![base],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let current = CapturedStructure {
         imports: vec![],
         classes: vec![cur],
         orphan_fields: vec![],
-orphan_methods: vec![],
+        orphan_methods: vec![],
     };
     let actions = diff_snapshots(&baseline, &current);
     let class_modified = actions
@@ -384,22 +402,60 @@ orphan_methods: vec![],
 /// G2-2: top-level functions must be diffed even without a class.
 #[test]
 fn orphan_function_change_is_detected() {
-    let mk = |sig: &str| CapturedMethod { sig: sig.to_string(), markers: vec![], body: None };
-    let b = CapturedStructure { imports: vec![], classes: vec![], orphan_fields: vec![], orphan_methods: vec![mk("foo()")] };
-    let c = CapturedStructure { imports: vec![], classes: vec![], orphan_fields: vec![], orphan_methods: vec![mk("foo(x)")] };
+    let mk = |sig: &str| CapturedMethod {
+        sig: sig.to_string(),
+        markers: vec![],
+        body: None,
+    };
+    let b = CapturedStructure {
+        imports: vec![],
+        classes: vec![],
+        orphan_fields: vec![],
+        orphan_methods: vec![mk("foo()")],
+    };
+    let c = CapturedStructure {
+        imports: vec![],
+        classes: vec![],
+        orphan_fields: vec![],
+        orphan_methods: vec![mk("foo(x)")],
+    };
     let a = diff_snapshots(&b, &c);
-    assert!(a.iter().any(|x| x.kind == DiffKind::Modified && x.target == DiffTarget::Method));
+    assert!(
+        a.iter()
+            .any(|x| x.kind == DiffKind::Modified && x.target == DiffTarget::Method)
+    );
 }
 
 /// G2-5: markers-only change sets reason_hint == markers.
 #[test]
 fn markers_only_change_reason_hint() {
-    let mk = |markers: Vec<String>| CapturedMethod { sig: "foo()".to_string(), markers, body: Some("return 1".to_string()) };
-    let cls = |m: CapturedMethod| CapturedClass { name: "Foo".to_string(), class_meta: String::new(), fields: vec![], methods: vec![m] };
-    let b = CapturedStructure { imports: vec![], classes: vec![cls(mk(vec![]))], orphan_fields: vec![], orphan_methods: vec![] };
-    let c = CapturedStructure { imports: vec![], classes: vec![cls(mk(vec!["#guard".to_string()]))], orphan_fields: vec![], orphan_methods: vec![] };
+    let mk = |markers: Vec<String>| CapturedMethod {
+        sig: "foo()".to_string(),
+        markers,
+        body: Some("return 1".to_string()),
+    };
+    let cls = |m: CapturedMethod| CapturedClass {
+        name: "Foo".to_string(),
+        class_meta: String::new(),
+        fields: vec![],
+        methods: vec![m],
+    };
+    let b = CapturedStructure {
+        imports: vec![],
+        classes: vec![cls(mk(vec![]))],
+        orphan_fields: vec![],
+        orphan_methods: vec![],
+    };
+    let c = CapturedStructure {
+        imports: vec![],
+        classes: vec![cls(mk(vec!["#guard".to_string()]))],
+        orphan_fields: vec![],
+        orphan_methods: vec![],
+    };
     let a = diff_snapshots(&b, &c);
-    let m = a.iter().find(|x| x.kind == DiffKind::Modified && x.target == DiffTarget::Method);
+    let m = a
+        .iter()
+        .find(|x| x.kind == DiffKind::Modified && x.target == DiffTarget::Method);
     assert!(m.is_some(), "expected Modified, got {a:?}");
     assert_eq!(m.unwrap().reason_hint, "markers");
 }

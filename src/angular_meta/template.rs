@@ -536,10 +536,7 @@ fn process_element_node(
         for child in node.named_children(&mut cursor) {
             let child_kind = child.kind();
             // Only recurse into element and text nodes, skip start_tag, end_tag.
-            if child_kind == "element"
-                || child_kind == "text"
-                || child_kind == "self_closing_tag"
-            {
+            if child_kind == "element" || child_kind == "text" || child_kind == "self_closing_tag" {
                 walk_node(child, source, max_depth, current_depth + 1, shape);
             }
         }
@@ -548,11 +545,7 @@ fn process_element_node(
 
 /// Process a `self_closing_tag` node (e.g. `<app-avatar />`).
 #[cfg(feature = "angular")]
-fn process_self_closing_tag_node(
-    node: tree_sitter::Node,
-    source: &str,
-    shape: &mut TemplateShape,
-) {
+fn process_self_closing_tag_node(node: tree_sitter::Node, source: &str, shape: &mut TemplateShape) {
     let mut element: Option<TemplateElement> = None;
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
@@ -580,7 +573,9 @@ fn process_self_closing_tag_node(
                         .utf8_text(source.as_bytes())
                         .ok()
                         .map(|s| s.to_string());
-                } else if inner.kind() == "quoted_attribute_value" || inner.kind() == "attribute_value" {
+                } else if inner.kind() == "quoted_attribute_value"
+                    || inner.kind() == "attribute_value"
+                {
                     attr_value = inner
                         .utf8_text(source.as_bytes())
                         .ok()
@@ -697,8 +692,13 @@ fn contains_at_keyword(text: &str, keyword: &str) -> bool {
             true
         } else {
             let ch = text.as_bytes()[after_pos];
-            ch == b' ' || ch == b'\t' || ch == b'\n' || ch == b'\r'
-                || ch == b'(' || ch == b'{' || ch == b';'
+            ch == b' '
+                || ch == b'\t'
+                || ch == b'\n'
+                || ch == b'\r'
+                || ch == b'('
+                || ch == b'{'
+                || ch == b';'
         };
         if before_ok && after_ok {
             return true;
@@ -832,7 +832,8 @@ fn extract_modern_syntax_from_text(text: &str, shape: &mut TemplateShape) {
     }
     // Detect bare @defer (no trigger) — only if no trigger was found in
     // this text node.
-    if contains_at_keyword(text, "defer") && !contains_at_keyword(text, "deferred") && !had_triggers {
+    if contains_at_keyword(text, "defer") && !contains_at_keyword(text, "deferred") && !had_triggers
+    {
         shape.defer_blocks.push("default".to_string());
     }
 
@@ -853,16 +854,14 @@ fn extract_modern_syntax_from_text(text: &str, shape: &mut TemplateShape) {
 #[cfg(feature = "angular")]
 fn find_child<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
     let mut cursor = node.walk();
-    node.children(&mut cursor).find(|&child| child.kind() == kind)
+    node.children(&mut cursor)
+        .find(|&child| child.kind() == kind)
 }
 
 /// Extract the tag name from an `element` node by finding its
 /// `start_tag` child and then the `tag_name` within it.
 #[cfg(feature = "angular")]
-fn extract_tag_name_from_element(
-    node: tree_sitter::Node,
-    source: &str,
-) -> Option<String> {
+fn extract_tag_name_from_element(node: tree_sitter::Node, source: &str) -> Option<String> {
     let start_tag = find_child(node, "start_tag")?;
     let mut cursor = start_tag.walk();
     for child in start_tag.children(&mut cursor) {

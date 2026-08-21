@@ -131,7 +131,7 @@ fn ast_based_spring_detect_with_status(source: &str) -> AstResult {
         Some(lang) => lang,
         None => return AstResult::ParseFailed, // Java feature not enabled
     };
-    
+
     if parser.set_language(&language).is_err() {
         return AstResult::ParseFailed;
     }
@@ -156,14 +156,14 @@ fn ast_based_spring_detect_with_status(source: &str) -> AstResult {
                 // the annotation name (with or without @ depending on grammar version).
                 // Try matching with both formats.
                 let text = annotation_text.trim();
-                
+
                 // Try direct match with @ prefix
                 for &strong_anno in STRONG_ANNOTATIONS {
                     if text == strong_anno || text.starts_with(strong_anno) {
                         return AstResult::Detected;
                     }
                 }
-                
+
                 // Try match without @ prefix (tree-sitter may strip it)
                 for &strong_anno in STRONG_ANNOTATIONS {
                     let anno_name = strong_anno.trim_start_matches('@');
@@ -171,7 +171,7 @@ fn ast_based_spring_detect_with_status(source: &str) -> AstResult {
                         return AstResult::Detected;
                     }
                 }
-                
+
                 // Check for weak annotations (need org.springframework import too)
                 for &weak_anno in WEAK_ANNOTATIONS {
                     if (text == weak_anno || text.starts_with(weak_anno))
@@ -180,7 +180,7 @@ fn ast_based_spring_detect_with_status(source: &str) -> AstResult {
                         return AstResult::Detected;
                     }
                 }
-                
+
                 // Try weak match without @ prefix
                 for &weak_anno in WEAK_ANNOTATIONS {
                     let anno_name = weak_anno.trim_start_matches('@').trim_end_matches('(');
@@ -199,7 +199,7 @@ fn ast_based_spring_detect_with_status(source: &str) -> AstResult {
 
 /// Original string-based Spring detection (fallback).
 /// This is the pre-A-11 implementation kept for backward compatibility.
-/// 
+///
 /// A-11 enhancement: We now check if the match is in a comment to avoid
 /// false positives from commented-out code or documentation.
 fn string_based_spring_detect(source: &str) -> bool {
@@ -275,4 +275,3 @@ fn is_in_string_literal(line: &str, pattern: &str) -> bool {
     }
     false
 }
-

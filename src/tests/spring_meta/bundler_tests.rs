@@ -1,7 +1,7 @@
 // src/tests/spring_meta/bundler_tests.rs
 // Tests for Spring Boot layer bundler.
 
-use crate::spring_meta::bundler::{resolve_bundle, resolve_layer, SpringLayer};
+use crate::spring_meta::bundler::{SpringLayer, resolve_bundle, resolve_layer};
 
 #[test]
 fn test_resolve_layer_controller() {

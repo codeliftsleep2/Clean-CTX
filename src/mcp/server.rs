@@ -26,8 +26,8 @@ use std::path::{Path, PathBuf};
 use crate::config::CleanCtxConfig;
 use crate::mcp::McpState;
 use crate::mcp::dispatcher::Dispatcher;
-use crate::protocol::send_response;
 use crate::protocol::JsonRpcRequest;
+use crate::protocol::send_response;
 
 /// Cached project root, resolved once per process lifetime.
 /// Walks up from the executable's directory looking for `.clean-ctx.json`
@@ -36,7 +36,7 @@ static PROJECT_ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
 /// Resolve the project root directory.
 ///
-/// Resolution order (P1-4): 
+/// Resolution order (P1-4):
 ///   1. `CLEAN_CTX_PROJECT_ROOT` env var (if set)
 ///   2. Walk up from CWD looking for `.clean-ctx.json` or `Cargo.toml`
 ///   3. Walk up from the executable's directory (for dev / local builds)
@@ -54,7 +54,10 @@ pub(crate) fn find_project_root() -> &'static PathBuf {
             if p.exists() {
                 return p;
             }
-            eprintln!("[clean-ctx] Warning: CLEAN_CTX_PROJECT_ROOT set but not found: {}", p.display());
+            eprintln!(
+                "[clean-ctx] Warning: CLEAN_CTX_PROJECT_ROOT set but not found: {}",
+                p.display()
+            );
         }
 
         // 2. Walk up from CWD (most reliable in production — MCP client's CWD)
@@ -135,7 +138,10 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // the user always sees which root won. This makes the override
     // explicit rather than a silent footgun.
     if let Ok(root) = std::env::var("CLEAN_CTX_PROJECT_ROOT") {
-        eprintln!("[clean-ctx] Using CLEAN_CTX_PROJECT_ROOT override: {}", root);
+        eprintln!(
+            "[clean-ctx] Using CLEAN_CTX_PROJECT_ROOT override: {}",
+            root
+        );
     }
 
     let config = CleanCtxConfig::load(project_root);
@@ -172,7 +178,8 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
         // configuration so the MCP server can align its `_meta.cache_hints`
         // breakers with the proxy's actual injection behavior. Non-fatal —
         // if the proxy isn't reachable, we simply skip the alignment.
-        if let Some(cache_state) = crate::proxy_spawner::query_proxy_cache_state(config.proxy.port) {
+        if let Some(cache_state) = crate::proxy_spawner::query_proxy_cache_state(config.proxy.port)
+        {
             state.proxy_cache = Some(cache_state.clone());
             eprintln!(
                 "[clean-ctx] Proxy cache state: auto_cache={} tail_ttl={}",
@@ -216,7 +223,10 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     if dispatcher.state().config.observability.export_metrics {
         let interval_secs = dispatcher.state().config.observability.export_interval_secs;
         let registry = std::sync::Arc::clone(&dispatcher.state().metrics_registry);
-        eprintln!("[clean-ctx] Metrics export enabled (every {}s)", interval_secs);
+        eprintln!(
+            "[clean-ctx] Metrics export enabled (every {}s)",
+            interval_secs
+        );
         std::thread::Builder::new()
             .name("metrics-exporter".into())
             .spawn(move || {
@@ -402,7 +412,10 @@ fn drain_line<R: BufRead>(handle: &mut R) {
         sink.clear();
     }
     if drained > 0 {
-        eprintln!("[clean-ctx] WARNING: Drained {} oversize bytes from stdin", drained);
+        eprintln!(
+            "[clean-ctx] WARNING: Drained {} oversize bytes from stdin",
+            drained
+        );
     }
 }
 

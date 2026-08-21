@@ -21,9 +21,9 @@
 
 use crate::angular_meta::graph::ClassKind;
 use crate::angular_meta::markers::{
-    build_component_line, build_directive_line, build_injects_line, build_input_line,
-    build_model_line, build_module_line, build_output_line, build_pipe_line, build_service_line,
-    ComponentFields,
+    ComponentFields, build_component_line, build_directive_line, build_injects_line,
+    build_input_line, build_model_line, build_module_line, build_output_line, build_pipe_line,
+    build_service_line,
 };
 use crate::compression::Fidelity;
 
@@ -230,7 +230,10 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Decorat
     if lines.is_empty() {
         None
     } else {
-        Some(DecoratorsResult { lines, inline_template })
+        Some(DecoratorsResult {
+            lines,
+            inline_template,
+        })
     }
 }
 
@@ -295,23 +298,23 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                 scan += 1;
             }
             if scan < len {
-                let (func_name, open_paren) =
-                    if scan + 5 < len && &body[scan..scan + 6] == "input(" {
-                        ("input", scan + 5)
-                    } else if scan + 5 < len && &body[scan..scan + 6] == "model(" {
-                        ("model", scan + 5)
-                    } else if scan + 6 < len && &body[scan..scan + 7] == "output(" {
-                        ("output", scan + 6)
-                    } else if scan + 5 < len
-                        && &body[scan..scan + 6] == "inject"
-                        && scan + 6 < len
-                        && bytes[scan + 6] == b'('
-                    {
-                        ("inject", scan + 6)
-                    } else {
-                        i += 1;
-                        continue;
-                    };
+                let (func_name, open_paren) = if scan + 5 < len && &body[scan..scan + 6] == "input("
+                {
+                    ("input", scan + 5)
+                } else if scan + 5 < len && &body[scan..scan + 6] == "model(" {
+                    ("model", scan + 5)
+                } else if scan + 6 < len && &body[scan..scan + 7] == "output(" {
+                    ("output", scan + 6)
+                } else if scan + 5 < len
+                    && &body[scan..scan + 6] == "inject"
+                    && scan + 6 < len
+                    && bytes[scan + 6] == b'('
+                {
+                    ("inject", scan + 6)
+                } else {
+                    i += 1;
+                    continue;
+                };
 
                 let kind = match func_name {
                     "input" => SignalKind::Input,
@@ -343,7 +346,11 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                     }
                 }
                 let name = body[name_start..name_end].trim().to_string();
-                let name = if name.is_empty() { "?".to_string() } else { name };
+                let name = if name.is_empty() {
+                    "?".to_string()
+                } else {
+                    name
+                };
 
                 out.push(SignalField { kind, name, alias });
             }
@@ -436,17 +443,17 @@ fn consume_call_expression(text: &str, open_paren: usize) -> Option<(usize, Stri
                     }
                 }
             }
-// F-FINAL-02: The template-literal branch now explicitly recognises
-// `\\` (escaped backslash) followed by a backtick. The previous code
-// relied on the generic `i += 2` skip for *any* escape sequence, which
-// correctly handles `\n`, `\t`, etc., but for the specific case of
-// `\` + backtick (an escaped backtick inside a template literal), the
-// code advanced past the *real* terminator backtick and silently
-// truncated the arg. The fix: when we see `\\` and the next byte is a
-// backtick, skip 2 bytes *and* continue the inner loop (do not treat
-// the backtick as a terminator). The check is a single comparison —
-// the generic `i += 2` already does the right thing for non-backtick
-// escapes, so this just makes the backtick case explicit.
+            // F-FINAL-02: The template-literal branch now explicitly recognises
+            // `\\` (escaped backslash) followed by a backtick. The previous code
+            // relied on the generic `i += 2` skip for *any* escape sequence, which
+            // correctly handles `\n`, `\t`, etc., but for the specific case of
+            // `\` + backtick (an escaped backtick inside a template literal), the
+            // code advanced past the *real* terminator backtick and silently
+            // truncated the arg. The fix: when we see `\\` and the next byte is a
+            // backtick, skip 2 bytes *and* continue the inner loop (do not treat
+            // the backtick as a terminator). The check is a single comparison —
+            // the generic `i += 2` already does the right thing for non-backtick
+            // escapes, so this just makes the backtick case explicit.
             b'`' => {
                 i += 1;
                 while i < len && bytes[i] != b'`' {
@@ -637,8 +644,12 @@ fn parse_object_literal(arg: &str) -> ComponentFields {
         if part.is_empty() {
             continue;
         }
-        let Some(colon) = part.find(':') else { continue; };
-        let key = part[..colon].trim().trim_matches(|c: char| c == '"' || c == '\'');
+        let Some(colon) = part.find(':') else {
+            continue;
+        };
+        let key = part[..colon]
+            .trim()
+            .trim_matches(|c: char| c == '"' || c == '\'');
         let value = part[colon + 1..].trim();
 
         match key {
@@ -663,7 +674,9 @@ fn parse_object_literal(arg: &str) -> ComponentFields {
                 }
             }
             "styles"
-                if (value.starts_with('`') || value.starts_with('"') || value.starts_with('\'')) =>
+                if (value.starts_with('`')
+                    || value.starts_with('"')
+                    || value.starts_with('\'')) =>
             {
                 fields.styles = Some(unquote(value).to_string());
             }
@@ -704,7 +717,9 @@ fn parse_module_fields(arg: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
 
     for part in split_top_level_commas(&trimmed) {
         let part = part.trim();
-        let Some(colon) = part.find(':') else { continue; };
+        let Some(colon) = part.find(':') else {
+            continue;
+        };
         let key = part[..colon].trim();
         let value = part[colon + 1..].trim();
         match key {
@@ -738,8 +753,12 @@ fn parse_pipe_fields(arg: &str) -> (Option<String>, bool) {
     let mut name: Option<String> = None;
     for part in split_top_level_commas(&trimmed) {
         let part = part.trim();
-        let Some(colon) = part.find(':') else { continue; };
-        let key = part[..colon].trim().trim_matches(|c: char| c == '"' || c == '\'');
+        let Some(colon) = part.find(':') else {
+            continue;
+        };
+        let key = part[..colon]
+            .trim()
+            .trim_matches(|c: char| c == '"' || c == '\'');
         let value = part[colon + 1..].trim();
         if key == "name" && (value.starts_with('"') || value.starts_with('\'')) {
             name = Some(unquote(value).to_string());
@@ -805,7 +824,9 @@ fn extract_constructor_injects(raw_class: &str) -> Option<Vec<String>> {
         if !has_inject_modifier {
             continue;
         }
-        let Some(colon) = param.find(':') else { continue; };
+        let Some(colon) = param.find(':') else {
+            continue;
+        };
         let type_part = param[colon + 1..].trim();
         let type_part = type_part.split('=').next().unwrap_or(type_part).trim();
         let type_name: String = type_part
@@ -817,11 +838,7 @@ fn extract_constructor_injects(raw_class: &str) -> Option<Vec<String>> {
         }
     }
 
-    if types.is_empty() {
-        None
-    } else {
-        Some(types)
-    }
+    if types.is_empty() { None } else { Some(types) }
 }
 
 fn is_word_byte(c: u8) -> bool {
@@ -932,7 +949,15 @@ fn unquote(s: &str) -> &str {
 // because it is only reachable from those feature-gated call sites.
 #[allow(dead_code)]
 #[allow(clippy::type_complexity)]
-pub fn extract_graph_entries(raw_class: &str) -> Option<(String, ClassKind, Option<String>, Vec<String>, Option<String>)> {
+pub fn extract_graph_entries(
+    raw_class: &str,
+) -> Option<(
+    String,
+    ClassKind,
+    Option<String>,
+    Vec<String>,
+    Option<String>,
+)> {
     let head_end = find_class_head_end(raw_class)?;
     let head = &raw_class[..head_end];
 

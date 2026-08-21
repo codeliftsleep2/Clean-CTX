@@ -30,7 +30,10 @@ macro_rules! lock_or_recover_protocol {
         match $lock {
             Ok(guard) => guard,
             Err(poisoned) => {
-                eprintln!("[clean-ctx] WARNING: Recovering from poisoned lock ({})", $name);
+                eprintln!(
+                    "[clean-ctx] WARNING: Recovering from poisoned lock ({})",
+                    $name
+                );
                 poisoned.into_inner()
             }
         }

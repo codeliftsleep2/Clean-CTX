@@ -6,10 +6,10 @@
 // When a Cargo feature is disabled, the corresponding layer is not registered,
 // and the tree-sitter grammar is not linked in the binary.
 
-use std::sync::OnceLock;
 use crate::compression::Fidelity;
 use crate::layers::language::LanguageLayer;
 use crate::layers::meta::MetaLayer;
+use std::sync::OnceLock;
 
 /// Global registry, initialized once per process.
 static LAYER_REGISTRY: OnceLock<LayerRegistry> = OnceLock::new();
@@ -41,26 +41,33 @@ impl LayerRegistry {
 
         // Language layers (always available when feature is enabled)
         #[cfg(feature = "typescript")]
-        reg.languages.push(Box::new(crate::layers::language::TypeScriptLayer::new()));
+        reg.languages
+            .push(Box::new(crate::layers::language::TypeScriptLayer::new()));
 
         #[cfg(feature = "csharp")]
-        reg.languages.push(Box::new(crate::layers::language::CSharpLayer::new()));
+        reg.languages
+            .push(Box::new(crate::layers::language::CSharpLayer::new()));
 
         #[cfg(feature = "rust")]
-        reg.languages.push(Box::new(crate::layers::language::RustLayer::new()));
+        reg.languages
+            .push(Box::new(crate::layers::language::RustLayer::new()));
 
         #[cfg(feature = "java")]
-        reg.languages.push(Box::new(crate::layers::language::JavaLayer::new()));
+        reg.languages
+            .push(Box::new(crate::layers::language::JavaLayer::new()));
 
         // Meta layers (only available when both the meta feature and base language are enabled)
         #[cfg(feature = "angular")]
-        reg.meta_layers.push(Box::new(crate::layers::meta::AngularMetaLayer::new()));
+        reg.meta_layers
+            .push(Box::new(crate::layers::meta::AngularMetaLayer::new()));
 
         #[cfg(feature = "spring_boot")]
-        reg.meta_layers.push(Box::new(crate::layers::meta::SpringBootMetaLayer::new()));
+        reg.meta_layers
+            .push(Box::new(crate::layers::meta::SpringBootMetaLayer::new()));
 
         #[cfg(feature = "dotnet")]
-        reg.meta_layers.push(Box::new(crate::dotnet_meta::DotNetMetaLayer::new()));
+        reg.meta_layers
+            .push(Box::new(crate::dotnet_meta::DotNetMetaLayer::new()));
 
         reg
     }
@@ -72,12 +79,18 @@ impl LayerRegistry {
 
     /// Find a language layer by name.
     pub fn language_layer(&self, name: &str) -> Option<&dyn LanguageLayer> {
-        self.languages.iter().find(|l| l.name() == name).map(|l| l.as_ref())
+        self.languages
+            .iter()
+            .find(|l| l.name() == name)
+            .map(|l| l.as_ref())
     }
 
     /// Find a language layer by file extension.
     pub fn language_layer_for_extension(&self, ext: &str) -> Option<&dyn LanguageLayer> {
-        self.languages.iter().find(|l| l.extensions().contains(&ext)).map(|l| l.as_ref())
+        self.languages
+            .iter()
+            .find(|l| l.extensions().contains(&ext))
+            .map(|l| l.as_ref())
     }
 
     /// Get all enabled language layers.
@@ -109,7 +122,7 @@ impl LayerRegistry {
         fidelity: Fidelity,
     ) -> Vec<(String, String)> {
         let mut results = Vec::new();
-        
+
         for layer in &self.meta_layers {
             // Use trait-based dispatch: check if this layer applies to the source
             if layer.is_applicable(source, std::path::Path::new("")) {
@@ -132,7 +145,7 @@ impl LayerRegistry {
                 }
             }
         }
-        
+
         results
     }
 

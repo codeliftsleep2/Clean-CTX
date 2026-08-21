@@ -5,8 +5,8 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod tests {
-    use crate::dotnet_meta::serialization::extract_serialization;
     use crate::compression::Fidelity;
+    use crate::dotnet_meta::serialization::extract_serialization;
 
     #[test]
     fn test_extracts_json_properties() {

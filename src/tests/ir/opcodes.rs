@@ -69,9 +69,8 @@ fn core_op_body_round_trips_through_wire() {
 #[test]
 fn arity_table_covers_all_opcodes() {
     let all_opcodes = [
-        "DEF_C", "DEF_M", "DEF_F", "DEF_I", "SIG", "RET", "FIELD_T",
-        "FLAGS", "FLAGS_C", "EXT", "IMPL", "INJECTS", "IMP", "TYPE",
-        "BODY", "DATAFLOW", "CTRL", "EFFECT", "CTX",
+        "DEF_C", "DEF_M", "DEF_F", "DEF_I", "SIG", "RET", "FIELD_T", "FLAGS", "FLAGS_C", "EXT",
+        "IMPL", "INJECTS", "IMP", "TYPE", "BODY", "DATAFLOW", "CTRL", "EFFECT", "CTX",
     ];
     for opcode in &all_opcodes {
         assert!(
@@ -113,20 +112,64 @@ fn arity_table_unknown_opcode() {
 
 #[test]
 fn opcode_name_matches_variant() {
-    assert_eq!(opcode_name(&CoreOp::DefClass("C1".into(), "X".into())), "DEF_C");
-    assert_eq!(opcode_name(&CoreOp::DefMethod("C1".into(), "M1".into(), "X".into())), "DEF_M");
-    assert_eq!(opcode_name(&CoreOp::DefField("C1".into(), "F1".into(), "X".into())), "DEF_F");
-    assert_eq!(opcode_name(&CoreOp::DefInterface("I1".into(), "X".into())), "DEF_I");
-    assert_eq!(opcode_name(&CoreOp::Param("M1".into(), "P1".into(), "$s".into(), "x".into())), "SIG");
-    assert_eq!(opcode_name(&CoreOp::Return("M1".into(), "$v".into())), "RET");
-    assert_eq!(opcode_name(&CoreOp::FieldType("F1".into(), "$n".into())), "FIELD_T");
+    assert_eq!(
+        opcode_name(&CoreOp::DefClass("C1".into(), "X".into())),
+        "DEF_C"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::DefMethod("C1".into(), "M1".into(), "X".into())),
+        "DEF_M"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::DefField("C1".into(), "F1".into(), "X".into())),
+        "DEF_F"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::DefInterface("I1".into(), "X".into())),
+        "DEF_I"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Param(
+            "M1".into(),
+            "P1".into(),
+            "$s".into(),
+            "x".into()
+        )),
+        "SIG"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Return("M1".into(), "$v".into())),
+        "RET"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::FieldType("F1".into(), "$n".into())),
+        "FIELD_T"
+    );
     assert_eq!(opcode_name(&CoreOp::Flags("M1".into(), vec![])), "FLAGS");
-    assert_eq!(opcode_name(&CoreOp::ClassFlags("C1".into(), vec![])), "FLAGS_C");
-    assert_eq!(opcode_name(&CoreOp::Extends("C1".into(), "C2".into())), "EXT");
-    assert_eq!(opcode_name(&CoreOp::Implements("C1".into(), "I1".into())), "IMPL");
-    assert_eq!(opcode_name(&CoreOp::Injects("C1".into(), vec![])), "INJECTS");
-    assert_eq!(opcode_name(&CoreOp::Import("IM1".into(), "m".into(), "n".into())), "IMP");
-    assert_eq!(opcode_name(&CoreOp::TypeAlias("T1".into(), "X".into())), "TYPE");
+    assert_eq!(
+        opcode_name(&CoreOp::ClassFlags("C1".into(), vec![])),
+        "FLAGS_C"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Extends("C1".into(), "C2".into())),
+        "EXT"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Implements("C1".into(), "I1".into())),
+        "IMPL"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Injects("C1".into(), vec![])),
+        "INJECTS"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Import("IM1".into(), "m".into(), "n".into())),
+        "IMP"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::TypeAlias("T1".into(), "X".into())),
+        "TYPE"
+    );
 }
 
 #[test]
