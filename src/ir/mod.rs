@@ -47,7 +47,6 @@ pub use binary_wire::{
     ir_to_binary_wire_json, is_binary_wire,
 };
 pub use compiler::{CompileError, CompiledIR, IRCompiler};
-pub use compiler_methods::MethodSig;
 pub use delta::{
     CompactDelta, CompactOps, DeltaComputer, DeltaOps, FieldPatch, IRDelta, ModOp, SemanticIntent,
     compact_decode, compact_encode, compute_field_patches, key_tuple_from_tuple,
