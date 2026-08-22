@@ -246,18 +246,24 @@ where
     }
 
     let mut body_content = assemble_body(&built.output_lines, fidelity);
+    // C-11: at Edit/Verbatim the Φ meta blocks must NOT be injected (they
+    // would corrupt byte-exact method bodies). Mirrors the guard already
+    // present in `compress_file_with_source`.
+    //
     // Meta-Layer blocks (Angular, Spring Boot, .NET): inject the Φ blocks
     // into the body BEFORE symbol compression so the `Φ` markers stay
     // untouched. Previously only the Angular block was appended — the
     // Spring and .NET blocks were silently dropped in this path.
-    if let Some(block) = &built.meta_block {
-        body_content.push_str(&block.render());
-    }
-    if let Some(block) = &built.spring_meta_block {
-        body_content.push_str(&block.render());
-    }
-    if let Some(block) = &built.dotnet_meta_block {
-        body_content.push_str(&block.render());
+    if fidelity != Fidelity::Edit && fidelity != Fidelity::Verbatim {
+        if let Some(block) = &built.meta_block {
+            body_content.push_str(&block.render());
+        }
+        if let Some(block) = &built.spring_meta_block {
+            body_content.push_str(&block.render());
+        }
+        if let Some(block) = &built.dotnet_meta_block {
+            body_content.push_str(&block.render());
+        }
     }
 
     // Phase III (Idea #11 — Micro-Opcode Table for Text):

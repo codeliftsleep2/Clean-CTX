@@ -286,14 +286,19 @@ pub fn compress_text(
 
     let built = build_output_lines(&all_captures, source_code, fidelity, None, None);
     let mut body_content = assemble_body(&built.output_lines, fidelity);
-    if let Some(block) = &built.meta_block {
-        body_content.push_str(&block.render());
-    }
-    if let Some(block) = &built.spring_meta_block {
-        body_content.push_str(&block.render());
-    }
-    if let Some(block) = &built.dotnet_meta_block {
-        body_content.push_str(&block.render());
+    // C-11: at Edit/Verbatim the Φ meta blocks must NOT be injected (they
+    // would corrupt byte-exact method bodies). Mirrors the guard already
+    // present in `compress_file_with_source`.
+    if fidelity != Fidelity::Edit && fidelity != Fidelity::Verbatim {
+        if let Some(block) = &built.meta_block {
+            body_content.push_str(&block.render());
+        }
+        if let Some(block) = &built.spring_meta_block {
+            body_content.push_str(&block.render());
+        }
+        if let Some(block) = &built.dotnet_meta_block {
+            body_content.push_str(&block.render());
+        }
     }
     // C-5: at Edit/Verbatim type-alias substitution must be skipped so
     // byte-exact method bodies are never rewritten.
@@ -383,7 +388,12 @@ pub fn build_output_lines(
                     output_lines.push(String::new());
                 }
                 output_lines.push(format_class_entry(&cap.text, &fields, fidelity));
-                class_captures.push(cap.text.clone());
+                // The meta-layer contract requires the FULL class text
+                // (leading decorators + body), NOT the compacted name.
+                // Reconstruct the decorator-inclusive span via the CANONICAL
+                // shared helper (same one used by
+                // `mcp::workspace_util::extract_class_blocks`).
+                class_captures.push(decorator_inclusive_class_text(source_code, cap));
                 class_count += 1;
                 fields.clear();
                 markers.clear();
@@ -639,14 +649,19 @@ pub fn compress_source(
     // sub-layer settings are honored (previously hardcoded to `None`).
     let built = build_output_lines(&all_captures, source_code, fidelity, None, config);
     let mut body_content = assemble_body(&built.output_lines, fidelity);
-    if let Some(block) = &built.meta_block {
-        body_content.push_str(&block.render());
-    }
-    if let Some(block) = &built.spring_meta_block {
-        body_content.push_str(&block.render());
-    }
-    if let Some(block) = &built.dotnet_meta_block {
-        body_content.push_str(&block.render());
+    // C-11: at Edit/Verbatim the Φ meta blocks must NOT be injected (they
+    // would corrupt byte-exact method bodies). Mirrors the guard already
+    // present in `compress_file_with_source`.
+    if fidelity != Fidelity::Edit && fidelity != Fidelity::Verbatim {
+        if let Some(block) = &built.meta_block {
+            body_content.push_str(&block.render());
+        }
+        if let Some(block) = &built.spring_meta_block {
+            body_content.push_str(&block.render());
+        }
+        if let Some(block) = &built.dotnet_meta_block {
+            body_content.push_str(&block.render());
+        }
     }
     let ta_footer = if let Some(aliases) = aliases
         && !aliases.is_empty()
@@ -756,6 +771,46 @@ fn combine_footers(sym_footer: &str, ta_footer: &str) -> String {
     } else {
         format!("{}\n{}", sym_footer, ta_footer)
     }
+}
+
+/// Reconstruct the decorator-inclusive class text for the meta-layer feed.
+///
+/// The meta-layer contract requires the FULL class source (leading `@`
+/// decorators + class declaration), but `cap.text` for a `class.root`
+/// capture is the COMPACTED class name (e.g. `"UserCardComponent"`) and
+/// tree-sitter's `class_declaration` node (`cap.raw_text`) excludes the
+/// preceding `@Component` / `@Injectable` decorators — they are sibling
+/// AST nodes.
+///
+/// This helper maps the `class` keyword position from the raw capture
+/// back into the absolute source, then uses the CANONICAL
+/// [`find_decorator_inclusive_start`](crate::meta_util::find_decorator_inclusive_start)
+/// helper to find the leading `@`. When a decorator precedes the class,
+/// the full decorator-inclusive span is returned; otherwise `cap.text`
+/// (the compacted name) is returned unchanged, preserving the existing
+/// behavior for non-decorated classes (e.g. plain `.cs` classes for the
+/// .NET meta-layer).
+fn decorator_inclusive_class_text(source_code: &str, cap: &CapEntry) -> String {
+    // Locate the `class` keyword within the raw capture text, then map
+    // it to an absolute byte offset in the source.
+    let Some(rel_class) = cap.raw_text.find("class ") else {
+        // No `class` keyword in the raw capture (defensive) — fall back.
+        return cap.text.clone();
+    };
+    let abs_class = cap.start_byte.saturating_add(rel_class);
+
+    // Scan backwards for a leading `@` decorator via the canonical helper.
+    if let Some(dec_start) = crate::meta_util::find_decorator_inclusive_start(source_code, abs_class)
+    {
+        let class_end = cap.start_byte.saturating_add(cap.raw_text.len());
+        if dec_start < class_end && class_end <= source_code.len() {
+            return source_code[dec_start..class_end].to_string();
+        }
+    }
+
+    // No decorator precedes the class — preserve the existing compacted
+    // input (zero behavioral change for non-decorated classes).
+    cap.text.clone()
 }
 
 /// Join the body lines using the per-fidelity separator.
