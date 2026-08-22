@@ -3,10 +3,10 @@
 // Unit tests for the NgRx Meta-Layer (Phase 2 of the Angular
 // Ecosystem Deepening).
 
-use crate::angular_meta::phi::PhiMarker;
 use crate::angular_meta::ngrx::{
-    expand_phi, expand_phi_in_line, extract_ngrx_shape, has_ngrx_imports, NgRxKind,
+    NgRxKind, expand_phi, expand_phi_in_line, extract_ngrx_shape, has_ngrx_imports,
 };
+use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
 
 // ── Import gate ────────────────────────────────────────────────────
@@ -57,7 +57,13 @@ export const loadUsers = createAction(
     assert_eq!(shape.actions.len(), 1);
     assert_eq!(shape.actions[0].name, "loadUsers");
     assert_eq!(shape.actions[0].event_string, "[Users] Load Users");
-    assert!(shape.actions[0].props_type.as_deref().unwrap_or("").contains("page"));
+    assert!(
+        shape.actions[0]
+            .props_type
+            .as_deref()
+            .unwrap_or("")
+            .contains("page")
+    );
 }
 
 // ── Reducer extraction ─────────────────────────────────────────────
@@ -90,9 +96,18 @@ export const userReducer = createReducer(
     assert_eq!(reducer.name, "userReducer");
     assert_eq!(reducer.state_type.as_deref(), Some("UserState"));
     // Two transitions: one for loadUsers, one for loadUsersSuccess
-    assert_eq!(reducer.transitions.len(), 2, "transitions: {:?}", reducer.transitions);
+    assert_eq!(
+        reducer.transitions.len(),
+        2,
+        "transitions: {:?}",
+        reducer.transitions
+    );
     assert_eq!(reducer.transitions[0].action_name, "loadUsers");
-    assert!(reducer.transitions[0].state_summary.contains("loading: true"));
+    assert!(
+        reducer.transitions[0]
+            .state_summary
+            .contains("loading: true")
+    );
 }
 
 #[test]
@@ -317,7 +332,8 @@ export const loadUsers = createAction('[Users] Load');  // phantomAction = creat
 "#;
     let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
     assert_eq!(
-        shape.actions.len(), 1,
+        shape.actions.len(),
+        1,
         "trailing-comment action must not be extracted, got: {:?}",
         shape.actions
     );
@@ -338,11 +354,15 @@ export const userReducer = createReducer(
     let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
     assert!(shape.reducer.is_some());
     assert_eq!(
-        shape.reducer.as_ref().unwrap().transitions.len(), 1,
+        shape.reducer.as_ref().unwrap().transitions.len(),
+        1,
         "comment-line on() transition must not be counted, got: {:?}",
         shape.reducer.as_ref().unwrap().transitions
     );
-    assert_eq!(shape.reducer.as_ref().unwrap().transitions[0].action_name, "loadUsers");
+    assert_eq!(
+        shape.reducer.as_ref().unwrap().transitions[0].action_name,
+        "loadUsers"
+    );
 }
 
 #[test]
@@ -358,7 +378,8 @@ export class UserEffects {
 "#;
     let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
     assert_eq!(
-        shape.effects.len(), 1,
+        shape.effects.len(),
+        1,
         "trailing-comment effect must not be extracted, got: {:?}",
         shape.effects
     );
@@ -403,10 +424,16 @@ export class UserDataService extends EntityCollectionServiceBase<User> {
 }
 "#;
     let shape = extract_ngrx_shape(src, Fidelity::Medium).expect("should detect NgRx");
-    assert!(shape.entity_adapter.is_some(), "entity_adapter should be Some");
+    assert!(
+        shape.entity_adapter.is_some(),
+        "entity_adapter should be Some"
+    );
     let adapter = shape.entity_adapter.as_ref().unwrap();
     assert_eq!(adapter.entity_type, "User");
-    assert!(adapter.data_layer, "NgRx Data service must be marked as data-layer");
+    assert!(
+        adapter.data_layer,
+        "NgRx Data service must be marked as data-layer"
+    );
 }
 
 // ── Inline reducer in createFeature ────────────────────────────────

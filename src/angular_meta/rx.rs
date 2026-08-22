@@ -97,22 +97,22 @@ impl PhiMarker for RxJsKind {
     /// prevent partial-match issues in string replacement).
     fn all_in_expand_order() -> &'static [RxJsKind] {
         &[
-            Self::Observable,  // Φobs:      (5 chars)
-            Self::Subject,     // Φsubject:  (9 chars)
-            Self::PipeRx,      // ΦpipeRx:   (8 chars)
-            Self::Map,         // Φmap:      (5 chars)
-            Self::Tap,         // Φtap:      (5 chars)
-            Self::Filter,      // Φfilter:   (8 chars)
-            Self::Catch,       // Φcatch:    (7 chars)
-            Self::Finalize,    // Φfinalize: (10 chars)
-            Self::Delay,       // Φdelay:    (7 chars)
-            Self::Combine,     // Φcombine:  (9 chars)
-            Self::Share,       // Φshare:    (7 chars)
-            Self::To,          // Φto:       (4 chars)
-            Self::With,        // Φwith:     (6 chars)
-            Self::Scan,        // Φscan:     (6 chars)
-            Self::Distinct,    // Φdistinct: (10 chars)
-            Self::Retry,       // Φretry:    (7 chars)
+            Self::Observable, // Φobs:      (5 chars)
+            Self::Subject,    // Φsubject:  (9 chars)
+            Self::PipeRx,     // ΦpipeRx:   (8 chars)
+            Self::Map,        // Φmap:      (5 chars)
+            Self::Tap,        // Φtap:      (5 chars)
+            Self::Filter,     // Φfilter:   (8 chars)
+            Self::Catch,      // Φcatch:    (7 chars)
+            Self::Finalize,   // Φfinalize: (10 chars)
+            Self::Delay,      // Φdelay:    (7 chars)
+            Self::Combine,    // Φcombine:  (9 chars)
+            Self::Share,      // Φshare:    (7 chars)
+            Self::To,         // Φto:       (4 chars)
+            Self::With,       // Φwith:     (6 chars)
+            Self::Scan,       // Φscan:     (6 chars)
+            Self::Distinct,   // Φdistinct: (10 chars)
+            Self::Retry,      // Φretry:    (7 chars)
         ]
     }
 
@@ -191,7 +191,7 @@ impl std::fmt::Display for SubjectKind {
 #[derive(Debug, Clone)]
 pub struct ObservableDecl {
     pub name: String,
-    pub source: Option<String>,   // "http.get", "of", "from", etc.
+    pub source: Option<String>, // "http.get", "of", "from", etc.
     pub type_param: Option<String>,
 }
 
@@ -209,7 +209,7 @@ pub struct SubjectDecl {
 pub struct PipeOperator {
     pub kind: RxJsKind,
     pub operator_name: String,
-    pub arg_summary: Option<String>,  // High fidelity only
+    pub arg_summary: Option<String>, // High fidelity only
 }
 
 /// A pipe chain attached to an observable field.
@@ -256,7 +256,11 @@ impl RxShape {
     /// `min_pipe_operators` suppresses `ΦpipeRx:` blocks with fewer
     /// than N operators (default 2) to prevent noise from trivial
     /// single-operator chains.
-    pub fn render_with_config(&self, fidelity: Fidelity, min_pipe_operators: Option<usize>) -> String {
+    pub fn render_with_config(
+        &self,
+        fidelity: Fidelity,
+        min_pipe_operators: Option<usize>,
+    ) -> String {
         if self.is_empty() {
             return String::new();
         }
@@ -290,12 +294,17 @@ impl RxShape {
                 }
                 Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     if let Some(ref iv) = subj.initial_value {
-                        s.push_str(&format!("  Φsubject:{} = new {}({})\n",
-                            subj.name, subj.kind, iv));
+                        s.push_str(&format!(
+                            "  Φsubject:{} = new {}({})\n",
+                            subj.name, subj.kind, iv
+                        ));
                     } else {
-                        s.push_str(&format!("  Φsubject:{} = new {}<{}>()\n",
-                            subj.name, subj.kind,
-                            subj.type_param.as_deref().unwrap_or("?")));
+                        s.push_str(&format!(
+                            "  Φsubject:{} = new {}<{}>()\n",
+                            subj.name,
+                            subj.kind,
+                            subj.type_param.as_deref().unwrap_or("?")
+                        ));
                     }
                 }
             }
@@ -311,7 +320,9 @@ impl RxShape {
                     s.push_str(&format!("  ΦpipeRx:{}\n", pipe.owner));
                 }
                 Fidelity::Medium => {
-                    let ops: Vec<&str> = pipe.operators.iter()
+                    let ops: Vec<&str> = pipe
+                        .operators
+                        .iter()
                         .map(|op| op.operator_name.as_str())
                         .collect();
                     s.push_str(&format!("  ΦpipeRx:{} = {}\n", pipe.owner, ops.join(" → ")));
@@ -319,9 +330,14 @@ impl RxShape {
                 Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     let mut pipe_line = format!("  ΦpipeRx:{} = pipe(\n", pipe.owner);
                     for (i, op) in pipe.operators.iter().enumerate() {
-                        let comma = if i < pipe.operators.len() - 1 { "," } else { "" };
+                        let comma = if i < pipe.operators.len() - 1 {
+                            ","
+                        } else {
+                            ""
+                        };
                         if let Some(ref arg) = op.arg_summary {
-                            pipe_line.push_str(&format!("    {}:{}{}\n", op.operator_name, arg, comma));
+                            pipe_line
+                                .push_str(&format!("    {}:{}{}\n", op.operator_name, arg, comma));
                         } else {
                             pipe_line.push_str(&format!("    {}{}\n", op.operator_name, comma));
                         }
@@ -335,7 +351,11 @@ impl RxShape {
 
         // Static combinators
         for comb in &self.combinators {
-            s.push_str(&format!("  Φcombine:{} {}\n", comb.name, comb.args.join(", ")));
+            s.push_str(&format!(
+                "  Φcombine:{} {}\n",
+                comb.name,
+                comb.args.join(", ")
+            ));
         }
 
         s
@@ -436,7 +456,11 @@ fn extract_observables(source: &str, shape: &mut RxShape) {
 ///
 /// `line_abs` is the absolute byte offset of `line` within `source`, used
 /// to reject matches inside comments/strings (Round-11 audit).
-fn extract_observable_from_line(source: &str, line_abs: usize, line: &str) -> Option<ObservableDecl> {
+fn extract_observable_from_line(
+    source: &str,
+    line_abs: usize,
+    line: &str,
+) -> Option<ObservableDecl> {
     // Check for service calls first (e.g. `name$: Observable<T> = this.http.get(...)`)
     // so the source is captured when the type annotation is also present.
     if let Some(obs) = extract_service_call_observable(source, line_abs, line) {
@@ -467,9 +491,21 @@ fn extract_observable_from_line(source: &str, line_abs: usize, line: &str) -> Op
 
     // Check for creation functions: `name$ = of(...)`, `name$ = from(...)`, etc.
     let creation_funcs = [
-        "of(", "from(", "interval(", "timer(", "fromEvent(",
-        "ajax(", "defer(", "empty(", "never(", "throwError(",
-        "iif(", "merge(", "concat(", "race(", "zip(",
+        "of(",
+        "from(",
+        "interval(",
+        "timer(",
+        "fromEvent(",
+        "ajax(",
+        "defer(",
+        "empty(",
+        "never(",
+        "throwError(",
+        "iif(",
+        "merge(",
+        "concat(",
+        "race(",
+        "zip(",
     ];
 
     for func in &creation_funcs {
@@ -495,7 +531,11 @@ fn extract_observable_from_line(source: &str, line_abs: usize, line: &str) -> Op
 ///
 /// `line_abs` is the absolute byte offset of `line` within `source`, used
 /// to reject matches inside comments/strings (Round-11 audit).
-fn extract_service_call_observable(source: &str, line_abs: usize, line: &str) -> Option<ObservableDecl> {
+fn extract_service_call_observable(
+    source: &str,
+    line_abs: usize,
+    line: &str,
+) -> Option<ObservableDecl> {
     // Check for service calls: `name$ = this.http.get(...)` or `name$ = http.get(...)`
     // or `name$: Observable<T> = this.http.get(...)`
     let eq_idx = line.find(" = ")?;
@@ -520,16 +560,24 @@ fn extract_service_call_observable(source: &str, line_abs: usize, line: &str) ->
     // either `(` or `<`.
     let after = &line[eq_idx + 3..];
     let service_patterns = [
-        "http.get", "http.post", "http.put", "http.delete", "http.patch",
-        "this.http.get", "this.http.post", "this.http.put",
-        "this.http.delete", "this.http.patch",
+        "http.get",
+        "http.post",
+        "http.put",
+        "http.delete",
+        "http.patch",
+        "this.http.get",
+        "this.http.post",
+        "this.http.put",
+        "this.http.delete",
+        "this.http.patch",
     ];
 
     for pat in &service_patterns {
         if let Some(pat_idx) = after.find(pat) {
             // Reject when the service pattern is inside a comment/string.
             if crate::angular_meta::util::is_inside_comment_or_string(
-                source, line_abs + eq_idx + 3 + pat_idx,
+                source,
+                line_abs + eq_idx + 3 + pat_idx,
             ) {
                 continue;
             }
@@ -545,7 +593,12 @@ fn extract_service_call_observable(source: &str, line_abs: usize, line: &str) ->
             // Now find the first `(` and extract the URL argument.
             let url = if let Some(open_idx) = rest.find('(') {
                 let after_open = &rest[open_idx + 1..];
-                after_open.split(')').next().unwrap_or("").trim().to_string()
+                after_open
+                    .split(')')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string()
             } else {
                 String::new()
             };
@@ -570,7 +623,8 @@ fn extract_service_call_observable(source: &str, line_abs: usize, line: &str) ->
     if let Some(mp_idx) = earliest {
         // Reject when the method pattern is inside a comment/string.
         if !crate::angular_meta::util::is_inside_comment_or_string(
-            source, line_abs + eq_idx + 3 + mp_idx,
+            source,
+            line_abs + eq_idx + 3 + mp_idx,
         ) {
             // Extract up to the first '('
             let method_call = after.split('(').next().unwrap_or("").trim();
@@ -596,9 +650,14 @@ fn extract_field_name(before: &str) -> Option<String> {
         return None;
     }
     // Filter out keywords and type names
-    if name == "private" || name == "public" || name == "protected"
-        || name == "readonly" || name == "static" || name == "const"
-        || name == "let" || name == "var"
+    if name == "private"
+        || name == "public"
+        || name == "protected"
+        || name == "readonly"
+        || name == "static"
+        || name == "const"
+        || name == "let"
+        || name == "var"
     {
         return None;
     }
@@ -640,9 +699,8 @@ fn extract_subjects(source: &str, shape: &mut RxShape) {
             if let Some(idx) = trimmed.find(pattern) {
                 // Round-11 audit: reject when the pattern match is inside a
                 // comment or string literal (e.g. a trailing comment).
-                if crate::angular_meta::util::is_inside_comment_or_string(
-                    source, trimmed_abs + idx,
-                ) {
+                if crate::angular_meta::util::is_inside_comment_or_string(source, trimmed_abs + idx)
+                {
                     continue;
                 }
                 // Extract field name before the `new` keyword.
@@ -666,24 +724,41 @@ fn extract_subjects(source: &str, shape: &mut RxShape) {
                     .unwrap_or(before)
                     .trim();
                 // Take the last non-empty token, stripping trailing `=`.
-                let name = before.split_whitespace()
+                let name = before
+                    .split_whitespace()
                     .last()
                     .map(|s| s.trim_end_matches('=').trim().to_string())
-                    .filter(|s| !s.is_empty() && *s != "=" && *s != ":" && *s != "private"
-                        && *s != "public" && *s != "protected" && *s != "readonly"
-                        && *s != "static" && *s != "const" && *s != "let" && *s != "var"
-                        && *s != "new");
+                    .filter(|s| {
+                        !s.is_empty()
+                            && *s != "="
+                            && *s != ":"
+                            && *s != "private"
+                            && *s != "public"
+                            && *s != "protected"
+                            && *s != "readonly"
+                            && *s != "static"
+                            && *s != "const"
+                            && *s != "let"
+                            && *s != "var"
+                            && *s != "new"
+                    });
                 // If the last token was `=` (e.g. `name = new Subject`),
                 // the actual field name is the second-to-last token.
                 let name = name.or_else(|| {
                     let tokens: Vec<&str> = before.split_whitespace().collect();
                     if tokens.len() >= 2 {
                         let candidate = tokens[tokens.len() - 2].trim_end_matches('=').trim();
-                        if !candidate.is_empty() && candidate != "=" && candidate != "new"
-                            && candidate != "private" && candidate != "public"
-                            && candidate != "protected" && candidate != "readonly"
-                            && candidate != "static" && candidate != "const"
-                            && candidate != "let" && candidate != "var"
+                        if !candidate.is_empty()
+                            && candidate != "="
+                            && candidate != "new"
+                            && candidate != "private"
+                            && candidate != "public"
+                            && candidate != "protected"
+                            && candidate != "readonly"
+                            && candidate != "static"
+                            && candidate != "const"
+                            && candidate != "let"
+                            && candidate != "var"
                         {
                             Some(candidate.to_string())
                         } else {
@@ -774,7 +849,10 @@ fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
             let mut words: Vec<&str> = name_part.split_whitespace().collect();
             // Drop a leading access modifier / `readonly` / `static`.
             while let Some(first) = words.first() {
-                if matches!(*first, "private" | "public" | "protected" | "readonly" | "static") {
+                if matches!(
+                    *first,
+                    "private" | "public" | "protected" | "readonly" | "static"
+                ) {
                     words.remove(0);
                 } else {
                     break;
@@ -789,7 +867,8 @@ fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
                 .filter(|s| !s.is_empty() && *s != "=" && *s != ":")
                 .unwrap_or_else(|| "?".to_string())
         } else {
-            before.split_whitespace()
+            before
+                .split_whitespace()
                 .last()
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty() && *s != "return" && *s != ")" && *s != "}")
@@ -816,10 +895,7 @@ fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
                     type_param: None,
                 });
             }
-            shape.pipes.push(PipeChain {
-                owner,
-                operators,
-            });
+            shape.pipes.push(PipeChain { owner, operators });
         }
 
         // Advance past the whole pipe call (including its close paren).
@@ -911,9 +987,7 @@ fn operator_to_kind(name: &str) -> RxJsKind {
 /// - `zip(a$, b$)`
 /// - `race(a$, b$)`
 fn extract_combinators(source: &str, shape: &mut RxShape) {
-    let combinator_names = [
-        "combineLatest", "forkJoin", "merge", "zip", "race",
-    ];
+    let combinator_names = ["combineLatest", "forkJoin", "merge", "zip", "race"];
 
     // Multi-line aware: scan the whole source for `name(` and collect
     // the full call body (which may span multiple lines) by tracking

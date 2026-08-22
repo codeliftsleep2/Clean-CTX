@@ -272,21 +272,19 @@ pub fn extract_quoted_value<'a>(obj: &'a str, key: &str) -> Option<&'a str> {
     // Match `key` or `"key"` or `'key'` followed by `:`.
     // `find_map` over the three key forms avoids a nested `if let` in a
     // loop body (clippy::collapsible_match).
-    ["", "\"", "'"]
-        .iter()
-        .find_map(|q| {
-            let pat = format!("{}{}:", q, key);
-            let idx = obj.find(&pat)?;
-            let rest = obj[idx + pat.len()..].trim_start();
-            if let Some(value) = rest.strip_prefix('"') {
-                read_quoted(value, '"')
-            } else if let Some(value) = rest.strip_prefix('\'') {
-                read_quoted(value, '\'')
-            } else {
-                // Object-literal shorthand: `path` (no value)
-                None
-            }
-        })
+    ["", "\"", "'"].iter().find_map(|q| {
+        let pat = format!("{}{}:", q, key);
+        let idx = obj.find(&pat)?;
+        let rest = obj[idx + pat.len()..].trim_start();
+        if let Some(value) = rest.strip_prefix('"') {
+            read_quoted(value, '"')
+        } else if let Some(value) = rest.strip_prefix('\'') {
+            read_quoted(value, '\'')
+        } else {
+            // Object-literal shorthand: `path` (no value)
+            None
+        }
+    })
 }
 
 /// Read a quoted string starting immediately after the opening quote char.
@@ -738,7 +736,10 @@ pub fn extract_decl_name(before: &str) -> Option<String> {
         // punctuation to pick up an enclosing class name; return `None`
         // so the caller renders `?` (matches the original signals layer
         // semantics — Round-8 audit regression guard).
-        if !last.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '$') {
+        if !last
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
+        {
             return None;
         }
         return Some(last.to_string());

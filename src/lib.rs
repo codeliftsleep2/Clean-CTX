@@ -19,35 +19,34 @@
 //   - `compression/language`        — shared language detection
 //
 
+pub mod analytics;
 pub mod cache;
+pub mod cbm;
 pub mod compressor;
 pub mod config;
-pub mod cbm;
 pub mod intelligence;
 pub mod mcp;
 pub mod protocol;
 pub mod queries;
-pub mod analytics;
 
 // New (authoritative) module paths — public so they can be re-exported.
+pub mod angular_meta;
 pub mod compaction;
 pub mod compression;
 pub mod decompression;
 pub mod dictionary;
 pub mod diff;
-pub mod angular_meta;
-pub mod ir;
-pub mod spring_meta;
-pub mod layers;
 pub mod dotnet_meta;
-pub mod meta_util;
 pub mod error;
-pub mod tokenizer;
-pub mod observability;
 pub mod gitdiff;
+pub mod ir;
+pub mod layers;
+pub mod meta_util;
+pub mod observability;
 pub mod proxy_spawner;
+pub mod spring_meta;
+pub mod tokenizer;
 
 // Integration tests module
 #[cfg(test)]
 mod tests;
-

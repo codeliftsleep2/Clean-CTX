@@ -76,15 +76,15 @@ impl PhiMarker for NgRxKind {
     /// prevent partial-match issues in string replacement).
     fn all_in_expand_order() -> &'static [NgRxKind] {
         &[
-            Self::NgRx,       // Φngrx:     (6 chars)
-            Self::Action,     // Φaction:   (8 chars)
-            Self::Reducer,    // Φreducer:  (9 chars)
-            Self::Effect,     // Φeffect:   (8 chars)
-            Self::Selector,   // Φselector: (10 chars)
-            Self::Entity,     // Φentity:   (8 chars)
-            Self::Store,      // Φstore:    (7 chars)
-            Self::Dispatch,   // Φdispatch: (10 chars)
-            Self::Select,     // Φselect:   (8 chars)
+            Self::NgRx,     // Φngrx:     (6 chars)
+            Self::Action,   // Φaction:   (8 chars)
+            Self::Reducer,  // Φreducer:  (9 chars)
+            Self::Effect,   // Φeffect:   (8 chars)
+            Self::Selector, // Φselector: (10 chars)
+            Self::Entity,   // Φentity:   (8 chars)
+            Self::Store,    // Φstore:    (7 chars)
+            Self::Dispatch, // Φdispatch: (10 chars)
+            Self::Select,   // Φselect:   (8 chars)
         ]
     }
 
@@ -236,7 +236,9 @@ impl NgRxShape {
     /// marker prefix. The caller (workspace graph pass) resolves
     /// service names to file aliases and feeds these into the
     /// `AngularGraphBuilder`.
-    pub fn to_graph_edges(&self) -> Vec<(String, String, crate::angular_meta::graph::NgRxEdgeKind)> {
+    pub fn to_graph_edges(
+        &self,
+    ) -> Vec<(String, String, crate::angular_meta::graph::NgRxEdgeKind)> {
         use crate::angular_meta::graph::NgRxEdgeKind;
         let mut edges = Vec::new();
 
@@ -297,7 +299,12 @@ impl NgRxShape {
             for _store in &self.store_injections {
                 edges.push((
                     format!("Φcmp:{}", component),
-                    format!("Φngrx:{}", self.feature_name.clone().unwrap_or_else(|| "Feature".to_string())),
+                    format!(
+                        "Φngrx:{}",
+                        self.feature_name
+                            .clone()
+                            .unwrap_or_else(|| "Feature".to_string())
+                    ),
                     NgRxEdgeKind::ComponentStore,
                 ));
             }
@@ -370,11 +377,15 @@ impl NgRxShape {
                 }
                 Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     if let Some(ref props) = action.props_type {
-                        s.push_str(&format!("  Φaction:{} '{}' props<{}>\n",
-                            action.name, action.event_string, props));
+                        s.push_str(&format!(
+                            "  Φaction:{} '{}' props<{}>\n",
+                            action.name, action.event_string, props
+                        ));
                     } else {
-                        s.push_str(&format!("  Φaction:{} '{}'\n",
-                            action.name, action.event_string));
+                        s.push_str(&format!(
+                            "  Φaction:{} '{}'\n",
+                            action.name, action.event_string
+                        ));
                     }
                 }
             }
@@ -393,8 +404,10 @@ impl NgRxShape {
                         s.push_str(&format!("  Φreducer:{}\n", reducer.name));
                     }
                     for transition in &reducer.transitions {
-                        s.push_str(&format!("    on({}) → {}\n",
-                            transition.action_name, transition.state_summary));
+                        s.push_str(&format!(
+                            "    on({}) → {}\n",
+                            transition.action_name, transition.state_summary
+                        ));
                     }
                 }
             }
@@ -444,8 +457,11 @@ impl NgRxShape {
                     if selector.inputs.is_empty() {
                         s.push_str(&format!("  Φselector:{}\n", selector.name));
                     } else {
-                        s.push_str(&format!("  Φselector:{} = createSelector({})\n",
-                            selector.name, selector.inputs.join(", ")));
+                        s.push_str(&format!(
+                            "  Φselector:{} = createSelector({})\n",
+                            selector.name,
+                            selector.inputs.join(", ")
+                        ));
                     }
                 }
             }
@@ -601,7 +617,8 @@ fn extract_feature_name(source: &str, shape: &mut NgRxShape) {
         let rest = &source[idx + "createFeature({".len()..];
         if let Some(name_idx) = rest.find("name:") {
             let after_name = &rest[name_idx + "name:".len()..];
-            let name = after_name.trim_start()
+            let name = after_name
+                .trim_start()
                 .trim_start_matches('\'')
                 .trim_start_matches('"')
                 .split('\'')
@@ -626,7 +643,8 @@ fn extract_feature_name(source: &str, shape: &mut NgRxShape) {
             return;
         }
         let rest = &source[idx + "StoreModule.forFeature(".len()..];
-        let name = rest.trim_start()
+        let name = rest
+            .trim_start()
             .trim_start_matches('\'')
             .trim_start_matches('"')
             .split('\'')
@@ -661,7 +679,8 @@ fn extract_actions(source: &str, shape: &mut NgRxShape) {
             continue;
         }
         let before = &source[..abs_idx];
-        let name = before.split_whitespace()
+        let name = before
+            .split_whitespace()
             .last()
             .map(|s| s.trim().to_string())
             .unwrap_or_default();
@@ -691,10 +710,12 @@ fn extract_actions(source: &str, shape: &mut NgRxShape) {
         // Collect the full call body (up to matching close paren).
         // `end_offset` is the offset just past the close paren — the
         // standardized contract (Round-8 structural audit).
-        let (body, end_offset) = crate::angular_meta::util::collect_call_body(&source[after_paren..]);
+        let (body, end_offset) =
+            crate::angular_meta::util::collect_call_body(&source[after_paren..]);
 
         // Extract event string (first quoted string)
-        let event_string = crate::angular_meta::util::extract_first_quoted(&body).unwrap_or_default();
+        let event_string =
+            crate::angular_meta::util::extract_first_quoted(&body).unwrap_or_default();
 
         // Extract props type. Prefer the explicit `props<T>()` form;
         // fall back to the generic `createAction<T>(` parameter.
@@ -760,13 +781,17 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
         let name = if is_inline {
             // Inline form: use the enclosing feature name if available,
             // else `createFeature`'s name field as the reducer name.
-            shape.feature_name.clone().unwrap_or_else(|| "featureReducer".to_string())
+            shape
+                .feature_name
+                .clone()
+                .unwrap_or_else(|| "featureReducer".to_string())
         } else {
             // Strip the trailing ` = ` (the assignment operator) so the
             // last whitespace token is the actual variable name. The bare
             // `createReducer(` match includes the ` = ` in `before`.
             let before_ident = before.trim_end().trim_end_matches('=').trim();
-            before_ident.split_whitespace()
+            before_ident
+                .split_whitespace()
                 .last()
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default()
@@ -775,7 +800,8 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
         // The match pattern is `createReducer(` — `idx` points at the `C`.
         // Advance past the `createReducer(` to collect the call body.
         let after_start = abs_idx + "createReducer(".len();
-        let (body, end_offset) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
+        let (body, end_offset) =
+            crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
         // Extract state type from the first argument's type annotation
         // (e.g. `initialState: UserState` or `initialState`).
@@ -798,11 +824,7 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
                 // Look for `: Type` in the first argument (e.g. `initialState: UserState`).
                 if let Some(colon_idx) = first_arg.find(':') {
                     let ty = first_arg[colon_idx + 1..].trim().to_string();
-                    if !ty.is_empty() {
-                        Some(ty)
-                    } else {
-                        None
-                    }
+                    if !ty.is_empty() { Some(ty) } else { None }
                 } else {
                     None
                 }
@@ -822,7 +844,9 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
                 continue;
             }
             let after_on = &body[abs_on + "on(".len()..];
-            let action_name = after_on.split(',').next()
+            let action_name = after_on
+                .split(',')
+                .next()
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default();
 
@@ -906,13 +930,15 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
             continue;
         }
         let before = &source[..abs_idx];
-        let name = before.split_whitespace()
+        let name = before
+            .split_whitespace()
             .last()
             .map(|s| s.trim().to_string())
             .unwrap_or_default();
 
         let after_start = abs_idx + " = createEffect(".len();
-        let (after, end_offset) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
+        let (after, end_offset) =
+            crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
         // Check for `{ dispatch: false }` option
         let no_dispatch = after.contains("dispatch: false");
@@ -926,8 +952,7 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
             let after_ot = &after[ot_idx + "ofType(".len()..];
             // Collect the ofType(...) body with the shared string-aware
             // primitive, then depth-split on commas (Round-8 audit).
-            let (of_body, _) =
-                crate::angular_meta::util::collect_call_body(after_ot);
+            let (of_body, _) = crate::angular_meta::util::collect_call_body(after_ot);
             crate::angular_meta::util::split_top_level(&of_body, ',')
                 .into_iter()
                 .map(|s| s.trim().to_string())
@@ -964,7 +989,9 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
                     }
                 }
 
-                let call = body.split('(').next()
+                let call = body
+                    .split('(')
+                    .next()
                     .map(|s| s.trim().trim_end_matches(';').trim().to_string())
                     .unwrap_or_default();
                 if call.is_empty() { None } else { Some(call) }
@@ -989,7 +1016,9 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
             if let Some(of_idx) = after_ce.find("of(") {
                 let after_of = &after_ce[of_idx + "of(".len()..];
                 // The action is the identifier before the first `(`.
-                let action = after_of.split('(').next()
+                let action = after_of
+                    .split('(')
+                    .next()
                     .map(|s| s.trim().trim_end_matches(')').to_string())
                     .unwrap_or_default();
                 if !action.is_empty() {
@@ -999,10 +1028,16 @@ fn extract_effects(source: &str, shape: &mut NgRxShape) {
                 }
             } else if let Some(arrow_idx) = after_ce.find("=> ") {
                 let after_arrow = &after_ce[arrow_idx + 3..];
-                let action = after_arrow.split('(').next()
+                let action = after_arrow
+                    .split('(')
+                    .next()
                     .map(|s| s.trim().to_string())
                     .unwrap_or_default();
-                if !action.is_empty() { Some(action) } else { None }
+                if !action.is_empty() {
+                    Some(action)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -1052,7 +1087,9 @@ fn find_effect_map_action(effect_body: &str) -> Option<String> {
         // Look for `=> actionName(` or `=> actionName` in the map argument.
         if let Some(arrow_idx) = after_map.find("=> ") {
             let after_arrow = &after_map[arrow_idx + 3..];
-            let action = after_arrow.split('(').next()
+            let action = after_arrow
+                .split('(')
+                .next()
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default();
             // Round-9 audit: require a plausible action-creator name. An
@@ -1089,13 +1126,15 @@ fn extract_selectors(source: &str, shape: &mut NgRxShape) {
             continue;
         }
         let before = &source[..abs_idx];
-        let name = before.split_whitespace()
+        let name = before
+            .split_whitespace()
             .last()
             .map(|s| s.trim().to_string())
             .unwrap_or_default();
 
         let after_start = abs_idx + " = createSelector(".len();
-        let (body, end_offset) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
+        let (body, end_offset) =
+            crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
         // Extract input selectors (comma-separated, before the projection fn).
         // The projection fn is the last argument and contains `=>` — drop it.
@@ -1134,7 +1173,8 @@ fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
             continue;
         }
         let before = &source[..abs_idx];
-        let _name = before.split_whitespace()
+        let _name = before
+            .split_whitespace()
             .last()
             .map(|s| s.trim().to_string())
             .unwrap_or_default();
@@ -1147,14 +1187,17 @@ fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
 
         // The config object starts after the `>`.
         let config_start = after_start + entity_type.len() + 1; // skip `>`
-        let (body, end_offset) = crate::angular_meta::util::collect_call_body(&source[config_start..]);
+        let (body, end_offset) =
+            crate::angular_meta::util::collect_call_body(&source[config_start..]);
 
         // Extract selectId and sortComparer from the config object body.
         // The body starts with `({...})` — strip the outer parens.
         let rest = body.trim_start_matches('(').trim_end_matches(')');
         let select_id = if let Some(sid_idx) = rest.find("selectId:") {
             let after_sid = &rest[sid_idx + "selectId:".len()..];
-            let sid = after_sid.split(',').next()
+            let sid = after_sid
+                .split(',')
+                .next()
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default();
             if !sid.is_empty() { Some(sid) } else { None }
@@ -1164,7 +1207,9 @@ fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
 
         let sort_comparer = if let Some(sc_idx) = rest.find("sortComparer:") {
             let after_sc = &rest[sc_idx + "sortComparer:".len()..];
-            let sc = after_sc.split('}').next()
+            let sc = after_sc
+                .split('}')
+                .next()
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default();
             if !sc.is_empty() { Some(sc) } else { None }
@@ -1255,7 +1300,8 @@ fn extract_component_name(source: &str, shape: &mut NgRxShape) {
         let class_idx = after_close.find("class ").map(|i| i + "class ".len());
         if let Some(class_start) = class_idx {
             let after_class = &after_close[class_start..];
-            let name = after_class.split_whitespace()
+            let name = after_class
+                .split_whitespace()
                 .next()
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default();
@@ -1286,14 +1332,14 @@ fn extract_store_injections(source: &str, shape: &mut NgRxShape) {
         // Pattern: `private store: Store<AppState>` or `store: Store<AppState>`
         if let Some(idx) = trimmed.find(": Store<") {
             // Round-11 audit: reject when the match is inside a comment/string.
-            if crate::angular_meta::util::is_inside_comment_or_string(
-                source, trimmed_abs + idx,
-            ) {
+            if crate::angular_meta::util::is_inside_comment_or_string(source, trimmed_abs + idx) {
                 line_start += line.len() + 1;
                 continue;
             }
             let after = &trimmed[idx + ": Store<".len()..];
-            let state_type = after.split('>').next()
+            let state_type = after
+                .split('>')
+                .next()
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default();
 
@@ -1357,12 +1403,14 @@ fn extract_call_sites(source: &str, shape: &mut NgRxShape) {
             // Collect the full call body (up to matching close paren).
             // `collect_call_body` is string-aware and multi-line capable.
             let after_start = abs_idx + pattern.len();
-            let (body, end_offset) = crate::angular_meta::util::collect_call_body(&source[after_start..]);
+            let (body, end_offset) =
+                crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
             // The action/selector name is the first identifier in the body
             // (e.g. `loadUsersSuccess({ users })` → `loadUsersSuccess`;
             // `selectUser({ id })` → `selectUser`).
-            let first_ident = body.trim_start()
+            let first_ident = body
+                .trim_start()
                 .split(['(', ',', ' ', '\t', '\n', '\r'])
                 .next()
                 .map(|s| s.trim().to_string())
@@ -1371,10 +1419,14 @@ fn extract_call_sites(source: &str, shape: &mut NgRxShape) {
             if !first_ident.is_empty() {
                 match kind {
                     SiteKind::Dispatch => {
-                        shape.dispatch_sites.push(DispatchSite { action_name: first_ident });
+                        shape.dispatch_sites.push(DispatchSite {
+                            action_name: first_ident,
+                        });
                     }
                     SiteKind::Select | SiteKind::PipeSelect => {
-                        shape.select_sites.push(SelectSite { selector_name: first_ident });
+                        shape.select_sites.push(SelectSite {
+                            selector_name: first_ident,
+                        });
                     }
                 }
             }

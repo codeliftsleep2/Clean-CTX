@@ -811,11 +811,13 @@ impl GraphBridge {
                         None
                     }
                 });
-                controller_hit.or_else(|| rows.first().and_then(|row| {
-                    let fname = row.first().and_then(|v| v.as_str())?;
-                    let cname = row.get(1).and_then(|v| v.as_str())?;
-                    Some(format!("{cname}.{fname}"))
-                }))
+                controller_hit.or_else(|| {
+                    rows.first().and_then(|row| {
+                        let fname = row.first().and_then(|v| v.as_str())?;
+                        let cname = row.get(1).and_then(|v| v.as_str())?;
+                        Some(format!("{cname}.{fname}"))
+                    })
+                })
             }
             Err(_) => None,
         };

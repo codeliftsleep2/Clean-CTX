@@ -5,8 +5,7 @@
 
 use crate::angular_meta::phi::PhiMarker;
 use crate::angular_meta::signals::{
-    expand_phi, expand_phi_in_line, extract_signal_shape, has_signal_imports,
-    SignalKind,
+    SignalKind, expand_phi, expand_phi_in_line, extract_signal_shape, has_signal_imports,
 };
 use crate::compression::Fidelity;
 
@@ -103,7 +102,8 @@ export class UserComponent {
     // Only the genuine `signal(0)` should be captured — `signalName` and
     // `computedTotal` are just identifiers that start with the pattern.
     assert_eq!(
-        shape.signals.len(), 1,
+        shape.signals.len(),
+        1,
         "only the genuine signal() should be captured, got: {:?}",
         shape.signals
     );
@@ -156,9 +156,15 @@ export class UserComponent {
 "#;
     let shape = extract_signal_shape(src, Fidelity::Medium).expect("should detect signals");
     assert_eq!(shape.signals.len(), 2, "signals: {:?}", shape.signals);
-    let effect_sig = shape.signals.iter().find(|s| s.kind == SignalKind::SignalEffect)
+    let effect_sig = shape
+        .signals
+        .iter()
+        .find(|s| s.kind == SignalKind::SignalEffect)
         .expect("should have an effect");
-    assert_eq!(effect_sig.name, "logEffect", "named effect LHS should be captured");
+    assert_eq!(
+        effect_sig.name, "logEffect",
+        "named effect LHS should be captured"
+    );
 }
 
 // ── NgRx createEffect collision guard (Round-3 audit) ──────────────
@@ -189,7 +195,10 @@ export class UserEffects {
     let shape = extract_signal_shape(src, Fidelity::Medium);
     // The file has no @angular/core import, so the import gate rejects it.
     // But even if it did, `createEffect(` must not be captured as `effect(`.
-    assert!(shape.is_none(), "NgRx effects file must not produce Signals markers");
+    assert!(
+        shape.is_none(),
+        "NgRx effects file must not produce Signals markers"
+    );
 }
 
 #[test]
@@ -209,7 +218,11 @@ export class UserComponent {
 "#;
     let shape = extract_signal_shape(src, Fidelity::Medium).expect("should detect signals");
     // Only the genuine `effect(` should be captured.
-    assert_eq!(shape.signals.len(), 1, "only genuine effect() should be captured");
+    assert_eq!(
+        shape.signals.len(),
+        1,
+        "only genuine effect() should be captured"
+    );
     assert_eq!(shape.signals[0].kind, SignalKind::SignalEffect);
 }
 
@@ -352,7 +365,8 @@ export class UserComponent {
 "#;
     let shape = extract_signal_shape(src, Fidelity::Medium).expect("should detect signals");
     assert_eq!(
-        shape.signals.len(), 2,
+        shape.signals.len(),
+        2,
         "trailing-comment signals must not be extracted, got: {:?}",
         shape.signals
     );

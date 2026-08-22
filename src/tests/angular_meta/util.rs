@@ -21,17 +21,18 @@ fn collect_call_body_ignores_parens_in_strings() {
     // opening `(` of the outer call (e.g. after `console.log(`).
     let text = r#"'foo(bar)'), map(x => x)"#;
     let (body, end) = collect_call_body(text);
-    assert!(body.contains("foo(bar)"), "string content should be preserved, got: {}", body);
+    assert!(
+        body.contains("foo(bar)"),
+        "string content should be preserved, got: {}",
+        body
+    );
     // The end offset must point at the REAL closing paren of the outer
     // call, not the `)` inside the string literal.
     assert!(
         end > body.find("foo(bar)").unwrap_or(0),
         "end offset should be past the string literal"
     );
-    assert!(
-        end > 0,
-        "body should extend to the true closing paren"
-    );
+    assert!(end > 0, "body should extend to the true closing paren");
 }
 
 #[test]
@@ -41,7 +42,10 @@ fn collect_call_body_handles_nested_parens_and_templates() {
     // bracket depth.
     let text = "x => `${x}(nested)`), map(y => y)";
     let (body, end) = collect_call_body(text);
-    assert!(body.contains("`${x}(nested)`"), "template literal content should be preserved");
+    assert!(
+        body.contains("`${x}(nested)`"),
+        "template literal content should be preserved"
+    );
     assert!(end > 0, "should find a closing paren");
 }
 
@@ -50,7 +54,11 @@ fn collect_call_body_handles_escaped_quotes() {
     // An escaped quote inside a string must not terminate the string.
     let text = r#"map(x => "it\'s (fine)"), tap(y => y)"#;
     let (body, _) = collect_call_body(text);
-    assert!(body.contains("it\\'s"), "escaped quote should be preserved, got: {}", body);
+    assert!(
+        body.contains("it\\'s"),
+        "escaped quote should be preserved, got: {}",
+        body
+    );
 }
 
 // ── split_top_level: depth-aware comma splitting (Round-6 audit) ───

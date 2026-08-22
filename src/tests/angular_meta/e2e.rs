@@ -21,7 +21,7 @@ use crate::compression::Fidelity;
 
 #[test]
 fn disabled_rxjs_ngrx_produces_zero_markers() {
-    use crate::config::{MetaLayerConfig, NgRxConfig, RxJsConfig, SignalsConfig, RoutingConfig};
+    use crate::config::{MetaLayerConfig, NgRxConfig, RoutingConfig, RxJsConfig, SignalsConfig};
 
     let source = r#"
         import { Injectable } from '@angular/core';
@@ -51,8 +51,14 @@ fn disabled_rxjs_ngrx_produces_zero_markers() {
     // Keep signals/routing enabled (defaults) so we prove only the
     // disabled layers are suppressed.
     let cfg = MetaLayerConfig {
-        rxjs: RxJsConfig { enabled: false, ..Default::default() },
-        ngrx: NgRxConfig { enabled: false, ..Default::default() },
+        rxjs: RxJsConfig {
+            enabled: false,
+            ..Default::default()
+        },
+        ngrx: NgRxConfig {
+            enabled: false,
+            ..Default::default()
+        },
         signals: SignalsConfig::default(),
         routing: RoutingConfig::default(),
         ..Default::default()
@@ -63,13 +69,37 @@ fn disabled_rxjs_ngrx_produces_zero_markers() {
     let rendered = block.render();
 
     // The Angular decorator block is still emitted.
-    assert!(rendered.contains("Φsvc:UserService"), "should contain Φsvc marker\n{}", rendered);
+    assert!(
+        rendered.contains("Φsvc:UserService"),
+        "should contain Φsvc marker\n{}",
+        rendered
+    );
     // Disabled layers must produce zero markers.
-    assert!(!rendered.contains("Φobs:"), "disabled RxJS must not emit Φobs:\n{}", rendered);
-    assert!(!rendered.contains("Φsubject:"), "disabled RxJS must not emit Φsubject:\n{}", rendered);
-    assert!(!rendered.contains("Φmap:"), "disabled RxJS must not emit Φmap:\n{}", rendered);
-    assert!(!rendered.contains("Φcatch:"), "disabled RxJS must not emit Φcatch:\n{}", rendered);
-    assert!(!rendered.contains("Φaction:"), "disabled NgRx must not emit Φaction:\n{}", rendered);
+    assert!(
+        !rendered.contains("Φobs:"),
+        "disabled RxJS must not emit Φobs:\n{}",
+        rendered
+    );
+    assert!(
+        !rendered.contains("Φsubject:"),
+        "disabled RxJS must not emit Φsubject:\n{}",
+        rendered
+    );
+    assert!(
+        !rendered.contains("Φmap:"),
+        "disabled RxJS must not emit Φmap:\n{}",
+        rendered
+    );
+    assert!(
+        !rendered.contains("Φcatch:"),
+        "disabled RxJS must not emit Φcatch:\n{}",
+        rendered
+    );
+    assert!(
+        !rendered.contains("Φaction:"),
+        "disabled NgRx must not emit Φaction:\n{}",
+        rendered
+    );
 }
 
 #[test]
@@ -93,9 +123,21 @@ fn angular_component_to_phi_markers_e2e() {
         .expect("should detect Angular component");
     let rendered = block.render();
 
-    assert!(rendered.contains("Φcmp:AppComponent"), "should contain Φcmp marker\n{}", rendered);
-    assert!(rendered.contains("sel=app-root"), "should contain selector\n{}", rendered);
-    assert!(!rendered.contains("NG_COMPONENT_"), "should not contain old NG_ prefix\n{}", rendered);
+    assert!(
+        rendered.contains("Φcmp:AppComponent"),
+        "should contain Φcmp marker\n{}",
+        rendered
+    );
+    assert!(
+        rendered.contains("sel=app-root"),
+        "should contain selector\n{}",
+        rendered
+    );
+    assert!(
+        !rendered.contains("NG_COMPONENT_"),
+        "should not contain old NG_ prefix\n{}",
+        rendered
+    );
 }
 
 #[test]
@@ -118,9 +160,21 @@ fn angular_component_with_external_template_e2e() {
         .expect("should detect Angular component");
     let rendered = block.render();
 
-    assert!(rendered.contains("Φcmp:UserCardComponent"), "should contain Φcmp marker\n{}", rendered);
-    assert!(rendered.contains("sel=app-user-card"), "should contain selector\n{}", rendered);
-    assert!(rendered.contains("tpl=./user-card.component.html"), "should contain template path\n{}", rendered);
+    assert!(
+        rendered.contains("Φcmp:UserCardComponent"),
+        "should contain Φcmp marker\n{}",
+        rendered
+    );
+    assert!(
+        rendered.contains("sel=app-user-card"),
+        "should contain selector\n{}",
+        rendered
+    );
+    assert!(
+        rendered.contains("tpl=./user-card.component.html"),
+        "should contain template path\n{}",
+        rendered
+    );
 }
 
 // ── Service E2E ────────────────────────────────────
@@ -144,8 +198,16 @@ fn angular_service_to_phi_markers_e2e() {
         .expect("should detect Angular service");
     let rendered = block.render();
 
-    assert!(rendered.contains("Φsvc:UserService"), "should contain Φsvc marker\n{}", rendered);
-    assert!(!rendered.contains("NG_COMPONENT_"), "should not contain old NG_ prefix\n{}", rendered);
+    assert!(
+        rendered.contains("Φsvc:UserService"),
+        "should contain Φsvc marker\n{}",
+        rendered
+    );
+    assert!(
+        !rendered.contains("NG_COMPONENT_"),
+        "should not contain old NG_ prefix\n{}",
+        rendered
+    );
 }
 
 // ── Injectable E2E ─────────────────────────────────
@@ -167,7 +229,11 @@ fn angular_injectable_to_phi_markers_e2e() {
     let rendered = block.render();
 
     // @Injectable() without providedIn produces Φsvc marker
-    assert!(rendered.contains("Φsvc:LoggerService"), "should contain Φsvc marker\n{}", rendered);
+    assert!(
+        rendered.contains("Φsvc:LoggerService"),
+        "should contain Φsvc marker\n{}",
+        rendered
+    );
 }
 
 // ── Directive E2E ──────────────────────────────────
@@ -186,12 +252,20 @@ fn angular_directive_to_phi_markers_e2e() {
     "#;
     let class_captures = vec![source.to_string()];
 
-    let block = run_meta_layer(source, &class_captures, Fidelity::Medium)
-        .expect("should detect directive");
+    let block =
+        run_meta_layer(source, &class_captures, Fidelity::Medium).expect("should detect directive");
     let rendered = block.render();
 
-    assert!(rendered.contains("Φdir:HighlightDirective"), "should contain Φdir marker\n{}", rendered);
-    assert!(rendered.contains("sel=[appHighlight]"), "should contain directive selector\n{}", rendered);
+    assert!(
+        rendered.contains("Φdir:HighlightDirective"),
+        "should contain Φdir marker\n{}",
+        rendered
+    );
+    assert!(
+        rendered.contains("sel=[appHighlight]"),
+        "should contain directive selector\n{}",
+        rendered
+    );
 }
 
 // ── Pipe E2E ───────────────────────────────────────
@@ -212,12 +286,20 @@ fn angular_pipe_to_phi_markers_e2e() {
     "#;
     let class_captures = vec![source.to_string()];
 
-    let block = run_meta_layer(source, &class_captures, Fidelity::Medium)
-        .expect("should detect pipe");
+    let block =
+        run_meta_layer(source, &class_captures, Fidelity::Medium).expect("should detect pipe");
     let rendered = block.render();
 
-    assert!(rendered.contains("Φpipe:CapitalizePipe"), "should contain Φpipe marker\n{}", rendered);
-    assert!(rendered.contains("name=capitalize"), "should contain pipe name\n{}", rendered);
+    assert!(
+        rendered.contains("Φpipe:CapitalizePipe"),
+        "should contain Φpipe marker\n{}",
+        rendered
+    );
+    assert!(
+        rendered.contains("name=capitalize"),
+        "should contain pipe name\n{}",
+        rendered
+    );
 }
 
 // ── NgModule E2E ───────────────────────────────────
@@ -238,11 +320,15 @@ fn angular_ngmodule_to_phi_markers_e2e() {
     "#;
     let class_captures = vec![source.to_string()];
 
-    let block = run_meta_layer(source, &class_captures, Fidelity::Medium)
-        .expect("should detect NgModule");
+    let block =
+        run_meta_layer(source, &class_captures, Fidelity::Medium).expect("should detect NgModule");
     let rendered = block.render();
 
-    assert!(rendered.contains("Φmod:AppModule"), "should contain Φmod marker\n{}", rendered);
+    assert!(
+        rendered.contains("Φmod:AppModule"),
+        "should contain Φmod marker\n{}",
+        rendered
+    );
 }
 
 // ── Non-Angular file (negative test) ───────────────
@@ -259,7 +345,10 @@ fn plain_typescript_no_angular_markers_e2e() {
     let class_captures = vec![source.to_string()];
 
     let result = run_meta_layer(source, &class_captures, Fidelity::Medium);
-    assert!(result.is_none(), "plain TS should not produce Angular meta-block");
+    assert!(
+        result.is_none(),
+        "plain TS should not produce Angular meta-block"
+    );
 }
 
 // ── No old format regression ──────────────────────
@@ -281,13 +370,28 @@ fn angular_e2e_no_old_format_markers() {
     let rendered = block.render();
 
     // Verify no old format markers anywhere
-    let old_formats = ["NG_COMPONENT_", "NG_SERVICE_", "NG_DIRECTIVE_", "NG_PIPE_", "NG_MODULE_"];
+    let old_formats = [
+        "NG_COMPONENT_",
+        "NG_SERVICE_",
+        "NG_DIRECTIVE_",
+        "NG_PIPE_",
+        "NG_MODULE_",
+    ];
     for old in &old_formats {
-        assert!(!rendered.contains(old), "should not contain old format {}\n{}", old, rendered);
+        assert!(
+            !rendered.contains(old),
+            "should not contain old format {}\n{}",
+            old,
+            rendered
+        );
     }
 
     // Verify Φ abbreviations use new format (not old NG_ prefix)
-    assert!(rendered.contains("Φcmp:TestComponent"), "should contain Φcmp\n{}", rendered);
+    assert!(
+        rendered.contains("Φcmp:TestComponent"),
+        "should contain Φcmp\n{}",
+        rendered
+    );
 }
 
 // ── Low fidelity still emits base markers ──────────
@@ -312,8 +416,16 @@ fn angular_low_fidelity_emits_base_phi_markers_e2e() {
     let rendered = block.render();
 
     // Low fidelity still emits base markers (no template shapes, no injects)
-    assert!(rendered.contains("Φcmp:AppComponent"), "should contain Φcmp at Low fidelity\n{}", rendered);
-    assert!(!rendered.contains("NG_COMPONENT_"), "should not contain old NG_ prefix\n{}", rendered);
+    assert!(
+        rendered.contains("Φcmp:AppComponent"),
+        "should contain Φcmp at Low fidelity\n{}",
+        rendered
+    );
+    assert!(
+        !rendered.contains("NG_COMPONENT_"),
+        "should not contain old NG_ prefix\n{}",
+        rendered
+    );
 }
 
 // ── Phase C: Structured MetaLayerOutput (no render-then-reparse) ──
@@ -353,7 +465,8 @@ fn structured_meta_layer_output_preserves_angular_sections() {
     "#;
 
     let registry = crate::layers::LayerRegistry::global();
-    let results = registry.run_meta_layers_pipeline(source, &[source.to_string()], Fidelity::Medium, None);
+    let results =
+        registry.run_meta_layers_pipeline(source, &[source.to_string()], Fidelity::Medium, None);
 
     // The angular layer must have emitted a structured output.
     let angular = results
@@ -379,12 +492,18 @@ fn structured_meta_layer_output_preserves_angular_sections() {
         .find(|s| s.header.contains("RxJS"))
         .expect("structured block should contain an RxJS named section");
     assert!(
-        rx_section.lines.iter().any(|l| l.trim_start().starts_with("Φsubject:refresh$")),
+        rx_section
+            .lines
+            .iter()
+            .any(|l| l.trim_start().starts_with("Φsubject:refresh$")),
         "RxJS section should contain Φsubject:refresh$ line, got: {:?}",
         rx_section.lines
     );
     assert!(
-        rx_section.lines.iter().any(|l| l.trim_start().starts_with("Φobs:users$")),
+        rx_section
+            .lines
+            .iter()
+            .any(|l| l.trim_start().starts_with("Φobs:users$")),
         "RxJS section should contain Φobs:users$ line, got: {:?}",
         rx_section.lines
     );
