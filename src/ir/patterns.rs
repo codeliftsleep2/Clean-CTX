@@ -492,14 +492,20 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     let mut saw_injects = false;
     let mut deps: Vec<String> = Vec::new();
 
-    // F-FULL-03/F-FULL-09: Consume any trailing CTOR Flags op that the
-    // additive CodePatternRecognizer emitted before the method body.
-    // This prevents orphan Flags(M1, ["CTOR"]) ops in the final stream.
-    if idx < slice.len() {
-        if let CoreOp::Flags(mid, flags) = &slice[idx] {
-            if mid == &method_id && flags.contains(&"CTOR".to_string()) {
+    // F-FULL-03/F-FULL-09: Consume ALL trailing Flags ops referencing this
+    // method_id. The additive CodePatternRecognizer emits FLAGS(Mx, ["CTOR"]),
+    // but language-layer passes (e.g. TypeScriptLayer) may emit additional
+    // FLAGS(Mx, ["PRIVATE", "STATIC", ...]) that must also be consumed to
+    // prevent orphaned Flags ops in the final stream (E003).
+    while idx < slice.len() {
+        if let CoreOp::Flags(mid, _) = &slice[idx] {
+            if mid == &method_id {
                 idx += 1;
+            } else {
+                break;
             }
+        } else {
+            break;
         }
     }
 
@@ -526,6 +532,23 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
                 deps = inj_deps.clone();
                 idx += 1;
             }
+        }
+    }
+
+    // Consume ALL trailing Flags ops referencing this method_id that
+    // were emitted AFTER the method body (RET/INJECTS). The additive
+    // CodePatternRecognizer emits FLAGS(Mx, ["CTOR"]) and language-layer
+    // passes emit FLAGS(Mx, ["PRIVATE", "STATIC", ...]) after the body.
+    // All of these must be consumed to prevent orphaned Flags (E003).
+    while idx < slice.len() {
+        if let CoreOp::Flags(mid, _) = &slice[idx] {
+            if mid == &method_id {
+                idx += 1;
+            } else {
+                break;
+            }
+        } else {
+            break;
         }
     }
 
