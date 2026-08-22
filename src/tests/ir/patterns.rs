@@ -2,6 +2,7 @@
 //
 // Tests for Phase H: Pattern Compression (Consumptive Recognizer).
 
+use crate::ir::layers::PatternRecognizer;
 use crate::ir::opcodes::CoreOp;
 use crate::ir::patterns::{CompressingPatternRecognizer, MergeItem, PatternOp};
 
@@ -598,4 +599,115 @@ fn recognizer_default_impl() {
     let ops = vec![defmethod("C1", "M1", "get x")];
     let (pats, _) = rec.compress(&ops);
     assert_eq!(pats.len(), 1);
+}
+
+// ── CTOR orphan regression (M6 bug) ─────────────────────────────
+//
+// Regression test for the confirmed failure shape that caused E003:
+//   FLAGS(Mx, ["CTOR"])   ← additive CodePatternRecognizer
+//   DEF_M(Cx, Mx, constructor)
+//   PARAM(Mx, ...)
+//   RET(Mx, ...)
+//   FLAGS(Mx, ["PRIVATE"])  ← language-layer flag (e.g. TypeScriptLayer)
+//
+// The consumptive CompressingPatternRecognizer must consume ALL trailing
+// Flags ops referencing the same method_id, not just the CTOR flag.
+
+#[test]
+fn ctor_consumes_all_trailing_flags_preventing_orphan() {
+    // Exact failure shape: FLAGS(CTOR) + DEF_M + PARAM + RET + FLAGS(PRIVATE)
+    let ops = vec![
+        flags("M6", &["CTOR"]),
+        defmethod("C2", "M6", "constructor"),
+        param("M6", "P1", "$s", "authService"),
+        ret("M6", "$v"),
+        flags("M6", &["PRIVATE"]),
+    ];
+    let rec = CompressingPatternRecognizer::new();
+    let (pats, stats) = rec.compress(&ops);
+
+    // Should produce exactly 1 PatternOp (the CTOR)
+    assert_eq!(pats.len(), 1, "should produce exactly one CTOR pattern");
+    let ctor = &pats[0];
+    assert!(matches!(ctor, PatternOp::Constructor { .. }));
+
+    // All 5 source ops should be consumed (no orphaned flags)
+    assert_eq!(stats.source_ops, 5, "all 5 source ops must be consumed");
+    assert_eq!(stats.output_ops, 1, "exactly 1 pattern op emitted");
+
+    if let PatternOp::Constructor {
+        class_id,
+        method_id,
+        deps,
+    } = ctor
+    {
+        assert_eq!(class_id, "C2");
+        assert_eq!(method_id, "M6");
+        assert!(deps.is_empty(), "no injects in this test");
+    }
+}
+
+#[test]
+fn ctor_consumes_multiple_trailing_flags() {
+    // Multiple language-layer flags after the constructor body
+    let ops = vec![
+        flags("M6", &["CTOR"]),
+        defmethod("C2", "M6", "constructor"),
+        param("M6", "P1", "$s", "service"),
+        ret("M6", "$v"),
+        flags("M6", &["PRIVATE", "STATIC"]),
+    ];
+    let rec = CompressingPatternRecognizer::new();
+    let (pats, stats) = rec.compress(&ops);
+
+    assert_eq!(pats.len(), 1);
+    assert_eq!(stats.source_ops, 5, "all 5 source ops consumed");
+    assert!(matches!(&pats[0], PatternOp::Constructor { .. }));
+}
+
+#[test]
+fn ctor_consumes_all_trailing_flags_through_merged_pipeline() {
+    // Test that the full pipeline (recognize -> compress_merged -> CoreOp::Pattern)
+    // leaves no orphaned FLAGS in the output.
+    // The FLAGS(CTOR) and FLAGS(PRIVATE) both appear AFTER the DEF_M + PARAM + RET
+    // in the production instruction stream, as emitted by the additive recognizer
+    // and language layer respectively.
+    let ops = vec![
+        defclass("C2", "TestComponent"),
+        defmethod("C2", "M6", "constructor"),
+        param("M6", "P1", "$s", "authService"),
+        ret("M6", "$v"),
+        flags("M6", &["CTOR"]),
+        flags("M6", &["PRIVATE"]),
+        defmethod("C2", "M7", "ngOnInit"),
+        ret("M7", "$v"),
+    ];
+    let rec = CompressingPatternRecognizer::new();
+    let result = rec.recognize(&ops);
+
+    // Verify no FLAGS referencing M6 remain orphaned
+    let orphaned_m6_flags: Vec<&CoreOp> = result
+        .iter()
+        .filter(|op| {
+            matches!(op, CoreOp::Flags(mid, _) if mid == "M6")
+        })
+        .collect();
+    assert!(
+        orphaned_m6_flags.is_empty(),
+        "no FLAGS(M6, ...) should remain orphaned in the output"
+    );
+
+    // Verify the constructor is represented as a PAT(CTOR, ...)
+    let has_ctor_pat = result.iter().any(|op| {
+        matches!(op, CoreOp::Pattern(name, args) if name == "CTOR" && args.len() >= 2 && args[0] == "C2" && args[1] == "M6")
+    });
+    assert!(has_ctor_pat, "constructor should be represented as PAT(CTOR, ...)");
+
+    // Verify the stream still has DefClass and the second method
+    let has_defclass = result.iter().any(|op| matches!(op, CoreOp::DefClass(_, _)));
+    let has_ngoninit = result.iter().any(|op| {
+        matches!(op, CoreOp::DefMethod(_, _, name) if name == "ngOnInit")
+    });
+    assert!(has_defclass, "DefClass should pass through");
+    assert!(has_ngoninit, "ngOnInit should pass through");
 }
