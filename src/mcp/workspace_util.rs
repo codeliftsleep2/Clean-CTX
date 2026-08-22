@@ -216,8 +216,12 @@ pub(crate) fn extract_class_blocks(source: &str) -> Vec<String> {
             break;
         }
         let abs = cursor + class_pos;
-        // Look backwards for decorator start.
-        let block_start = find_decorator_start(source, abs);
+        // Look backwards for decorator start using the CANONICAL shared
+        // helper (single source of truth; no duplicate reconstruction).
+        // Falls back to the class keyword position when no decorator
+        // precedes it — preserving the original behavior verbatim.
+        let block_start =
+            crate::meta_util::find_decorator_inclusive_start(source, abs).unwrap_or(abs);
         if let Some(open) = decorators::find_class_body_open(&source[block_start..]) {
             let abs_open = block_start + open;
             // Find the matching close brace using the shared layer-agnostic
@@ -239,70 +243,4 @@ pub(crate) fn extract_class_blocks(source: &str) -> Vec<String> {
 #[cfg(feature = "angular")]
 fn find_next_class_keyword(text: &str) -> Option<usize> {
     text.find("class ")
-}
-
-/// Scan backwards from `class_pos` to find a preceding `@` decorator.
-/// Returns the start of the block (decorator `@` position, or
-/// `class_pos` if no decorator found). Handles TypeScript modifier
-/// keywords (`export`, `abstract`, `default`, `declare`) that may
-/// appear between the decorator and the class keyword.
-#[cfg(feature = "angular")]
-fn find_decorator_start(source: &str, class_pos: usize) -> usize {
-    let bytes = source.as_bytes();
-    let mut i = class_pos;
-
-    // Skip backwards through whitespace.
-    while i > 0 && bytes[i - 1].is_ascii_whitespace() {
-        i -= 1;
-    }
-
-    // Check for modifier keywords before class (export, abstract, etc.).
-    let word_end = i;
-    while i > 0 && (bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_') {
-        i -= 1;
-    }
-    let word = &source[i..word_end];
-    if matches!(word, "export" | "abstract" | "default" | "declare") {
-        // Skip whitespace before the modifier.
-        while i > 0 && bytes[i - 1].is_ascii_whitespace() {
-            i -= 1;
-        }
-    } else {
-        i = word_end; // Not a modifier, restore position.
-    }
-
-    // If we're at ')' (end of decorator call), find matching '@'.
-    if i > 0 && bytes[i - 1] == b')' {
-        let mut depth = 0i32;
-        let mut j = i - 1;
-        loop {
-            match bytes[j] {
-                b')' => depth += 1,
-                b'(' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        // Scan backwards through the decorator name to find '@'.
-                        let mut k = j;
-                        while k > 0
-                            && (bytes[k - 1].is_ascii_alphanumeric()
-                                || bytes[k - 1] == b'_'
-                                || bytes[k - 1] == b'$')
-                        {
-                            k -= 1;
-                        }
-                        if k > 0 && bytes[k - 1] == b'@' {
-                            return k - 1;
-                        }
-                    }
-                }
-                _ => {}
-            }
-            if j == 0 {
-                break;
-            }
-            j -= 1;
-        }
-    }
-
-    class_pos
 }

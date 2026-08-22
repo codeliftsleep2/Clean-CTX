@@ -613,6 +613,85 @@ pub fn extract_entity_type(text: &str) -> String {
     result.trim().to_string()
 }
 
+/// Find the start of the `@` decorator that immediately precedes a class
+/// declaration at byte index `class_pos` in `source`.
+///
+/// Tree-sitter's `class_declaration` node does NOT include leading
+/// decorators — `@Component({...})` is a sibling AST node. Meta-layers
+/// (Angular) require the decorator-inclusive class text to detect
+/// `@Component` / `@Injectable` etc. This helper scans backward from the
+/// `class` keyword position to find the leading `@`, handling TypeScript
+/// modifier keywords (`export`, `abstract`, `default`, `declare`) that may
+/// appear between the decorator and the class keyword.
+///
+/// Returns `Some(decorator_start)` when a leading `@` decorator is found,
+/// `None` otherwise (no decorator — callers should fall back to their
+/// existing non-decorator input).
+///
+/// This is the CANONICAL decorator-inclusive reconstruction helper.
+/// `mcp::workspace_util::extract_class_blocks` and
+/// `compression::pipeline::decorator_inclusive_class_text` both delegate
+/// here so the decorator-inclusive contract is not duplicated.
+pub fn find_decorator_inclusive_start(source: &str, class_pos: usize) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut i = class_pos;
+
+    // Skip backwards through whitespace.
+    while i > 0 && bytes[i - 1].is_ascii_whitespace() {
+        i -= 1;
+    }
+
+    // Check for modifier keywords before class (export, abstract, etc.).
+    let word_end = i;
+    while i > 0 && (bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_') {
+        i -= 1;
+    }
+    let word = &source[i..word_end];
+    if matches!(word, "export" | "abstract" | "default" | "declare") {
+        // Skip whitespace before the modifier.
+        while i > 0 && bytes[i - 1].is_ascii_whitespace() {
+            i -= 1;
+        }
+    } else {
+        i = word_end; // Not a modifier, restore position.
+    }
+
+    // If we're at ')' (end of decorator call), find matching '@'.
+    if i > 0 && bytes[i - 1] == b')' {
+        let mut depth = 0i32;
+        let mut j = i - 1;
+        loop {
+            match bytes[j] {
+                b')' => depth += 1,
+                b'(' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        // Scan backwards through the decorator name to find '@'.
+                        let mut k = j;
+                        while k > 0
+                            && (bytes[k - 1].is_ascii_alphanumeric()
+                                || bytes[k - 1] == b'_'
+                                || bytes[k - 1] == b'$')
+                        {
+                            k -= 1;
+                        }
+                        if k > 0 && bytes[k - 1] == b'@' {
+                            return Some(k - 1);
+                        }
+                    }
+                }
+                _ => {}
+            }
+            if j == 0 {
+                break;
+            }
+            j -= 1;
+        }
+    }
+
+    None
+}
+
 /// Returns `true` if byte index `pos` in `source` lies inside a comment
 /// (`//` line comment or `/* */` block comment) or a string/template
 /// literal.

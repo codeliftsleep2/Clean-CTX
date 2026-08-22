@@ -473,6 +473,88 @@ fn compress_text_edit_fidelity_skips_meta_block() {
     );
 }
 
+// ---------- Angular meta-layer receives decorator-inclusive class text ----------
+//
+// The meta-layer's `class_captures` contract requires the FULL class text
+// (leading decorators + class body), NOT the compacted class name. The
+// production capture pipeline normalizes `class.root` captures via
+// `extract_class_name` into `cap.text` (e.g. `"UserCardComponent"`), but
+// `decorators::extract_decorators` searches the capture for `@Component`
+// before the `class` keyword — a bare name yields no decorators and the
+// Angular `Φcmp:`/`Φsvc:` markers are silently dropped.
+//
+// Note: tree-sitter's `class_declaration` node (`cap.raw_text`) also
+// excludes the leading decorators — they are sibling AST nodes. The
+// meta-layer dispatch in `build_output_lines` therefore reconstructs the
+// decorator-inclusive SOURCE SPAN via the canonical
+// `decorator_inclusive_class_text` helper (which maps the class position
+// back into the source and scans backward for the leading `@`).
+//
+// This test drives the REAL capture pipeline (`compress_text`), not a
+// hand-constructed `CapEntry` with full-source text, so it fails if the
+// class-captures regression is reintroduced.
+
+#[cfg(feature = "angular")]
+#[test]
+fn compress_text_emits_angular_component_markers() {
+    let source = r#"
+        import { Component } from '@angular/core';
+
+        @Component({
+            selector: 'app-user-card',
+            templateUrl: './user-card.component.html'
+        })
+        export class UserCardComponent {
+            @Input() userId: string = '';
+        }
+    "#;
+    let result = compress_text(source, "ts", Fidelity::Medium, "α1", None);
+    assert!(result.is_ok(), "compress_text should succeed");
+    let (_body_lines, full_output) = result.unwrap();
+    assert!(
+        full_output.contains("Φcmp:UserCardComponent"),
+        "compressed output must contain the Angular Φcmp marker, got:\n{}",
+        full_output
+    );
+    assert!(
+        full_output.contains("sel=app-user-card"),
+        "compressed output must contain the component selector, got:\n{}",
+        full_output
+    );
+}
+
+// The `@Injectable` decorator is the same decorator-inclusive contract but
+// a different Angular classification — it must also survive the production
+// compression path now that the meta-layer receives the full class text.
+
+#[cfg(feature = "angular")]
+#[test]
+fn compress_text_emits_angular_injectable_markers() {
+    let source = r#"
+        import { Injectable } from '@angular/core';
+        import { HttpClient } from '@angular/common/http';
+
+        @Injectable({ providedIn: 'root' })
+        export class UserService {
+            constructor(private http: HttpClient) {}
+            getUsers() { return this.http.get('/api/users'); }
+        }
+    "#;
+    let result = compress_text(source, "ts", Fidelity::High, "α1", None);
+    assert!(result.is_ok(), "compress_text should succeed");
+    let (_body_lines, full_output) = result.unwrap();
+    assert!(
+        full_output.contains("Φsvc:UserService"),
+        "compressed output must contain the Angular Φsvc marker, got:\n{}",
+        full_output
+    );
+    assert!(
+        full_output.contains("scope=root"),
+        "compressed output must contain providedIn scope, got:\n{}",
+        full_output
+    );
+}
+
 // ---------- H-6/H-7: header labels at Edit/Verbatim ----------
 
 #[test]
