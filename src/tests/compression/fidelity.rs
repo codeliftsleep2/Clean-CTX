@@ -58,7 +58,11 @@ fn parse_preserves_offending_value_in_error() {
     // The display impl surfaces the bad value so the operator can fix it.
     let err = Fidelity::parse("hihg").unwrap_err();
     let msg = err.to_string();
-    assert!(msg.contains("hihg"), "error must include the bad value: {}", msg);
+    assert!(
+        msg.contains("hihg"),
+        "error must include the bad value: {}",
+        msg
+    );
     assert!(
         msg.contains("low") && msg.contains("medium") && msg.contains("high"),
         "error must list valid options: {}",
@@ -67,10 +71,28 @@ fn parse_preserves_offending_value_in_error() {
 }
 
 #[test]
+fn parse_edit_accepted() {
+    assert_eq!(Fidelity::parse("edit").unwrap(), Fidelity::Edit);
+}
+
+#[test]
+fn parse_verbatim_accepted() {
+    assert_eq!(Fidelity::parse("verbatim").unwrap(), Fidelity::Verbatim);
+}
+
+#[test]
+fn parse_edit_case_insensitive() {
+    assert_eq!(Fidelity::parse("EDIT").unwrap(), Fidelity::Edit);
+    assert_eq!(Fidelity::parse("Verbatim").unwrap(), Fidelity::Verbatim);
+}
+
+#[test]
 fn parse_or_default_accepts_valid_input() {
     assert_eq!(Fidelity::parse_or_default("low"), Fidelity::Low);
     assert_eq!(Fidelity::parse_or_default("medium"), Fidelity::Medium);
     assert_eq!(Fidelity::parse_or_default("high"), Fidelity::High);
+    assert_eq!(Fidelity::parse_or_default("edit"), Fidelity::Edit);
+    assert_eq!(Fidelity::parse_or_default("verbatim"), Fidelity::Verbatim);
 }
 
 #[test]

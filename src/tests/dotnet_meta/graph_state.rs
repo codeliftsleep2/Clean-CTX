@@ -5,8 +5,8 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod tests {
-    use crate::dotnet_meta::graph_state::DotnetGraphHandle;
     use crate::dotnet_meta::graph::{DotnetGraphBuilder, GraphNode};
+    use crate::dotnet_meta::graph_state::DotnetGraphHandle;
     use crate::dotnet_meta::markers::PhiLineKind;
 
     #[test]

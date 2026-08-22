@@ -5,26 +5,24 @@
 //
 // v0.3.0: Separated from core handlers for Single Responsibility.
 
-use serde_json::Value;
 use crate::mcp::McpState;
-use crate::mcp::cache_hints::{render_cache_text, render_cache_json};
+use crate::mcp::cache_hints::{render_cache_json, render_cache_text};
 use crate::protocol::send_response;
+use serde_json::Value;
 
 /// Handle `context_stats` — renders the Clean-CTX dashboard.
 /// Shows per-file or session-level token savings, compression stats,
 /// and cache/persistence status. Supports `text` (default) and `json` formats.
-pub(crate) fn handle_context_stats(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState) {
     state.flush_persistence();
 
     // Rebuild stats from DB if persistence is enabled
     let db_stats = {
         let guard = state.persistence_store_lock();
         guard.as_ref().and_then(|store| {
-            store.sqlite().and_then(|sql_guard| sql_guard.rebuild_stats().ok())
+            store
+                .sqlite()
+                .and_then(|sql_guard| sql_guard.rebuild_stats().ok())
         })
     };
 
@@ -118,7 +116,10 @@ pub(crate) fn handle_context_stats(
         let mut text = crate::mcp::session_stats::render_dashboard_text(&merged);
 
         let active_tokenizer = state.config.tokenizer.to_string();
-        text.push_str(&format!("── Tokenizer ──\n  Active: {} (config: {})\n", active_tokenizer, active_tokenizer));
+        text.push_str(&format!(
+            "── Tokenizer ──\n  Active: {} (config: {})\n",
+            active_tokenizer, active_tokenizer
+        ));
 
         if let Some(ref db_summary) = db_stats.as_ref().map(|db| db.summary()) {
             text.push_str(&format!(

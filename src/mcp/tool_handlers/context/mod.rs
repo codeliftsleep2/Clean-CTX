@@ -5,18 +5,14 @@
 //
 // v0.3.0: Separated from core handlers for Single Responsibility.
 
-use serde_json::Value;
 use crate::mcp::McpState;
 use crate::mcp::context_store::ContextStore;
 use crate::protocol::send_response;
+use serde_json::Value;
 
 /// Handle `context_history` — shows per-file versioning, delta history,
 /// and cache efficiency metrics. With no file path, shows all tracked files.
-pub(crate) fn handle_context_history(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_context_history(id: &Value, params: &Value, state: &McpState) {
     let file_path = params["arguments"]["filePath"].as_str();
 
     if let Some(fp) = file_path {
@@ -28,15 +24,22 @@ pub(crate) fn handle_context_history(
         let mut lines = Vec::new();
         lines.push(format!("File: {}", fp));
         lines.push(format!("  Text Delta Versions: {}", version));
-        lines.push(format!("  IR Baseline: {}", if has_ir { "yes" } else { "no" }));
-        lines.push(format!("  Context Store: {}", if store_meta.is_some() { "yes" } else { "no" }));
+        lines.push(format!(
+            "  IR Baseline: {}",
+            if has_ir { "yes" } else { "no" }
+        ));
+        lines.push(format!(
+            "  Context Store: {}",
+            if store_meta.is_some() { "yes" } else { "no" }
+        ));
         if let Some(meta) = store_meta {
             lines.push(format!("  Context Version: {}", meta.version));
         }
 
         let metrics = state.cache_metrics_lock();
         let total = metrics.hits + metrics.misses;
-        lines.push(format!("  Cache Hit Rate: {}/{} ({}%)",
+        lines.push(format!(
+            "  Cache Hit Rate: {}/{} ({}%)",
             metrics.hits,
             total,
             if total > 0 {

@@ -16,20 +16,32 @@ pub struct DiffAction {
     pub detail: String,
     /// For `~` actions, the prior compact representation. Empty otherwise.
     pub previous_detail: String,
+    /// Why a modified method changed. One of:
+    ///   `"body"`    — signature + markers identical, body fingerprint changed
+    ///   `"markers"` — signature identical, behavior markers changed
+    ///   `"sig"`     — signature changed
+    ///   `""`        — not a method modification.
+    /// G2-5 audit: previously the formatter couldn't distinguish a
+    /// body-only change from a markers-only change (both kept the same
+    /// `detail`), so markers-only changes were mislabeled "(body changed)".
+    pub reason_hint: String,
 }
 
-/// Serialized as `"+", "-", "~", "="`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Defaults to `(Unchanged, Class)` so `DiffAction::default()` works.
+/// G2-5: these are derived (clippy `derivable-impls`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum DiffKind {
     Added,
     Removed,
     Modified,
+    #[default]
     Unchanged,
 }
 
 /// Serialized as `"class", "method", "field", "import"`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum DiffTarget {
+    #[default]
     Class,
     Method,
     Field,

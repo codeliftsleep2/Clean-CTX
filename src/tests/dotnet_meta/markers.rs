@@ -6,7 +6,7 @@
 #[allow(clippy::module_inception)]
 mod tests {
     use crate::dotnet_meta::markers::{
-        build_action_line, build_controller_line, build_ef_line, build_hub_line, PhiLineKind,
+        PhiLineKind, build_action_line, build_controller_line, build_ef_line, build_hub_line,
     };
 
     #[test]
@@ -41,7 +41,10 @@ mod tests {
 
     #[test]
     fn test_phi_line_kind_from_token() {
-        assert_eq!(PhiLineKind::from_token("Φctrl"), Some(PhiLineKind::Controller));
+        assert_eq!(
+            PhiLineKind::from_token("Φctrl"),
+            Some(PhiLineKind::Controller)
+        );
         assert_eq!(PhiLineKind::from_token("Φef"), Some(PhiLineKind::DbContext));
         assert_eq!(PhiLineKind::from_token("Φhub"), Some(PhiLineKind::Hub));
         assert_eq!(PhiLineKind::from_token("Φunknown"), None);

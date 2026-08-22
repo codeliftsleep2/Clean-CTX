@@ -13,16 +13,14 @@
 
 use crate::ir::binary_wire::{decode, encode};
 use crate::ir::compiler::CompiledIR;
-use crate::ir::delta::{
-    compact_decode, compact_encode, DeltaOps, IRDelta, ModOp,
-};
+use crate::ir::delta::{DeltaOps, IRDelta, ModOp, compact_decode, compact_encode};
 use crate::ir::hierarchical::{ir_to_hierarchical_wire, wire_to_ir as hierarchical_wire_to_ir};
 use crate::ir::opcodes::CoreOp;
 use crate::ir::wire::{ir_to_wire, op_to_tuple, tuple_to_op, wire_to_ir};
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-/// Build a CompiledIR containing every CoreOp variant (all 19).
+/// Build a CompiledIR containing every CoreOp variant (all 20).
 fn all_variants_ir() -> CompiledIR {
     CompiledIR {
         file_id: "all.ts".to_string(),
@@ -44,6 +42,8 @@ fn all_variants_ir() -> CompiledIR {
             CoreOp::Import("IM1".into(), "fs".into(), "readFile".into()),
             CoreOp::TypeAlias("T1".into(), "string".into()),
             CoreOp::Pattern("CTOR".into(), vec!["C1".into(), "M1".into(), "S1".into()]),
+            // Edit Mode: verbatim method body
+            CoreOp::Body("M1".into(), "{\n  let x = 1;\n  return x;\n}".into()),
             // R-43a: 4 new execution semantics variants
             CoreOp::DataFlow("M1".into(), "reads".into(), "userRepo".into()),
             CoreOp::ControlFlow("M1".into(), "if".into(), "condition".into()),
@@ -55,20 +55,19 @@ fn all_variants_ir() -> CompiledIR {
 
 /// Assert two CompiledIRs are identical instruction-by-instruction.
 fn assert_ir_eq(original: &CompiledIR, restored: &CompiledIR) {
-    assert_eq!(
-        restored.file_id, original.file_id,
-        "file_id mismatch"
-    );
-    assert_eq!(
-        restored.version, original.version,
-        "version mismatch"
-    );
+    assert_eq!(restored.file_id, original.file_id, "file_id mismatch");
+    assert_eq!(restored.version, original.version, "version mismatch");
     assert_eq!(
         restored.instructions.len(),
         original.instructions.len(),
         "instruction count mismatch"
     );
-    for (i, (a, b)) in restored.instructions.iter().zip(original.instructions.iter()).enumerate() {
+    for (i, (a, b)) in restored
+        .instructions
+        .iter()
+        .zip(original.instructions.iter())
+        .enumerate()
+    {
         assert_eq!(a, b, "instruction mismatch at index {}", i);
     }
 }
@@ -111,7 +110,7 @@ fn round_trip_execution_context() {
     assert_eq!(original, restored);
 }
 
-// ── 2. Named Wire Format: Full IR Round-Trip (All 19 Variants) ──
+// ── 2. Named Wire Format: Full IR Round-Trip (All 20 Variants) ──
 
 #[test]
 fn round_trip_named_wire_all_variants() {
@@ -141,7 +140,12 @@ fn round_trip_binary_wire_all_variants() {
     // Binary format stores class_id as empty string for DefClass, DefMethod, DefField
     // (it expects the caller to reconstruct from context). So we check opcode-by-opcode
     // using opcode_name rather than full equality for structural ops.
-    for (i, (a, b)) in restored.instructions.iter().zip(original.instructions.iter()).enumerate() {
+    for (i, (a, b)) in restored
+        .instructions
+        .iter()
+        .zip(original.instructions.iter())
+        .enumerate()
+    {
         // Binary wire uses empty string for structural parent IDs — skip those
         match (a, b) {
             (CoreOp::DefClass(_, _), CoreOp::DefClass(_, _))
@@ -160,8 +164,9 @@ fn round_trip_binary_wire_all_variants() {
                     i
                 );
             }
-            // R-43a execution semantics ops have all data preserved
-            (CoreOp::DataFlow(..), CoreOp::DataFlow(..))
+            // Edit Mode + R-43a execution semantics ops have all data preserved
+            (CoreOp::Body(..), CoreOp::Body(..))
+            | (CoreOp::DataFlow(..), CoreOp::DataFlow(..))
             | (CoreOp::ControlFlow(..), CoreOp::ControlFlow(..))
             | (CoreOp::SideEffect(..), CoreOp::SideEffect(..))
             | (CoreOp::ExecutionContext(..), CoreOp::ExecutionContext(..))
@@ -205,8 +210,8 @@ fn round_trip_binary_wire_empty() {
 fn round_trip_hierarchical_wire_all_variants() {
     let original = all_variants_ir();
     let wire = ir_to_hierarchical_wire(&original);
-    let restored = hierarchical_wire_to_ir(&wire)
-        .expect("hierarchical wire round-trip should succeed");
+    let restored =
+        hierarchical_wire_to_ir(&wire).expect("hierarchical wire round-trip should succeed");
     // Hierarchical format drops execution semantics ops (they're no-ops in conversion)
     // So we only verify the structural ops round-trip correctly
     assert_eq!(restored.file_id, original.file_id);
@@ -245,16 +250,19 @@ fn round_trip_compact_delta_with_ops() {
         to: 3,
         ops: DeltaOps {
             adds: vec![
-                vec!["DATAFLOW".into(), "M1".into(), "reads".into(), "repo".into()],
+                vec![
+                    "DATAFLOW".into(),
+                    "M1".into(),
+                    "reads".into(),
+                    "repo".into(),
+                ],
                 vec!["EFFECT".into(), "M1".into(), "async".into()],
             ],
             mods: vec![ModOp::new_replace(
                 vec!["DEF_M".into(), "C1".into(), "M1".into()],
                 vec!["DEF_M".into(), "C1".into(), "M1".into(), "renamed".into()],
             )],
-            dels: vec![
-                vec!["CTX".into(), "M1".into(), "sync".into()],
-            ],
+            dels: vec![vec!["CTX".into(), "M1".into(), "sync".into()]],
         },
         intent: None,
     };
@@ -282,9 +290,12 @@ fn round_trip_compact_delta_preserves_intent() {
         from: 1,
         to: 2,
         ops: DeltaOps {
-            adds: vec![
-                vec!["DEF_M".into(), "C1".into(), "M2".into(), "newMethod".into()],
-            ],
+            adds: vec![vec![
+                "DEF_M".into(),
+                "C1".into(),
+                "M2".into(),
+                "newMethod".into(),
+            ]],
             mods: vec![],
             dels: vec![],
         },
@@ -300,7 +311,10 @@ fn round_trip_compact_delta_preserves_intent() {
     assert_eq!(decoded.file, delta.file);
     assert_eq!(decoded.from, delta.from);
     assert_eq!(decoded.to, delta.to);
-    assert!(decoded.intent.is_some(), "intent should survive compact round-trip");
+    assert!(
+        decoded.intent.is_some(),
+        "intent should survive compact round-trip"
+    );
     match decoded.intent.unwrap() {
         crate::ir::delta::SemanticIntent::AddMethod { class, method_name } => {
             assert_eq!(class, "C1");
@@ -322,7 +336,10 @@ fn round_trip_compact_delta_intent_absent_when_none() {
     let compact = compact_encode(&delta);
     // The intent field should be absent from the compact JSON (skip_serializing_if)
     let json = serde_json::to_value(&compact).expect("serialize compact delta");
-    assert!(json.get("i").is_none(), "intent field should be absent when None");
+    assert!(
+        json.get("i").is_none(),
+        "intent field should be absent when None"
+    );
     let decoded = compact_decode(&compact).expect("compact delta round-trip should succeed");
     assert!(decoded.intent.is_none(), "decoded intent should be None");
 }
@@ -335,7 +352,7 @@ fn round_trip_compact_delta_intent_absent_when_none() {
 
 /// Generate a random CoreOp for property testing.
 fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
-    let variant = rng() % 19;
+    let variant = rng() % 20;
     match variant {
         0 => CoreOp::DefClass(format!("C{}", rng() % 10), format!("Class{}", rng() % 100)),
         1 => CoreOp::DefMethod(
@@ -348,44 +365,64 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
             format!("F{}", rng() % 10),
             format!("field{}", rng() % 100),
         ),
-        3 => CoreOp::DefInterface(
-            format!("I{}", rng() % 10),
-            format!("Iface{}", rng() % 100),
-        ),
+        3 => CoreOp::DefInterface(format!("I{}", rng() % 10), format!("Iface{}", rng() % 100)),
         4 => CoreOp::Param(
             format!("M{}", rng() % 10),
             format!("P{}", rng() % 10),
-            match rng() % 4 { 0 => "$s", 1 => "$n", 2 => "$b", _ => "$v" }.to_string(),
+            match rng() % 4 {
+                0 => "$s",
+                1 => "$n",
+                2 => "$b",
+                _ => "$v",
+            }
+            .to_string(),
             format!("param{}", rng() % 100),
         ),
         5 => CoreOp::Return(
             format!("M{}", rng() % 10),
-            match rng() % 4 { 0 => "$s", 1 => "$n", 2 => "$b", _ => "$v" }.to_string(),
+            match rng() % 4 {
+                0 => "$s",
+                1 => "$n",
+                2 => "$b",
+                _ => "$v",
+            }
+            .to_string(),
         ),
         6 => CoreOp::FieldType(
             format!("F{}", rng() % 10),
-            match rng() % 4 { 0 => "$s", 1 => "$n", 2 => "$b", _ => "$v" }.to_string(),
+            match rng() % 4 {
+                0 => "$s",
+                1 => "$n",
+                2 => "$b",
+                _ => "$v",
+            }
+            .to_string(),
         ),
         7 => CoreOp::Flags(
             format!("M{}", rng() % 10),
             vec![
-                match rng() % 4 { 0 => "IF", 1 => "LOOP", 2 => "ASYNC", _ => "RET" }.to_string(),
+                match rng() % 4 {
+                    0 => "IF",
+                    1 => "LOOP",
+                    2 => "ASYNC",
+                    _ => "RET",
+                }
+                .to_string(),
             ],
         ),
         8 => CoreOp::ClassFlags(
             format!("C{}", rng() % 10),
             vec![
-                match rng() % 3 { 0 => "EXPORT", 1 => "ABSTRACT", _ => "STATIC" }.to_string(),
+                match rng() % 3 {
+                    0 => "EXPORT",
+                    1 => "ABSTRACT",
+                    _ => "STATIC",
+                }
+                .to_string(),
             ],
         ),
-        9 => CoreOp::Extends(
-            format!("C{}", rng() % 10),
-            format!("C{}", rng() % 10),
-        ),
-        10 => CoreOp::Implements(
-            format!("C{}", rng() % 10),
-            format!("I{}", rng() % 10),
-        ),
+        9 => CoreOp::Extends(format!("C{}", rng() % 10), format!("C{}", rng() % 10)),
+        10 => CoreOp::Implements(format!("C{}", rng() % 10), format!("I{}", rng() % 10)),
         11 => CoreOp::Injects(
             format!("C{}", rng() % 10),
             vec![format!("Dep{}", rng() % 10)],
@@ -395,10 +432,7 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
             format!("module{}", rng() % 10),
             format!("export{}", rng() % 10),
         ),
-        13 => CoreOp::TypeAlias(
-            format!("T{}", rng() % 10),
-            format!("Type{}", rng() % 10),
-        ),
+        13 => CoreOp::TypeAlias(format!("T{}", rng() % 10), format!("Type{}", rng() % 10)),
         14 => CoreOp::Pattern(
             format!("PAT{}", rng() % 10),
             vec![format!("arg{}", rng() % 10)],
@@ -406,27 +440,55 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
         // R-43a: Execution Semantics
         15 => CoreOp::DataFlow(
             format!("M{}", rng() % 10),
-            match rng() % 2 { 0 => "reads".to_string(), _ => "writes".to_string() },
+            match rng() % 2 {
+                0 => "reads".to_string(),
+                _ => "writes".to_string(),
+            },
             format!("target{}", rng() % 10),
         ),
         16 => CoreOp::ControlFlow(
             format!("M{}", rng() % 10),
             match rng() % 6 {
-                0 => "if", 1 => "loop", 2 => "match", 3 => "try", 4 => "await", _ => "return"
-            }.to_string(),
+                0 => "if",
+                1 => "loop",
+                2 => "match",
+                3 => "try",
+                4 => "await",
+                _ => "return",
+            }
+            .to_string(),
             format!("expr{}", rng() % 10),
         ),
         17 => CoreOp::SideEffect(
             format!("M{}", rng() % 10),
             match rng() % 5 {
-                0 => "pure", 1 => "io", 2 => "mutation", 3 => "async", _ => "transaction"
-            }.to_string(),
+                0 => "pure",
+                1 => "io",
+                2 => "mutation",
+                3 => "async",
+                _ => "transaction",
+            }
+            .to_string(),
         ),
         18 => CoreOp::ExecutionContext(
             format!("M{}", rng() % 10),
             match rng() % 5 {
-                0 => "sync", 1 => "async", 2 => "thread_bound", 3 => "transaction_scope", _ => "realtime"
-            }.to_string(),
+                0 => "sync",
+                1 => "async",
+                2 => "thread_bound",
+                3 => "transaction_scope",
+                _ => "realtime",
+            }
+            .to_string(),
+        ),
+        19 => CoreOp::Body(
+            format!("M{}", rng() % 10),
+            format!(
+                "{{
+  let x = {};
+}}",
+                rng() % 100
+            ),
         ),
         _ => unreachable!(),
     }
@@ -449,9 +511,13 @@ fn random_ir(rng: &mut impl FnMut() -> u64) -> CompiledIR {
 /// A simple deterministic RNG for property testing.
 /// Uses a linear congruential generator with wrapping arithmetic.
 fn make_rng(seed: u64) -> impl FnMut() -> u64 {
-    let mut state = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let mut state = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     move || {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         state >> 33 // Use high bits for better distribution
     }
 }
@@ -473,7 +539,12 @@ fn property_named_wire_round_trip() {
             "seed {}: instruction count mismatch after named wire round-trip",
             seed
         );
-        for (i, (a, b)) in restored.instructions.iter().zip(original.instructions.iter()).enumerate() {
+        for (i, (a, b)) in restored
+            .instructions
+            .iter()
+            .zip(original.instructions.iter())
+            .enumerate()
+        {
             assert_eq!(a, b, "seed {}: instruction mismatch at index {}", seed, i);
         }
     }
@@ -498,7 +569,12 @@ fn property_binary_wire_round_trip() {
             "seed {}: instruction count mismatch after binary wire round-trip",
             seed
         );
-        for (i, (a, b)) in restored.instructions.iter().zip(original.instructions.iter()).enumerate() {
+        for (i, (a, b)) in restored
+            .instructions
+            .iter()
+            .zip(original.instructions.iter())
+            .enumerate()
+        {
             // Binary wire uses empty string for structural parent IDs
             match (a, b) {
                 (CoreOp::DefClass(_, _), CoreOp::DefClass(_, _))
@@ -514,11 +590,13 @@ fn property_binary_wire_round_trip() {
                         crate::ir::wire::op_to_tuple(a)[0],
                         crate::ir::wire::op_to_tuple(b)[0],
                         "seed {}: binary wire opcode mismatch at index {}",
-                        seed, i
+                        seed,
+                        i
                     );
                 }
                 // Data-preserving ops
-                (CoreOp::DataFlow(..), CoreOp::DataFlow(..))
+                (CoreOp::Body(..), CoreOp::Body(..))
+                | (CoreOp::DataFlow(..), CoreOp::DataFlow(..))
                 | (CoreOp::ControlFlow(..), CoreOp::ControlFlow(..))
                 | (CoreOp::SideEffect(..), CoreOp::SideEffect(..))
                 | (CoreOp::ExecutionContext(..), CoreOp::ExecutionContext(..))
@@ -529,7 +607,11 @@ fn property_binary_wire_round_trip() {
                 | (CoreOp::ClassFlags(..), CoreOp::ClassFlags(..))
                 | (CoreOp::Injects(..), CoreOp::Injects(..))
                 | (CoreOp::Pattern(..), CoreOp::Pattern(..)) => {
-                    assert_eq!(a, b, "seed {}: binary wire instruction mismatch at index {}", seed, i);
+                    assert_eq!(
+                        a, b,
+                        "seed {}: binary wire instruction mismatch at index {}",
+                        seed, i
+                    );
                 }
                 _ => panic!("seed {}: variant mismatch at index {}", seed, i),
             }
@@ -561,8 +643,17 @@ fn property_double_encode_stability() {
             decoded_bin1.instructions.len(),
             decoded_bin2.instructions.len()
         );
-        for (i, (a, b)) in decoded_bin1.instructions.iter().zip(decoded_bin2.instructions.iter()).enumerate() {
-            assert_eq!(a, b, "seed {}: binary double-encode mismatch at index {}", seed, i);
+        for (i, (a, b)) in decoded_bin1
+            .instructions
+            .iter()
+            .zip(decoded_bin2.instructions.iter())
+            .enumerate()
+        {
+            assert_eq!(
+                a, b,
+                "seed {}: binary double-encode mismatch at index {}",
+                seed, i
+            );
         }
     }
 }
@@ -605,7 +696,12 @@ fn round_trip_only_execution_semantics() {
     let bytes = encode(&ir);
     let restored_bin = decode(&bytes).expect("execution semantics only: binary wire round-trip");
     assert_eq!(restored_bin.instructions.len(), ir.instructions.len());
-    for (i, (a, b)) in restored_bin.instructions.iter().zip(ir.instructions.iter()).enumerate() {
+    for (i, (a, b)) in restored_bin
+        .instructions
+        .iter()
+        .zip(ir.instructions.iter())
+        .enumerate()
+    {
         assert_eq!(a, b, "execution semantics binary mismatch at index {}", i);
     }
 }
@@ -619,9 +715,12 @@ fn round_trip_delta_with_semantic_intent() {
         from: 1,
         to: 2,
         ops: DeltaOps {
-            adds: vec![
-                vec!["DATAFLOW".into(), "M1".into(), "reads".into(), "repo".into()],
-            ],
+            adds: vec![vec![
+                "DATAFLOW".into(),
+                "M1".into(),
+                "reads".into(),
+                "repo".into(),
+            ]],
             mods: vec![],
             dels: vec![],
         },
@@ -659,8 +758,10 @@ fn round_trip_delta_without_intent_skips_field() {
     let json = serde_json::to_string(&delta).expect("serialize delta without intent");
     // The intent field should be absent (skip_serializing_if)
     let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-    assert!(parsed.get("intent").is_none() || parsed["intent"].is_null(),
-        "intent field should be absent when None");
+    assert!(
+        parsed.get("intent").is_none() || parsed["intent"].is_null(),
+        "intent field should be absent when None"
+    );
 }
 
 // ── 9. R-02: Type Alias IR Round-Trip Tests ─────────────────────
@@ -669,8 +770,8 @@ fn round_trip_delta_without_intent_skips_field() {
 // survive wire-format round-trips, and that the alias mapping is
 // preserved.
 
-use std::collections::BTreeMap;
 use crate::ir::type_aliases::apply_type_aliases_to_ir;
+use std::collections::BTreeMap;
 
 fn make_aliases(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
@@ -742,14 +843,25 @@ fn round_trip_ir_with_type_aliases_binary_wire() {
     // Binary wire format uses empty strings for TypeAlias ID fields (like
     // DefClass, Import, etc.), so we verify the TYPE opcode is present
     // rather than the full alias/original content.
-    assert!(restored.instructions.iter().any(|op| matches!(op,
-        CoreOp::TypeAlias(..))), "TypeAlias op should survive binary wire round-trip");
+    assert!(
+        restored
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::TypeAlias(..))),
+        "TypeAlias op should survive binary wire round-trip"
+    );
     // Verify the substituted type values survived (FieldType/Return are
     // data-preserving in binary wire).
-    assert!(restored.instructions.iter().any(|op| matches!(op,
-        CoreOp::FieldType(_, t) if t == "$uid")), "FieldType with $uid should survive");
-    assert!(restored.instructions.iter().any(|op| matches!(op,
-        CoreOp::Return(_, t) if t == "$uid")), "Return with $uid should survive");
+    assert!(
+        restored.instructions.iter().any(|op| matches!(op,
+        CoreOp::FieldType(_, t) if t == "$uid")),
+        "FieldType with $uid should survive"
+    );
+    assert!(
+        restored.instructions.iter().any(|op| matches!(op,
+        CoreOp::Return(_, t) if t == "$uid")),
+        "Return with $uid should survive"
+    );
 }
 
 #[test]
@@ -763,7 +875,8 @@ fn round_trip_ir_with_multiple_type_aliases() {
     apply_type_aliases_to_ir(&mut instructions, &aliases);
 
     // Both TypeAlias ops should be present
-    let ta_count = instructions.iter()
+    let ta_count = instructions
+        .iter()
         .filter(|op| matches!(op, CoreOp::TypeAlias(..)))
         .count();
     assert_eq!(ta_count, 2, "expected 2 TypeAlias ops");

@@ -3,13 +3,13 @@
 // JSON-RPC 2.0 subprocess client for codebase-memory-mcp.
 // Self-contained — no knowledge of Clean-CTX internals.
 
+use serde_json::Value;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
-use serde_json::Value;
 
 use crate::cbm::config::CbmStatus;
 
@@ -65,7 +65,6 @@ pub struct CbmClient {
     circuit_cooldown_secs: u64,
 }
 
-
 /// Determines whether a CBM error is transient and should be retried.
 ///
 /// Retryable errors:
@@ -82,10 +81,7 @@ pub(crate) fn is_retryable(error: &CbmError) -> bool {
         error,
         CbmError::ConnectionLost(_)
             | CbmError::Timeout(_)
-            | CbmError::RpcError {
-                code: -32603,
-                ..
-            }
+            | CbmError::RpcError { code: -32603, .. }
     )
 }
 
@@ -113,11 +109,17 @@ impl CbmClient {
             .spawn()
             .map_err(|e| CbmError::LaunchError(format!("spawn: {e}")))?;
 
-        let stdin = child.stdin.take()
+        let stdin = child
+            .stdin
+            .take()
             .ok_or_else(|| CbmError::LaunchError("no stdin".into()))?;
-        let stdout = child.stdout.take()
+        let stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| CbmError::LaunchError("no stdout".into()))?;
-        let stderr = child.stderr.take()
+        let stderr = child
+            .stderr
+            .take()
             .ok_or_else(|| CbmError::LaunchError("no stderr".into()))?;
 
         // H-1 fix: drain stderr in a background thread to prevent deadlock.
@@ -178,7 +180,9 @@ impl CbmClient {
         }))
     }
 
-    pub fn status(&self) -> &CbmStatus { &self.status }
+    pub fn status(&self) -> &CbmStatus {
+        &self.status
+    }
 
     // ── Circuit breaker ─────────────────────────────────────────
 
@@ -219,10 +223,15 @@ impl CbmClient {
     pub(crate) fn record_failure(&mut self) {
         self.consecutive_failures += 1;
         if self.consecutive_failures >= self.max_consecutive_failures {
-            self.status = CbmStatus::Degraded(format!("circuit_open_after_{}_failures", self.max_consecutive_failures));
+            self.status = CbmStatus::Degraded(format!(
+                "circuit_open_after_{}_failures",
+                self.max_consecutive_failures
+            ));
             self.degraded_since = Some(Instant::now());
-            eprintln!("[clean-ctx-cbm] Circuit opened after {} consecutive failures",
-                self.max_consecutive_failures);
+            eprintln!(
+                "[clean-ctx-cbm] Circuit opened after {} consecutive failures",
+                self.max_consecutive_failures
+            );
         }
     }
 
@@ -279,8 +288,8 @@ impl CbmClient {
             "method": "tools/call",
             "params": { "name": tool_name, "arguments": args }
         });
-        let req_line = serde_json::to_string(&request)
-            .map_err(|e| CbmError::ParseError(e.to_string()))?;
+        let req_line =
+            serde_json::to_string(&request).map_err(|e| CbmError::ParseError(e.to_string()))?;
         writeln!(self.stdin, "{req_line}").map_err(|e| {
             self.status = CbmStatus::Degraded(format!("write: {e}"));
             CbmError::ConnectionLost(e.to_string())
@@ -308,9 +317,10 @@ impl CbmClient {
                     buf.push_str(&line);
                     if buf.len() > MAX_RESPONSE_BYTES {
                         self.status = CbmStatus::Degraded("oversized".into());
-                        return Err(CbmError::ConnectionLost(
-                            format!("response >{}B", MAX_RESPONSE_BYTES)
-                        ));
+                        return Err(CbmError::ConnectionLost(format!(
+                            "response >{}B",
+                            MAX_RESPONSE_BYTES
+                        )));
                     }
                     if serde_json::from_str::<Value>(buf.trim()).is_ok() {
                         // Valid complete JSON — return the raw intercepted text
@@ -379,8 +389,8 @@ impl CbmClient {
             "method": "tools/call",
             "params": { "name": tool_name, "arguments": args }
         });
-        let req_line = serde_json::to_string(&request)
-            .map_err(|e| CbmError::ParseError(e.to_string()))?;
+        let req_line =
+            serde_json::to_string(&request).map_err(|e| CbmError::ParseError(e.to_string()))?;
         writeln!(self.stdin, "{req_line}").map_err(|e| {
             self.status = CbmStatus::Degraded(format!("write: {e}"));
             CbmError::ConnectionLost(e.to_string())
@@ -407,9 +417,10 @@ impl CbmClient {
                     buf.push_str(&line);
                     if buf.len() > MAX_RESPONSE_BYTES {
                         self.status = CbmStatus::Degraded("oversized".into());
-                        return Err(CbmError::ConnectionLost(
-                            format!("response >{}B", MAX_RESPONSE_BYTES)
-                        ));
+                        return Err(CbmError::ConnectionLost(format!(
+                            "response >{}B",
+                            MAX_RESPONSE_BYTES
+                        )));
                     }
                     if let Ok(resp) = serde_json::from_str::<Value>(buf.trim()) {
                         if let Some(error) = resp.get("error") {
@@ -418,7 +429,9 @@ impl CbmClient {
                                 message: error["message"].as_str().unwrap_or("unknown").into(),
                             });
                         }
-                        return resp.get("result").cloned()
+                        return resp
+                            .get("result")
+                            .cloned()
                             .ok_or_else(|| CbmError::ParseError("missing result".into()));
                     }
                     // Not yet complete JSON — continue reading lines
@@ -447,10 +460,12 @@ impl CbmClient {
     /// The actual data is a JSON string inside `result.content[0].text`.
     /// This helper extracts and parses that inner JSON string.
     fn parse_cbm_response(&self, response: &Value) -> Result<Value, CbmError> {
-        let content = response["content"].as_array()
+        let content = response["content"]
+            .as_array()
             .and_then(|a| a.first())
             .ok_or_else(|| CbmError::ParseError("missing content array".into()))?;
-        let text = content["text"].as_str()
+        let text = content["text"]
+            .as_str()
             .ok_or_else(|| CbmError::ParseError("missing text field in content".into()))?;
         serde_json::from_str(text)
             .map_err(|e| CbmError::ParseError(format!("inner JSON parse: {e}")))
@@ -461,7 +476,12 @@ impl CbmClient {
     /// Search the CBM knowledge graph by name pattern and optional label filter.
     ///
     /// CBM params: `name_pattern`, `label`, `file_pattern`, `project`, `limit`, `offset`
-    pub fn search_graph(&mut self, name_pattern: &str, project: &str, label: Option<&str>) -> Result<Vec<Value>, CbmError> {
+    pub fn search_graph(
+        &mut self,
+        name_pattern: &str,
+        project: &str,
+        label: Option<&str>,
+    ) -> Result<Vec<Value>, CbmError> {
         let mut args = serde_json::json!({"name_pattern": name_pattern, "project": project});
         if let Some(l) = label {
             args["label"] = serde_json::Value::String(l.to_string());
@@ -474,7 +494,13 @@ impl CbmClient {
     /// Trace call paths in the CBM knowledge graph.
     ///
     /// CBM params: `function_name`, `direction` (inbound|outbound|both), `depth`, `project`
-    pub fn trace_path(&mut self, function_name: &str, direction: &str, project: &str, depth: Option<usize>) -> Result<Vec<Value>, CbmError> {
+    pub fn trace_path(
+        &mut self,
+        function_name: &str,
+        direction: &str,
+        project: &str,
+        depth: Option<usize>,
+    ) -> Result<Vec<Value>, CbmError> {
         let mut args = serde_json::json!({"function_name": function_name, "direction": direction, "project": project});
         if let Some(d) = depth {
             args["depth"] = serde_json::Value::Number(serde_json::Number::from(d));
@@ -499,14 +525,22 @@ impl CbmClient {
     ///
     /// Returns rows as `Vec<Vec<Value>>` where each inner vec is a row of column values.
     /// CBM wraps results in `{columns, rows}` format.
-    pub fn query_graph(&mut self, cypher: &str, project: &str) -> Result<Vec<Vec<Value>>, CbmError> {
-        let r = self.call_tool("query_graph", serde_json::json!({"query": cypher, "project": project}))?;
+    pub fn query_graph(
+        &mut self,
+        cypher: &str,
+        project: &str,
+    ) -> Result<Vec<Vec<Value>>, CbmError> {
+        let r = self.call_tool(
+            "query_graph",
+            serde_json::json!({"query": cypher, "project": project}),
+        )?;
         let inner = self.parse_cbm_response(&r)?;
-        Ok(inner["rows"].as_array()
+        Ok(inner["rows"]
+            .as_array()
             .map(|rows| {
-                rows.iter().filter_map(|row| {
-                    row.as_array().cloned()
-                }).collect()
+                rows.iter()
+                    .filter_map(|row| row.as_array().cloned())
+                    .collect()
             })
             .unwrap_or_default())
     }
@@ -515,26 +549,49 @@ impl CbmClient {
     ///
     /// CBM has no dedicated `get_symbol_importance` tool, but `in_degree`
     /// on function nodes provides the same information.
-    pub fn get_symbol_importance(&mut self, project: &str, min_degree: Option<usize>) -> Result<Vec<Value>, CbmError> {
+    pub fn get_symbol_importance(
+        &mut self,
+        project: &str,
+        min_degree: Option<usize>,
+    ) -> Result<Vec<Value>, CbmError> {
         let min = min_degree.unwrap_or(1);
         let cypher = format!(
             "MATCH (f:Function) WHERE f.in_degree >= {} RETURN f.name, f.file_path, f.in_degree, f.out_degree ORDER BY f.in_degree DESC",
             min
         );
         let rows = self.query_graph(&cypher, project)?;
-        Ok(rows.into_iter().map(|row| {
-            let name = row.first().and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let file = row.get(1).and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let in_degree = row.get(2).and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
-            let out_degree = row.get(3).and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
-            serde_json::json!({
-                "name": name,
-                "file": file,
-                "in_degree": in_degree as u64,
-                "out_degree": out_degree as u64,
-                "importance": in_degree / 100.0,  // normalized score for blending
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let name = row
+                    .first()
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let file = row
+                    .get(1)
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let in_degree = row
+                    .get(2)
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .unwrap_or(0.0);
+                let out_degree = row
+                    .get(3)
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .unwrap_or(0.0);
+                serde_json::json!({
+                    "name": name,
+                    "file": file,
+                    "in_degree": in_degree as u64,
+                    "out_degree": out_degree as u64,
+                    "importance": in_degree / 100.0,  // normalized score for blending
+                })
             })
-        }).collect())
+            .collect())
     }
 
     /// Get dead code candidates from CBM via Cypher query.
@@ -544,13 +601,16 @@ impl CbmClient {
     pub fn get_dead_code(&mut self, project: &str) -> Result<Vec<Value>, CbmError> {
         let cypher = "MATCH (f:Function) WHERE f.in_degree = 0 AND f.is_entry_point = false RETURN f.name, f.file_path".to_string();
         let rows = self.query_graph(&cypher, project)?;
-        Ok(rows.into_iter().map(|row| {
-            serde_json::json!({
-                "name": row.first().and_then(|v| v.as_str()).unwrap_or(""),
-                "file": row.get(1).and_then(|v| v.as_str()).unwrap_or(""),
-                "reason": "no callers",
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                serde_json::json!({
+                    "name": row.first().and_then(|v| v.as_str()).unwrap_or(""),
+                    "file": row.get(1).and_then(|v| v.as_str()).unwrap_or(""),
+                    "reason": "no callers",
+                })
             })
-        }).collect())
+            .collect())
     }
 
     /// Trigger indexing of a project in CBM.
@@ -575,4 +635,3 @@ impl Drop for CbmClient {
         }
     }
 }
-

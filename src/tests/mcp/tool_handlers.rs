@@ -9,9 +9,11 @@
 // "pretty" = fallback), cache invalidation, and angular/spring
 // meta-layer abbreviation in compiled output.
 
-use crate::mcp::tools::{parse_fidelity_arg, resolve_fidelity, dispatch_tools_call};
-use crate::mcp::tool_handlers::core::handle_compress_code_context;
 use crate::compression::Fidelity;
+use crate::mcp::tool_handlers::core::{
+    contract_fields, contract_fields_focused, handle_compress_code_context,
+};
+use crate::mcp::tools::{dispatch_tools_call, parse_fidelity_arg, resolve_fidelity};
 use serde_json::json;
 
 // ── resolve_fidelity tests ──
@@ -25,13 +27,21 @@ fn resolve_fidelity_explicit_low() {
 
 #[test]
 fn resolve_fidelity_explicit_medium() {
-    let result = resolve_fidelity(Some("medium"), None, &crate::config::CleanCtxConfig::default());
+    let result = resolve_fidelity(
+        Some("medium"),
+        None,
+        &crate::config::CleanCtxConfig::default(),
+    );
     assert_eq!(result, Fidelity::Medium);
 }
 
 #[test]
 fn resolve_fidelity_explicit_high() {
-    let result = resolve_fidelity(Some("high"), None, &crate::config::CleanCtxConfig::default());
+    let result = resolve_fidelity(
+        Some("high"),
+        None,
+        &crate::config::CleanCtxConfig::default(),
+    );
     assert_eq!(result, Fidelity::High);
 }
 
@@ -44,14 +54,20 @@ fn resolve_fidelity_none_uses_default() {
 
 #[test]
 fn resolve_fidelity_invalid_string_falls_back_to_default() {
-    let result = resolve_fidelity(Some("bogus"), None, &crate::config::CleanCtxConfig::default());
+    let result = resolve_fidelity(
+        Some("bogus"),
+        None,
+        &crate::config::CleanCtxConfig::default(),
+    );
     assert_eq!(result, Fidelity::Low);
 }
 
 #[test]
 fn resolve_fidelity_extension_override() {
     let mut config = crate::config::CleanCtxConfig::default();
-    config.fidelity_overrides.insert("ts".to_string(), crate::compression::Fidelity::High);
+    config
+        .fidelity_overrides
+        .insert("ts".to_string(), crate::compression::Fidelity::High);
     let result = resolve_fidelity(None, Some("ts"), &config);
     assert_eq!(result, Fidelity::High);
 }
@@ -184,13 +200,21 @@ fn inject_baseline_breakpoint_helper_injects_hint() {
 
     inject_baseline_breakpoint(&mut response, &state, "compressed output");
 
-    assert!(response.get("_meta").is_none(), "_meta should NOT be at response root");
+    assert!(
+        response.get("_meta").is_none(),
+        "_meta should NOT be at response root"
+    );
     let hints = &response["result"]["_meta"]["cache_hints"];
     let breakpoints = hints["breakpoints"].as_array().unwrap();
     assert_eq!(breakpoints.len(), 1);
     assert_eq!(breakpoints[0]["region"], "baseline");
     assert_eq!(breakpoints[0]["ttl"], "1h");
-    assert!(breakpoints[0]["breaker"].as_str().unwrap().starts_with("bl_"));
+    assert!(
+        breakpoints[0]["breaker"]
+            .as_str()
+            .unwrap()
+            .starts_with("bl_")
+    );
     assert_eq!(state.cache_metrics_lock().misses, 1);
 }
 
@@ -206,14 +230,20 @@ fn inject_tail_breakpoint_helper_injects_hint() {
 
     inject_tail_breakpoint(&mut response, &state);
 
-    assert!(response.get("_meta").is_none(), "_meta should NOT be at response root");
+    assert!(
+        response.get("_meta").is_none(),
+        "_meta should NOT be at response root"
+    );
     let hints = &response["result"]["_meta"]["cache_hints"];
     let breakpoints = hints["breakpoints"].as_array().unwrap();
     assert_eq!(breakpoints.len(), 1);
     assert_eq!(breakpoints[0]["region"], "tail");
     assert_eq!(breakpoints[0]["ttl"], "5m");
     assert_eq!(breakpoints[0]["breaker"], "rolling");
-    assert_eq!(state.cache_metrics_lock().breakpoints.get("tail").unwrap(), "ephemeral");
+    assert_eq!(
+        state.cache_metrics_lock().breakpoints.get("tail").unwrap(),
+        "ephemeral"
+    );
 }
 
 #[test]
@@ -256,7 +286,8 @@ fn delta_code_context_cached_ir_path_does_not_panic() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }
@@ -267,7 +298,8 @@ fn delta_text_context_no_changes_path_does_not_panic() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "delta_text_context", &params, &state);
     dispatch_tools_call(&id, "delta_text_context", &params, &state);
 }
@@ -320,6 +352,11 @@ fn render_hierarchical_for_llm_typescript_class() {
         return_type: None,
         flags: Some(vec!["IF".into()]),
         patterns: vec![],
+        body: None,
+        control_flow: vec![],
+        data_flow: vec![],
+        side_effect: None,
+        execution_context: None,
     });
     let hir = HierarchicalIR {
         classes: vec![class],
@@ -365,6 +402,11 @@ fn render_hierarchical_for_llm_spring_boot_class() {
         return_type: None,
         flags: Some(vec!["RET".into()]),
         patterns: vec![],
+        body: None,
+        control_flow: vec![],
+        data_flow: vec![],
+        side_effect: None,
+        execution_context: None,
     };
     let m2 = MethodNode {
         id: "M2".into(),
@@ -376,12 +418,21 @@ fn render_hierarchical_for_llm_spring_boot_class() {
         return_type: None,
         flags: Some(vec!["RET".into(), "IF".into()]),
         patterns: vec![],
+        body: None,
+        control_flow: vec![],
+        data_flow: vec![],
+        side_effect: None,
+        execution_context: None,
     };
     class.methods.push(m1);
     class.methods.push(m2);
     let hir = HierarchicalIR {
         classes: vec![class],
-        imports: vec![vec!["IM1".into(), "org.springframework.web".into(), "*".into()]],
+        imports: vec![vec![
+            "IM1".into(),
+            "org.springframework.web".into(),
+            "*".into(),
+        ]],
         type_aliases: vec![
             vec!["@rest".into(), "UserController".into()],
             vec!["@map".into(), "GET /users".into()],
@@ -449,9 +500,21 @@ fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
         name: "Data".into(),
         methods: vec![],
         fields: vec![
-            FieldNode { id: "F1".into(), name: "x".into(), field_type: Some("$n".into()) },
-            FieldNode { id: "F2".into(), name: "y".into(), field_type: Some("$n".into()) },
-            FieldNode { id: "F3".into(), name: "label".into(), field_type: Some("$s".into()) },
+            FieldNode {
+                id: "F1".into(),
+                name: "x".into(),
+                field_type: Some("$n".into()),
+            },
+            FieldNode {
+                id: "F2".into(),
+                name: "y".into(),
+                field_type: Some("$n".into()),
+            },
+            FieldNode {
+                id: "F3".into(),
+                name: "label".into(),
+                field_type: Some("$s".into()),
+            },
         ],
         class_flags: None,
         extends: None,
@@ -460,7 +523,11 @@ fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
         patterns: vec![],
         synthetic: false,
     };
-    let hir = HierarchicalIR { classes: vec![class], imports: vec![], type_aliases: vec![] };
+    let hir = HierarchicalIR {
+        classes: vec![class],
+        imports: vec![],
+        type_aliases: vec![],
+    };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Low fidelity: space-separated fields on one line
     assert!(result.contains("F x:$n y:$n label:$s"));
@@ -475,8 +542,16 @@ fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
         name: "Data".into(),
         methods: vec![],
         fields: vec![
-            FieldNode { id: "F1".into(), name: "x".into(), field_type: Some("$n".into()) },
-            FieldNode { id: "F2".into(), name: "y".into(), field_type: Some("$n".into()) },
+            FieldNode {
+                id: "F1".into(),
+                name: "x".into(),
+                field_type: Some("$n".into()),
+            },
+            FieldNode {
+                id: "F2".into(),
+                name: "y".into(),
+                field_type: Some("$n".into()),
+            },
         ],
         class_flags: None,
         extends: None,
@@ -485,7 +560,11 @@ fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
         patterns: vec![],
         synthetic: false,
     };
-    let hir = HierarchicalIR { classes: vec![class], imports: vec![], type_aliases: vec![] };
+    let hir = HierarchicalIR {
+        classes: vec![class],
+        imports: vec![],
+        type_aliases: vec![],
+    };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
     // Medium fidelity: one field per line
     assert!(result.contains("F x:$n\n"));
@@ -508,7 +587,11 @@ fn render_hierarchical_for_llm_injects_do_not_panic() {
         patterns: vec![],
         synthetic: false,
     };
-    let hir = HierarchicalIR { classes: vec![class], imports: vec![], type_aliases: vec![] };
+    let hir = HierarchicalIR {
+        classes: vec![class],
+        imports: vec![],
+        type_aliases: vec![],
+    };
     // Should not panic — injects are structural (pattern-level), not rendered
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     assert!(result.contains("// ── Service ──"));
@@ -521,7 +604,9 @@ fn mcp_state_llm_text_cache_insert_and_read() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     // Insert into cache
-    state.llm_text_cache_lock().insert("α1".to_string(), "// SCHEMA v2\n// ── Foo ──\n".to_string());
+    state
+        .llm_text_cache_lock()
+        .insert("α1".to_string(), "// SCHEMA v2\n// ── Foo ──\n".to_string());
     // Read from cache
     let cache_guard = state.llm_text_cache_lock();
     let cached = cache_guard.get("α1");
@@ -544,7 +629,6 @@ fn mcp_state_llm_text_cache_clear_on_new() {
     // Fresh state should have empty cache
     assert!(state.llm_text_cache_lock().is_empty());
 }
-
 
 // ── Micro-opcode expanded table verification (Phase 8) ──
 
@@ -572,12 +656,24 @@ fn micro_opcode_apply_expand_roundtrip_with_new_markers() {
     let original = "Foo{field1};⊕guard check() ⊕loop iterate() ⊕⇒result ⊕!err";
     let compressed = apply_micro_opcodes(original, Fidelity::Low);
     let expanded = expand_micro_opcodes(&compressed);
-    assert_eq!(expanded, original, "Round-trip must preserve original content");
+    assert_eq!(
+        expanded, original,
+        "Round-trip must preserve original content"
+    );
     // Verify compression replaces markers
-    assert!(compressed.contains("§I"), "⊕guard should be compressed to §I");
-    assert!(compressed.contains("§L"), "⊕loop should be compressed to §L");
+    assert!(
+        compressed.contains("§I"),
+        "⊕guard should be compressed to §I"
+    );
+    assert!(
+        compressed.contains("§L"),
+        "⊕loop should be compressed to §L"
+    );
     assert!(compressed.contains("§E"), "⊕⇒ should be compressed to §E");
-    assert!(compressed.contains("§C"), "{{ and }} should be compressed to §C");
+    assert!(
+        compressed.contains("§C"),
+        "{{ and }} should be compressed to §C"
+    );
 }
 
 // ── Regression: relative path resolution ─────────────────────────
@@ -610,7 +706,11 @@ fn resolve_file_path_relative_joins_cwd() {
 #[test]
 fn resolve_file_path_with_workspace_root() {
     use crate::mcp::tool_helpers::resolve_file_path;
-    let abs_root = if cfg!(windows) { "D:\\myproject" } else { "/home/user/myproject" };
+    let abs_root = if cfg!(windows) {
+        "D:\\myproject"
+    } else {
+        "/home/user/myproject"
+    };
     let result = resolve_file_path("src/main.ts", Some(abs_root));
     let expected = if cfg!(windows) {
         "D:\\myproject\\src\\main.ts"
@@ -625,8 +725,31 @@ fn handle_compress_code_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     handle_compress_code_context(&id, &params, &state);
+}
+
+// ── M-8 regression: compress_workspace honors workspaceRoot ─────────
+// The schema advertises `workspaceRoot`; the dispatch handler must pass
+// it through to `resolve_file_path_checked` (not pin to CWD). This smoke
+// test exercises the dispatch path with a workspaceRoot arg to ensure
+// the handler reads it without panicking.
+#[test]
+fn handle_compress_workspace_accepts_workspace_root() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({
+        "arguments": {
+            "directoryPath": "src",
+            "workspaceRoot": ".",
+            "fidelity": "low"
+        }
+    });
+    // Should not panic — the handler reads workspaceRoot and resolves
+    // directoryPath against it (M-8 regression).
+    dispatch_tools_call(&id, "compress_workspace", &params, &state);
 }
 
 #[test]
@@ -634,7 +757,8 @@ fn handle_delta_code_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }
 
@@ -643,7 +767,8 @@ fn handle_delta_text_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "delta_text_context", &params, &state);
 }
 
@@ -652,7 +777,8 @@ fn handle_diff_code_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "diff_code_context", &params, &state);
 }
 
@@ -661,7 +787,8 @@ fn handle_restore_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "restore_context", &params, &state);
 }
 
@@ -670,7 +797,217 @@ fn handle_provide_code_context_accepts_relative_path() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "overview" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "overview" } });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+// ── Edit Mode response contract field tests (Gap 5/3/6 fixes) ─────
+
+/// Gap 5 fix: structural-only fidelities report `content_kind == "skeleton"`
+/// and no byte-exact regions.
+#[test]
+fn contract_fields_low_is_skeleton() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Low);
+    assert_eq!(kind, "skeleton");
+    assert!(
+        byte_exact.is_empty(),
+        "Low must not claim byte-exact regions"
+    );
+}
+
+#[test]
+fn contract_fields_medium_is_skeleton() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Medium);
+    assert_eq!(kind, "skeleton");
+    assert!(byte_exact.is_empty());
+}
+
+#[test]
+fn contract_fields_high_is_skeleton() {
+    let (kind, byte_exact) = contract_fields(Fidelity::High);
+    assert_eq!(kind, "skeleton");
+    assert!(byte_exact.is_empty());
+}
+
+/// Gap 3/Gap 5 fix: Edit reports verbatim method bodies as the byte-exact
+/// region, matching the `byte_exact` promise in the SYSTEM_PROMPT.
+#[test]
+fn contract_fields_edit_reports_method_bodies() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Edit);
+    assert_eq!(kind, "skeleton_with_verbatim_bodies");
+    assert_eq!(byte_exact, vec!["method_bodies"]);
+}
+
+/// Gap 3/Gap 5 fix: Verbatim reports the entire document as byte-exact.
+#[test]
+fn contract_fields_verbatim_is_document() {
+    let (kind, byte_exact) = contract_fields(Fidelity::Verbatim);
+    assert_eq!(kind, "verbatim_document");
+    assert_eq!(byte_exact, vec!["document"]);
+}
+
+// ── contract_fields_focused tests (Symbol Targeting) ──────────────
+
+/// None focus at Edit → identical to unfocused (every body byte-exact).
+#[test]
+fn contract_fields_focused_none_edit_is_all_bodies() {
+    let (kind, byte_exact) = contract_fields_focused(Fidelity::Edit, None);
+    assert_eq!(kind, "skeleton_with_verbatim_bodies");
+    assert_eq!(byte_exact, vec!["method_bodies"]);
+}
+
+/// Empty focus set at Edit → zero method bodies are byte-exact.
+/// Must report `"skeleton"` with no byte-exact regions, otherwise the
+/// LLM would attempt replace_in_file SEARCH on bodies that don't exist.
+#[test]
+fn contract_fields_focused_empty_set_edit_is_skeleton() {
+    let focus = std::collections::HashSet::new();
+    let (kind, byte_exact) = contract_fields_focused(Fidelity::Edit, Some(&focus));
+    assert_eq!(kind, "skeleton");
+    assert!(byte_exact.is_empty());
+}
+
+/// Non-empty focus set at Edit → only focused method bodies are byte-exact.
+#[test]
+fn contract_fields_focused_some_edit_is_focused_bodies() {
+    let focus = std::collections::HashSet::from(["GetOrgUnitDic".to_string()]);
+    let (kind, byte_exact) = contract_fields_focused(Fidelity::Edit, Some(&focus));
+    assert_eq!(kind, "skeleton_with_focused_verbatim_bodies");
+    assert_eq!(byte_exact, vec!["focused_method_bodies"]);
+}
+
+/// Focus is silently ignored at non-Edit fidelities — structural only.
+#[test]
+fn contract_fields_focused_non_edit_ignores_focus() {
+    let focus = std::collections::HashSet::from(["doWork".to_string()]);
+    for fidelity in [Fidelity::Low, Fidelity::Medium, Fidelity::High] {
+        let (kind, byte_exact) = contract_fields_focused(fidelity, Some(&focus));
+        assert_eq!(kind, "skeleton");
+        assert!(byte_exact.is_empty());
+    }
+}
+
+/// Verbatim always reports the entire document as byte-exact.
+#[test]
+fn contract_fields_focused_verbatim_is_document() {
+    let focus = std::collections::HashSet::from(["doWork".to_string()]);
+    let (kind, byte_exact) = contract_fields_focused(Fidelity::Verbatim, Some(&focus));
+    assert_eq!(kind, "verbatim_document");
+    assert_eq!(byte_exact, vec!["document"]);
+}
+
+/// `contract_fields` is the None-focus specialization of `contract_fields_focused`.
+#[test]
+fn contract_fields_delegates_to_focused_none() {
+    for fidelity in [
+        Fidelity::Low,
+        Fidelity::Medium,
+        Fidelity::High,
+        Fidelity::Edit,
+        Fidelity::Verbatim,
+    ] {
+        assert_eq!(
+            contract_fields(fidelity),
+            contract_fields_focused(fidelity, None)
+        );
+    }
+}
+
+// ── Edit Mode response contract smoke tests (Phase 4) ──────────────
+
+/// Gap 5/3 fix: `provide_code_context` with `intent="edit"` must not panic
+/// and must produce a response carrying the self-reporting contract fields
+/// (`content_kind`, `byte_exact`, `degradation`). Since handlers write to
+/// stdout, we verify the handler path is exercised without panic.
+#[test]
+fn provide_code_context_edit_intent_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "edit" } });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Gap 5/3 fix: `provide_code_context` with explicit `fidelity="edit"` must
+/// not panic (the edit-mode IR path with verbatim bodies).
+#[test]
+fn provide_code_context_explicit_edit_fidelity_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "edit" } });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Gap 2 fix: `provide_code_context` with an invalid explicit fidelity must
+/// not panic (the handler should return -32602, not crash).
+#[test]
+fn provide_code_context_invalid_fidelity_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "full" } });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Gap 3 fix: `fidelity="verbatim"` must not panic and must bypass
+/// compression entirely (raw source byte-exact). Exercises the new
+/// Verbatim short-circuit in `handle_provide_code_context`.
+#[test]
+fn provide_code_context_verbatim_fidelity_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Verbatim short-circuit in `handle_compress_code_context` must not panic.
+#[test]
+fn compress_code_context_verbatim_fidelity_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
+    dispatch_tools_call(&id, "compress_code_context", &params, &state);
+}
+
+/// Symbol targeting: `provide_code_context` with `focusMethods` at edit
+/// fidelity must not panic (the new focused-render path).
+#[test]
+fn provide_code_context_focus_methods_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({
+        "arguments": {
+            "filePath": "src/lib.rs",
+            "fidelity": "edit",
+            "focusMethods": ["test_method", "another_method"]
+        }
+    });
+    dispatch_tools_call(&id, "provide_code_context", &params, &state);
+}
+
+/// Symbol targeting: `focusMethods` with an empty array must not panic
+/// and should degrade gracefully.
+#[test]
+fn provide_code_context_focus_methods_empty_does_not_panic() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    let id = serde_json::json!(1);
+    let params = serde_json::json!({
+        "arguments": {
+            "filePath": "src/lib.rs",
+            "fidelity": "edit",
+            "focusMethods": []
+        }
+    });
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
@@ -683,7 +1020,8 @@ fn blast_radius_disabled_by_default_does_not_panic() {
     let config = crate::config::CleanCtxConfig::default();
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     // Should not panic when blast radius is disabled (default)
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
@@ -694,7 +1032,8 @@ fn blast_radius_enabled_does_not_panic_without_cbm() {
     config.intelligence.blast_radius_enabled = true;
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     // Should not panic when blast radius is enabled but CBM is unavailable
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
@@ -705,7 +1044,8 @@ fn blast_radius_delta_mode_does_not_panic() {
     config.intelligence.blast_radius_enabled = true;
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
-    let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
+    let params =
+        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     // Should not panic in delta mode with blast radius enabled
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }

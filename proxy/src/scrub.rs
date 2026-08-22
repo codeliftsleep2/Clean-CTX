@@ -170,7 +170,10 @@ pub fn scrub_secrets(content: &str) -> ScrubResult {
         }
     }
 
-    ScrubResult { content: result, hits }
+    ScrubResult {
+        content: result,
+        hits,
+    }
 }
 
 /// Scrub secrets with fail-closed semantics: if scrubbing panics for any
@@ -178,8 +181,7 @@ pub fn scrub_secrets(content: &str) -> ScrubResult {
 /// risk leaking a secret.
 #[allow(dead_code)]
 pub fn scrub_fail_closed(content: &str) -> Result<ScrubResult, ScrubError> {
-    std::panic::catch_unwind(|| scrub_secrets(content))
-        .map_err(|_| ScrubError::Panicked)
+    std::panic::catch_unwind(|| scrub_secrets(content)).map_err(|_| ScrubError::Panicked)
 }
 
 /// Errors from secret scrubbing.
@@ -250,7 +252,8 @@ mod tests {
 
     #[test]
     fn test_scrub_pem_private_key() {
-        let input = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----";
+        let input =
+            "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----";
         let result = scrub_secrets(input);
         assert!(result.content.contains("[REDACTED]"));
         assert!(!result.content.contains("PRIVATE KEY"));
@@ -339,7 +342,8 @@ mod tests {
 
     #[test]
     fn test_scrub_github_pat() {
-        let input = "PAT: github_pat_11ABCDEF0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234567890abcdef12";
+        let input =
+            "PAT: github_pat_11ABCDEF0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234567890abcdef12";
         let result = scrub_secrets(input);
         assert!(result.content.contains("[REDACTED]"));
         assert!(!result.content.contains("github_pat_"));
@@ -356,7 +360,8 @@ mod tests {
 
     #[test]
     fn test_no_false_positive_normal_code() {
-        let input = "let api_key_input = getApiKey();\nconst password_length = 12;\nlet token_count = 0;";
+        let input =
+            "let api_key_input = getApiKey();\nconst password_length = 12;\nlet token_count = 0;";
         let result = scrub_secrets(input);
         assert_eq!(result.content, input);
         assert!(result.hits.is_empty());
@@ -364,7 +369,8 @@ mod tests {
 
     #[test]
     fn test_no_false_positive_comments() {
-        let input = "// This is a comment about password handling\n// The api_key is stored in .env";
+        let input =
+            "// This is a comment about password handling\n// The api_key is stored in .env";
         let result = scrub_secrets(input);
         assert_eq!(result.content, input);
         assert!(result.hits.is_empty());
@@ -396,7 +402,9 @@ mod tests {
     #[test]
     fn test_might_contain_secret() {
         assert!(might_contain_secret("AKIAIOSFODNN7EXAMPLE"));
-        assert!(might_contain_secret("ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234"));
+        assert!(might_contain_secret(
+            "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234"
+        ));
         assert!(might_contain_secret("eyJhbGciOiJIUzI1NiJ9"));
         assert!(might_contain_secret("password = hunter2"));
         assert!(might_contain_secret("secret_key: abc123"));

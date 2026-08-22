@@ -39,7 +39,10 @@ fn apply_micro_opcodes_low_fidelity_replaces_return() {
 fn apply_micro_opcodes_low_fidelity_combined() {
     let body = "Foo{field1;field2};$ctor C1 M1 $s payload;⊕guard check() ⊕⇒result";
     let result = apply_micro_opcodes(body, Fidelity::Low);
-    assert_eq!(result, "Foo§Cfield1;field2§C;§P C1 M1 $s payload;§I check() §Eresult");
+    assert_eq!(
+        result,
+        "Foo§Cfield1;field2§C;§P C1 M1 $s payload;§I check() §Eresult"
+    );
 }
 
 #[test]
@@ -101,7 +104,10 @@ fn expand_micro_opcodes_restores_return() {
 fn expand_micro_opcodes_combined() {
     let body = "Foo§Cfield1;field2§C;§P C1 M1 $s payload;§I check() §Eresult";
     let result = expand_micro_opcodes(body);
-    assert_eq!(result, "Foo{field1;field2};$ctor C1 M1 $s payload;⊕guard check() ⊕⇒result");
+    assert_eq!(
+        result,
+        "Foo{field1;field2};$ctor C1 M1 $s payload;⊕guard check() ⊕⇒result"
+    );
 }
 
 #[test]

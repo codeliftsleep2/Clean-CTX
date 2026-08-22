@@ -10,21 +10,21 @@
 // delegated to the Pipeline abstraction (pipeline.rs). Filter loading
 // is delegated to filter_loader.rs.
 
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::sync::{Arc, atomic::AtomicU64};
-use tokio::sync::{watch, RwLock};
-use hyper::body::{Incoming, Bytes};
+use bytes::Bytes as BytesType;
+use http_body_util::Full;
+use hyper::body::{Bytes, Incoming};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
-use hyper::{Request, Response, Method, StatusCode};
+use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use http_body_util::Full;
-use bytes::Bytes as BytesType;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::{atomic::AtomicU64, Arc};
 use tokio::net::TcpListener;
-use tracing::{info, warn, error, debug};
+use tokio::sync::{watch, RwLock};
+use tracing::{debug, error, info, warn};
 
-use crate::cache::{self, CacheStats, inject_breakpoints};
+use crate::cache::{self, inject_breakpoints, CacheStats};
 use crate::config::ProxyConfig;
 use crate::error::ProxyError;
 use crate::filter_loader::load_builtin_filters;
@@ -89,7 +89,9 @@ impl ProxyState {
     }
 
     pub fn next_req_id(&self) -> String {
-        let n = self.request_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let n = self
+            .request_counter
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         format!("{:06}", n)
     }
 }
@@ -132,7 +134,10 @@ pub async fn run_server_with_listener(
     config: ProxyConfig,
     mut shutdown_rx: watch::Receiver<bool>,
 ) -> Result<(), ProxyError> {
-    info!("[proxy] Clean-CTX proxy listening on http://{}", listener.local_addr().unwrap());
+    info!(
+        "[proxy] Clean-CTX proxy listening on http://{}",
+        listener.local_addr().unwrap()
+    );
     info!("[proxy] Upstream: {}", config.upstream_url);
 
     let state = Arc::new(RwLock::new(ProxyState::new(config)?));
@@ -199,7 +204,7 @@ fn unauthorized_response(msg: &str) -> Response<Full<BytesType>> {
         .status(StatusCode::UNAUTHORIZED)
         .header("content-type", "application/json")
         .body(Full::new(BytesType::from(
-            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string())
+            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string()),
         )))
         .unwrap()
 }
@@ -214,7 +219,7 @@ fn rate_limited_response() -> Response<Full<BytesType>> {
         .header("content-type", "application/json")
         .header("retry-after", "1")
         .body(Full::new(BytesType::from(
-            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string())
+            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string()),
         )))
         .unwrap()
 }
@@ -228,7 +233,7 @@ fn bad_gateway_response(msg: &str) -> Response<Full<BytesType>> {
         .status(StatusCode::BAD_GATEWAY)
         .header("content-type", "application/json")
         .body(Full::new(BytesType::from(
-            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string())
+            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string()),
         )))
         .unwrap()
 }
@@ -254,13 +259,16 @@ async fn handle_request(
     {
         let guard = state.read().await;
         if let Some(ref expected_key) = guard.config.api_key {
-            let provided_key = parts.headers
+            let provided_key = parts
+                .headers
                 .get("x-api-key")
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("");
             if provided_key != expected_key {
                 warn!("[{req_id}] Unauthorized request (bad or missing API key)");
-                return Ok(unauthorized_response("Missing or invalid API key. Provide via X-Api-Key header."));
+                return Ok(unauthorized_response(
+                    "Missing or invalid API key. Provide via X-Api-Key header.",
+                ));
             }
 
             // Rate limit check (only when auth is active).
@@ -291,11 +299,13 @@ async fn handle_request(
 
     // Detect platform from path to determine intercept endpoint
     // Use exact path matching to avoid intercepting non-API endpoints
-    let should_intercept = method == Method::POST && (
-        path == "/v1/messages"            // Anthropic
+    let should_intercept = method == Method::POST
+        && (
+            path == "/v1/messages"            // Anthropic
         || path == "/v1/chat/completions" // OpenAI
-        || path == "/chat"                // Generic (root-level only)
-    );
+        || path == "/chat"
+            // Generic (root-level only)
+        );
 
     if should_intercept {
         match handle_messages_request(parts, body, &req_id, state).await {
@@ -343,11 +353,12 @@ async fn handle_messages_request(
             sliding_window_max_age_turns: guard.config.sliding_window_max_age_turns,
             sliding_window_force_preserve_floor: guard.config.sliding_window_force_preserve_floor,
         };
-        let adapter: Box<dyn PlatformAdapter> = if let Some(ref platform_name) = guard.config.platform {
-            platform::get_platform(platform_name)
-        } else {
-            platform::detect_platform(&body_value)
-        };
+        let adapter: Box<dyn PlatformAdapter> =
+            if let Some(ref platform_name) = guard.config.platform {
+                platform::get_platform(platform_name)
+            } else {
+                platform::detect_platform(&body_value)
+            };
         (
             pipeline_config,
             adapter,
@@ -361,7 +372,12 @@ async fn handle_messages_request(
     // Run the CPU-intensive pipeline with no lock held.
     let pipeline = Pipeline::build(&pipeline_config);
     let mut local_transform_stats = crate::transform::TransformStats::default();
-    pipeline.run(&mut body_value, &mut local_transform_stats, &pipeline_config, adapter.as_ref());
+    pipeline.run(
+        &mut body_value,
+        &mut local_transform_stats,
+        &pipeline_config,
+        adapter.as_ref(),
+    );
 
     // Inject cache breakpoints (cheap — no lock needed for the transform itself).
     let mut local_cache_stats = crate::cache::CacheStats::default();
@@ -384,7 +400,10 @@ async fn handle_messages_request(
         let req_id_owned = req_id.to_string();
         tokio::spawn(async move {
             let mut log_stats = LogStats::default();
-            if let Err(e) = logger::log_request(&log_dir, &req_id_owned, &body_value_clone, &mut log_stats).await {
+            if let Err(e) =
+                logger::log_request(&log_dir, &req_id_owned, &body_value_clone, &mut log_stats)
+                    .await
+            {
                 warn!("[{req_id_owned}] Failed to log request: {e}");
             }
         });
@@ -440,7 +459,9 @@ async fn forward_to_upstream(
         )
     };
 
-    let path_and_query = parts.uri.path_and_query()
+    let path_and_query = parts
+        .uri
+        .path_and_query()
         .map(|pq| pq.as_str())
         .unwrap_or(parts.uri.path());
 
@@ -448,16 +469,9 @@ async fn forward_to_upstream(
         return Err(ProxyError::Body(format!("Invalid path: {path_and_query}")));
     }
 
-    let upstream_uri = format!(
-        "{}{}",
-        upstream_url.trim_end_matches('/'),
-        path_and_query
-    );
+    let upstream_uri = format!("{}{}", upstream_url.trim_end_matches('/'), path_and_query);
 
-    let mut req_builder = http_client.request(
-        parts.method.clone(),
-        &upstream_uri,
-    );
+    let mut req_builder = http_client.request(parts.method.clone(), &upstream_uri);
 
     for (name, value) in parts.headers.iter() {
         let name_str = name.as_str();
@@ -468,10 +482,7 @@ async fn forward_to_upstream(
 
     // Inject platform-specific headers
     if auto_cache && platform_name.as_deref() != Some("openai") {
-        req_builder = req_builder.header(
-            "anthropic-beta",
-            cache::anthropic_beta_header(),
-        );
+        req_builder = req_builder.header("anthropic-beta", cache::anthropic_beta_header());
     }
 
     req_builder = req_builder.header("X-Request-ID", req_id);
@@ -482,7 +493,10 @@ async fn forward_to_upstream(
     let resp_headers = upstream_response.headers().clone();
     let resp_bytes = upstream_response.bytes().await?;
 
-    debug!("[{req_id}] Upstream returned {status} ({} bytes)", resp_bytes.len());
+    debug!(
+        "[{req_id}] Upstream returned {status} ({} bytes)",
+        resp_bytes.len()
+    );
 
     // Parse real cache usage tokens from the upstream response.
     // Anthropic returns `usage.cache_read_input_tokens` and
@@ -493,9 +507,7 @@ async fn forward_to_upstream(
         let mut guard = state.write().await;
         guard.cache_stats.cache_read_tokens += cache_read_tokens;
         guard.cache_stats.cache_creation_tokens += cache_creation_tokens;
-        debug!(
-            "[{req_id}] Cache usage: read={cache_read_tokens} creation={cache_creation_tokens}"
-        );
+        debug!("[{req_id}] Cache usage: read={cache_read_tokens} creation={cache_creation_tokens}");
     }
 
     // Log response body if configured
@@ -507,21 +519,28 @@ async fn forward_to_upstream(
             let req_id_owned = req_id.to_string();
             tokio::spawn(async move {
                 let mut log_stats = LogStats::default();
-                if let Err(e) = logger::log_response(&log_dir, &req_id_owned, &resp_bytes_clone, &mut log_stats).await {
+                if let Err(e) =
+                    logger::log_response(&log_dir, &req_id_owned, &resp_bytes_clone, &mut log_stats)
+                        .await
+                {
                     warn!("[{req_id_owned}] Failed to log response: {e}");
                 }
             });
         }
     }
 
-    let mut response = Response::builder()
-        .status(status);
+    let mut response = Response::builder().status(status);
 
     let safe_headers = [
-        "content-type", "content-length", "x-request-id",
-        "anthropic-ratelimit-requests-limit", "anthropic-ratelimit-requests-remaining",
-        "anthropic-ratelimit-tokens-limit", "anthropic-ratelimit-tokens-remaining",
-        "anthropic-ratelimit-tokens-reset", "anthropic-ratelimit-requests-reset",
+        "content-type",
+        "content-length",
+        "x-request-id",
+        "anthropic-ratelimit-requests-limit",
+        "anthropic-ratelimit-requests-remaining",
+        "anthropic-ratelimit-tokens-limit",
+        "anthropic-ratelimit-tokens-remaining",
+        "anthropic-ratelimit-tokens-reset",
+        "anthropic-ratelimit-requests-reset",
     ];
 
     for (name, value) in resp_headers.iter() {
@@ -530,9 +549,7 @@ async fn forward_to_upstream(
         }
     }
 
-    Ok(response
-        .body(Full::new(resp_bytes))
-        .unwrap())
+    Ok(response.body(Full::new(resp_bytes)).unwrap())
 }
 
 /// Parse real cache usage tokens from an upstream response body.
@@ -546,8 +563,12 @@ async fn forward_to_upstream(
 fn parse_cache_usage(resp_bytes: &[u8]) -> (u64, u64) {
     // Try non-streaming JSON first
     if let Ok(value) = serde_json::from_slice::<serde_json::Value>(resp_bytes) {
-        let read = value["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0);
-        let creation = value["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0);
+        let read = value["usage"]["cache_read_input_tokens"]
+            .as_u64()
+            .unwrap_or(0);
+        let creation = value["usage"]["cache_creation_input_tokens"]
+            .as_u64()
+            .unwrap_or(0);
         return (read, creation);
     }
 
@@ -570,8 +591,12 @@ fn parse_cache_usage(resp_bytes: &[u8]) -> (u64, u64) {
         };
         // The `message_delta` event carries the final usage block in SSE.
         if value["type"].as_str() == Some("message_delta") {
-            read = value["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0);
-            creation = value["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0);
+            read = value["usage"]["cache_read_input_tokens"]
+                .as_u64()
+                .unwrap_or(0);
+            creation = value["usage"]["cache_creation_input_tokens"]
+                .as_u64()
+                .unwrap_or(0);
             // The message_delta is the last event — no need to keep scanning.
             break;
         }
@@ -585,8 +610,8 @@ fn parse_cache_usage(resp_bytes: &[u8]) -> (u64, u64) {
 /// *during* streaming rather than after buffering the entire body.
 /// This prevents an oversized request from causing OOM before the check runs.
 async fn read_body(body: Incoming, max_size: usize) -> Result<Bytes, ProxyError> {
-    use http_body_util::BodyExt;
     use bytes::BufMut;
+    use http_body_util::BodyExt;
 
     let mut buf = bytes::BytesMut::new();
     // Drive the body frame-by-frame so we can enforce the cap incrementally.
@@ -646,7 +671,7 @@ async fn handle_cache_state_endpoint(state: SharedState) -> Response<Full<BytesT
         .status(StatusCode::OK)
         .header("content-type", "application/json")
         .body(Full::new(BytesType::from(
-            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string())
+            serde_json::to_string(&body).unwrap_or_else(|_| "{}".to_string()),
         )))
         .unwrap()
 }
@@ -670,7 +695,12 @@ mod tests {
     fn test_unauthorized_response_format() {
         let resp = unauthorized_response("Missing or invalid API key");
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
-        let content_type = resp.headers().get("content-type").unwrap().to_str().unwrap();
+        let content_type = resp
+            .headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap();
         assert_eq!(content_type, "application/json");
     }
 
@@ -684,10 +714,25 @@ mod tests {
     #[test]
     fn test_hop_by_hop_headers_are_filtered() {
         // These connection-scoped headers must never be forwarded upstream.
-        for header in ["host", "connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade"] {
-            assert!(!should_forward_header(header), "{header} should be filtered");
+        for header in [
+            "host",
+            "connection",
+            "keep-alive",
+            "transfer-encoding",
+            "te",
+            "trailer",
+            "upgrade",
+        ] {
+            assert!(
+                !should_forward_header(header),
+                "{header} should be filtered"
+            );
             // Case-insensitive.
-            assert!(!should_forward_header(&header.to_uppercase()), "{} should be filtered case-insensitively", header);
+            assert!(
+                !should_forward_header(&header.to_uppercase()),
+                "{} should be filtered case-insensitively",
+                header
+            );
         }
     }
 
@@ -764,8 +809,14 @@ data: {"type":"message_delta","usage":{"output_tokens":50,"cache_read_input_toke
 data: [DONE]
 "#;
         let (read, creation) = parse_cache_usage(body);
-        assert_eq!(read, 8000, "SSE message_delta should carry cache_read_input_tokens");
-        assert_eq!(creation, 3000, "SSE message_delta should carry cache_creation_input_tokens");
+        assert_eq!(
+            read, 8000,
+            "SSE message_delta should carry cache_read_input_tokens"
+        );
+        assert_eq!(
+            creation, 3000,
+            "SSE message_delta should carry cache_creation_input_tokens"
+        );
     }
 
     #[test]

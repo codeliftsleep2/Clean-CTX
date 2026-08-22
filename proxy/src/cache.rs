@@ -132,15 +132,22 @@ pub fn inject_breakpoints(body: &mut Value, tail_ttl: &str, stats: &mut CacheSta
     if let Some(system) = body["system"].as_array_mut() {
         // Find the index of the last large block (> 500 chars)
         let last_large_idx = system.iter().rposition(|block| {
-            block["text"].as_str().is_some_and(|t| t.len() > SMALL_BLOCK_THRESHOLD)
+            block["text"]
+                .as_str()
+                .is_some_and(|t| t.len() > SMALL_BLOCK_THRESHOLD)
         });
 
         if let Some(target_idx) = last_large_idx {
             // Strip cache_control from small blocks (< 500 chars) — breakpoints
             // on small blocks waste slots. Do NOT remove the block itself.
             for block in system.iter_mut() {
-                if block["text"].as_str().is_none_or(|t| t.len() < SMALL_BLOCK_THRESHOLD)
-                    && block.as_object_mut().and_then(|o| o.remove("cache_control")).is_some()
+                if block["text"]
+                    .as_str()
+                    .is_none_or(|t| t.len() < SMALL_BLOCK_THRESHOLD)
+                    && block
+                        .as_object_mut()
+                        .and_then(|o| o.remove("cache_control"))
+                        .is_some()
                 {
                     stats.small_blocks_filtered += 1;
                 }
@@ -166,11 +173,13 @@ pub fn inject_breakpoints(body: &mut Value, tail_ttl: &str, stats: &mut CacheSta
         if let Some(first_msg) = messages.first_mut() {
             if let Some(content) = first_msg["content"].as_array_mut() {
                 // Find the last text/tool_result/image block (cacheable type)
-                let cacheable_idx: Option<usize> = content.iter().enumerate()
+                let cacheable_idx: Option<usize> = content
+                    .iter()
+                    .enumerate()
                     .filter(|(_, block)| {
-                        block["type"].as_str().is_some_and(|t| {
-                            matches!(t, "text" | "tool_result" | "image")
-                        })
+                        block["type"]
+                            .as_str()
+                            .is_some_and(|t| matches!(t, "text" | "tool_result" | "image"))
                     })
                     .map(|(i, _)| i)
                     .next_back();
@@ -199,9 +208,10 @@ pub fn inject_breakpoints(body: &mut Value, tail_ttl: &str, stats: &mut CacheSta
         for msg in messages.iter_mut().rev() {
             if let Some(content) = msg["content"].as_array_mut() {
                 for block in content.iter_mut().rev() {
-                    if block["type"].as_str().is_some_and(|t| {
-                        matches!(t, "text" | "tool_result" | "image")
-                    }) {
+                    if block["type"]
+                        .as_str()
+                        .is_some_and(|t| matches!(t, "text" | "tool_result" | "image"))
+                    {
                         block["cache_control"] = serde_json::json!({
                             "type": "ephemeral",
                             "ttl": tail_ttl
@@ -234,7 +244,11 @@ fn strip_existing_breakpoints(body: &mut Value) -> usize {
     // Strip from tools[]
     if let Some(tools) = body["tools"].as_array_mut() {
         for tool in tools.iter_mut() {
-            if tool.as_object_mut().and_then(|o| o.remove("cache_control")).is_some() {
+            if tool
+                .as_object_mut()
+                .and_then(|o| o.remove("cache_control"))
+                .is_some()
+            {
                 count += 1;
             }
         }
@@ -243,7 +257,11 @@ fn strip_existing_breakpoints(body: &mut Value) -> usize {
     // Strip from system[]
     if let Some(system) = body["system"].as_array_mut() {
         for block in system.iter_mut() {
-            if block.as_object_mut().and_then(|o| o.remove("cache_control")).is_some() {
+            if block
+                .as_object_mut()
+                .and_then(|o| o.remove("cache_control"))
+                .is_some()
+            {
                 count += 1;
             }
         }
@@ -254,7 +272,11 @@ fn strip_existing_breakpoints(body: &mut Value) -> usize {
         for msg in messages.iter_mut() {
             if let Some(content) = msg["content"].as_array_mut() {
                 for block in content.iter_mut() {
-                    if block.as_object_mut().and_then(|o| o.remove("cache_control")).is_some() {
+                    if block
+                        .as_object_mut()
+                        .and_then(|o| o.remove("cache_control"))
+                        .is_some()
+                    {
                         count += 1;
                     }
                 }
@@ -318,11 +340,13 @@ mod tests {
     /// Does NOT include any existing cache_control breakpoints.
     fn make_test_body(tools_count: usize) -> Value {
         let tools: Vec<Value> = (0..tools_count)
-            .map(|i| json!({
-                "name": format!("Tool{i}"),
-                "description": format!("Tool {i} description"),
-                "input_schema": {"type": "object", "properties": {}}
-            }))
+            .map(|i| {
+                json!({
+                    "name": format!("Tool{i}"),
+                    "description": format!("Tool {i} description"),
+                    "input_schema": {"type": "object", "properties": {}}
+                })
+            })
             .collect();
 
         json!({
@@ -346,7 +370,10 @@ mod tests {
     #[test]
     fn test_no_existing_breakpoints_in_body() {
         let body = make_test_body(1);
-        assert!(!has_any_breakpoints(&body), "Test body should have no breakpoints initially");
+        assert!(
+            !has_any_breakpoints(&body),
+            "Test body should have no breakpoints initially"
+        );
     }
 
     #[test]
@@ -367,7 +394,10 @@ mod tests {
         let mut stats = CacheStats::default();
         inject_breakpoints(&mut body, "5m", &mut stats);
         // Should place a system breakpoint on the 600-char block
-        assert_eq!(stats.system_slots, 1, "Should have placed system slot on large block");
+        assert_eq!(
+            stats.system_slots, 1,
+            "Should have placed system slot on large block"
+        );
     }
 
     #[test]
@@ -452,7 +482,10 @@ mod tests {
         let mut stats = CacheStats::default();
         let slots = inject_breakpoints(&mut body, "5m", &mut stats);
 
-        assert_eq!(slots, 0, "Should not inject when client breakpoints exist on system");
+        assert_eq!(
+            slots, 0,
+            "Should not inject when client breakpoints exist on system"
+        );
         assert_eq!(stats.client_breakpoints_preserved, 1);
         assert!(body["system"][0].get("cache_control").is_some());
     }
@@ -465,9 +498,14 @@ mod tests {
         let mut stats = CacheStats::default();
         let slots = inject_breakpoints(&mut body, "5m", &mut stats);
 
-        assert_eq!(slots, 0, "Should not inject when client breakpoints exist on messages");
+        assert_eq!(
+            slots, 0,
+            "Should not inject when client breakpoints exist on messages"
+        );
         assert_eq!(stats.client_breakpoints_preserved, 1);
-        assert!(body["messages"][0]["content"][0].get("cache_control").is_some());
+        assert!(body["messages"][0]["content"][0]
+            .get("cache_control")
+            .is_some());
     }
 
     #[test]

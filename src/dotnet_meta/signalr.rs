@@ -11,9 +11,12 @@
 // - Streaming endpoints (`ChannelReader<T>`, `IAsyncEnumerable<T>`)
 // - Connection lifecycle (`OnConnectedAsync`, `OnDisconnectedAsync`)
 
-use super::markers::{build_connection_line, build_group_line, build_hub_line, build_hub_method_line, build_stream_line, build_user_line};
-use crate::dotnet_meta::MetaBlock;
+use super::markers::{
+    build_connection_line, build_group_line, build_hub_line, build_hub_method_line,
+    build_stream_line, build_user_line,
+};
 use crate::compression::Fidelity;
+use crate::dotnet_meta::MetaBlock;
 
 /// Extract SignalR markers from a single class capture.
 ///
@@ -121,7 +124,11 @@ fn extract_hub_methods(class_source: &str, fidelity: Fidelity) -> Vec<String> {
                 let params = params_str[..close_paren].to_string();
 
                 // Extract method name (last word before '(')
-                let method_name = signature.split_whitespace().last().unwrap_or("").to_string();
+                let method_name = signature
+                    .split_whitespace()
+                    .last()
+                    .unwrap_or("")
+                    .to_string();
 
                 // Skip if it's a lifecycle method (handled separately)
                 if method_name == "OnConnectedAsync" || method_name == "OnDisconnectedAsync" {
@@ -179,7 +186,9 @@ fn detect_client_target(method_body: &str, method_name: &str) -> Option<String> 
         let rest = &method_body[pos + "Clients.".len()..];
 
         // Extract until ';' or newline
-        let end = rest.find(|c: char| [';', '\n', '\r'].contains(&c)).unwrap_or(rest.len());
+        let end = rest
+            .find(|c: char| [';', '\n', '\r'].contains(&c))
+            .unwrap_or(rest.len());
         let target = rest[..end].trim().to_string();
 
         if !target.is_empty() {
@@ -196,7 +205,9 @@ fn extract_group_operations(method_body: &str, method_name: &str) -> Vec<String>
     let mut groups = Vec::new();
 
     // Look for `Groups.AddToGroupAsync` or `Groups.RemoveFromGroupAsync`
-    if method_body.contains("Groups.AddToGroupAsync") || method_body.contains("Groups.RemoveFromGroupAsync") {
+    if method_body.contains("Groups.AddToGroupAsync")
+        || method_body.contains("Groups.RemoveFromGroupAsync")
+    {
         // Extract group name (simplified)
         if let Some(pos) = method_body.find("Groups.") {
             let rest = &method_body[pos + "Groups.".len()..];

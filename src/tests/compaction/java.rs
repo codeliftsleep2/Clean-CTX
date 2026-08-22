@@ -50,7 +50,10 @@ fn java_extract_type_name_strips_modifiers() {
 #[test]
 fn java_constructor_sig_low_fidelity() {
     assert_eq!(
-        extract_java_constructor_sig("public UserService(UserRepository repo, AuthService auth)", Fidelity::Low),
+        extract_java_constructor_sig(
+            "public UserService(UserRepository repo, AuthService auth)",
+            Fidelity::Low
+        ),
         "UserService(UserRepository,AuthService)"
     );
 }
@@ -58,7 +61,10 @@ fn java_constructor_sig_low_fidelity() {
 #[test]
 fn java_constructor_sig_medium_fidelity() {
     assert_eq!(
-        extract_java_constructor_sig("public UserService(UserRepository repo, AuthService auth)", Fidelity::Medium),
+        extract_java_constructor_sig(
+            "public UserService(UserRepository repo, AuthService auth)",
+            Fidelity::Medium
+        ),
         "UserService(UserRepository,AuthService)"
     );
 }
@@ -66,7 +72,10 @@ fn java_constructor_sig_medium_fidelity() {
 #[test]
 fn java_constructor_sig_high_fidelity() {
     assert_eq!(
-        extract_java_constructor_sig("public UserService(UserRepository repo, AuthService auth)", Fidelity::High),
+        extract_java_constructor_sig(
+            "public UserService(UserRepository repo, AuthService auth)",
+            Fidelity::High
+        ),
         "public UserService(UserRepository repo, AuthService auth)"
     );
 }
@@ -126,7 +135,12 @@ fn java_format_type_entry_interface_medium() {
 #[test]
 fn java_format_type_entry_enum_low() {
     assert_eq!(
-        format_java_type_entry("Status", "enum.root", &["ACTIVE".to_string(), "INACTIVE".to_string()], Fidelity::Low),
+        format_java_type_entry(
+            "Status",
+            "enum.root",
+            &["ACTIVE".to_string(), "INACTIVE".to_string()],
+            Fidelity::Low
+        ),
         "Status{ACTIVE;INACTIVE}"
     );
 }
@@ -134,7 +148,12 @@ fn java_format_type_entry_enum_low() {
 #[test]
 fn java_format_type_entry_record_high() {
     assert_eq!(
-        format_java_type_entry("UserDto", "record.root", &["String name".to_string(), "int age".to_string()], Fidelity::High),
+        format_java_type_entry(
+            "UserDto",
+            "record.root",
+            &["String name".to_string(), "int age".to_string()],
+            Fidelity::High
+        ),
         "record UserDto {\n  String name\n  int age"
     );
 }

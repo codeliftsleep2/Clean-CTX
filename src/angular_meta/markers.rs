@@ -136,23 +136,23 @@ impl PhiLineKind {
     /// but this ordering is cheap insurance).
     pub fn all_in_expand_order() -> &'static [PhiLineKind] {
         &[
-            Self::Injects,    // Φinjects:  (9 chars)
-            Self::Component,  // Φcmp:      (5 chars)
-            Self::Directive,  // Φdir:      (5 chars)
-            Self::Module,     // Φmod:      (5 chars)
-            Self::Pipe,       // Φpipe:     (6 chars)
-            Self::Service,    // Φsvc:      (5 chars)
-            Self::Model,      // Φmodel:    (7 chars)
-            Self::Input,      // Φin:       (4 chars)
-            Self::Output,     // Φout:      (5 chars)
-            Self::Graph,      // Φgraph:    (7 chars)
-            Self::Template,        // Φtpl:      (5 chars)
-            Self::Style,           // Φsty:      (5 chars)
-            Self::TemplateBinding, // Φtbind:    (7 chars)
+            Self::Injects,           // Φinjects:  (9 chars)
+            Self::Component,         // Φcmp:      (5 chars)
+            Self::Directive,         // Φdir:      (5 chars)
+            Self::Module,            // Φmod:      (5 chars)
+            Self::Pipe,              // Φpipe:     (6 chars)
+            Self::Service,           // Φsvc:      (5 chars)
+            Self::Model,             // Φmodel:    (7 chars)
+            Self::Input,             // Φin:       (4 chars)
+            Self::Output,            // Φout:      (5 chars)
+            Self::Graph,             // Φgraph:    (7 chars)
+            Self::Template,          // Φtpl:      (5 chars)
+            Self::Style,             // Φsty:      (5 chars)
+            Self::TemplateBinding,   // Φtbind:    (7 chars)
             Self::TemplateDirective, // Φtdir:    (6 chars)
             Self::TemplateComponent, // Φtcmp:    (6 chars)
-            Self::Bundle,          // ΦBUNDLE    (8 chars)
-            Self::Map,             // ΦMAP       (5 chars)
+            Self::Bundle,            // ΦBUNDLE    (8 chars)
+            Self::Map,               // ΦMAP       (5 chars)
         ]
     }
 
@@ -467,19 +467,38 @@ pub fn build_component_line(class_name: &str, fields: &ComponentFields) -> Strin
 /// Build a `Φsvc:<ClassName> [scope=…]` marker line from a parsed
 /// `@Injectable` decorator.
 pub fn build_service_line(class_name: &str, provided_in: Option<&str>) -> String {
-    ServiceLine { class_name, provided_in }.render()
+    ServiceLine {
+        class_name,
+        provided_in,
+    }
+    .render()
 }
 
 /// Build a `Φmod:<ClassName> [decl=… imp=… exp=…]` marker line from a
 /// parsed `@NgModule` decorator.
-pub fn build_module_line(class_name: &str, decl: &[String], imp: &[String], exp: &[String]) -> String {
-    ModuleLine { class_name, decl, imp, exp }.render()
+pub fn build_module_line(
+    class_name: &str,
+    decl: &[String],
+    imp: &[String],
+    exp: &[String],
+) -> String {
+    ModuleLine {
+        class_name,
+        decl,
+        imp,
+        exp,
+    }
+    .render()
 }
 
 /// Build a `Φdir:<ClassName> [sel=…]` marker line from a parsed
 /// `@Directive` decorator.
 pub fn build_directive_line(class_name: &str, selector: Option<&str>) -> String {
-    DirectiveLine { class_name, selector }.render()
+    DirectiveLine {
+        class_name,
+        selector,
+    }
+    .render()
 }
 
 /// Build a `Φpipe:<ClassName> [name=…]` marker line from a parsed

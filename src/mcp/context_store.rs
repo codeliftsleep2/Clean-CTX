@@ -12,9 +12,9 @@
 // to concrete storage implementations. This means zero handler
 // changes when SQLite arrives.
 
+use crate::compression::Fidelity;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use crate::compression::Fidelity;
 
 /// Metadata about a stored compression context for a file.
 #[derive(Debug, Clone)]
@@ -213,17 +213,15 @@ impl ContextStore for InMemoryContextStore {
     }
 
     fn delta_count(&self, context_id: &str) -> usize {
-        self.deltas
-            .get(context_id)
-            .map(|v| v.len())
-            .unwrap_or(0)
+        self.deltas.get(context_id).map(|v| v.len()).unwrap_or(0)
     }
 
     fn clear_file(&mut self, file_path: &str) {
         // Remove context metadata
         if let Some(_meta) = self.contexts.remove(file_path) {
             // Find and remove associated ID mappings and their deltas
-            let ids_to_remove: Vec<String> = self.id_to_path
+            let ids_to_remove: Vec<String> = self
+                .id_to_path
                 .iter()
                 .filter(|(_, v)| *v == file_path)
                 .map(|(k, _)| k.clone())

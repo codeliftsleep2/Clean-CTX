@@ -68,9 +68,9 @@ impl RateLimiter {
 
         // Periodic GC
         if now.duration_since(inner.last_gc) >= GC_INTERVAL {
-            inner.buckets.retain(|_, b| {
-                now.duration_since(b.last_refill) < BUCKET_TTL
-            });
+            inner
+                .buckets
+                .retain(|_, b| now.duration_since(b.last_refill) < BUCKET_TTL);
             inner.last_gc = now;
         }
 
@@ -82,10 +82,13 @@ impl RateLimiter {
             client_key
         };
 
-        let bucket = inner.buckets.entry(bucket_key.to_string()).or_insert_with(|| Bucket {
-            tokens: self.burst,
-            last_refill: now,
-        });
+        let bucket = inner
+            .buckets
+            .entry(bucket_key.to_string())
+            .or_insert_with(|| Bucket {
+                tokens: self.burst,
+                last_refill: now,
+            });
 
         // Refill tokens based on elapsed time
         let elapsed = now.duration_since(bucket.last_refill).as_secs_f64();
@@ -109,7 +112,12 @@ impl RateLimiter {
     /// Return the current drop ratio (requests being rate-limited) — placeholder.
     /// Full tracking of accepted vs rejected would require atomic counters.
     pub async fn stats_summary(&self) -> String {
-        format!("rps={} burst={} active_clients={}", self.rps, self.burst, self.active_clients().await)
+        format!(
+            "rps={} burst={} active_clients={}",
+            self.rps,
+            self.burst,
+            self.active_clients().await
+        )
     }
 }
 
@@ -180,7 +188,7 @@ mod tests {
         assert!(limiter.check("127.0.0.1").await);
         assert!(limiter.check("127.0.0.1").await);
         assert!(!limiter.check("127.0.0.1").await); // burst exhausted
-        // 10ms later ~1 token available
+                                                    // 10ms later ~1 token available
         thread::sleep(Duration::from_millis(10));
         assert!(limiter.check("127.0.0.1").await);
     }
@@ -194,10 +202,10 @@ mod tests {
         assert!(limiter.check("   ").await);
         // Both should share the same bucket (rate limited together)
         // Bucket has 5 tokens total, 2 already used, so 3 more requests will succeed
-        assert!(limiter.check("").await);  // 3rd token
-        assert!(limiter.check("").await);  // 4th token
-        assert!(limiter.check("").await);  // 5th token (exhausted)
-        // Bucket is now exhausted (5 tokens used)
+        assert!(limiter.check("").await); // 3rd token
+        assert!(limiter.check("").await); // 4th token
+        assert!(limiter.check("").await); // 5th token (exhausted)
+                                          // Bucket is now exhausted (5 tokens used)
         assert!(!limiter.check("").await);
         assert!(!limiter.check("   ").await);
     }

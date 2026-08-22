@@ -28,10 +28,7 @@ pub enum CleanCtxError {
     Io(String),
     /// CBM graph bridge errors (binary not found, timeout, etc.).
     /// May be transient (timeout) or permanent (binary missing).
-    Cbm {
-        message: String,
-        retryable: bool,
-    },
+    Cbm { message: String, retryable: bool },
     /// Compression pipeline errors (parse failure, invalid fidelity, etc.).
     /// Typically permanent — the input is malformed.
     Compression(String),
@@ -40,10 +37,7 @@ pub enum CleanCtxError {
     Ir(String),
     /// Persistence/SQLite errors (DB corruption, disk full, etc.).
     /// May be transient (disk full → free space) or permanent.
-    Persistence {
-        message: String,
-        retryable: bool,
-    },
+    Persistence { message: String, retryable: bool },
     /// Configuration errors (invalid JSON, missing fields, etc.).
     /// Permanent — fix the config file.
     Config(String),
@@ -79,12 +73,20 @@ impl CleanCtxError {
         match self {
             CleanCtxError::Io(_) => -32603,
             CleanCtxError::Cbm { retryable, .. } => {
-                if *retryable { -32000 } else { -32001 }
+                if *retryable {
+                    -32000
+                } else {
+                    -32001
+                }
             }
             CleanCtxError::Compression(_) => -32602,
             CleanCtxError::Ir(_) => -32602,
             CleanCtxError::Persistence { retryable, .. } => {
-                if *retryable { -32000 } else { -32603 }
+                if *retryable {
+                    -32000
+                } else {
+                    -32603
+                }
             }
             CleanCtxError::Config(_) => -32602,
             CleanCtxError::Internal(_) => -32603,

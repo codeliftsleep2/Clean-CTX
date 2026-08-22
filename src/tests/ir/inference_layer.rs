@@ -4,8 +4,8 @@
 
 use std::collections::HashMap;
 
-use crate::cbm::bridge::{DeadCodeEntry, SymbolImportance};
 use crate::cbm::bridge::test_helpers::new_mock_with_edges;
+use crate::cbm::bridge::{DeadCodeEntry, SymbolImportance};
 use crate::ir::inference_layer::{
     InferenceAnnotation, InferenceEdge, InferenceEdgeType, InferenceLayer, InferenceSource,
 };
@@ -166,7 +166,11 @@ fn test_all_edge_types() {
         .map(|e| e.edge_type.clone())
         .collect();
     for (edge_type, _) in &edge_types {
-        assert!(types_present.contains(edge_type), "Missing edge type: {:?}", edge_type);
+        assert!(
+            types_present.contains(edge_type),
+            "Missing edge type: {:?}",
+            edge_type
+        );
     }
 }
 
@@ -210,13 +214,21 @@ fn test_all_inference_sources() {
         .map(|e| e.source.clone())
         .collect();
     for (source, _, _) in &sources {
-        assert!(sources_present.contains(source), "Missing source: {:?}", source);
+        assert!(
+            sources_present.contains(source),
+            "Missing source: {:?}",
+            source
+        );
     }
 
     // Verify each source is present in annotations
     for (_source, name, _) in &sources {
         let key = format!("key_{}", name);
-        assert!(layer.has_annotation_key(&key), "Missing annotation key: {}", key);
+        assert!(
+            layer.has_annotation_key(&key),
+            "Missing annotation key: {}",
+            key
+        );
     }
 }
 
@@ -331,7 +343,11 @@ fn test_multiple_annotations_per_symbol() {
 
     let keys_present: Vec<&str> = anns.iter().map(|a| a.key.as_str()).collect();
     for key in &keys {
-        assert!(keys_present.contains(key), "Missing annotation key: {}", key);
+        assert!(
+            keys_present.contains(key),
+            "Missing annotation key: {}",
+            key
+        );
     }
 }
 
@@ -663,25 +679,34 @@ fn test_enrich_from_cbm_populates_edges_and_annotations() {
             ("CallerC".to_string(), "CalleeD".to_string()),
         ],
         vec![
-            ("MethodX".to_string(), "TargetY".to_string(), "reads".to_string()),
-            ("MethodZ".to_string(), "TargetW".to_string(), "writes".to_string()),
+            (
+                "MethodX".to_string(),
+                "TargetY".to_string(),
+                "reads".to_string(),
+            ),
+            (
+                "MethodZ".to_string(),
+                "TargetW".to_string(),
+                "writes".to_string(),
+            ),
         ],
         {
             let mut m = HashMap::new();
-            m.insert("Sym1".to_string(), SymbolImportance {
-                symbol: "Sym1".to_string(),
-                score: 0.9,
-                file: "a.ts".to_string(),
-            });
+            m.insert(
+                "Sym1".to_string(),
+                SymbolImportance {
+                    symbol: "Sym1".to_string(),
+                    score: 0.9,
+                    file: "a.ts".to_string(),
+                },
+            );
             m
         },
-        vec![
-            DeadCodeEntry {
-                symbol: "DeadSym".to_string(),
-                file: "b.ts".to_string(),
-                reason: "unused".to_string(),
-            },
-        ],
+        vec![DeadCodeEntry {
+            symbol: "DeadSym".to_string(),
+            file: "b.ts".to_string(),
+            reason: "unused".to_string(),
+        }],
     );
 
     let mut layer = InferenceLayer::new();
@@ -697,22 +722,36 @@ fn test_enrich_from_cbm_populates_edges_and_annotations() {
     }
 
     // Verify call edges
-    let calls: Vec<&InferenceEdge> = layer.inferred_edges.iter()
+    let calls: Vec<&InferenceEdge> = layer
+        .inferred_edges
+        .iter()
         .filter(|e| e.edge_type == InferenceEdgeType::Calls)
         .collect();
     assert_eq!(calls.len(), 2);
-    assert!(calls.iter().any(|e| e.from == "CallerA" && e.to == "CalleeB"));
-    assert!(calls.iter().any(|e| e.from == "CallerC" && e.to == "CalleeD"));
+    assert!(
+        calls
+            .iter()
+            .any(|e| e.from == "CallerA" && e.to == "CalleeB")
+    );
+    assert!(
+        calls
+            .iter()
+            .any(|e| e.from == "CallerC" && e.to == "CalleeD")
+    );
 
     // Verify dataflow edges (reads → DataFlowRead, writes → DataFlowWrite)
-    let reads: Vec<&InferenceEdge> = layer.inferred_edges.iter()
+    let reads: Vec<&InferenceEdge> = layer
+        .inferred_edges
+        .iter()
         .filter(|e| e.edge_type == InferenceEdgeType::DataFlowRead)
         .collect();
     assert_eq!(reads.len(), 1);
     assert_eq!(reads[0].from, "MethodX");
     assert_eq!(reads[0].to, "TargetY");
 
-    let writes: Vec<&InferenceEdge> = layer.inferred_edges.iter()
+    let writes: Vec<&InferenceEdge> = layer
+        .inferred_edges
+        .iter()
         .filter(|e| e.edge_type == InferenceEdgeType::DataFlowWrite)
         .collect();
     assert_eq!(writes.len(), 1);
@@ -776,10 +815,14 @@ fn test_enrich_from_cbm_does_not_duplicate_existing_edges() {
 
     // 1 structural + 1 CBM edge
     assert_eq!(layer.inferred_edges.len(), 2);
-    let structural: Vec<&InferenceEdge> = layer.inferred_edges.iter()
+    let structural: Vec<&InferenceEdge> = layer
+        .inferred_edges
+        .iter()
         .filter(|e| e.source == InferenceSource::Structural)
         .collect();
-    let cbm: Vec<&InferenceEdge> = layer.inferred_edges.iter()
+    let cbm: Vec<&InferenceEdge> = layer
+        .inferred_edges
+        .iter()
         .filter(|e| e.source == InferenceSource::Cbm)
         .collect();
     assert_eq!(structural.len(), 1);
@@ -796,7 +839,11 @@ fn test_enrich_from_cbm_direction_normalization() {
         vec![],
         vec![
             ("M1".to_string(), "T1".to_string(), "WRITES".to_string()),
-            ("M2".to_string(), "T2".to_string(), "DATAFLOW_WRITE".to_string()),
+            (
+                "M2".to_string(),
+                "T2".to_string(),
+                "DATAFLOW_WRITE".to_string(),
+            ),
             ("M3".to_string(), "T3".to_string(), "write_to".to_string()),
             ("M4".to_string(), "T4".to_string(), "READS".to_string()),
             ("M5".to_string(), "T5".to_string(), "DATAFLOW".to_string()),
@@ -810,10 +857,14 @@ fn test_enrich_from_cbm_direction_normalization() {
 
     assert_eq!(layer.inferred_edges.len(), 5);
 
-    let writes: Vec<&InferenceEdge> = layer.inferred_edges.iter()
+    let writes: Vec<&InferenceEdge> = layer
+        .inferred_edges
+        .iter()
         .filter(|e| e.edge_type == InferenceEdgeType::DataFlowWrite)
         .collect();
-    let reads: Vec<&InferenceEdge> = layer.inferred_edges.iter()
+    let reads: Vec<&InferenceEdge> = layer
+        .inferred_edges
+        .iter()
         .filter(|e| e.edge_type == InferenceEdgeType::DataFlowRead)
         .collect();
 

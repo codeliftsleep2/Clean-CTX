@@ -40,6 +40,7 @@ fn baseline_round_trip() {
         imports: vec!["A".into()],
         classes: vec![],
         orphan_fields: vec![],
+        orphan_methods: vec![],
     };
     c.store_baseline("k".into(), snap.clone());
     assert_eq!(c.get_baseline("k"), Some(&snap));

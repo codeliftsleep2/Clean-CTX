@@ -15,8 +15,8 @@
 // 7. ? matches exactly one character
 // 8. Pattern matching is consistent with is_excluded
 
-use proptest::prelude::*;
 use crate::config::CleanCtxConfig;
+use proptest::prelude::*;
 
 // Import glob_match via the parent module.
 // Since glob_match is private, we test it through the public

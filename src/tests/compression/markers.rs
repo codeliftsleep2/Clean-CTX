@@ -2,11 +2,17 @@ use super::*;
 
 #[test]
 fn build_marker_known_captures() {
-    assert_eq!(build_marker("throw.root", "new Error()"), Some("⊕!new Error()".to_string()));
+    assert_eq!(
+        build_marker("throw.root", "new Error()"),
+        Some("⊕!new Error()".to_string())
+    );
     assert_eq!(build_marker("for.root", ""), Some("⊕loop".to_string()));
     assert_eq!(build_marker("if.root", ""), Some("⊕guard".to_string()));
     assert_eq!(build_marker("while.root", ""), Some("⊕loop".to_string()));
-    assert_eq!(build_marker("return.root", "result"), Some("⊕⇒result".to_string()));
+    assert_eq!(
+        build_marker("return.root", "result"),
+        Some("⊕⇒result".to_string())
+    );
 }
 
 #[test]

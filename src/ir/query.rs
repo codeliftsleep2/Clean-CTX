@@ -8,7 +8,7 @@
 // Local queries return results first; CBM enriches with cross-file results.
 // When CBM is disabled, all queries return local-only results.
 
-use super::inference_layer::{InferenceLayer, InferenceEdgeType};
+use super::inference_layer::{InferenceEdgeType, InferenceLayer};
 use super::program_graph::{GraphEdge, GraphNode, ProgramGraph};
 use super::symbol_table::SymbolKind;
 
@@ -92,14 +92,22 @@ impl IRQueryEngine {
     /// Get fan-in (callers) — local graph edges.
     /// Returns count with confidence breakdown.
     pub fn get_fan_in(&self, method: &str) -> FanInResult {
-        let local_count = self.graph.edges.iter()
+        let local_count = self
+            .graph
+            .edges
+            .iter()
             .filter(|e| matches!(e, GraphEdge::Calls { to, .. } if to == method))
             .count();
 
-        let inferred_count = self.inference.as_ref()
-            .map(|inf| inf.inferred_edges.iter()
-                .filter(|e| matches!(e.edge_type, InferenceEdgeType::Calls) && e.to == method)
-                .count())
+        let inferred_count = self
+            .inference
+            .as_ref()
+            .map(|inf| {
+                inf.inferred_edges
+                    .iter()
+                    .filter(|e| matches!(e.edge_type, InferenceEdgeType::Calls) && e.to == method)
+                    .count()
+            })
             .unwrap_or(0);
 
         let total = local_count + inferred_count;
@@ -117,7 +125,9 @@ impl IRQueryEngine {
     /// Get fan-out (number of methods this method calls).
     /// Local only — CBM doesn't track outbound edges.
     pub fn get_fan_out(&self, method: &str) -> usize {
-        self.graph.edges.iter()
+        self.graph
+            .edges
+            .iter()
             .filter(|e| matches!(e, GraphEdge::Calls { from, .. } if from == method))
             .count()
     }
@@ -126,22 +136,35 @@ impl IRQueryEngine {
     /// Local only — CBM doesn't track side effects.
     pub fn find_side_effects(&self) -> Vec<&GraphNode> {
         // In a full implementation, this would scan the CoreOp stream for EFFECT ops
-        self.graph.nodes.iter()
+        self.graph
+            .nodes
+            .iter()
             .filter(|n| n.kind == SymbolKind::Method)
             .collect()
     }
 
     /// Get all classes that extend a given class.
     pub fn find_subclasses(&self, class_id: &str) -> Vec<&GraphNode> {
-        let child_ids: Vec<&str> = self.graph.edges.iter()
+        let child_ids: Vec<&str> = self
+            .graph
+            .edges
+            .iter()
             .filter_map(|e| {
                 if let GraphEdge::Extends { child, parent } = e {
-                    if parent == class_id { Some(child.as_str()) } else { None }
-                } else { None }
+                    if parent == class_id {
+                        Some(child.as_str())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             })
             .collect();
 
-        self.graph.nodes.iter()
+        self.graph
+            .nodes
+            .iter()
             .filter(|n| child_ids.contains(&n.id.as_str()))
             .collect()
     }

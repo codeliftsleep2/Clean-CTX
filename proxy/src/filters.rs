@@ -235,7 +235,12 @@ pub fn is_complete_json(s: &str) -> bool {
 }
 
 /// JSON guard: if truncated and content is valid JSON, pass through or omit.
-pub fn json_guard(original: &str, filtered: &str, truncated: bool, reduce_json: bool) -> (String, bool) {
+pub fn json_guard(
+    original: &str,
+    filtered: &str,
+    truncated: bool,
+    reduce_json: bool,
+) -> (String, bool) {
     if !truncated || reduce_json {
         return (filtered.to_string(), truncated);
     }

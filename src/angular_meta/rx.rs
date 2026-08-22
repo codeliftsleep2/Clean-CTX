@@ -272,7 +272,7 @@ impl RxShape {
                 Fidelity::Low => {
                     s.push_str(&format!("  Φobs:{}\n", obs.name));
                 }
-                Fidelity::Medium | Fidelity::High => {
+                Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     if let Some(ref src) = obs.source {
                         s.push_str(&format!("  Φobs:{} → {}\n", obs.name, src));
                     } else {
@@ -288,7 +288,7 @@ impl RxShape {
                 Fidelity::Low => {
                     s.push_str(&format!("  Φsubject:{}\n", subj.name));
                 }
-                Fidelity::Medium | Fidelity::High => {
+                Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     if let Some(ref iv) = subj.initial_value {
                         s.push_str(&format!("  Φsubject:{} = new {}({})\n",
                             subj.name, subj.kind, iv));
@@ -316,7 +316,7 @@ impl RxShape {
                         .collect();
                     s.push_str(&format!("  ΦpipeRx:{} = {}\n", pipe.owner, ops.join(" → ")));
                 }
-                Fidelity::High => {
+                Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     let mut pipe_line = format!("  ΦpipeRx:{} = pipe(\n", pipe.owner);
                     for (i, op) in pipe.operators.iter().enumerate() {
                         let comma = if i < pipe.operators.len() - 1 { "," } else { "" };

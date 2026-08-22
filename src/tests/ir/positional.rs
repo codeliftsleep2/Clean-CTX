@@ -3,11 +3,11 @@
 // Tests for Phase H: Positional Encoding.
 
 use crate::ir::opcodes::CoreOp;
-use crate::ir::wire::op_to_tuple;
 use crate::ir::positional::{
-    PositionalConfig, encode_op, decode_op, encode_stream, ir_to_positional_wire,
-    estimate_savings, positional_char_count, verify_round_trip,
+    PositionalConfig, decode_op, encode_op, encode_stream, estimate_savings, ir_to_positional_wire,
+    positional_char_count, verify_round_trip,
 };
+use crate::ir::wire::op_to_tuple;
 
 fn defclass(id: &str, name: &str) -> CoreOp {
     CoreOp::DefClass(id.into(), name.into())
@@ -198,7 +198,10 @@ fn tagged_matches_op_to_tuple() {
     let op = defmethod("C1", "M1", "processComplexData");
     let tagged = encode_op(&op, PositionalConfig::tagged());
     let from_wire = op_to_tuple(&op);
-    assert_eq!(tagged, from_wire, "tagged encoding should match op_to_tuple");
+    assert_eq!(
+        tagged, from_wire,
+        "tagged encoding should match op_to_tuple"
+    );
 }
 
 // ── Decode ────────────────────────────────────────────────────
@@ -211,13 +214,19 @@ fn decode_stripped_def_c() {
 
 #[test]
 fn decode_stripped_def_m() {
-    let op = decode_op("DEF_M", &["C1".into(), "M1".into(), "processComplexData".into()]);
+    let op = decode_op(
+        "DEF_M",
+        &["C1".into(), "M1".into(), "processComplexData".into()],
+    );
     assert_eq!(op, Some(defmethod("C1", "M1", "processComplexData")));
 }
 
 #[test]
 fn decode_stripped_sig() {
-    let op = decode_op("SIG", &["M1".into(), "P1".into(), "$s".into(), "payload".into()]);
+    let op = decode_op(
+        "SIG",
+        &["M1".into(), "P1".into(), "$s".into(), "payload".into()],
+    );
     assert_eq!(op, Some(param("M1", "P1", "$s", "payload")));
 }
 
@@ -281,8 +290,8 @@ fn round_trip_stripped_all_variants() {
     for op in &ops {
         let enc = encode_op(op, PositionalConfig::stripped());
         let opcode = op_to_tuple(op).remove(0);
-        let decoded = decode_op(&opcode, &enc)
-            .unwrap_or_else(|| panic!("decode failed for {:?}", op));
+        let decoded =
+            decode_op(&opcode, &enc).unwrap_or_else(|| panic!("decode failed for {:?}", op));
         assert_eq!(&decoded, op, "round-trip mismatch for {:?}", op);
     }
 }
@@ -310,8 +319,8 @@ fn round_trip_tagged_all_variants() {
         let enc = encode_op(op, PositionalConfig::tagged());
         let opcode = enc[0].clone();
         let operands: Vec<String> = enc[1..].to_vec();
-        let decoded = decode_op(&opcode, &operands)
-            .unwrap_or_else(|| panic!("decode failed for {:?}", op));
+        let decoded =
+            decode_op(&opcode, &operands).unwrap_or_else(|| panic!("decode failed for {:?}", op));
         assert_eq!(&decoded, op, "round-trip mismatch for {:?}", op);
     }
 }
@@ -372,8 +381,12 @@ fn stripped_is_shorter_than_named() {
         ret("M1", "$b"),
     ];
     let (named, positional) = estimate_savings(&ops);
-    assert!(positional < named,
-        "positional should be smaller: named={} positional={}", named, positional);
+    assert!(
+        positional < named,
+        "positional should be smaller: named={} positional={}",
+        named,
+        positional
+    );
 }
 
 #[test]

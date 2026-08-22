@@ -7,7 +7,7 @@
 // `show_file` behave correctly.
 
 use crate::error::CleanCtxError;
-use crate::gitdiff::workspace::{collect_changed_files, show_file, FileChange};
+use crate::gitdiff::workspace::{FileChange, collect_changed_files, show_file};
 
 /// Create a temp git repo with two commits:
 ///   - Commit 1: `a.txt`, `b.txt`, `keep.txt`
@@ -80,7 +80,10 @@ fn collect_changed_files_classifies_all_statuses() {
     assert_eq!(added, vec!["c.txt".to_string()]);
     assert_eq!(modified, vec!["a.txt".to_string()]);
     assert_eq!(deleted, vec!["b.txt".to_string()]);
-    assert_eq!(renamed, vec![("keep.txt".to_string(), "renamed.txt".to_string())]);
+    assert_eq!(
+        renamed,
+        vec![("keep.txt".to_string(), "renamed.txt".to_string())]
+    );
 }
 
 #[test]

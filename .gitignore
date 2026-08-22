@@ -31,3 +31,8 @@ target
 
 # Local AI assistant configuration (user-specific, not for commit)
 .clinerules
+clippy_audit5.log
+test_audit5.log
+
+# Local session handoff documents (not for commit)
+docs/SESSION_HANDOFF_*.md

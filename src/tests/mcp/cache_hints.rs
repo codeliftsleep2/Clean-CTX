@@ -22,7 +22,8 @@ fn test_cache_config_defaults() {
 fn test_cache_config_serde() {
     let config = crate::config::CacheConfig::default();
     let json = serde_json::to_string(&config).expect("serialize");
-    let deserialized: crate::config::CacheConfig = serde_json::from_str(&json).expect("deserialize");
+    let deserialized: crate::config::CacheConfig =
+        serde_json::from_str(&json).expect("deserialize");
     assert_eq!(config.enabled, deserialized.enabled);
     assert_eq!(config.system_prompt_ttl, deserialized.system_prompt_ttl);
     assert_eq!(config.tools_ttl, deserialized.tools_ttl);
@@ -52,7 +53,11 @@ fn test_compute_baseline_breaker() {
     let text = "class Foo { }";
     let breaker = compute_baseline_breaker(text);
     assert!(breaker.starts_with("bl_"), "breaker should start with bl_");
-    assert_eq!(breaker.len(), 67, "SHA-256 hex is 64 chars + bl_ prefix = 67");
+    assert_eq!(
+        breaker.len(),
+        67,
+        "SHA-256 hex is 64 chars + bl_ prefix = 67"
+    );
 
     // Same input → same breaker
     let breaker2 = compute_baseline_breaker(text);
@@ -90,7 +95,14 @@ fn test_cache_disabled_skips_injection() {
     let state = McpState::new(config);
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
-    let saved = inject_cache_breakpoints(&mut response, &state, "baseline", "1h", "test-breaker", None);
+    let saved = inject_cache_breakpoints(
+        &mut response,
+        &state,
+        "baseline",
+        "1h",
+        "test-breaker",
+        None,
+    );
     assert_eq!(saved, 0, "no tokens saved when cache disabled");
     assert_eq!(state.cache_metrics_lock().hits, 0);
     assert_eq!(state.cache_metrics_lock().misses, 0);
@@ -105,7 +117,14 @@ fn test_inject_system_prompt_hint() {
     let state = McpState::new(CleanCtxConfig::default());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
-    inject_cache_breakpoints(&mut response, &state, "system_prompt", "1h", "vocab-v1", None);
+    inject_cache_breakpoints(
+        &mut response,
+        &state,
+        "system_prompt",
+        "1h",
+        "vocab-v1",
+        None,
+    );
 
     // _meta must be inside result, not at top level
     let hints = &response["result"]["_meta"]["cache_hints"];
@@ -114,7 +133,11 @@ fn test_inject_system_prompt_hint() {
     assert_eq!(breakpoints[0]["region"], "system_prompt");
     assert_eq!(breakpoints[0]["ttl"], "1h");
     assert_eq!(breakpoints[0]["breaker"], "vocab-v1");
-    assert_eq!(state.cache_metrics_lock().misses, 1, "first emission = miss");
+    assert_eq!(
+        state.cache_metrics_lock().misses,
+        1,
+        "first emission = miss"
+    );
 }
 
 /// Verify that inject_cache_breakpoints correctly injects a tools breakpoint.
@@ -147,7 +170,12 @@ fn test_inject_baseline_hint() {
     let breakpoints = hints["breakpoints"].as_array().unwrap();
     assert_eq!(breakpoints[0]["region"], "baseline");
     assert_eq!(breakpoints[0]["ttl"], "1h");
-    assert!(breakpoints[0]["breaker"].as_str().unwrap().starts_with("bl_"));
+    assert!(
+        breakpoints[0]["breaker"]
+            .as_str()
+            .unwrap()
+            .starts_with("bl_")
+    );
 }
 
 /// Verify that inject_cache_breakpoints correctly injects a tail breakpoint with "rolling" breaker.
@@ -198,7 +226,14 @@ fn test_cache_metrics_accumulate() {
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
     // Two different breakpoints
-    inject_cache_breakpoints(&mut response, &state, "system_prompt", "1h", "vocab-v1", None);
+    inject_cache_breakpoints(
+        &mut response,
+        &state,
+        "system_prompt",
+        "1h",
+        "vocab-v1",
+        None,
+    );
     inject_cache_breakpoints(&mut response, &state, "tools", "1h", "tools-v1", None);
 
     assert_eq!(state.cache_metrics_lock().misses, 2);
@@ -208,27 +243,51 @@ fn test_cache_metrics_accumulate() {
 /// Verify that render_cache_text returns the expected format.
 #[test]
 fn test_cache_dashboard_text() {
-    let mut metrics = CacheMetrics { hits: 12, misses: 3, tokens_saved: 18420, ..Default::default() };
-    metrics.breakpoints.insert("tools".to_string(), "hit".to_string());
+    let mut metrics = CacheMetrics {
+        hits: 12,
+        misses: 3,
+        tokens_saved: 18420,
+        ..Default::default()
+    };
+    metrics
+        .breakpoints
+        .insert("tools".to_string(), "hit".to_string());
 
     // With hits+misses > 0, enabled=true returns Some with full stats
     let text = render_cache_text(&metrics, true).expect("should return text when active");
     assert!(text.contains("12"), "should show 12 hits");
     assert!(text.contains("3"), "should show 3 misses");
-    assert!(text.contains("Prompt Cache (LLM"), "should contain LLM header");
+    assert!(
+        text.contains("Prompt Cache (LLM"),
+        "should contain LLM header"
+    );
     assert!(text.contains("enabled"), "should show enabled status");
-    assert!(text.contains("LLM Tokens Saved"), "should show LLM token savings");
+    assert!(
+        text.contains("LLM Tokens Saved"),
+        "should show LLM token savings"
+    );
 
     // With hits+misses > 0, enabled=false still returns Some (shows disabled status)
-    let text_disabled = render_cache_text(&metrics, false).expect("should return text with disabled status");
-    assert!(text_disabled.contains("disabled"), "should show disabled status when cache is off");
+    let text_disabled =
+        render_cache_text(&metrics, false).expect("should return text with disabled status");
+    assert!(
+        text_disabled.contains("disabled"),
+        "should show disabled status when cache is off"
+    );
 }
 
 /// Verify that render_cache_json returns the expected structured output.
 #[test]
 fn test_cache_dashboard_json() {
-    let mut metrics = CacheMetrics { hits: 12, misses: 3, tokens_saved: 18420, ..Default::default() };
-    metrics.breakpoints.insert("tools".to_string(), "hit".to_string());
+    let mut metrics = CacheMetrics {
+        hits: 12,
+        misses: 3,
+        tokens_saved: 18420,
+        ..Default::default()
+    };
+    metrics
+        .breakpoints
+        .insert("tools".to_string(), "hit".to_string());
 
     let json = render_cache_json(&metrics, true);
     assert_eq!(json["hits"], 12);
@@ -240,16 +299,25 @@ fn test_cache_dashboard_json() {
 
     // M-1 regression: disabled JSON should have enabled=false
     let json_disabled = render_cache_json(&metrics, false);
-    assert_eq!(json_disabled["enabled"], false, "enabled should be false when cache is off");
+    assert_eq!(
+        json_disabled["enabled"], false,
+        "enabled should be false when cache is off"
+    );
 }
 
 /// Verify that generate_vocabulary_text returns expected content.
 #[test]
 fn test_generate_vocabulary_text() {
     let text = generate_vocabulary_text();
-    assert!(text.contains("Clean-CTX Opcode/Marker Vocabulary"), "should have header");
+    assert!(
+        text.contains("Clean-CTX Opcode/Marker Vocabulary"),
+        "should have header"
+    );
     assert!(text.contains("$c   → class"), "should include $c opcode");
-    assert!(text.contains("Φcmp"), "should include Angular component marker");
+    assert!(
+        text.contains("Φcmp"),
+        "should include Angular component marker"
+    );
     assert!(text.contains("⊕guard"), "should include guard marker");
 }
 
@@ -346,7 +414,13 @@ fn test_multiple_calls_meta_stays_in_result() {
     // The breakpoint should have been replaced (second call's breakpoint)
     let hints = &response["result"]["_meta"]["cache_hints"];
     let breakpoints = hints["breakpoints"].as_array().unwrap();
-    assert_eq!(breakpoints.len(), 1, "second call replaces the cache_hints entry");
-    assert_eq!(breakpoints[0]["region"], "tools",
-        "should show the tools breakpoint from the second call");
+    assert_eq!(
+        breakpoints.len(),
+        1,
+        "second call replaces the cache_hints entry"
+    );
+    assert_eq!(
+        breakpoints[0]["region"], "tools",
+        "should show the tools breakpoint from the second call"
+    );
 }

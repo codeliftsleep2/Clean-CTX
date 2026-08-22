@@ -9,9 +9,9 @@
 //   - Getter/Setter pattern (DEF_M("get/set X"))
 //   - Override pattern (DEF_M + FLAGS(OVERRIDE))
 
+use super::PatternRecognizer;
 use crate::ir::opcodes::CoreOp;
 use crate::ir::patterns::is_constructor_name;
-use super::PatternRecognizer;
 
 /// Pattern recognizer (Layer 4).
 /// Analyzes the instruction stream and compresses recognized patterns.
@@ -98,11 +98,7 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
     // the consumptive recognizer, matching all 5 constructor variants:
     // "constructor", "new", "__init__", "initialize", "ctor"
     let (_, method_id, _name) = match &slice[0] {
-        CoreOp::DefMethod(cid, mid, name)
-            if is_constructor_name(name) =>
-        {
-            (cid, mid, name)
-        }
+        CoreOp::DefMethod(cid, mid, name) if is_constructor_name(name) => (cid, mid, name),
         _ => return None,
     };
 

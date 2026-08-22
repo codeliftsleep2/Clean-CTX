@@ -4,6 +4,8 @@
 
 use std::collections::BTreeMap;
 
+use crate::compaction::method::{find_method_params, is_csharp_return_type};
+
 use super::snapshot::CapturedClass;
 
 /// Group a vector of items by a derived key, preserving the relative order
@@ -32,17 +34,57 @@ pub(crate) fn group_strings_by_key(
     out
 }
 
+/// Extract the method name from a compact signature for grouping.
+///
+/// For TS/Java name-first signatures (`getUser(id:string):Promise<User>`)
+/// this is the text before the first `(` or `<`. For C# return-type-first
+/// signatures (`bool Resolve(term,__)`, `GetTestOrgUnitValidatorData
+/// GetTestOrgUnitValidatorData()`) the return type must be skipped —
+/// otherwise the key becomes `bool` or `GetTestOrgUnitValidatorData`
+/// (the return type), producing doubled tokens in the rendered diff
+/// (`+ method bool bool Resolve(...)`) and incorrect grouping of
+/// methods that share a return type. F-02 diff audit.
 pub(crate) fn method_key(sig: &str) -> String {
-    let end = sig
-        .find(|c: char| c == '(' || c == '<' || c.is_whitespace())
-        .unwrap_or(sig.len());
-    sig[..end].to_string()
+    // Use the method's own `(` (LAST balanced depth-0 group) so a C#
+    // tuple return type is not mis-tokenized as the parameter list.
+    let before_paren = match find_method_params(sig) {
+        Some((open, _)) => &sig[..open],
+        None => sig,
+    };
+    let tokens: Vec<&str> = before_paren.split_whitespace().collect();
+    if tokens.len() >= 2 && is_csharp_return_type(tokens[tokens.len() - 2]) {
+        // C# return-type-first: the method name is the last token.
+        tokens
+            .last()
+            .unwrap()
+            .split('<')
+            .next()
+            .unwrap_or(tokens.last().unwrap())
+            .to_string()
+    } else if tokens.is_empty() {
+        // Defensive: the signature begins with `(`/`<` — no name prefix.
+        String::new()
+    } else {
+        // TS/Java name-first: the method name is the LAST whitespace token
+        // before the `(`/`<`. Leading declarator keywords like
+        // `export function foo`, `export async function foo`, or
+        // `async function foo` are NOT stripped by `strip_modifiers`
+        // (MODIFIERS_MEDIUM has no `export`/`function`), so taking the
+        // FIRST token mis-keyed every top-level function as "export" or
+        // "async" — all top-level functions in a file grouped under the
+        // same key and the rendered label was wrong. G3-5 diff audit.
+        tokens
+            .last()
+            .unwrap()
+            .split('<')
+            .next()
+            .unwrap_or(tokens.last().unwrap())
+            .to_string()
+    }
 }
 
 pub(crate) fn field_key(field: &str) -> String {
-    let end = field
-        .find([':', '?', '=', ';'])
-        .unwrap_or(field.len());
+    let end = field.find([':', '?', '=', ';']).unwrap_or(field.len());
     field[..end].trim().to_string()
 }
 
@@ -60,4 +102,3 @@ pub(crate) fn summarize_class(cls: &CapturedClass) -> String {
         parts.join(", ")
     }
 }
-

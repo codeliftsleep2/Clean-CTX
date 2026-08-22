@@ -50,7 +50,14 @@ fn register_component_with_selector() {
 #[test]
 fn register_unknown_selector_returns_none() {
     let mut collector = GraphCollector::new();
-    collector.push("UserCardComponent", "α2", ClassKind::Component, Some("app-user-card"), &[], None);
+    collector.push(
+        "UserCardComponent",
+        "α2",
+        ClassKind::Component,
+        Some("app-user-card"),
+        &[],
+        None,
+    );
     let graph = collector.build_graph();
 
     let resolved = graph.resolve_selector("app-unknown");
@@ -82,7 +89,14 @@ fn di_chain_direct_injection() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
     let injects = vec!["UserService".to_string()];
-    collector.push("UserCardComponent", "α1", ClassKind::Component, Some("app-user-card"), &injects, None);
+    collector.push(
+        "UserCardComponent",
+        "α1",
+        ClassKind::Component,
+        Some("app-user-card"),
+        &injects,
+        None,
+    );
     collector.push("UserService", "α2", ClassKind::Service, None, &empty, None);
     let graph = collector.build_graph();
 
@@ -101,9 +115,30 @@ fn di_chain_transitive_injection() {
     let empty: Vec<String> = Vec::new();
     let logger_injects = vec!["LoggerService".to_string()];
     let user_svc_injects = vec!["HttpClient".to_string(), "LoggerService".to_string()];
-    collector.push("UserPageComponent", "α1", ClassKind::Component, Some("app-user-page"), &logger_injects, None);
-    collector.push("UserService", "α2", ClassKind::Service, None, &user_svc_injects, None);
-    collector.push("LoggerService", "α3", ClassKind::Service, None, &empty, None);
+    collector.push(
+        "UserPageComponent",
+        "α1",
+        ClassKind::Component,
+        Some("app-user-page"),
+        &logger_injects,
+        None,
+    );
+    collector.push(
+        "UserService",
+        "α2",
+        ClassKind::Service,
+        None,
+        &user_svc_injects,
+        None,
+    );
+    collector.push(
+        "LoggerService",
+        "α3",
+        ClassKind::Service,
+        None,
+        &empty,
+        None,
+    );
     collector.push("HttpClient", "α4", ClassKind::Service, None, &empty, None);
     let graph = collector.build_graph();
 
@@ -123,7 +158,14 @@ fn di_chain_transitive_injection() {
 fn graph_line_injects_unknown_types_with_question_mark() {
     let mut collector = GraphCollector::new();
     let injects = vec!["UnknownService".to_string()];
-    collector.push("UserCardComponent", "α1", ClassKind::Component, None, &injects, None);
+    collector.push(
+        "UserCardComponent",
+        "α1",
+        ClassKind::Component,
+        None,
+        &injects,
+        None,
+    );
     let graph = collector.build_graph();
 
     let graph_line = graph.format_graph_line("UserCardComponent").unwrap();
@@ -142,7 +184,14 @@ fn format_graph_footer_empty_for_empty_graph() {
 fn format_graph_footer_non_empty_for_resolved() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("UserCardComponent", "α1", ClassKind::Component, Some("app-user-card"), &empty, None);
+    collector.push(
+        "UserCardComponent",
+        "α1",
+        ClassKind::Component,
+        Some("app-user-card"),
+        &empty,
+        None,
+    );
     let graph = collector.build_graph();
     let footer = graph.format_graph_footer();
     assert!(!footer.is_empty());
@@ -154,7 +203,14 @@ fn format_graph_footer_non_empty_for_resolved() {
 #[test]
 fn register_directive_with_selector() {
     let mut collector = GraphCollector::new();
-    collector.push("HighlightDirective", "α5", ClassKind::Directive, Some("[appHighlight]"), &[], None);
+    collector.push(
+        "HighlightDirective",
+        "α5",
+        ClassKind::Directive,
+        Some("[appHighlight]"),
+        &[],
+        None,
+    );
     let graph = collector.build_graph();
 
     assert_eq!(graph.len(), 1);
@@ -165,7 +221,14 @@ fn register_directive_with_selector() {
 #[test]
 fn register_pipe() {
     let mut collector = GraphCollector::new();
-    collector.push("UpperCasePipe", "α6", ClassKind::Pipe, None, &[], Some("uppercase"));
+    collector.push(
+        "UpperCasePipe",
+        "α6",
+        ClassKind::Pipe,
+        None,
+        &[],
+        Some("uppercase"),
+    );
     let graph = collector.build_graph();
 
     assert_eq!(graph.len(), 1);
@@ -177,9 +240,23 @@ fn register_pipe() {
 fn class_names_by_kind_filters_correctly() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("UserCardComponent", "α1", ClassKind::Component, None, &empty, None);
+    collector.push(
+        "UserCardComponent",
+        "α1",
+        ClassKind::Component,
+        None,
+        &empty,
+        None,
+    );
     collector.push("UserService", "α2", ClassKind::Service, None, &empty, None);
-    collector.push("LoggerService", "α3", ClassKind::Service, None, &empty, None);
+    collector.push(
+        "LoggerService",
+        "α3",
+        ClassKind::Service,
+        None,
+        &empty,
+        None,
+    );
     let graph = collector.build_graph();
 
     let services = graph.class_names_by_kind(ClassKind::Service);
@@ -237,7 +314,14 @@ fn has_cycle_no_cycle() {
     let mut builder = AngularGraphBuilder::new();
     let _empty: Vec<String> = Vec::new();
     builder.register_class("SvcA", "α1", ClassKind::Service, None, &[], None);
-    builder.register_class("SvcB", "α2", ClassKind::Service, None, &["SvcA".to_string()], None);
+    builder.register_class(
+        "SvcB",
+        "α2",
+        ClassKind::Service,
+        None,
+        &["SvcA".to_string()],
+        None,
+    );
     let graph = builder.build();
     assert!(!graph.has_cycle());
 }
@@ -246,9 +330,30 @@ fn has_cycle_no_cycle() {
 fn has_cycle_detected() {
     let mut builder = AngularGraphBuilder::new();
     let _empty: Vec<String> = Vec::new();
-    builder.register_class("SvcA", "α1", ClassKind::Service, None, &["SvcB".to_string()], None);
-    builder.register_class("SvcB", "α2", ClassKind::Service, None, &["SvcC".to_string()], None);
-    builder.register_class("SvcC", "α3", ClassKind::Service, None, &["SvcA".to_string()], None);
+    builder.register_class(
+        "SvcA",
+        "α1",
+        ClassKind::Service,
+        None,
+        &["SvcB".to_string()],
+        None,
+    );
+    builder.register_class(
+        "SvcB",
+        "α2",
+        ClassKind::Service,
+        None,
+        &["SvcC".to_string()],
+        None,
+    );
+    builder.register_class(
+        "SvcC",
+        "α3",
+        ClassKind::Service,
+        None,
+        &["SvcA".to_string()],
+        None,
+    );
     let graph = builder.build();
     assert!(graph.has_cycle());
 }
@@ -258,7 +363,14 @@ fn find_cycles_returns_empty_for_acyclic() {
     let mut builder = AngularGraphBuilder::new();
     let _empty: Vec<String> = Vec::new();
     builder.register_class("SvcA", "α1", ClassKind::Service, None, &[], None);
-    builder.register_class("SvcB", "α2", ClassKind::Service, None, &["SvcA".to_string()], None);
+    builder.register_class(
+        "SvcB",
+        "α2",
+        ClassKind::Service,
+        None,
+        &["SvcA".to_string()],
+        None,
+    );
     let graph = builder.build();
     let cycles = graph.find_cycles();
     assert!(cycles.is_empty());
@@ -267,8 +379,22 @@ fn find_cycles_returns_empty_for_acyclic() {
 #[test]
 fn find_cycles_detects_simple_cycle() {
     let mut builder = AngularGraphBuilder::new();
-    builder.register_class("A", "α1", ClassKind::Service, None, &["B".to_string()], None);
-    builder.register_class("B", "α2", ClassKind::Service, None, &["A".to_string()], None);
+    builder.register_class(
+        "A",
+        "α1",
+        ClassKind::Service,
+        None,
+        &["B".to_string()],
+        None,
+    );
+    builder.register_class(
+        "B",
+        "α2",
+        ClassKind::Service,
+        None,
+        &["A".to_string()],
+        None,
+    );
     let graph = builder.build();
     let cycles = graph.find_cycles();
     assert!(!cycles.is_empty());
@@ -279,8 +405,22 @@ fn find_cycles_detects_simple_cycle() {
 fn transitive_dependencies_depth_1() {
     let mut builder = AngularGraphBuilder::new();
     let empty: Vec<String> = Vec::new();
-    builder.register_class("A", "α1", ClassKind::Service, None, &["B".to_string()], None);
-    builder.register_class("B", "α2", ClassKind::Service, None, &["C".to_string()], None);
+    builder.register_class(
+        "A",
+        "α1",
+        ClassKind::Service,
+        None,
+        &["B".to_string()],
+        None,
+    );
+    builder.register_class(
+        "B",
+        "α2",
+        ClassKind::Service,
+        None,
+        &["C".to_string()],
+        None,
+    );
     builder.register_class("C", "α3", ClassKind::Service, None, &empty, None);
     let graph = builder.build();
     let deps = graph.transitive_dependencies("A", 1);
@@ -292,8 +432,22 @@ fn transitive_dependencies_depth_1() {
 fn transitive_dependencies_depth_2() {
     let mut builder = AngularGraphBuilder::new();
     let empty: Vec<String> = Vec::new();
-    builder.register_class("A", "α1", ClassKind::Service, None, &["B".to_string()], None);
-    builder.register_class("B", "α2", ClassKind::Service, None, &["C".to_string()], None);
+    builder.register_class(
+        "A",
+        "α1",
+        ClassKind::Service,
+        None,
+        &["B".to_string()],
+        None,
+    );
+    builder.register_class(
+        "B",
+        "α2",
+        ClassKind::Service,
+        None,
+        &["C".to_string()],
+        None,
+    );
     builder.register_class("C", "α3", ClassKind::Service, None, &empty, None);
     let graph = builder.build();
     let deps = graph.transitive_dependencies("A", 2);

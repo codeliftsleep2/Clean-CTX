@@ -21,10 +21,9 @@
 
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{
-    CoreOp, FLAG_ABSTRACT, FLAG_ASYNC, FLAG_EXPORT, FLAG_GEN, FLAG_PRIVATE, FLAG_PROTECTED,
+    CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, EFFECT_ASYNC,
+    EFFECT_IO, FLAG_ABSTRACT, FLAG_ASYNC, FLAG_EXPORT, FLAG_GEN, FLAG_PRIVATE, FLAG_PROTECTED,
     FLAG_STATIC,
-    DATAFLOW_READ, DATAFLOW_WRITE, EFFECT_ASYNC, EFFECT_IO,
-    CTX_ASYNC, CTRL_AWAIT, CTRL_TRY,
 };
 
 /// TypeScript language layer (Layer 2).
@@ -134,8 +133,14 @@ impl TypeScriptLayer {
 
         // Detect async method
         if raw_sig.contains("async") {
-            ops.push(CoreOp::SideEffect(method_id.to_string(), EFFECT_ASYNC.to_string()));
-            ops.push(CoreOp::ExecutionContext(method_id.to_string(), CTX_ASYNC.to_string()));
+            ops.push(CoreOp::SideEffect(
+                method_id.to_string(),
+                EFFECT_ASYNC.to_string(),
+            ));
+            ops.push(CoreOp::ExecutionContext(
+                method_id.to_string(),
+                CTX_ASYNC.to_string(),
+            ));
         }
 
         // RxJS: detect .subscribe() → DataFlow("reads", "observable")
@@ -149,7 +154,10 @@ impl TypeScriptLayer {
 
         // RxJS: detect .pipe() with tap → SideEffect("io")
         if raw_sig.contains(".pipe(") && raw_sig.contains("tap(") {
-            ops.push(CoreOp::SideEffect(method_id.to_string(), EFFECT_IO.to_string()));
+            ops.push(CoreOp::SideEffect(
+                method_id.to_string(),
+                EFFECT_IO.to_string(),
+            ));
         }
 
         // RxJS: detect .pipe() with map/filter → DataFlow("reads", "observable")

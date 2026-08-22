@@ -23,6 +23,13 @@ pub enum Fidelity {
     Medium,
     /// Minimal compression — preserves as much semantic depth as possible
     High,
+    /// Edit mode — structural skeleton + verbatim method bodies via `CoreOp::Body`.
+    /// Method bodies are byte-exact copies of the source, safe for `replace_in_file`
+    /// SEARCH blocks. Structural signatures remain compressed.
+    Edit,
+    /// Verbatim — full raw source, zero compression. Byte-exact entire document.
+    /// Used when the agent needs to edit signatures, imports, or class-level structure.
+    Verbatim,
 }
 
 impl serde::Serialize for Fidelity {
@@ -31,6 +38,8 @@ impl serde::Serialize for Fidelity {
             Fidelity::Low => "low",
             Fidelity::Medium => "medium",
             Fidelity::High => "high",
+            Fidelity::Edit => "edit",
+            Fidelity::Verbatim => "verbatim",
         })
     }
 }
@@ -52,7 +61,7 @@ impl fmt::Display for FidelityParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "unknown fidelity '{}' (expected 'low', 'medium', or 'high')",
+            "unknown fidelity '{}' (expected one of: 'low', 'medium', 'high', 'edit', 'verbatim')",
             self.0
         )
     }
@@ -70,6 +79,8 @@ impl Fidelity {
             "low" => Ok(Fidelity::Low),
             "medium" => Ok(Fidelity::Medium),
             "high" => Ok(Fidelity::High),
+            "edit" => Ok(Fidelity::Edit),
+            "verbatim" => Ok(Fidelity::Verbatim),
             other => Err(FidelityParseError(other.to_string())),
         }
     }
@@ -82,10 +93,7 @@ impl Fidelity {
     /// — they should return `-32602` instead.
     pub fn parse_or_default(s: &str) -> Self {
         Self::parse(s).unwrap_or_else(|err| {
-            eprintln!(
-                "[clean-ctx] Warning: {} — defaulting to 'low'",
-                err
-            );
+            eprintln!("[clean-ctx] Warning: {} — defaulting to 'low'", err);
             Fidelity::Low
         })
     }

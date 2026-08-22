@@ -32,18 +32,13 @@ const MIN_ORIGINAL_LEN: usize = 4;
 ///
 /// Only aliases that actually appear in the body are emitted in the
 /// footer (avoids dead footer entries).
-pub fn apply_type_aliases(
-    body: &str,
-    aliases: &BTreeMap<String, String>,
-) -> (String, String) {
+pub fn apply_type_aliases(body: &str, aliases: &BTreeMap<String, String>) -> (String, String) {
     // Filter to valid pairs and sort by original length descending so
     // longer type names are matched before shorter ones (`UserService`
     // before `User`).
     let mut pairs: Vec<(&String, &String)> = aliases
         .iter()
-        .filter(|(original, alias)| {
-            is_valid_alias(alias) && original.len() >= MIN_ORIGINAL_LEN
-        })
+        .filter(|(original, alias)| is_valid_alias(alias) && original.len() >= MIN_ORIGINAL_LEN)
         .collect();
     pairs.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
 

@@ -3,15 +3,15 @@
 // Tool definitions and dispatch for the MCP server.
 // v0.3.0: Registry-based dispatch for modular handlers, fallback to legacy.
 
-use serde_json::Value;
+use crate::cbm;
 use crate::compressor::Fidelity;
 use crate::decompression::Decompressor;
 use crate::mcp::McpState;
+use crate::mcp::cache_hints::{compute_workspace_breaker, inject_cache_breakpoints};
 use crate::mcp::workspace;
-use crate::mcp::cache_hints::{inject_cache_breakpoints, compute_workspace_breaker};
 use crate::protocol::send_response;
 use crate::tokenizer::{TokenizerKind, resolve_tokenizer_kind};
-use crate::cbm;
+use serde_json::Value;
 
 use super::tool_handlers;
 
@@ -23,10 +23,18 @@ pub(crate) use super::tool_helpers::diff_code_context_handler;
 /// process, avoiding "unsupported extension" errors for unbuilt grammars.
 fn supported_languages() -> Vec<&'static str> {
     let mut langs = Vec::new();
-    if cfg!(feature = "typescript") { langs.push("typescript"); }
-    if cfg!(feature = "csharp") { langs.push("csharp"); }
-    if cfg!(feature = "rust") { langs.push("rust"); }
-    if cfg!(feature = "java") { langs.push("java"); }
+    if cfg!(feature = "typescript") {
+        langs.push("typescript");
+    }
+    if cfg!(feature = "csharp") {
+        langs.push("csharp");
+    }
+    if cfg!(feature = "rust") {
+        langs.push("rust");
+    }
+    if cfg!(feature = "java") {
+        langs.push("java");
+    }
     langs
 }
 
@@ -36,7 +44,10 @@ fn inject_supported_languages(mut tools: Vec<serde_json::Value>) -> Vec<serde_js
     let supported = supported_languages();
     for tool in &mut tools {
         if let Some(obj) = tool.as_object_mut() {
-            obj.insert("supportedLanguages".to_string(), serde_json::json!(supported));
+            obj.insert(
+                "supportedLanguages".to_string(),
+                serde_json::json!(supported),
+            );
         }
     }
     tools
@@ -51,9 +62,10 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, .rs, or .java file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%). Default: 'low'." },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%), 'edit' (structural skeleton + verbatim method bodies for safe replace_in_file), 'verbatim' (full raw source, zero compression). Default: 'low'." },
                     "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." },
-                    "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." }
+                    "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
             }
@@ -76,7 +88,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "directoryPath": { "type": "string", "description": "Absolute path to the project directory to scan." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, ~70-80%), 'high' (minimal compression, ~50-60%), 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: 'low'." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["directoryPath"]
             }
@@ -88,7 +101,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: 'low'." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
             }
@@ -100,8 +114,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "fidelity": { "type": "string" },
-                    "workspaceRoot": { "type": "string" }
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
             }
@@ -113,7 +127,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "fidelity": { "type": "string" }
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
             }
@@ -137,9 +152,10 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"] },
-                    "fidelity": { "type": "string" },
-                    "workspaceRoot": { "type": "string" },
+                    "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"], "description": "edit: byte-exact method bodies for safe replace_in_file. refactor: full structural detail. overview: max compression. debug: balanced. implement: moderate detail." },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: config default." },
+                    "focusMethods": { "type": "array", "items": { "type": "string" }, "description": "Optional. When set alongside fidelity: \"edit\", only these method/function names get full verbatim bodies; all other methods in the file are rendered signature-only. Omit to render every method's body (current default behavior)." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." },
                     "tokenizer": { "type": "string" }
                 },
                 "required": ["filePath"]
@@ -152,7 +168,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "fidelity": { "type": "string" }
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
             }
@@ -226,7 +243,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "workspaceRoot": { "type": "string", "description": "Optional. Defaults to CWD. Resolved against trusted root." },
                     "fromRef": { "type": "string", "description": "Required. e.g. HEAD~1, main, abc123, v1.0. Strictly validated." },
                     "toRef": { "type": "string", "description": "Optional. Defaults to working tree (uncommitted changes)." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: config default." }
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." }
                 },
                 "required": ["fromRef"]
             }
@@ -247,19 +264,25 @@ pub(crate) fn parse_fidelity_arg(
     params: &Value,
     config: &crate::config::CleanCtxConfig,
 ) -> Result<Fidelity, ()> {
-    let fidelity_str = params["arguments"]["fidelity"]
-        .as_str()
-        .unwrap_or(match config.default_fidelity {
-            Fidelity::Low => "low",
-            Fidelity::Medium => "medium",
-            Fidelity::High => "high",
-        });
-    
+    let fidelity_str =
+        params["arguments"]["fidelity"]
+            .as_str()
+            .unwrap_or(match config.default_fidelity {
+                Fidelity::Low => "low",
+                Fidelity::Medium => "medium",
+                Fidelity::High => "high",
+                Fidelity::Edit => "edit",
+                Fidelity::Verbatim => "verbatim",
+            });
+
     // Log when using default
     if params["arguments"]["fidelity"].is_null() {
-        eprintln!("[clean-ctx] fidelity not specified, using default: {} (from config)", fidelity_str);
+        eprintln!(
+            "[clean-ctx] fidelity not specified, using default: {} (from config)",
+            fidelity_str
+        );
     }
-    
+
     match Fidelity::parse(fidelity_str) {
         Ok(f) => Ok(f),
         Err(e) => {
@@ -273,7 +296,10 @@ pub(crate) fn parse_fidelity_arg(
     }
 }
 
-pub(crate) fn parse_tokenizer_arg(params: &Value, config: &crate::config::CleanCtxConfig) -> TokenizerKind {
+pub(crate) fn parse_tokenizer_arg(
+    params: &Value,
+    config: &crate::config::CleanCtxConfig,
+) -> TokenizerKind {
     let tool_arg = params["arguments"]["tokenizer"].as_str();
     resolve_tokenizer_kind(tool_arg, Some(&config.tokenizer.to_string()))
 }
@@ -301,12 +327,11 @@ pub(crate) fn resolve_fidelity(
     config.default_fidelity
 }
 
-static HANDLER_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> = std::sync::OnceLock::new();
+static HANDLER_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> =
+    std::sync::OnceLock::new();
 
 fn get_registry() -> &'static tool_handlers::registry::HandlerRegistry {
-    HANDLER_REGISTRY.get_or_init(|| {
-        tool_handlers::registry::create_default_registry()
-    })
+    HANDLER_REGISTRY.get_or_init(tool_handlers::registry::create_default_registry)
 }
 
 // P3-3: Handler registry initialization.
@@ -353,12 +378,7 @@ pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
 /// P1-6: All inline-handled tools have early returns. The remaining tools
 /// fall through to the registry. The `inline_tool_names()` function above
 /// enables test-time verification that no tool name appears in both paths.
-pub(crate) fn dispatch_tools_call(
-    id: &Value,
-    tool_name: &str,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, state: &McpState) {
     // Inline dispatch for tools that have special handling requirements
     // (decompress, compress_workspace, and all CBM tools).
     // Each arm returns to prevent double-fire if a tool is also registered.
@@ -385,8 +405,15 @@ pub(crate) fn dispatch_tools_call(
         }
         "compress_workspace" => {
             let dir_path = params["arguments"]["directoryPath"].as_str().unwrap_or(".");
-            // XPIA mitigation: reject directory paths outside the trusted workspace root
-            let dir_path = match super::tool_helpers::resolve_file_path_checked(dir_path, None) {
+            // XPIA mitigation: reject directory paths outside the trusted workspace root.
+            // Pass the caller-supplied workspaceRoot through so the boundary check
+            // honors it (multi-repo support) instead of pinning to CWD.
+            let workspace_root = params["arguments"]["workspaceRoot"].as_str();
+            let dir_path = match super::tool_helpers::resolve_file_path_checked(
+                dir_path,
+                workspace_root,
+                &state.config.additional_roots,
+            ) {
                 Ok(p) => p,
                 Err(msg) => {
                     send_response(&serde_json::json!({
@@ -417,13 +444,20 @@ pub(crate) fn dispatch_tools_call(
                     });
                     if state.config.cache.enabled {
                         let ttl = state.config.cache.baseline_ttl.clone();
-                        let breaker = compute_workspace_breaker(std::slice::from_ref(&result.manifest));
+                        let breaker =
+                            compute_workspace_breaker(std::slice::from_ref(&result.manifest));
                         let tok_box = crate::tokenizer::create_tokenizer(
-                            crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
-                        ).ok();
+                            crate::tokenizer::resolve_tokenizer_kind(
+                                None,
+                                Some(&state.config.tokenizer.to_string()),
+                            ),
+                        )
+                        .ok();
                         let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
                         if let Some(result_obj) = response.get_mut("result") {
-                            inject_cache_breakpoints(result_obj, state, "baseline", &ttl, &breaker, tok_ref);
+                            inject_cache_breakpoints(
+                                result_obj, state, "baseline", &ttl, &breaker, tok_ref,
+                            );
                         }
                     }
                     send_response(&response);
@@ -446,6 +480,7 @@ pub(crate) fn dispatch_tools_call(
             let root = match super::tool_helpers::resolve_file_path_checked(
                 root_arg.unwrap_or("."),
                 root_arg,
+                &state.config.additional_roots,
             ) {
                 Ok(p) => p,
                 Err(msg) => {
@@ -539,13 +574,20 @@ pub(crate) fn dispatch_tools_call(
                     });
                     if state.config.cache.enabled {
                         let ttl = state.config.cache.baseline_ttl.clone();
-                        let breaker = compute_workspace_breaker(std::slice::from_ref(&summary.manifest));
+                        let breaker =
+                            compute_workspace_breaker(std::slice::from_ref(&summary.manifest));
                         let tok_box = crate::tokenizer::create_tokenizer(
-                            crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
-                        ).ok();
+                            crate::tokenizer::resolve_tokenizer_kind(
+                                None,
+                                Some(&state.config.tokenizer.to_string()),
+                            ),
+                        )
+                        .ok();
                         let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
                         if let Some(result_obj) = response.get_mut("result") {
-                            inject_cache_breakpoints(result_obj, state, "baseline", &ttl, &breaker, tok_ref);
+                            inject_cache_breakpoints(
+                                result_obj, state, "baseline", &ttl, &breaker, tok_ref,
+                            );
                         }
                     }
                     send_response(&response);
@@ -561,12 +603,30 @@ pub(crate) fn dispatch_tools_call(
             return;
         }
         // CBM tools
-        "graph_search" => { crate::cbm::handlers::handle_graph_search(id, params, state); return; }
-        "graph_query" => { crate::cbm::handlers::handle_graph_query(id, params, state); return; }
-        "graph_trace" => { crate::cbm::handlers::handle_graph_trace(id, params, state); return; }
-        "get_architecture" => { crate::cbm::handlers::handle_get_architecture(id, params, state); return; }
-        "get_cbm_status" => { crate::cbm::handlers::handle_get_cbm_status(id, params, state); return; }
-        "cbm_proxy" => { crate::cbm::proxy::handle_cbm_proxy(id, params, state); return; }
+        "graph_search" => {
+            crate::cbm::handlers::handle_graph_search(id, params, state);
+            return;
+        }
+        "graph_query" => {
+            crate::cbm::handlers::handle_graph_query(id, params, state);
+            return;
+        }
+        "graph_trace" => {
+            crate::cbm::handlers::handle_graph_trace(id, params, state);
+            return;
+        }
+        "get_architecture" => {
+            crate::cbm::handlers::handle_get_architecture(id, params, state);
+            return;
+        }
+        "get_cbm_status" => {
+            crate::cbm::handlers::handle_get_cbm_status(id, params, state);
+            return;
+        }
+        "cbm_proxy" => {
+            crate::cbm::proxy::handle_cbm_proxy(id, params, state);
+            return;
+        }
         // Unknown — fall through to registry
         _ => {}
     }

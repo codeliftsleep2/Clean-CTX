@@ -28,7 +28,10 @@ pub fn safe_typescript_language() -> Option<Language> {
     #[cfg(feature = "typescript")]
     {
         static LANG: OnceLock<Language> = OnceLock::new();
-        Some(LANG.get_or_init(|| tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()).clone())
+        Some(
+            LANG.get_or_init(|| tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
+                .clone(),
+        )
     }
     #[cfg(not(feature = "typescript"))]
     {
@@ -43,7 +46,10 @@ pub fn safe_csharp_language() -> Option<Language> {
     #[cfg(feature = "csharp")]
     {
         static LANG: OnceLock<Language> = OnceLock::new();
-        Some(LANG.get_or_init(|| tree_sitter_c_sharp::LANGUAGE.into()).clone())
+        Some(
+            LANG.get_or_init(|| tree_sitter_c_sharp::LANGUAGE.into())
+                .clone(),
+        )
     }
     #[cfg(not(feature = "csharp"))]
     {
@@ -58,7 +64,10 @@ pub fn safe_rust_language() -> Option<Language> {
     #[cfg(feature = "rust")]
     {
         static LANG: OnceLock<Language> = OnceLock::new();
-        Some(LANG.get_or_init(|| tree_sitter_rust::LANGUAGE.into()).clone())
+        Some(
+            LANG.get_or_init(|| tree_sitter_rust::LANGUAGE.into())
+                .clone(),
+        )
     }
     #[cfg(not(feature = "rust"))]
     {
@@ -73,7 +82,10 @@ pub fn safe_java_language() -> Option<Language> {
     #[cfg(feature = "java")]
     {
         static LANG: OnceLock<Language> = OnceLock::new();
-        Some(LANG.get_or_init(|| tree_sitter_java::LANGUAGE.into()).clone())
+        Some(
+            LANG.get_or_init(|| tree_sitter_java::LANGUAGE.into())
+                .clone(),
+        )
     }
     #[cfg(not(feature = "java"))]
     {
@@ -117,8 +129,7 @@ pub fn looks_like_rust(source: &str) -> bool {
 
     // Count all signals
     let signals = [
-        has_fn, has_struct, has_enum, has_impl, has_trait,
-        has_pub, has_use, has_mod,
+        has_fn, has_struct, has_enum, has_impl, has_trait, has_pub, has_use, has_mod,
     ]
     .iter()
     .filter(|&&x| x)
@@ -179,10 +190,19 @@ pub fn looks_like_java(source: &str) -> bool {
 
     // Count all signals
     let signals = [
-        has_package, has_import_java, has_import_javax, has_import_jakarta,
-        has_import_spring, has_override, has_interface,
-        has_class, has_public, has_private, has_protected,
-        has_extends, has_implements,
+        has_package,
+        has_import_java,
+        has_import_javax,
+        has_import_jakarta,
+        has_import_spring,
+        has_override,
+        has_interface,
+        has_class,
+        has_public,
+        has_private,
+        has_protected,
+        has_extends,
+        has_implements,
     ]
     .iter()
     .filter(|&&x| x)
@@ -208,7 +228,7 @@ pub fn looks_like_java(source: &str) -> bool {
 /// registry skips that language and falls back to TypeScript (if available).
 pub fn detect_language(source: &str) -> (Language, &'static str) {
     let registry = crate::layers::LayerRegistry::global();
-    
+
     // Try to find a matching language layer via content heuristic
     if crate::compression::language::looks_like_csharp(source) {
         if let Some(layer) = registry.language_layer("csharp") {
@@ -229,7 +249,7 @@ pub fn detect_language(source: &str) -> (Language, &'static str) {
             }
         }
     }
-    
+
     // Fallback to TypeScript (only if the feature is enabled)
     if let Some(lang) = safe_typescript_language() {
         (lang, queries::TS_QUERY)
@@ -241,7 +261,9 @@ pub fn detect_language(source: &str) -> (Language, &'static str) {
         (lang, queries::JAVA_QUERY)
     } else {
         // This should never happen in practice (at least one language should be enabled)
-        panic!("No language features enabled. Enable at least one of: typescript, csharp, rust, java");
+        panic!(
+            "No language features enabled. Enable at least one of: typescript, csharp, rust, java"
+        );
     }
 }
 
@@ -260,19 +282,21 @@ pub fn detect_language(source: &str) -> (Language, &'static str) {
 /// extension is not recognized.
 pub fn language_for_extension(extension: &str) -> Option<(Language, &'static str)> {
     let registry = crate::layers::LayerRegistry::global();
-    
-    registry.language_layer_for_extension(extension).and_then(|layer| {
-        layer.language_ptr().map(|lang| {
-            // Return the appropriate query for this language
-            match layer.name() {
-                "typescript" => (lang, queries::TS_QUERY),
-                "csharp" => (lang, queries::CS_QUERY),
-                "rust" => (lang, queries::RS_QUERY),
-                "java" => (lang, queries::JAVA_QUERY),
-                _ => (lang, queries::TS_QUERY), // fallback
-            }
+
+    registry
+        .language_layer_for_extension(extension)
+        .and_then(|layer| {
+            layer.language_ptr().map(|lang| {
+                // Return the appropriate query for this language
+                match layer.name() {
+                    "typescript" => (lang, queries::TS_QUERY),
+                    "csharp" => (lang, queries::CS_QUERY),
+                    "rust" => (lang, queries::RS_QUERY),
+                    "java" => (lang, queries::JAVA_QUERY),
+                    _ => (lang, queries::TS_QUERY), // fallback
+                }
+            })
         })
-    })
 }
 
 #[cfg(all(test, feature = "rust"))]

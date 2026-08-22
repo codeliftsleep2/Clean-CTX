@@ -11,9 +11,13 @@
 // - Logging (ILogger<T>, ILoggerFactory)
 // - Background jobs (BackgroundJob, RecurringJob)
 
-use super::markers::{build_cache_line, build_common_line, build_custom_validator_line, build_di_line, build_identity_line, build_job_line, build_jwt_line, build_log_line, build_metric_line, build_output_line, build_rule_line, build_service_line, build_validator_line};
-use crate::dotnet_meta::MetaBlock;
+use super::markers::{
+    build_cache_line, build_common_line, build_custom_validator_line, build_di_line,
+    build_identity_line, build_job_line, build_jwt_line, build_log_line, build_metric_line,
+    build_output_line, build_rule_line, build_service_line, build_validator_line,
+};
 use crate::compression::Fidelity;
+use crate::dotnet_meta::MetaBlock;
 
 /// Extract general .NET markers from a single class capture.
 ///
@@ -171,9 +175,10 @@ fn extract_services(class_source: &str) -> Vec<String> {
             services.push(build_service_line(name));
             continue;
         }
-        
+
         // Interfaces starting with 'I' (convention) — but exclude known framework types
-        if name.starts_with('I') && name.len() > 1
+        if name.starts_with('I')
+            && name.len() > 1
             && !KNOWN_FRAMEWORK_INTERFACES.contains(&name.as_str())
         {
             // Also require the name to appear in a DI registration context or
@@ -193,7 +198,12 @@ fn extract_services(class_source: &str) -> Vec<String> {
 /// Check if an interface name appears in a DI registration context
 /// (AddScoped, AddSingleton, AddTransient, AddDbContext).
 fn appears_in_di_context(source: &str, name: &str) -> bool {
-    let di_keywords = ["AddScoped<", "AddSingleton<", "AddTransient<", "AddDbContext<"];
+    let di_keywords = [
+        "AddScoped<",
+        "AddSingleton<",
+        "AddTransient<",
+        "AddDbContext<",
+    ];
     for keyword in &di_keywords {
         if source.contains(&format!("{}{}", keyword, name))
             || source.contains(&format!("{}I{}", keyword, &name[1..]))
@@ -281,10 +291,16 @@ fn extract_di_registrations(class_source: &str) -> Vec<String> {
                 if let Some(comma_pos) = types.find(',') {
                     let service = types[..comma_pos].trim().to_string();
                     let impl_type = types[comma_pos + 1..].trim().to_string();
-                    registrations.push(build_di_line(&service, &format!("{}<{}>", &pattern[..pattern.len() - 1], impl_type)));
+                    registrations.push(build_di_line(
+                        &service,
+                        &format!("{}<{}>", &pattern[..pattern.len() - 1], impl_type),
+                    ));
                 } else {
                     // Single type (e.g., AddDbContext<AppDbContext>)
-                    registrations.push(build_di_line(&types, &format!("{}<{}>", &pattern[..pattern.len() - 1], types)));
+                    registrations.push(build_di_line(
+                        &types,
+                        &format!("{}<{}>", &pattern[..pattern.len() - 1], types),
+                    ));
                 }
             }
 
@@ -440,7 +456,10 @@ fn extract_identity(class_source: &str) -> Vec<String> {
             let rest = &class_source[pos + "SignInManager<".len()..];
             if let Some(generic_end) = rest.find('>') {
                 let user_type = rest[..generic_end].trim().to_string();
-                identity.push(build_identity_line(&format!("SignInManager<{}>", user_type)));
+                identity.push(build_identity_line(&format!(
+                    "SignInManager<{}>",
+                    user_type
+                )));
             }
         }
     }
@@ -505,7 +524,9 @@ fn extract_logging(class_source: &str) -> Vec<String> {
     }
 
     // Look for Application Insights / OpenTelemetry
-    if class_source.contains("AddApplicationInsights") || class_source.contains("ApplicationInsights") {
+    if class_source.contains("AddApplicationInsights")
+        || class_source.contains("ApplicationInsights")
+    {
         logging.push(build_metric_line("ApplicationInsights"));
     }
 

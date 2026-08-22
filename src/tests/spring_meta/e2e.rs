@@ -30,12 +30,26 @@ public class UserController {
 }"#;
 
     let result = extract_annotations(raw_class, Fidelity::Medium);
-    assert!(result.is_some(), "should detect RestController with mappings");
+    assert!(
+        result.is_some(),
+        "should detect RestController with mappings"
+    );
     let lines = &result.unwrap().lines;
 
-    assert!(lines.iter().any(|l| l.starts_with("Φrest:UserController")), "should contain Φrest marker: {:?}", lines);
-    assert!(lines.iter().any(|l| l.starts_with("Φmap:")), "should contain Φmap markers: {:?}", lines);
-    assert!(!lines.iter().any(|l| l.starts_with("SP_REST_")), "should not contain old SP_ prefix");
+    assert!(
+        lines.iter().any(|l| l.starts_with("Φrest:UserController")),
+        "should contain Φrest marker: {:?}",
+        lines
+    );
+    assert!(
+        lines.iter().any(|l| l.starts_with("Φmap:")),
+        "should contain Φmap markers: {:?}",
+        lines
+    );
+    assert!(
+        !lines.iter().any(|l| l.starts_with("SP_REST_")),
+        "should not contain old SP_ prefix"
+    );
 }
 
 #[test]
@@ -49,11 +63,23 @@ public class HealthController {
 }"#;
 
     let result = extract_annotations(raw_class, Fidelity::Medium);
-    assert!(result.is_some(), "should detect RestController without mappings");
+    assert!(
+        result.is_some(),
+        "should detect RestController without mappings"
+    );
     let lines = &result.unwrap().lines;
 
-    assert!(lines.iter().any(|l| l.starts_with("Φrest:HealthController")), "should contain Φrest marker: {:?}", lines);
-    assert!(!lines.iter().any(|l| l.starts_with("SP_REST_")), "should not contain old SP_ prefix");
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("Φrest:HealthController")),
+        "should contain Φrest marker: {:?}",
+        lines
+    );
+    assert!(
+        !lines.iter().any(|l| l.starts_with("SP_REST_")),
+        "should not contain old SP_ prefix"
+    );
 }
 
 // ── Service E2E ────────────────────────────────────
@@ -72,8 +98,15 @@ public class UserService {
     assert!(result.is_some(), "should detect @Service");
     let lines = &result.unwrap().lines;
 
-    assert!(lines.iter().any(|l| l.starts_with("Φsvc:UserService")), "should contain Φsvc marker: {:?}", lines);
-    assert!(!lines.iter().any(|l| l.starts_with("SP_SERVICE_")), "should not contain old SP_ prefix");
+    assert!(
+        lines.iter().any(|l| l.starts_with("Φsvc:UserService")),
+        "should contain Φsvc marker: {:?}",
+        lines
+    );
+    assert!(
+        !lines.iter().any(|l| l.starts_with("SP_SERVICE_")),
+        "should not contain old SP_ prefix"
+    );
 }
 
 // ── Repository E2E ─────────────────────────────────
@@ -92,8 +125,15 @@ public class UserRepository {
     assert!(result.is_some(), "should detect @Repository");
     let lines = &result.unwrap().lines;
 
-    assert!(lines.iter().any(|l| l.starts_with("Φrepo:UserRepository")), "should contain Φrepo marker: {:?}", lines);
-    assert!(!lines.iter().any(|l| l.starts_with("SP_REPOSITORY_")), "should not contain old SP_ prefix");
+    assert!(
+        lines.iter().any(|l| l.starts_with("Φrepo:UserRepository")),
+        "should contain Φrepo marker: {:?}",
+        lines
+    );
+    assert!(
+        !lines.iter().any(|l| l.starts_with("SP_REPOSITORY_")),
+        "should not contain old SP_ prefix"
+    );
 }
 
 // ── Configuration E2E ──────────────────────────────
@@ -113,8 +153,16 @@ public class AppConfig {
     assert!(result.is_some(), "should detect @Configuration");
     let lines = &result.unwrap().lines;
 
-    assert!(lines.iter().any(|l| l.starts_with("Φconf:AppConfig")), "should contain Φconf marker: {:?}", lines);
-    assert!(lines.iter().any(|l| l.starts_with("Φbean:dataSource")), "should contain Φbean marker: {:?}", lines);
+    assert!(
+        lines.iter().any(|l| l.starts_with("Φconf:AppConfig")),
+        "should contain Φconf marker: {:?}",
+        lines
+    );
+    assert!(
+        lines.iter().any(|l| l.starts_with("Φbean:dataSource")),
+        "should contain Φbean marker: {:?}",
+        lines
+    );
 }
 
 // ── @Value Injection E2E ───────────────────────────
@@ -136,7 +184,11 @@ public class ConfigService {
     assert!(result.is_some(), "should detect @Service with @Value");
     let lines = &result.unwrap().lines;
 
-    assert!(lines.iter().any(|l| l.starts_with("Φsvc:ConfigService")), "should contain Φsvc marker: {:?}", lines);
+    assert!(
+        lines.iter().any(|l| l.starts_with("Φsvc:ConfigService")),
+        "should contain Φsvc marker: {:?}",
+        lines
+    );
 }
 
 // ── Non-Spring Java (negative test) ────────────────
@@ -155,7 +207,10 @@ fn plain_java_no_spring_markers_e2e() {
 }"#;
 
     let result = extract_annotations(raw_class, Fidelity::Medium);
-    assert!(result.is_none(), "plain Java should not produce Spring annotations");
+    assert!(
+        result.is_none(),
+        "plain Java should not produce Spring annotations"
+    );
 }
 
 // ── No old format regression ──────────────────────
@@ -172,14 +227,30 @@ public class UserController {
     let lines = &result.unwrap().lines;
 
     // Verify no old format markers
-    let old_prefixes = ["SP_REST_", "SP_SERVICE_", "SP_REPOSITORY_", "SP_CONFIGURATION_",
-                        "SP_CONTROLLER_", "SP_BEAN_", "SP_COMPONENT_"];
+    let old_prefixes = [
+        "SP_REST_",
+        "SP_SERVICE_",
+        "SP_REPOSITORY_",
+        "SP_CONFIGURATION_",
+        "SP_CONTROLLER_",
+        "SP_BEAN_",
+        "SP_COMPONENT_",
+    ];
     for old in &old_prefixes {
-        assert!(!lines.iter().any(|l| l.starts_with(old)), "should not contain old format {}: {:?}", old, lines);
+        assert!(
+            !lines.iter().any(|l| l.starts_with(old)),
+            "should not contain old format {}: {:?}",
+            old,
+            lines
+        );
     }
 
     // Verify Φ abbreviations are present
-    assert!(lines.iter().any(|l| l.starts_with("Φrest:UserController")), "should contain Φrest: {:?}", lines);
+    assert!(
+        lines.iter().any(|l| l.starts_with("Φrest:UserController")),
+        "should contain Φrest: {:?}",
+        lines
+    );
 }
 
 // ── All Spring annotation types E2E ────────────────
@@ -188,19 +259,33 @@ public class UserController {
 fn spring_all_annotation_types_e2e() {
     // Test each Spring stereotype annotation produces the correct Φ marker
     let test_cases = vec![
-        ("@RestController\npublic class TestCtrl {}", "Φrest:TestCtrl"),
+        (
+            "@RestController\npublic class TestCtrl {}",
+            "Φrest:TestCtrl",
+        ),
         ("@Controller\npublic class TestCtrl {}", "Φctrl:TestCtrl"),
         ("@Service\npublic class TestService {}", "Φsvc:TestService"),
         ("@Repository\npublic class TestRepo {}", "Φrepo:TestRepo"),
-        ("@Configuration\npublic class TestConfig {}", "Φconf:TestConfig"),
+        (
+            "@Configuration\npublic class TestConfig {}",
+            "Φconf:TestConfig",
+        ),
     ];
 
     for (raw_class, expected_prefix) in test_cases {
         let result = extract_annotations(raw_class, Fidelity::Medium);
-        assert!(result.is_some(), "should detect annotation in: {}", raw_class);
+        assert!(
+            result.is_some(),
+            "should detect annotation in: {}",
+            raw_class
+        );
         let lines = &result.unwrap().lines;
-        assert!(lines.iter().any(|l| l.starts_with(expected_prefix)),
-            "expected {} marker in: {:?}", expected_prefix, lines);
+        assert!(
+            lines.iter().any(|l| l.starts_with(expected_prefix)),
+            "expected {} marker in: {:?}",
+            expected_prefix,
+            lines
+        );
     }
 }
 
@@ -218,8 +303,15 @@ public class UserService {
 }"#;
 
     let result = extract_annotations(raw_class, Fidelity::Medium);
-    assert!(result.is_some(), "should detect @Service with @Transactional");
+    assert!(
+        result.is_some(),
+        "should detect @Service with @Transactional"
+    );
     let lines = &result.unwrap().lines;
 
-    assert!(lines.iter().any(|l| l.starts_with("Φsvc:UserService")), "should contain Φsvc marker: {:?}", lines);
+    assert!(
+        lines.iter().any(|l| l.starts_with("Φsvc:UserService")),
+        "should contain Φsvc marker: {:?}",
+        lines
+    );
 }

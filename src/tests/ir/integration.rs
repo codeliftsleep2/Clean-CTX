@@ -6,9 +6,9 @@
 
 use crate::ir::compiler::{CompiledIR, IRCompiler};
 use crate::ir::delta::DeltaComputer;
+use crate::ir::opcodes::CoreOp;
 use crate::ir::replay::ContextState;
 use crate::ir::wire::ir_to_wire;
-use crate::ir::opcodes::CoreOp;
 
 // ── helpers ────────────────────────────────────────────────────────
 
@@ -44,7 +44,10 @@ fn state_replay_full_cycle() {
     let pretty = state.render_pretty("file1", crate::compression::Fidelity::Low);
     assert!(pretty.is_some(), "Should render from state");
     let pretty = pretty.unwrap();
-    assert!(pretty.contains("SampleService"), "pretty output should contain class name");
+    assert!(
+        pretty.contains("SampleService"),
+        "pretty output should contain class name"
+    );
 }
 
 // ── Wire Format Integration ───────────────────────────────────────

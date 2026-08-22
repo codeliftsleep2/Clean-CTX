@@ -9,7 +9,11 @@ fn table_has_34_entries() {
 fn no_duplicate_opcodes() {
     let mut seen = std::collections::BTreeSet::new();
     for (op, _) in PRIMITIVE_OPCODES {
-        assert!(seen.insert(*op), "duplicate opcode in PRIMITIVE_OPCODES: {}", op);
+        assert!(
+            seen.insert(*op),
+            "duplicate opcode in PRIMITIVE_OPCODES: {}",
+            op
+        );
     }
 }
 
@@ -17,7 +21,11 @@ fn no_duplicate_opcodes() {
 fn no_duplicate_tokens() {
     let mut seen = std::collections::BTreeSet::new();
     for (_, token) in PRIMITIVE_OPCODES {
-        assert!(seen.insert(*token), "duplicate token in PRIMITIVE_OPCODES: {}", token);
+        assert!(
+            seen.insert(*token),
+            "duplicate token in PRIMITIVE_OPCODES: {}",
+            token
+        );
     }
 }
 

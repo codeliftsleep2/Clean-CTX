@@ -3,8 +3,8 @@
 // End-to-end integration test for the Clean-CTX Anthropic proxy.
 // Single sequential test to avoid Windows port-reuse conflicts.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use serde_json::json;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::watch;
 
 /// A minimal mock upstream that returns valid Anthropic-shaped JSON.
@@ -63,13 +63,22 @@ impl MockUpstream {
             }
         });
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        Self { url: addr, count, shutdown_tx, _h: h }
+        Self {
+            url: addr,
+            count,
+            shutdown_tx,
+            _h: h,
+        }
     }
-    fn request_count(&self) -> usize { self.count.load(Ordering::SeqCst) }
+    fn request_count(&self) -> usize {
+        self.count.load(Ordering::SeqCst)
+    }
 }
 
 impl Drop for MockUpstream {
-    fn drop(&mut self) { let _ = self.shutdown_tx.send(true); }
+    fn drop(&mut self) {
+        let _ = self.shutdown_tx.send(true);
+    }
 }
 
 #[tokio::test]
@@ -80,7 +89,9 @@ async fn test_proxy_full() {
     let direct = reqwest::Client::new()
         .post(&mock.url)
         .json(&json!({"test": true}))
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
     assert_eq!(direct.status().as_u16(), 200);
     assert_eq!(mock.request_count(), 1);
 
@@ -93,7 +104,9 @@ async fn test_proxy_full() {
         auto_cache: true,
         tail_ttl: "5m".to_string(),
         drop_tools: vec!["NotebookEdit".to_string(), "CronCreate".to_string()],
-        drop_tools_set: vec!["NotebookEdit".to_string(), "CronCreate".to_string()].into_iter().collect(),
+        drop_tools_set: vec!["NotebookEdit".to_string(), "CronCreate".to_string()]
+            .into_iter()
+            .collect(),
         strip_ansi: true,
         trim_bash_git: false,
         model_override: None,
@@ -112,7 +125,9 @@ async fn test_proxy_full() {
     };
     let (tx, rx) = watch::channel(false);
     let ph = tokio::spawn(async move {
-        clean_ctx_proxy::server::run_server_with_listener(plistener, config, rx).await.unwrap();
+        clean_ctx_proxy::server::run_server_with_listener(plistener, config, rx)
+            .await
+            .unwrap();
     });
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
@@ -120,10 +135,17 @@ async fn test_proxy_full() {
     let proxy_url = format!("http://127.0.0.1:{pport}");
 
     // 1. GET passthrough (non-messages path) — should proxy through
-    let resp = client.get(format!("{proxy_url}/v1/other"))
+    let resp = client
+        .get(format!("{proxy_url}/v1/other"))
         .header("x-api-key", "sk-test")
-        .send().await.unwrap();
-    assert_eq!(resp.status().as_u16(), 200, "GET passthrough should return 200");
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status().as_u16(),
+        200,
+        "GET passthrough should return 200"
+    );
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     // 2. POST /v1/messages with tools (trigger cache injection + tool drop)
@@ -141,15 +163,26 @@ async fn test_proxy_full() {
         ],
         "messages": [{"role": "user", "content": [{"type": "text", "text": "Hello"}]}]
     });
-    let resp = client.post(format!("{proxy_url}/v1/messages"))
+    let resp = client
+        .post(format!("{proxy_url}/v1/messages"))
         .header("x-api-key", "sk-test")
         .json(&payload)
-        .send().await.unwrap();
-    assert_eq!(resp.status().as_u16(), 200, "POST /v1/messages should return 200");
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status().as_u16(),
+        200,
+        "POST /v1/messages should return 200"
+    );
 
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     // Mock should have received 1 direct + 1 passthrough GET + 1 proxied POST = 3
-    assert!(mock.request_count() >= 3, "mock got {} requests", mock.request_count());
+    assert!(
+        mock.request_count() >= 3,
+        "mock got {} requests",
+        mock.request_count()
+    );
 
     // Cleanup
     tx.send(true).ok();

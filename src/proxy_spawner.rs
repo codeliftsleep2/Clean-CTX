@@ -41,7 +41,10 @@ pub fn resolve_proxy_binary() -> Option<PathBuf> {
         if p.exists() {
             return Some(p);
         }
-        eprintln!("[clean-ctx] Warning: PROXY_BINARY_PATH set but not found: {}", p.display());
+        eprintln!(
+            "[clean-ctx] Warning: PROXY_BINARY_PATH set but not found: {}",
+            p.display()
+        );
     }
 
     // 2. Same directory as the running MCP binary.
@@ -130,10 +133,16 @@ pub fn build_proxy_env(config: &ProxyAutoStartConfig) -> Vec<(String, String)> {
         env.push(("PROXY_API_KEY".to_string(), key.clone()));
     }
     if config.rate_limit_rps != 60.0 {
-        env.push(("RATE_LIMIT_RPS".to_string(), config.rate_limit_rps.to_string()));
+        env.push((
+            "RATE_LIMIT_RPS".to_string(),
+            config.rate_limit_rps.to_string(),
+        ));
     }
     if config.rate_limit_burst != 10.0 {
-        env.push(("RATE_LIMIT_BURST".to_string(), config.rate_limit_burst.to_string()));
+        env.push((
+            "RATE_LIMIT_BURST".to_string(),
+            config.rate_limit_burst.to_string(),
+        ));
     }
 
     env
@@ -224,8 +233,7 @@ pub fn spawn_proxy(
                     "[clean-ctx] WARNING: clean-ctx-proxy exited shortly after start ({}). \
                      Port {} may already be in use, or proxy configuration validation failed. \
                      Continuing without the proxy.",
-                    status,
-                    config.port
+                    status, config.port
                 );
                 return Ok(None);
             }

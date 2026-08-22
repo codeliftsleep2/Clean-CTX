@@ -21,13 +21,13 @@ use clean_ctx::ir::compiler::IRCompiler;
 use clean_ctx::ir::layers::typescript::TypeScriptLayer;
 // P0-4: Meta-layers are handled by LayerRegistry::global() inside
 // IRCompiler::compile(). No manual add_meta_layer() needed.
+use clean_ctx::compression::language::language_for_extension;
+use clean_ctx::ir::delta::{DeltaComputer, compact_encode};
 use clean_ctx::ir::layers::patterns::CodePatternRecognizer;
 use clean_ctx::ir::patterns::CompressingPatternRecognizer;
-use clean_ctx::ir::wire::ir_to_wire;
-use clean_ctx::ir::string_table::ir_to_string_table_wire;
 use clean_ctx::ir::string_table::estimate_savings;
-use clean_ctx::ir::delta::{DeltaComputer, compact_encode};
-use clean_ctx::compression::language::language_for_extension;
+use clean_ctx::ir::string_table::ir_to_string_table_wire;
+use clean_ctx::ir::wire::ir_to_wire;
 use std::path::PathBuf;
 
 /// The repo's own test corpus — TS files only.
@@ -44,11 +44,14 @@ fn sample_files() -> Vec<PathBuf> {
 }
 
 /// Compile a file to IR and return the CompiledIR.
-fn compile_file_ir(file: &PathBuf, fidelity: Fidelity) -> Result<clean_ctx::ir::compiler::CompiledIR, Box<dyn std::error::Error>> {
+fn compile_file_ir(
+    file: &PathBuf,
+    fidelity: Fidelity,
+) -> Result<clean_ctx::ir::compiler::CompiledIR, Box<dyn std::error::Error>> {
     let source = std::fs::read_to_string(file)?;
     let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
-    let (language, query_string) = language_for_extension(ext)
-        .ok_or_else(|| format!("Unsupported extension: .{}", ext))?;
+    let (language, query_string) =
+        language_for_extension(ext).ok_or_else(|| format!("Unsupported extension: .{}", ext))?;
 
     let file_id = file.file_stem().unwrap().to_string_lossy().to_string();
 
@@ -106,7 +109,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Delta savings: rename a class to generate a delta
             let mut modified_ir = ir.clone();
             modified_ir.version = ir.version + 1;
-            if let Some(clean_ctx::ir::CoreOp::DefClass(_, name)) = modified_ir.instructions.first_mut() {
+            if let Some(clean_ctx::ir::CoreOp::DefClass(_, name)) =
+                modified_ir.instructions.first_mut()
+            {
                 name.push_str("V2");
             }
 
@@ -160,7 +165,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("───────────────────────────────────────────────────────────────────────");
     println!("  String Table Savings Breakdown (Low fidelity, raw chars)");
     println!("───────────────────────────────────────────────────────────────────────");
-    println!("  {:<40} {:>10} {:>10} {:>8}", "file", "named(ch)", "table(ch)", "sav%");
+    println!(
+        "  {:<40} {:>10} {:>10} {:>8}",
+        "file", "named(ch)", "table(ch)", "sav%"
+    );
 
     for file in &sample_files() {
         let ir = compile_file_ir(file, Fidelity::Low)?;
@@ -175,7 +183,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or(file)
             .display()
             .to_string();
-        println!("  {:<40} {:>10} {:>10} {:>6}%", name, named_chars, table_chars, pct);
+        println!(
+            "  {:<40} {:>10} {:>10} {:>6}%",
+            name, named_chars, table_chars, pct
+        );
     }
 
     // ── Compact delta JSON example ────────────────────────────────
@@ -203,17 +214,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let compact_delta = compact_encode(&d);
             let compact_str = serde_json::to_string_pretty(&compact_delta)?;
 
-            println!("  Named full IR size:  {} chars / {} tokens",
+            println!(
+                "  Named full IR size:  {} chars / {} tokens",
                 named_full.len(),
-                bpe.encode_with_special_tokens(&named_full).len());
+                bpe.encode_with_special_tokens(&named_full).len()
+            );
 
-            println!("  Named delta size:    {} chars / {} tokens",
+            println!(
+                "  Named delta size:    {} chars / {} tokens",
                 named_delta.len(),
-                bpe.encode_with_special_tokens(&named_delta).len());
+                bpe.encode_with_special_tokens(&named_delta).len()
+            );
 
-            println!("  Compact delta size:  {} chars / {} tokens",
+            println!(
+                "  Compact delta size:  {} chars / {} tokens",
                 compact_str.len(),
-                bpe.encode_with_special_tokens(&compact_str).len());
+                bpe.encode_with_special_tokens(&compact_str).len()
+            );
 
             println!();
             println!("  Compact delta JSON:");

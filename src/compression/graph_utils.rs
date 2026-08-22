@@ -33,11 +33,7 @@ where
         color.insert(i, 0);
     }
 
-    fn dfs<F>(
-        node: usize,
-        adj_fn: &F,
-        color: &mut HashMap<usize, u8>,
-    ) -> bool
+    fn dfs<F>(node: usize, adj_fn: &F, color: &mut HashMap<usize, u8>) -> bool
     where
         F: Fn(usize) -> Vec<usize>,
     {
@@ -55,9 +51,7 @@ where
     }
 
     for node in 0..node_count {
-        if color.get(&node).copied().unwrap_or(0) == 0
-            && dfs(node, &adjacency_fn, &mut color)
-        {
+        if color.get(&node).copied().unwrap_or(0) == 0 && dfs(node, &adjacency_fn, &mut color) {
             return true;
         }
     }
@@ -77,11 +71,7 @@ where
 ///
 /// # Complexity
 /// O(V + E) time, O(V) space
-pub fn find_cycles<F, L>(
-    node_count: usize,
-    adjacency_fn: F,
-    node_label_fn: L,
-) -> Vec<Vec<String>>
+pub fn find_cycles<F, L>(node_count: usize, adjacency_fn: F, node_label_fn: L) -> Vec<Vec<String>>
 where
     F: Fn(usize) -> Vec<usize>,
     L: Fn(usize) -> String,
@@ -118,10 +108,8 @@ where
                 1 => {
                     let pos = path_stack.iter().position(|&n| n == next);
                     if let Some(start) = pos {
-                        let cycle: Vec<String> = path_stack[start..]
-                            .iter()
-                            .map(|&n| label_fn(n))
-                            .collect();
+                        let cycle: Vec<String> =
+                            path_stack[start..].iter().map(|&n| label_fn(n)).collect();
                         cycles.push(cycle);
                     }
                 }
@@ -138,7 +126,14 @@ where
 
     for node in 0..node_count {
         if color.get(&node).copied().unwrap_or(0) == 0 {
-            dfs_find(node, &adjacency_fn, &node_label_fn, &mut color, &mut path_stack, &mut cycles);
+            dfs_find(
+                node,
+                &adjacency_fn,
+                &node_label_fn,
+                &mut color,
+                &mut path_stack,
+                &mut cycles,
+            );
         }
     }
 
@@ -209,19 +204,31 @@ mod tests {
 
     #[test]
     fn has_cycle_two_nodes_no_cycle() {
-        let adj = |i: usize| match i { 0 => vec![1], _ => vec![] };
+        let adj = |i: usize| match i {
+            0 => vec![1],
+            _ => vec![],
+        };
         assert!(!has_cycle(2, adj));
     }
 
     #[test]
     fn has_cycle_two_nodes_with_cycle() {
-        let adj = |i: usize| match i { 0 => vec![1], 1 => vec![0], _ => vec![] };
+        let adj = |i: usize| match i {
+            0 => vec![1],
+            1 => vec![0],
+            _ => vec![],
+        };
         assert!(has_cycle(2, adj));
     }
 
     #[test]
     fn has_cycle_three_node_cycle() {
-        let adj = |i: usize| match i { 0 => vec![1], 1 => vec![2], 2 => vec![0], _ => vec![] };
+        let adj = |i: usize| match i {
+            0 => vec![1],
+            1 => vec![2],
+            2 => vec![0],
+            _ => vec![],
+        };
         assert!(has_cycle(3, adj));
     }
 
@@ -233,7 +240,11 @@ mod tests {
 
     #[test]
     fn find_cycles_simple_cycle() {
-        let adj = |i: usize| match i { 0 => vec![1], 1 => vec![0], _ => vec![] };
+        let adj = |i: usize| match i {
+            0 => vec![1],
+            1 => vec![0],
+            _ => vec![],
+        };
         let cycles = find_cycles(2, adj, |i| i.to_string());
         assert_eq!(cycles.len(), 1);
         assert_eq!(cycles[0], vec!["0", "1"]);
@@ -247,21 +258,34 @@ mod tests {
 
     #[test]
     fn transitive_dependencies_depth_1() {
-        let adj = |i: usize| match i { 0 => vec![1, 2], 1 => vec![3], _ => vec![] };
+        let adj = |i: usize| match i {
+            0 => vec![1, 2],
+            1 => vec![3],
+            _ => vec![],
+        };
         let result = transitive_dependencies(0, 1, 4, adj);
         assert_eq!(result, vec![1, 2]);
     }
 
     #[test]
     fn transitive_dependencies_depth_2() {
-        let adj = |i: usize| match i { 0 => vec![1, 2], 1 => vec![3], _ => vec![] };
+        let adj = |i: usize| match i {
+            0 => vec![1, 2],
+            1 => vec![3],
+            _ => vec![],
+        };
         let result = transitive_dependencies(0, 2, 4, adj);
         assert_eq!(result, vec![1, 2, 3]);
     }
 
     #[test]
     fn transitive_dependencies_unlimited() {
-        let adj = |i: usize| match i { 0 => vec![1], 1 => vec![2], 2 => vec![3], _ => vec![] };
+        let adj = |i: usize| match i {
+            0 => vec![1],
+            1 => vec![2],
+            2 => vec![3],
+            _ => vec![],
+        };
         let result = transitive_dependencies(0, 0, 4, adj);
         assert_eq!(result, vec![1, 2, 3]);
     }

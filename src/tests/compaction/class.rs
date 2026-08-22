@@ -40,6 +40,29 @@ fn extract_class_name_strips_generic_parameters() {
     assert_eq!(extract_class_name("class Foo<T>"), "Foo");
 }
 
+// ── C# attribute handling ─────────────────────────────────────────
+
+#[test]
+fn extract_class_name_strips_csharp_attributes() {
+    // C# uses `:` for inheritance — `extract_class_name` does not
+    // preserve base types (the CSharpLayer emits `X ControllerBase`
+    // separately). We only assert the bare name here.
+    assert_eq!(
+        extract_class_name("[ApiController]\npublic class UserController : ControllerBase"),
+        "UserController"
+    );
+}
+
+#[test]
+fn extract_class_name_strips_multiple_csharp_attributes() {
+    assert_eq!(
+        extract_class_name(
+            "[ApiController]\n[Route(\"api/[controller]\")]\npublic class UserController"
+        ),
+        "UserController"
+    );
+}
+
 // ── Phase E: Rust impl generic preservation regression tests ───────
 
 #[test]
@@ -54,7 +77,10 @@ fn rust_extract_struct_name_enum() {
 
 #[test]
 fn rust_extract_struct_name_trait() {
-    assert_eq!(extract_rust_struct_name("pub trait Repository"), "Repository");
+    assert_eq!(
+        extract_rust_struct_name("pub trait Repository"),
+        "Repository"
+    );
 }
 
 #[test]
@@ -82,10 +108,7 @@ fn rust_extract_struct_name_generic_trait_impl() {
 /// Phase E regression: inherent impl with generics.
 #[test]
 fn rust_extract_struct_name_inherent_impl_with_generics() {
-    assert_eq!(
-        extract_rust_struct_name("impl<T> Cache<T>"),
-        "Cache<T>"
-    );
+    assert_eq!(extract_rust_struct_name("impl<T> Cache<T>"), "Cache<T>");
 }
 
 /// Phase E regression: complex generics with nested types.

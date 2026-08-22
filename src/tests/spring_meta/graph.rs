@@ -49,24 +49,30 @@ mod tests {
             method: Some("GET".to_string()),
             path: "/api/users".to_string(),
         };
-        builder.register_class("UserController", "α3", ClassKind::Controller, &[endpoint], &[]);
+        builder.register_class(
+            "UserController",
+            "α3",
+            ClassKind::Controller,
+            &[endpoint],
+            &[],
+        );
         let graph = builder.build();
         let resolved = graph.resolve_endpoint("/api/users");
         assert_eq!(resolved, Some("UserController@α3".to_string()));
     }
 
-#[test]
-fn format_graph_line() {
-    let mut builder = SpringGraphBuilder::new();
-    builder.register_class("UserService", "α4", ClassKind::Service, &[], &[]);
-    let graph = builder.build();
-    let line = graph.format_graph_line("UserService");
-    assert!(line.is_some());
-    let line_str = line.unwrap();
-    assert!(line_str.contains("Φgraph:UserService"));
-    assert!(line_str.contains("injects=[]"));
-    assert!(line_str.contains("← injected-by=[]"));
-}
+    #[test]
+    fn format_graph_line() {
+        let mut builder = SpringGraphBuilder::new();
+        builder.register_class("UserService", "α4", ClassKind::Service, &[], &[]);
+        let graph = builder.build();
+        let line = graph.format_graph_line("UserService");
+        assert!(line.is_some());
+        let line_str = line.unwrap();
+        assert!(line_str.contains("Φgraph:UserService"));
+        assert!(line_str.contains("injects=[]"));
+        assert!(line_str.contains("← injected-by=[]"));
+    }
 
     #[test]
     fn format_graph_footer_empty_for_empty_graph() {
@@ -88,7 +94,13 @@ fn format_graph_line() {
     #[test]
     fn di_chain() {
         let mut builder = SpringGraphBuilder::new();
-        builder.register_class("UserController", "α1", ClassKind::Controller, &[], &["UserService".to_string()]);
+        builder.register_class(
+            "UserController",
+            "α1",
+            ClassKind::Controller,
+            &[],
+            &["UserService".to_string()],
+        );
         builder.register_class("UserService", "α2", ClassKind::Service, &[], &[]);
         let graph = builder.build();
         assert_eq!(graph.all_classes().len(), 2);

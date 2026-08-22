@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use crate::compression::opcodes::{is_primitive_opcode, PRIMITIVE_OPCODES};
+use crate::compression::opcodes::{PRIMITIVE_OPCODES, is_primitive_opcode};
 use crate::dictionary::symbol::tokenize_for_symbols;
 
 /// Short opcodes ordered by frequency weight: `$a` is the most frequent,
@@ -20,12 +20,10 @@ use crate::dictionary::symbol::tokenize_for_symbols;
 /// distinct from raw tokens. Using letters instead of digits avoids
 /// clashing with the existing `$1`, `$2`, … sequential scheme.
 const HUFFMAN_CODES: &[&str] = &[
-    "$a", "$b", "$c", "$d", "$e", "$f", "$g", "$h", "$i", "$j",
-    "$k", "$l", "$m", "$n", "$o", "$p", "$q", "$r", "$s", "$t",
-    "$u", "$v", "$w", "$x", "$y", "$z",
-    "$A", "$B", "$C", "$D", "$E", "$F", "$G", "$H", "$I", "$J",
-    "$K", "$L", "$M", "$N", "$O", "$P", "$Q", "$R", "$S", "$T",
-    "$U", "$V", "$W", "$X", "$Y", "$Z",
+    "$a", "$b", "$c", "$d", "$e", "$f", "$g", "$h", "$i", "$j", "$k", "$l", "$m", "$n", "$o", "$p",
+    "$q", "$r", "$s", "$t", "$u", "$v", "$w", "$x", "$y", "$z", "$A", "$B", "$C", "$D", "$E", "$F",
+    "$G", "$H", "$I", "$J", "$K", "$L", "$M", "$N", "$O", "$P", "$Q", "$R", "$S", "$T", "$U", "$V",
+    "$W", "$X", "$Y", "$Z",
 ];
 
 /// A Huffman-coded symbol dictionary that assigns the shortest codes to the
@@ -94,7 +92,8 @@ impl HuffmanSymbolDictionary {
     ///
     /// Codes that are already used by primitive opcodes are skipped.
     pub fn build_codes(&mut self) {
-        let mut freq_vec: Vec<(String, usize)> = self.frequency
+        let mut freq_vec: Vec<(String, usize)> = self
+            .frequency
             .iter()
             .map(|(k, &v)| (k.clone(), v))
             .collect();
@@ -156,10 +155,11 @@ impl HuffmanSymbolDictionary {
     ///   $b = Observable (38)
     /// ```
     pub fn format_footer(&self) -> String {
-        let mut custom: Vec<_> = self.reverse.iter()
+        let mut custom: Vec<_> = self
+            .reverse
+            .iter()
             .filter(|(opcode, token)| {
-                !is_primitive_opcode(opcode)
-                    && self.frequency.contains_key(token.as_str())
+                !is_primitive_opcode(opcode) && self.frequency.contains_key(token.as_str())
             })
             .collect();
 
@@ -227,11 +227,7 @@ impl HuffmanSymbolDictionary {
             map.insert(token.to_string(), code.to_string());
         }
 
-        if map.is_empty() {
-            None
-        } else {
-            Some(map)
-        }
+        if map.is_empty() { None } else { Some(map) }
     }
 }
 

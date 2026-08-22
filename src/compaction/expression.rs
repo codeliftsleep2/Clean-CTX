@@ -23,8 +23,17 @@ pub fn compact_expression(text: &str, fidelity: Fidelity) -> String {
         }
         Fidelity::Medium => {
             // Strip body brace and anything after it
-            first_line.split('{').next().unwrap_or(first_line).trim().to_string()
+            first_line
+                .split('{')
+                .next()
+                .unwrap_or(first_line)
+                .trim()
+                .to_string()
         }
+        // C-12 (FAANG audit): At Edit/Verbatim the expression must be
+        // byte-exact (full text, not just the first line) so
+        // `replace_in_file` SEARCH blocks match. High keeps the first line.
+        Fidelity::Edit | Fidelity::Verbatim => text.to_string(),
         Fidelity::High => first_line.to_string(),
     }
 }

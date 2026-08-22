@@ -147,7 +147,11 @@ fn init_temp_repo() -> tempfile::TempDir {
         .arg("initial")
         .output()
         .expect("git commit");
-    assert!(commit.status.success(), "git commit failed: {:?}", commit.stderr);
+    assert!(
+        commit.status.success(),
+        "git commit failed: {:?}",
+        commit.stderr
+    );
 
     dir
 }

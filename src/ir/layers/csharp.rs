@@ -21,10 +21,9 @@
 
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{
-    CoreOp, FLAG_ABSTRACT, FLAG_ASYNC, FLAG_EXPORT, FLAG_PRIVATE, FLAG_PROTECTED, FLAG_STATIC,
-    DATAFLOW_READ, DATAFLOW_WRITE, EFFECT_ASYNC, EFFECT_IO, EFFECT_TRANSACTION,
-    CTRL_AWAIT, CTRL_TRY,
-    CTX_ASYNC, CTX_REALTIME, CTX_TRANSACTION_SCOPE,
+    CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CTX_REALTIME, CTX_TRANSACTION_SCOPE, CoreOp, DATAFLOW_READ,
+    DATAFLOW_WRITE, EFFECT_ASYNC, EFFECT_IO, EFFECT_TRANSACTION, FLAG_ABSTRACT, FLAG_ASYNC,
+    FLAG_EXPORT, FLAG_PRIVATE, FLAG_PROTECTED, FLAG_STATIC,
 };
 
 /// C# language layer (Layer 2).
@@ -134,8 +133,14 @@ impl CSharpLayer {
             || raw_sig.contains("IAsyncEnumerable");
 
         if is_async {
-            ops.push(CoreOp::SideEffect(method_id.to_string(), EFFECT_ASYNC.to_string()));
-            ops.push(CoreOp::ExecutionContext(method_id.to_string(), CTX_ASYNC.to_string()));
+            ops.push(CoreOp::SideEffect(
+                method_id.to_string(),
+                EFFECT_ASYNC.to_string(),
+            ));
+            ops.push(CoreOp::ExecutionContext(
+                method_id.to_string(),
+                CTX_ASYNC.to_string(),
+            ));
 
             // Detect IAsyncEnumerable (streaming)
             if raw_sig.contains("IAsyncEnumerable") {
@@ -149,21 +154,37 @@ impl CSharpLayer {
 
         // Detect SaveChangesAsync (EF Core I/O)
         if raw_sig.contains("SaveChangesAsync") {
-            ops.push(CoreOp::SideEffect(method_id.to_string(), EFFECT_IO.to_string()));
+            ops.push(CoreOp::SideEffect(
+                method_id.to_string(),
+                EFFECT_IO.to_string(),
+            ));
             if !is_async {
-                ops.push(CoreOp::ExecutionContext(method_id.to_string(), CTX_ASYNC.to_string()));
+                ops.push(CoreOp::ExecutionContext(
+                    method_id.to_string(),
+                    CTX_ASYNC.to_string(),
+                ));
             }
         }
 
         // Detect TransactionScope usage
         if raw_sig.contains("TransactionScope") {
-            ops.push(CoreOp::ExecutionContext(method_id.to_string(), CTX_TRANSACTION_SCOPE.to_string()));
-            ops.push(CoreOp::SideEffect(method_id.to_string(), EFFECT_TRANSACTION.to_string()));
+            ops.push(CoreOp::ExecutionContext(
+                method_id.to_string(),
+                CTX_TRANSACTION_SCOPE.to_string(),
+            ));
+            ops.push(CoreOp::SideEffect(
+                method_id.to_string(),
+                EFFECT_TRANSACTION.to_string(),
+            ));
         }
 
         // Detect Channel<T> usage (dataflow)
         if raw_sig.contains("ChannelReader") || raw_sig.contains("ChannelWriter") {
-            let direction = if raw_sig.contains("ChannelWriter") { DATAFLOW_WRITE } else { DATAFLOW_READ };
+            let direction = if raw_sig.contains("ChannelWriter") {
+                DATAFLOW_WRITE
+            } else {
+                DATAFLOW_READ
+            };
             ops.push(CoreOp::DataFlow(
                 method_id.to_string(),
                 direction.to_string(),
@@ -263,9 +284,9 @@ impl LanguageLayer for CSharpLayer {
                     }
 
                     // R-43a: Detect IDisposable/IAsyncDisposable class
-                    let implements_disposable = interfaces.iter().any(|i| {
-                        i.trim() == "IDisposable" || i.trim() == "IAsyncDisposable"
-                    });
+                    let implements_disposable = interfaces
+                        .iter()
+                        .any(|i| i.trim() == "IDisposable" || i.trim() == "IAsyncDisposable");
                     if implements_disposable {
                         ops.push(CoreOp::SideEffect(class_id.clone(), EFFECT_IO.to_string()));
                     }

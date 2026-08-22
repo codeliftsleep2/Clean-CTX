@@ -1,6 +1,6 @@
 use crate::ir::compiler::CompiledIR;
 use crate::ir::opcodes::CoreOp;
-use crate::ir::wire::{op_to_tuple, tuple_to_op, ir_to_wire, wire_to_ir, DecodeError};
+use crate::ir::wire::{DecodeError, ir_to_wire, op_to_tuple, tuple_to_op, wire_to_ir};
 
 #[test]
 fn op_to_tuple_def_class() {
@@ -28,7 +28,12 @@ fn op_to_tuple_def_interface() {
 
 #[test]
 fn op_to_tuple_param() {
-    let tuple = op_to_tuple(&CoreOp::Param("M1".into(), "P1".into(), "$s".into(), "name".into()));
+    let tuple = op_to_tuple(&CoreOp::Param(
+        "M1".into(),
+        "P1".into(),
+        "$s".into(),
+        "name".into(),
+    ));
     assert_eq!(tuple, vec!["SIG", "M1", "P1", "$s", "name"]);
 }
 
@@ -46,7 +51,10 @@ fn op_to_tuple_field_type() {
 
 #[test]
 fn op_to_tuple_flags() {
-    let tuple = op_to_tuple(&CoreOp::Flags("M1".into(), vec!["IF".into(), "LOOP".into()]));
+    let tuple = op_to_tuple(&CoreOp::Flags(
+        "M1".into(),
+        vec!["IF".into(), "LOOP".into()],
+    ));
     assert_eq!(tuple, vec!["FLAGS", "M1", "IF", "LOOP"]);
 }
 
@@ -70,7 +78,10 @@ fn op_to_tuple_implements() {
 
 #[test]
 fn op_to_tuple_injects() {
-    let tuple = op_to_tuple(&CoreOp::Injects("C1".into(), vec!["S1".into(), "S2".into()]));
+    let tuple = op_to_tuple(&CoreOp::Injects(
+        "C1".into(),
+        vec!["S1".into(), "S2".into()],
+    ));
     assert_eq!(tuple, vec!["INJECTS", "C1", "S1", "S2"]);
 }
 
@@ -266,7 +277,11 @@ fn wire_round_trip() {
     assert_eq!(restored.file_id, original.file_id);
     assert_eq!(restored.version, original.version);
     assert_eq!(restored.instructions.len(), original.instructions.len());
-    for (a, b) in original.instructions.iter().zip(restored.instructions.iter()) {
+    for (a, b) in original
+        .instructions
+        .iter()
+        .zip(restored.instructions.iter())
+    {
         assert_eq!(a, b);
     }
 }
@@ -336,8 +351,12 @@ fn wire_to_ir_malformed_tuple_returns_err() {
     // Either MalformedTuple (if the decoder can tell it's a known opcode)
     // or UnknownOpcode (if the decoder treats the short tuple as unknown).
     assert!(
-        matches!(err, DecodeError::MalformedTuple(_) | DecodeError::UnknownOpcode(_)),
-        "expected MalformedTuple or UnknownOpcode, got: {:?}", err
+        matches!(
+            err,
+            DecodeError::MalformedTuple(_) | DecodeError::UnknownOpcode(_)
+        ),
+        "expected MalformedTuple or UnknownOpcode, got: {:?}",
+        err
     );
 }
 
@@ -428,7 +447,12 @@ fn round_trip_all_variants_is_stable() {
     let wire = ir_to_wire(&ir);
     let decoded = wire_to_ir(&wire).expect("all-variants round-trip should succeed");
     assert_eq!(decoded.instructions.len(), ir.instructions.len());
-    for (i, (a, b)) in decoded.instructions.iter().zip(ir.instructions.iter()).enumerate() {
+    for (i, (a, b)) in decoded
+        .instructions
+        .iter()
+        .zip(ir.instructions.iter())
+        .enumerate()
+    {
         assert_eq!(a, b, "mismatch at instruction {}", i);
     }
 }

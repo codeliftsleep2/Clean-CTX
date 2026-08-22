@@ -30,7 +30,7 @@
 
 use std::collections::HashMap;
 
-use crate::compression::opcodes::{is_primitive_opcode, PRIMITIVE_OPCODES};
+use crate::compression::opcodes::{PRIMITIVE_OPCODES, is_primitive_opcode};
 use crate::dictionary::symbol::tokenize_for_symbols;
 
 /// Workspace-level symbol dictionary. Collects token frequencies across
@@ -121,7 +121,8 @@ impl GlobalSymbolTable {
             return;
         }
 
-        let mut freq_vec: Vec<(String, usize)> = self.frequency
+        let mut freq_vec: Vec<(String, usize)> = self
+            .frequency
             .iter()
             .map(|(k, &v)| (k.clone(), v))
             .collect();
@@ -132,12 +133,10 @@ impl GlobalSymbolTable {
         // Use letter-based codes ($a, $b, …) to avoid clashing with
         // sequential $1, $2, … from per-file dictionaries.
         const HUFFMAN_CODES: &[&str] = &[
-            "$a", "$b", "$c", "$d", "$e", "$f", "$g", "$h", "$i", "$j",
-            "$k", "$l", "$m", "$n", "$o", "$p", "$q", "$r", "$s", "$t",
-            "$u", "$v", "$w", "$x", "$y", "$z",
-            "$A", "$B", "$C", "$D", "$E", "$F", "$G", "$H", "$I", "$J",
-            "$K", "$L", "$M", "$N", "$O", "$P", "$Q", "$R", "$S", "$T",
-            "$U", "$V", "$W", "$X", "$Y", "$Z",
+            "$a", "$b", "$c", "$d", "$e", "$f", "$g", "$h", "$i", "$j", "$k", "$l", "$m", "$n",
+            "$o", "$p", "$q", "$r", "$s", "$t", "$u", "$v", "$w", "$x", "$y", "$z", "$A", "$B",
+            "$C", "$D", "$E", "$F", "$G", "$H", "$I", "$J", "$K", "$L", "$M", "$N", "$O", "$P",
+            "$Q", "$R", "$S", "$T", "$U", "$V", "$W", "$X", "$Y", "$Z",
         ];
 
         let mut code_idx = 0;
@@ -221,10 +220,11 @@ impl GlobalSymbolTable {
     /// §/GSYM
     /// ```
     pub fn format_global_footer(&self) -> String {
-        let mut custom: Vec<_> = self.reverse.iter()
+        let mut custom: Vec<_> = self
+            .reverse
+            .iter()
             .filter(|(opcode, token)| {
-                !is_primitive_opcode(opcode)
-                    && self.frequency.contains_key(token.as_str())
+                !is_primitive_opcode(opcode) && self.frequency.contains_key(token.as_str())
             })
             .collect();
 
@@ -234,7 +234,10 @@ impl GlobalSymbolTable {
 
         // Sort by global index for deterministic output.
         custom.sort_by_key(|(code, _)| {
-            self.opcode_to_index.get(code.as_str()).copied().unwrap_or(0)
+            self.opcode_to_index
+                .get(code.as_str())
+                .copied()
+                .unwrap_or(0)
         });
 
         let mut footer = String::from("§GSYM\n");

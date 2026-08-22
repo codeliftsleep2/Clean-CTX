@@ -5,8 +5,8 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod tests {
-    use crate::dotnet_meta::aspnet::extract_aspnet;
     use crate::compression::Fidelity;
+    use crate::dotnet_meta::aspnet::extract_aspnet;
 
     #[test]
     fn test_extracts_controller() {
@@ -22,8 +22,18 @@ mod tests {
         assert!(result.is_some());
         let block = result.unwrap();
         assert!(!block.lines.is_empty());
-        assert!(block.lines.iter().any(|l| l.contains("Φctrl:UserController")));
-        assert!(block.lines.iter().any(|l| l.contains("Φapi:UserController")));
+        assert!(
+            block
+                .lines
+                .iter()
+                .any(|l| l.contains("Φctrl:UserController"))
+        );
+        assert!(
+            block
+                .lines
+                .iter()
+                .any(|l| l.contains("Φapi:UserController"))
+        );
     }
 
     #[test]
@@ -42,8 +52,18 @@ mod tests {
         let result = extract_aspnet(source, Fidelity::Medium);
         assert!(result.is_some());
         let block = result.unwrap();
-        assert!(block.lines.iter().any(|l| l.contains("Φaction:GET GetById")));
-        assert!(block.lines.iter().any(|l| l.contains("Φaction:POST Create")));
+        assert!(
+            block
+                .lines
+                .iter()
+                .any(|l| l.contains("Φaction:GET GetById"))
+        );
+        assert!(
+            block
+                .lines
+                .iter()
+                .any(|l| l.contains("Φaction:POST Create"))
+        );
     }
 
     #[test]

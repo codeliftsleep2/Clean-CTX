@@ -3,7 +3,9 @@
 // Class-level extraction and formatting helpers.
 // Extended to support Rust structs, enums, and traits.
 
-use crate::compaction::modifiers::{strip_modifiers, MODIFIERS_CLASS, MODIFIERS_STRUCT_RS};
+use crate::compaction::modifiers::{
+    MODIFIERS_CLASS, MODIFIERS_STRUCT_RS, strip_csharp_attributes, strip_modifiers,
+};
 use crate::compression::Fidelity;
 
 /// Extract just the class name (and optional base/interface list) from the
@@ -19,8 +21,12 @@ use crate::compression::Fidelity;
 /// Output examples (Medium): "FooService:BaseService"
 /// Output examples (High):   "FooService:BaseService,IFoo"
 pub fn extract_class_name(text: &str) -> String {
+    // C# captures may start with attribute lines
+    // (`[ApiController]`, `[Route("api/[controller]")]`); strip them so
+    // the declaration line is the actual `class` keyword line.
+    let stripped = strip_csharp_attributes(text);
     // Take only the declaration line (everything before the first `{`)
-    let decl = text.lines().next().unwrap_or(text);
+    let decl = stripped.lines().next().unwrap_or(stripped);
     let decl = decl.split('{').next().unwrap_or(decl).trim();
 
     // Strip leading modifiers: export, default, abstract, public, sealed, …
@@ -31,8 +37,14 @@ pub fn extract_class_name(text: &str) -> String {
     // then returned, leaving "static abstract class Foo" behind).
     // The shared `strip_modifiers` helper loops until stable.
     let rest = strip_modifiers(decl, MODIFIERS_CLASS);
-    // Strip "class " keyword
-    let rest = rest.strip_prefix("class ").unwrap_or(&rest).trim();
+    // Strip "class " / "interface " / "record " keyword (C# interfaces and
+    // records are distinct AST nodes but share the same class-like shape).
+    let rest = rest
+        .strip_prefix("class ")
+        .or_else(|| rest.strip_prefix("interface "))
+        .or_else(|| rest.strip_prefix("record "))
+        .unwrap_or(rest.as_str())
+        .trim();
 
     // Split on whitespace: first token is "Name<T>" or "Name"
     let name_token = rest.split_whitespace().next().unwrap_or(rest);
@@ -51,8 +63,70 @@ pub fn extract_class_name(text: &str) -> String {
         (true, true) => bare_name.to_string(),
         (false, true) => format!("{}:{}", bare_name, extends.join(",")),
         (true, false) => format!("{}:{}", bare_name, implements.join(",")),
-        (false, false) => format!("{}:{},{}", bare_name, extends.join(","), implements.join(",")),
+        (false, false) => format!(
+            "{}:{},{}",
+            bare_name,
+            extends.join(","),
+            implements.join(",")
+        ),
     }
+}
+
+/// Extract just the base class / interface list from a class declaration.
+///
+/// Input:  "public class FooService : BaseService, IFoo { ... }"
+/// Output: ":BaseService,IFoo"
+///
+/// Input:  "class Bar { ... }"
+/// Output: ""
+///
+/// The result is stored in `CapturedClass::class_meta` so a change to
+/// the inheritance list is detected even when the class name is
+/// unchanged. F-04 diff audit.
+pub fn extract_class_meta(text: &str) -> String {
+    let stripped = strip_csharp_attributes(text);
+    let decl = stripped.lines().next().unwrap_or(stripped);
+    let decl = decl.split('{').next().unwrap_or(decl).trim();
+    let rest = strip_modifiers(decl, MODIFIERS_CLASS);
+    let rest = rest
+        .strip_prefix("class ")
+        .or_else(|| rest.strip_prefix("interface "))
+        .or_else(|| rest.strip_prefix("record "))
+        .unwrap_or(rest.as_str())
+        .trim();
+
+    // Find the `:` that separates the class name from the base list.
+    // C# uses `: Base, IFoo`; TS uses `extends Base implements IFoo`.
+    let mut meta = String::new();
+    if let Some((_, after)) = rest.split_once(':') {
+        // C# base list: everything after the first `:` up to the next
+        // keyword or end of string.
+        let after = after
+            .split_once("where")
+            .map(|(l, _)| l)
+            .unwrap_or(after)
+            .trim();
+        if !after.is_empty() {
+            meta.push(':');
+            meta.push_str(after);
+        }
+    }
+    // TS extends/implements
+    let extends = extract_base_types(rest, "extends");
+    let implements = extract_base_types(rest, "implements");
+    if !extends.is_empty() {
+        if !meta.is_empty() {
+            meta.push(',');
+        }
+        meta.push_str(&extends.join(","));
+    }
+    if !implements.is_empty() {
+        if !meta.is_empty() {
+            meta.push(',');
+        }
+        meta.push_str(&implements.join(","));
+    }
+    meta
 }
 
 /// Format a class entry line, embedding any accumulated field signatures.
@@ -76,7 +150,7 @@ pub fn format_class_entry(name: &str, fields: &[String], fidelity: Fidelity) -> 
                 format!("class {} {{ {} }}", name, fields.join("; "))
             }
         }
-        Fidelity::High => {
+        Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
             if fields.is_empty() {
                 format!("class {} {{", name)
             } else {
@@ -289,7 +363,7 @@ pub fn format_rust_type_entry(name: &str, fields: &[String], fidelity: Fidelity)
                 format!("{} {{ {} }}", name, fields.join("; "))
             }
         }
-        Fidelity::High => {
+        Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
             if fields.is_empty() {
                 format!("{} {{", name)
             } else {

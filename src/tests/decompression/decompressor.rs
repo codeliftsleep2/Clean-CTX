@@ -1,5 +1,5 @@
-use super::*;
 use super::super::walker::LineKind;
+use super::*;
 
 #[test]
 fn test_decompress_low() {
@@ -32,8 +32,14 @@ use super::word_boundary_replace;
 fn replaces_at_ascii_word_boundary() {
     // The headline positive case: a "$ctor" surrounded by spaces
     // expands, but a "c$ctor" does not.
-    assert_eq!(word_boundary_replace("a $ctor b", "$ctor", "constructor"), "a constructor b");
-    assert_eq!(word_boundary_replace("a$ctorb", "$ctor", "constructor"), "a$ctorb");
+    assert_eq!(
+        word_boundary_replace("a $ctor b", "$ctor", "constructor"),
+        "a constructor b"
+    );
+    assert_eq!(
+        word_boundary_replace("a$ctorb", "$ctor", "constructor"),
+        "a$ctorb"
+    );
 }
 
 #[test]
@@ -82,12 +88,18 @@ fn respects_multi_byte_char_boundaries() {
 
 #[test]
 fn handles_match_at_start() {
-    assert_eq!(word_boundary_replace("$ctor abc", "$ctor", "constructor"), "constructor abc");
+    assert_eq!(
+        word_boundary_replace("$ctor abc", "$ctor", "constructor"),
+        "constructor abc"
+    );
 }
 
 #[test]
 fn handles_match_at_end() {
-    assert_eq!(word_boundary_replace("abc $ctor", "$ctor", "constructor"), "abc constructor");
+    assert_eq!(
+        word_boundary_replace("abc $ctor", "$ctor", "constructor"),
+        "abc constructor"
+    );
 }
 
 #[test]
@@ -110,9 +122,12 @@ fn parse_builds_sorted_opcodes_longest_first() {
     assert!(!d.sorted_opcodes.is_empty());
     // The first entry should be the longest opcode.
     for w in d.sorted_opcodes.windows(2) {
-        assert!(w[0].0.len() >= w[1].0.len(),
+        assert!(
+            w[0].0.len() >= w[1].0.len(),
             "sorted_opcodes must be longest-first: {:?} before {:?}",
-            w[0].0, w[1].0);
+            w[0].0,
+            w[1].0
+        );
     }
 }
 
@@ -123,6 +138,14 @@ fn decompress_with_precomputed_opcodes_matches_expected() {
     let input = "// --- Compacted Layout (Low Fidelity): α1 ---\n$c Foo;$a bar\n\n§PATHMAP\n  α1 = /tmp/Foo.ts";
     let mut d = Decompressor::new();
     let result = d.quick_decompress(input);
-    assert!(result.contains("class Foo"), "Expected 'class Foo' in: {}", result);
-    assert!(result.contains("async bar"), "Expected 'async bar' in: {}", result);
+    assert!(
+        result.contains("class Foo"),
+        "Expected 'class Foo' in: {}",
+        result
+    );
+    assert!(
+        result.contains("async bar"),
+        "Expected 'async bar' in: {}",
+        result
+    );
 }

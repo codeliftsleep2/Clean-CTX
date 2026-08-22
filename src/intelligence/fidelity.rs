@@ -16,8 +16,8 @@
 // low-importance symbols that should be EXCLUDED from compression
 // entirely. This replaces the post-compression enrichment pattern.
 
-use std::collections::{HashMap, HashSet};
 use crate::compressor::Fidelity;
+use std::collections::{HashMap, HashSet};
 
 /// A fidelity recommendation from the intelligence layer.
 #[derive(Debug, Clone, PartialEq)]
@@ -134,11 +134,14 @@ mod tests {
 
     fn make_importance(symbol: &str, score: f64, file: &str) -> HashMap<String, SymbolImportance> {
         let mut map = HashMap::new();
-        map.insert(symbol.to_string(), SymbolImportance {
-            symbol: symbol.to_string(),
-            score,
-            file: file.to_string(),
-        });
+        map.insert(
+            symbol.to_string(),
+            SymbolImportance {
+                symbol: symbol.to_string(),
+                score,
+                file: file.to_string(),
+            },
+        );
         map
     }
 
@@ -146,58 +149,91 @@ mod tests {
 
     #[test]
     fn test_empty_map_returns_fallback() {
-        let result = cbm_informed_fidelity("src/user.rs", &HashMap::new(), FidelityRecommendation::NoRecommendation);
+        let result = cbm_informed_fidelity(
+            "src/user.rs",
+            &HashMap::new(),
+            FidelityRecommendation::NoRecommendation,
+        );
         assert_eq!(result, FidelityRecommendation::NoRecommendation);
     }
 
     #[test]
     fn test_high_importance_forces_high() {
         let importances = make_importance("UserService", 0.9, "user.rs");
-        let result = cbm_informed_fidelity("src/user.rs", &importances, FidelityRecommendation::NoRecommendation);
+        let result = cbm_informed_fidelity(
+            "src/user.rs",
+            &importances,
+            FidelityRecommendation::NoRecommendation,
+        );
         assert_eq!(result, FidelityRecommendation::ForceHigh);
     }
 
     #[test]
     fn test_low_importance_forces_low() {
         let importances = make_importance("UserService", 0.2, "user.rs");
-        let result = cbm_informed_fidelity("src/user.rs", &importances, FidelityRecommendation::NoRecommendation);
+        let result = cbm_informed_fidelity(
+            "src/user.rs",
+            &importances,
+            FidelityRecommendation::NoRecommendation,
+        );
         assert_eq!(result, FidelityRecommendation::ForceLow);
     }
 
     #[test]
     fn test_medium_importance_no_recommendation() {
         let importances = make_importance("UserService", 0.6, "user.rs");
-        let result = cbm_informed_fidelity("src/user.rs", &importances, FidelityRecommendation::NoRecommendation);
+        let result = cbm_informed_fidelity(
+            "src/user.rs",
+            &importances,
+            FidelityRecommendation::NoRecommendation,
+        );
         assert_eq!(result, FidelityRecommendation::NoRecommendation);
     }
 
     #[test]
     fn test_non_matching_file_uses_fallback() {
         let importances = make_importance("UserService", 0.9, "other.rs");
-        let result = cbm_informed_fidelity("src/user.rs", &importances, FidelityRecommendation::NoRecommendation);
+        let result = cbm_informed_fidelity(
+            "src/user.rs",
+            &importances,
+            FidelityRecommendation::NoRecommendation,
+        );
         // No direct match, but max_score > 0 — should be conservative
         assert_eq!(result, FidelityRecommendation::NoRecommendation);
     }
 
     #[test]
     fn test_fallback_passthrough() {
-        let result = cbm_informed_fidelity("src/user.rs", &HashMap::new(), FidelityRecommendation::ForceHigh);
+        let result = cbm_informed_fidelity(
+            "src/user.rs",
+            &HashMap::new(),
+            FidelityRecommendation::ForceHigh,
+        );
         assert_eq!(result, FidelityRecommendation::ForceHigh);
     }
 
     #[test]
     fn test_apply_force_high() {
-        assert_eq!(apply_recommendation(&FidelityRecommendation::ForceHigh), Some(Fidelity::High));
+        assert_eq!(
+            apply_recommendation(&FidelityRecommendation::ForceHigh),
+            Some(Fidelity::High)
+        );
     }
 
     #[test]
     fn test_apply_force_low() {
-        assert_eq!(apply_recommendation(&FidelityRecommendation::ForceLow), Some(Fidelity::Low));
+        assert_eq!(
+            apply_recommendation(&FidelityRecommendation::ForceLow),
+            Some(Fidelity::Low)
+        );
     }
 
     #[test]
     fn test_apply_no_recommendation() {
-        assert_eq!(apply_recommendation(&FidelityRecommendation::NoRecommendation), None);
+        assert_eq!(
+            apply_recommendation(&FidelityRecommendation::NoRecommendation),
+            None
+        );
     }
 
     // ── build_cbm_skip_set tests ────────────────────────────────────
@@ -206,7 +242,10 @@ mod tests {
     fn test_build_skip_set_low() {
         let importances = make_importance("UtilityHelper", 0.2, "utils.rs");
         let skip = build_cbm_skip_set("src/utils.rs", &importances);
-        assert!(skip.contains("UtilityHelper"), "Low-importance symbol should be in skip set");
+        assert!(
+            skip.contains("UtilityHelper"),
+            "Low-importance symbol should be in skip set"
+        );
         assert_eq!(skip.len(), 1);
     }
 
@@ -214,47 +253,68 @@ mod tests {
     fn test_build_skip_set_medium() {
         let importances = make_importance("NormalService", 0.6, "service.rs");
         let skip = build_cbm_skip_set("src/service.rs", &importances);
-        assert!(!skip.contains("NormalService"), "Medium-importance symbol should NOT be in skip set");
+        assert!(
+            !skip.contains("NormalService"),
+            "Medium-importance symbol should NOT be in skip set"
+        );
     }
 
     #[test]
     fn test_build_skip_set_high() {
         let importances = make_importance("CriticalAPI", 0.95, "api.rs");
         let skip = build_cbm_skip_set("src/api.rs", &importances);
-        assert!(!skip.contains("CriticalAPI"), "High-importance symbol should NOT be in skip set");
+        assert!(
+            !skip.contains("CriticalAPI"),
+            "High-importance symbol should NOT be in skip set"
+        );
     }
 
     #[test]
     fn test_build_skip_set_empty() {
         let skip = build_cbm_skip_set("src/file.rs", &HashMap::new());
-        assert!(skip.is_empty(), "Empty importance map should produce empty skip set");
+        assert!(
+            skip.is_empty(),
+            "Empty importance map should produce empty skip set"
+        );
     }
 
     #[test]
     fn test_build_skip_set_unrelated_file() {
         let importances = make_importance("LowSymbol", 0.1, "other.rs");
         let skip = build_cbm_skip_set("src/user.rs", &importances);
-        assert!(!skip.contains("LowSymbol"), "Symbol in unrelated file should NOT be in skip set");
+        assert!(
+            !skip.contains("LowSymbol"),
+            "Symbol in unrelated file should NOT be in skip set"
+        );
     }
 
     #[test]
     fn test_build_skip_set_multiple() {
         let mut map = HashMap::new();
-        map.insert("SymA".to_string(), SymbolImportance {
-            symbol: "SymA".to_string(),
-            score: 0.15,
-            file: "file.rs".to_string(),
-        });
-        map.insert("SymB".to_string(), SymbolImportance {
-            symbol: "SymB".to_string(),
-            score: 0.9,
-            file: "file.rs".to_string(),
-        });
-        map.insert("SymC".to_string(), SymbolImportance {
-            symbol: "SymC".to_string(),
-            score: 0.3,
-            file: "file.rs".to_string(),
-        });
+        map.insert(
+            "SymA".to_string(),
+            SymbolImportance {
+                symbol: "SymA".to_string(),
+                score: 0.15,
+                file: "file.rs".to_string(),
+            },
+        );
+        map.insert(
+            "SymB".to_string(),
+            SymbolImportance {
+                symbol: "SymB".to_string(),
+                score: 0.9,
+                file: "file.rs".to_string(),
+            },
+        );
+        map.insert(
+            "SymC".to_string(),
+            SymbolImportance {
+                symbol: "SymC".to_string(),
+                score: 0.3,
+                file: "file.rs".to_string(),
+            },
+        );
         let skip = build_cbm_skip_set("file.rs", &map);
         assert!(skip.contains("SymA"), "SymA (0.15) should be skipped");
         assert!(!skip.contains("SymB"), "SymB (0.9) should NOT be skipped");

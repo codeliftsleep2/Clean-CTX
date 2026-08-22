@@ -56,11 +56,9 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for StderrWriter {
 /// is a no-op.
 pub fn init_tracing() {
     // Use EnvFilter for flexible filtering
-    let filter = EnvFilter::try_from_env("CLEAN_CTX_LOG_FILTER")
-        .unwrap_or_else(|_| {
-            EnvFilter::try_from_env("CLEAN_CTX_LOG")
-                .unwrap_or_else(|_| EnvFilter::new("info"))
-        });
+    let filter = EnvFilter::try_from_env("CLEAN_CTX_LOG_FILTER").unwrap_or_else(|_| {
+        EnvFilter::try_from_env("CLEAN_CTX_LOG").unwrap_or_else(|_| EnvFilter::new("info"))
+    });
 
     let format = std::env::var("CLEAN_CTX_LOG_FORMAT").unwrap_or_default();
 

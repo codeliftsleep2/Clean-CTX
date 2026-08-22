@@ -103,3 +103,61 @@ fn fidelity_medium_is_passed_through_to_closure() {
     .expect("pipeline should parse valid TS");
     assert_eq!(seen, Some(Fidelity::Medium));
 }
+
+/// Type alias for a language query test case: (label, language factory, query string).
+#[cfg(all(test, feature = "rust"))]
+type LanguageQueryTestCase = (
+    &'static str,
+    fn() -> Option<tree_sitter::Language>,
+    &'static str,
+);
+
+/// Regression test: verify that each enabled language query compiles
+/// successfully against its grammar. A query with an unrecognised node
+/// type will fail at `Query::new` time, which previously caused a
+/// CI-blocking panic in the fallback chain. This test catches such
+/// node-type mismatches before they reach production.
+///
+/// Languages whose Cargo feature is disabled are silently skipped, so
+/// this test passes in any configuration.
+#[cfg(all(test, feature = "rust"))]
+#[test]
+fn all_language_queries_compile_successfully() {
+    use tree_sitter::Query;
+
+    let test_cases: Vec<LanguageQueryTestCase> = vec![
+        (
+            "typescript",
+            crate::compression::language::safe_typescript_language,
+            queries::TS_QUERY,
+        ),
+        (
+            "csharp",
+            crate::compression::language::safe_csharp_language,
+            queries::CS_QUERY,
+        ),
+        (
+            "rust",
+            crate::compression::language::safe_rust_language,
+            queries::RS_QUERY,
+        ),
+        (
+            "java",
+            crate::compression::language::safe_java_language,
+            queries::JAVA_QUERY,
+        ),
+    ];
+
+    for (name, lang_fn, query_str) in test_cases {
+        let Some(lang) = lang_fn() else {
+            // Language feature not enabled — skip gracefully
+            continue;
+        };
+        let result = Query::new(&lang, query_str);
+        assert!(
+            result.is_ok(),
+            "query compilation regression: {name} query failed to compile: {}",
+            result.err().unwrap(),
+        );
+    }
+}

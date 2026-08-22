@@ -141,7 +141,7 @@ impl RouteShape {
                 Fidelity::Low => {
                     s.push_str(&format!("  Φroute:{}\n", route.path));
                 }
-                Fidelity::Medium | Fidelity::High => {
+                Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     let mut parts: Vec<String> = Vec::new();
                     if let Some(ref c) = route.component {
                         parts.push(format!("component={}", c));
@@ -173,7 +173,7 @@ impl RouteShape {
                 Fidelity::Low => {
                     s.push_str(&format!("  Φguard:{}\n", guard.name));
                 }
-                Fidelity::Medium | Fidelity::High => {
+                Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     s.push_str(&format!("  Φguard:{} {}\n", guard.name, guard.kind));
                 }
             }

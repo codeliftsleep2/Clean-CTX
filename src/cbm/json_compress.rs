@@ -53,7 +53,8 @@ pub fn compress_cbm_response(raw_text: &str) -> Option<CompressedCbmResponse> {
 
     // Step 2: Check for JSON-RPC error
     let cbm_error = parsed.get("error").and_then(|e| {
-        e.get("message").and_then(|m| m.as_str().map(|s| s.to_string()))
+        e.get("message")
+            .and_then(|m| m.as_str().map(|s| s.to_string()))
     });
 
     // Step 3: Extract the content field from the result
@@ -62,11 +63,17 @@ pub fn compress_cbm_response(raw_text: &str) -> Option<CompressedCbmResponse> {
         format!("§E: {}", error)
     } else if let Some(content_arr) = parsed.pointer("/result/content") {
         // Standard MCP response with content array
-        let texts: Vec<String> = content_arr.as_array().map(|arr| {
-            arr.iter().filter_map(|c| {
-                c.get("text").and_then(|t| t.as_str().map(|s| s.to_string()))
-            }).collect()
-        }).unwrap_or_default();
+        let texts: Vec<String> = content_arr
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|c| {
+                        c.get("text")
+                            .and_then(|t| t.as_str().map(|s| s.to_string()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         texts.join("\n")
     } else if let Some(result_obj) = parsed.get("result") {
         // CBM tool response with structured data — serialize compactly
@@ -108,7 +115,8 @@ fn compress_json_body(body: &str) -> String {
     }
 
     // If not valid JSON, strip whitespace and return
-    let stripped: String = body.chars()
+    let stripped: String = body
+        .chars()
         .filter(|c| !c.is_whitespace() || *c == ' ' || *c == '\n')
         .collect();
     stripped
@@ -118,12 +126,15 @@ fn compress_json_body(body: &str) -> String {
 fn compress_value(val: &Value) -> String {
     match val {
         Value::Object(map) => {
-            let entries: Vec<String> = map.iter()
+            let entries: Vec<String> = map
+                .iter()
                 .filter(|(_, v)| !v.is_null()) // strip nulls (RM-2)
                 .map(|(k, v)| {
                     let key = shorten_key(k);
                     let val_str = compress_value(v);
-                    if val_str.is_empty() { return String::new(); }
+                    if val_str.is_empty() {
+                        return String::new();
+                    }
                     format!("{}:{}", key, val_str)
                 })
                 .filter(|s| !s.is_empty())
@@ -135,7 +146,8 @@ fn compress_value(val: &Value) -> String {
             }
         }
         Value::Array(arr) => {
-            let entries: Vec<String> = arr.iter()
+            let entries: Vec<String> = arr
+                .iter()
                 .map(compress_value)
                 .filter(|s| !s.is_empty())
                 .collect();
@@ -233,7 +245,8 @@ mod tests {
 
     #[test]
     fn test_compress_extracts_error() {
-        let json = r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}"#;
+        let json =
+            r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}"#;
         let result = compress_cbm_response(json).unwrap();
         assert_eq!(result.cbm_error, Some("Method not found".into()));
         assert!(result.compressed_text.contains("§E:"));
@@ -277,31 +290,75 @@ mod tests {
             "jsonrpc": "2.0",
             "id": 1,
             "result": { "results": items }
-        }).to_string();
+        })
+        .to_string();
 
         let result = compress_cbm_response(&json).unwrap();
         assert!(result.cbm_error.is_none());
         // Compressed text must be shorter than raw
-        assert!(result.compressed_text.len() < json.len(), 
-            "Compressed ({}) must be shorter than raw ({})", result.compressed_text.len(), json.len());
+        assert!(
+            result.compressed_text.len() < json.len(),
+            "Compressed ({}) must be shorter than raw ({})",
+            result.compressed_text.len(),
+            json.len()
+        );
     }
 
     #[test]
     fn test_shorten_key_coverage() {
         // Ensure all known keys are shortened
         let keys = [
-            "results", "symbols", "edges", "nodes", "name", "file", "label", "id",
-            "score", "importance", "reason", "modules", "dependencies", "kind",
-            "properties", "from", "to", "changes", "graph_version", "impact",
-            "symbol", "change_type", "query", "project", "arguments", "content",
-            "type", "text", "description", "status", "error", "message", "code",
-            "jsonrpc", "method", "params", "result", "path", "file_count",
-            "matched_symbols", "is_direct", "data",
+            "results",
+            "symbols",
+            "edges",
+            "nodes",
+            "name",
+            "file",
+            "label",
+            "id",
+            "score",
+            "importance",
+            "reason",
+            "modules",
+            "dependencies",
+            "kind",
+            "properties",
+            "from",
+            "to",
+            "changes",
+            "graph_version",
+            "impact",
+            "symbol",
+            "change_type",
+            "query",
+            "project",
+            "arguments",
+            "content",
+            "type",
+            "text",
+            "description",
+            "status",
+            "error",
+            "message",
+            "code",
+            "jsonrpc",
+            "method",
+            "params",
+            "result",
+            "path",
+            "file_count",
+            "matched_symbols",
+            "is_direct",
+            "data",
         ];
         for key in &keys {
             let shortened = shorten_key(key);
-            assert!(shortened.len() <= key.len(), 
-                "Key '{}' shortened to '{}' which is longer!", key, shortened);
+            assert!(
+                shortened.len() <= key.len(),
+                "Key '{}' shortened to '{}' which is longer!",
+                key,
+                shortened
+            );
         }
     }
 }

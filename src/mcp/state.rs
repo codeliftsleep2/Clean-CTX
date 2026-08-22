@@ -17,17 +17,12 @@
 // use `Mutex`/`RwLock` internally, so `&mut` is never required.
 // is single-threaded by design) and the config is shared immutably.
 
-use std::collections::{HashMap, HashSet};
-use std::sync::{Mutex, RwLock};
-use std::sync::Arc;
-use std::time::SystemTime;
 use crate::angular_meta::graph_state::AngularGraphHandle;
-use crate::dotnet_meta::graph_state::DotnetGraphHandle;
-use crate::spring_meta::graph_state::SpringGraphHandle;
 use crate::cache::LocalStateCache;
+use crate::compression::text_delta::TextDeltaComputer;
 use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
-use crate::compression::text_delta::TextDeltaComputer;
+use crate::dotnet_meta::graph_state::DotnetGraphHandle;
 use crate::ir::replay::ContextState;
 use crate::layers::LayerRegistry;
 use crate::mcp::buffered_store::BufferedStore;
@@ -35,6 +30,11 @@ use crate::mcp::cache_hints::CacheMetrics;
 use crate::mcp::context_store::InMemoryContextStore;
 use crate::mcp::session_stats::SessionStats;
 use crate::mcp::sqlite_store::SqliteStore;
+use crate::spring_meta::graph_state::SpringGraphHandle;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use std::sync::{Mutex, RwLock};
+use std::time::SystemTime;
 
 /// P1-5: Lock recovery macro — replaces 20+ identical 4-line match patterns.
 ///
@@ -331,16 +331,18 @@ impl McpState {
         let mut bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
 
         // Resolve the disk-cache DB path by scope precedence.
-        let cache_db_path = cbm_config.cache_db_path.as_ref().map(std::path::PathBuf::from).or_else(|| {
-            match cbm_config.cache_scope {
+        let cache_db_path = cbm_config
+            .cache_db_path
+            .as_ref()
+            .map(std::path::PathBuf::from)
+            .or_else(|| match cbm_config.cache_scope {
                 crate::cbm::config::CacheScope::Global => {
                     Some(std::path::PathBuf::from(".clean-ctx/cbm-graph-cache.db"))
                 }
                 crate::cbm::config::CacheScope::PerWorkspace => {
                     Some(project_root.join(".clean-ctx/cbm-graph-cache.db"))
                 }
-            }
-        });
+            });
 
         if let Some(db_path) = cache_db_path {
             match crate::cbm::cache_store::GraphCacheStore::open(&db_path) {
@@ -471,14 +473,34 @@ impl McpState {
 
     #[allow(clippy::too_many_arguments)]
     /// Record compression stats (thread-safe convenience method).
-    pub fn record_compression(&self, file_path: &str, raw_tokens: usize, compressed_tokens: usize, fidelity: &str, is_angular: bool, source: &str, full_compressed_tokens: Option<usize>, domain: &str) {
-        self.session_stats_lock().record_compression(file_path, raw_tokens, compressed_tokens, fidelity, is_angular, source, full_compressed_tokens, domain);
+    pub fn record_compression(
+        &self,
+        file_path: &str,
+        raw_tokens: usize,
+        compressed_tokens: usize,
+        fidelity: &str,
+        is_angular: bool,
+        source: &str,
+        full_compressed_tokens: Option<usize>,
+        domain: &str,
+    ) {
+        self.session_stats_lock().record_compression(
+            file_path,
+            raw_tokens,
+            compressed_tokens,
+            fidelity,
+            is_angular,
+            source,
+            full_compressed_tokens,
+            domain,
+        );
     }
 
     /// Record a CBM pipe-level proxy compression event (thread-safe convenience
     /// method). Each CBM interception call ACCUMULATES into session stats.
     pub fn record_cbm_proxy(&self, tool_name: &str, raw_tokens: usize, compressed_tokens: usize) {
-        self.session_stats_lock().record_cbm_proxy(tool_name, raw_tokens, compressed_tokens);
+        self.session_stats_lock()
+            .record_cbm_proxy(tool_name, raw_tokens, compressed_tokens);
     }
 
     /// Get file version from IR context (thread-safe convenience method).
@@ -535,7 +557,14 @@ impl McpState {
 
         // Fast path: check if path is absolute and has no relative components
         // using the robust Path::components() iterator instead of string contains().
-        if p.is_absolute() && p.components().all(|c| matches!(c, Component::Normal(_) | Component::RootDir | Component::Prefix(_))) {
+        if p.is_absolute()
+            && p.components().all(|c| {
+                matches!(
+                    c,
+                    Component::Normal(_) | Component::RootDir | Component::Prefix(_)
+                )
+            })
+        {
             #[cfg(debug_assertions)]
             eprintln!("[resolve_cache_key] FAST PATH: {}", path);
             return path.to_string();
@@ -544,11 +573,16 @@ impl McpState {
         eprintln!("[resolve_cache_key] SLOW PATH (canonicalize): {}", path);
         #[cfg(debug_assertions)]
         let canon_start = std::time::Instant::now();
-        let result = p.canonicalize()
+        let result = p
+            .canonicalize()
             .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_else(|_| path.to_string());
         #[cfg(debug_assertions)]
-        eprintln!("[resolve_cache_key] canonicalize took {:?} for {}", canon_start.elapsed(), path);
+        eprintln!(
+            "[resolve_cache_key] canonicalize took {:?} for {}",
+            canon_start.elapsed(),
+            path
+        );
         result
     }
 
@@ -578,16 +612,27 @@ impl McpState {
             let lock_start = std::time::Instant::now();
             let cache = lock_or_recover!(self.source_cache.lock(), "source_cache");
             #[cfg(debug_assertions)]
-            eprintln!("[read_source] Phase 1 lock acquire took {:?} for {}", lock_start.elapsed(), path);
+            eprintln!(
+                "[read_source] Phase 1 lock acquire took {:?} for {}",
+                lock_start.elapsed(),
+                path
+            );
             if let Some(cached) = cache.get(&cache_key) {
                 // P0-3: Check if file has changed using mtime and size
                 if cached.mtime == current_mtime && cached.size == current_size {
                     #[cfg(debug_assertions)]
-                    eprintln!("[read_source] CACHE HIT for {} (total: {:?})", path, overall_start.elapsed());
+                    eprintln!(
+                        "[read_source] CACHE HIT for {} (total: {:?})",
+                        path,
+                        overall_start.elapsed()
+                    );
                     return Ok(Arc::clone(&cached.content));
                 }
                 #[cfg(debug_assertions)]
-                eprintln!("[read_source] CACHE STALE for {} (mtime/size changed)", path);
+                eprintln!(
+                    "[read_source] CACHE STALE for {} (mtime/size changed)",
+                    path
+                );
             }
             #[cfg(debug_assertions)]
             eprintln!("[read_source] CACHE MISS for {}", path);
@@ -598,24 +643,37 @@ impl McpState {
         let io_start = std::time::Instant::now();
         let content = Arc::new(std::fs::read_to_string(path)?);
         #[cfg(debug_assertions)]
-        eprintln!("[read_source] Phase 2 read_to_string took {:?} for {} ({} bytes)", io_start.elapsed(), path, content.len());
+        eprintln!(
+            "[read_source] Phase 2 read_to_string took {:?} for {} ({} bytes)",
+            io_start.elapsed(),
+            path,
+            content.len()
+        );
 
         // Phase 3: Update cache (brief lock, with double-check)
         #[cfg(debug_assertions)]
         let lock2_start = std::time::Instant::now();
         let mut cache = lock_or_recover!(self.source_cache.lock(), "source_cache");
         #[cfg(debug_assertions)]
-        eprintln!("[read_source] Phase 3 lock acquire took {:?} for {}", lock2_start.elapsed(), path);
-        
+        eprintln!(
+            "[read_source] Phase 3 lock acquire took {:?} for {}",
+            lock2_start.elapsed(),
+            path
+        );
+
         // P0-3: Insert or update cache entry with metadata
         cache.entry(cache_key).or_insert(CacheEntry {
             content: Arc::clone(&content),
             mtime: current_mtime,
             size: current_size,
         });
-        
+
         #[cfg(debug_assertions)]
-        eprintln!("[read_source] TOTAL for {}: {:?}", path, overall_start.elapsed());
+        eprintln!(
+            "[read_source] TOTAL for {}: {:?}",
+            path,
+            overall_start.elapsed()
+        );
 
         Ok(content)
     }

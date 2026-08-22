@@ -20,10 +20,10 @@
 // }
 // ```
 
-use std::collections::BTreeMap;
 use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
 use super::wire::op_to_tuple;
+use std::collections::BTreeMap;
 
 /// R-43a: High-level semantic intent of a delta operation.
 /// Provides human-readable context for what changed, beyond the structural diff.
@@ -155,11 +155,7 @@ impl DeltaComputer {
 
     /// Compute the delta between baseline and current IR.
     /// Returns None if both IRs are identical.
-    pub fn compute(
-        &self,
-        baseline: &CompiledIR,
-        current: &CompiledIR,
-    ) -> Option<IRDelta> {
+    pub fn compute(&self, baseline: &CompiledIR, current: &CompiledIR) -> Option<IRDelta> {
         let base_indexed = index_instructions(&baseline.instructions);
         let cur_indexed = index_instructions(&current.instructions);
 
@@ -412,8 +408,14 @@ fn primary_key(op: &CoreOp) -> String {
         CoreOp::Import(alias, _, _) => format!("IMP:{}", alias),
         CoreOp::TypeAlias(alias, _) => format!("TYPE:{}", alias),
         CoreOp::Pattern(name, args) => {
-            format!("PAT:{}:{}", name, args.first().map(|s| s.as_str()).unwrap_or("?"))
+            format!(
+                "PAT:{}:{}",
+                name,
+                args.first().map(|s| s.as_str()).unwrap_or("?")
+            )
         }
+        // Edit Mode: Verbatim Method Bodies
+        CoreOp::Body(mid, _) => format!("BODY:{}", mid),
         // R-43a: Execution Semantics
         CoreOp::DataFlow(mid, _, _) => format!("DATAFLOW:{}", mid),
         CoreOp::ControlFlow(mid, _, _) => format!("CTRL:{}", mid),
@@ -447,6 +449,8 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
             }
             v
         }
+        // Edit Mode: Verbatim Method Bodies
+        CoreOp::Body(mid, _) => vec!["BODY".into(), mid.clone()],
         // R-43a: Execution Semantics
         CoreOp::DataFlow(mid, _, _) => vec!["DATAFLOW".into(), mid.clone()],
         CoreOp::ControlFlow(mid, _, _) => vec!["CTRL".into(), mid.clone()],
@@ -460,7 +464,10 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
 /// Returns None if the tuples have different opcodes or the same full content.
 /// Returns Some(patches) with an empty vec if the tuples are identical.
 /// Only non-identical fields are included, skipping the opcode (index 0).
-pub fn compute_field_patches(base_tuple: &[String], cur_tuple: &[String]) -> Option<Vec<FieldPatch>> {
+pub fn compute_field_patches(
+    base_tuple: &[String],
+    cur_tuple: &[String],
+) -> Option<Vec<FieldPatch>> {
     if base_tuple.is_empty() || cur_tuple.is_empty() {
         return None;
     }
@@ -548,6 +555,8 @@ fn abbreviate_opcode(opcode: &str) -> &str {
         "IMP" => "IP",
         "TYPE" => "T",
         "PAT" => "P",
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => "BD",
         // R-43a: compact abbreviations
         "DATAFLOW" => "DF",
         "CTRL" => "CT",
@@ -575,6 +584,8 @@ fn expand_opcode(abbrev: &str) -> &str {
         "IP" => "IMP",
         "T" => "TYPE",
         "P" => "PAT",
+        // Edit Mode: Verbatim Method Bodies
+        "BD" => "BODY",
         // R-43a: compact abbreviations
         "DF" => "DATAFLOW",
         "CT" => "CTRL",
@@ -749,6 +760,8 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         "INJECTS" => format!("INJECTS:{}", tuple.get(1).unwrap_or(&String::new())),
         "IMP" => format!("IMP:{}", tuple.get(1).unwrap_or(&String::new())),
         "TYPE" => format!("TYPE:{}", tuple.get(1).unwrap_or(&String::new())),
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => format!("BODY:{}", tuple.get(1).unwrap_or(&String::new())),
         // R-43a: Execution Semantics
         "DATAFLOW" => format!("DATAFLOW:{}", tuple.get(1).unwrap_or(&String::new())),
         "CTRL" => format!("CTRL:{}", tuple.get(1).unwrap_or(&String::new())),
@@ -757,7 +770,10 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         _ => {
             // F-16: Unknown opcode — fallback produces a key from the full tuple.
             if cfg!(debug_assertions) {
-                eprintln!("[warn] primary_key_from_tuple: unknown opcode '{}'", tuple[0]);
+                eprintln!(
+                    "[warn] primary_key_from_tuple: unknown opcode '{}'",
+                    tuple[0]
+                );
             }
             tuple.join(":")
         }
@@ -801,6 +817,8 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
         "INJECTS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "IMP" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "TYPE" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         // R-43a: Execution Semantics
         "DATAFLOW" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "CTRL" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],

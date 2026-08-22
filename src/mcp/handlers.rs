@@ -3,13 +3,13 @@
 // JSON-RPC method handlers for the MCP server.
 // Each function corresponds to a single method and sends its own response.
 
-use serde_json::Value;
-use crate::protocol::send_response;
-use crate::mcp::tools;
-use crate::mcp::prompts;
 use crate::mcp::McpState;
-use crate::mcp::cache_hints::{inject_cache_breakpoints, generate_vocabulary_text};
+use crate::mcp::cache_hints::{generate_vocabulary_text, inject_cache_breakpoints};
+use crate::mcp::prompts;
+use crate::mcp::tools;
+use crate::protocol::send_response;
 use crate::tokenizer::{create_tokenizer, resolve_tokenizer_kind};
+use serde_json::Value;
 
 /// Handle `initialize` — returns server capabilities and protocol version.
 pub(crate) fn handle_initialize(id: &Value) {
@@ -36,7 +36,11 @@ pub(crate) fn handle_tools_list(id: &Value, state: &McpState) {
 
     // Inject tools cache breakpoint into result._meta, NOT the response root
     let cache_enabled = state.config.cache.enabled;
-    let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
+    let tok_box = create_tokenizer(resolve_tokenizer_kind(
+        None,
+        Some(&state.config.tokenizer.to_string()),
+    ))
+    .ok();
     let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
     if cache_enabled {
         let ttl = state.config.cache.tools_ttl.clone();
@@ -61,7 +65,11 @@ pub(crate) fn handle_prompts_list(id: &Value, state: &McpState) {
 
     // Inject system prompt cache breakpoint into result._meta, NOT the response root
     let cache_enabled = state.config.cache.enabled;
-    let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
+    let tok_box = create_tokenizer(resolve_tokenizer_kind(
+        None,
+        Some(&state.config.tokenizer.to_string()),
+    ))
+    .ok();
     let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
     if cache_enabled {
         let ttl = state.config.cache.system_prompt_ttl.clone();
@@ -96,13 +104,24 @@ pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str, state: &McpState
 
         // Inject system prompt cache breakpoint into result._meta, NOT the response root
         let cache_enabled = state.config.cache.enabled;
-        let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
+        let tok_box = create_tokenizer(resolve_tokenizer_kind(
+            None,
+            Some(&state.config.tokenizer.to_string()),
+        ))
+        .ok();
         let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
         if cache_enabled {
             let ttl = state.config.cache.system_prompt_ttl.clone();
             let breaker = format!("vocab-{}", state.config.cache.vocab_version);
             if let Some(result_obj) = response.get_mut("result") {
-                inject_cache_breakpoints(result_obj, state, "system_prompt", &ttl, &breaker, tok_ref);
+                inject_cache_breakpoints(
+                    result_obj,
+                    state,
+                    "system_prompt",
+                    &ttl,
+                    &breaker,
+                    tok_ref,
+                );
             }
         }
 
@@ -155,13 +174,24 @@ pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str, state: &McpState
 
         // Inject system prompt cache breakpoint into result._meta, NOT the response root
         let cache_enabled = state.config.cache.enabled;
-        let tok_box = create_tokenizer(resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))).ok();
+        let tok_box = create_tokenizer(resolve_tokenizer_kind(
+            None,
+            Some(&state.config.tokenizer.to_string()),
+        ))
+        .ok();
         let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
         if cache_enabled {
             let ttl = state.config.cache.system_prompt_ttl.clone();
             let breaker = format!("vocab-{}", state.config.cache.vocab_version);
             if let Some(result_obj) = response.get_mut("result") {
-                inject_cache_breakpoints(result_obj, state, "system_prompt", &ttl, &breaker, tok_ref);
+                inject_cache_breakpoints(
+                    result_obj,
+                    state,
+                    "system_prompt",
+                    &ttl,
+                    &breaker,
+                    tok_ref,
+                );
             }
         }
 
