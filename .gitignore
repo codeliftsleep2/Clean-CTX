@@ -16,8 +16,9 @@ target
 #vscode files
 /*.vscode
 
-#local clean-ctx folder
+#local clean-ctx folder and config file
 /*.clean-ctx
+/.clean-ctx.json
 
 #Extra Docs
 /extradocs
