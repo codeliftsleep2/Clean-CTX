@@ -559,7 +559,7 @@ pub fn expand_phi_in_line(line: &str) -> String {
             // Expansion includes a trailing space so that
             // `Φcmp:Foo` → `@Component Foo` (space separates
             // decorator from name).
-        s = s.replace(prefix, &format!("{} ", kind.expansion()));
+            s = s.replace(prefix, &format!("{} ", kind.expansion()));
         }
     }
     // Chain the registered sub-layer expansions (RxJS, NgRx, Signals,

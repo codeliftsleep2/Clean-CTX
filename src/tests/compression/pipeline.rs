@@ -209,7 +209,7 @@ fn build_output_lines_edit_fidelity_emits_byte_exact_method() {
         raw_text: method_text.to_string(),
         start_byte: 0,
     };
-    let built = build_output_lines(&[cap], "", Fidelity::Edit, None);
+    let built = build_output_lines(&[cap], "", Fidelity::Edit, None, None);
     assert_eq!(built.output_lines.len(), 1, "one method line expected");
     assert_eq!(
         built.output_lines[0], method_text,
@@ -227,7 +227,7 @@ fn build_output_lines_verbatim_fidelity_emits_byte_exact_method() {
         raw_text: method_text.to_string(),
         start_byte: 0,
     };
-    let built = build_output_lines(&[cap], "", Fidelity::Verbatim, None);
+    let built = build_output_lines(&[cap], "", Fidelity::Verbatim, None, None);
     assert_eq!(built.output_lines.len(), 1, "one method line expected");
     assert_eq!(
         built.output_lines[0], method_text,
@@ -245,7 +245,7 @@ fn build_output_lines_high_fidelity_still_indents_signature() {
         raw_text: sig.to_string(),
         start_byte: 0,
     };
-    let built = build_output_lines(&[cap], "", Fidelity::High, None);
+    let built = build_output_lines(&[cap], "", Fidelity::High, None, None);
     assert_eq!(built.output_lines.len(), 1);
     assert_eq!(
         built.output_lines[0],
@@ -443,7 +443,7 @@ fn build_output_lines_edit_fidelity_raw_fallback_is_byte_exact() {
     // H-5 fix: when nothing is captured, the raw fallback at Edit/Verbatim
     // must emit the first line as-is (NOT collapse whitespace via simple_compact).
     let source = "  const   spaced   =   true;  ";
-    let built = build_output_lines(&[], source, Fidelity::Edit, None);
+    let built = build_output_lines(&[], source, Fidelity::Edit, None, None);
     assert_eq!(built.output_lines.len(), 1, "one fallback line expected");
     assert_eq!(
         built.output_lines[0], "const   spaced   =   true;",

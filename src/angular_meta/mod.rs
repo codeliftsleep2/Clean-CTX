@@ -26,16 +26,16 @@ pub(crate) mod detect;
 pub mod footer;
 pub mod graph;
 pub mod graph_state;
+pub(crate) mod markers;
 pub mod ngrx;
 pub mod phi;
 pub mod routing;
 pub mod rx;
 pub mod signals;
-pub mod util;
-pub(crate) mod markers;
 pub mod style;
 pub mod template;
 pub mod template_compress;
+pub mod util;
 
 use crate::compression::Fidelity;
 
@@ -252,16 +252,19 @@ pub fn run_meta_layer_with_config(
 
     // Tier 2 (RxJS): append the RxJS meta block if present.
     if let Some(shape) = rx_shape {
-        let rx_block = shape.render_with_config(fidelity, config.map(|c| c.rxjs.min_pipe_operators));
+        let rx_block =
+            shape.render_with_config(fidelity, config.map(|c| c.rxjs.min_pipe_operators));
         if !rx_block.is_empty() {
             // The RxJS block has its own `// --- Φ RxJS Meta ---` header.
             // Split the rendered block into header + lines and store as
             // a named section so it renders under the correct header.
-            let mut rx_lines: Vec<String> = rx_block.lines()
-                .map(|l| l.to_string())
-                .collect();
+            let mut rx_lines: Vec<String> = rx_block.lines().map(|l| l.to_string()).collect();
             // First line is the header — pop it off.
-            let header = if rx_lines.first().map(|l| l.starts_with("// ---")).unwrap_or(false) {
+            let header = if rx_lines
+                .first()
+                .map(|l| l.starts_with("// ---"))
+                .unwrap_or(false)
+            {
                 rx_lines.remove(0)
             } else {
                 "// --- Φ RxJS Meta ---".to_string()
@@ -277,10 +280,12 @@ pub fn run_meta_layer_with_config(
     if let Some(shape) = ngrx_shape {
         let ngrx_block = shape.render_with_config(fidelity, config.map(|c| &c.ngrx));
         if !ngrx_block.is_empty() {
-            let mut ngrx_lines: Vec<String> = ngrx_block.lines()
-                .map(|l| l.to_string())
-                .collect();
-            let header = if ngrx_lines.first().map(|l| l.starts_with("// ---")).unwrap_or(false) {
+            let mut ngrx_lines: Vec<String> = ngrx_block.lines().map(|l| l.to_string()).collect();
+            let header = if ngrx_lines
+                .first()
+                .map(|l| l.starts_with("// ---"))
+                .unwrap_or(false)
+            {
                 ngrx_lines.remove(0)
             } else {
                 "// --- Φ NgRx Meta ---".to_string()
@@ -296,10 +301,13 @@ pub fn run_meta_layer_with_config(
     if let Some(shape) = signal_shape {
         let signal_block = shape.render(fidelity);
         if !signal_block.is_empty() {
-            let mut signal_lines: Vec<String> = signal_block.lines()
-                .map(|l| l.to_string())
-                .collect();
-            let header = if signal_lines.first().map(|l| l.starts_with("// ---")).unwrap_or(false) {
+            let mut signal_lines: Vec<String> =
+                signal_block.lines().map(|l| l.to_string()).collect();
+            let header = if signal_lines
+                .first()
+                .map(|l| l.starts_with("// ---"))
+                .unwrap_or(false)
+            {
                 signal_lines.remove(0)
             } else {
                 "// --- Φ Signals Meta ---".to_string()
@@ -315,10 +323,12 @@ pub fn run_meta_layer_with_config(
     if let Some(shape) = route_shape {
         let route_block = shape.render(fidelity);
         if !route_block.is_empty() {
-            let mut route_lines: Vec<String> = route_block.lines()
-                .map(|l| l.to_string())
-                .collect();
-            let header = if route_lines.first().map(|l| l.starts_with("// ---")).unwrap_or(false) {
+            let mut route_lines: Vec<String> = route_block.lines().map(|l| l.to_string()).collect();
+            let header = if route_lines
+                .first()
+                .map(|l| l.starts_with("// ---"))
+                .unwrap_or(false)
+            {
                 route_lines.remove(0)
             } else {
                 "// --- Φ Routing Meta ---".to_string()

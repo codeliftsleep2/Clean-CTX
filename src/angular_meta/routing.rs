@@ -421,7 +421,8 @@ fn extract_guards(source: &str, shape: &mut RouteShape) {
         }
 
         // Find the variable name before the type annotation.
-        let name = before.split_whitespace()
+        let name = before
+            .split_whitespace()
             .last()
             .map(|s| s.trim_end_matches(':').trim().to_string())
             .filter(|s| !s.is_empty() && *s != ":")
@@ -492,7 +493,8 @@ fn extract_resolvers(source: &str, shape: &mut RouteShape) {
         }
 
         // Find the variable name before the type annotation.
-        let name = before.split_whitespace()
+        let name = before
+            .split_whitespace()
             .last()
             .map(|s| s.trim_end_matches(':').trim().to_string())
             .filter(|s| !s.is_empty() && *s != ":")

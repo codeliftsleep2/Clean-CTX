@@ -5,7 +5,7 @@
 
 use crate::angular_meta::phi::PhiMarker;
 use crate::angular_meta::routing::{
-    expand_phi, expand_phi_in_line, extract_route_shape, has_router_imports, RouteKind,
+    RouteKind, expand_phi, expand_phi_in_line, extract_route_shape, has_router_imports,
 };
 use crate::compression::Fidelity;
 
@@ -62,7 +62,10 @@ export const appRoutes: Routes = [
     assert_eq!(shape.routes.len(), 1);
     let route = &shape.routes[0];
     assert_eq!(route.path, "users/:id");
-    assert_eq!(route.load_component.as_deref(), Some("./user-detail.component"));
+    assert_eq!(
+        route.load_component.as_deref(),
+        Some("./user-detail.component")
+    );
 }
 
 // ── Round-7 audit: escaped-quote brace scanning ────────────────────
@@ -87,7 +90,10 @@ export const appRoutes: Routes = [
     let shape = extract_route_shape(src, Fidelity::Medium).expect("should detect routes");
     assert_eq!(shape.routes.len(), 1, "routes: {:?}", shape.routes);
     let route = &shape.routes[0];
-    assert_eq!(route.path, "user\\'s", "escaped quote path should be preserved");
+    assert_eq!(
+        route.path, "user\\'s",
+        "escaped quote path should be preserved"
+    );
     assert_eq!(route.component.as_deref(), Some("UserProfileComponent"));
 }
 
@@ -136,7 +142,8 @@ export const appRoutes: Routes = [
     // Only the real `path: 'users'` should be extracted — no phantom routes
     // from the comment `path:` or the string `'path: not-a-route'`.
     assert_eq!(
-        shape.routes.len(), 1,
+        shape.routes.len(),
+        1,
         "only the real route should be extracted, got: {:?}",
         shape.routes
     );
@@ -201,7 +208,8 @@ export const appRoutes: Routes = [
 "#;
     let shape = extract_route_shape(src, Fidelity::Medium).expect("should detect routes");
     assert_eq!(
-        shape.routes.len(), 1,
+        shape.routes.len(),
+        1,
         "trailing comment path must not duplicate the route, got: {:?}",
         shape.routes
     );
@@ -221,7 +229,8 @@ const menuItem = { path: '/home', label: 'Home' };
 "#;
     let shape = extract_route_shape(src, Fidelity::Medium).expect("should detect routes");
     assert_eq!(
-        shape.routes.len(), 1,
+        shape.routes.len(),
+        1,
         "sibling object literal path must not be a route, got: {:?}",
         shape.routes
     );
@@ -245,7 +254,8 @@ export class AuthGuard implements CanActivate {
 "#;
     let shape = extract_route_shape(src, Fidelity::Medium).expect("should detect guards");
     assert_eq!(
-        shape.guards.len(), 1,
+        shape.guards.len(),
+        1,
         "only the real guard should be extracted, got: {:?}",
         shape.guards
     );
@@ -287,13 +297,15 @@ export class UserResolver implements Resolve<User> {
     // Only the real guard and resolver should be extracted — no phantom
     // entries from the commented-out `implements` / `Resolve<User>`.
     assert_eq!(
-        shape.guards.len(), 1,
+        shape.guards.len(),
+        1,
         "only the real guard should be extracted, got: {:?}",
         shape.guards
     );
     assert_eq!(shape.guards[0].name, "AuthGuard");
     assert_eq!(
-        shape.resolvers.len(), 1,
+        shape.resolvers.len(),
+        1,
         "only the real resolver should be extracted, got: {:?}",
         shape.resolvers
     );
@@ -397,8 +409,14 @@ export const appRoutes: Routes = [
     let shape = extract_route_shape(src, Fidelity::Low).expect("should detect routes");
     let rendered = shape.render(Fidelity::Low);
     assert!(rendered.contains("Φroute:users"));
-    assert!(!rendered.contains("component="), "Low fidelity should not include component");
-    assert!(!rendered.contains("guards="), "Low fidelity should not include guards");
+    assert!(
+        !rendered.contains("component="),
+        "Low fidelity should not include component"
+    );
+    assert!(
+        !rendered.contains("guards="),
+        "Low fidelity should not include guards"
+    );
 }
 
 #[test]

@@ -12,17 +12,16 @@ use std::path::PathBuf;
 use crate::analytics::calculate_savings;
 use crate::cache::LocalStateCache;
 use crate::compaction::{
-    compact_expression, extract_class_name, extract_field,
-    extract_method_sig,
+    compact_expression, extract_class_name, extract_field, extract_method_sig,
 };
-use crate::compression::capture_pipeline::run_capture_pipeline;
-use crate::compression::language::language_for_extension;
-use crate::compression::pipeline::{assemble_body, build_output_lines};
-use crate::compression::report::{format_compacted_body, format_final_output};
-use crate::compression::micro_opcodes::apply_micro_opcodes;
-use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
+use crate::compression::capture_pipeline::run_capture_pipeline;
+use crate::compression::language::language_for_extension;
+use crate::compression::micro_opcodes::apply_micro_opcodes;
+use crate::compression::pipeline::{assemble_body, build_output_lines};
+use crate::compression::report::{format_compacted_body, format_final_output};
+use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::dictionary::PathDictionary;
 
 /// A progress event emitted by streaming compression. The `progress` is in
@@ -71,7 +70,10 @@ where
     on_progress(CompressionProgress {
         progress: 0.0,
         phase: "reading".to_string(),
-        partial: Some(format!("// Streaming read: {} ({} bytes)", path_alias, total_bytes)),
+        partial: Some(format!(
+            "// Streaming read: {} ({} bytes)",
+            path_alias, total_bytes
+        )),
     })?;
 
     let f = fs::File::open(&file)?;
@@ -81,12 +83,18 @@ where
     let mut bytes_read: usize = 0;
     loop {
         let n = reader.read(&mut buf)?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         let chunk = std::str::from_utf8(&buf[..n])
             .map_err(|e| format!("Invalid UTF-8 in source file: {}", e))?;
         source_code.push_str(chunk);
         bytes_read += n;
-        let p = if total_bytes > 0 { (bytes_read as f64 / total_bytes as f64) * 0.2 } else { 0.2 };
+        let p = if total_bytes > 0 {
+            (bytes_read as f64 / total_bytes as f64) * 0.2
+        } else {
+            0.2
+        };
         on_progress(CompressionProgress {
             progress: p,
             phase: "reading".to_string(),
@@ -176,7 +184,12 @@ where
         );
         return Ok(format!(
             "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
-            meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, ratio_report, cached_notice
+            meta.raw_tokens,
+            meta.compressed_tokens,
+            meta.savings_percentage,
+            fidelity,
+            ratio_report,
+            cached_notice
         ));
     }
 

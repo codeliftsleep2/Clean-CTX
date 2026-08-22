@@ -5,8 +5,7 @@
 
 use crate::angular_meta::phi::PhiMarker;
 use crate::angular_meta::rx::{
-    expand_phi, expand_phi_in_line, extract_rx_shape, has_rxjs_imports,
-    RxJsKind, SubjectKind,
+    RxJsKind, SubjectKind, expand_phi, expand_phi_in_line, extract_rx_shape, has_rxjs_imports,
 };
 use crate::compression::Fidelity;
 
@@ -60,7 +59,13 @@ export class UserService {
     let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
     assert_eq!(shape.observables.len(), 1);
     assert_eq!(shape.observables[0].name, "users$");
-    assert!(shape.observables[0].source.as_deref().unwrap_or("").contains("http.get"));
+    assert!(
+        shape.observables[0]
+            .source
+            .as_deref()
+            .unwrap_or("")
+            .contains("http.get")
+    );
 }
 
 // ── Round-9 audit: type-annotated + assigned observable declaration ──
@@ -82,7 +87,12 @@ export class UserService {
 }
 "#;
     let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
-    assert_eq!(shape.observables.len(), 1, "observables: {:?}", shape.observables);
+    assert_eq!(
+        shape.observables.len(),
+        1,
+        "observables: {:?}",
+        shape.observables
+    );
     assert_eq!(
         shape.observables[0].name, "users$",
         "type-annotated assignment must extract the field name, got: {}",
@@ -95,7 +105,11 @@ export class UserService {
     );
     // The source must still be captured.
     assert!(
-        shape.observables[0].source.as_deref().unwrap_or("").contains("http.get"),
+        shape.observables[0]
+            .source
+            .as_deref()
+            .unwrap_or("")
+            .contains("http.get"),
         "source should be captured, got: {:?}",
         shape.observables[0].source
     );
@@ -121,7 +135,8 @@ export class UserService {
 "#;
     let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect observables");
     assert_eq!(
-        shape.observables.len(), 1,
+        shape.observables.len(),
+        1,
         "trailing/comment observables must not be extracted, got: {:?}",
         shape.observables
     );
@@ -139,7 +154,8 @@ export class UserService {
 "#;
     let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect subjects");
     assert_eq!(
-        shape.subjects.len(), 1,
+        shape.subjects.len(),
+        1,
         "trailing-comment subject must not be extracted, got: {:?}",
         shape.subjects
     );
@@ -158,7 +174,8 @@ export class UserService {
 "#;
     let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect combinators");
     assert_eq!(
-        shape.combinators.len(), 1,
+        shape.combinators.len(),
+        1,
         "string-literal combinator must not be extracted, got: {:?}",
         shape.combinators
     );
@@ -247,7 +264,13 @@ export class UserService {
     );
     // The initial value and type param must still be captured.
     assert_eq!(shape.subjects[0].initial_value.as_deref(), Some("null"));
-    assert!(shape.subjects[0].type_param.as_deref().unwrap_or("").contains("User"));
+    assert!(
+        shape.subjects[0]
+            .type_param
+            .as_deref()
+            .unwrap_or("")
+            .contains("User")
+    );
 }
 
 // ── Pipe chain extraction ──────────────────────────────────────────
@@ -428,7 +451,12 @@ export class UserService {
 "#;
     let shape = extract_rx_shape(src, Fidelity::Medium).expect("should detect RxJS");
     assert_eq!(shape.pipes.len(), 1, "pipe chain should be detected intact");
-    assert_eq!(shape.pipes[0].operators.len(), 2, "operators: {:?}", shape.pipes[0].operators);
+    assert_eq!(
+        shape.pipes[0].operators.len(),
+        2,
+        "operators: {:?}",
+        shape.pipes[0].operators
+    );
     assert_eq!(shape.pipes[0].operators[0].operator_name, "map");
     assert_eq!(shape.pipes[0].operators[1].operator_name, "tap");
 }

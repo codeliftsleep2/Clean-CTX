@@ -59,12 +59,12 @@ impl PhiMarker for SignalKind {
     /// All variants in a canonical order.
     fn all_in_expand_order() -> &'static [SignalKind] {
         &[
-            Self::SignalEffect,   // Φsig-effect: (12 chars)
-            Self::ToObservable,   // ΦtoObservable: (14 chars)
-            Self::LinkedSignal,   // ΦlinkedSignal: (14 chars)
-            Self::ToSignal,       // ΦtoSignal: (10 chars)
-            Self::Computed,       // Φcomputed: (10 chars)
-            Self::Signal,         // Φsignal: (8 chars)
+            Self::SignalEffect, // Φsig-effect: (12 chars)
+            Self::ToObservable, // ΦtoObservable: (14 chars)
+            Self::LinkedSignal, // ΦlinkedSignal: (14 chars)
+            Self::ToSignal,     // ΦtoSignal: (10 chars)
+            Self::Computed,     // Φcomputed: (10 chars)
+            Self::Signal,       // Φsignal: (8 chars)
         ]
     }
 
@@ -143,12 +143,16 @@ impl SignalShape {
                         } else {
                             (expansion, "")
                         };
-                        s.push_str(&format!("  {}{} = {}<{}>{}\n",
+                        s.push_str(&format!(
+                            "  {}{} = {}<{}>{}\n",
                             sig.kind.marker_prefix(),
-                            sig.name, base, tp, suffix));
+                            sig.name,
+                            base,
+                            tp,
+                            suffix
+                        ));
                     } else {
-                        s.push_str(&format!("  {}{}\n",
-                            sig.kind.marker_prefix(), sig.name));
+                        s.push_str(&format!("  {}{}\n", sig.kind.marker_prefix(), sig.name));
                     }
                 }
             }
@@ -208,9 +212,19 @@ pub fn extract_signal_shape(source: &str, _fidelity: Fidelity) -> Option<SignalS
     // Extract `toSignal()` declarations
     extract_signal_decls(source, &mut shape, "= toSignal", SignalKind::ToSignal);
     // Extract `toObservable()` declarations
-    extract_signal_decls(source, &mut shape, "= toObservable", SignalKind::ToObservable);
+    extract_signal_decls(
+        source,
+        &mut shape,
+        "= toObservable",
+        SignalKind::ToObservable,
+    );
     // Extract `linkedSignal()` declarations
-    extract_signal_decls(source, &mut shape, "= linkedSignal", SignalKind::LinkedSignal);
+    extract_signal_decls(
+        source,
+        &mut shape,
+        "= linkedSignal",
+        SignalKind::LinkedSignal,
+    );
 
     if shape.is_empty() {
         return None;
@@ -231,12 +245,7 @@ fn extract_decl_name(before: &str) -> Option<String> {
 }
 
 /// Extract signal declarations matching a pattern.
-fn extract_signal_decls(
-    source: &str,
-    shape: &mut SignalShape,
-    pattern: &str,
-    kind: SignalKind,
-) {
+fn extract_signal_decls(source: &str, shape: &mut SignalShape, pattern: &str, kind: SignalKind) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find(pattern) {
         let abs_idx = search_from + idx;
