@@ -393,7 +393,9 @@ pub fn build_output_lines(
                 // Reconstruct the decorator-inclusive span via the CANONICAL
                 // shared helper (same one used by
                 // `mcp::workspace_util::extract_class_blocks`).
-                class_captures.push(decorator_inclusive_class_text(source_code, cap));
+                class_captures.push(
+                    crate::meta_util::class_source_from_capture(source_code, cap).to_string(),
+                );
                 class_count += 1;
                 fields.clear();
                 markers.clear();
@@ -771,46 +773,6 @@ fn combine_footers(sym_footer: &str, ta_footer: &str) -> String {
     } else {
         format!("{}\n{}", sym_footer, ta_footer)
     }
-}
-
-/// Reconstruct the decorator-inclusive class text for the meta-layer feed.
-///
-/// The meta-layer contract requires the FULL class source (leading `@`
-/// decorators + class declaration), but `cap.text` for a `class.root`
-/// capture is the COMPACTED class name (e.g. `"UserCardComponent"`) and
-/// tree-sitter's `class_declaration` node (`cap.raw_text`) excludes the
-/// preceding `@Component` / `@Injectable` decorators — they are sibling
-/// AST nodes.
-///
-/// This helper maps the `class` keyword position from the raw capture
-/// back into the absolute source, then uses the CANONICAL
-/// [`find_decorator_inclusive_start`](crate::meta_util::find_decorator_inclusive_start)
-/// helper to find the leading `@`. When a decorator precedes the class,
-/// the full decorator-inclusive span is returned; otherwise `cap.text`
-/// (the compacted name) is returned unchanged, preserving the existing
-/// behavior for non-decorated classes (e.g. plain `.cs` classes for the
-/// .NET meta-layer).
-fn decorator_inclusive_class_text(source_code: &str, cap: &CapEntry) -> String {
-    // Locate the `class` keyword within the raw capture text, then map
-    // it to an absolute byte offset in the source.
-    let Some(rel_class) = cap.raw_text.find("class ") else {
-        // No `class` keyword in the raw capture (defensive) — fall back.
-        return cap.text.clone();
-    };
-    let abs_class = cap.start_byte.saturating_add(rel_class);
-
-    // Scan backwards for a leading `@` decorator via the canonical helper.
-    if let Some(dec_start) = crate::meta_util::find_decorator_inclusive_start(source_code, abs_class)
-    {
-        let class_end = cap.start_byte.saturating_add(cap.raw_text.len());
-        if dec_start < class_end && class_end <= source_code.len() {
-            return source_code[dec_start..class_end].to_string();
-        }
-    }
-
-    // No decorator precedes the class — preserve the existing compacted
-    // input (zero behavioral change for non-decorated classes).
-    cap.text.clone()
 }
 
 /// Join the body lines using the per-fidelity separator.
