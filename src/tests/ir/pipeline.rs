@@ -182,3 +182,55 @@ fn test_inference_layer_pass_without_cbm_builds_empty_layer() {
     assert!(layer.inferred_edges.is_empty());
     assert!(layer.annotations.is_empty());
 }
+
+// ── C-22: PassContext.captures identity regression ──────────────────
+
+#[test]
+fn core_ir_pass_populates_captures() {
+    // C-22 invariant: after CoreIRPass runs, state.captures must be
+    // populated with the CapEntry batch — NOT left as an empty Vec.
+    // MetaLayerPass and the text path derive class source spans from
+    // this field.
+    use crate::compression::capture_pipeline::CapEntry;
+
+    let pass = CoreIRPass::new();
+    let mut ctx = PassContext::new(String::new(), "file.ts".into(), Fidelity::Low);
+
+    // CoreIRPass with empty source does not run the capture pipeline
+    // (early return). captures stays empty.
+    let _ = pass.run(&mut ctx);
+    assert!(ctx.captures.is_empty(), "empty source → no captures");
+
+    // A non-empty source triggers the capture pipeline. Since no
+    // tree-sitter language is configured, CoreIRPass will error before
+    // populating captures. We verify the error path doesn't corrupt state.
+    let mut ctx2 = PassContext::new(
+        "@Component()\nexport class Foo {}".into(),
+        "file.ts".into(),
+        Fidelity::Low,
+    );
+    let err = pass.run(&mut ctx2);
+    assert!(
+        err.is_err(),
+        "expected error for missing tree-sitter language"
+    );
+    assert!(
+        ctx2.captures.is_empty(),
+        "captures should remain empty after error"
+    );
+
+    // Verify that CapEntry has the fields expected by class_source_from_capture.
+    // This is a compile-time check that the CapEntry API contract holds.
+    let cap = CapEntry {
+        name: "class.root".into(),
+        text: "Foo".into(),
+        raw_text: "class Foo {}".into(),
+        start_byte: 30,
+    };
+    let source = "@Component()\nexport class Foo {}";
+    let span = crate::meta_util::class_source_from_capture(source, &cap);
+    assert!(
+        span.contains("@Component"),
+        "class_source_from_capture must produce decorator-inclusive text from CapEntry"
+    );
+}

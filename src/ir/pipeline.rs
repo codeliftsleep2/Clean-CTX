@@ -673,6 +673,14 @@ impl IRPass for CoreIRPass {
         // Flush any remaining method flags (F-28)
         state.flush_method_flags();
 
+        // C-22: Persist the canonical capture identity for MetaLayerPass.
+        // The loop above borrowed the local `captures` while `state` was
+        // mutated; once the loop ends the owned batch is MOVED into the
+        // existing `PassContext.captures` field (no clone, no parallel
+        // vector). MetaLayerPass derives the meta-layer class sources from
+        // these CapEntry spans.
+        state.captures = captures;
+
         Ok(())
     }
 }
@@ -725,21 +733,33 @@ impl IRPass for MetaLayerPass {
         "meta_layer"
     }
     fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
-        let class_names: Vec<String> = state
-            .instructions
+        // C-22: Derive each class capture's canonical SOURCE SPAN from the
+        // persisted capture identity (`state.captures`) — NOT from the
+        // compacted `CoreOp::DefClass.name`. The meta-layer extractors need
+        // the decorator/annotation/attribute-inclusive class text to detect
+        // framework semantics (Angular @Component, Spring @RestController,
+        // .NET [ApiController]).
+        let class_captures: Vec<String> = state
+            .captures
             .iter()
-            .filter_map(|op| {
-                if let CoreOp::DefClass(_, name) = op {
-                    Some(name.clone())
-                } else {
-                    None
-                }
+            .filter(|cap| {
+                matches!(
+                    cap.name.as_str(),
+                    "class.root"
+                        | "interface.root"
+                        | "struct.root"
+                        | "enum.root"
+                        | "trait.root"
+                        | "record.root"
+                        | "impl.root"
+                )
             })
+            .map(|cap| crate::meta_util::class_source_from_capture(&state.source, cap).to_string())
             .collect();
 
         let meta_results = crate::layers::LayerRegistry::global().run_meta_layers_pipeline(
             &state.source,
-            &class_names,
+            &class_captures,
             state.fidelity,
             None,
         );
