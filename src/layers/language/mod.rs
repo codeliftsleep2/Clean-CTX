@@ -4,8 +4,8 @@
 // Each implementation is gated by its Cargo feature so the tree-sitter
 // grammar is only compiled when the feature is enabled.
 
-use tree_sitter::Language;
 use crate::compression::Fidelity;
+use tree_sitter::Language;
 
 /// Result of compiling source through a language layer.
 /// Mirrors the existing pipeline output so callers don't need to change.
@@ -81,21 +81,23 @@ impl LanguageLayer for TypeScriptLayer {
 
     fn compile(&self, source: &str, fidelity: Fidelity) -> Result<CompileOutput, CompileError> {
         // Delegate to the existing pipeline
-        let result = crate::compression::pipeline::compress_text(
-            source,
-            "ts",
-            fidelity,
-            "ts",
-            None,
-        ).map_err(|e| CompileError::CompressionError(e.to_string()))?;
+        let result =
+            crate::compression::pipeline::compress_text(source, "ts", fidelity, "ts", None)
+                .map_err(|e| CompileError::CompressionError(e.to_string()))?;
 
         let (body_lines, _full_output) = result;
         let body = body_lines.join("\n");
 
         // Count structures from body
         let class_count = body_lines.iter().filter(|l| l.contains("class ")).count();
-        let method_count = body_lines.iter().filter(|l| l.contains("fn ") || l.contains("def ")).count();
-        let import_count = body_lines.iter().filter(|l| l.starts_with("import ") || l.starts_with("from ")).count();
+        let method_count = body_lines
+            .iter()
+            .filter(|l| l.contains("fn ") || l.contains("def "))
+            .count();
+        let import_count = body_lines
+            .iter()
+            .filter(|l| l.starts_with("import ") || l.starts_with("from "))
+            .count();
 
         Ok(CompileOutput {
             body,
@@ -176,13 +178,9 @@ impl LanguageLayer for CSharpLayer {
     }
 
     fn compile(&self, source: &str, fidelity: Fidelity) -> Result<CompileOutput, CompileError> {
-        let result = crate::compression::pipeline::compress_text(
-            source,
-            "cs",
-            fidelity,
-            "cs",
-            None,
-        ).map_err(|e| CompileError::CompressionError(e.to_string()))?;
+        let result =
+            crate::compression::pipeline::compress_text(source, "cs", fidelity, "cs", None)
+                .map_err(|e| CompileError::CompressionError(e.to_string()))?;
 
         let (body_lines, _full_output) = result;
         let body = body_lines.join("\n");
@@ -266,13 +264,9 @@ impl LanguageLayer for RustLayer {
     }
 
     fn compile(&self, source: &str, fidelity: Fidelity) -> Result<CompileOutput, CompileError> {
-        let result = crate::compression::pipeline::compress_text(
-            source,
-            "rs",
-            fidelity,
-            "rs",
-            None,
-        ).map_err(|e| CompileError::CompressionError(e.to_string()))?;
+        let result =
+            crate::compression::pipeline::compress_text(source, "rs", fidelity, "rs", None)
+                .map_err(|e| CompileError::CompressionError(e.to_string()))?;
 
         let (body_lines, _full_output) = result;
         let body = body_lines.join("\n");
@@ -356,13 +350,9 @@ impl LanguageLayer for JavaLayer {
     }
 
     fn compile(&self, source: &str, fidelity: Fidelity) -> Result<CompileOutput, CompileError> {
-        let result = crate::compression::pipeline::compress_text(
-            source,
-            "java",
-            fidelity,
-            "java",
-            None,
-        ).map_err(|e| CompileError::CompressionError(e.to_string()))?;
+        let result =
+            crate::compression::pipeline::compress_text(source, "java", fidelity, "java", None)
+                .map_err(|e| CompileError::CompressionError(e.to_string()))?;
 
         let (body_lines, _full_output) = result;
         let body = body_lines.join("\n");

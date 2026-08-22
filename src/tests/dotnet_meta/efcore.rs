@@ -5,8 +5,8 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod tests {
-    use crate::dotnet_meta::efcore::extract_efcore;
     use crate::compression::Fidelity;
+    use crate::dotnet_meta::efcore::extract_efcore;
 
     #[test]
     fn test_extracts_dbcontext() {

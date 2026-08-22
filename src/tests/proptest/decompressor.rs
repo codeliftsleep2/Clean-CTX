@@ -15,9 +15,9 @@
 // 6. quick_decompress output is never empty for valid compressed input
 // 7. Decompressor round-trips: compress → decompress returns original structure
 
-use proptest::prelude::*;
-use crate::decompression::decompressor::word_boundary_replace;
 use crate::decompression::Decompressor;
+use crate::decompression::decompressor::word_boundary_replace;
+use proptest::prelude::*;
 
 proptest! {
     /// Invariant: word_boundary_replace never panics on any input.

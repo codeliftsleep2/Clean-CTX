@@ -32,7 +32,11 @@ fn test_valid_ir_no_errors() {
     let ir = valid_ir();
     let validator = DefaultValidator::new();
     let errors = validator.validate(&ir);
-    assert!(errors.is_empty(), "valid IR should have no errors: {:?}", errors);
+    assert!(
+        errors.is_empty(),
+        "valid IR should have no errors: {:?}",
+        errors
+    );
 }
 
 #[test]
@@ -87,9 +91,7 @@ fn test_flags_unknown_method() {
 fn test_extends_unknown_class() {
     let ir = CompiledIR {
         file_id: "test.ts".to_string(),
-        instructions: vec![
-            CoreOp::Extends("C99".into(), "Base".into()),
-        ],
+        instructions: vec![CoreOp::Extends("C99".into(), "Base".into())],
         version: 1,
     };
     let validator = DefaultValidator::new();
@@ -102,9 +104,7 @@ fn test_extends_unknown_class() {
 fn test_implements_unknown_class() {
     let ir = CompiledIR {
         file_id: "test.ts".to_string(),
-        instructions: vec![
-            CoreOp::Implements("C99".into(), "Iface".into()),
-        ],
+        instructions: vec![CoreOp::Implements("C99".into(), "Iface".into())],
         version: 1,
     };
     let validator = DefaultValidator::new();
@@ -117,9 +117,7 @@ fn test_implements_unknown_class() {
 fn test_injects_unknown_class() {
     let ir = CompiledIR {
         file_id: "test.ts".to_string(),
-        instructions: vec![
-            CoreOp::Injects("C99".into(), vec!["Dep".into()]),
-        ],
+        instructions: vec![CoreOp::Injects("C99".into(), vec!["Dep".into()])],
         version: 1,
     };
     let validator = DefaultValidator::new();

@@ -34,7 +34,13 @@ pub fn sanitize_request(body: &Value) -> Value {
 
     // Redact API key if present as a top-level field
     if let Some(obj) = sanitized.as_object_mut() {
-        for key in &["x_api_key", "x-api-key", "api_key", "anthropic_api_key", "authorization"] {
+        for key in &[
+            "x_api_key",
+            "x-api-key",
+            "api_key",
+            "anthropic_api_key",
+            "authorization",
+        ] {
             if obj.contains_key(*key) {
                 obj.insert(key.to_string(), Value::String("[REDACTED]".to_string()));
             }
@@ -55,8 +61,7 @@ pub async fn log_request(
     tokio::fs::create_dir_all(log_dir).await?;
 
     let sanitized = sanitize_request(body);
-    let json_str = serde_json::to_string_pretty(&sanitized)
-        .unwrap_or_else(|_| "{}".to_string());
+    let json_str = serde_json::to_string_pretty(&sanitized).unwrap_or_else(|_| "{}".to_string());
 
     let file_path = log_dir.join(format!("{req_id}.req.json"));
     let mut file = tokio::fs::File::create(&file_path).await?;

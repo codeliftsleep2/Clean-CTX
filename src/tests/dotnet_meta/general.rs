@@ -5,8 +5,8 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod tests {
-    use crate::dotnet_meta::general::extract_general;
     use crate::compression::Fidelity;
+    use crate::dotnet_meta::general::extract_general;
 
     #[test]
     fn test_extracts_services() {
@@ -72,7 +72,12 @@ mod tests {
         let result = extract_general(source, Fidelity::Medium);
         assert!(result.is_some());
         let block = result.unwrap();
-        assert!(block.lines.iter().any(|l| l.contains("Φlog:ILogger<MyService>")));
+        assert!(
+            block
+                .lines
+                .iter()
+                .any(|l| l.contains("Φlog:ILogger<MyService>"))
+        );
     }
 
     #[test]
@@ -85,6 +90,11 @@ mod tests {
         let result = extract_general(source, Fidelity::Medium);
         assert!(result.is_some());
         let block = result.unwrap();
-        assert!(block.lines.iter().any(|l| l.contains("Φcache:IMemoryCache")));
+        assert!(
+            block
+                .lines
+                .iter()
+                .any(|l| l.contains("Φcache:IMemoryCache"))
+        );
     }
 }

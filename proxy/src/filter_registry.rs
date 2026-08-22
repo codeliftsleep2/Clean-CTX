@@ -65,16 +65,10 @@ impl FilterRegistry {
 
         // Most specific match wins (longest matched span)
         // For regex, we use the length of the matched string
-        all_filters
-            .into_iter()
-            .max_by_key(|f| {
-                let span = f
-                    .match_command
-                    .find(command)
-                    .map(|m| m.len())
-                    .unwrap_or(0);
-                (span, f.priority)
-            })
+        all_filters.into_iter().max_by_key(|f| {
+            let span = f.match_command.find(command).map(|m| m.len()).unwrap_or(0);
+            (span, f.priority)
+        })
     }
 
     /// Get a filter by name, checking overrides first, then builtin, then community.

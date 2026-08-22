@@ -4,8 +4,7 @@
 
 use crate::config::ProxyAutoStartConfig;
 use crate::proxy_spawner::{
-    build_proxy_env, resolve_proxy_binary, spawn_proxy, proxy_child_exited,
-    ProxyCacheStateInfo,
+    ProxyCacheStateInfo, build_proxy_env, proxy_child_exited, resolve_proxy_binary, spawn_proxy,
 };
 
 fn test_config() -> ProxyAutoStartConfig {
@@ -26,7 +25,10 @@ fn build_proxy_env_defaults_only_port_and_upstream() {
     let map: std::collections::HashMap<&str, &str> =
         env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
     assert_eq!(map.get("PORT"), Some(&"8787"));
-    assert_eq!(map.get("PROXY_UPSTREAM_URL"), Some(&"https://api.anthropic.com"));
+    assert_eq!(
+        map.get("PROXY_UPSTREAM_URL"),
+        Some(&"https://api.anthropic.com")
+    );
 }
 
 #[test]
@@ -39,7 +41,10 @@ fn build_proxy_env_pins_upstream_when_unset() {
     let env = build_proxy_env(&cfg);
     let map: std::collections::HashMap<&str, &str> =
         env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-    assert_eq!(map.get("PROXY_UPSTREAM_URL"), Some(&"https://api.anthropic.com"));
+    assert_eq!(
+        map.get("PROXY_UPSTREAM_URL"),
+        Some(&"https://api.anthropic.com")
+    );
 }
 
 #[test]
@@ -49,7 +54,10 @@ fn build_proxy_env_uses_configured_upstream() {
     let env = build_proxy_env(&cfg);
     let map: std::collections::HashMap<&str, &str> =
         env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-    assert_eq!(map.get("PROXY_UPSTREAM_URL"), Some(&"http://127.0.0.1:4141"));
+    assert_eq!(
+        map.get("PROXY_UPSTREAM_URL"),
+        Some(&"http://127.0.0.1:4141")
+    );
 }
 
 #[test]
@@ -70,7 +78,8 @@ fn build_proxy_env_maps_all_fields() {
     cfg.rate_limit_burst = 5.0;
 
     let env = build_proxy_env(&cfg);
-    let map: std::collections::HashMap<&str, &str> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    let map: std::collections::HashMap<&str, &str> =
+        env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
 
     assert_eq!(map.get("PORT"), Some(&"9999"));
     assert_eq!(map.get("AUTO_CACHE"), Some(&"1"));
@@ -81,7 +90,10 @@ fn build_proxy_env_maps_all_fields() {
     assert_eq!(map.get("MODEL_OVERRIDE"), Some(&"claude-opus-4-6"));
     assert_eq!(map.get("SCRUB_SECRETS"), Some(&"1"));
     assert_eq!(map.get("TOOL_FILTERS"), Some(&"1"));
-    assert_eq!(map.get("PROXY_UPSTREAM_URL"), Some(&"http://127.0.0.1:4141"));
+    assert_eq!(
+        map.get("PROXY_UPSTREAM_URL"),
+        Some(&"http://127.0.0.1:4141")
+    );
     assert_eq!(map.get("PROXY_API_KEY"), Some(&"secret-key"));
     assert_eq!(map.get("RATE_LIMIT_RPS"), Some(&"30"));
     assert_eq!(map.get("RATE_LIMIT_BURST"), Some(&"5"));
@@ -95,7 +107,8 @@ fn build_proxy_env_skips_defaults() {
     cfg.rate_limit_rps = 60.0;
     cfg.rate_limit_burst = 10.0;
     let env = build_proxy_env(&cfg);
-    let map: std::collections::HashMap<&str, &str> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    let map: std::collections::HashMap<&str, &str> =
+        env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
     assert!(!map.contains_key("TAIL_TTL"));
     assert!(!map.contains_key("RATE_LIMIT_RPS"));
     assert!(!map.contains_key("RATE_LIMIT_BURST"));

@@ -3,16 +3,12 @@
 // Persistence tool handlers: save, list sessions, replay history,
 // and purge old deltas.
 
-use serde_json::Value;
 use crate::mcp::McpState;
 use crate::protocol::send_response;
+use serde_json::Value;
 
 /// Handle `save_context` — persists current in-memory context to the DB.
-pub(crate) fn handle_save_context(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) {
     let _file_path = params["arguments"]["filePath"].as_str();
     let mut saved_count = 0;
 
@@ -34,11 +30,7 @@ pub(crate) fn handle_save_context(
 }
 
 /// Handle `list_sessions` — lists delta counts from the SQLite DB.
-pub(crate) fn handle_list_sessions(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_list_sessions(id: &Value, params: &Value, state: &McpState) {
     let _ = params;
     let guard = state.persistence_store_lock();
     let has_persistence = guard.is_some() && guard.as_ref().and_then(|s| s.sqlite()).is_some();
@@ -61,16 +53,16 @@ pub(crate) fn handle_list_sessions(
 }
 
 /// Handle `replay_history` — loads and replays delta history from DB.
-pub(crate) fn handle_replay_history(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState) {
     let file_path = params["arguments"]["filePath"].as_str().unwrap_or("");
-    let target_seq = params["arguments"]["targetSequence"].as_i64().map(|v| v as u32);
+    let target_seq = params["arguments"]["targetSequence"]
+        .as_i64()
+        .map(|v| v as u32);
 
     if file_path.is_empty() {
-        send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }));
+        send_response(
+            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }),
+        );
         return;
     }
 
@@ -89,25 +81,27 @@ pub(crate) fn handle_replay_history(
             }
             Ok(None) => {
                 drop(guard);
-                send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("No context found for: {}", file_path) } }));
+                send_response(
+                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("No context found for: {}", file_path) } }),
+                );
             }
             Err(e) => {
                 drop(guard);
-                send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Replay failed: {}", e) } }));
+                send_response(
+                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Replay failed: {}", e) } }),
+                );
             }
         }
     } else {
         drop(guard);
-        send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": "Persistence DB not enabled." } }));
+        send_response(
+            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": "Persistence DB not enabled." } }),
+        );
     }
 }
 
 /// Handle `purge_old_deltas` — clean up old deltas from DB.
-pub(crate) fn handle_purge_old_deltas(
-    id: &Value,
-    params: &Value,
-    state: &McpState,
-) {
+pub(crate) fn handle_purge_old_deltas(id: &Value, params: &Value, state: &McpState) {
     let days = params["arguments"]["days"].as_i64().unwrap_or(30).max(1);
 
     let mut guard = state.persistence_store_lock();
@@ -115,15 +109,21 @@ pub(crate) fn handle_purge_old_deltas(
         match store.purge_old_deltas(days as u32) {
             Ok(n) => {
                 drop(guard);
-                send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "ok": true, "purged": n, "message": format!("Purged {} delta(s) older than {} days.", n, days) } }));
+                send_response(
+                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "ok": true, "purged": n, "message": format!("Purged {} delta(s) older than {} days.", n, days) } }),
+                );
             }
             Err(e) => {
                 drop(guard);
-                send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Purge failed: {}", e) } }));
+                send_response(
+                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Purge failed: {}", e) } }),
+                );
             }
         }
     } else {
         drop(guard);
-        send_response(&serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": "Persistence DB not enabled." } }));
+        send_response(
+            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": "Persistence DB not enabled." } }),
+        );
     }
 }

@@ -14,9 +14,9 @@
 //   - Incremental changes (delta transport on large workspace)
 //   - Cache hit rate (second pass should be faster)
 
+use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::mcp::McpState;
-use crate::compression::Fidelity;
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -46,13 +46,24 @@ fn setup_large_test_workspace(n: usize) -> (PathBuf, tempfile::TempDir) {
 
     // ── TypeScript files (Angular components + services) ──────────────
     for i in 0..ts_count {
-        let subdir = if i % 3 == 0 { "components" } else if i % 3 == 1 { "services" } else { "models" };
-        let file_path = path.join("src").join("app").join(subdir).join(format!("entity_{}.ts", i));
+        let subdir = if i % 3 == 0 {
+            "components"
+        } else if i % 3 == 1 {
+            "services"
+        } else {
+            "models"
+        };
+        let file_path = path
+            .join("src")
+            .join("app")
+            .join(subdir)
+            .join(format!("entity_{}.ts", i));
         std::fs::create_dir_all(file_path.parent().unwrap()).ok();
 
         let source = if i % 3 == 0 {
             // Angular component
-            format!(r#"
+            format!(
+                r#"
 import {{ Component, Input, Output, EventEmitter, OnInit }} from '@angular/core';
 import {{ CommonModule }} from '@angular/common';
 import {{ FormsModule }} from '@angular/forms';
@@ -88,10 +99,13 @@ export class EntityComponent{} implements OnInit {{
         return processed;
     }}
 }}
-"#, i, i, i, i, i)
+"#,
+                i, i, i, i, i
+            )
         } else if i % 3 == 1 {
             // Angular service
-            format!(r#"
+            format!(
+                r#"
 import {{ Injectable }} from '@angular/core';
 import {{ HttpClient, HttpParams }} from '@angular/common/http';
 import {{ Observable, of, throwError }} from 'rxjs';
@@ -128,10 +142,13 @@ export class EntityService{} {{
         );
     }}
 }}
-"#, i, i, i, i, i, i, i, i, i)
+"#,
+                i, i, i, i, i, i, i, i, i
+            )
         } else {
             // TypeScript model/interface
-            format!(r#"
+            format!(
+                r#"
 export interface EntityModel{} {{
     id: string;
     name: string;
@@ -162,7 +179,9 @@ export class EntityValidator{} {{
         }};
     }}
 }}
-"#, i, i, i, i, i)
+"#,
+                i, i, i, i, i
+            )
         };
 
         let mut f = std::fs::File::create(&file_path).unwrap();
@@ -173,11 +192,16 @@ export class EntityValidator{} {{
     #[cfg(feature = "csharp")]
     for i in 0..cs_count {
         let subdir = if i % 2 == 0 { "Controllers" } else { "Models" };
-        let file_path = path.join("src").join("WebApi").join(subdir).join(format!("Entity{}.cs", i));
+        let file_path = path
+            .join("src")
+            .join("WebApi")
+            .join(subdir)
+            .join(format!("Entity{}.cs", i));
         std::fs::create_dir_all(file_path.parent().unwrap()).ok();
 
         let source = if i % 2 == 0 {
-            format!(r#"
+            format!(
+                r#"
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -233,9 +257,12 @@ namespace WebApi.Controllers
         }}
     }}
 }}
-"#, i, i, i, i, i, i, i, i, i, i, i)
+"#,
+                i, i, i, i, i, i, i, i, i, i, i
+            )
         } else {
-            format!(r#"
+            format!(
+                r#"
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -275,7 +302,9 @@ namespace WebApi.Models
         public Entity{} Parent {{ get; set; }} = null!;
     }}
 }}
-"#, i, i, i, i, i, i)
+"#,
+                i, i, i, i, i, i
+            )
         };
 
         let mut f = std::fs::File::create(&file_path).unwrap();
@@ -285,10 +314,14 @@ namespace WebApi.Models
     // ── Rust files (modules + structs) — gated by `rust` feature ──────
     #[cfg(feature = "rust")]
     for i in 0..rs_count {
-        let file_path = path.join("src").join("rust").join(format!("module_{}.rs", i));
+        let file_path = path
+            .join("src")
+            .join("rust")
+            .join(format!("module_{}.rs", i));
         std::fs::create_dir_all(file_path.parent().unwrap()).ok();
 
-        let source = format!(r#"
+        let source = format!(
+            r#"
 use std::collections::HashMap;
 use serde::{{Deserialize, Serialize}};
 use thiserror::Error;
@@ -368,7 +401,9 @@ impl EntityRepository {{
         self.store.remove(&id).ok_or(EntityError::NotFound(id)).map(|_| ())
     }}
 }}
-"#, i, i, i, i, i, i, i);
+"#,
+            i, i, i, i, i, i, i
+        );
 
         let mut f = std::fs::File::create(&file_path).unwrap();
         f.write_all(source.as_bytes()).unwrap();
@@ -379,19 +414,30 @@ impl EntityRepository {{
     let java_count = {
         let mut remaining = n - ts_count;
         #[cfg(feature = "csharp")]
-        { remaining -= cs_count; }
+        {
+            remaining -= cs_count;
+        }
         #[cfg(feature = "rust")]
-        { remaining -= rs_count; }
+        {
+            remaining -= rs_count;
+        }
         remaining
     };
     #[cfg(feature = "java")]
     for i in 0..java_count {
-        let file_path = path.join("src").join("main").join("java").join("com").join("example")
-            .join("demo").join(format!("Entity{}.java", i));
+        let file_path = path
+            .join("src")
+            .join("main")
+            .join("java")
+            .join("com")
+            .join("example")
+            .join("demo")
+            .join(format!("Entity{}.java", i));
         std::fs::create_dir_all(file_path.parent().unwrap()).ok();
 
         let source = if i % 2 == 0 {
-            format!(r#"
+            format!(
+                r#"
 package com.example.demo;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -436,9 +482,12 @@ public class Entity{}Controller {{
         return ResponseEntity.noContent().build();
     }}
 }}
-"#, i, i, i, i, i, i, i, i, i)
+"#,
+                i, i, i, i, i, i, i, i, i
+            )
         } else {
-            format!(r#"
+            format!(
+                r#"
 package com.example.demo;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -480,7 +529,9 @@ public class Entity{}Service {{
         return repository.findByNameContainingIgnoreCase(name);
     }}
 }}
-"#, i, i, i, i, i, i, i, i)
+"#,
+                i, i, i, i, i, i, i, i
+            )
         };
 
         let mut f = std::fs::File::create(&file_path).unwrap();
@@ -569,16 +620,35 @@ fn large_workspace_performance_low_fidelity() {
     let result = result.expect("Workspace compression should succeed");
 
     let total_files = result.manifest.matches("FILE:").count();
-    assert!(total_files >= 40, "Should process at least 40 files, got {}", total_files);
-    assert!(result.errors.is_empty(), "Should have zero errors, got {}: {:?}",
-        result.errors.len(), result.errors);
-    assert!(duration.as_secs() < 60, "Should complete in <60s, took {:?}", duration);
+    assert!(
+        total_files >= 40,
+        "Should process at least 40 files, got {}",
+        total_files
+    );
+    assert!(
+        result.errors.is_empty(),
+        "Should have zero errors, got {}: {:?}",
+        result.errors.len(),
+        result.errors
+    );
+    assert!(
+        duration.as_secs() < 60,
+        "Should complete in <60s, took {:?}",
+        duration
+    );
 
-    println!("Low fidelity workspace: {} files in {:?}", total_files, duration);
+    println!(
+        "Low fidelity workspace: {} files in {:?}",
+        total_files, duration
+    );
     if let (Some(before), Some(after)) = (mem_before, mem_after) {
         let delta_mb = (after.saturating_sub(before)) as f64 / 1_048_576.0;
-        println!("  Memory: before={}KB, after={}KB, delta={:.1}MB",
-            before / 1024, after / 1024, delta_mb);
+        println!(
+            "  Memory: before={}KB, after={}KB, delta={:.1}MB",
+            before / 1024,
+            after / 1024,
+            delta_mb
+        );
     }
 }
 
@@ -601,11 +671,22 @@ fn large_workspace_medium_fidelity() {
     let result = result.expect("Medium fidelity workspace compression should succeed");
 
     let total_files = result.manifest.matches("FILE:").count();
-    assert!(total_files >= 15, "Should process at least 15 files, got {}", total_files);
+    assert!(
+        total_files >= 15,
+        "Should process at least 15 files, got {}",
+        total_files
+    );
     assert!(result.errors.is_empty(), "Should have zero errors");
-    assert!(duration.as_secs() < 60, "Should complete in <60s, took {:?}", duration);
+    assert!(
+        duration.as_secs() < 60,
+        "Should complete in <60s, took {:?}",
+        duration
+    );
 
-    println!("Medium fidelity workspace: {} files in {:?}", total_files, duration);
+    println!(
+        "Medium fidelity workspace: {} files in {:?}",
+        total_files, duration
+    );
 }
 
 /// Test: Large workspace with High fidelity
@@ -627,11 +708,22 @@ fn large_workspace_high_fidelity() {
     let result = result.expect("High fidelity workspace compression should succeed");
 
     let total_files = result.manifest.matches("FILE:").count();
-    assert!(total_files >= 10, "Should process at least 10 files, got {}", total_files);
+    assert!(
+        total_files >= 10,
+        "Should process at least 10 files, got {}",
+        total_files
+    );
     assert!(result.errors.is_empty(), "Should have zero errors");
-    assert!(duration.as_secs() < 60, "Should complete in <60s, took {:?}", duration);
+    assert!(
+        duration.as_secs() < 60,
+        "Should complete in <60s, took {:?}",
+        duration
+    );
 
-    println!("High fidelity workspace: {} files in {:?}", total_files, duration);
+    println!(
+        "High fidelity workspace: {} files in {:?}",
+        total_files, duration
+    );
 }
 
 /// Test: Workspace with excluded patterns
@@ -657,8 +749,11 @@ fn large_workspace_with_exclusions() {
     assert!(total_files > 0, "Should process some files");
     assert!(result.errors.is_empty(), "Should have zero errors");
 
-    println!("Workspace with exclusions: {} files processed, {} excluded",
-        total_files, result.excluded.len());
+    println!(
+        "Workspace with exclusions: {} files processed, {} excluded",
+        total_files,
+        result.excluded.len()
+    );
 }
 
 /// Test: Incremental changes on large workspace
@@ -680,7 +775,10 @@ fn large_workspace_incremental_delta() {
 
     // Modify a few files (simulate incremental changes)
     for i in 0..5 {
-        let file_path = workspace_path.join("src").join("app").join("services")
+        let file_path = workspace_path
+            .join("src")
+            .join("app")
+            .join("services")
             .join(format!("entity_{}.ts", i));
         if file_path.exists() {
             let mut f = std::fs::OpenOptions::new()
@@ -701,13 +799,22 @@ fn large_workspace_incremental_delta() {
     let second_file_count = result2.manifest.matches("FILE:").count();
 
     // Both passes should process similar number of files
-    assert_eq!(first_file_count, second_file_count,
+    assert_eq!(
+        first_file_count, second_file_count,
         "File count should be consistent across passes: {} vs {}",
-        first_file_count, second_file_count);
-    assert!(result2.errors.is_empty(), "Second pass should have zero errors");
+        first_file_count, second_file_count
+    );
+    assert!(
+        result2.errors.is_empty(),
+        "Second pass should have zero errors"
+    );
 
-    println!("Incremental delta: {} files (first), {} files (second), {} errors",
-        first_file_count, second_file_count, result2.errors.len());
+    println!(
+        "Incremental delta: {} files (first), {} files (second), {} errors",
+        first_file_count,
+        second_file_count,
+        result2.errors.len()
+    );
 }
 
 /// Test: Cache hit rate — second pass on unchanged workspace should be faster
@@ -732,7 +839,10 @@ fn large_workspace_cache_hit_rate() {
     let duration1 = start1.elapsed();
     let result1 = result1.expect("First pass (cold cache) should succeed");
     let first_file_count = result1.manifest.matches("FILE:").count();
-    assert!(result1.errors.is_empty(), "First pass should have zero errors");
+    assert!(
+        result1.errors.is_empty(),
+        "First pass should have zero errors"
+    );
 
     // Second pass: same workspace, should hit cache
     let start2 = Instant::now();
@@ -744,23 +854,33 @@ fn large_workspace_cache_hit_rate() {
     let duration2 = start2.elapsed();
     let result2 = result2.expect("Second pass (cache) should succeed");
     let second_file_count = result2.manifest.matches("FILE:").count();
-    assert!(result2.errors.is_empty(), "Second pass should have zero errors");
+    assert!(
+        result2.errors.is_empty(),
+        "Second pass should have zero errors"
+    );
 
     // Both passes should produce the same file count
-    assert_eq!(first_file_count, second_file_count,
+    assert_eq!(
+        first_file_count, second_file_count,
         "File count should be identical across passes: {} vs {}",
-        first_file_count, second_file_count);
+        first_file_count, second_file_count
+    );
 
     // Second pass should be faster (cache hit)
-    assert!(duration2 < duration1,
+    assert!(
+        duration2 < duration1,
         "Second pass ({:?}) should be faster than first ({:?}) — cache hit expected",
-        duration2, duration1);
+        duration2,
+        duration1
+    );
 
     let speedup = if duration2.as_nanos() > 0 {
         duration1.as_nanos() / duration2.as_nanos()
     } else {
         u128::MAX
     };
-    println!("Cache hit rate: first={:?}, second={:?} ({}x faster)",
-        duration1, duration2, speedup);
+    println!(
+        "Cache hit rate: first={:?}, second={:?} ({}x faster)",
+        duration1, duration2, speedup
+    );
 }

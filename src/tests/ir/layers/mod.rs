@@ -6,10 +6,10 @@
 mod java;
 
 use crate::compression::Fidelity;
-use crate::ir::layers::LayerContext;
 use crate::ir::layers::LanguageLayer;
-use crate::ir::layers::typescript::TypeScriptLayer;
+use crate::ir::layers::LayerContext;
 use crate::ir::layers::csharp::CSharpLayer;
+use crate::ir::layers::typescript::TypeScriptLayer;
 // P0-4: ir::layers::MetaLayer and angular/spring/dotnet modules removed.
 // Meta-layers now use the canonical trait in src/layers/meta/.
 // LanguageLayer tests remain (TypeScript, C#).
@@ -32,8 +32,14 @@ fn ts_layer_extracts_extends_from_class() {
 
     let ops = layer.process_capture("class.root", "class Foo extends Bar {}", &mut ctx);
 
-    let has_extend = ops.iter().any(|op| matches!(op, CoreOp::Extends(c, b) if c == "C1" && b == "Bar"));
-    assert!(has_extend, "TypeScript layer should emit EXT op for extends: {:?}", ops);
+    let has_extend = ops
+        .iter()
+        .any(|op| matches!(op, CoreOp::Extends(c, b) if c == "C1" && b == "Bar"));
+    assert!(
+        has_extend,
+        "TypeScript layer should emit EXT op for extends: {:?}",
+        ops
+    );
 }
 
 #[test]
@@ -44,10 +50,15 @@ fn ts_layer_extracts_implements_from_class() {
 
     let ops = layer.process_capture("class.root", "class Foo implements Bar, Baz {}", &mut ctx);
 
-    let implement_count = ops.iter()
+    let implement_count = ops
+        .iter()
         .filter(|op| matches!(op, CoreOp::Implements(..)))
         .count();
-    assert_eq!(implement_count, 2, "Should emit 2 IMPL ops for 2 interfaces: {:?}", ops);
+    assert_eq!(
+        implement_count, 2,
+        "Should emit 2 IMPL ops for 2 interfaces: {:?}",
+        ops
+    );
 }
 
 #[test]
@@ -61,7 +72,11 @@ fn ts_layer_extracts_export_flag() {
     let has_export = ops.iter().any(|op| {
         matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"EXPORT".to_string()))
     });
-    assert!(has_export, "TypeScript layer should emit EXPORT flag: {:?}", ops);
+    assert!(
+        has_export,
+        "TypeScript layer should emit EXPORT flag: {:?}",
+        ops
+    );
 }
 
 #[test]
@@ -75,7 +90,11 @@ fn ts_layer_extracts_async_flag() {
     let has_async = ops.iter().any(|op| {
         matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"ASYNC".to_string()))
     });
-    assert!(has_async, "TypeScript layer should emit ASYNC flag: {:?}", ops);
+    assert!(
+        has_async,
+        "TypeScript layer should emit ASYNC flag: {:?}",
+        ops
+    );
 }
 
 #[test]
@@ -98,7 +117,11 @@ fn ts_layer_extracts_static_flag() {
     let has_static = ops.iter().any(|op| {
         matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"STATIC".to_string()))
     });
-    assert!(has_static, "TypeScript layer should emit STATIC flag: {:?}", ops);
+    assert!(
+        has_static,
+        "TypeScript layer should emit STATIC flag: {:?}",
+        ops
+    );
 }
 
 // ── C# Layer Tests ────────────────────────────────────
@@ -117,26 +140,46 @@ fn cs_layer_extracts_inheritance_with_colon() {
 
     let ops = layer.process_capture("class.root", "public class MyClass : BaseClass", &mut ctx);
 
-    let has_extend = ops.iter().any(|op| matches!(op, CoreOp::Extends(c, b) if c == "C1" && b == "BaseClass"));
-    assert!(has_extend, "C# layer should emit EXT op for inheritance: {:?}", ops);
+    let has_extend = ops
+        .iter()
+        .any(|op| matches!(op, CoreOp::Extends(c, b) if c == "C1" && b == "BaseClass"));
+    assert!(
+        has_extend,
+        "C# layer should emit EXT op for inheritance: {:?}",
+        ops
+    );
 }
 
 #[test]
 fn cs_layer_extracts_interfaces_from_colon() {
     let mut layer = CSharpLayer::new();
-    let mut ctx = LayerContext::new("class MyClass : BaseClass, IInterface1, IInterface2", Fidelity::Low);
+    let mut ctx = LayerContext::new(
+        "class MyClass : BaseClass, IInterface1, IInterface2",
+        Fidelity::Low,
+    );
     ctx.current_class = Some("C1".into());
 
-    let ops = layer.process_capture("class.root", "class MyClass : BaseClass, IInterface1, IInterface2", &mut ctx);
+    let ops = layer.process_capture(
+        "class.root",
+        "class MyClass : BaseClass, IInterface1, IInterface2",
+        &mut ctx,
+    );
 
     // First item after : is the base class (Extends), rest are interfaces (Implements)
-    let has_extend = ops.iter().any(|op| matches!(op, CoreOp::Extends(c, b) if c == "C1" && b == "BaseClass"));
+    let has_extend = ops
+        .iter()
+        .any(|op| matches!(op, CoreOp::Extends(c, b) if c == "C1" && b == "BaseClass"));
     assert!(has_extend, "C# should emit EXT for base class: {:?}", ops);
 
-    let implement_count = ops.iter()
+    let implement_count = ops
+        .iter()
         .filter(|op| matches!(op, CoreOp::Implements(..)))
         .count();
-    assert_eq!(implement_count, 2, "C# should emit 2 IMPL ops for interfaces: {:?}", ops);
+    assert_eq!(
+        implement_count, 2,
+        "C# should emit 2 IMPL ops for interfaces: {:?}",
+        ops
+    );
 }
 
 #[test]
@@ -150,7 +193,11 @@ fn cs_layer_extracts_public_flag() {
     let has_export = ops.iter().any(|op| {
         matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"EXPORT".to_string()))
     });
-    assert!(has_export, "C# layer should emit EXPORT for public class: {:?}", ops);
+    assert!(
+        has_export,
+        "C# layer should emit EXPORT for public class: {:?}",
+        ops
+    );
 }
 
 #[test]
@@ -164,7 +211,11 @@ fn cs_layer_extracts_abstract_flag() {
     let has_abstract = ops.iter().any(|op| {
         matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"ABSTRACT".to_string()))
     });
-    assert!(has_abstract, "C# layer should emit ABSTRACT flag: {:?}", ops);
+    assert!(
+        has_abstract,
+        "C# layer should emit ABSTRACT flag: {:?}",
+        ops
+    );
 }
 
 // ── Layer Context Tests ───────────────────────────────

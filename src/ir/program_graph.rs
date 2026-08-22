@@ -64,10 +64,7 @@ impl GraphBuilder {
     /// Build a program graph from compiled IRs and symbol table.
     /// Lazy — called on demand, not during compilation.
     /// All edges have confidence = 1.0 (structural facts).
-    pub fn build(
-        compiled_irs: &[CompiledIR],
-        _symbol_table: &GlobalSymbolTable,
-    ) -> ProgramGraph {
+    pub fn build(compiled_irs: &[CompiledIR], _symbol_table: &GlobalSymbolTable) -> ProgramGraph {
         let mut graph = ProgramGraph::default();
 
         for ir in compiled_irs {
@@ -241,32 +238,38 @@ impl ProgramGraph {
 
     /// Get all edges of a specific type.
     pub fn edges_of_type(&self, edge_type: &str) -> Vec<&GraphEdge> {
-        self.edges.iter().filter(|e| matches_edge_type(e, edge_type)).collect()
+        self.edges
+            .iter()
+            .filter(|e| matches_edge_type(e, edge_type))
+            .collect()
     }
 
     /// Get fan-in (number of callers) for a method.
     pub fn fan_in(&self, method_id: &str) -> usize {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter(|e| matches!(e, GraphEdge::Calls { to, .. } if to == method_id))
             .count()
     }
 
     /// Get fan-out (number of callees) for a method.
     pub fn fan_out(&self, method_id: &str) -> usize {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter(|e| matches!(e, GraphEdge::Calls { from, .. } if from == method_id))
             .count()
     }
 }
 
 fn matches_edge_type(edge: &GraphEdge, edge_type: &str) -> bool {
-    matches!((edge, edge_type),
+    matches!(
+        (edge, edge_type),
         (GraphEdge::Calls { .. }, "calls")
-        | (GraphEdge::Extends { .. }, "extends")
-        | (GraphEdge::Implements { .. }, "implements")
-        | (GraphEdge::Injects { .. }, "injects")
-        | (GraphEdge::DataFlowRead { .. }, "dataflow_read")
-        | (GraphEdge::DataFlowWrite { .. }, "dataflow_write")
+            | (GraphEdge::Extends { .. }, "extends")
+            | (GraphEdge::Implements { .. }, "implements")
+            | (GraphEdge::Injects { .. }, "injects")
+            | (GraphEdge::DataFlowRead { .. }, "dataflow_read")
+            | (GraphEdge::DataFlowWrite { .. }, "dataflow_write")
     )
 }
 

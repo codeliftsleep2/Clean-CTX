@@ -11,19 +11,18 @@
 //   traits.rs    — ToolHandlerDef trait (v0.3.0 placeholder)
 //   registry.rs  — HandlerRegistry + wiring
 
-pub mod core;
 pub mod context;
+pub mod core;
 pub mod persistence;
+pub mod registry;
 pub mod stats;
 pub mod traits;
-pub mod registry;
 
 // Re-exports for API consumers (v0.3.0+)
 #[allow(unused_imports)]
-pub use traits::BoxedHandlerFn;
-#[allow(unused_imports)]
 pub use registry::HandlerRegistry;
-
+#[allow(unused_imports)]
+pub use traits::BoxedHandlerFn;
 
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/tool_handlers.rs"]

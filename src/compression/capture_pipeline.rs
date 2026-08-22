@@ -78,12 +78,9 @@ where
     while let Some(mat) = matches.next() {
         for capture in mat.captures.iter() {
             let capture_name = query.capture_names()[capture.index as usize].to_string();
-            tracing::debug!("[run_capture_pipeline] capture: {}", capture_name);
             if let Ok(text_slice) = capture.node.utf8_text(source_bytes) {
                 let raw = text_slice.to_string();
-                 tracing::debug!("[run_capture_pipeline] calling process() for {}", capture_name);
                 if let Some(processed) = process(&capture_name, &raw, fidelity) {
-                    tracing::debug!("[run_capture_pipeline] process() returned");
                     all_captures.push(CapEntry {
                         name: capture_name,
                         text: processed,

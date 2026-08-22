@@ -41,14 +41,25 @@ pub fn compute_pagerank(
 
     // Normalize IR scores to 0.0 - 1.0 range
     let ir_max = ir_scores.values().cloned().fold(0.0_f64, f64::max);
-    let normalized_ir: HashMap<&str, f64> = ir_scores.iter()
+    let normalized_ir: HashMap<&str, f64> = ir_scores
+        .iter()
         .map(|(k, v)| (k.as_str(), if ir_max > 0.0 { v / ir_max } else { 0.0 }))
         .collect();
 
     // Normalize CBM scores to 0.0 - 1.0 range
     let cbm_max = cbm_scores.values().map(|s| s.score).fold(0.0_f64, f64::max);
-    let normalized_cbm: HashMap<&str, f64> = cbm_scores.iter()
-        .map(|(k, v)| (k.as_str(), if cbm_max > 0.0 { v.score / cbm_max } else { 0.0 }))
+    let normalized_cbm: HashMap<&str, f64> = cbm_scores
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.as_str(),
+                if cbm_max > 0.0 {
+                    v.score / cbm_max
+                } else {
+                    0.0
+                },
+            )
+        })
         .collect();
 
     // Build combined scores
@@ -57,13 +68,16 @@ pub fn compute_pagerank(
         let ir = normalized_ir.get(sym.as_str()).copied().unwrap_or(0.0);
         let cbm = normalized_cbm.get(sym.as_str()).copied().unwrap_or(0.0);
         let combined = ir * ir_w + cbm * cbm_w;
-        result.insert(sym.clone(), PageRankScore {
-            symbol: sym.clone(),
-            file: importance.file.clone(),
-            combined_score: combined,
-            ir_score: ir,
-            cbm_score: cbm,
-        });
+        result.insert(
+            sym.clone(),
+            PageRankScore {
+                symbol: sym.clone(),
+                file: importance.file.clone(),
+                combined_score: combined,
+                ir_score: ir,
+                cbm_score: cbm,
+            },
+        );
     }
 
     // Add IR-only symbols (not in CBM)
@@ -71,13 +85,16 @@ pub fn compute_pagerank(
         if !result.contains_key(sym) {
             let ir = normalized_ir.get(sym.as_str()).copied().unwrap_or(0.0);
             let combined = ir * ir_w; // cbm = 0.0
-            result.insert(sym.clone(), PageRankScore {
-                symbol: sym.clone(),
-                file: String::new(),
-                combined_score: combined,
-                ir_score: ir,
-                cbm_score: 0.0,
-            });
+            result.insert(
+                sym.clone(),
+                PageRankScore {
+                    symbol: sym.clone(),
+                    file: String::new(),
+                    combined_score: combined,
+                    ir_score: ir,
+                    cbm_score: 0.0,
+                },
+            );
         }
     }
 
@@ -87,7 +104,11 @@ pub fn compute_pagerank(
 /// Get the top-N symbols by combined PageRank score.
 pub fn top_symbols(scores: &HashMap<String, PageRankScore>, n: usize) -> Vec<&PageRankScore> {
     let mut sorted: Vec<&PageRankScore> = scores.values().collect();
-    sorted.sort_by(|a, b| b.combined_score.partial_cmp(&a.combined_score).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_by(|a, b| {
+        b.combined_score
+            .partial_cmp(&a.combined_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     sorted.truncate(n);
     sorted
 }
@@ -111,7 +132,10 @@ mod tests {
         let result = compute_pagerank(ir, HashMap::new(), None);
         assert_eq!(result.len(), 2);
         // UserService.login is more important
-        assert!(result["UserService.login"].combined_score > result["PaymentGateway.charge"].combined_score);
+        assert!(
+            result["UserService.login"].combined_score
+                > result["PaymentGateway.charge"].combined_score
+        );
         // IR-only symbols have 0.0 cbm_score
         assert_eq!(result["UserService.login"].cbm_score, 0.0);
     }
@@ -119,12 +143,22 @@ mod tests {
     #[test]
     fn test_compute_pagerank_cbm_only() {
         let mut cbm = HashMap::new();
-        cbm.insert("AuthService".into(), SymbolImportance {
-            symbol: "AuthService".into(), score: 0.9, file: "auth.rs".into(),
-        });
-        cbm.insert("Logger".into(), SymbolImportance {
-            symbol: "Logger".into(), score: 0.3, file: "log.rs".into(),
-        });
+        cbm.insert(
+            "AuthService".into(),
+            SymbolImportance {
+                symbol: "AuthService".into(),
+                score: 0.9,
+                file: "auth.rs".into(),
+            },
+        );
+        cbm.insert(
+            "Logger".into(),
+            SymbolImportance {
+                symbol: "Logger".into(),
+                score: 0.3,
+                file: "log.rs".into(),
+            },
+        );
         let result = compute_pagerank(HashMap::new(), cbm, None);
         assert_eq!(result.len(), 2);
         assert!(result["AuthService"].combined_score > result["Logger"].combined_score);
@@ -135,17 +169,28 @@ mod tests {
     fn test_compute_pagerank_combined() {
         // IR scores for UserService (fully qualified) and PaymentGateway
         let mut ir = HashMap::new();
-        ir.insert("UserService".into(), 5.0);  // Same name as CBM entry
+        ir.insert("UserService".into(), 5.0); // Same name as CBM entry
         ir.insert("PaymentGateway.charge".into(), 10.0);
 
         // CBM gives high importance to AuthService and moderate to UserService
         let mut cbm = HashMap::new();
-        cbm.insert("UserService".into(), SymbolImportance {  // Same name matched
-            symbol: "UserService".into(), score: 0.6, file: "user.rs".into(),
-        });
-        cbm.insert("AuthService".into(), SymbolImportance {
-            symbol: "AuthService".into(), score: 0.9, file: "auth.rs".into(),
-        });
+        cbm.insert(
+            "UserService".into(),
+            SymbolImportance {
+                // Same name matched
+                symbol: "UserService".into(),
+                score: 0.6,
+                file: "user.rs".into(),
+            },
+        );
+        cbm.insert(
+            "AuthService".into(),
+            SymbolImportance {
+                symbol: "AuthService".into(),
+                score: 0.9,
+                file: "auth.rs".into(),
+            },
+        );
 
         let result = compute_pagerank(ir, cbm, Some(0.6));
         // 3 entries: UserService (IR + CBM), PaymentGateway.charge (IR-only), AuthService (CBM-only)
@@ -154,7 +199,10 @@ mod tests {
         // UserService should have both IR and CBM scores (same key in both maps)
         let us = &result["UserService"];
         assert!(us.ir_score > 0.0, "IR score for UserService should be > 0");
-        assert!(us.cbm_score > 0.0, "CBM score for UserService should be > 0");
+        assert!(
+            us.cbm_score > 0.0,
+            "CBM score for UserService should be > 0"
+        );
 
         // PaymentGateway is IR-only (cbm_score = 0)
         let pg = &result["PaymentGateway.charge"];
@@ -164,18 +212,36 @@ mod tests {
     #[test]
     fn test_top_symbols_orders_by_score() {
         let mut scores = HashMap::new();
-        scores.insert("low".into(), PageRankScore {
-            symbol: "low".into(), file: "".into(),
-            combined_score: 0.1, ir_score: 0.0, cbm_score: 0.0,
-        });
-        scores.insert("high".into(), PageRankScore {
-            symbol: "high".into(), file: "".into(),
-            combined_score: 0.9, ir_score: 0.0, cbm_score: 0.0,
-        });
-        scores.insert("medium".into(), PageRankScore {
-            symbol: "medium".into(), file: "".into(),
-            combined_score: 0.5, ir_score: 0.0, cbm_score: 0.0,
-        });
+        scores.insert(
+            "low".into(),
+            PageRankScore {
+                symbol: "low".into(),
+                file: "".into(),
+                combined_score: 0.1,
+                ir_score: 0.0,
+                cbm_score: 0.0,
+            },
+        );
+        scores.insert(
+            "high".into(),
+            PageRankScore {
+                symbol: "high".into(),
+                file: "".into(),
+                combined_score: 0.9,
+                ir_score: 0.0,
+                cbm_score: 0.0,
+            },
+        );
+        scores.insert(
+            "medium".into(),
+            PageRankScore {
+                symbol: "medium".into(),
+                file: "".into(),
+                combined_score: 0.5,
+                ir_score: 0.0,
+                cbm_score: 0.0,
+            },
+        );
 
         let top = top_symbols(&scores, 2);
         assert_eq!(top.len(), 2);
@@ -186,14 +252,26 @@ mod tests {
     #[test]
     fn test_top_symbols_limit_less_than_total() {
         let mut scores = HashMap::new();
-        scores.insert("a".into(), PageRankScore {
-            symbol: "a".into(), file: "".into(),
-            combined_score: 0.1, ir_score: 0.0, cbm_score: 0.0,
-        });
-        scores.insert("b".into(), PageRankScore {
-            symbol: "b".into(), file: "".into(),
-            combined_score: 0.9, ir_score: 0.0, cbm_score: 0.0,
-        });
+        scores.insert(
+            "a".into(),
+            PageRankScore {
+                symbol: "a".into(),
+                file: "".into(),
+                combined_score: 0.1,
+                ir_score: 0.0,
+                cbm_score: 0.0,
+            },
+        );
+        scores.insert(
+            "b".into(),
+            PageRankScore {
+                symbol: "b".into(),
+                file: "".into(),
+                combined_score: 0.9,
+                ir_score: 0.0,
+                cbm_score: 0.0,
+            },
+        );
 
         let top = top_symbols(&scores, 10);
         assert_eq!(top.len(), 2);

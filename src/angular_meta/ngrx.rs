@@ -368,7 +368,7 @@ impl NgRxShape {
                 Fidelity::Low => {
                     s.push_str(&format!("  Φaction:{}\n", action.name));
                 }
-                Fidelity::Medium | Fidelity::High => {
+                Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     if let Some(ref props) = action.props_type {
                         s.push_str(&format!("  Φaction:{} '{}' props<{}>\n",
                             action.name, action.event_string, props));
@@ -386,7 +386,7 @@ impl NgRxShape {
                 Fidelity::Low => {
                     s.push_str(&format!("  Φreducer:{}\n", reducer.name));
                 }
-                Fidelity::Medium | Fidelity::High => {
+                Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     if let Some(ref st) = reducer.state_type {
                         s.push_str(&format!("  Φreducer:{} → {}\n", reducer.name, st));
                     } else {
@@ -406,7 +406,7 @@ impl NgRxShape {
                 Fidelity::Low => {
                     s.push_str(&format!("  Φeffect:{}\n", effect.name));
                 }
-                Fidelity::Medium | Fidelity::High => {
+                Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     let mut line = format!("  Φeffect:{}", effect.name);
                     if let Some(ref src) = effect.source_action {
                         line.push_str(&format!(" ← {}", src));
@@ -419,7 +419,10 @@ impl NgRxShape {
                     }
                     s.push_str(&line);
                     s.push('\n');
-                    if fidelity == Fidelity::High {
+                    if fidelity == Fidelity::High
+                        || fidelity == Fidelity::Edit
+                        || fidelity == Fidelity::Verbatim
+                    {
                         if let Some(ref success) = effect.success_action {
                             s.push_str(&format!("    → {}\n", success));
                         }
@@ -437,7 +440,7 @@ impl NgRxShape {
                 Fidelity::Low => {
                     s.push_str(&format!("  Φselector:{}\n", selector.name));
                 }
-                Fidelity::Medium | Fidelity::High => {
+                Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     if selector.inputs.is_empty() {
                         s.push_str(&format!("  Φselector:{}\n", selector.name));
                     } else {
@@ -461,7 +464,7 @@ impl NgRxShape {
                     s.push_str(&line);
                     s.push('\n');
                 }
-                Fidelity::High => {
+                Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     let mut line = format!("  Φentity:{}", entity.entity_type);
                     if entity.data_layer {
                         line.push_str(" (data-layer)");

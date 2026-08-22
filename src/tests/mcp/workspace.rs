@@ -16,11 +16,7 @@ fn create_ts_file(dir: &Path, name: &str, content: &str) {
 fn compress_workspace_dir_respects_exclude_patterns() {
     let dir = TempDir::new().unwrap();
     let dir_path = dir.path().to_path_buf();
-    create_ts_file(
-        dir.path(),
-        "keep.ts",
-        "export class A { foo(): void {} }\n",
-    );
+    create_ts_file(dir.path(), "keep.ts", "export class A { foo(): void {} }\n");
     create_ts_file(
         dir.path(),
         "skip-me.ts",
@@ -34,12 +30,8 @@ fn compress_workspace_dir_respects_exclude_patterns() {
     config.exclude_patterns.push("skip-me*".to_string());
     let state = McpState::new(config);
 
-    let result = compress_workspace_dir(
-        dir_path.to_str().unwrap(),
-        Fidelity::Low,
-        &state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir_path.to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     let manifest = &result.manifest;
     // The kept file shows up in the manifest.
@@ -87,12 +79,8 @@ fn workspace_emits_alias_cross_reference() {
     let config = CleanCtxConfig::default();
     let state = McpState::new(config);
 
-    let result = compress_workspace_dir(
-        dir_path.to_str().unwrap(),
-        Fidelity::Low,
-        &state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir_path.to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     let manifest = &result.manifest;
     // The manifest should contain the per-file alias line.
@@ -136,22 +124,18 @@ fn workspace_shares_aliases_with_per_file_tool() {
     .expect("per-file compress should succeed");
 
     // The per-file result should contain an alias.
-    assert!(compressed.contains('α'), "per-file output should contain alias");
+    assert!(
+        compressed.contains('α'),
+        "per-file output should contain alias"
+    );
 
     // Now compress the workspace — it should reuse the same alias.
-    let result = compress_workspace_dir(
-        dir_path.to_str().unwrap(),
-        Fidelity::Low,
-        &state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir_path.to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     // Both the per-file output and workspace manifest should have
     // the same alias for the same file.
-    let per_file_alias = compressed
-        .lines()
-        .find(|l| l.contains('α'))
-        .unwrap();
+    let per_file_alias = compressed.lines().find(|l| l.contains('α')).unwrap();
     let workspace_alias_line = result
         .manifest
         .lines()
@@ -183,11 +167,7 @@ fn collect_source_files_survives_symlink_loop() {
     // Create a subdirectory with a real .ts file.
     let sub = dir_path.join("sub");
     fs::create_dir(&sub).unwrap();
-    create_ts_file(
-        &sub,
-        "good.ts",
-        "export class Good {}\n",
-    );
+    create_ts_file(&sub, "good.ts", "export class Good {}\n");
 
     // Create a symlink loop: loop_dir -> dir_path/sub/loop_dir
     // (which we're about to create).
@@ -255,12 +235,8 @@ fn compress_pass_emits_per_file_section() {
     let config = CleanCtxConfig::default();
     let state = McpState::new(config);
 
-    let result = compress_workspace_dir(
-        dir.path().to_str().unwrap(),
-        Fidelity::Low,
-        &state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     assert!(
         result.manifest.contains("FILE:"),
@@ -286,17 +262,17 @@ fn bundle_pass_emits_phi_bundle_and_footer() {
         "@Component({selector:'app-my'}) export class MyComp {}",
     );
     create_ts_file(dir.path(), "my-comp.component.html", "<div>hello</div>");
-    create_ts_file(dir.path(), "my-comp.component.scss", ".root { color: red; }");
+    create_ts_file(
+        dir.path(),
+        "my-comp.component.scss",
+        ".root { color: red; }",
+    );
 
     let config = CleanCtxConfig::default();
     let state = McpState::new(config);
 
-    let result = compress_workspace_dir(
-        dir.path().to_str().unwrap(),
-        Fidelity::Low,
-        &state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     // Bundle pass emits §ΦMAP footer when bundles exist.
     assert!(
@@ -323,12 +299,8 @@ fn graph_pass_emits_phi_graph_section() {
     let config = CleanCtxConfig::default();
     let state = McpState::new(config);
 
-    let result = compress_workspace_dir(
-        dir.path().to_str().unwrap(),
-        Fidelity::Low,
-        &state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     assert!(
         result.manifest.contains("§ΦGRAPH"),
@@ -382,26 +354,32 @@ fn compress_workspace_caches_result() {
     let state = McpState::new(config);
 
     // First call: cache miss, normal compression
-    let result1 = compress_workspace_dir(
-        dir.path().to_str().unwrap(),
-        Fidelity::Low,
-        &state,
-    )
-    .expect("first compress should succeed");
-    assert!(result1.manifest.contains("alpha.ts"), "first call should contain alpha.ts");
+    let result1 = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("first compress should succeed");
+    assert!(
+        result1.manifest.contains("alpha.ts"),
+        "first call should contain alpha.ts"
+    );
 
     // Second call with same directory and no file changes: cache hit
-    let result2 = compress_workspace_dir(
-        dir.path().to_str().unwrap(),
-        Fidelity::Low,
-        &state,
-    )
-    .expect("second compress should succeed");
+    let result2 = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("second compress should succeed");
 
     // Both results should be identical
-    assert_eq!(result1.manifest, result2.manifest, "cached result should match original");
-    assert_eq!(result1.errors.len(), result2.errors.len(), "errors should match");
-    assert_eq!(result1.excluded.len(), result2.excluded.len(), "excluded should match");
+    assert_eq!(
+        result1.manifest, result2.manifest,
+        "cached result should match original"
+    );
+    assert_eq!(
+        result1.errors.len(),
+        result2.errors.len(),
+        "errors should match"
+    );
+    assert_eq!(
+        result1.excluded.len(),
+        result2.excluded.len(),
+        "excluded should match"
+    );
 }
 
 /// F-22: Different fidelities must produce different cache entries.
@@ -419,24 +397,22 @@ fn compress_workspace_cache_key_includes_fidelity() {
     let state = McpState::new(config);
 
     // Compress at Low fidelity: uses global symbol two-pass approach
-    let low_result = compress_workspace_dir(
-        dir.path().to_str().unwrap(),
-        Fidelity::Low,
-        &state,
-    )
-    .expect("low fidelity compress should succeed");
-    assert!(low_result.manifest.contains("beta.ts"), "low fidelity should contain beta.ts");
+    let low_result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("low fidelity compress should succeed");
+    assert!(
+        low_result.manifest.contains("beta.ts"),
+        "low fidelity should contain beta.ts"
+    );
 
     // Compress at Medium fidelity: uses standard compress_pass
-    let medium_result = compress_workspace_dir(
-        dir.path().to_str().unwrap(),
-        Fidelity::Medium,
-        &state,
-    )
-    .expect("medium fidelity compress should succeed");
+    let medium_result =
+        compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Medium, &state)
+            .expect("medium fidelity compress should succeed");
 
     // The manifests should differ because different fidelity paths produce different output
     // (Low fidelity uses the global symbol two-pass path)
-    assert_ne!(low_result.manifest, medium_result.manifest,
-        "different fidelities should produce different cached results");
+    assert_ne!(
+        low_result.manifest, medium_result.manifest,
+        "different fidelities should produce different cached results"
+    );
 }

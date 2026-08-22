@@ -192,14 +192,15 @@ impl ProxyConfig {
             .map(|v| v == "1" || v.to_lowercase() == "true")
             .unwrap_or(false);
 
-        let tail_ttl = env_var("TAIL_TTL")
-            .unwrap_or_else(|| "5m".to_string());
+        let tail_ttl = env_var("TAIL_TTL").unwrap_or_else(|| "5m".to_string());
 
         let drop_tools: Vec<String> = env_var("DROP_TOOLS")
-            .map(|v| v.split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect())
+            .map(|v| {
+                v.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
             .unwrap_or_default();
 
         let drop_tools_set: HashSet<String> = drop_tools.iter().cloned().collect();
@@ -226,8 +227,7 @@ impl ProxyConfig {
             .map(|v| v == "1" || v.to_lowercase() == "true")
             .unwrap_or(false);
 
-        let log_dir = env_var("LOG_DIR")
-            .unwrap_or_else(|| ".clean-ctx/proxy-logs".to_string());
+        let log_dir = env_var("LOG_DIR").unwrap_or_else(|| ".clean-ctx/proxy-logs".to_string());
 
         Self {
             port,
@@ -355,7 +355,11 @@ fn env_var(name: &str) -> Option<String> {
     match std::env::var(name) {
         Ok(v) => {
             let trimmed = v.trim().to_string();
-            if trimmed.is_empty() { None } else { Some(trimmed) }
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
         }
         Err(_) => None,
     }

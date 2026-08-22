@@ -36,10 +36,10 @@ pub(crate) mod text_delta;
 // short alias tokens (`UserId` → `$uid`) and emits a reversible `§TA`
 // footer. Wired into `compress_file_with_source`, `compress_text`, and
 // `compress_source` in `pipeline.rs`.
+pub mod fidelity;
+pub mod language;
 pub(crate) mod type_aliases;
 pub(crate) mod workspace_symbols;
-pub mod language;
-pub mod fidelity;
 
 // Re-export shared types for downstream callers.
 //
@@ -55,4 +55,4 @@ pub use language::{detect_language, language_for_extension, looks_like_csharp};
 
 // Re-export the orchestrator entry points and the progress type.
 pub use pipeline::compress_file;
-pub use streaming::{compress_file_streaming, CompressionProgress};
+pub use streaming::{CompressionProgress, compress_file_streaming};

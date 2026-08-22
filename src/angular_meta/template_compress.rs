@@ -11,7 +11,7 @@
 // It also provides PrimeNG component recognition (`Φp-<name>:` markers)
 // for the Phase 4 deliverable.
 
-use crate::angular_meta::template::{extract_template_shape, TemplateShape};
+use crate::angular_meta::template::{TemplateShape, extract_template_shape};
 use crate::compression::Fidelity;
 
 /// Compress an Angular template at the given fidelity level.

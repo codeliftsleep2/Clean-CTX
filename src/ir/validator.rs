@@ -13,9 +13,9 @@
 // - Side-effect consistency: EFFECT("async") → ExecutionContext("async")
 // - Side-effect consistency: EFFECT("io") → should have CTX with matching context
 
-use std::collections::{HashMap, HashSet};
 use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
+use std::collections::{HashMap, HashSet};
 
 /// Validates a CompiledIR against structural invariants.
 pub trait IRValidator {
@@ -67,7 +67,10 @@ impl IRValidator for DefaultValidator {
                 }
                 CoreOp::DefMethod(cid, mid, _) => {
                     method_ids.insert(mid.clone());
-                    methods_per_class.entry(cid.clone()).or_default().insert(mid.clone());
+                    methods_per_class
+                        .entry(cid.clone())
+                        .or_default()
+                        .insert(mid.clone());
                 }
                 CoreOp::DefField(..) => {}
                 CoreOp::DefInterface(..) => {}

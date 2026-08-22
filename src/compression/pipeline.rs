@@ -695,6 +695,8 @@ pub fn assemble_body(output_lines: &[String], fidelity: Fidelity) -> String {
         Fidelity::Low => output_lines.join(";"),
         Fidelity::Medium => output_lines.join("\n"),
         Fidelity::High => output_lines.join("\n"),
+        // Edit/Verbatim preserve structure — newline-joined.
+        Fidelity::Edit | Fidelity::Verbatim => output_lines.join("\n"),
     }
 }
 

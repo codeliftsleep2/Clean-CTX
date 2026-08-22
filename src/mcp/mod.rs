@@ -11,13 +11,11 @@
 //   - workspace  : workspace-level operations (compress_workspace_dir, collect_source_files)
 //   - state      : per-session state shared by all tool handlers (F-05)
 
+pub(crate) mod buffered_store;
+pub(crate) mod cache_hints;
+pub(crate) mod context_store;
 pub mod dispatcher;
 mod handlers;
-pub(crate) mod tool_handlers;
-pub(crate) mod tool_helpers;
-pub(crate) mod cache_hints;
-pub(crate) mod buffered_store;
-pub(crate) mod context_store;
 pub(crate) mod heuristics;
 pub(crate) mod prompts;
 pub(crate) mod proxy_stats;
@@ -26,6 +24,8 @@ mod server;
 pub(crate) mod session_stats;
 pub(crate) mod sqlite_store;
 pub(crate) mod state;
+pub(crate) mod tool_handlers;
+pub(crate) mod tool_helpers;
 pub(crate) mod tools;
 pub(crate) mod workspace;
 pub(crate) mod workspace_util;

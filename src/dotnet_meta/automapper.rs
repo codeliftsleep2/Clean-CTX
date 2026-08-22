@@ -9,9 +9,11 @@
 // - `Ignore()` ignored members
 // - `ProjectTo<T>()` projections
 
-use super::markers::{build_ignore_line, build_mapfrom_line, build_mapper_line, build_projection_line};
-use crate::dotnet_meta::MetaBlock;
+use super::markers::{
+    build_ignore_line, build_mapfrom_line, build_mapper_line, build_projection_line,
+};
 use crate::compression::Fidelity;
+use crate::dotnet_meta::MetaBlock;
 
 /// Extract AutoMapper markers from a single class capture.
 ///

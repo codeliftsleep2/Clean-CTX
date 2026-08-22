@@ -12,7 +12,14 @@ fn resolve_direct_injection_dependency() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
     let injects = vec!["BService".to_string()];
-    collector.push("AComponent", "α1", ClassKind::Component, Some("app-a"), &injects, None);
+    collector.push(
+        "AComponent",
+        "α1",
+        ClassKind::Component,
+        Some("app-a"),
+        &injects,
+        None,
+    );
     collector.push("BService", "α2", ClassKind::Service, None, &empty, None);
     let graph = collector.build_graph();
 
@@ -31,7 +38,14 @@ fn resolve_transitive_dependency() {
     let empty: Vec<String> = Vec::new();
     let a_injects = vec!["BService".to_string()];
     let b_injects = vec!["CService".to_string()];
-    collector.push("AComponent", "α1", ClassKind::Component, None, &a_injects, None);
+    collector.push(
+        "AComponent",
+        "α1",
+        ClassKind::Component,
+        None,
+        &a_injects,
+        None,
+    );
     collector.push("BService", "α2", ClassKind::Service, None, &b_injects, None);
     collector.push("CService", "α3", ClassKind::Service, None, &empty, None);
     let graph = collector.build_graph();
@@ -53,8 +67,22 @@ fn injected_by_reverse_edges() {
     let empty: Vec<String> = Vec::new();
     let a_injects = vec!["CService".to_string()];
     let b_injects = vec!["CService".to_string()];
-    collector.push("AComponent", "α1", ClassKind::Component, None, &a_injects, None);
-    collector.push("BComponent", "α2", ClassKind::Component, None, &b_injects, None);
+    collector.push(
+        "AComponent",
+        "α1",
+        ClassKind::Component,
+        None,
+        &a_injects,
+        None,
+    );
+    collector.push(
+        "BComponent",
+        "α2",
+        ClassKind::Component,
+        None,
+        &b_injects,
+        None,
+    );
     collector.push("CService", "α3", ClassKind::Service, None, &empty, None);
     let graph = collector.build_graph();
 
@@ -71,8 +99,22 @@ fn no_false_positive_for_duplicate_class_name() {
     // The last registered wins, which is an acceptable limitation.
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("ConfigService", "α1", ClassKind::Service, None, &empty, None);
-    collector.push("ConfigService", "α2", ClassKind::Service, None, &empty, None);
+    collector.push(
+        "ConfigService",
+        "α1",
+        ClassKind::Service,
+        None,
+        &empty,
+        None,
+    );
+    collector.push(
+        "ConfigService",
+        "α2",
+        ClassKind::Service,
+        None,
+        &empty,
+        None,
+    );
     let graph = collector.build_graph();
 
     // Only one should be tracked (last wins)
@@ -88,7 +130,14 @@ fn resolution_failure_silently_dropped() {
     // Class injects a type that is not registered anywhere in the graph.
     let mut collector = GraphCollector::new();
     let injects = vec!["UnknownType".to_string()];
-    collector.push("AComponent", "α1", ClassKind::Component, None, &injects, None);
+    collector.push(
+        "AComponent",
+        "α1",
+        ClassKind::Component,
+        None,
+        &injects,
+        None,
+    );
     let graph = collector.build_graph();
 
     // Should not panic or error — unknown types get `?` suffix.
@@ -103,7 +152,14 @@ fn external_dependency_not_in_graph() {
     // not part of the workspace — should show as unresolved `?`.
     let mut collector = GraphCollector::new();
     let injects = vec!["HttpClient".to_string()];
-    collector.push("UserService", "α1", ClassKind::Service, None, &injects, None);
+    collector.push(
+        "UserService",
+        "α1",
+        ClassKind::Service,
+        None,
+        &injects,
+        None,
+    );
     let graph = collector.build_graph();
 
     let line = graph.format_graph_line("UserService").unwrap();
@@ -114,7 +170,14 @@ fn external_dependency_not_in_graph() {
 fn service_with_no_dependencies_has_empty_injects() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    collector.push("StandaloneService", "α1", ClassKind::Service, None, &empty, None);
+    collector.push(
+        "StandaloneService",
+        "α1",
+        ClassKind::Service,
+        None,
+        &empty,
+        None,
+    );
     let graph = collector.build_graph();
 
     let line = graph.format_graph_line("StandaloneService").unwrap();
@@ -136,8 +199,19 @@ fn module_class_resolution() {
 fn multiple_injects_in_single_class() {
     let mut collector = GraphCollector::new();
     let empty: Vec<String> = Vec::new();
-    let injects = vec!["ServiceA".to_string(), "ServiceB".to_string(), "ServiceC".to_string()];
-    collector.push("BigComponent", "α1", ClassKind::Component, None, &injects, None);
+    let injects = vec![
+        "ServiceA".to_string(),
+        "ServiceB".to_string(),
+        "ServiceC".to_string(),
+    ];
+    collector.push(
+        "BigComponent",
+        "α1",
+        ClassKind::Component,
+        None,
+        &injects,
+        None,
+    );
     collector.push("ServiceA", "α2", ClassKind::Service, None, &empty, None);
     collector.push("ServiceB", "α3", ClassKind::Service, None, &empty, None);
     collector.push("ServiceC", "α4", ClassKind::Service, None, &empty, None);

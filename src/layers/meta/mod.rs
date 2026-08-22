@@ -17,10 +17,10 @@
 // in this file for historical reasons. New meta-layers should NOT follow
 // this pattern.
 
-use std::path::Path;
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::ir::compiler::CompiledIR;
+use std::path::Path;
 
 /// Structured output of a single meta-layer pass.
 ///
@@ -145,7 +145,8 @@ impl MetaLayer for AngularMetaLayer {
         config: Option<&CleanCtxConfig>,
     ) -> Option<MetaLayerOutput> {
         // Extract class names from the IR for compatibility
-        let class_captures: Vec<String> = ir.instructions
+        let class_captures: Vec<String> = ir
+            .instructions
             .iter()
             .filter_map(|op| {
                 if let crate::ir::opcodes::CoreOp::DefClass(_, name) = op {
@@ -160,8 +161,7 @@ impl MetaLayer for AngularMetaLayer {
         // min_pipe_operators, include_dispatch_sites, etc.). When the
         // config is absent or the "angular" entry is missing, all
         // sub-layers run with their defaults.
-        let meta_config = config
-            .and_then(|c| c.meta_layers.get("angular"));
+        let meta_config = config.and_then(|c| c.meta_layers.get("angular"));
         let block = crate::angular_meta::run_meta_layer_with_config(
             source,
             &class_captures,
@@ -258,7 +258,8 @@ impl MetaLayer for SpringBootMetaLayer {
         _config: Option<&CleanCtxConfig>,
     ) -> Option<MetaLayerOutput> {
         // Extract class names from the IR for compatibility
-        let class_captures: Vec<String> = ir.instructions
+        let class_captures: Vec<String> = ir
+            .instructions
             .iter()
             .filter_map(|op| {
                 if let crate::ir::opcodes::CoreOp::DefClass(_, name) = op {

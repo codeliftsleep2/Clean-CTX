@@ -21,9 +21,9 @@
 // the real response JSON is tokenized instead of using the rough chars/4
 // estimate, giving precise token savings in the dashboard.
 
-use std::collections::HashMap;
 use serde::Serialize;
 use sha2::Digest;
+use std::collections::HashMap;
 
 /// Tracks cache efficiency metrics for the session.
 ///
@@ -135,7 +135,10 @@ pub fn inject_cache_breakpoints(
     if state.emitted_breakpoints_lock().contains(&dedup_key) {
         // Cache hit — count it
         state.cache_metrics_lock().hits += 1;
-        state.cache_metrics_lock().breakpoints.insert(region.to_string(), "hit".to_string());
+        state
+            .cache_metrics_lock()
+            .breakpoints
+            .insert(region.to_string(), "hit".to_string());
 
         // Token savings estimate when a cache hit occurs.
         // We tokenize just the breakpoint metadata (not the full response)
@@ -147,7 +150,8 @@ pub fn inject_cache_breakpoints(
                     ttl: ttl.to_string(),
                     breaker: breaker.to_string(),
                 }],
-            }).unwrap_or_default();
+            })
+            .unwrap_or_default();
             tok.count_tokens(&hint_json)
         } else {
             // Fallback: rough chars/4 estimate of the breakpoint metadata
@@ -202,13 +206,19 @@ pub fn inject_cache_breakpoints(
 
     // Record as miss (first emission)
     state.cache_metrics_lock().misses += 1;
-    state.cache_metrics_lock().breakpoints.insert(region.to_string(), "miss".to_string());
+    state
+        .cache_metrics_lock()
+        .breakpoints
+        .insert(region.to_string(), "miss".to_string());
     0
 }
 
 /// Update cache metrics for the rolling tail (always ephemeral).
 pub fn mark_tail_ephemeral(state: &crate::mcp::McpState) {
-    state.cache_metrics_lock().breakpoints.insert("tail".to_string(), "ephemeral".to_string());
+    state
+        .cache_metrics_lock()
+        .breakpoints
+        .insert("tail".to_string(), "ephemeral".to_string());
 }
 
 /// Render the cache metrics section for the text dashboard.

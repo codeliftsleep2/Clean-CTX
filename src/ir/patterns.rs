@@ -21,8 +21,8 @@
 //
 // A pattern that doesn't match falls through unchanged (zero regression).
 
-use super::opcodes::CoreOp;
 use super::layers::PatternRecognizer;
+use super::opcodes::CoreOp;
 
 /// A compressed pattern op.
 ///
@@ -75,32 +75,47 @@ pub enum PatternOp {
     },
     /// `DEF_M + FLAGS(OVERRIDE)` → single op.
     /// Wire: `["PAT", "OVERRIDE", class_id, method_id]`
-    Override {
-        class_id: String,
-        method_id: String,
-    },
+    Override { class_id: String, method_id: String },
     /// A pattern that was recognised but the constructor had no params —
     /// still useful to flag so the LLM knows it's a ctor.
     /// Wire: `["PAT", "EMPTY_CTOR", class_id, method_id]`
-    EmptyConstructor {
-        class_id: String,
-        method_id: String,
-    },
+    EmptyConstructor { class_id: String, method_id: String },
 }
 
 impl PatternOp {
     /// Convert to a positional `Vec<String>` for the wire.
     pub fn to_tuple(&self) -> Vec<String> {
         match self {
-            PatternOp::Constructor { class_id, method_id, deps } => {
-                let mut t = vec!["PAT".into(), "CTOR".into(), class_id.clone(), method_id.clone()];
+            PatternOp::Constructor {
+                class_id,
+                method_id,
+                deps,
+            } => {
+                let mut t = vec![
+                    "PAT".into(),
+                    "CTOR".into(),
+                    class_id.clone(),
+                    method_id.clone(),
+                ];
                 t.extend(deps.iter().cloned());
                 t
             }
-            PatternOp::EmptyConstructor { class_id, method_id } => {
-                vec!["PAT".into(), "EMPTY_CTOR".into(), class_id.clone(), method_id.clone()]
+            PatternOp::EmptyConstructor {
+                class_id,
+                method_id,
+            } => {
+                vec![
+                    "PAT".into(),
+                    "EMPTY_CTOR".into(),
+                    class_id.clone(),
+                    method_id.clone(),
+                ]
             }
-            PatternOp::Observable { class_id, method_id, return_type } => {
+            PatternOp::Observable {
+                class_id,
+                method_id,
+                return_type,
+            } => {
                 vec![
                     "PAT".into(),
                     "OBSERVABLE".into(),
@@ -109,7 +124,11 @@ impl PatternOp {
                     return_type.clone(),
                 ]
             }
-            PatternOp::Promise { class_id, method_id, return_type } => {
+            PatternOp::Promise {
+                class_id,
+                method_id,
+                return_type,
+            } => {
                 vec![
                     "PAT".into(),
                     "PROMISE".into(),
@@ -118,7 +137,11 @@ impl PatternOp {
                     return_type.clone(),
                 ]
             }
-            PatternOp::Getter { class_id, method_id, property } => {
+            PatternOp::Getter {
+                class_id,
+                method_id,
+                property,
+            } => {
                 vec![
                     "PAT".into(),
                     "GETTER".into(),
@@ -127,7 +150,11 @@ impl PatternOp {
                     property.clone(),
                 ]
             }
-            PatternOp::Setter { class_id, method_id, property } => {
+            PatternOp::Setter {
+                class_id,
+                method_id,
+                property,
+            } => {
                 vec![
                     "PAT".into(),
                     "SETTER".into(),
@@ -136,7 +163,10 @@ impl PatternOp {
                     property.clone(),
                 ]
             }
-            PatternOp::Override { class_id, method_id } => {
+            PatternOp::Override {
+                class_id,
+                method_id,
+            } => {
                 vec![
                     "PAT".into(),
                     "OVERRIDE".into(),
@@ -159,27 +189,57 @@ impl PatternOp {
         let method_id = tuple.get(3)?.clone();
         match tuple[1].as_str() {
             "CTOR" => {
-                let deps = if tuple.len() > 4 { tuple[4..].to_vec() } else { Vec::new() };
-                Some(PatternOp::Constructor { class_id, method_id, deps })
+                let deps = if tuple.len() > 4 {
+                    tuple[4..].to_vec()
+                } else {
+                    Vec::new()
+                };
+                Some(PatternOp::Constructor {
+                    class_id,
+                    method_id,
+                    deps,
+                })
             }
-            "EMPTY_CTOR" => Some(PatternOp::EmptyConstructor { class_id, method_id }),
+            "EMPTY_CTOR" => Some(PatternOp::EmptyConstructor {
+                class_id,
+                method_id,
+            }),
             "OBSERVABLE" => {
                 let return_type = tuple.get(4)?.clone();
-                Some(PatternOp::Observable { class_id, method_id, return_type })
+                Some(PatternOp::Observable {
+                    class_id,
+                    method_id,
+                    return_type,
+                })
             }
             "PROMISE" => {
                 let return_type = tuple.get(4)?.clone();
-                Some(PatternOp::Promise { class_id, method_id, return_type })
+                Some(PatternOp::Promise {
+                    class_id,
+                    method_id,
+                    return_type,
+                })
             }
             "GETTER" => {
                 let property = tuple.get(4)?.clone();
-                Some(PatternOp::Getter { class_id, method_id, property })
+                Some(PatternOp::Getter {
+                    class_id,
+                    method_id,
+                    property,
+                })
             }
             "SETTER" => {
                 let property = tuple.get(4)?.clone();
-                Some(PatternOp::Setter { class_id, method_id, property })
+                Some(PatternOp::Setter {
+                    class_id,
+                    method_id,
+                    property,
+                })
             }
-            "OVERRIDE" => Some(PatternOp::Override { class_id, method_id }),
+            "OVERRIDE" => Some(PatternOp::Override {
+                class_id,
+                method_id,
+            }),
             _ => None,
         }
     }
@@ -315,16 +375,19 @@ impl CompressingPatternRecognizer {
 impl PatternRecognizer for CompressingPatternRecognizer {
     fn recognize(&self, instructions: &[CoreOp]) -> Vec<CoreOp> {
         let merged = self.compress_merged(instructions);
-        merged.into_iter().map(|item| match item {
-            MergeItem::Passthrough(op) => op,
-            MergeItem::Pattern(pat) => {
-                let tuple = pat.to_tuple();
-                // tuple[0] is "PAT", tuple[1] is pattern name, rest are args
-                let name = tuple.get(1).cloned().unwrap_or_default();
-                let args = tuple.into_iter().skip(2).collect();
-                CoreOp::Pattern(name, args)
-            }
-        }).collect()
+        merged
+            .into_iter()
+            .map(|item| match item {
+                MergeItem::Passthrough(op) => op,
+                MergeItem::Pattern(pat) => {
+                    let tuple = pat.to_tuple();
+                    // tuple[0] is "PAT", tuple[1] is pattern name, rest are args
+                    let name = tuple.get(1).cloned().unwrap_or_default();
+                    let args = tuple.into_iter().skip(2).collect();
+                    CoreOp::Pattern(name, args)
+                }
+            })
+            .collect()
     }
 }
 
@@ -398,7 +461,10 @@ fn try_compress_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
 /// `layers/patterns.rs` can also use it, ensuring both recognizers
 /// match the same set of constructor names.
 pub fn is_constructor_name(name: &str) -> bool {
-    matches!(name, "constructor" | "new" | "__init__" | "initialize" | "ctor")
+    matches!(
+        name,
+        "constructor" | "new" | "__init__" | "initialize" | "ctor"
+    )
 }
 
 /// CTOR pattern: `DEF_M(constructor) [+ Flags(Mid, ["CTOR"])] + Param* + Return + INJECTS` → 1 op.
@@ -474,7 +540,11 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
 
     let consumed = idx;
     Some((
-        PatternOp::Constructor { class_id, method_id, deps },
+        PatternOp::Constructor {
+            class_id,
+            method_id,
+            deps,
+        },
         consumed,
     ))
 }
@@ -493,7 +563,10 @@ fn try_empty_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     if let CoreOp::Return(mid, _) = &slice[1] {
         if mid == &method_id {
             return Some((
-                PatternOp::EmptyConstructor { class_id, method_id },
+                PatternOp::EmptyConstructor {
+                    class_id,
+                    method_id,
+                },
                 2,
             ));
         }
@@ -515,18 +588,20 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         _ => return None,
     };
     // Must be Promise-like and have an ASYNC flag
-    let is_promise_like =
-        return_type == "$P" || return_type.contains("Promise") || return_type.contains("Observable");
+    let is_promise_like = return_type == "$P"
+        || return_type.contains("Promise")
+        || return_type.contains("Observable");
     if !is_promise_like {
         return None;
     }
     match &slice[2] {
-        CoreOp::Flags(mid, flags)
-            if mid == &method_id
-                && flags.iter().any(|f| f == "ASYNC") =>
-        {
+        CoreOp::Flags(mid, flags) if mid == &method_id && flags.iter().any(|f| f == "ASYNC") => {
             Some((
-                PatternOp::Observable { class_id, method_id, return_type },
+                PatternOp::Observable {
+                    class_id,
+                    method_id,
+                    return_type,
+                },
                 3,
             ))
         }
@@ -546,8 +621,7 @@ fn try_promise_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     };
     match &slice[1] {
         CoreOp::Return(mid, ty) if mid == &method_id => {
-            let is_promise_like =
-                ty == "$P" || ty.contains("Promise") || ty.contains("Observable");
+            let is_promise_like = ty == "$P" || ty.contains("Promise") || ty.contains("Observable");
             if is_promise_like {
                 Some((
                     PatternOp::Promise {
@@ -584,11 +658,7 @@ fn try_getter_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     // Optionally consume a trailing Return
     let consumed = if slice.len() >= 2 {
         if let CoreOp::Return(mid, _) = &slice[1] {
-            if mid == &method_id {
-                2
-            } else {
-                1
-            }
+            if mid == &method_id { 2 } else { 1 }
         } else {
             1
         }
@@ -596,7 +666,11 @@ fn try_getter_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         1
     };
     Some((
-        PatternOp::Getter { class_id, method_id, property },
+        PatternOp::Getter {
+            class_id,
+            method_id,
+            property,
+        },
         consumed,
     ))
 }
@@ -634,7 +708,11 @@ fn try_setter_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         }
     }
     Some((
-        PatternOp::Setter { class_id, method_id, property },
+        PatternOp::Setter {
+            class_id,
+            method_id,
+            property,
+        },
         idx,
     ))
 }
@@ -651,7 +729,10 @@ fn try_override_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     match &slice[1] {
         CoreOp::Flags(mid, flags) if mid == &method_id && flags.iter().any(|f| f == "OVERRIDE") => {
             Some((
-                PatternOp::Override { class_id, method_id },
+                PatternOp::Override {
+                    class_id,
+                    method_id,
+                },
                 2,
             ))
         }

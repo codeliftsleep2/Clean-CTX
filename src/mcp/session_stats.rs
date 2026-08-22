@@ -10,9 +10,9 @@
 // tagged with a `SavingsDomain` so the dashboard can show per-domain
 // breakdowns without double-counting.
 
+use crate::mcp::cache_hints::CacheMetrics;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use crate::mcp::cache_hints::CacheMetrics;
 
 /// Per-domain aggregate stats (used in `SessionSummary` for the
 /// per-domain breakdown section of the dashboard).
@@ -203,7 +203,9 @@ impl SessionStats {
         // and overwrote the per-file entry with 0/0, erasing the savings the
         // file had on its initial hit (dashboard showed N/A).
         let preserve_full_on_delta = strategy == "delta"
-            && prev_file_stats.as_ref().is_some_and(|f| f.strategy == "full");
+            && prev_file_stats
+                .as_ref()
+                .is_some_and(|f| f.strategy == "full");
 
         if let Some(ref existing) = prev_file_stats {
             // Only deduct previous counters when NOT preserving full→delta.
@@ -211,7 +213,9 @@ impl SessionStats {
             // in the session totals.
             if !preserve_full_on_delta {
                 self.total_raw_tokens = self.total_raw_tokens.saturating_sub(existing.raw_tokens);
-                self.total_compressed_tokens = self.total_compressed_tokens.saturating_sub(existing.compressed_tokens);
+                self.total_compressed_tokens = self
+                    .total_compressed_tokens
+                    .saturating_sub(existing.compressed_tokens);
             }
             // If strategy changed, decrement the old strategy counter.
             // When preserving full→delta, the full_compress_count stays
@@ -247,9 +251,11 @@ impl SessionStats {
                     existing_domain.file_count = existing_domain.file_count.saturating_sub(1);
                     // Recompute savings pct
                     if existing_domain.total_raw_tokens > 0 {
-                        let saved = existing_domain.total_raw_tokens
+                        let saved = existing_domain
+                            .total_raw_tokens
                             .saturating_sub(existing_domain.total_compressed_tokens);
-                        existing_domain.savings_pct = (saved as f64 / existing_domain.total_raw_tokens as f64) * 100.0;
+                        existing_domain.savings_pct =
+                            (saved as f64 / existing_domain.total_raw_tokens as f64) * 100.0;
                     } else {
                         existing_domain.savings_pct = 0.0;
                     }
@@ -297,8 +303,10 @@ impl SessionStats {
         };
 
         // Get or create per-file entry
-        let entry = self.files.entry(file_path.to_string()).or_insert_with(|| {
-            FileStats {
+        let entry = self
+            .files
+            .entry(file_path.to_string())
+            .or_insert_with(|| FileStats {
                 file_path: file_path.to_string(),
                 raw_tokens: 0,
                 compressed_tokens: 0,
@@ -311,8 +319,7 @@ impl SessionStats {
                 full_compressed_tokens: None,
                 delta_efficiency_pct: None,
                 domain: domain.to_string(),
-            }
-        });
+            });
 
         // When preserving full→delta, keep the full compression's token
         // counts and savings_pct in the per-file entry (so the dashboard
@@ -335,27 +342,42 @@ impl SessionStats {
         entry.delta_efficiency_pct = delta_eff_pct;
 
         // Update domain-level stats
-        let domain_entry = self.domain_stats.entry(domain.to_string()).or_insert_with(|| {
-            DomainStats {
+        let domain_entry = self
+            .domain_stats
+            .entry(domain.to_string())
+            .or_insert_with(|| DomainStats {
                 domain: domain.to_string(),
                 total_raw_tokens: 0,
                 total_compressed_tokens: 0,
                 savings_pct: 0.0,
                 file_count: 0,
-                tokens_removed: if domain == "cbm_filter" { Some(0) } else { None },
-                cache_hits: if domain == "prompt_cache" { Some(0) } else { None },
-                cache_misses: if domain == "prompt_cache" { Some(0) } else { None },
-            }
-        });
+                tokens_removed: if domain == "cbm_filter" {
+                    Some(0)
+                } else {
+                    None
+                },
+                cache_hits: if domain == "prompt_cache" {
+                    Some(0)
+                } else {
+                    None
+                },
+                cache_misses: if domain == "prompt_cache" {
+                    Some(0)
+                } else {
+                    None
+                },
+            });
         // When preserving full→delta, the domain stats already reflect the
         // full compression's tokens — do not add the delta's (0/0) on top.
         if !preserve_full_on_delta {
             domain_entry.total_raw_tokens += raw_tokens;
             domain_entry.total_compressed_tokens += compressed_tokens;
             if domain_entry.total_raw_tokens > 0 {
-                let saved = domain_entry.total_raw_tokens
+                let saved = domain_entry
+                    .total_raw_tokens
                     .saturating_sub(domain_entry.total_compressed_tokens);
-                domain_entry.savings_pct = (saved as f64 / domain_entry.total_raw_tokens as f64) * 100.0;
+                domain_entry.savings_pct =
+                    (saved as f64 / domain_entry.total_raw_tokens as f64) * 100.0;
             }
         }
         // Increment file count only if this is a new file for this domain
@@ -388,20 +410,23 @@ impl SessionStats {
         // Per-tool entry accumulates across calls
         let file_path = format!("cbm://{tool}");
         let is_new_tool = !self.files.contains_key(&file_path);
-        let entry = self.files.entry(file_path.clone()).or_insert_with(|| FileStats {
-            file_path,
-            raw_tokens: 0,
-            compressed_tokens: 0,
-            savings_pct: 0.0,
-            version: 0,
-            delta_count: 0,
-            fidelity: "low".into(),
-            is_angular: false,
-            strategy: "full".into(),
-            full_compressed_tokens: None,
-            delta_efficiency_pct: None,
-            domain: "cbm_filter".into(),
-        });
+        let entry = self
+            .files
+            .entry(file_path.clone())
+            .or_insert_with(|| FileStats {
+                file_path,
+                raw_tokens: 0,
+                compressed_tokens: 0,
+                savings_pct: 0.0,
+                version: 0,
+                delta_count: 0,
+                fidelity: "low".into(),
+                is_angular: false,
+                strategy: "full".into(),
+                full_compressed_tokens: None,
+                delta_efficiency_pct: None,
+                domain: "cbm_filter".into(),
+            });
         entry.raw_tokens += raw_tokens;
         entry.compressed_tokens += compressed_tokens;
         entry.version += 1;
@@ -415,7 +440,8 @@ impl SessionStats {
         // Domain breakdown accumulates across calls.
         // `file_count` counts UNIQUE tools (first call per tool), consistent
         // with `ir_compression`'s unique-file semantics.
-        let domain = self.domain_stats
+        let domain = self
+            .domain_stats
             .entry("cbm_filter".to_string())
             .or_insert_with(|| DomainStats {
                 domain: "cbm_filter".into(),
@@ -432,7 +458,9 @@ impl SessionStats {
         if is_new_tool {
             domain.file_count += 1;
         }
-        let removed = domain.total_raw_tokens.saturating_sub(domain.total_compressed_tokens);
+        let removed = domain
+            .total_raw_tokens
+            .saturating_sub(domain.total_compressed_tokens);
         domain.savings_pct = if domain.total_raw_tokens > 0 {
             (removed as f64 / domain.total_raw_tokens as f64) * 100.0
         } else {
@@ -448,8 +476,10 @@ impl SessionStats {
     /// sending them, not by compressing them.
     pub fn record_cache_hit(&mut self, tokens_saved: usize) {
         let domain = "prompt_cache";
-        let entry = self.domain_stats.entry(domain.to_string()).or_insert_with(|| {
-            DomainStats {
+        let entry = self
+            .domain_stats
+            .entry(domain.to_string())
+            .or_insert_with(|| DomainStats {
                 domain: domain.to_string(),
                 total_raw_tokens: 0,
                 total_compressed_tokens: 0,
@@ -458,8 +488,7 @@ impl SessionStats {
                 tokens_removed: None,
                 cache_hits: Some(0),
                 cache_misses: Some(0),
-            }
-        });
+            });
         if let Some(ref mut hits) = entry.cache_hits {
             *hits += 1;
         }
@@ -501,8 +530,10 @@ impl SessionStats {
     /// preserved alongside the MCP-side dedup savings.
     pub fn sync_cache_metrics(&mut self, metrics: &CacheMetrics) {
         let domain = "prompt_cache";
-        let entry = self.domain_stats.entry(domain.to_string()).or_insert_with(|| {
-            DomainStats {
+        let entry = self
+            .domain_stats
+            .entry(domain.to_string())
+            .or_insert_with(|| DomainStats {
                 domain: domain.to_string(),
                 total_raw_tokens: 0,
                 total_compressed_tokens: 0,
@@ -511,8 +542,7 @@ impl SessionStats {
                 tokens_removed: None,
                 cache_hits: Some(0),
                 cache_misses: Some(0),
-            }
-        });
+            });
         // ACCUMULATE hits/misses rather than overwrite. Real proxy cache hits
         // (recorded via `record_cache_hit`) must be preserved alongside the
         // MCP-side dedup hits. Overwriting would erase the proxy's real
@@ -527,7 +557,11 @@ impl SessionStats {
         // Real proxy cache-read tokens (from `record_cache_hit`) are already
         // in total_raw_tokens and must not be overwritten.
         entry.total_raw_tokens += metrics.tokens_saved;
-        entry.savings_pct = if entry.total_raw_tokens > 0 { 100.0 } else { 0.0 };
+        entry.savings_pct = if entry.total_raw_tokens > 0 {
+            100.0
+        } else {
+            0.0
+        };
     }
 
     /// Merge another `SessionStats` into this one.
@@ -567,10 +601,14 @@ impl SessionStats {
         // NOTE: CBM proxy events are added SEPARATELY because they are not
         // derivable from unique file entries — each tool creates one entry
         // regardless of how many times it was called.
-        self.full_compress_count = self.files.values()
+        self.full_compress_count = self
+            .files
+            .values()
             .filter(|f| f.strategy != "delta" && !f.file_path.starts_with("cbm://"))
             .count();
-        self.delta_count = self.files.values()
+        self.delta_count = self
+            .files
+            .values()
             .filter(|f| f.strategy == "delta")
             .count();
         // Accumulated CBM proxy events survive merges (in-memory + DB-recovered)
@@ -588,12 +626,10 @@ impl SessionStats {
     /// rather than by file-level compression events.
     fn rebuild_domain_stats(&mut self) {
         // Preserve cache-specific metadata before rebuild
-        let preserved_prompt_cache: Option<DomainStats> = self.domain_stats
-            .get("prompt_cache")
-            .cloned();
-        let preserved_cbm_filter: Option<DomainStats> = self.domain_stats
-            .get("cbm_filter")
-            .cloned();
+        let preserved_prompt_cache: Option<DomainStats> =
+            self.domain_stats.get("prompt_cache").cloned();
+        let preserved_cbm_filter: Option<DomainStats> =
+            self.domain_stats.get("cbm_filter").cloned();
 
         let mut domain_raw: HashMap<String, usize> = HashMap::new();
         let mut domain_compressed: HashMap<String, usize> = HashMap::new();
@@ -643,7 +679,11 @@ impl SessionStats {
                         // NOT derived from per-file entries, so they must be
                         // carried across rebuilds.
                         stats.total_raw_tokens = preserved.total_raw_tokens;
-                        stats.savings_pct = if stats.total_raw_tokens > 0 { 100.0 } else { 0.0 };
+                        stats.savings_pct = if stats.total_raw_tokens > 0 {
+                            100.0
+                        } else {
+                            0.0
+                        };
                     }
                 } else if d == "cbm_filter" {
                     if let Some(ref preserved) = preserved_cbm_filter {
@@ -681,21 +721,20 @@ impl SessionStats {
             0.0
         };
         let avg_savings_pct = if total_files > 0 {
-            self.files
-                .values()
-                .map(|f| f.savings_pct)
-                .sum::<f64>()
-                / total_files as f64
+            self.files.values().map(|f| f.savings_pct).sum::<f64>() / total_files as f64
         } else {
             0.0
         };
 
         // Compute average delta efficiency across all delta-strategy files
-        let delta_files: Vec<&FileStats> = self.files.values()
+        let delta_files: Vec<&FileStats> = self
+            .files
+            .values()
             .filter(|f| f.strategy == "delta" && f.delta_efficiency_pct.is_some())
             .collect();
         let avg_delta_eff = if !delta_files.is_empty() {
-            let sum: f64 = delta_files.iter()
+            let sum: f64 = delta_files
+                .iter()
                 .filter_map(|f| f.delta_efficiency_pct)
                 .sum();
             Some(sum / delta_files.len() as f64)
@@ -703,11 +742,7 @@ impl SessionStats {
             None
         };
 
-        let session_duration_secs = self
-            .started_at
-            .elapsed()
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let session_duration_secs = self.started_at.elapsed().map(|d| d.as_secs()).unwrap_or(0);
 
         SessionSummary {
             total_files,
@@ -726,10 +761,7 @@ impl SessionStats {
 
     /// Get the session duration in seconds.
     pub fn session_duration_secs(&self) -> u64 {
-        self.started_at
-            .elapsed()
-            .map(|d| d.as_secs())
-            .unwrap_or(0)
+        self.started_at.elapsed().map(|d| d.as_secs()).unwrap_or(0)
     }
 }
 
@@ -744,13 +776,21 @@ pub fn render_dashboard_text(stats: &SessionStats) -> String {
     output.push_str("═══════════════════════════════════════════════════════════════\n");
     output.push_str(&format!("  Session Duration: {}\n", duration));
     output.push_str(&format!("  Files Tracked: {}\n", summary.total_files));
-    output.push_str(&format!("  Total Raw Tokens: {}\n", format_number(summary.total_raw_tokens)));
-    output.push_str(&format!("  Total Compressed Tokens: {}\n", format_number(summary.total_compressed_tokens)));
-    output.push_str(&format!("  Total LLM Token Savings: {:.1}%\n", summary.total_savings_pct));
+    output.push_str(&format!(
+        "  Total Raw Tokens: {}\n",
+        format_number(summary.total_raw_tokens)
+    ));
+    output.push_str(&format!(
+        "  Total Compressed Tokens: {}\n",
+        format_number(summary.total_compressed_tokens)
+    ));
+    output.push_str(&format!(
+        "  Total LLM Token Savings: {:.1}%\n",
+        summary.total_savings_pct
+    ));
     output.push_str(&format!(
         "  Operations: {} full compressions, {} deltas (local CPU only)\n",
-        summary.full_compress_count,
-        summary.delta_count,
+        summary.full_compress_count, summary.delta_count,
     ));
     // Delta efficiency summary line (only shown when there are actual delta ops)
     if let Some(avg_eff) = summary.avg_delta_efficiency_pct {
@@ -766,7 +806,13 @@ pub fn render_dashboard_text(stats: &SessionStats) -> String {
         output.push_str("── Per-Domain LLM Token Savings ──\n");
 
         // Define display order for domains
-        let domain_order = ["ir_compression", "angular_template", "cbm_filter", "prompt_cache", "tool_filter"];
+        let domain_order = [
+            "ir_compression",
+            "angular_template",
+            "cbm_filter",
+            "prompt_cache",
+            "tool_filter",
+        ];
         let mut has_any = false;
 
         for domain_key in &domain_order {
@@ -852,12 +898,19 @@ pub fn render_dashboard_text(stats: &SessionStats) -> String {
 
     // Sort files by savings ascending
     let mut file_list: Vec<&FileStats> = stats.all_file_stats().values().collect();
-    file_list.sort_by(|a, b| b.savings_pct.partial_cmp(&a.savings_pct).unwrap_or(std::cmp::Ordering::Equal));
+    file_list.sort_by(|a, b| {
+        b.savings_pct
+            .partial_cmp(&a.savings_pct)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     for file in &file_list {
         // Truncate long file paths
         let display_path = if file.file_path.len() > 38 {
-            format!("...{}", &file.file_path[file.file_path.len().saturating_sub(37)..])
+            format!(
+                "...{}",
+                &file.file_path[file.file_path.len().saturating_sub(37)..]
+            )
         } else {
             file.file_path.clone()
         };

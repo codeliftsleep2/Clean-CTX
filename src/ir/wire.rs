@@ -14,7 +14,7 @@
 
 use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Errors during wire format decoding.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,20 +50,10 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
     match op {
         CoreOp::DefClass(id, name) => vec!["DEF_C".into(), id.clone(), name.clone()],
         CoreOp::DefMethod(cid, mid, name) => {
-            vec![
-                "DEF_M".into(),
-                cid.clone(),
-                mid.clone(),
-                name.clone(),
-            ]
+            vec!["DEF_M".into(), cid.clone(), mid.clone(), name.clone()]
         }
         CoreOp::DefField(cid, fid, name) => {
-            vec![
-                "DEF_F".into(),
-                cid.clone(),
-                fid.clone(),
-                name.clone(),
-            ]
+            vec!["DEF_F".into(), cid.clone(), fid.clone(), name.clone()]
         }
         CoreOp::DefInterface(id, name) => vec!["DEF_I".into(), id.clone(), name.clone()],
         CoreOp::Param(mid, pid, ty, name) => {
@@ -95,18 +85,17 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             v
         }
         CoreOp::Import(alias, module, named) => {
-            vec![
-                "IMP".into(),
-                alias.clone(),
-                module.clone(),
-                named.clone(),
-            ]
+            vec!["IMP".into(), alias.clone(), module.clone(), named.clone()]
         }
         CoreOp::TypeAlias(alias, original) => vec!["TYPE".into(), alias.clone(), original.clone()],
         CoreOp::Pattern(name, args) => {
             let mut v = vec!["PAT".into(), name.clone()];
             v.extend(args.iter().cloned());
             v
+        }
+        // Edit Mode: Verbatim Method Bodies
+        CoreOp::Body(mid, text) => {
+            vec!["BODY".into(), mid.clone(), text.clone()]
         }
         // R-43a: Execution Semantics
         CoreOp::DataFlow(mid, direction, target) => {
@@ -118,26 +107,13 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             ]
         }
         CoreOp::ControlFlow(mid, kind, target) => {
-            vec![
-                "CTRL".into(),
-                mid.clone(),
-                kind.clone(),
-                target.clone(),
-            ]
+            vec!["CTRL".into(), mid.clone(), kind.clone(), target.clone()]
         }
         CoreOp::SideEffect(mid, effect_type) => {
-            vec![
-                "EFFECT".into(),
-                mid.clone(),
-                effect_type.clone(),
-            ]
+            vec!["EFFECT".into(), mid.clone(), effect_type.clone()]
         }
         CoreOp::ExecutionContext(mid, context_type) => {
-            vec![
-                "CTX".into(),
-                mid.clone(),
-                context_type.clone(),
-            ]
+            vec!["CTX".into(), mid.clone(), context_type.clone()]
         }
     }
 }
@@ -213,20 +189,14 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
         }
         "FLAGS" => {
             if tuple.len() >= 3 {
-                Some(CoreOp::Flags(
-                    tuple[1].clone(),
-                    tuple[2..].to_vec(),
-                ))
+                Some(CoreOp::Flags(tuple[1].clone(), tuple[2..].to_vec()))
             } else {
                 None
             }
         }
         "FLAGS_C" => {
             if tuple.len() >= 3 {
-                Some(CoreOp::ClassFlags(
-                    tuple[1].clone(),
-                    tuple[2..].to_vec(),
-                ))
+                Some(CoreOp::ClassFlags(tuple[1].clone(), tuple[2..].to_vec()))
             } else {
                 None
             }
@@ -247,10 +217,7 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
         }
         "INJECTS" => {
             if tuple.len() >= 3 {
-                Some(CoreOp::Injects(
-                    tuple[1].clone(),
-                    tuple[2..].to_vec(),
-                ))
+                Some(CoreOp::Injects(tuple[1].clone(), tuple[2..].to_vec()))
             } else {
                 None
             }
@@ -275,10 +242,15 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
         }
         "PAT" => {
             if tuple.len() >= 3 {
-                Some(CoreOp::Pattern(
-                    tuple[1].clone(),
-                    tuple[2..].to_vec(),
-                ))
+                Some(CoreOp::Pattern(tuple[1].clone(), tuple[2..].to_vec()))
+            } else {
+                None
+            }
+        }
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => {
+            if tuple.len() >= 3 {
+                Some(CoreOp::Body(tuple[1].clone(), tuple[2].clone()))
             } else {
                 None
             }
@@ -308,20 +280,14 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
         }
         "EFFECT" => {
             if tuple.len() >= 3 {
-                Some(CoreOp::SideEffect(
-                    tuple[1].clone(),
-                    tuple[2].clone(),
-                ))
+                Some(CoreOp::SideEffect(tuple[1].clone(), tuple[2].clone()))
             } else {
                 None
             }
         }
         "CTX" => {
             if tuple.len() >= 3 {
-                Some(CoreOp::ExecutionContext(
-                    tuple[1].clone(),
-                    tuple[2].clone(),
-                ))
+                Some(CoreOp::ExecutionContext(tuple[1].clone(), tuple[2].clone()))
             } else {
                 None
             }
@@ -353,7 +319,10 @@ pub fn ir_to_wire(ir: &CompiledIR) -> Value {
 /// "hierarchical", and "binary".
 /// Returns None if the encoding is unrecognized or decoding fails.
 pub fn wire_to_ir_detect(value: &Value) -> Option<super::compiler::CompiledIR> {
-    let encoding = value.get("encoding").and_then(|v| v.as_str()).unwrap_or("named");
+    let encoding = value
+        .get("encoding")
+        .and_then(|v| v.as_str())
+        .unwrap_or("named");
     match encoding {
         "string_table" => super::string_table::wire_to_ir(value),
         "hierarchical" => super::hierarchical::wire_to_ir(value).ok(),
@@ -390,16 +359,12 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
     for (i, tuple_val) in ir_array.iter().enumerate() {
         let tuple: Vec<String> = tuple_val
             .as_array()
-            .ok_or_else(|| {
-                DecodeError::InvalidFieldType(format!("ir[{}]: expected array", i))
-            })?
+            .ok_or_else(|| DecodeError::InvalidFieldType(format!("ir[{}]: expected array", i)))?
             .iter()
             .map(|v| {
-                v.as_str()
-                    .map(|s| s.to_string())
-                    .ok_or_else(|| {
-                        DecodeError::InvalidFieldType(format!("ir[{}]: expected string element", i))
-                    })
+                v.as_str().map(|s| s.to_string()).ok_or_else(|| {
+                    DecodeError::InvalidFieldType(format!("ir[{}]: expected string element", i))
+                })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -407,11 +372,7 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
             if tuple.is_empty() {
                 DecodeError::MalformedTuple(format!("ir[{}]: empty tuple", i))
             } else {
-                DecodeError::UnknownOpcode(format!(
-                    "ir[{}]: unknown opcode '{}'",
-                    i,
-                    tuple[0]
-                ))
+                DecodeError::UnknownOpcode(format!("ir[{}]: unknown opcode '{}'", i, tuple[0]))
             }
         })?;
         instructions.push(op);

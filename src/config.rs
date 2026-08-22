@@ -98,6 +98,18 @@ pub struct HeuristicsConfig {
     /// Whether to check DB for prior fidelity on file re-visits.
     #[serde(default = "default_true")]
     pub session_aware_fidelity: bool,
+    /// Auto-select Edit fidelity for implementation/service files
+    /// when no explicit intent/fidelity is given. When true, files
+    /// classified as Service or Implementation get `Fidelity::Edit`
+    /// so method bodies are carried verbatim for safe edits.
+    #[serde(default = "default_true")]
+    pub auto_edit_mode: bool,
+    /// File classes that auto-select Edit fidelity when `auto_edit_mode`
+    /// is on and no explicit intent/fidelity is given. Class names match
+    /// the `FileClass` variants as lowercase strings ("service",
+    /// "implementation", etc.). Defaults to ["service", "implementation"].
+    #[serde(default = "default_edit_auto_classifications")]
+    pub edit_auto_classifications: Vec<String>,
 }
 
 impl Default for HeuristicsConfig {
@@ -112,8 +124,14 @@ impl Default for HeuristicsConfig {
             high_lines: default_high_lines(),
             auto_classify: default_true(),
             session_aware_fidelity: default_true(),
+            auto_edit_mode: default_true(),
+            edit_auto_classifications: default_edit_auto_classifications(),
         }
     }
+}
+
+fn default_edit_auto_classifications() -> Vec<String> {
+    vec!["service".to_string(), "implementation".to_string()]
 }
 
 fn default_large_file_threshold() -> usize { 300 }
@@ -299,6 +317,21 @@ pub struct CleanCtxConfig {
     /// to match both.
     #[serde(default)]
     pub exclude_patterns: Vec<String>,
+
+    /// Additional workspace roots to scan for cross-file symbol resolution.
+    ///
+    /// Each entry is an absolute path to a directory that should be
+    /// treated as part of the workspace for type detection, symbol
+    /// compression, and CBM graph queries. Paths are validated at
+    /// check time; a path that doesn't exist is silently skipped rather
+    /// than erroring the whole config.
+    ///
+    /// Example `.clean-ctx.json`:
+    /// ```json
+    /// { "additional_roots": ["C:\\Users\\me\\source\\repos\\Outcomes"] }
+    /// ```
+    #[serde(default)]
+    pub additional_roots: Vec<String>,
 
     /// Custom behavior markers: marker → description
     #[serde(default)]
@@ -706,6 +739,7 @@ impl Default for CleanCtxConfig {
             type_aliases: BTreeMap::new(),
             fidelity_overrides: BTreeMap::new(),
             exclude_patterns: Vec::new(),
+            additional_roots: Vec::new(),
             custom_markers: BTreeMap::new(),
             default_fidelity: default_fidelity(),
             diff_compression: default_true(),

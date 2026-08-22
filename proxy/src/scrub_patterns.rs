@@ -30,16 +30,16 @@ pub(crate) fn tokens_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
         Regex::new(concat!(
-            r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+",  // JWT
-            r"|\b(?:AKIA|ASIA)[0-9A-Z]{16}\b",                          // AWS access key
-            r"|\bAIza[0-9A-Za-z_\-]{35}\b",                              // Google API key
-            r"|\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\b",           // GitHub token
-            r"|\bgithub_pat_[A-Za-z0-9_]{22,}\b",                        // GitHub fine-grained PAT
-            r"|\bxox[baprs]-[A-Za-z0-9-]{10,}\b",                        // Slack token
-            r"|\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}\b",           // Stripe key
-            r"|\bsk-(?:ant-)?[A-Za-z0-9_\-]{20,}\b",                    // OpenAI / Anthropic key
-            r"|\bhv[sbr]\.[A-Za-z0-9_-]{20,}\b",                        // HashiCorp Vault token
-            r"|\bpypi-[A-Za-z0-9_-]{16,}\b",                             // PyPI API token
+            r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", // JWT
+            r"|\b(?:AKIA|ASIA)[0-9A-Z]{16}\b",                       // AWS access key
+            r"|\bAIza[0-9A-Za-z_\-]{35}\b",                          // Google API key
+            r"|\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\b",        // GitHub token
+            r"|\bgithub_pat_[A-Za-z0-9_]{22,}\b",                    // GitHub fine-grained PAT
+            r"|\bxox[baprs]-[A-Za-z0-9-]{10,}\b",                    // Slack token
+            r"|\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}\b",        // Stripe key
+            r"|\bsk-(?:ant-)?[A-Za-z0-9_\-]{20,}\b",                 // OpenAI / Anthropic key
+            r"|\bhv[sbr]\.[A-Za-z0-9_-]{20,}\b",                     // HashiCorp Vault token
+            r"|\bpypi-[A-Za-z0-9_-]{16,}\b",                         // PyPI API token
         ))
         .expect("Invalid tokens regex")
     })
@@ -97,16 +97,41 @@ pub(crate) fn database_url_re() -> &'static Regex {
 /// All token/PEM/URL literal anchors for the pre-filter.
 /// These are case-sensitive substrings that every token/PEM/URL rule requires.
 pub(crate) const LITERAL_ANCHORS: &[&str] = &[
-    "eyJ", "AKIA", "ASIA", "AIza", "ghp_", "gho_", "ghu_", "ghs_", "ghr_",
-    "github_pat_", "xox", "sk_", "rk_", "sk-", "-----BEGIN", "://",
-    "hvs.", "hvb.", "hvr.", "pypi-",
+    "eyJ",
+    "AKIA",
+    "ASIA",
+    "AIza",
+    "ghp_",
+    "gho_",
+    "ghu_",
+    "ghs_",
+    "ghr_",
+    "github_pat_",
+    "xox",
+    "sk_",
+    "rk_",
+    "sk-",
+    "-----BEGIN",
+    "://",
+    "hvs.",
+    "hvb.",
+    "hvr.",
+    "pypi-",
 ];
 
 /// Keyword roots for the pre-filter (case-insensitive).
 /// These are substrings the assignment and authorization rules require.
 pub(crate) const KEYWORD_ROOTS: &[&str] = &[
-    "password", "passwd", "secret", "token", "api_key", "access_key",
-    "private_key", "auth_token", "client_secret", "credential",
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "api_key",
+    "access_key",
+    "private_key",
+    "auth_token",
+    "client_secret",
+    "credential",
     "bearer",
 ];
 
@@ -117,8 +142,12 @@ mod tests {
     #[test]
     fn test_pem_private_key_pattern() {
         let re = pem_private_key_re();
-        assert!(re.is_match("-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"));
-        assert!(!re.is_match("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkq...\n-----END PUBLIC KEY-----"));
+        assert!(re.is_match(
+            "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"
+        ));
+        assert!(
+            !re.is_match("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkq...\n-----END PUBLIC KEY-----")
+        );
     }
 
     #[test]
@@ -133,7 +162,9 @@ mod tests {
         assert!(re.is_match("AIzaSyA1234567890abcdefghijklmnopqrstuv"));
         // GitHub
         assert!(re.is_match("ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234"));
-        assert!(re.is_match("github_pat_11ABCDEF0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234567890abcdef12"));
+        assert!(re.is_match(
+            "github_pat_11ABCDEF0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234567890abcdef12"
+        ));
         // Slack
         assert!(re.is_match("xoxb-FAKETOKEN123456789012345678901234567890"));
         // Stripe
@@ -185,7 +216,10 @@ mod tests {
         assert!(re.is_match("https://user:password@example.com/path"));
         assert!(re.is_match("postgres://admin:secret@localhost:5432/db"));
         // Should preserve scheme, user, and host
-        let result = re.replace("https://user:password@example.com/path", "${1}[REDACTED]${2}");
+        let result = re.replace(
+            "https://user:password@example.com/path",
+            "${1}[REDACTED]${2}",
+        );
         assert_eq!(result, "https://user:[REDACTED]@example.com/path");
     }
 

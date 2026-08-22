@@ -3,8 +3,8 @@
 // Regression tests for the FAANG audit P1/P2 fixes.
 // These tests verify that each fix cannot regress.
 
-use tempfile::TempDir;
 use serial_test::serial;
+use tempfile::TempDir;
 
 use crate::mcp::context_store::ContextStore;
 
@@ -49,8 +49,10 @@ fn audit1_compress_persists_to_db() {
     let guard = state.persistence_store_lock();
     if let Some(ref store) = *guard {
         let has = store.has_context(&rs_path);
-        assert!(has,
-            "AUDIT-1: BufferedStore should have context after compress");
+        assert!(
+            has,
+            "AUDIT-1: BufferedStore should have context after compress"
+        );
     } else {
         panic!("AUDIT-1: persistence store should be Some");
     }
@@ -117,8 +119,10 @@ fn audit3_restore_clears_persistence_db() {
     let guard = state.persistence_store_lock();
     if let Some(ref store) = *guard {
         let has = store.has_context(&rs_path);
-        assert!(!has,
-            "AUDIT-3: persistence store should NOT have context after restore");
+        assert!(
+            !has,
+            "AUDIT-3: persistence store should NOT have context after restore"
+        );
     }
 }
 
@@ -142,8 +146,10 @@ fn audit4_delta_text_stores_baseline() {
     // Before any delta_text call, has_baseline should be false
     {
         let td = state.text_delta_lock();
-        assert!(!td.has_baseline(&alias),
-            "AUDIT-4: baseline should NOT exist before first call");
+        assert!(
+            !td.has_baseline(&alias),
+            "AUDIT-4: baseline should NOT exist before first call"
+        );
     }
 
     // Call delta_text_context (first call stores baseline)
@@ -155,8 +161,10 @@ fn audit4_delta_text_stores_baseline() {
 
     // After the call, has_baseline should be true
     let td = state.text_delta_lock();
-    assert!(td.has_baseline(&alias),
-        "AUDIT-4: baseline SHOULD exist after first delta_text_context call");
+    assert!(
+        td.has_baseline(&alias),
+        "AUDIT-4: baseline SHOULD exist after first delta_text_context call"
+    );
     drop(td);
 }
 
@@ -176,8 +184,7 @@ fn audit5_list_sessions_disabled_returns_result() {
     // Verify persistence is disabled
     {
         let guard = state.persistence_store_lock();
-        assert!(guard.is_none(),
-            "AUDIT-5: persistence should be disabled");
+        assert!(guard.is_none(), "AUDIT-5: persistence should be disabled");
     }
 
     // Call list_sessions — should not panic
@@ -214,10 +221,14 @@ fn audit6_ir_context_read_helper_works() {
     drop(write);
 
     let read = state.ir_context_read();
-    assert!(!read.has_file("nonexistent"),
-        "AUDIT-6: nonexistent file should not exist");
-    assert!(read.has_file("test"),
-        "AUDIT-6: test file should exist after load");
+    assert!(
+        !read.has_file("nonexistent"),
+        "AUDIT-6: nonexistent file should not exist"
+    );
+    assert!(
+        read.has_file("test"),
+        "AUDIT-6: test file should exist after load"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -230,15 +241,23 @@ fn audit7_compress_workspace_not_in_registry() {
     // also in the registry (without a return), it would double-fire.
     // Verify it's NOT in the registry.
     let registry = crate::mcp::tool_handlers::registry::create_default_registry();
-    assert!(registry.get("compress_workspace").is_none(),
-        "AUDIT-7: compress_workspace should NOT be in registry (handled inline)");
-    assert!(registry.get("decompress_code_context").is_none(),
-        "AUDIT-7: decompress_code_context should NOT be in registry");
+    assert!(
+        registry.get("compress_workspace").is_none(),
+        "AUDIT-7: compress_workspace should NOT be in registry (handled inline)"
+    );
+    assert!(
+        registry.get("decompress_code_context").is_none(),
+        "AUDIT-7: decompress_code_context should NOT be in registry"
+    );
     // CBM tools should also NOT be in registry
-    assert!(registry.get("graph_search").is_none(),
-        "AUDIT-7: graph_search should NOT be in registry");
-    assert!(registry.get("cbm_proxy").is_none(),
-        "AUDIT-7: cbm_proxy should NOT be in registry");
+    assert!(
+        registry.get("graph_search").is_none(),
+        "AUDIT-7: graph_search should NOT be in registry"
+    );
+    assert!(
+        registry.get("cbm_proxy").is_none(),
+        "AUDIT-7: cbm_proxy should NOT be in registry"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -262,8 +281,11 @@ fn audit8_state_new_is_fast() {
     config.persistence.enabled = false;
     let _state = crate::mcp::McpState::new(config);
     let elapsed = start.elapsed();
-    assert!(elapsed.as_millis() < 1000,
-        "AUDIT-8: McpState::new() took {}ms -- should be <1s (no CBM blocking)", elapsed.as_millis());
+    assert!(
+        elapsed.as_millis() < 1000,
+        "AUDIT-8: McpState::new() took {}ms -- should be <1s (no CBM blocking)",
+        elapsed.as_millis()
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -273,15 +295,57 @@ fn audit8_state_new_is_fast() {
 #[test]
 fn audit9_ensure_indexed_idempotent() {
     // FAANG audit P0: ensure_indexed() should be a no-op if already indexed.
-    let config = crate::cbm::config::CbmConfig { enabled: false, ..Default::default() };
-    let mut bridge = crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
-    // First call -- should not panic (CBM disabled)
+    // When CBM is unavailable, BOTH calls must return the SAME error and the
+    // indexing state must remain untouched — proving no doomed background
+    // indexing thread was spawned (regression: the first call used to spawn
+    // a thread that flipped state to Failed, making the second call Err).
+    let config = crate::cbm::config::CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge =
+        crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
+
+    // First call -- should error (CBM unavailable), not spawn a thread.
     let result1 = bridge.ensure_indexed();
-    // Second call -- should be a no-op
+    // Second call -- should be identical (idempotent, no state mutation).
     let result2 = bridge.ensure_indexed();
-    // Both should return same result (idempotent)
-    assert_eq!(result1.is_ok(), result2.is_ok(),
-        "AUDIT-9: ensure_indexed should be idempotent -- 1st={:?}, 2nd={:?}", result1, result2);
+
+    // Both must be Err — never Ok(StillIndexing) for a doomed thread.
+    assert!(
+        result1.is_err() && result2.is_err(),
+        "AUDIT-9: ensure_indexed should error when CBM unavailable -- 1st={:?}, 2nd={:?}",
+        result1,
+        result2
+    );
+
+    // Both must carry the SAME deterministic error message.
+    let msg1 = match &result1 {
+        Err(e) => e.to_string(),
+        Ok(s) => format!("{:?}", s),
+    };
+    let msg2 = match &result2 {
+        Err(e) => e.to_string(),
+        Ok(s) => format!("{:?}", s),
+    };
+    assert_eq!(
+        msg1, msg2,
+        "AUDIT-9: ensure_indexed should return the same error both calls -- 1st={}, 2nd={}",
+        msg1, msg2
+    );
+    assert!(
+        msg1.contains("CBM not available"),
+        "AUDIT-9: expected 'CBM not available' error, got: {}",
+        msg1
+    );
+
+    // The guard must prevent ANY indexing-state mutation (no doomed thread).
+    let states = bridge.indexing_state();
+    assert!(
+        states.is_empty(),
+        "AUDIT-9: ensure_indexed must not mutate indexing state when CBM unavailable -- got {:?}",
+        states
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -323,12 +387,12 @@ fn audit11_helper_methods_compile() {
     // Drop persistence guard BEFORE calling flush_persistence to avoid deadlock
     // (flush_persistence internally acquires the same lock)
     let _ps = state.persistence_store_lock();
-    drop(_ps);  // Release before flush
+    drop(_ps); // Release before flush
     let _flush = state.flush_persistence();
     let _sc = state.source_cache_lock();
     // Test cbm_filter_lock directly, then drop before get_skip_set (which locks internally)
     let _cf = state.cbm_filter_lock();
-    drop(_cf);  // Release before get_skip_set to avoid reentrant deadlock
+    drop(_cf); // Release before get_skip_set to avoid reentrant deadlock
     let _skip = state.get_skip_set("x.rs");
     let _cm = state.cache_metrics_lock();
 }
@@ -340,9 +404,15 @@ fn audit11_helper_methods_compile() {
 #[test]
 fn audit12_bridge_indexed_flag_initialized() {
     // Verify that a fresh GraphBridge has indexed=false.
-    let config = crate::cbm::config::CbmConfig { enabled: false, ..Default::default() };
+    let config = crate::cbm::config::CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
     let bridge = crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
     // After ensure_indexed (with no CBM), indexed should remain false
     // This is a behavior test, not a field-access test
-    assert!(!bridge.is_available(), "CBM should be unavailable in this test");
+    assert!(
+        !bridge.is_available(),
+        "CBM should be unavailable in this test"
+    );
 }

@@ -40,12 +40,23 @@ fn critical_1_system_blocks_not_deleted() {
 
     // CRITICAL: The small system block must still exist in the array
     let system = body["system"].as_array().expect("system should be array");
-    assert_eq!(system.len(), 2, "System blocks must NOT be deleted — found {}", system.len());
-    assert_eq!(system[0]["text"], "Short.", "Small block text must be preserved");
+    assert_eq!(
+        system.len(),
+        2,
+        "System blocks must NOT be deleted — found {}",
+        system.len()
+    );
+    assert_eq!(
+        system[0]["text"], "Short.",
+        "Small block text must be preserved"
+    );
 
     // Client-sent breakpoints are PRESERVED — injection is skipped entirely.
     // The proxy must NOT clobber client caching.
-    assert_eq!(slots, 0, "Injection should be skipped when client breakpoints exist");
+    assert_eq!(
+        slots, 0,
+        "Injection should be skipped when client breakpoints exist"
+    );
     assert_eq!(stats.client_breakpoints_preserved, 1);
     assert!(
         system[0].get("cache_control").is_some(),
@@ -59,8 +70,14 @@ fn critical_1_system_blocks_not_deleted() {
 #[test]
 fn critical_3_body_size_limit_defined() {
     // Verify the constant exists and is reasonable (10 MB)
-    assert!(clean_ctx_proxy::server::MAX_BODY_SIZE >= 1_000_000, "Body size limit should be at least 1MB");
-    assert!(clean_ctx_proxy::server::MAX_BODY_SIZE <= 100_000_000, "Body size limit should be at most 100MB");
+    assert!(
+        clean_ctx_proxy::server::MAX_BODY_SIZE >= 1_000_000,
+        "Body size limit should be at least 1MB"
+    );
+    assert!(
+        clean_ctx_proxy::server::MAX_BODY_SIZE <= 100_000_000,
+        "Body size limit should be at most 100MB"
+    );
 }
 
 // ============================================================
@@ -97,9 +114,18 @@ fn high_7_model_regex_cached() {
 fn high_8_error_sanitized() {
     // Error messages should not contain file paths or internal details
     let err_msg = "Proxy error";
-    assert!(!err_msg.contains("/"), "Error should not contain file paths");
-    assert!(!err_msg.contains("127.0.0.1"), "Error should not contain internal addresses");
-    assert!(!err_msg.contains("reqwest"), "Error should not contain library names");
+    assert!(
+        !err_msg.contains("/"),
+        "Error should not contain file paths"
+    );
+    assert!(
+        !err_msg.contains("127.0.0.1"),
+        "Error should not contain internal addresses"
+    );
+    assert!(
+        !err_msg.contains("reqwest"),
+        "Error should not contain library names"
+    );
 }
 
 // ============================================================
@@ -125,8 +151,14 @@ fn high_9_path_must_start_with_slash() {
 // ============================================================
 #[test]
 fn high_10_connection_limit() {
-    assert!(clean_ctx_proxy::server::MAX_CONNECTIONS > 0, "Connection limit must be positive");
-    assert!(clean_ctx_proxy::server::MAX_CONNECTIONS <= 10000, "Connection limit should be reasonable");
+    assert!(
+        clean_ctx_proxy::server::MAX_CONNECTIONS > 0,
+        "Connection limit must be positive"
+    );
+    assert!(
+        clean_ctx_proxy::server::MAX_CONNECTIONS <= 10000,
+        "Connection limit should be reasonable"
+    );
 }
 
 // ============================================================
@@ -134,8 +166,8 @@ fn high_10_connection_limit() {
 // ============================================================
 #[test]
 fn medium_13_ansi_single_pass() {
-    use clean_ctx_proxy::transform::{strip_ansi, TransformStats};
     use clean_ctx_proxy::platform::anthropic::AnthropicAdapter;
+    use clean_ctx_proxy::transform::{strip_ansi, TransformStats};
     use serde_json::json;
 
     let esc = "\x1B";
@@ -175,7 +207,10 @@ fn medium_20_request_id_forwarded() {
     // This is tested implicitly by the server using req_id in the header
     // Here we just verify the constant exists
     let req_id = "test-123";
-    assert!(!req_id.is_empty(), "Request IDs should be non-empty strings");
+    assert!(
+        !req_id.is_empty(),
+        "Request IDs should be non-empty strings"
+    );
 }
 
 // ============================================================
@@ -221,14 +256,21 @@ fn cache_small_block_breakpoint_stripped_not_deleted() {
 
     // Client-sent breakpoints are PRESERVED — injection is skipped entirely.
     // The proxy must NOT clobber client caching.
-    assert_eq!(slots, 0, "Injection should be skipped when client breakpoints exist");
+    assert_eq!(
+        slots, 0,
+        "Injection should be skipped when client breakpoints exist"
+    );
     assert_eq!(stats.client_breakpoints_preserved, 1);
-    assert!(system[0].get("cache_control").is_some(),
-        "Client-sent cache_control must be preserved, not stripped");
+    assert!(
+        system[0].get("cache_control").is_some(),
+        "Client-sent cache_control must be preserved, not stripped"
+    );
 
     // Large block should NOT get a new breakpoint (injection skipped)
-    assert!(system[1].get("cache_control").is_none(),
-        "Large block should NOT get cache_control when client breakpoints exist");
+    assert!(
+        system[1].get("cache_control").is_none(),
+        "Large block should NOT get cache_control when client breakpoints exist"
+    );
 }
 
 // ============================================================
@@ -321,7 +363,10 @@ fn regression_total_injected_only_counts_actual() {
     let mut stats = CacheStats::default();
     let slots = inject_breakpoints(&mut body, "5m", &mut stats);
     assert_eq!(slots, 0, "Should place 0 slots");
-    assert_eq!(stats.total_injected, 0, "total_injected should be 0 when no slots placed");
+    assert_eq!(
+        stats.total_injected, 0,
+        "total_injected should be 0 when no slots placed"
+    );
 
     // Body with tools → at least 1 slot placed
     let mut body2 = json!({
@@ -331,7 +376,10 @@ fn regression_total_injected_only_counts_actual() {
     let mut stats2 = CacheStats::default();
     let slots2 = inject_breakpoints(&mut body2, "5m", &mut stats2);
     assert!(slots2 > 0, "Should place at least 1 slot");
-    assert_eq!(stats2.total_injected, 1, "total_injected should be 1 when slots placed");
+    assert_eq!(
+        stats2.total_injected, 1,
+        "total_injected should be 1 when slots placed"
+    );
 }
 
 // ============================================================
@@ -359,9 +407,18 @@ fn regression_slot2_rposition_finds_correct_block() {
 
     let system = body["system"].as_array().unwrap();
     assert_eq!(stats.system_slots, 1);
-    assert!(system[0].get("cache_control").is_none(), "Index 0 (small) must not have breakpoint");
-    assert!(system[1].get("cache_control").is_some(), "Index 1 (large) must have breakpoint");
-    assert!(system[2].get("cache_control").is_none(), "Index 2 (small) must not have breakpoint");
+    assert!(
+        system[0].get("cache_control").is_none(),
+        "Index 0 (small) must not have breakpoint"
+    );
+    assert!(
+        system[1].get("cache_control").is_some(),
+        "Index 1 (large) must have breakpoint"
+    );
+    assert!(
+        system[2].get("cache_control").is_none(),
+        "Index 2 (small) must not have breakpoint"
+    );
 }
 
 // ============================================================

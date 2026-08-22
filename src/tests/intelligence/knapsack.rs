@@ -1,5 +1,5 @@
-use super::super::super::intelligence::knapsack::{pack_to_budget, sort_by_rank, RankedSymbol};
 use super::super::super::intelligence::budget::TokenBudget;
+use super::super::super::intelligence::knapsack::{RankedSymbol, pack_to_budget, sort_by_rank};
 
 fn make_symbol(symbol: &str, rank: f64, token_cost: usize) -> RankedSymbol {
     RankedSymbol {
@@ -46,9 +46,7 @@ fn test_pack_overflow_drops_lowest() {
 
 #[test]
 fn test_pack_single_oversized_symbol() {
-    let symbols = vec![
-        make_symbol("HugeFile", 0.9, 5000),
-    ];
+    let symbols = vec![make_symbol("HugeFile", 0.9, 5000)];
     let mut budget = TokenBudget::new(1000);
     let packed = pack_to_budget(symbols, &mut budget);
     assert!(packed.is_empty());
@@ -58,10 +56,7 @@ fn test_pack_single_oversized_symbol() {
 
 #[test]
 fn test_pack_budget_larger_than_workspace() {
-    let symbols = vec![
-        make_symbol("A", 0.9, 100),
-        make_symbol("B", 0.5, 200),
-    ];
+    let symbols = vec![make_symbol("A", 0.9, 100), make_symbol("B", 0.5, 200)];
     let mut budget = TokenBudget::new(10000);
     let packed = pack_to_budget(symbols, &mut budget);
     assert_eq!(packed.len(), 2);
@@ -71,9 +66,7 @@ fn test_pack_budget_larger_than_workspace() {
 
 #[test]
 fn test_pack_zero_budget() {
-    let symbols = vec![
-        make_symbol("A", 0.9, 100),
-    ];
+    let symbols = vec![make_symbol("A", 0.9, 100)];
     let mut budget = TokenBudget::new(0);
     let packed = pack_to_budget(symbols, &mut budget);
     assert!(packed.is_empty());

@@ -2,9 +2,7 @@
 //
 // Tests for the file-triplet bundler.
 
-use crate::angular_meta::bundler::{
-    is_component_ts, resolve_bundle_group, resolve_triplet,
-};
+use crate::angular_meta::bundler::{is_component_ts, resolve_bundle_group, resolve_triplet};
 use std::path::{Path, PathBuf};
 
 /// Debug: check if the test fixture files exist and what paths resolve to.

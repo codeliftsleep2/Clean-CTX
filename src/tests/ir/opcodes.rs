@@ -49,10 +49,28 @@ fn core_op_type_alias_display() {
 }
 
 #[test]
+fn core_op_body_display() {
+    let op = CoreOp::Body("M1".into(), "{\n  return 42;\n}".into());
+    assert_eq!(format!("{}", op), "BODY M1 {\n  return 42;\n}");
+}
+
+#[test]
+fn core_op_body_round_trips_through_wire() {
+    use crate::ir::wire::{op_to_tuple, tuple_to_op};
+    let op = CoreOp::Body("M1".into(), "{\n  return 42;\n}".into());
+    let tuple = op_to_tuple(&op);
+    assert_eq!(tuple[0], "BODY");
+    assert_eq!(tuple[1], "M1");
+    assert_eq!(tuple[2], "{\n  return 42;\n}");
+    let restored = tuple_to_op(&tuple).unwrap();
+    assert_eq!(restored, op);
+}
+
+#[test]
 fn arity_table_covers_all_opcodes() {
     let all_opcodes = [
-        "DEF_C", "DEF_M", "DEF_F", "DEF_I", "SIG", "RET", "FIELD_T",
-        "FLAGS", "FLAGS_C", "EXT", "IMPL", "INJECTS", "IMP", "TYPE",
+        "DEF_C", "DEF_M", "DEF_F", "DEF_I", "SIG", "RET", "FIELD_T", "FLAGS", "FLAGS_C", "EXT",
+        "IMPL", "INJECTS", "IMP", "TYPE", "BODY", "DATAFLOW", "CTRL", "EFFECT", "CTX",
     ];
     for opcode in &all_opcodes {
         assert!(
@@ -78,6 +96,12 @@ fn arity_table_fixed_opcodes() {
     assert_eq!(arity("SIG"), Some(5));
     assert_eq!(arity("RET"), Some(3));
     assert_eq!(arity("IMP"), Some(4));
+    assert_eq!(arity("BODY"), Some(3));
+}
+
+#[test]
+fn opcode_name_body() {
+    assert_eq!(opcode_name(&CoreOp::Body("M1".into(), "{}".into())), "BODY");
 }
 
 #[test]
@@ -88,20 +112,64 @@ fn arity_table_unknown_opcode() {
 
 #[test]
 fn opcode_name_matches_variant() {
-    assert_eq!(opcode_name(&CoreOp::DefClass("C1".into(), "X".into())), "DEF_C");
-    assert_eq!(opcode_name(&CoreOp::DefMethod("C1".into(), "M1".into(), "X".into())), "DEF_M");
-    assert_eq!(opcode_name(&CoreOp::DefField("C1".into(), "F1".into(), "X".into())), "DEF_F");
-    assert_eq!(opcode_name(&CoreOp::DefInterface("I1".into(), "X".into())), "DEF_I");
-    assert_eq!(opcode_name(&CoreOp::Param("M1".into(), "P1".into(), "$s".into(), "x".into())), "SIG");
-    assert_eq!(opcode_name(&CoreOp::Return("M1".into(), "$v".into())), "RET");
-    assert_eq!(opcode_name(&CoreOp::FieldType("F1".into(), "$n".into())), "FIELD_T");
+    assert_eq!(
+        opcode_name(&CoreOp::DefClass("C1".into(), "X".into())),
+        "DEF_C"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::DefMethod("C1".into(), "M1".into(), "X".into())),
+        "DEF_M"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::DefField("C1".into(), "F1".into(), "X".into())),
+        "DEF_F"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::DefInterface("I1".into(), "X".into())),
+        "DEF_I"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Param(
+            "M1".into(),
+            "P1".into(),
+            "$s".into(),
+            "x".into()
+        )),
+        "SIG"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Return("M1".into(), "$v".into())),
+        "RET"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::FieldType("F1".into(), "$n".into())),
+        "FIELD_T"
+    );
     assert_eq!(opcode_name(&CoreOp::Flags("M1".into(), vec![])), "FLAGS");
-    assert_eq!(opcode_name(&CoreOp::ClassFlags("C1".into(), vec![])), "FLAGS_C");
-    assert_eq!(opcode_name(&CoreOp::Extends("C1".into(), "C2".into())), "EXT");
-    assert_eq!(opcode_name(&CoreOp::Implements("C1".into(), "I1".into())), "IMPL");
-    assert_eq!(opcode_name(&CoreOp::Injects("C1".into(), vec![])), "INJECTS");
-    assert_eq!(opcode_name(&CoreOp::Import("IM1".into(), "m".into(), "n".into())), "IMP");
-    assert_eq!(opcode_name(&CoreOp::TypeAlias("T1".into(), "X".into())), "TYPE");
+    assert_eq!(
+        opcode_name(&CoreOp::ClassFlags("C1".into(), vec![])),
+        "FLAGS_C"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Extends("C1".into(), "C2".into())),
+        "EXT"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Implements("C1".into(), "I1".into())),
+        "IMPL"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Injects("C1".into(), vec![])),
+        "INJECTS"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::Import("IM1".into(), "m".into(), "n".into())),
+        "IMP"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::TypeAlias("T1".into(), "X".into())),
+        "TYPE"
+    );
 }
 
 #[test]

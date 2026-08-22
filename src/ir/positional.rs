@@ -22,10 +22,10 @@
 // This module is the "transport" side of Phase H. The compression side
 // lives in `crate::ir::patterns` (the Layer 4 `CompressingPatternRecognizer`).
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use super::opcodes::{arity, opcode_name};
 use super::opcodes::CoreOp;
+use super::opcodes::{arity, opcode_name};
 use super::wire::{op_to_tuple, tuple_to_op};
 
 /// Configuration for positional encoding.
@@ -150,8 +150,12 @@ pub fn ir_to_positional_wire(
 /// include the JSON array brackets and quotes.
 pub fn estimate_savings(ops: &[CoreOp]) -> (usize, usize) {
     let config = PositionalConfig::stripped();
-    let named = ops.iter().map(|op| op_to_tuple(op).join(",").len() + 4).sum::<usize>();
-    let positional = ops.iter()
+    let named = ops
+        .iter()
+        .map(|op| op_to_tuple(op).join(",").len() + 4)
+        .sum::<usize>();
+    let positional = ops
+        .iter()
         .map(|op| encode_op(op, config).join(",").len() + 4)
         .sum::<usize>();
     (named, positional)

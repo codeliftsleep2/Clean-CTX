@@ -132,7 +132,7 @@ impl SignalShape {
                     // (e.g. `"Φsignal:"`), so we must NOT add another one.
                     s.push_str(&format!("  {}{}\n", sig.kind.marker_prefix(), sig.name));
                 }
-                Fidelity::Medium | Fidelity::High => {
+                Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     if let Some(ref tp) = sig.type_param {
                         // `expansion()` returns e.g. `"signal()"`.
                         // Insert the generic param before the `()` so we

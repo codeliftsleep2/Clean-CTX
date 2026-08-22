@@ -5,7 +5,7 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod tests {
-    use crate::dotnet_meta::graph::{DotnetGraph, DotnetGraphBuilder, GraphNode, GraphEdge};
+    use crate::dotnet_meta::graph::{DotnetGraph, DotnetGraphBuilder, GraphEdge, GraphNode};
     use crate::dotnet_meta::markers::PhiLineKind;
 
     #[test]
@@ -293,7 +293,10 @@ mod tests {
 
     #[test]
     fn test_parse_node_from_line() {
-        let node = DotnetGraph::parse_node_from_line("Φctrl:UserController [api/users]", "Controllers/UserController.cs");
+        let node = DotnetGraph::parse_node_from_line(
+            "Φctrl:UserController [api/users]",
+            "Controllers/UserController.cs",
+        );
         assert!(node.is_some());
         let node = node.unwrap();
         assert_eq!(node.id, "UserController");
@@ -303,7 +306,10 @@ mod tests {
 
     #[test]
     fn test_parse_node_from_line_hub() {
-        let node = DotnetGraph::parse_node_from_line("Φhub:NotificationHub [INotificationClient]", "Hubs/NotificationHub.cs");
+        let node = DotnetGraph::parse_node_from_line(
+            "Φhub:NotificationHub [INotificationClient]",
+            "Hubs/NotificationHub.cs",
+        );
         assert!(node.is_some());
         let node = node.unwrap();
         assert_eq!(node.id, "NotificationHub");

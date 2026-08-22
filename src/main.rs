@@ -82,35 +82,42 @@ fn cmd_setup_cbm(force: bool) -> Result<(), Box<dyn std::error::Error>> {
                 // Flush stdout to ensure prompt appears before input
                 use std::io::Write;
                 std::io::stderr().flush()?;
-                
+
                 let mut input = String::new();
                 std::io::stdin().read_line(&mut input)?;
                 let input = input.trim().to_lowercase();
-                
+
                 if input != "y" && input != "yes" {
                     eprintln!("[clean-ctx] Aborted.");
                     return Ok(());
                 }
             }
-            
+
             // Read existing config and merge cbm block
             match std::fs::read_to_string(config_path) {
                 Ok(content) => {
-                    if let Ok(mut config_val) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Ok(mut config_val) = serde_json::from_str::<serde_json::Value>(&content)
+                    {
                         let cbm_block = clean_ctx::cbm::setup::generate_cbm_config_block(&info);
                         config_val["cbm"] = cbm_block;
                         if let Ok(pretty) = serde_json::to_string_pretty(&config_val) {
                             std::fs::write(config_path, &pretty)?;
-                            eprintln!("[clean-ctx] Updated .clean-ctx.json with CBM configuration.");
+                            eprintln!(
+                                "[clean-ctx] Updated .clean-ctx.json with CBM configuration."
+                            );
                         }
                     }
                 }
                 Err(_) => {
-                    eprintln!("[clean-ctx] Could not read .clean-ctx.json to update. Update manually.");
+                    eprintln!(
+                        "[clean-ctx] Could not read .clean-ctx.json to update. Update manually."
+                    );
                 }
             }
         } else {
-            eprintln!("[clean-ctx] No .clean-ctx.json found. Run `clean-ctx init` first, then rerun setup.");
+            eprintln!(
+                "[clean-ctx] No .clean-ctx.json found. Run `clean-ctx init` first, then rerun setup."
+            );
         }
     }
 
@@ -127,13 +134,19 @@ fn cmd_init() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::create_dir_all(&clean_ctx_dir)?;
         eprintln!("[clean-ctx] Created directory: {}", clean_ctx_dir.display());
     } else {
-        eprintln!("[clean-ctx] Directory already exists: {}", clean_ctx_dir.display());
+        eprintln!(
+            "[clean-ctx] Directory already exists: {}",
+            clean_ctx_dir.display()
+        );
     }
 
     // Create .clean-ctx.json config file
     let config_path = cwd.join(".clean-ctx.json");
     if config_path.exists() {
-        eprintln!("[clean-ctx] Config already exists: {}", config_path.display());
+        eprintln!(
+            "[clean-ctx] Config already exists: {}",
+            config_path.display()
+        );
         eprintln!("[clean-ctx] Delete it first if you want to regenerate defaults.");
         return Ok(());
     }
@@ -158,20 +171,26 @@ fn cmd_init() -> Result<(), Box<dyn std::error::Error>> {
 /// Useful for debugging configuration issues.
 fn cmd_config_dump() -> Result<(), Box<dyn std::error::Error>> {
     let config = clean_ctx::config::CleanCtxConfig::load(std::path::Path::new("."));
-    
-    eprintln!("═══════════════════════════════════════════════════════════════════════════════════════");
+
+    eprintln!(
+        "═══════════════════════════════════════════════════════════════════════════════════════"
+    );
     eprintln!("  Clean-CTX Resolved Configuration");
-    eprintln!("═══════════════════════════════════════════════════════════════════════════════════════");
+    eprintln!(
+        "═══════════════════════════════════════════════════════════════════════════════════════"
+    );
     eprintln!();
-    
+
     // Print config file location if found
-    if let Some(config_path) = clean_ctx::config::CleanCtxConfig::find_config(std::path::Path::new(".")) {
+    if let Some(config_path) =
+        clean_ctx::config::CleanCtxConfig::find_config(std::path::Path::new("."))
+    {
         eprintln!("  Config file: {}", config_path.display());
     } else {
         eprintln!("  Config file: (none found — using defaults)");
     }
     eprintln!();
-    
+
     // Print CI environment detection
     let is_ci = clean_ctx::config::CleanCtxConfig::is_ci_environment();
     eprintln!("  CI environment detected: {}", is_ci);
@@ -179,22 +198,26 @@ fn cmd_config_dump() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("  ⚠️  Persistence auto-disabled in CI");
     }
     eprintln!();
-    
+
     // Print effective persistence setting
     eprintln!("  Persistence enabled: {}", config.persistence.enabled);
     eprintln!();
-    
+
     // Print full config as pretty JSON
     eprintln!("  Full configuration:");
-    eprintln!("  ────────────────────────────────────────────────────────────────────────────────────");
-    
+    eprintln!(
+        "  ────────────────────────────────────────────────────────────────────────────────────"
+    );
+
     // Convert to JSON and print with indentation
     let config_json = serde_json::to_string_pretty(&config)?;
     for line in config_json.lines() {
         eprintln!("  {}", line);
     }
-    
-    eprintln!("  ────────────────────────────────────────────────────────────────────────────────────");
+
+    eprintln!(
+        "  ────────────────────────────────────────────────────────────────────────────────────"
+    );
     eprintln!();
     eprintln!("  Configuration precedence (highest to lowest):");
     eprintln!("    1. Tool argument (per-call overrides)");
@@ -203,7 +226,7 @@ fn cmd_config_dump() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("    4. Default (built-in defaults)");
     eprintln!();
     eprintln!("  For more information, see: docs/CONFIGURATION.md");
-    
+
     Ok(())
 }
 
@@ -254,11 +277,17 @@ fn cmd_proxy(stop: bool) -> Result<(), Box<dyn std::error::Error>> {
                         std::thread::sleep(std::time::Duration::from_millis(50));
                     }
                 }
-                eprintln!("[clean-ctx] Stopped proxy on port {} (pid {})", proxy_cfg.port, pid);
+                eprintln!(
+                    "[clean-ctx] Stopped proxy on port {} (pid {})",
+                    proxy_cfg.port, pid
+                );
                 Ok(())
             }
             None => {
-                eprintln!("[clean-ctx] No proxy found listening on port {}", proxy_cfg.port);
+                eprintln!(
+                    "[clean-ctx] No proxy found listening on port {}",
+                    proxy_cfg.port
+                );
                 Ok(())
             }
         }

@@ -22,10 +22,7 @@ fn resolve_fidelity_uses_extension_override() {
     config
         .fidelity_overrides
         .insert("ts".to_string(), crate::compression::Fidelity::High);
-    assert_eq!(
-        resolve_fidelity(None, Some("ts"), &config),
-        Fidelity::High
-    );
+    assert_eq!(resolve_fidelity(None, Some("ts"), &config), Fidelity::High);
 }
 
 #[test]
@@ -56,6 +53,87 @@ fn parse_fidelity_arg_rejects_typo() {
     assert!(result.is_err());
 }
 
+// ── Gap 4 fix: workspaceRoot schema presence (Phase 4) ─────────────
+
+/// Every compression tool that resolves paths must advertise `workspaceRoot`
+/// in its schema so clients (and the LLM) can pass a multi-repo root.
+#[test]
+fn schema_includes_workspace_root_on_path_resolving_tools() {
+    let tools = tool_list();
+    let tools_by_name: std::collections::HashMap<&str, &serde_json::Value> = tools
+        .iter()
+        .map(|t| (t["name"].as_str().unwrap_or(""), t))
+        .collect();
+
+    // Tools that accept absolute file paths should expose workspaceRoot.
+    for name in [
+        "compress_code_context",
+        "diff_code_context",
+        "delta_code_context",
+        "delta_text_context",
+        "restore_context",
+        "provide_code_context",
+        "compress_workspace",
+    ] {
+        let tool = tools_by_name
+            .get(name)
+            .unwrap_or_else(|| panic!("missing tool {} in tool_list", name));
+        let has_root = tool["inputSchema"]["properties"]["workspaceRoot"].is_object();
+        assert!(
+            has_root,
+            "tool '{}' schema is missing workspaceRoot (Gap 4)",
+            name
+        );
+    }
+}
+
+/// Symbol targeting: `provide_code_context` schema advertises the optional
+/// `focusMethods` array parameter for targeted Edit-fidelity rendering.
+#[test]
+fn schema_provide_code_context_includes_focus_methods() {
+    let tools = tool_list();
+    let provide = tools
+        .iter()
+        .find(|t| t["name"] == "provide_code_context")
+        .unwrap_or_else(|| panic!("missing provide_code_context in tool_list"));
+
+    let focus_methods = &provide["inputSchema"]["properties"]["focusMethods"];
+    assert!(
+        focus_methods.is_object(),
+        "provide_code_context schema is missing focusMethods"
+    );
+    assert_eq!(
+        focus_methods["type"], "array",
+        "focusMethods should be an array"
+    );
+    assert_eq!(
+        focus_methods["items"]["type"], "string",
+        "focusMethods items should be strings"
+    );
+}
+
+/// Gap 4 fix: fidelity enums include edit/verbatim where applicable.
+#[test]
+fn schema_fidelity_enums_include_edit_and_verbatim() {
+    let tools = tool_list();
+    for tool in &tools {
+        let name = tool["name"].as_str().unwrap_or("");
+        let Some(fid) = tool["inputSchema"]["properties"]["fidelity"].as_object() else {
+            continue; // tool has no fidelity arg
+        };
+        let Some(enum_vals) = fid.get("enum").and_then(|e| e.as_array()) else {
+            continue; // no enum constraint — skip (not all tools need it)
+        };
+        let vals: Vec<&str> = enum_vals.iter().filter_map(|v| v.as_str()).collect();
+        assert!(
+            vals.contains(&"edit") && vals.contains(&"verbatim"),
+            "tool '{}' fidelity enum must include 'edit' and 'verbatim', got: {:?}",
+            name,
+            vals
+        );
+    }
+}
+
 // ---------- F-21: diff_code_context cache-hit fast path ----------
 
 /// F-21: calling `diff_code_context` on an unchanged file should
@@ -76,13 +154,8 @@ fn diff_code_context_unchanged_file_skips_reparse() {
     let source1 = std::fs::read_to_string(&path).unwrap();
 
     // First call: stores baseline.
-    let result1 = diff_code_context_handler(
-        path.clone(),
-        &source1,
-        &mut cache,
-        Fidelity::Low,
-    )
-    .expect("first diff call should succeed");
+    let result1 = diff_code_context_handler(path.clone(), &source1, &mut cache, Fidelity::Low)
+        .expect("first diff call should succeed");
     assert!(
         result1.contains("No baseline snapshot"),
         "first call should store baseline, got: {}",
@@ -91,13 +164,8 @@ fn diff_code_context_unchanged_file_skips_reparse() {
 
     // Second call (unchanged file): should short-circuit.
     let source2 = std::fs::read_to_string(&path).unwrap();
-    let result2 = diff_code_context_handler(
-        path.clone(),
-        &source2,
-        &mut cache,
-        Fidelity::Low,
-    )
-    .expect("second diff call should succeed");
+    let result2 = diff_code_context_handler(path.clone(), &source2, &mut cache, Fidelity::Low)
+        .expect("second diff call should succeed");
     assert!(
         result2.contains("No changes"),
         "second call on unchanged file should say 'No changes', got: {}",
@@ -122,13 +190,8 @@ fn diff_code_context_changed_file_produces_diff() {
     let source_before = std::fs::read_to_string(&path).unwrap();
 
     // First call: stores baseline.
-    let _ = diff_code_context_handler(
-        path.clone(),
-        &source_before,
-        &mut cache,
-        Fidelity::Low,
-    )
-    .expect("first diff call should succeed");
+    let _ = diff_code_context_handler(path.clone(), &source_before, &mut cache, Fidelity::Low)
+        .expect("first diff call should succeed");
 
     // Modify the file.
     {
@@ -143,13 +206,8 @@ fn diff_code_context_changed_file_produces_diff() {
     let source_after = std::fs::read_to_string(&path).unwrap();
 
     // Second call (changed file): should produce a real diff.
-    let result = diff_code_context_handler(
-        path,
-        &source_after,
-        &mut cache,
-        Fidelity::Low,
-    )
-    .expect("diff call on changed file should succeed");
+    let result = diff_code_context_handler(path, &source_after, &mut cache, Fidelity::Low)
+        .expect("diff call on changed file should succeed");
     assert!(
         result.contains("AST Diff") && !result.contains("No changes"),
         "changed file should produce a real diff, not a no-change message, got: {}",
@@ -215,9 +273,11 @@ fn p3_21_tool_names_match_tool_list_and_registry() {
     );
 
     // Verify: union of inline + registry equals tool_list
-    let union: std::collections::HashSet<String> = inline_names.union(&registry_names).cloned().collect();
+    let union: std::collections::HashSet<String> =
+        inline_names.union(&registry_names).cloned().collect();
     assert_eq!(
-        tool_list_names, union,
+        tool_list_names,
+        union,
         "P3-21: tool_list() names don't match inline + registry union.\n\
          In tool_list but not in union: {:?}\n\
          In union but not in tool_list: {:?}",

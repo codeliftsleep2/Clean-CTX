@@ -66,20 +66,18 @@ pub fn validate_ref(reference: &str) -> Result<(), CleanCtxError> {
 pub fn resolve_ref(root: &str, reference: &str) -> Result<String, CleanCtxError> {
     validate_ref(reference)?;
     let spec = format!("{reference}^{{commit}}");
-    let output = match super::runner::run_git(
-        root,
-        &["rev-parse", "--verify", "--end-of-options", &spec],
-    ) {
-        Ok(o) => o,
-        // `rev-parse --verify` fails with a non-zero exit for unknown
-        // refs — map that to a user-facing Config error rather than an
-        // opaque internal git failure.
-        Err(_) => {
-            return Err(CleanCtxError::Config(format!(
-                "git ref '{reference}' does not resolve to a commit"
-            )));
-        }
-    };
+    let output =
+        match super::runner::run_git(root, &["rev-parse", "--verify", "--end-of-options", &spec]) {
+            Ok(o) => o,
+            // `rev-parse --verify` fails with a non-zero exit for unknown
+            // refs — map that to a user-facing Config error rather than an
+            // opaque internal git failure.
+            Err(_) => {
+                return Err(CleanCtxError::Config(format!(
+                    "git ref '{reference}' does not resolve to a commit"
+                )));
+            }
+        };
     let hash = output.trim().to_string();
     if hash.is_empty() {
         return Err(CleanCtxError::Config(format!(

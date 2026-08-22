@@ -72,15 +72,13 @@ pub struct ProxyCacheStats {
 pub fn fetch_proxy_stats(proxy_port: u16) -> Option<ProxyStatsResponse> {
     let url = format!("http://127.0.0.1:{}/stats", proxy_port);
     match ureq::get(&url).call() {
-        Ok(response) => {
-            match response.into_body().read_json::<ProxyStatsResponse>() {
-                Ok(stats) => Some(stats),
-                Err(e) => {
-                    eprintln!("[clean-ctx] WARNING: Failed to parse proxy stats: {e}");
-                    None
-                }
+        Ok(response) => match response.into_body().read_json::<ProxyStatsResponse>() {
+            Ok(stats) => Some(stats),
+            Err(e) => {
+                eprintln!("[clean-ctx] WARNING: Failed to parse proxy stats: {e}");
+                None
             }
-        }
+        },
         Err(e) => {
             eprintln!("[clean-ctx] Proxy stats unavailable (proxy not running?): {e}");
             None
@@ -128,17 +126,20 @@ mod tests {
                 total_applications: 1,
                 programs: {
                     let mut m = std::collections::HashMap::new();
-                    m.insert("cargo".to_string(), ProxyProgramFilterStats {
-                        program: "cargo".to_string(),
-                        applications: 1,
-                        original_tokens: 500,
-                        filtered_tokens: 25,
-                        tokens_saved: 475,
-                        original_lines: 100,
-                        filtered_lines: 5,
-                        lines_removed: 95,
-                        reduction_pct: 95.0,
-                    });
+                    m.insert(
+                        "cargo".to_string(),
+                        ProxyProgramFilterStats {
+                            program: "cargo".to_string(),
+                            applications: 1,
+                            original_tokens: 500,
+                            filtered_tokens: 25,
+                            tokens_saved: 475,
+                            original_lines: 100,
+                            filtered_lines: 5,
+                            lines_removed: 95,
+                            reduction_pct: 95.0,
+                        },
+                    );
                     m
                 },
             },
@@ -171,17 +172,20 @@ mod tests {
                 total_applications: 1,
                 programs: {
                     let mut m = std::collections::HashMap::new();
-                    m.insert("cargo".to_string(), ProxyProgramFilterStats {
-                        program: "cargo".to_string(),
-                        applications: 1,
-                        original_tokens: 500,
-                        filtered_tokens: 25,
-                        tokens_saved: 475,
-                        original_lines: 100,
-                        filtered_lines: 5,
-                        lines_removed: 95,
-                        reduction_pct: 95.0,
-                    });
+                    m.insert(
+                        "cargo".to_string(),
+                        ProxyProgramFilterStats {
+                            program: "cargo".to_string(),
+                            applications: 1,
+                            original_tokens: 500,
+                            filtered_tokens: 25,
+                            tokens_saved: 475,
+                            original_lines: 100,
+                            filtered_lines: 5,
+                            lines_removed: 95,
+                            reduction_pct: 95.0,
+                        },
+                    );
                     m
                 },
             },
@@ -206,7 +210,10 @@ mod tests {
         // created — recording a hit with 0 tokens would inflate the hit count
         // while showing zero savings.
         let prompt_cache = domain_breakdown.get("prompt_cache");
-        assert!(prompt_cache.is_none(), "prompt_cache should not exist without real cache_read_tokens");
+        assert!(
+            prompt_cache.is_none(),
+            "prompt_cache should not exist without real cache_read_tokens"
+        );
     }
 
     #[test]
@@ -225,9 +232,15 @@ mod tests {
 
         // Real cache-read tokens should be recorded as savings
         let prompt_cache = session_stats.domain_breakdown().get("prompt_cache");
-        assert!(prompt_cache.is_some(), "prompt_cache should exist with real cache_read_tokens");
+        assert!(
+            prompt_cache.is_some(),
+            "prompt_cache should exist with real cache_read_tokens"
+        );
         if let Some(pc) = prompt_cache {
-            assert_eq!(pc.total_raw_tokens, 5000, "cache_read_tokens should be recorded as savings");
+            assert_eq!(
+                pc.total_raw_tokens, 5000,
+                "cache_read_tokens should be recorded as savings"
+            );
             assert_eq!(pc.cache_hits, Some(1));
         }
     }

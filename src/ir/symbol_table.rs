@@ -122,13 +122,7 @@ impl GlobalSymbolTable {
     /// (for delta replay scenarios). The reverse index and file membership
     /// are updated accordingly. When overwriting, `version_last` is bumped
     /// to the current version via `touch()` (F-24).
-    pub fn register(
-        &mut self,
-        alias: String,
-        original: String,
-        kind: SymbolKind,
-        file_id: &str,
-    ) {
+    pub fn register(&mut self, alias: String, original: String, kind: SymbolKind, file_id: &str) {
         // If alias already exists, clean up old reverse/file members first
         if let Some(existing) = self.symbols.get(&alias) {
             self.reverse.remove(&existing.original);
@@ -189,9 +183,7 @@ impl GlobalSymbolTable {
 
     /// Look up a symbol by original name.
     pub fn get_by_original(&self, original: &str) -> Option<&SymbolEntry> {
-        self.reverse
-            .get(original)
-            .and_then(|a| self.symbols.get(a))
+        self.reverse.get(original).and_then(|a| self.symbols.get(a))
     }
 
     /// Get the alias for an original name (convenience method).
@@ -203,12 +195,7 @@ impl GlobalSymbolTable {
     pub fn get_file_symbols(&self, file_id: &str) -> Vec<&SymbolEntry> {
         self.file_members
             .get(file_id)
-            .map(|aliases| {
-                aliases
-                    .iter()
-                    .filter_map(|a| self.symbols.get(a))
-                    .collect()
-            })
+            .map(|aliases| aliases.iter().filter_map(|a| self.symbols.get(a)).collect())
             .unwrap_or_default()
     }
 

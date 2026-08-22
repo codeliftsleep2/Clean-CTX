@@ -2,7 +2,7 @@
 //
 // A-04: Tests for the metrics registry.
 
-use crate::observability::metrics::{Histogram, Counter, Gauge, MetricsRegistry, ErrorCategory};
+use crate::observability::metrics::{Counter, ErrorCategory, Gauge, Histogram, MetricsRegistry};
 
 #[test]
 fn test_histogram_new() {
@@ -97,7 +97,11 @@ fn test_metrics_registry_time() {
     assert_eq!(result, 42);
     let snap = h.snapshot();
     assert_eq!(snap.total, 1);
-    assert!(snap.mean >= 10.0, "mean should be >= 10ms, got {}", snap.mean);
+    assert!(
+        snap.mean >= 10.0,
+        "mean should be >= 10ms, got {}",
+        snap.mean
+    );
 }
 
 #[test]
@@ -131,11 +135,26 @@ fn test_metrics_snapshot_format_dashboard() {
 
     let snap = reg.snapshot();
     let dashboard = snap.format_dashboard();
-    assert!(dashboard.contains("100"), "dashboard should show 100 compressions");
-    assert!(dashboard.contains("80"), "dashboard should show 80 delta hits");
-    assert!(dashboard.contains("500"), "dashboard should show 500 cache hits");
-    assert!(dashboard.contains("timeout"), "dashboard should show timeout errors");
-    assert!(dashboard.contains("Clean-CTX Metrics Dashboard"), "dashboard should have header");
+    assert!(
+        dashboard.contains("100"),
+        "dashboard should show 100 compressions"
+    );
+    assert!(
+        dashboard.contains("80"),
+        "dashboard should show 80 delta hits"
+    );
+    assert!(
+        dashboard.contains("500"),
+        "dashboard should show 500 cache hits"
+    );
+    assert!(
+        dashboard.contains("timeout"),
+        "dashboard should show timeout errors"
+    );
+    assert!(
+        dashboard.contains("Clean-CTX Metrics Dashboard"),
+        "dashboard should have header"
+    );
 }
 
 #[test]
@@ -166,7 +185,7 @@ fn test_histogram_exponential() {
     assert_eq!(h.bounds[0], 1);
     assert_eq!(h.bounds[14], 16384);
     // Record values across the range
-    h.record(0);  // underflows to first bucket
+    h.record(0); // underflows to first bucket
     h.record(1);
     h.record(100);
     h.record(10000);
@@ -197,7 +216,10 @@ fn test_error_category_as_str() {
 
 #[test]
 fn test_error_category_display() {
-    assert_eq!(format!("{}", ErrorCategory::CompressionFail), "compression_fail");
+    assert_eq!(
+        format!("{}", ErrorCategory::CompressionFail),
+        "compression_fail"
+    );
     assert_eq!(format!("{}", ErrorCategory::Internal), "internal");
 }
 
