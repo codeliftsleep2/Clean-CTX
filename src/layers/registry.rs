@@ -133,19 +133,10 @@ impl LayerRegistry {
         for layer in &self.meta_layers {
             // Use trait-based dispatch: check if this layer applies to the source
             if layer.is_applicable(source, std::path::Path::new(""), config) {
-                // Build a minimal CompiledIR with the class captures so meta-layers
-                // that extract class names from instructions still work.
-                let class_instructions: Vec<crate::ir::opcodes::CoreOp> = class_captures
-                    .iter()
-                    .map(|name| crate::ir::opcodes::CoreOp::DefClass(String::new(), name.clone()))
-                    .collect();
-                let ir = crate::ir::compiler::CompiledIR {
-                    file_id: String::new(),
-                    instructions: class_instructions,
-                    version: 1,
-                };
-                // Pass the real source code so detection and extraction work correctly
-                if let Some(output) = layer.enrich(source, &ir, fidelity, config) {
+                // Pass the real source code and class captures directly — no
+                // DefClass round-trip (eliminates the semantic corruption where
+                // DefClass.name carried full source text instead of a class name).
+                if let Some(output) = layer.enrich(source, class_captures, fidelity, config) {
                     results.push(output);
                 }
             }

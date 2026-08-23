@@ -461,9 +461,28 @@ fn find_class_head_end(raw: &str) -> Option<usize> {
 // + string-literal scan itself delegates to the shared
 // `meta_util::find_first_top_level` primitive (Round-8 structural
 // audit) — no hand-rolled scanner remains in this file.
+/// Find the byte offset of the `{` that opens the class body, not any `{`
+/// inside a decorator object literal. Scans from the type declaration keyword
+/// forward, tracking brace depth so that `@Component({...})` braces
+/// are skipped.
+///
+/// Supports all type keywords: class, interface, enum, record.
+/// The brace-depth + string-literal scan delegates to the shared
+/// `meta_util::find_first_top_level` primitive (Round-8 structural
+/// audit) — no hand-rolled scanner remains in this file.
 pub(crate) fn find_class_body_open(raw: &str) -> Option<usize> {
-    let class_pos = raw.find("class ")?;
-    crate::meta_util::find_first_top_level(raw, '{', class_pos + 6)
+    const TYPE_KW: &[(&str, usize)] = &[
+        ("class ", 6),
+        ("interface ", 10),
+        ("enum ", 5),
+        ("record ", 7),
+    ];
+    for (kw, kw_len) in TYPE_KW {
+        if let Some(pos) = raw.find(kw) {
+            return crate::meta_util::find_first_top_level(raw, '{', pos + kw_len);
+        }
+    }
+    None
 }
 
 // F-ANG-13: returns `None` when no class name can be found (was
