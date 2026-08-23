@@ -477,3 +477,215 @@ fn circuit_breaker_recovery_logs_transition() {
     bridge.update_status();
     assert_eq!(bridge.status(), &CbmStatus::Unavailable);
 }
+
+// ── I-B7: get_call_edges ────────────────────────────────────────────
+
+#[test]
+fn test_get_call_edges_from_cache() {
+    use crate::cbm::bridge::test_helpers::new_mock_with_edges;
+    let mut bridge = new_mock_with_edges(
+        vec![
+            ("CallerA".into(), "CalleeB".into()),
+            ("CallerC".into(), "CalleeD".into()),
+        ],
+        vec![],
+        std::collections::HashMap::new(),
+        vec![],
+    );
+    let edges = bridge.get_call_edges();
+    assert_eq!(edges.len(), 2);
+    assert!(edges.contains(&("CallerA".into(), "CalleeB".into())));
+    assert!(edges.contains(&("CallerC".into(), "CalleeD".into())));
+}
+
+#[test]
+fn test_get_call_edges_unavailable_returns_empty() {
+    use crate::cbm::GraphBridge;
+    use crate::cbm::config::CbmConfig;
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
+    assert!(bridge.get_call_edges().is_empty());
+}
+
+// ── I-B8: get_dataflow_edges ────────────────────────────────────────
+
+#[test]
+fn test_get_dataflow_edges_from_cache() {
+    use crate::cbm::bridge::test_helpers::new_mock_with_edges;
+    let mut bridge = new_mock_with_edges(
+        vec![],
+        vec![
+            ("M1".into(), "T1".into(), "reads".into()),
+            ("M2".into(), "T2".into(), "writes".into()),
+        ],
+        std::collections::HashMap::new(),
+        vec![],
+    );
+    let edges = bridge.get_dataflow_edges();
+    assert_eq!(edges.len(), 2);
+    assert!(edges.contains(&("M1".into(), "T1".into(), "reads".into())));
+    assert!(edges.contains(&("M2".into(), "T2".into(), "writes".into())));
+}
+
+#[test]
+fn test_get_dataflow_edges_unavailable_returns_empty() {
+    use crate::cbm::GraphBridge;
+    use crate::cbm::config::CbmConfig;
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
+    assert!(bridge.get_dataflow_edges().is_empty());
+}
+
+// ── I-B10: resolve_cross_language_endpoint ──────────────────────────
+
+#[test]
+fn test_resolve_cross_language_endpoint_from_cache() {
+    use crate::cbm::bridge::{CachedGraphData, test_helpers::new_mock_empty};
+    use serde_json::json;
+    let mut bridge = new_mock_empty();
+    let cache_data: Option<String> = Some("UserController.GetAll".into());
+    bridge.cache.insert(
+        "endpoint:getAll".into(),
+        CachedGraphData {
+            data: json!(cache_data),
+            expires_at: std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        },
+    );
+    let result = bridge.resolve_cross_language_endpoint("getAll");
+    assert_eq!(result, Some("UserController.GetAll".into()));
+}
+
+#[test]
+fn test_resolve_cross_language_endpoint_none_on_miss() {
+    use crate::cbm::bridge::test_helpers::new_mock_empty;
+    let mut bridge = new_mock_empty();
+    let result = bridge.resolve_cross_language_endpoint("getMissing");
+    assert!(result.is_none());
+}
+
+#[test]
+fn test_resolve_cross_language_endpoint_unavailable_returns_none() {
+    use crate::cbm::GraphBridge;
+    use crate::cbm::config::CbmConfig;
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
+    assert!(bridge.resolve_cross_language_endpoint("getAll").is_none());
+}
+
+// ── I-B17: invalidate_symbol ────────────────────────────────────────
+
+#[test]
+fn test_invalidate_symbol_removes_matching_keys() {
+    use crate::cbm::bridge::{CachedGraphData, test_helpers::new_mock_empty};
+    use serde_json::json;
+    let mut bridge = new_mock_empty();
+    let expires = std::time::Instant::now() + std::time::Duration::from_secs(3600);
+    bridge.cache.insert(
+        "search:UserService".into(),
+        CachedGraphData {
+            data: json!([]),
+            expires_at: expires,
+        },
+    );
+    bridge.cache.insert(
+        "blast:UserService".into(),
+        CachedGraphData {
+            data: json!([]),
+            expires_at: expires,
+        },
+    );
+    bridge.cache.insert(
+        "search:OtherService".into(),
+        CachedGraphData {
+            data: json!([]),
+            expires_at: expires,
+        },
+    );
+    bridge.invalidate_symbol("UserService");
+    assert!(
+        bridge.cache.get("search:UserService").is_none(),
+        "should remove search:UserService"
+    );
+    assert!(
+        bridge.cache.get("blast:UserService").is_none(),
+        "should remove blast:UserService"
+    );
+    assert!(
+        bridge.cache.get("search:OtherService").is_some(),
+        "should keep search:OtherService"
+    );
+}
+
+// ── I-J2: apply_minimum_compression ──────────────────────────────────
+
+#[test]
+fn test_apply_minimum_compression_extracts_result() {
+    use crate::cbm::proxy::apply_minimum_compression;
+    let raw = r#"{"jsonrpc":"2.0","id":1,"result":{"data":"test"}}"#;
+    let compressed = apply_minimum_compression(raw);
+    assert!(
+        compressed.contains("data"),
+        "should preserve data key: {compressed}"
+    );
+    assert!(
+        !compressed.contains("jsonrpc"),
+        "should strip envelope: {compressed}"
+    );
+    assert!(compressed.len() < raw.len(), "should be shorter than raw");
+}
+
+#[test]
+fn test_apply_minimum_compression_strips_whitespace_on_unparseable() {
+    use crate::cbm::proxy::apply_minimum_compression;
+    let compressed = apply_minimum_compression("some   text   with   spaces");
+    assert_eq!(compressed, "sometextwithspaces");
+}
+
+#[test]
+fn test_apply_minimum_compression_preserves_error_json() {
+    use crate::cbm::proxy::apply_minimum_compression;
+    // Input with intentional whitespace to demonstrate stripping.
+    let raw = r#"{
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": { "code": -32603, "message": "internal" }
+    }"#;
+    let compressed = apply_minimum_compression(raw);
+    // No `result` key, so the entire JSON is re-serialized with minimal whitespace.
+    assert!(
+        compressed.len() < raw.len(),
+        "should be shorter than raw: {} < {}",
+        compressed.len(),
+        raw.len()
+    );
+    // Error code must be preserved in output.
+    assert!(
+        compressed.contains("-32603"),
+        "error code should be preserved: {compressed}"
+    );
+}
+
+// ── I-B15: detect_changes no-client test ─────────────────────────────
+
+#[test]
+fn test_detect_changes_no_client_returns_ok_none() {
+    use crate::cbm::GraphBridge;
+    use crate::cbm::config::CbmConfig;
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
+    let result = bridge.detect_changes();
+    assert!(result.is_ok(), "should return Ok when client is None");
+    assert_eq!(result.unwrap(), None);
+}

@@ -416,3 +416,115 @@ fn compress_workspace_cache_key_includes_fidelity() {
         "different fidelities should produce different cached results"
     );
 }
+
+/// I-F4: Cross-layer CBM graceful degradation — NgRx effect file, no bridge.
+#[test]
+fn workspace_ngrx_cross_layer_graceful_degradation() {
+    let dir = TempDir::new().unwrap();
+    // The graph pass only runs when at least one Angular file is detected.
+    // Create an @Injectable() service to trigger the graph pass, plus
+    // an NgRx effects file with EffectService edges.
+    create_ts_file(
+        dir.path(),
+        "user.service.ts",
+        "import { Injectable } from '@angular/core';\n\
+         @Injectable({ providedIn: 'root' })\n\
+         export class UserService { getUsers() {} }\n",
+    );
+    create_ts_file(
+        dir.path(),
+        "user.effects.ts",
+        r#"import { createAction } from '@ngrx/store';
+import { createEffect, ofType } from '@ngrx/effects';
+import { map, switchMap } from 'rxjs/operators';
+
+export const loadUsers = createAction('[User] Load Users');
+
+export const loadUsers$ = createEffect(() =>
+  this.actions$.pipe(
+    ofType(loadUsers),
+    switchMap(() => this.userService.getUsers()),
+    map(users => ({ type: '[User] Load Users Success', users }))
+  )
+);
+"#,
+    );
+
+    let config = CleanCtxConfig::default();
+    let state = McpState::new(config);
+
+    let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress with NgRx should succeed (graceful degradation)");
+
+    assert!(
+        result.manifest.contains("§ΦGRAPH"),
+        "manifest should contain ΦGRAPH section:\n{}",
+        result.manifest
+    );
+}
+
+/// I-F4 + I-B10: Cross-layer CBM with mock bridge — Endpoint resolved.
+#[test]
+fn workspace_ngrx_cross_layer_with_mock_bridge_resolves_endpoint() {
+    use crate::cbm::CbmStatus;
+    use crate::cbm::bridge::{CachedGraphData, test_helpers::new_mock_empty};
+
+    let dir = TempDir::new().unwrap();
+    // Angular service to trigger the graph pass.
+    create_ts_file(
+        dir.path(),
+        "user.service.ts",
+        "import { Injectable } from '@angular/core';\n\
+         @Injectable({ providedIn: 'root' })\n\
+         export class UserService { getUsers() {} }\n",
+    );
+    create_ts_file(
+        dir.path(),
+        "user.effects.ts",
+        r#"import { createAction } from '@ngrx/store';
+import { createEffect, ofType } from '@ngrx/effects';
+import { map, switchMap } from 'rxjs/operators';
+
+export const loadUsers = createAction('[User] Load Users');
+
+export const loadUsers$ = createEffect(() =>
+  this.actions$.pipe(
+    ofType(loadUsers),
+    switchMap(() => this.userService.getUsers()),
+    map(users => ({ type: '[User] Load Users Success', users }))
+  )
+);
+"#,
+    );
+
+    let mut config = CleanCtxConfig::default();
+    config.cbm.enabled = false; // prevent real CBM launch
+    let mut state = McpState::new(config);
+
+    // Inject mock bridge with endpoint: getUsers → UserController.GetUsers
+    let mock_bridge = new_mock_empty();
+    let cache_data: Option<String> = Some("UserController.GetUsers".into());
+    mock_bridge.cache.insert(
+        "endpoint:getUsers".into(),
+        CachedGraphData {
+            data: serde_json::to_value(&cache_data).unwrap(),
+            expires_at: std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        },
+    );
+    *state.graph_bridge.lock().unwrap() = Some(mock_bridge);
+    state.cbm_status = CbmStatus::Available;
+
+    let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress with CBM bridge should succeed");
+
+    assert!(
+        result.manifest.contains("§ΦGRAPH"),
+        "manifest should contain ΦGRAPH:\n{}",
+        result.manifest
+    );
+    assert!(
+        result.manifest.contains("Φeff→endpoint:"),
+        "should contain EffectEndpoint edge marker, got:\n{}",
+        result.manifest
+    );
+}

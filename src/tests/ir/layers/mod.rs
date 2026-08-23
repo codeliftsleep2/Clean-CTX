@@ -232,19 +232,27 @@ fn cs_signalr_hub_sets_context_flag() {
         &mut ctx,
     );
 
-    let has_exec_ctx = ops.iter().any(|op| matches!(op, CoreOp::ExecutionContext(..)));
+    let has_exec_ctx = ops
+        .iter()
+        .any(|op| matches!(op, CoreOp::ExecutionContext(..)));
     assert!(
         !has_exec_ctx,
         "class.root must NOT emit ExecutionContext (was causing E010): {:?}",
         ops
     );
     assert!(ctx.is_signalr_hub, "is_signalr_hub must be set");
-    assert!(!ctx.is_disposable_class, "is_disposable_class must remain false");
+    assert!(
+        !ctx.is_disposable_class,
+        "is_disposable_class must remain false"
+    );
 }
 #[test]
 fn cs_signalr_hub_method_emits_realtime_ctx() {
     let mut layer = CSharpLayer::new();
-    let mut ctx = LayerContext::new("public async Task SendMessage(string message)", Fidelity::Low);
+    let mut ctx = LayerContext::new(
+        "public async Task SendMessage(string message)",
+        Fidelity::Low,
+    );
     ctx.current_class = Some("C1".into());
     ctx.current_method = Some("M5".into());
     ctx.is_signalr_hub = true; // Set by prior class.root
@@ -265,9 +273,9 @@ fn cs_signalr_hub_method_emits_realtime_ctx() {
         ops
     );
 
-    let has_bad = ops.iter().any(|op| {
-        matches!(op, CoreOp::ExecutionContext(mid, _) if mid == "C1::realtime" || mid == "C1")
-    });
+    let has_bad = ops.iter().any(
+        |op| matches!(op, CoreOp::ExecutionContext(mid, _) if mid == "C1::realtime" || mid == "C1"),
+    );
     assert!(
         !has_bad,
         "must NOT emit ExecutionContext with class-level ID: {:?}",
@@ -300,8 +308,16 @@ fn cs_signalr_hub_method_still_emits_async_semantics() {
         matches!(op, CoreOp::ExecutionContext(mid, ctx_type)
             if mid == "M5" && ctx_type == "async")
     });
-    assert!(async_ctx, "must still emit ExecutionContext(M5, async): {:?}", ops);
-    assert!(realtime, "hub method must also emit ExecutionContext(M5, realtime): {:?}", ops);
+    assert!(
+        async_ctx,
+        "must still emit ExecutionContext(M5, async): {:?}",
+        ops
+    );
+    assert!(
+        realtime,
+        "hub method must also emit ExecutionContext(M5, realtime): {:?}",
+        ops
+    );
 }
 
 #[test]
@@ -319,9 +335,9 @@ fn cs_disposable_class_sets_context_flag() {
         &mut ctx,
     );
 
-    let has_bad = ops.iter().any(|op| {
-        matches!(op, CoreOp::SideEffect(mid, _) if mid == "C1")
-    });
+    let has_bad = ops
+        .iter()
+        .any(|op| matches!(op, CoreOp::SideEffect(mid, _) if mid == "C1"));
     assert!(
         !has_bad,
         "class.root must NOT emit SideEffect(C1, ...) (was causing E009): {:?}",
@@ -341,15 +357,19 @@ fn cs_disposable_class_method_emits_io_side_effect() {
 
     let ops = layer.process_capture("method.root", "public void Dispose()", &mut ctx);
 
-    let has_io = ops.iter().any(|op| {
-        matches!(op, CoreOp::SideEffect(mid, etype) if mid == "M5" && etype == "io")
-    });
+    let has_io = ops
+        .iter()
+        .any(|op| matches!(op, CoreOp::SideEffect(mid, etype) if mid == "M5" && etype == "io"));
     assert!(has_io, "method must emit SideEffect(M5, io): {:?}", ops);
 
-    let has_bad = ops.iter().any(|op| {
-        matches!(op, CoreOp::SideEffect(mid, _) if mid == "C1")
-    });
-    assert!(!has_bad, "must NOT emit SideEffect with class-level ID: {:?}", ops);
+    let has_bad = ops
+        .iter()
+        .any(|op| matches!(op, CoreOp::SideEffect(mid, _) if mid == "C1"));
+    assert!(
+        !has_bad,
+        "must NOT emit SideEffect with class-level ID: {:?}",
+        ops
+    );
 }
 
 // ── Cross-contamination regression ────────────────────
@@ -370,15 +390,14 @@ fn cs_signalr_hub_flags_reset_between_classes() {
         &mut ctx,
     );
     assert!(ctx.is_signalr_hub, "first class should set is_signalr_hub");
-    assert!(!ctx.is_disposable_class, "first class should NOT set is_disposable_class");
+    assert!(
+        !ctx.is_disposable_class,
+        "first class should NOT set is_disposable_class"
+    );
 
     // Process second class (plain class, no Hub)
     ctx.current_class = Some("C2".into());
-    let _ = layer.process_capture(
-        "class.root",
-        "public class PlainClass",
-        &mut ctx,
-    );
+    let _ = layer.process_capture("class.root", "public class PlainClass", &mut ctx);
     assert!(
         !ctx.is_signalr_hub,
         "second class must reset is_signalr_hub: {:?}",
@@ -392,11 +411,7 @@ fn cs_signalr_hub_flags_reset_between_classes() {
 
     // Verify that a method on the second class does NOT get realtime context
     ctx.current_method = Some("M10".into());
-    let ops = layer.process_capture(
-        "method.root",
-        "public void DoSomething()",
-        &mut ctx,
-    );
+    let ops = layer.process_capture("method.root", "public void DoSomething()", &mut ctx);
     let has_realtime = ops.iter().any(|op| {
         matches!(op, CoreOp::ExecutionContext(mid, ctx_type)
             if mid == "M10" && ctx_type == "realtime")
@@ -418,7 +433,10 @@ fn layer_context_initializes_correctly() {
     assert!(ctx.current_class.is_none());
     assert!(ctx.current_method.is_none());
     assert!(ctx.symbol_table.is_empty());
-    assert!(!ctx.is_signalr_hub, "is_signalr_hub should default to false");
+    assert!(
+        !ctx.is_signalr_hub,
+        "is_signalr_hub should default to false"
+    );
     assert!(
         !ctx.is_disposable_class,
         "is_disposable_class should default to false"

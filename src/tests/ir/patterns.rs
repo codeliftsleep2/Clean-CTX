@@ -688,9 +688,7 @@ fn ctor_consumes_all_trailing_flags_through_merged_pipeline() {
     // Verify no FLAGS referencing M6 remain orphaned
     let orphaned_m6_flags: Vec<&CoreOp> = result
         .iter()
-        .filter(|op| {
-            matches!(op, CoreOp::Flags(mid, _) if mid == "M6")
-        })
+        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M6"))
         .collect();
     assert!(
         orphaned_m6_flags.is_empty(),
@@ -701,13 +699,16 @@ fn ctor_consumes_all_trailing_flags_through_merged_pipeline() {
     let has_ctor_pat = result.iter().any(|op| {
         matches!(op, CoreOp::Pattern(name, args) if name == "CTOR" && args.len() >= 2 && args[0] == "C2" && args[1] == "M6")
     });
-    assert!(has_ctor_pat, "constructor should be represented as PAT(CTOR, ...)");
+    assert!(
+        has_ctor_pat,
+        "constructor should be represented as PAT(CTOR, ...)"
+    );
 
     // Verify the stream still has DefClass and the second method
     let has_defclass = result.iter().any(|op| matches!(op, CoreOp::DefClass(_, _)));
-    let has_ngoninit = result.iter().any(|op| {
-        matches!(op, CoreOp::DefMethod(_, _, name) if name == "ngOnInit")
-    });
+    let has_ngoninit = result
+        .iter()
+        .any(|op| matches!(op, CoreOp::DefMethod(_, _, name) if name == "ngOnInit"));
     assert!(has_defclass, "DefClass should pass through");
     assert!(has_ngoninit, "ngOnInit should pass through");
 }
@@ -747,9 +748,9 @@ fn ctor_two_pass_pipeline_no_orphan_e003() {
     let ctor_flag_pos = after_additive.iter().position(|op| {
         matches!(op, CoreOp::Flags(mid, flags) if mid == "M6" && flags.contains(&"CTOR".to_string()))
     });
-    let def_m_pos = after_additive.iter().position(|op| {
-        matches!(op, CoreOp::DefMethod(_, mid, _) if mid == "M6")
-    });
+    let def_m_pos = after_additive
+        .iter()
+        .position(|op| matches!(op, CoreOp::DefMethod(_, mid, _) if mid == "M6"));
     assert!(
         ctor_flag_pos < def_m_pos,
         "FLAGS(CTOR) must appear before DEF_M(M6) after additive pass"
@@ -773,7 +774,10 @@ fn ctor_two_pass_pipeline_no_orphan_e003() {
     let has_ctor_pat = after_consumptive.iter().any(|op| {
         matches!(op, CoreOp::Pattern(name, args) if name == "CTOR" && args.len() >= 2 && args[0] == "C2" && args[1] == "M6")
     });
-    assert!(has_ctor_pat, "constructor should be PAT(CTOR, ...) after two-pass pipeline");
+    assert!(
+        has_ctor_pat,
+        "constructor should be PAT(CTOR, ...) after two-pass pipeline"
+    );
 
     // Pass 3: validation — must produce no E003 errors
     let validator = DefaultValidator::new();
@@ -791,10 +795,12 @@ fn ctor_two_pass_pipeline_no_orphan_e003() {
     );
 
     // Verify passthrough ops are preserved
-    let has_defclass = after_consumptive.iter().any(|op| matches!(op, CoreOp::DefClass(_, _)));
-    let has_ngoninit = after_consumptive.iter().any(|op| {
-        matches!(op, CoreOp::DefMethod(_, _, name) if name == "ngOnInit")
-    });
+    let has_defclass = after_consumptive
+        .iter()
+        .any(|op| matches!(op, CoreOp::DefClass(_, _)));
+    let has_ngoninit = after_consumptive
+        .iter()
+        .any(|op| matches!(op, CoreOp::DefMethod(_, _, name) if name == "ngOnInit"));
     assert!(has_defclass, "DefClass should pass through");
     assert!(has_ngoninit, "ngOnInit should pass through");
 }
@@ -829,9 +835,9 @@ fn empty_ctor_two_pass_no_orphan_e003() {
     let ctor_flag_pos = after_additive.iter().position(|op| {
         matches!(op, CoreOp::Flags(mid, flags) if mid == "M6" && flags.contains(&"CTOR".to_string()))
     });
-    let def_m_pos = after_additive.iter().position(|op| {
-        matches!(op, CoreOp::DefMethod(_, mid, _) if mid == "M6")
-    });
+    let def_m_pos = after_additive
+        .iter()
+        .position(|op| matches!(op, CoreOp::DefMethod(_, mid, _) if mid == "M6"));
     assert!(
         ctor_flag_pos < def_m_pos,
         "FLAGS(CTOR) must appear before DEF_M(M6) after additive pass"
@@ -855,7 +861,10 @@ fn empty_ctor_two_pass_no_orphan_e003() {
     let has_empty_ctor_pat = after_consumptive.iter().any(|op| {
         matches!(op, CoreOp::Pattern(name, args) if name == "EMPTY_CTOR" && args.len() >= 2 && args[0] == "C2" && args[1] == "M6")
     });
-    assert!(has_empty_ctor_pat, "empty constructor should be PAT(EMPTY_CTOR, ...)");
+    assert!(
+        has_empty_ctor_pat,
+        "empty constructor should be PAT(EMPTY_CTOR, ...)"
+    );
 
     // Pass 3: validation — must produce no E003 errors
     let validator = DefaultValidator::new();
@@ -900,9 +909,9 @@ fn observable_two_pass_no_orphan_e003() {
     let obs_flag_pos = after_additive.iter().position(|op| {
         matches!(op, CoreOp::Flags(mid, flags) if mid == "M6" && flags.contains(&"OBSERVABLE".to_string()))
     });
-    let def_m_pos = after_additive.iter().position(|op| {
-        matches!(op, CoreOp::DefMethod(_, mid, _) if mid == "M6")
-    });
+    let def_m_pos = after_additive
+        .iter()
+        .position(|op| matches!(op, CoreOp::DefMethod(_, mid, _) if mid == "M6"));
     assert!(
         obs_flag_pos < def_m_pos,
         "FLAGS(OBSERVABLE) must appear before DEF_M(M6) after additive pass"
@@ -1100,9 +1109,9 @@ fn rust_pub_new_two_pass_no_orphan_e003() {
     let ctor_flag_pos = after_additive.iter().position(|op| {
         matches!(op, CoreOp::Flags(mid, flags) if mid == "M6" && flags.contains(&"CTOR".to_string()))
     });
-    let def_m_pos = after_additive.iter().position(|op| {
-        matches!(op, CoreOp::DefMethod(_, mid, _) if mid == "M6")
-    });
+    let def_m_pos = after_additive
+        .iter()
+        .position(|op| matches!(op, CoreOp::DefMethod(_, mid, _) if mid == "M6"));
     assert!(
         ctor_flag_pos < def_m_pos,
         "FLAGS(CTOR) must appear before DEF_M(M6) for Rust pub fn new()"

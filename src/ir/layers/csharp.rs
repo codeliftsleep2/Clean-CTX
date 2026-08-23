@@ -317,10 +317,7 @@ impl LanguageLayer for CSharpLayer {
 
                     // R-43a: Per-method IDisposable side-effect
                     if context.is_disposable_class {
-                        ops.push(CoreOp::SideEffect(
-                            method_id.clone(),
-                            EFFECT_IO.to_string(),
-                        ));
+                        ops.push(CoreOp::SideEffect(method_id.clone(), EFFECT_IO.to_string()));
                     }
                 }
             }

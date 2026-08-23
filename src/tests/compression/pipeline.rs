@@ -650,7 +650,6 @@ fn compress_text_emits_java_spring_markers() {
     );
 }
 
-
 // ── Multi-Class Cross-Contamination Verification ────────────────────
 //
 // Verifies per-class metadata invariant through the production
@@ -682,8 +681,10 @@ fn multi_class_java_spring_no_cross_medium() {
     assert!(result.is_ok());
     let (_, out) = result.unwrap();
     assert!(out.contains("ItemController"));
-    assert!(!out.contains("ItemService") || !out.contains("rest:ItemService"),
-        "ItemService must not inherit rest marker");
+    assert!(
+        !out.contains("ItemService") || !out.contains("rest:ItemService"),
+        "ItemService must not inherit rest marker"
+    );
 }
 
 #[cfg(feature = "spring_boot")]
@@ -694,8 +695,10 @@ fn multi_class_java_spring_no_cross_high() {
     assert!(result.is_ok());
     let (_, out) = result.unwrap();
     assert!(out.contains("AppConfig"));
-    assert!(!out.contains("AppConfig") || !out.contains("rest:AppConfig"),
-        "AppConfig must not inherit rest marker");
+    assert!(
+        !out.contains("AppConfig") || !out.contains("rest:AppConfig"),
+        "AppConfig must not inherit rest marker"
+    );
 }
 
 #[cfg(feature = "angular")]
@@ -708,10 +711,14 @@ fn multi_class_ts_angular_no_cross_low() {
     assert!(out.contains("HelloComponent"));
     assert!(out.contains("DataService"));
     assert!(out.contains("GoodbyeComponent"));
-    assert!(!out.contains("DataService") || !out.contains("cmp:DataService"),
-        "DataService must not inherit cmp marker");
-    assert!(!out.contains("HelloComponent") || !out.contains("svc:HelloComponent"),
-        "HelloComponent must not inherit svc marker");
+    assert!(
+        !out.contains("DataService") || !out.contains("cmp:DataService"),
+        "DataService must not inherit cmp marker"
+    );
+    assert!(
+        !out.contains("HelloComponent") || !out.contains("svc:HelloComponent"),
+        "HelloComponent must not inherit svc marker"
+    );
     let h = out.find("HelloComponent").unwrap();
     let g = out.find("GoodbyeComponent").unwrap();
     assert!(h < g, "document order preserved");
@@ -726,8 +733,10 @@ fn multi_class_ts_angular_no_cross_medium() {
     let (_, out) = result.unwrap();
     assert!(out.contains("HelloComponent"));
     assert!(out.contains("GoodbyeComponent"));
-    assert!(!out.contains("DataService") || !out.contains("cmp:DataService"),
-        "DataService must not inherit cmp at Medium");
+    assert!(
+        !out.contains("DataService") || !out.contains("cmp:DataService"),
+        "DataService must not inherit cmp at Medium"
+    );
 }
 
 #[cfg(feature = "angular")]
@@ -739,8 +748,10 @@ fn multi_class_ts_angular_no_cross_high() {
     let (_, out) = result.unwrap();
     assert!(out.contains("HelloComponent"));
     assert!(out.contains("GoodbyeComponent"));
-    assert!(!out.contains("DataService") || !out.contains("cmp:DataService"),
-        "DataService must not inherit cmp at High");
+    assert!(
+        !out.contains("DataService") || !out.contains("cmp:DataService"),
+        "DataService must not inherit cmp at High"
+    );
 }
 
 #[cfg(feature = "dotnet")]
@@ -753,10 +764,14 @@ fn multi_class_csharp_dotnet_no_cross_low() {
     assert!(out.contains("ProductsController"));
     assert!(out.contains("NotificationHub"));
     assert!(out.contains("InventoryDbContext"));
-    assert!(!out.contains("NotificationHub") || !out.contains("api:NotificationHub"),
-        "NotificationHub must not inherit api marker");
-    assert!(!out.contains("InventoryDbContext") || !out.contains("api:InventoryDbContext"),
-        "DbContext must not inherit api marker");
+    assert!(
+        !out.contains("NotificationHub") || !out.contains("api:NotificationHub"),
+        "NotificationHub must not inherit api marker"
+    );
+    assert!(
+        !out.contains("InventoryDbContext") || !out.contains("api:InventoryDbContext"),
+        "DbContext must not inherit api marker"
+    );
     let p = out.find("ProductsController").unwrap();
     let h = out.find("NotificationHub").unwrap();
     let d = out.find("InventoryDbContext").unwrap();
@@ -771,8 +786,10 @@ fn multi_class_csharp_dotnet_no_cross_medium() {
     assert!(result.is_ok());
     let (_, out) = result.unwrap();
     assert!(out.contains("ProductsController"));
-    assert!(!out.contains("NotificationHub") || !out.contains("api:NotificationHub"),
-        "NotificationHub must not inherit api at Medium");
+    assert!(
+        !out.contains("NotificationHub") || !out.contains("api:NotificationHub"),
+        "NotificationHub must not inherit api at Medium"
+    );
 }
 
 #[cfg(feature = "dotnet")]
@@ -783,6 +800,8 @@ fn multi_class_csharp_dotnet_no_cross_high() {
     assert!(result.is_ok());
     let (_, out) = result.unwrap();
     assert!(out.contains("ProductsController"));
-    assert!(!out.contains("NotificationHub") || !out.contains("api:NotificationHub"),
-        "NotificationHub must not inherit api at High");
+    assert!(
+        !out.contains("NotificationHub") || !out.contains("api:NotificationHub"),
+        "NotificationHub must not inherit api at High"
+    );
 }
