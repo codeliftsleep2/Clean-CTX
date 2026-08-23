@@ -244,6 +244,13 @@ impl LanguageLayer for CSharpLayer {
 
         match capture_name {
             "class.root" => {
+                // Reset per-class flags (R-43a): these are set during class.root
+                // processing and consumed during method.root processing. They must
+                // be reset for each new class to prevent cross-contamination when
+                // a file contains multiple classes.
+                context.is_signalr_hub = false;
+                context.is_disposable_class = false;
+
                 // Extract inheritance from raw text
                 let (base, interfaces) = Self::extract_class_relationships(raw_text);
                 if let Some(class_id) = &context.current_class {
@@ -256,15 +263,11 @@ impl LanguageLayer for CSharpLayer {
                             .unwrap_or_else(|| base_id.clone());
                         ops.push(CoreOp::Extends(class_id.clone(), base_alias));
 
-                        // R-43a: Detect SignalR Hub base class → ExecutionContext("realtime")
+                        // R-43a: Detect SignalR Hub base class in the context
+                        // so per-method ExecutionContext("realtime") ops are
+                        // emitted during method.root processing (fixes E010).
                         if Self::is_signalr_hub(&base_id) {
-                            // Apply realtime context to all methods in this class
-                            // by tracking it in the layer context for method processing
-                            // We emit a class-level execution context hint
-                            ops.push(CoreOp::ExecutionContext(
-                                format!("{}::realtime", class_id),
-                                CTX_REALTIME.to_string(),
-                            ));
+                            context.is_signalr_hub = true;
                         }
                     }
                     // Emit Implements for each interface
@@ -288,7 +291,7 @@ impl LanguageLayer for CSharpLayer {
                         .iter()
                         .any(|i| i.trim() == "IDisposable" || i.trim() == "IAsyncDisposable");
                     if implements_disposable {
-                        ops.push(CoreOp::SideEffect(class_id.clone(), EFFECT_IO.to_string()));
+                        context.is_disposable_class = true;
                     }
                 }
             }
@@ -303,6 +306,22 @@ impl LanguageLayer for CSharpLayer {
                     // R-43a: Extract execution semantics
                     let exec_ops = Self::extract_method_execution_semantics(method_id, raw_text);
                     ops.extend(exec_ops);
+
+                    // R-43a: Per-method SignalR hub realtime context
+                    if context.is_signalr_hub {
+                        ops.push(CoreOp::ExecutionContext(
+                            method_id.clone(),
+                            CTX_REALTIME.to_string(),
+                        ));
+                    }
+
+                    // R-43a: Per-method IDisposable side-effect
+                    if context.is_disposable_class {
+                        ops.push(CoreOp::SideEffect(
+                            method_id.clone(),
+                            EFFECT_IO.to_string(),
+                        ));
+                    }
                 }
             }
             _ => {}
