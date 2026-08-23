@@ -1,4 +1,4 @@
-# Clean-CTX — Changelog
+﻿# Clean-CTX — Changelog
 
 **All notable changes to this project will be documented in this file.**
 
@@ -36,7 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- **UTF-8 encoding corruption** in 4 test assertions (`src/tests/compression/pipeline.rs`): mojibake (`Î¦`→`Φ`, `Î±`→`α`, `Â§`→`§`) caused false-negative failures in `compress_text_with_aliases_medium_fidelity`, `compress_text_with_aliases_high_fidelity`, `compress_text_emits_angular_component_markers`, and `compress_text_emits_angular_injectable_markers`. Restored via `git checkout` and re-appended with explicit UTF-8 encoding.
+- **UTF-8 encoding corruption** in 4 test assertions (`src/tests/compression/pipeline.rs`): mojibake (corrupt `0xCE+0xA6`→`Φ`, `0xCE+0xB1`→`α`, `0xC2+0xA7`→`§`) caused false-negative failures in `compress_text_with_aliases_medium_fidelity`, `compress_text_with_aliases_high_fidelity`, `compress_text_emits_angular_component_markers`, and `compress_text_emits_angular_injectable_markers`. Restored via `git checkout` and re-appended with explicit UTF-8 encoding.
 
 ### Changed
 
