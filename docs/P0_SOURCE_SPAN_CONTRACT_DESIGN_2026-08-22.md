@@ -38,7 +38,7 @@ class_capture_end  = cap.start_byte + cap.raw_text.len()
 
 where `span_start` is the leading decorator/annotation/attribute byte, or the
 declaration keyword byte when no annotation group precedes it (non-decorated
-classes â†’ full backward compatibility).
+classes `→`. full backward compatibility).
 
 On the IR path the class source must be derived from the **existing capture
 identity** `PassContext.captures: Vec<CapEntry>` (pipeline.rs:95-96) which
@@ -58,8 +58,8 @@ run_capture_pipeline
 Vec<CapEntry>
     â†“
 PassContext.captures          (C-22: existing identity, now populated)
-    â”œâ”€â”€ CoreIRPass â†’ CoreOp::DefClass(name)
-    â””â”€â”€ MetaLayerPass â†’ CapEntry â†’ canonical source span â†’ meta-layer registry
+    â”œâ”€â”€ CoreIRPass `→`. CoreOp::DefClass(name)
+    â””â”€â”€ MetaLayerPass `→`. CapEntry `→`. canonical source span `→`. meta-layer registry
 ```
 
 Detailed call chain:
@@ -67,12 +67,12 @@ Detailed call chain:
 ```
 mcp/tool_handlers/core.rs (handle_compress_code_context,
                           handle_provide_code_context, handle_delta)
-  â†’ compile_file_ir / compile_file_ir_focused (mcp/tool_helpers.rs:232-358)
-      â†’ language layers wired per-extension (tool_helpers.rs:292-306)
-      â†’ IRCompiler::compile_focused (ir/compiler.rs:153-172)
-          â†’ compile_inner (ir/compiler.rs:189-240)
-              â†’ PassContext + PassPipeline::default_production()
-                  â†’ CoreIRPass (ir/pipeline.rs:436-678)
+  `→`. compile_file_ir / compile_file_ir_focused (mcp/tool_helpers.rs:232-358)
+      `→`. language layers wired per-extension (tool_helpers.rs:292-306)
+      `→`. IRCompiler::compile_focused (ir/compiler.rs:153-172)
+          `→`. compile_inner (ir/compiler.rs:189-240)
+              `→`. PassContext + PassPipeline::default_production()
+                  `→`. CoreIRPass (ir/pipeline.rs:436-678)
                         captures via run_capture_pipeline
                         (compression/capture_pipeline.rs:55-101)
                         each class.root CapEntry: { name, text, raw_text, start_byte }
@@ -83,12 +83,12 @@ mcp/tool_handlers/core.rs (handle_compress_code_context,
                         ...
                         // after the loop (C-22):
                         state.captures = captures;   // MOVE the owned batch no clone
-                  â†’ MetaLayerPass (ir/pipeline.rs:723-763)
+                  `→`. MetaLayerPass (ir/pipeline.rs:723-763)
                         BEFORE: class_names from CoreOp::DefClass(_, name)  // compacted
                         AFTER (C-22):
                           filter state.captures for type-root captures
                           slice state.source[ canonical_class_source(source, cap) ]
-                          â†’ registry.run_meta_layers_pipeline(source, slices, ...)
+                          `→`. registry.run_meta_layers_pipeline(source, slices, ...)
 ```
 
 **Loss today:** `CoreIRPass` keeps the capture batch in a local
@@ -108,16 +108,16 @@ owns: `cap.start_byte`, `cap.raw_text.len()`, and the new
 
 ```
 compress_file_with_source (compression/pipeline.rs:110-255)
-  â†’ run_capture_pipeline (same closure)
-  â†’ build_output_lines (compression/pipeline.rs:354-528)
+  `→`. run_capture_pipeline (same closure)
+  `→`. build_output_lines (compression/pipeline.rs:354-528)
       class.root arm:
         output_lines.push(format_class_entry(&cap.text, ...))      // compacted
         class_captures.push(decorator_inclusive_class_text(src,cap))
-          â†’ find_decorator_inclusive_start(...)   // TS-only (@Name(...))
-            // Java: `@RestController` â†’ None â†’ falls back to cap.text  âŒ
-            // C#:   `[ApiController]` â†’ None â†’ falls back to cap.text  âŒ
-      â†’ registry.run_meta_layers_pipeline(source, class_captures) // TS fixed, others broken
-  â†’ Î¦ blocks appended (lines 212-221, 292-303, 655-665)
+          `→`. find_decorator_inclusive_start(...)   // TS-only (@Name(...))
+            // Java: `@RestController` `→`. None `→`. falls back to cap.text  âŒ
+            // C#:   `[ApiController]` `→`. None `→`. falls back to cap.text  âŒ
+      `→`. registry.run_meta_layers_pipeline(source, class_captures) // TS fixed, others broken
+  `→`. Φ blocks appended (lines 212-221, 292-303, 655-665)
 ```
 
 ### 2.3 Streaming path
@@ -179,7 +179,7 @@ pub fn find_class_source_start(source: &str, type_keyword_pos: usize) -> usize;
    identifier is a modifier keyword (`public` / `private` / `protected` /
    `export` / `abstract` / `static` / `sealed` / `partial` / `internal` /
    `final`); if so, repeat from step 2 for the token before the modifier. If
-   the reached token is NOT an annotation (`@`/`[`), no group precedes â†’
+   the reached token is NOT an annotation (`@`/`[`), no group precedes `→`.
    return the original `type_keyword_pos` (the fallback unchanged behavior
    for non-decorated classes). Use the `modifiers` lists in
    `compaction::modifiers` as the authoritative keyword set.
@@ -224,7 +224,7 @@ canonical_class_source(source, cap):
 ```
 
 If no annotation/attribute group precedes, `start` = the declaration-keyword
-position identical to today's fallback for non-decorated classes â†’ no
+position identical to today's fallback for non-decorated classes `→`. no
 behavior change.
 
 ---
@@ -237,7 +237,7 @@ Consumers:
 |---|---|---|
 | `compression/pipeline.rs::build_output_lines` class.root arm (L384-399) | private `decorator_inclusive_class_text` (TS-only) | canonical `class_source_text(source, &cap)` (trilingual) |
 | `ir/pipeline.rs::CoreIRPass` (L436-678) | keeps batch in a local; `state.captures` never populated | after the loop: `state.captures = captures;` (MOVE same identity, no clone) |
-| `ir/pipeline.rs::MetaLayerPass` (L728-746) | `CoreOp::DefClass.name` (compacted) | filters `state.captures` for type roots; calls `class_source_text` â†’ registry |
+| `ir/pipeline.rs::MetaLayerPass` (L728-746) | `CoreOp::DefClass.name` (compacted) | filters `state.captures` for type roots; calls `class_source_text` `→`. registry |
 | `mcp/workspace_util.rs::extract_class_blocks` (L205-239) | TS-only `find_decorator_inclusive_start` | same new helper (trilingual) |
 
 The registry API `run_meta_layers_pipeline(source, class_captures: &[String],
@@ -285,7 +285,7 @@ full source.
           )
       })
       .map(|cap| {
-          // canonical helper: type keyword â†’ find_class_source_start â†’ slice
+          // canonical helper: type keyword `→`. find_class_source_start `→`. slice
           class_source_from_capture(&state.source, cap).to_string()
       })
       .collect();
@@ -305,7 +305,7 @@ full source.
 - `extract_class_blocks` switch from `find_decorator_inclusive_start` to
   the new trilingual helper. Preserves TS block extraction behavior.
 
-**E. Tests** (per project rules â†’ `src/tests/`)
+**E. Tests** (per project rules `→`. `src/tests/`)
 - `src/tests/meta_util/class_source_span.rs` (new): TS/Java/C#,
   bare annotations, multi-line attributes, modifiers, non-decorated.
 - `src/tests/compression/pipeline.rs`: add
@@ -314,7 +314,7 @@ full source.
   hand-constructed CapEntry (matches the Angular regression-test style
   at lines 497-524).
 - `src/tests/ir/pipeline.rs`: IR-path marker tests + the new C-22 regression
-  (see Â§8).
+  (see §8).
 
 ---
 
@@ -340,10 +340,10 @@ Non-decorated classes must remain byte-identical:
 
 | Case | Before (today) | After (canonical) |
 |---|---|---|
-| TS `export class Foo {}` | `cap.text` = `"Foo"` | helper returns `class_pos` â†’ `"Foo"` unchanged |
-| Java `class Foo {}` | `"Foo"` | `class_pos` â†’ `"Foo"` unchanged |
-| C# `public class Foo {}` | `"Foo"` | `class_pos` â†’ `"Foo"` (fallback) unchanged |
-| C# `[ApiController] public class Foo : Base {}` | `"Foo"` (dead no marker) | annotation/attribute-inclusive slice â†’ `Î¦aspnet` new signal |
+| TS `export class Foo {}` | `cap.text` = `"Foo"` | helper returns `class_pos` `→`. `"Foo"` unchanged |
+| Java `class Foo {}` | `"Foo"` | `class_pos` `→`. `"Foo"` unchanged |
+| C# `public class Foo {}` | `"Foo"` | `class_pos` `→`. `"Foo"` (fallback) unchanged |
+| C# `[ApiController] public class Foo : Base {}` | `"Foo"` (dead no marker) | annotation/attribute-inclusive slice `→`. `Φaspnet` new signal |
 | TS `@Component(...)` | decorator slice (works) | same (decorator-only change) |
 
 Rule: modifiers between the annotation group and the `class` keyword remain
@@ -360,18 +360,18 @@ changes.
 
 1. IR C#: `compile_file_ir` on an ASP.NET controller
    (`[ApiController] [Route("api/foo")] public class FooController : ControllerBase`)
-   â†’ `CompiledIR.instructions` contains the ASP.NET `TypeAlias` marker row.
-2. IR Java: `@RestController` â†’ Spring `TypeAlias`.
+   `→`. `CompiledIR.instructions` contains the ASP.NET `TypeAlias` marker row.
+2. IR Java: `@RestController` `→`. Spring `TypeAlias`.
 3. IR Angular: the existing `@Component` fixture driven through
-   `compile_file_ir` â†’ the Angular marker is now present (was dead).
-4. Text C#: `compress_text` / `compress_file` â†’ `.NET` Î¦ block.
-5. Text Java: `compress_text` â†’ `Î¦rest`.
-6. Non-decorated at IR+TEXT (plain TS/Java/C#) â†’ no new markers; output
+   `compile_file_ir` `→`. the Angular marker is now present (was dead).
+4. Text C#: `compress_text` / `compress_file` `→`. `.NET` Φ block.
+5. Text Java: `compress_text` `→`. `Φrest`.
+6. Non-decorated at IR+TEXT (plain TS/Java/C#) `→`. no new markers; output
    byte-identical to baseline.
-7. Render E2E: `handle_provide_code_context` at High â†’ SCHEMA v2 render
+7. Render E2E: `handle_provide_code_context` at High `→`. SCHEMA v2 render
    contains the meta block.
 8. Stream parity: `compress_file_streaming` on the C#/Java fixtures.
-9. Cache-hit: at Low/Medium a cache-HIT response isn't changed by the new Î¦
+9. Cache-hit: at Low/Medium a cache-HIT response isn't changed by the new Φ
    blocks (meta pipeline only runs on the miss path).
 10. Scope guard: `.rs` / `.java` stay absent from `COMPRESSIBLE_EXTENSIONS`
     in this P0.

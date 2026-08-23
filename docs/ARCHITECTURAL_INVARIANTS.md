@@ -103,7 +103,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | Property | Value |
 |----------|-------|
 | **Intent** | Compilation stages must execute in a known architectural order. |
-| **Invariant** | The production `PassPipeline` must register passes in the required order: `CoreIRPass` â†’ `LanguageLayerPass` â†’ `MetaLayerPass` â†’ `PatternRecognitionPass` â†’ `AliasResolutionPass` â†’ `ValidationPass`. This ordering reflects the data and semantic dependencies between stages. |
+| **Invariant** | The production `PassPipeline` must register passes in the required order: `CoreIRPass` `→`. `LanguageLayerPass` `→`. `MetaLayerPass` `→`. `PatternRecognitionPass` `→`. `AliasResolutionPass` `→`. `ValidationPass`. This ordering reflects the data and semantic dependencies between stages. |
 | **Enforcement** | `production_pipeline_preserves_architectural_order` test in `src/tests/ir/pipeline.rs` asserts the exact pass sequence via `PassPipeline::pass_names()`. |
 | **Authority** | `src/ir/pipeline.rs` (`PassPipeline::default_production()`), `src/tests/ir/pipeline.rs` (ordering test) |
 | **Type** | ENFORCED (test) |
@@ -137,7 +137,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 |----------|-------|
 | **Description** | The `PassPipeline` migration from the monolithic `IRCompiler::compile_inner()` has been completed. `PassPipeline` is now the active production compilation path. |
 | **Resolution** | `IRCompiler::compile_inner()` is now an orchestration boundary that constructs a `PassContext`, configures the `PassPipeline`, and delegates compilation to `PassPipeline::run()`. Individual compilation stages are implemented in their corresponding `IRPass` implementations in `src/ir/pipeline.rs`. |
-| **Production pipeline order** | `CoreIRPass` â†’ `LanguageLayerPass` â†’ `MetaLayerPass` â†’ `PatternRecognitionPass` â†’ `AliasResolutionPass` â†’ `ValidationPass` |
+| **Production pipeline order** | `CoreIRPass` `→`. `LanguageLayerPass` `→`. `MetaLayerPass` `→`. `PatternRecognitionPass` `→`. `AliasResolutionPass` `→`. `ValidationPass` |
 | **Optional passes** | `ExecutionSemanticsPass`, `ProgramGraphPass`, `InferenceLayerPass` remain outside the default production pipeline. |
 | **See also** | `src/ir/pipeline.rs`, `src/ir/compiler.rs`, `docs/ARCHITECTURAL_INVARIANTS.md` (PIPELINE-001) |
 
@@ -160,5 +160,6 @@ Do not create a fitness-function framework, trait, registry, or gate abstraction
 
 The following are important architectural properties but are **not** formalized as architectural invariants:
 
-- **Module dependency direction:** Currently enforced by Rust's module and visibility system within a single crate. The existing dependency patterns (MCP â†’ IR, IR â†’ compression, no reverse dependencies) are healthy but not independently tested. If a dependency becomes important enough to require hard enforcement, the appropriate mechanism is splitting into separate crates.
+- **Module dependency direction:** Currently enforced by Rust's module and visibility system within a single crate. The existing dependency patterns (MCP → IR, IR → compression, no reverse dependencies) are healthy but not independently tested. If a dependency becomes important enough to require hard enforcement, the appropriate mechanism is splitting into separate crates.
 - **Meta-layer additivity:** Meta-layers currently append to compressed output rather than modifying it. However, the `MetaLayer::enrich()` trait signature permits modification, and "additivity" has not been established as a formal architectural contract. This is a candidate for future formalization if the contract is explicitly defined.
+- **Meta-layer per-class source isolation:** Previously an uncovered concern — each meta-layer could accidentally inspect neighboring type declarations or whole-file text when trying to extract framework annotations. This is now **formally covered by C-22** (see above). The canonical capture path (`PassContext.captures` → `class_source_from_capture()` → `MetaLayer::enrich(class_captures)`) ensures that a meta-layer receives only the exact source span belonging to the type it is enriching. Multi-class cross-contamination tests (9 tests across Angular/Spring/.NET at all three fidelity levels) enforce this structurally: a class's `@Component` / `@RestController` / `[ApiController]` marker never leaks to sibling classes.
