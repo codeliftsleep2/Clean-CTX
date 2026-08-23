@@ -60,6 +60,25 @@
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
+│  │ Spring Boot Meta-Layer (Φ markers + graph)       │   │
+│  │   detect → annotations → markers → graph         │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ .NET Meta-Layer (Φ markers + graph)              │   │
+│  │   detect → attributes → markers → graph          │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  All meta-layers dispatched via LayerRegistry:          │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ LayerRegistry (singleton)                        │   │
+│  │   MetaLayer::is_applicable() → detect framework  │   │
+│  │   MetaLayer::enrich(source, class_captures, ...) │   │
+│  │     → class_captures derived per C-22 from       │   │
+│  │       PassContext.captures, NOT DefClass.name    │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐   │
 │  │ MCP Prompts (cleanctx-notation + dashboard)      │   │
 │  └──────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘

@@ -149,7 +149,15 @@ The IR compiler (`IRCompiler::compile` in `src/ir/compiler.rs`) reuses the exist
 2. Capture walk (existing — no change)
 3. Core IR emission (replaces build_output_lines)
 4. Language layer translation (TypeScriptLayer, CSharpLayer, RustLayer, JavaLayer)
-5. Meta-layer pass (AngularMetaLayer, SpringMetaLayer)
+5. Meta-layer pass (AngularMetaLayer, SpringBootMetaLayer, DotNetMetaLayer)
+   — Derives class_captures directly from PassContext.captures per C-22,
+     NOT from DefClass.name. Each type-root capture (class/interface/enum/
+     record/struct/trait) produces its canonical source span via
+     class_source_from_capture(), ensuring decorators/annotations/attributes
+     are included for all three framework meta-layers.
+   — Multi-class-per-file invariant: each class capture receives ONLY its
+     own source span; the } class-boundary guard prevents backward scans
+     from crossing into preceding classes.
 6. Additive pattern recognition (CodePatternRecognizer — CTOR/OBSERVABLE/GETTER/SETTER)
 7. Consumptive pattern compression (CompressingPatternRecognizer — PAT ops)
 8. Forward alias resolution (resolve_forward_aliases)
@@ -444,8 +452,9 @@ The state machine supports:
 
 | Framework | File | Features |
 |-----------|------|----------|
-| Angular | `layers/angular.rs` | Wraps `angular_meta` module, emits `@cmp`/`@svc`/`@pipe` markers |
-| Spring Boot | `layers/spring.rs` | Wraps `spring_meta` module, emits `Φrest:`/`Φsvc:` markers |
+| Angular | `layers/angular.rs` | Wraps `angular_meta` module, emits `Φcmp:`/`Φsvc:`/`Φpipe:`/`Φin:`/`Φout:`/`Φmodel:`/`Φtpl:`/`Φsty:` markers + ecosystem sub-layers: RxJS (`Φobs:`/`Φsubject:`/`ΦpipeRx:`), NgRx (`Φngrx:`/`Φaction:`/`Φreducer:`/`Φeffect:`/`Φselector:`/`Φentity:`), Signals (`Φsignal:`/`Φcomputed:`/`Φsig-effect:`), Routing (`Φroute:`/`Φguard:`/`Φresolver:`) |
+| Spring Boot | `layers/spring.rs` | Wraps `spring_meta` module, emits `Φrest:`/`Φctrl:`/`Φsvc:`/`Φrepo:`/`Φconf:`/`Φmap:`/`Φaut:`/`Φval:`/`Φbean:`/`Φprop:`/`Φpropf:` markers |
+| .NET | `layers/dotnet.rs` | Wraps `dotnet_meta` module, emits `Φctrl:`/`Φapi:`/`Φaction:`/`Φhub:`/`Φef:`/`Φdbset:`/`Φmap:`/`Φsvc:`/`Φdi:`/`Φjson:`/`Φauth:`/`Φmodel:` markers for ASP.NET Core, EF Core, SignalR, AutoMapper |
 
 ### Layer 4: Pattern Recognizers
 
