@@ -417,42 +417,92 @@ pub enum MergeItem {
     Pattern(PatternOp),
 }
 
-// ── Pattern recognisers (consumptive) ─────────────────────────────────
+// ── Centralized flag consumption helpers ──────────────────────────────
+
+/// Count consecutive `Flags(method_id, _)` ops starting at `offset` in `slice`.
+/// Returns the number of trailing Flags ops that reference `method_id`.
+fn count_trailing_flags(slice: &[CoreOp], offset: usize, method_id: &str) -> usize {
+    let mut count = 0;
+    while offset + count < slice.len() {
+        match &slice[offset + count] {
+            CoreOp::Flags(mid, _) if mid == method_id => count += 1,
+            _ => break,
+        }
+    }
+    count
+}
 
 /// Try to match and consume a pattern at the start of `slice`.
-/// Returns `(pattern, instructions_consumed)` on success.
+///
+/// Centralized wrapper that enforces the invariant:
+/// > A pattern consuming `DefMethod(Mx)` must consume/handle all immediately
+/// > adjacent `Flags(Mx, ...)` before and after its span.
+///
+/// This handles leading flags (emitted by the additive `CodePatternRecognizer`)
+/// and trailing flags (emitted by language-layer passes) for EVERY consumptive
+/// pattern, preventing orphaned Flags ops (E003) regardless of which pattern
+/// matches.
 fn try_compress_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     if slice.is_empty() {
         return None;
     }
 
-    // CTOR + injectable deps
-    if let Some(result) = try_ctor_pattern(slice) {
-        return Some(result);
+    // Step 1: Find the first non-Flags op to determine the method_id.
+    // Leading Flags ops from the additive CodePatternRecognizer (e.g.
+    // FLAGS(Mx, ["CTOR"])) may precede DefMethod.
+    let first_non_flags = {
+        let mut idx = 0;
+        while idx < slice.len() {
+            match &slice[idx] {
+                CoreOp::Flags(_, _) => idx += 1,
+                _ => break,
+            }
+        }
+        idx
+    };
+
+    // If everything is Flags, there's no pattern to match.
+    if first_non_flags >= slice.len() {
+        return None;
     }
-    // Empty constructor
-    if let Some(result) = try_empty_ctor_pattern(slice) {
-        return Some(result);
+
+    // Extract method_id from the first non-Flags op (must be DefMethod for
+    // any pattern to match).
+    let method_id = match &slice[first_non_flags] {
+        CoreOp::DefMethod(_, mid, _) => mid.clone(),
+        _ => return None,
+    };
+
+    // Step 2: Verify all leading Flags ops reference this method_id.
+    // If any leading flag belongs to a different method, do NOT consume it.
+    for flag in slice.iter().take(first_non_flags) {
+        if let CoreOp::Flags(mid, _) = flag {
+            if mid != &method_id {
+                return None;
+            }
+        }
     }
-    // Observable / Promise
-    if let Some(result) = try_observable_pattern(slice) {
-        return Some(result);
+
+    // Step 3: Try each pattern on the slice starting after leading flags.
+    let inner_slice = &slice[first_non_flags..];
+    let result = try_ctor_pattern(inner_slice)
+        .or_else(|| try_empty_ctor_pattern(inner_slice))
+        .or_else(|| try_observable_pattern(inner_slice))
+        .or_else(|| try_promise_pattern(inner_slice))
+        .or_else(|| try_getter_pattern(inner_slice))
+        .or_else(|| try_setter_pattern(inner_slice))
+        .or_else(|| try_override_pattern(inner_slice));
+
+    // Step 4: If a pattern matched, consume trailing Flags ops for the
+    // same method_id. This prevents orphaned Flags (E003) from language-layer
+    // flags (PRIVATE, STATIC, EXPORT, etc.) that follow the method body.
+    if let Some((pat, inner_consumed)) = result {
+        let trailing = count_trailing_flags(slice, first_non_flags + inner_consumed, &method_id);
+        let total_consumed = first_non_flags + inner_consumed + trailing;
+        Some((pat, total_consumed))
+    } else {
+        None
     }
-    if let Some(result) = try_promise_pattern(slice) {
-        return Some(result);
-    }
-    // Accessors
-    if let Some(result) = try_getter_pattern(slice) {
-        return Some(result);
-    }
-    if let Some(result) = try_setter_pattern(slice) {
-        return Some(result);
-    }
-    // Override
-    if let Some(result) = try_override_pattern(slice) {
-        return Some(result);
-    }
-    None
 }
 
 /// Returns true if the method name is a recognized constructor name.
@@ -467,17 +517,16 @@ pub fn is_constructor_name(name: &str) -> bool {
     )
 }
 
-/// CTOR pattern: `DEF_M(constructor) [+ Flags(Mid, ["CTOR"])] + Param* + Return + INJECTS` → 1 op.
+/// CTOR pattern: `DEF_M(constructor) + Param* + Return + INJECTS` → 1 op.
 ///
-/// F-FULL-03/F-FULL-09: The consumptive recognizer is aware of the additive
-/// `CodePatternRecognizer`'s CTOR `Flags` op that may immediately precede
-/// the `DefMethod`. If present, it consumes the `Flags` op as part of the
-/// matched span, preventing orphan `Flags(M1, ["CTOR"])` ops from remaining
-/// in the stream after the `DefMethod` has been consumed.
+/// NOTE: Leading/trailing Flags ops are handled by the centralized
+/// `try_compress_pattern` wrapper. This function receives a slice that
+/// starts at `DefMethod` and returns consumed count for the body only.
 fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     if slice.is_empty() {
         return None;
     }
+
     let (class_id, method_id) = match &slice[0] {
         CoreOp::DefMethod(cid, mid, name) if is_constructor_name(name) => {
             (cid.clone(), mid.clone())
@@ -486,28 +535,11 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     };
 
     // Walk forward, collecting params + return + (optional) INJECTS
-    let mut idx = 1;
+    let mut idx = 1; // skip DEF_M
     let mut param_count = 0;
     let mut saw_return = false;
     let mut saw_injects = false;
     let mut deps: Vec<String> = Vec::new();
-
-    // F-FULL-03/F-FULL-09: Consume ALL trailing Flags ops referencing this
-    // method_id. The additive CodePatternRecognizer emits FLAGS(Mx, ["CTOR"]),
-    // but language-layer passes (e.g. TypeScriptLayer) may emit additional
-    // FLAGS(Mx, ["PRIVATE", "STATIC", ...]) that must also be consumed to
-    // prevent orphaned Flags ops in the final stream (E003).
-    while idx < slice.len() {
-        if let CoreOp::Flags(mid, _) = &slice[idx] {
-            if mid == &method_id {
-                idx += 1;
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
 
     while idx < slice.len() {
         match &slice[idx] {
@@ -535,23 +567,6 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         }
     }
 
-    // Consume ALL trailing Flags ops referencing this method_id that
-    // were emitted AFTER the method body (RET/INJECTS). The additive
-    // CodePatternRecognizer emits FLAGS(Mx, ["CTOR"]) and language-layer
-    // passes emit FLAGS(Mx, ["PRIVATE", "STATIC", ...]) after the body.
-    // All of these must be consumed to prevent orphaned Flags (E003).
-    while idx < slice.len() {
-        if let CoreOp::Flags(mid, _) = &slice[idx] {
-            if mid == &method_id {
-                idx += 1;
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
     // We require: at least 1 param OR an INJECTS op to qualify as a
     // constructor-injection pattern. Otherwise it's an empty ctor.
     if !saw_injects && param_count == 0 {
@@ -561,14 +576,13 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         return None;
     }
 
-    let consumed = idx;
     Some((
         PatternOp::Constructor {
             class_id,
             method_id,
             deps,
         },
-        consumed,
+        idx,
     ))
 }
 
