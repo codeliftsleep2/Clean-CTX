@@ -589,18 +589,28 @@ fn find_class_head_end(raw: &str) -> Option<usize> {
 }
 
 /// Find the byte offset of the `{` that opens the class body, not any `{`
-/// inside an annotation object literal. Scans from the `class` keyword
+/// inside an annotation object literal. Scans from the type declaration keyword
 /// forward, tracking brace depth so that `@RequestMapping({...})` braces
 /// are skipped.
 ///
+/// Supports all type keywords: class, interface, enum, record, struct.
 /// The brace-depth + string-literal scan delegates to the shared
 /// `meta_util::find_first_top_level` primitive (Round-8 structural audit)
 /// — no hand-rolled scanner remains in this file.
 fn find_class_body_open(raw: &str) -> Option<usize> {
-    // NOTE: only the `class ` keyword is used here, matching the original
-    // per-layer behaviour (interface/record bodies are not body-scanned).
-    let class_pos = raw.find("class ")?;
-    crate::meta_util::find_first_top_level(raw, '{', class_pos + 6)
+    const TYPE_KW: &[(&str, usize)] = &[
+        ("class ", 6),
+        ("interface ", 10),
+        ("enum ", 5),
+        ("record ", 7),
+        ("struct ", 7),
+    ];
+    for (kw, kw_len) in TYPE_KW {
+        if let Some(pos) = raw.find(kw) {
+            return crate::meta_util::find_first_top_level(raw, '{', pos + kw_len);
+        }
+    }
+    None
 }
 
 fn extract_class_name(raw: &str) -> Option<String> {

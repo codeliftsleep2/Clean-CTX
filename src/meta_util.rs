@@ -748,6 +748,14 @@ pub fn find_class_source_start(source: &str, type_keyword_pos: usize) -> usize {
         }
         let prev = bytes[i - 1];
 
+        // If we encounter a closing brace, we've crossed into the preceding
+        // class's closing `}`. Stop immediately — this is a hard class boundary.
+        // `}` is never a valid annotation prefix, and any annotations before it
+        // belong to the preceding class, not the current one.
+        if prev == b'}' {
+            break;
+        }
+
         if prev == b'@' || prev == b'[' {
             i -= 1;
             found = Some(i);

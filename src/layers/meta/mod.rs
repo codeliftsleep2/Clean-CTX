@@ -19,7 +19,6 @@
 
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
-use crate::ir::compiler::CompiledIR;
 use std::path::Path;
 
 /// Structured output of a single meta-layer pass.
@@ -72,14 +71,19 @@ pub trait MetaLayer: Send + Sync {
     ///
     /// # Arguments
     /// - `source`: The full source text of the file being compressed.
-    /// - `ir`: The compiled IR for this file (if available).
+    /// - `class_captures`: The canonical source spans of each type capture
+    ///   (class/interface/enum/record/struct), in document order. Each span
+    ///   is the exact text of that type's declaration including leading
+    ///   decorators/annotations/attributes and the full body. The meta-layer
+    ///   must NEVER inspect text outside the owning class span — this is the
+    ///   per-class metadata invariant.
     /// - `fidelity`: The fidelity level controlling verbosity.
     /// - `config`: The project config (optional) so per-layer `enabled`
     ///   flags and sub-layer settings are honored.
     fn enrich(
         &self,
         source: &str,
-        ir: &CompiledIR,
+        class_captures: &[String],
         fidelity: Fidelity,
         config: Option<&CleanCtxConfig>,
     ) -> Option<MetaLayerOutput>;
@@ -140,23 +144,10 @@ impl MetaLayer for AngularMetaLayer {
     fn enrich(
         &self,
         source: &str,
-        ir: &CompiledIR,
+        class_captures: &[String],
         fidelity: Fidelity,
         config: Option<&CleanCtxConfig>,
     ) -> Option<MetaLayerOutput> {
-        // Extract class names from the IR for compatibility
-        let class_captures: Vec<String> = ir
-            .instructions
-            .iter()
-            .filter_map(|op| {
-                if let crate::ir::opcodes::CoreOp::DefClass(_, name) = op {
-                    Some(name.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
         // Honor the per-framework meta-layer config (enabled flags,
         // min_pipe_operators, include_dispatch_sites, etc.). When the
         // config is absent or the "angular" entry is missing, all
@@ -211,7 +202,7 @@ impl MetaLayer for AngularMetaLayer {
     fn enrich(
         &self,
         _source: &str,
-        _ir: &CompiledIR,
+        _class_captures: &[String],
         _fidelity: Fidelity,
         _config: Option<&CleanCtxConfig>,
     ) -> Option<MetaLayerOutput> {
@@ -253,24 +244,11 @@ impl MetaLayer for SpringBootMetaLayer {
     fn enrich(
         &self,
         source: &str,
-        ir: &CompiledIR,
+        class_captures: &[String],
         fidelity: Fidelity,
         _config: Option<&CleanCtxConfig>,
     ) -> Option<MetaLayerOutput> {
-        // Extract class names from the IR for compatibility
-        let class_captures: Vec<String> = ir
-            .instructions
-            .iter()
-            .filter_map(|op| {
-                if let crate::ir::opcodes::CoreOp::DefClass(_, name) = op {
-                    Some(name.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let block = crate::spring_meta::run_meta_layer(source, &class_captures, fidelity)?;
+        let block = crate::spring_meta::run_meta_layer(source, class_captures, fidelity)?;
         if block.is_empty() {
             return None;
         }
@@ -314,7 +292,7 @@ impl MetaLayer for SpringBootMetaLayer {
     fn enrich(
         &self,
         _source: &str,
-        _ir: &CompiledIR,
+        _class_captures: &[String],
         _fidelity: Fidelity,
         _config: Option<&CleanCtxConfig>,
     ) -> Option<MetaLayerOutput> {

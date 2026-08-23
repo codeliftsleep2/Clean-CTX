@@ -185,25 +185,13 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
     fn enrich(
         &self,
         source: &str,
-        ir: &crate::ir::compiler::CompiledIR,
+        class_captures: &[String],
         fidelity: crate::compression::Fidelity,
         _config: Option<&crate::config::CleanCtxConfig>,
     ) -> Option<crate::layers::meta::MetaLayerOutput> {
-        // Extract class names from IR
-        let class_captures: Vec<String> = ir
-            .instructions
-            .iter()
-            .filter_map(|op| {
-                if let crate::ir::opcodes::CoreOp::DefClass(_, name) = op {
-                    Some(name.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        // Run the meta-layer pipeline using the real source code (not ir.file_id)
-        let block = run_meta_layer(source, &class_captures, fidelity)?;
+        // Run the meta-layer pipeline using the real source code and
+        // class captures directly — no DefClass round-trip.
+        let block = run_meta_layer(source, class_captures, fidelity)?;
         if block.is_empty() {
             return None;
         }
@@ -252,7 +240,7 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
     fn enrich(
         &self,
         _source: &str,
-        _ir: &crate::ir::compiler::CompiledIR,
+        _class_captures: &[String],
         _fidelity: crate::compression::Fidelity,
         _config: Option<&crate::config::CleanCtxConfig>,
     ) -> Option<crate::layers::meta::MetaLayerOutput> {
