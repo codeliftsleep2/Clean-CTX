@@ -1,4 +1,4 @@
-# Clean-CTX â€” Architectural Invariants
+# Clean-CTX Architectural Invariants
 
 **Purpose:** Make Clean-CTX's important architectural decisions visible, identify how they are currently enforced (type system, compiler, tests, or convention), and establish a pattern for future architectural governance.
 
@@ -33,7 +33,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ## Invariant Catalog
 
-### WIRE-001 â€” Canonical IR Serialization Stability
+### WIRE-001 Canonical IR Serialization Stability
 
 | Property | Value |
 |----------|-------|
@@ -46,7 +46,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### VALID-001 â€” IR Structural Validity
+### VALID-001 IR Structural Validity
 
 | Property | Value |
 |----------|-------|
@@ -59,7 +59,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### DELTA-001 â€” Delta Correctness
+### DELTA-001 Delta Correctness
 
 | Property | Value |
 |----------|-------|
@@ -72,7 +72,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### ARCH-001 â€” Inference State Is Ephemeral
+### ARCH-001 Inference State Is Ephemeral
 
 | Property | Value |
 |----------|-------|
@@ -85,7 +85,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### ARCH-002 â€” Language-Agnostic Canonical IR Boundary
+### ARCH-002 Language-Agnostic Canonical IR Boundary
 
 | Property | Value |
 |----------|-------|
@@ -98,7 +98,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### PIPELINE-001 â€” Compilation Pipeline Ordering
+### PIPELINE-001 Compilation Pipeline Ordering
 
 | Property | Value |
 |----------|-------|
@@ -131,7 +131,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ## Architectural Debt
 
-### ARCH-DEBT-001 â€” PassPipeline Migration (RESOLVED)
+### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)
 
 | Property | Value |
 |----------|-------|
