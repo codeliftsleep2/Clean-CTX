@@ -55,6 +55,16 @@ pub struct LayerContext {
     pub fidelity: Fidelity,
     /// Source code being compiled
     pub source: String,
+    /// R-43a: Set during class.root processing — true if the current class
+    /// extends SignalR's `Hub` or `Hub<T>` (e.g. SignalR ChatHub).
+    /// Checked during method.root processing to emit per-method
+    /// ExecutionContext(method_id, "realtime") for every method in the hub.
+    pub is_signalr_hub: bool,
+    /// R-43a: Set during class.root processing — true if the current class
+    /// implements `IDisposable` or `IAsyncDisposable`.
+    /// Checked during method.root processing to emit per-method
+    /// SideEffect(method_id, "io") for every method in the disposable class.
+    pub is_disposable_class: bool,
 }
 
 impl LayerContext {
@@ -68,6 +78,8 @@ impl LayerContext {
             symbol_table: GlobalSymbolTable::new(),
             fidelity,
             source: source.to_string(),
+            is_signalr_hub: false,
+            is_disposable_class: false,
         }
     }
 
