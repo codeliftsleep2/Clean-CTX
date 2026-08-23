@@ -649,3 +649,140 @@ fn compress_text_emits_java_spring_markers() {
         full_output
     );
 }
+
+
+// ── Multi-Class Cross-Contamination Verification ────────────────────
+//
+// Verifies per-class metadata invariant through the production
+// compress_text pipeline. Cross-contamination = class A receives
+// markers that belong to class B.
+
+#[cfg(feature = "spring_boot")]
+#[test]
+fn multi_class_java_spring_no_cross_low() {
+    let source = include_str!("../../test_files/java/MultiClassFixture.java");
+    let result = compress_text(source, "java", Fidelity::Low, "gJ1", None);
+    assert!(result.is_ok());
+    let (_, out) = result.unwrap();
+    assert!(out.contains("ItemController"));
+    assert!(out.contains("ItemService"));
+    assert!(out.contains("AppConfig"));
+    assert!(out.contains("HealthController"));
+    let i1 = out.find("ItemController").unwrap();
+    let i2 = out.find("ItemService").unwrap();
+    let i3 = out.find("HealthController").unwrap();
+    assert!(i1 < i2 && i2 < i3, "document order preserved");
+}
+
+#[cfg(feature = "spring_boot")]
+#[test]
+fn multi_class_java_spring_no_cross_medium() {
+    let source = include_str!("../../test_files/java/MultiClassFixture.java");
+    let result = compress_text(source, "java", Fidelity::Medium, "gJ2", None);
+    assert!(result.is_ok());
+    let (_, out) = result.unwrap();
+    assert!(out.contains("ItemController"));
+    assert!(!out.contains("ItemService") || !out.contains("rest:ItemService"),
+        "ItemService must not inherit rest marker");
+}
+
+#[cfg(feature = "spring_boot")]
+#[test]
+fn multi_class_java_spring_no_cross_high() {
+    let source = include_str!("../../test_files/java/MultiClassFixture.java");
+    let result = compress_text(source, "java", Fidelity::High, "gJ3", None);
+    assert!(result.is_ok());
+    let (_, out) = result.unwrap();
+    assert!(out.contains("AppConfig"));
+    assert!(!out.contains("AppConfig") || !out.contains("rest:AppConfig"),
+        "AppConfig must not inherit rest marker");
+}
+
+#[cfg(feature = "angular")]
+#[test]
+fn multi_class_ts_angular_no_cross_low() {
+    let source = include_str!("../../test_files/typescript/MultiClassFixture.ts");
+    let result = compress_text(source, "ts", Fidelity::Low, "gT1", None);
+    assert!(result.is_ok());
+    let (_, out) = result.unwrap();
+    assert!(out.contains("HelloComponent"));
+    assert!(out.contains("DataService"));
+    assert!(out.contains("GoodbyeComponent"));
+    assert!(!out.contains("DataService") || !out.contains("cmp:DataService"),
+        "DataService must not inherit cmp marker");
+    assert!(!out.contains("HelloComponent") || !out.contains("svc:HelloComponent"),
+        "HelloComponent must not inherit svc marker");
+    let h = out.find("HelloComponent").unwrap();
+    let g = out.find("GoodbyeComponent").unwrap();
+    assert!(h < g, "document order preserved");
+}
+
+#[cfg(feature = "angular")]
+#[test]
+fn multi_class_ts_angular_no_cross_medium() {
+    let source = include_str!("../../test_files/typescript/MultiClassFixture.ts");
+    let result = compress_text(source, "ts", Fidelity::Medium, "gT2", None);
+    assert!(result.is_ok());
+    let (_, out) = result.unwrap();
+    assert!(out.contains("HelloComponent"));
+    assert!(out.contains("GoodbyeComponent"));
+    assert!(!out.contains("DataService") || !out.contains("cmp:DataService"),
+        "DataService must not inherit cmp at Medium");
+}
+
+#[cfg(feature = "angular")]
+#[test]
+fn multi_class_ts_angular_no_cross_high() {
+    let source = include_str!("../../test_files/typescript/MultiClassFixture.ts");
+    let result = compress_text(source, "ts", Fidelity::High, "gT3", None);
+    assert!(result.is_ok());
+    let (_, out) = result.unwrap();
+    assert!(out.contains("HelloComponent"));
+    assert!(out.contains("GoodbyeComponent"));
+    assert!(!out.contains("DataService") || !out.contains("cmp:DataService"),
+        "DataService must not inherit cmp at High");
+}
+
+#[cfg(feature = "dotnet")]
+#[test]
+fn multi_class_csharp_dotnet_no_cross_low() {
+    let source = include_str!("../../test_files/dotnet/MultiClassFixture.cs");
+    let result = compress_text(source, "cs", Fidelity::Low, "gC1", None);
+    assert!(result.is_ok());
+    let (_, out) = result.unwrap();
+    assert!(out.contains("ProductsController"));
+    assert!(out.contains("NotificationHub"));
+    assert!(out.contains("InventoryDbContext"));
+    assert!(!out.contains("NotificationHub") || !out.contains("api:NotificationHub"),
+        "NotificationHub must not inherit api marker");
+    assert!(!out.contains("InventoryDbContext") || !out.contains("api:InventoryDbContext"),
+        "DbContext must not inherit api marker");
+    let p = out.find("ProductsController").unwrap();
+    let h = out.find("NotificationHub").unwrap();
+    let d = out.find("InventoryDbContext").unwrap();
+    assert!(p < h && h < d, "document order preserved");
+}
+
+#[cfg(feature = "dotnet")]
+#[test]
+fn multi_class_csharp_dotnet_no_cross_medium() {
+    let source = include_str!("../../test_files/dotnet/MultiClassFixture.cs");
+    let result = compress_text(source, "cs", Fidelity::Medium, "gC2", None);
+    assert!(result.is_ok());
+    let (_, out) = result.unwrap();
+    assert!(out.contains("ProductsController"));
+    assert!(!out.contains("NotificationHub") || !out.contains("api:NotificationHub"),
+        "NotificationHub must not inherit api at Medium");
+}
+
+#[cfg(feature = "dotnet")]
+#[test]
+fn multi_class_csharp_dotnet_no_cross_high() {
+    let source = include_str!("../../test_files/dotnet/MultiClassFixture.cs");
+    let result = compress_text(source, "cs", Fidelity::High, "gC3", None);
+    assert!(result.is_ok());
+    let (_, out) = result.unwrap();
+    assert!(out.contains("ProductsController"));
+    assert!(!out.contains("NotificationHub") || !out.contains("api:NotificationHub"),
+        "NotificationHub must not inherit api at High");
+}

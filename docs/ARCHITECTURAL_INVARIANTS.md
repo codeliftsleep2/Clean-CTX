@@ -1,4 +1,4 @@
-# Clean-CTX — Architectural Invariants
+# Clean-CTX Architectural Invariants
 
 **Purpose:** Make Clean-CTX's important architectural decisions visible, identify how they are currently enforced (type system, compiler, tests, or convention), and establish a pattern for future architectural governance.
 
@@ -33,7 +33,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ## Invariant Catalog
 
-### WIRE-001 — Canonical IR Serialization Stability
+### WIRE-001 Canonical IR Serialization Stability
 
 | Property | Value |
 |----------|-------|
@@ -46,12 +46,12 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### VALID-001 — IR Structural Validity
+### VALID-001 IR Structural Validity
 
 | Property | Value |
 |----------|-------|
 | **Intent** | Canonical IR must not contain invalid references or structurally inconsistent instructions. |
-| **Invariant** | Valid IR passes `DefaultValidator` without E001–E010 violations. Invalid IR (dangling references, orphaned methods, inconsistent effect/context annotations) is detected. |
+| **Invariant** | Valid IR passes `DefaultValidator` without E001â€“E010 violations. Invalid IR (dangling references, orphaned methods, inconsistent effect/context annotations) is detected. |
 | **Enforcement** | `DefaultValidator` implementing `IRValidator` trait. 10 unit tests (one per rule) plus edge-case tests for empty IR and error display. |
 | **Authority** | `src/ir/validator.rs` (rules), `src/tests/ir/validator.rs` (tests) |
 | **Type** | ENFORCED (test) |
@@ -59,7 +59,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### DELTA-001 — Delta Correctness
+### DELTA-001 Delta Correctness
 
 | Property | Value |
 |----------|-------|
@@ -72,7 +72,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### ARCH-001 — Inference State Is Ephemeral
+### ARCH-001 Inference State Is Ephemeral
 
 | Property | Value |
 |----------|-------|
@@ -85,7 +85,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### ARCH-002 — Language-Agnostic Canonical IR Boundary
+### ARCH-002 Language-Agnostic Canonical IR Boundary
 
 | Property | Value |
 |----------|-------|
@@ -98,12 +98,12 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### PIPELINE-001 — Compilation Pipeline Ordering
+### PIPELINE-001 Compilation Pipeline Ordering
 
 | Property | Value |
 |----------|-------|
 | **Intent** | Compilation stages must execute in a known architectural order. |
-| **Invariant** | The production `PassPipeline` must register passes in the required order: `CoreIRPass` → `LanguageLayerPass` → `MetaLayerPass` → `PatternRecognitionPass` → `AliasResolutionPass` → `ValidationPass`. This ordering reflects the data and semantic dependencies between stages. |
+| **Invariant** | The production `PassPipeline` must register passes in the required order: `CoreIRPass` `→`. `LanguageLayerPass` `→`. `MetaLayerPass` `→`. `PatternRecognitionPass` `→`. `AliasResolutionPass` `→`. `ValidationPass`. This ordering reflects the data and semantic dependencies between stages. |
 | **Enforcement** | `production_pipeline_preserves_architectural_order` test in `src/tests/ir/pipeline.rs` asserts the exact pass sequence via `PassPipeline::pass_names()`. |
 | **Authority** | `src/ir/pipeline.rs` (`PassPipeline::default_production()`), `src/tests/ir/pipeline.rs` (ordering test) |
 | **Type** | ENFORCED (test) |
@@ -116,17 +116,28 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 - **Pattern Recognition** must precede **Alias Resolution**: Alias resolution must see all relevant `Extends`/`Implements` instructions after pattern processing.
 - **Alias Resolution** must precede **Validation**: Validation must inspect the final canonical instruction stream after all transformations.
 
+### C-22 — Meta-Layer Source Context from Canonical Capture Identity
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Meta-layer source context MUST be derived from the canonical `CapEntry` capture identity — NOT from the compacted `CoreOp::DefClass.name`. |
+| **Invariant** | `MetaLayerPass` derives each class capture's canonical source span from `PassContext.captures` (the persisted capture identity). `class_source_from_capture()` produces the decorator/annotation/attribute-inclusive class text (TS `@Name(...)`, Java `@Name`, C# `[Name]`). The `MetaLayer::enrich()` trait receives `class_captures: &[String]` directly — no `DefClass.name` round-trip. Non-decorated classes use the declaration-keyword byte as fallback (backward compatible). |
+| **Enforcement** | `class_source_from_capture_c22_identity` test asserts `class_source_from_capture` reconstructs the capture from source + `CapEntry`. `MetaLayerPass::run()` in `src/ir/pipeline.rs` filters type-root captures from `state.captures`. Multi-class cross-contamination tests (9 tests across Angular/Spring/.NET at Low/Medium/High) verify per-class isolation — a class's `@Component`/`@RestController`/`[ApiController]` marker never leaks to sibling classes. |
+| **Authority** | `src/meta_util.rs` (`class_source_from_capture`), `src/ir/pipeline.rs` (`MetaLayerPass::run`), `src/layers/registry.rs` (`run_meta_layers_pipeline`), `src/tests/meta_util.rs` (C-22 identity test), `src/tests/compression/pipeline.rs` (multi-class tests) |
+| **Type** | ENFORCED (test + structural) |
+| **Gate** | `cargo test` |
+
 ---
 
 ## Architectural Debt
 
-### ARCH-DEBT-001 — PassPipeline Migration (RESOLVED)
+### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)
 
 | Property | Value |
 |----------|-------|
 | **Description** | The `PassPipeline` migration from the monolithic `IRCompiler::compile_inner()` has been completed. `PassPipeline` is now the active production compilation path. |
 | **Resolution** | `IRCompiler::compile_inner()` is now an orchestration boundary that constructs a `PassContext`, configures the `PassPipeline`, and delegates compilation to `PassPipeline::run()`. Individual compilation stages are implemented in their corresponding `IRPass` implementations in `src/ir/pipeline.rs`. |
-| **Production pipeline order** | `CoreIRPass` → `LanguageLayerPass` → `MetaLayerPass` → `PatternRecognitionPass` → `AliasResolutionPass` → `ValidationPass` |
+| **Production pipeline order** | `CoreIRPass` `→`. `LanguageLayerPass` `→`. `MetaLayerPass` `→`. `PatternRecognitionPass` `→`. `AliasResolutionPass` `→`. `ValidationPass` |
 | **Optional passes** | `ExecutionSemanticsPass`, `ProgramGraphPass`, `InferenceLayerPass` remain outside the default production pipeline. |
 | **See also** | `src/ir/pipeline.rs`, `src/ir/compiler.rs`, `docs/ARCHITECTURAL_INVARIANTS.md` (PIPELINE-001) |
 
@@ -151,3 +162,4 @@ The following are important architectural properties but are **not** formalized 
 
 - **Module dependency direction:** Currently enforced by Rust's module and visibility system within a single crate. The existing dependency patterns (MCP → IR, IR → compression, no reverse dependencies) are healthy but not independently tested. If a dependency becomes important enough to require hard enforcement, the appropriate mechanism is splitting into separate crates.
 - **Meta-layer additivity:** Meta-layers currently append to compressed output rather than modifying it. However, the `MetaLayer::enrich()` trait signature permits modification, and "additivity" has not been established as a formal architectural contract. This is a candidate for future formalization if the contract is explicitly defined.
+- **Meta-layer per-class source isolation:** Previously an uncovered concern — each meta-layer could accidentally inspect neighboring type declarations or whole-file text when trying to extract framework annotations. This is now **formally covered by C-22** (see above). The canonical capture path (`PassContext.captures` → `class_source_from_capture()` → `MetaLayer::enrich(class_captures)`) ensures that a meta-layer receives only the exact source span belonging to the type it is enriching. Multi-class cross-contamination tests (9 tests across Angular/Spring/.NET at all three fidelity levels) enforce this structurally: a class's `@Component` / `@RestController` / `[ApiController]` marker never leaks to sibling classes.
