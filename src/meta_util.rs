@@ -529,10 +529,9 @@ pub fn extract_first_quoted(text: &str) -> Option<String> {
     let trimmed = text.trim_start();
     let (value, quote) = if let Some(stripped) = trimmed.strip_prefix('\'') {
         (stripped, '\'')
-    } else if let Some(stripped) = trimmed.strip_prefix('"') {
-        (stripped, '"')
     } else {
-        return None;
+        let stripped = trimmed.strip_prefix('"')?;
+        (stripped, '"')
     };
     let mut chars = value.char_indices();
     while let Some((i, c)) = chars.next() {

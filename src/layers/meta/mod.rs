@@ -155,7 +155,7 @@ impl MetaLayer for AngularMetaLayer {
         let meta_config = config.and_then(|c| c.meta_layers.get("angular"));
         let block = crate::angular_meta::run_meta_layer_with_config(
             source,
-            &class_captures,
+            class_captures,
             fidelity,
             meta_config,
         )?;
