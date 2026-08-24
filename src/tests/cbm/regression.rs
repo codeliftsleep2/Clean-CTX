@@ -992,3 +992,120 @@ fn proxy_target_resolution_gates_only_project_bound_calls() {
 
     let _ = std::fs::remove_dir_all(&primary);
 }
+
+// ══════════════════════════════════════════════════════════════════
+// CBM-ID fix: get_architecture must parse CBM 0.8.1's REAL wire schema
+// (packages → modules, boundaries → dependencies).
+//
+// Fixtures are verbatim captures from the live CBM binary:
+//   - arch_main_repo.json : this workspace, fast mode (276 nodes / 985 edges)
+//   - arch_mini_fast.json : 3-function mini repo (no `boundaries` key)
+// ══════════════════════════════════════════════════════════════════
+
+#[test]
+fn parse_architecture_maps_packages_and_boundaries_from_live_payload() {
+    use crate::cbm::bridge::parse_architecture_response;
+
+    let arch: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/arch_main_repo.json"))
+            .expect("captured main-repo fixture must be valid JSON");
+
+    let ov = parse_architecture_response(&arch);
+
+    assert_eq!(ov.modules.len(), 3, "packages[] must map to modules");
+    let cbm = ov
+        .modules
+        .iter()
+        .find(|m| m.name == "cbm")
+        .expect("cbm package present");
+    assert_eq!(cbm.file_count, 81, "node_count maps into file_count");
+
+    assert_eq!(
+        ov.dependencies.len(),
+        3,
+        "boundaries[] must map to dependencies"
+    );
+    let dep = ov
+        .dependencies
+        .iter()
+        .find(|d| d.from == "tests" && d.to == "cbm")
+        .expect("tests→cbm boundary present");
+    assert_eq!(dep.kind, "calls", "boundaries are call edges");
+}
+
+#[test]
+fn parse_architecture_tolerates_small_graph_without_boundaries_key() {
+    use crate::cbm::bridge::parse_architecture_response;
+
+    let arch: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/arch_mini_fast.json"))
+            .expect("captured mini-repo fixture must be valid JSON");
+
+    let ov = parse_architecture_response(&arch);
+
+    assert_eq!(ov.modules.len(), 1);
+    assert_eq!(ov.modules[0].name, "main");
+    assert_eq!(ov.modules[0].file_count, 4);
+
+    // The mini payload has NO `boundaries` key — the old parser read a
+    // key that never exists; the new one defaults to empty instead of
+    // erroring.
+    assert!(ov.dependencies.is_empty());
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CBM-ID fix: graph_search must NOT restrict CBM's name_pattern search
+// to label="Function" — that hid every Class/Enum/Field/Module from the
+// wrapper. Request shape is pinned via the extracted pure helper.
+// ══════════════════════════════════════════════════════════════════
+
+#[test]
+fn build_search_graph_args_omits_label_by_default() {
+    use crate::cbm::client::CbmClient;
+
+    let args = CbmClient::build_search_graph_args(".*GraphBridge.*", "proj-slug", None);
+    assert_eq!(args["name_pattern"], ".*GraphBridge.*");
+    assert_eq!(args["project"], "proj-slug");
+    assert!(
+        args.get("label").is_none(),
+        "default wrapper search must not restrict the node label — \
+         the hardcoded Function filter made Class symbols unfindable"
+    );
+}
+
+#[test]
+fn build_search_graph_args_includes_explicit_label_override() {
+    use crate::cbm::client::CbmClient;
+
+    let args = CbmClient::build_search_graph_args(".*GraphBridge.*", "proj-slug", Some("Class"));
+    assert_eq!(args["label"], "Class");
+}
+
+// ── CBM-ID fix: search result mapping (real wire capture) ───────
+//
+// Verbatim CBM 0.8.1 search_graph envelope (live capture): results carry
+// `qualified_name` / `file_path` — NOT `id` / `file`. The old GraphNode
+// mapping required those nonexistent keys, so filter_map dropped every
+// result and wrapper searches were always empty.
+
+const SEARCH_RESULT_WIRE_CAPTURE: &str = r#"{"total":1,"results":[{"name":"GraphBridge","qualified_name":"C-Users-MNasty-Desktop-RustContextLayerAI.src.cbm.bridge.GraphBridge","label":"Class","file_path":"src/cbm/bridge.rs","in_degree":6,"out_degree":0,"complexity":0,"lines":0,"is_exported":true,"is_test":false,"is_entry_point":false,"docstring":"/// Graph bridge with TTL caching and graceful degradation.\n"}],"has_more":false}"#;
+
+#[test]
+fn map_search_result_keeps_results_using_cbm_081_field_names() {
+    use crate::cbm::bridge::map_search_result;
+
+    let envelope: serde_json::Value =
+        serde_json::from_str(SEARCH_RESULT_WIRE_CAPTURE).expect("captured envelope parses");
+    let results = envelope["results"].as_array().expect("results array");
+
+    assert_eq!(results.len(), 1, "capture sanity");
+    let node = map_search_result(&results[0]).expect("result must NOT be dropped");
+
+    assert_eq!(node.name, "GraphBridge");
+    assert_eq!(node.label, "Class");
+    assert_eq!(node.file, "src/cbm/bridge.rs", "file_path maps to file");
+    assert_eq!(
+        node.id, "C-Users-MNasty-Desktop-RustContextLayerAI.src.cbm.bridge.GraphBridge",
+        "qualified_name maps to id"
+    );
+}

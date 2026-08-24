@@ -476,16 +476,30 @@ impl CbmClient {
     /// Search the CBM knowledge graph by name pattern and optional label filter.
     ///
     /// CBM params: `name_pattern`, `label`, `file_pattern`, `project`, `limit`, `offset`
+    /// Build the `search_graph` tool arguments.
+    ///
+    /// Pure helper so tests can pin the exact request shape sent to CBM.
+    /// `label` is optional — omitting it searches across all node labels
+    /// (Class, Method, Function, Enum, ...).
+    pub(crate) fn build_search_graph_args(
+        name_pattern: &str,
+        project: &str,
+        label: Option<&str>,
+    ) -> Value {
+        let mut args = serde_json::json!({"name_pattern": name_pattern, "project": project});
+        if let Some(l) = label {
+            args["label"] = serde_json::Value::String(l.to_string());
+        }
+        args
+    }
+
     pub fn search_graph(
         &mut self,
         name_pattern: &str,
         project: &str,
         label: Option<&str>,
     ) -> Result<Vec<Value>, CbmError> {
-        let mut args = serde_json::json!({"name_pattern": name_pattern, "project": project});
-        if let Some(l) = label {
-            args["label"] = serde_json::Value::String(l.to_string());
-        }
+        let args = Self::build_search_graph_args(name_pattern, project, label);
         let r = self.call_tool("search_graph", args)?;
         let inner = self.parse_cbm_response(&r)?;
         Ok(inner["results"].as_array().cloned().unwrap_or_default())

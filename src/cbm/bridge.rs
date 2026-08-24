@@ -54,6 +54,75 @@ pub struct ArchitectureDependency {
     pub kind: String,
 }
 
+/// Parse CBM 0.8.1's actual `get_architecture` wire schema into the
+/// Clean-CTX view.
+///
+/// CBM does **not** emit `modules`/`dependencies` keys. The equivalent
+/// data lives in (verified against live captures in
+/// `src/tests/cbm/fixtures/arch_*.json`):
+///
+/// - `packages[]`   `{name, node_count, fan_in, fan_out}` → modules.
+///   `node_count` lands in `ArchitectureModule::file_count`, the closest
+///   existing field; CBM packages carry no filesystem path, so `path`
+///   stays empty.
+/// - `boundaries[]` `{from, to, call_count}`              → dependencies
+///   (cross-package call edges; `kind` is always `"calls"`).
+///
+/// Key sets vary between projects/modes (small graphs omit `boundaries`,
+/// large ones may omit `entry_points`) — missing keys deserialize to
+/// empty vecs rather than erroring.
+/// Map one CBM 0.8.1 `search_graph` result object onto [`GraphNode`].
+///
+/// CBM emits `qualified_name` / `file_path` — there is **no `id`** and **no
+/// `file`** key (verified against live captures). The previous mapping
+/// required `n["id"]`, so `filter_map`'s `?` silently dropped EVERY result
+/// and wrapper searches were always empty regardless of the pattern.
+pub(crate) fn map_search_result(n: &Value) -> Option<GraphNode> {
+    let name = n["name"].as_str()?;
+    Some(GraphNode {
+        id: n["qualified_name"].as_str().unwrap_or(name).to_string(),
+        label: n["label"].as_str().unwrap_or("").to_string(),
+        name: name.to_string(),
+        file: n["file_path"].as_str().unwrap_or("").to_string(),
+        properties: HashMap::new(),
+    })
+}
+
+pub(crate) fn parse_architecture_response(arch: &Value) -> ArchitectureOverview {
+    let modules = arch["packages"]
+        .as_array()
+        .map(|ms| {
+            ms.iter()
+                .filter_map(|m| {
+                    Some(ArchitectureModule {
+                        name: m["name"].as_str()?.to_string(),
+                        path: String::new(),
+                        file_count: m["node_count"].as_u64().unwrap_or(0) as usize,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let dependencies = arch["boundaries"]
+        .as_array()
+        .map(|ds| {
+            ds.iter()
+                .filter_map(|d| {
+                    Some(ArchitectureDependency {
+                        from: d["from"].as_str()?.to_string(),
+                        to: d["to"].as_str()?.to_string(),
+                        kind: "calls".to_string(),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    ArchitectureOverview {
+        modules,
+        dependencies,
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeadCodeEntry {
     pub symbol: String,
@@ -715,8 +784,9 @@ impl GraphBridge {
     /// Since the canonical-identity fix, this is always a CBM-canonical path
     /// slug (never a directory basename). Used as:
     ///   - the `project` argument on every CBM tool call,
-    ///   - the `indexing_state` key for readiness gating,
-    ///   - the disk-cache partition label.
+    ///   - the `indexing_state` key for readiness gating.
+    ///     (The disk graph-cache partitions by the canonical root *path*,
+    ///     `self.project_root` — a 1:1 equivalent of this slug per repo.)
     pub(crate) fn project_str(&self) -> String {
         self.project
             .clone()
@@ -933,38 +1003,10 @@ impl GraphBridge {
         match result {
             Ok(arch) => {
                 self.set_last_error(None);
-                let modules = arch["modules"]
-                    .as_array()
-                    .map(|ms| {
-                        ms.iter()
-                            .filter_map(|m| {
-                                Some(ArchitectureModule {
-                                    name: m["name"].as_str()?.to_string(),
-                                    path: m["path"].as_str().unwrap_or("").to_string(),
-                                    file_count: m["file_count"].as_u64().unwrap_or(0) as usize,
-                                })
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let dependencies = arch["dependencies"]
-                    .as_array()
-                    .map(|ds| {
-                        ds.iter()
-                            .filter_map(|d| {
-                                Some(ArchitectureDependency {
-                                    from: d["from"].as_str()?.to_string(),
-                                    to: d["to"].as_str()?.to_string(),
-                                    kind: d["kind"].as_str().unwrap_or("import").to_string(),
-                                })
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let ov = ArchitectureOverview {
-                    modules,
-                    dependencies,
-                };
+                // CBM 0.8.1 emits packages/boundaries (not modules/
+                // dependencies) — map through the verified wire-schema
+                // parser instead of reading keys that never exist.
+                let ov = parse_architecture_response(&arch);
                 self.cache_insert(&key, &ov);
                 Some(ov)
             }
@@ -1137,22 +1179,18 @@ impl GraphBridge {
             )
         });
         let name_pattern = if has_regex { q } else { format!(".*{q}.*") };
-        let result = self.query(move |c| c.search_graph(&name_pattern, &project, Some("Function")));
+        // No label filter: CBM's name_pattern matches across ALL node labels.
+        // Hardcoding `Some("Function")` here made every Class/Enum/Field/
+        // Module invisible to graph_search (probe: the identical pattern
+        // returns the GraphBridge Class unlabeled, zero hits labeled
+        // Function). Explicit label overrides remain available on the raw
+        // cbm_proxy path, which forwards CBM-native arguments unchanged.
+        let result = self.query(move |c| c.search_graph(&name_pattern, &project, None));
         match result {
             Ok(nodes) => {
                 self.set_last_error(None);
-                let gn: Vec<GraphNode> = nodes
-                    .iter()
-                    .filter_map(|n| {
-                        Some(GraphNode {
-                            id: n["id"].as_str()?.to_string(),
-                            label: n["label"].as_str().unwrap_or("").into(),
-                            name: n["name"].as_str()?.to_string(),
-                            file: n["file"].as_str().unwrap_or("").into(),
-                            properties: HashMap::new(),
-                        })
-                    })
-                    .collect();
+                let gn: Vec<GraphNode> =
+                    nodes.iter().filter_map(map_search_result).collect();
                 self.cache_insert(&key, &gn);
                 gn
             }

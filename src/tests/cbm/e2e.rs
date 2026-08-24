@@ -672,3 +672,76 @@ fn live_proxy_exercises_all_cbm_tools() {
         "get_architecture proxy returned neither a result nor an error envelope: {raw4}"
     );
 }
+
+/// CBM-ID fix regression: the graph_search wrapper must find symbols of
+/// ALL node labels. Before the fix, `bridge.search` hardcoded
+/// `label: "Function"`, so Class nodes (e.g. GraphBridge itself) were
+/// invisible to every wrapper search.
+///
+/// The test invalidates caches first: pre-fix runs wrote their own empty
+/// search results into the disk graph cache (`search:*` keys), and
+/// `check_cache` hydrates those before any wire call — measuring that
+/// poison would prove nothing about CBM.
+///
+/// Assertions run AFTER the bridge guard is dropped so a failure can never
+/// poison the shared mutex for later live tests.
+#[serial(cbm_live)]
+#[test]
+fn e2e_bridge_search_finds_class_symbols_across_labels() {
+    enum Outcome {
+        Skipped(&'static str),
+        Hit { name: String, label: String },
+        Empty,
+    }
+    let outcome = {
+        if !cbm_binary_exists() {
+            Outcome::Skipped("CBM not installed")
+        } else {
+            let state = shared_live_state();
+            let mut guard = state.graph_bridge_lock();
+            let bridge = match guard.as_mut() {
+                Some(b) => b,
+                None => {
+                    eprintln!("Skipping — no live bridge");
+                    return;
+                }
+            };
+            match bridge.ensure_indexed() {
+                Ok(crate::cbm::bridge::IndexingStatus::Ready) => {}
+                Ok(other) => {
+                    eprintln!("Skipping — indexing not ready: {other:?}");
+                    return;
+                }
+                Err(e) => {
+                    eprintln!("Skipping — CBM unavailable: {e}");
+                    return;
+                }
+            }
+
+            // Purge stale (possibly pre-fix, label-filtered) cached searches
+            // so this regression exercises the real CBM wire path.
+            bridge.invalidate_cache();
+
+            let nodes = bridge.search("^GraphBridge$");
+            match nodes.iter().find(|n| n.name == "GraphBridge") {
+                Some(hit) => Outcome::Hit {
+                    name: hit.name.clone(),
+                    label: hit.label.clone(),
+                },
+                None => Outcome::Empty,
+            }
+        }
+    };
+
+    match outcome {
+        Outcome::Skipped(reason) => eprintln!("Skipping — {reason}"),
+        Outcome::Empty => panic!(
+            "search must see non-Function nodes after removing the \
+             Function-only label filter"
+        ),
+        Outcome::Hit { name, label } => {
+            assert_eq!(name, "GraphBridge");
+            assert_eq!(label, "Class", "GraphBridge must be found as a Class");
+        }
+    }
+}
