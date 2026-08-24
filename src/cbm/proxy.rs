@@ -143,9 +143,15 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
 
     let args = tool_params;
 
-    // Step 2: Forward to CBM via pipe — intercept the raw response text
-    if !crate::cbm::handlers::ensure_indexed_or_error(id, bridge) {
-        return;
+    // Step 2: Forward to CBM via pipe — intercept the raw response text.
+    //
+    // The indexing gate must resolve against the project actually being queried
+    // (never a stale active-project entry), and project-independent calls such
+    // as `list_projects` must NOT be gated at all.
+    if let Some(target_project) = resolve_proxy_target_project(bridge, params, &args) {
+        if !crate::cbm::handlers::ensure_indexed_or_error_for(id, bridge, &target_project) {
+            return;
+        }
     }
     let raw_response = match bridge.proxy_call(cbm_tool, args) {
         Ok(text) => text,
@@ -232,6 +238,30 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
             }));
         }
     }
+}
+
+/// Resolve the project a `cbm_proxy` call actually targets, or `None` for
+/// project-independent tools (e.g. `list_projects`).
+///
+/// Priority: CBM-native `parameters.project` (already merged into `tool_params`)
+/// → Clean-CTX `arguments.project` → `arguments.workspaceRoot` (a repo path).
+/// Every value is canonicalized to the authoritative CBM project slug so a
+/// proxy call can never gate on an unrelated/raw project name.
+pub(crate) fn resolve_proxy_target_project(
+    bridge: &crate::cbm::GraphBridge,
+    params: &Value,
+    tool_params: &Value,
+) -> Option<String> {
+    if let Some(p) = tool_params.get("project").and_then(|v| v.as_str()) {
+        return Some(bridge.resolve_project_id(p));
+    }
+    if let Some(p) = params["arguments"]["project"].as_str() {
+        return Some(bridge.resolve_project_id(p));
+    }
+    if let Some(root) = params["arguments"]["workspaceRoot"].as_str() {
+        return Some(bridge.resolve_project_id(root));
+    }
+    None
 }
 
 /// RC-2 fallback: minimum compression when JSON compressor fails.

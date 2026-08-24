@@ -79,7 +79,29 @@ fn set_project_from_params(bridge: &mut crate::cbm::GraphBridge, params: &Value)
 /// the query on the next turn. This prevents the 10-30s blocking
 /// that previously occurred on every first CBM handler call.
 pub(crate) fn ensure_indexed_or_error(id: &Value, bridge: &mut crate::cbm::GraphBridge) -> bool {
-    match bridge.ensure_indexed() {
+    send_indexing_gate(id, bridge.ensure_indexed())
+}
+
+/// Variant of `ensure_indexed_or_error` that checks a SPECIFIC project's
+/// indexing state. Used by `cbm_proxy`, whose target project is the one in
+/// the request parameters — never an unrelated/stale active-project entry.
+/// Unknown (untracked) projects pass through so they can never dead-end in
+/// `StillIndexing{0}` forever.
+pub(crate) fn ensure_indexed_or_error_for(
+    id: &Value,
+    bridge: &mut crate::cbm::GraphBridge,
+    project: &str,
+) -> bool {
+    send_indexing_gate(id, bridge.ensure_indexed_for(project))
+}
+
+/// Shared indexing-gate responder. Sends the retry/ready/error MCP response
+/// and returns `true` only when the project is ready for queries.
+fn send_indexing_gate(
+    id: &Value,
+    status: Result<IndexingStatus, crate::cbm::client::CbmError>,
+) -> bool {
+    match status {
         Ok(IndexingStatus::Ready) => true,
         Ok(IndexingStatus::StillIndexing { elapsed_secs }) => {
             let msg = if elapsed_secs < 5 {

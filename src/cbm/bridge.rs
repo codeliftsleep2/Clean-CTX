@@ -150,6 +150,17 @@ pub struct GraphBridge {
     /// Multi-repo: keyed by project name so switching projects doesn't
     /// corrupt another project's indexing state.
     pub(crate) indexing_state: Arc<Mutex<HashMap<String, IndexingState>>>,
+    /// Authoritative mapping: canonical repository root → CBM project ID.
+    ///
+    /// CBM derives a project's identity from the canonical repo path (see
+    /// `cbm_project_slug`), NOT from the directory basename. This map holds
+    /// the primary root plus every configured additional root, so queries,
+    /// readiness checks, and proxy calls always use the same CBM identity.
+    pub(crate) project_ids: HashMap<PathBuf, String>,
+    /// Inverse of `project_ids`: CBM project ID → canonical repository root.
+    /// Used to resolve the `repo_path` when (re)indexing a specific project.
+    pub(crate) project_paths: HashMap<String, PathBuf>,
+
     /// Last error from the most recent user-facing graph query
     /// (`search`, `trace_path`, `query_graph`, `get_architecture`).
     ///
@@ -172,13 +183,45 @@ impl GraphBridge {
     ///   2. PATH search for `codebase-memory-mcp`
     ///   3. Common install locations (`~/.cargo/bin`, `/usr/local/bin`, etc.)
     ///
-    /// Project name is auto-detected from the workspace root directory name.
+    /// CBM project identity is the canonical path-derived slug (never the
+    /// directory basename). Equivalent to `try_create_with_roots(config, root, &[])`.
     pub fn try_create(config: &CbmConfig, project_root: &Path) -> Self {
+        Self::try_create_with_roots(config, project_root, &[])
+    }
+
+    /// Create a `GraphBridge` for a primary root plus additional roots.
+    ///
+    /// The authoritative CBM project identity for every root is the canonical
+    /// slug CBM derives from the repository path (`cbm_project_slug`) — the
+    /// directory basename is never treated as a CBM project ID. Each configured
+    /// root is registered in `project_ids`/`project_paths` and, when CBM is
+    /// available, begins indexing asynchronously at construction.
+    pub fn try_create_with_roots(
+        config: &CbmConfig,
+        project_root: &Path,
+        additional_roots: &[PathBuf],
+    ) -> Self {
         let binary_path = resolve_cbm_binary(config);
-        let project_name = project_root
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "default".to_string());
+
+        // Canonicalize the primary root: CBM identity is path-derived, so the
+        // same path must be used everywhere (indexing, readiness, queries).
+        let project_root_canon = project_root
+            .canonicalize()
+            .unwrap_or_else(|_| project_root.to_path_buf());
+
+        // Build the authoritative root → project-id map for this bridge.
+        let mut project_ids: HashMap<PathBuf, String> = HashMap::new();
+        let mut project_paths: HashMap<String, PathBuf> = HashMap::new();
+        insert_cbm_project(&mut project_ids, &mut project_paths, &project_root_canon);
+        for extra in additional_roots {
+            // Canonicalize lazily; skip roots that don't exist on this machine
+            // (mirrors `resolve_file_path_checked`'s tolerant additional_roots).
+            if let Ok(extra_canon) = extra.canonicalize() {
+                if !project_ids.contains_key(&extra_canon) {
+                    insert_cbm_project(&mut project_ids, &mut project_paths, &extra_canon);
+                }
+            }
+        }
 
         let client = if config.enabled {
             match binary_path {
@@ -211,11 +254,6 @@ impl GraphBridge {
             None
         };
 
-        // Canonicalize the project root for use as the disk-cache partition key.
-        let project_root_canon = project_root
-            .canonicalize()
-            .unwrap_or_else(|_| project_root.to_path_buf());
-
         let is_available = client.is_some();
         let mut bridge = Self {
             status: if is_available {
@@ -226,8 +264,10 @@ impl GraphBridge {
             client: Arc::new(Mutex::new(client)),
             cache: DashMap::new(),
             cache_ttl: config.cache_ttl,
-            project: Some(project_name),
+            project: project_ids.get(&project_root_canon).cloned(),
             project_root: project_root_canon,
+            project_ids,
+            project_paths,
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(HashMap::new())),
@@ -246,7 +286,7 @@ impl GraphBridge {
         // constructed, so by the time a request arrives the graph is ready (or
         // `ensure_indexed()` reports `StillIndexing` and the agent retries).
         if is_available {
-            bridge.start_indexing();
+            bridge.start_indexing_roots();
         }
 
         bridge
@@ -262,11 +302,16 @@ impl GraphBridge {
     /// so cached results from the previous project are never served to the
     /// new project (the disk cache is project-partitioned and remains).
     pub fn set_project(&mut self, project: &str) {
-        let changed = self.project.as_deref() != Some(project);
-        self.project = Some(project.to_string());
+        // Resolve the requested identity to CBM's canonical slug (path, known
+        // root basename, or literal slug). A raw dirname must never become a
+        // divergent CBM project ID.
+        let resolved = self.resolve_project_id(project);
+        let changed = self.project.as_deref() != Some(resolved.as_str());
+        self.project = Some(resolved.clone());
         if changed {
             self.cache.clear();
         }
+        self.ensure_tracked(&resolved);
     }
 
     /// Switch the active workspace (multi-repo support).
@@ -284,19 +329,18 @@ impl GraphBridge {
         if self.project_root == root_canon {
             return;
         }
+        // Resolve the new root's canonical CBM slug: known configured root → its
+        // canonical project ID; otherwise derive + register on demand (multi-repo).
+        let slug = if let Some(s) = self.project_ids.get(&root_canon) {
+            s.clone()
+        } else {
+            insert_cbm_project(&mut self.project_ids, &mut self.project_paths, &root_canon)
+        };
         self.project_root = root_canon;
-        let name = self
-            .project_root
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "default".to_string());
-        self.project = Some(name.clone());
+        self.project = Some(slug.clone());
         self.cache.clear();
-        // Reset only this project's indexing state so it re-indexes on the
-        // next query; unrelated projects' states are preserved.
-        if let Ok(mut states) = self.indexing_state.lock() {
-            states.remove(&name);
-        }
+        // A root introduced at runtime starts indexing immediately when usable.
+        self.ensure_tracked(&slug);
     }
     pub fn status(&self) -> &CbmStatus {
         &self.status
@@ -394,8 +438,14 @@ impl GraphBridge {
     /// that performs the actual `index_repository(repo_path, "fast")` pipe I/O,
     /// then transitions the state to `Complete` or `Failed`. The thread flips
     /// the circuit breaker via `record_failure()` on error.
-    fn start_indexing(&mut self) {
-        let project = self.project_str();
+    fn start_indexing_for(&mut self, project: &str) {
+        let project_owned = project.to_string();
+        let repo_path = self
+            .project_paths
+            .get(project)
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| self.project_root.to_string_lossy().into_owned());
+        let project_for_spawn = project_owned.clone();
 
         // Mark as in-progress before spawning (so concurrent calls see it).
         {
@@ -404,7 +454,7 @@ impl GraphBridge {
                 .lock()
                 .unwrap_or_else(|p| p.into_inner());
             let state = states
-                .entry(project.clone())
+                .entry(project_owned.clone())
                 .or_insert(IndexingState::NotStarted);
             *state = IndexingState::InProgress {
                 started_at: Instant::now(),
@@ -415,14 +465,12 @@ impl GraphBridge {
         let client_arc = Arc::clone(&self.client);
         let state_arc = Arc::clone(&self.indexing_state);
         let _status = self.status.clone();
-        let repo_path = self.project_root.to_string_lossy().to_string();
 
         // Spawn background indexing thread.
         std::thread::Builder::new()
             .name("cbm-indexer".into())
             .spawn(move || {
-                eprintln!("[clean-ctx-cbm] Background indexing started for: {project}");
-
+                eprintln!("[clean-ctx-cbm] Background indexing started for: {project_for_spawn}");
                 let result = {
                     let mut client_guard = match client_arc.lock() {
                         Ok(g) => g,
@@ -461,7 +509,7 @@ impl GraphBridge {
                     }
                 };
                 let s = states
-                    .entry(project.clone())
+                    .entry(project_for_spawn.clone())
                     .or_insert(IndexingState::NotStarted);
                 match result {
                     Ok(()) => {
@@ -479,6 +527,22 @@ impl GraphBridge {
                 }
             })
             .ok();
+    }
+    /// Start indexing for every configured root (primary + additional).
+    ///
+    /// Called from `try_create_with_roots()` when CBM is available, so all
+    /// roots begin indexing immediately at construction. Each root is tracked
+    /// under its own canonical CBM slug; one root remaining `StillIndexing`
+    /// never blocks another root that is already `Complete`.
+    pub(crate) fn start_indexing_roots(&mut self) {
+        let slugs: Vec<String> = self.project_ids.values().cloned().collect();
+        let mut started: Vec<String> = Vec::new();
+        for slug in &slugs {
+            if !started.contains(slug) {
+                self.start_indexing_for(slug);
+                started.push(slug.clone());
+            }
+        }
     }
 
     /// Ensure the project is indexed before issuing queries.
@@ -532,6 +596,113 @@ impl GraphBridge {
         }
     }
 
+    /// Resolve a caller-supplied project reference to the canonical CBM project slug.
+    ///
+    /// Resolution order:
+    ///   1. If `raw` looks like a path (or canonicalizes to an existing path),
+    ///      canonicalize and map through the authoritative root→slug map; derive+register on miss.
+    ///   2. If `raw` is a known project slug → it is used as-is.
+    ///   3. If `raw` matches a configured root's directory basename → that root's canonical slug.
+    ///   4. Otherwise the literal string is treated as a CBM slug (CBM itself will
+    ///      authoritatively reject it if it has no such project).
+    pub fn resolve_project_id(&self, raw: &str) -> String {
+        let trimmed = raw.trim();
+
+        // 1. Path-like (Windows/Linux separators or a canonicalizable existing path).
+        if trimmed.contains('/')
+            || trimmed.contains('\\')
+            || trimmed.contains(':')
+            || Path::new(trimmed).canonicalize().is_ok()
+        {
+            let canon = Path::new(trimmed)
+                .canonicalize()
+                .unwrap_or_else(|_| Path::new(trimmed).to_path_buf());
+            if let Some(slug) = self.project_ids.get(&canon) {
+                return slug.clone();
+            }
+            // Unknown path: derive its canonical slug WITHOUT registering it —
+            // this method is identity-resolution only (and takes `&self` so the
+            // proxy can call it). Registration happens in `set_workspace_root`.
+            return cbm_project_slug(&canon);
+        }
+
+        // 2. Literal known slug.
+        if self.project_paths.contains_key(trimmed) {
+            return trimmed.to_string();
+        }
+
+        // 3. A configured root's basename (e.g. "RustContextLayerAI" → primary slug).
+        for (root, slug) in &self.project_ids {
+            if root.file_name().map(|n| n.to_string_lossy().into_owned())
+                == Some(trimmed.to_string())
+            {
+                return slug.clone();
+            }
+        }
+
+        // 4. Literal fallback.
+        trimmed.to_string()
+    }
+
+    /// Ensure a known root is tracked (has an indexing entry). If a root is
+    /// introduced at runtime with no entry, indexing starts for it when available.
+    fn ensure_tracked(&mut self, slug: &str) {
+        if self.project_paths.contains_key(slug) {
+            let already_gated = self.indexing_state().contains_key(slug);
+            if !already_gated && self.is_available() {
+                self.start_indexing_for(slug);
+            }
+        }
+    }
+    /// Report the indexing state of a specific CBM project.
+    ///
+    /// Used by `cbm_proxy` so readiness is resolved against the project actually
+    /// being queried. Semantics:
+    ///   - The active project delegates to `ensure_indexed()`.
+    ///   - A project that is NOT tracked (unknown slug) passes through as
+    ///     `Ready` — CBM returns its authoritative error if the project doesn't
+    ///     exist, so an unrelated/unknown project can never dead-end in
+    ///     `StillIndexing{0}` forever.
+    ///   - A tracked root reports its own per-project state (`Complete`→`Ready`,
+    ///     `InProgress`→`StillIndexing`, `Failed`→`Err`, `NotStarted`→`StillIndexing{0}`).
+    pub fn ensure_indexed_for(&mut self, project: &str) -> Result<IndexingStatus, CbmError> {
+        // Guard before touching any state: when CBM is unavailable, return the
+        // same error on every call (AUDIT-9 regression).
+        if !self.is_available() {
+            return Err(CbmError::LaunchError("CBM not available".into()));
+        }
+        if self.project.as_deref() != Some(project) {
+            // Not the active project. Unknown/untracked projects pass through.
+            if !self.project_paths.contains_key(project) {
+                return Ok(IndexingStatus::Ready);
+            }
+            let mut states = self
+                .indexing_state
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
+            let state = states
+                .entry(project.to_string())
+                .or_insert(IndexingState::NotStarted);
+            return match state {
+                IndexingState::Complete => Ok(IndexingStatus::Ready),
+                IndexingState::InProgress { started_at } => {
+                    let elapsed = started_at.elapsed().as_secs();
+                    if elapsed > 60 {
+                        *state = IndexingState::Failed("indexing timed out after 60s".into());
+                        Err(CbmError::LaunchError("indexing timed out".into()))
+                    } else {
+                        Ok(IndexingStatus::StillIndexing {
+                            elapsed_secs: elapsed,
+                        })
+                    }
+                }
+                IndexingState::Failed(msg) => Err(CbmError::LaunchError(msg.clone())),
+                IndexingState::NotStarted => Ok(IndexingStatus::StillIndexing { elapsed_secs: 0 }),
+            };
+        }
+        // Active project → the active gate.
+        self.ensure_indexed()
+    }
     /// Access the indexing state map for inspection (e.g., get_cbm_status handler).
     pub fn indexing_state(&self) -> std::sync::MutexGuard<'_, HashMap<String, IndexingState>> {
         self.indexing_state
@@ -539,8 +710,14 @@ impl GraphBridge {
             .unwrap_or_else(|p| p.into_inner())
     }
 
-    /// Resolve project name, using explicit if set, else auto-detected.
-    fn project_str(&self) -> String {
+    /// Resolve the ACTIVE project's canonical CBM slug.
+    ///
+    /// Since the canonical-identity fix, this is always a CBM-canonical path
+    /// slug (never a directory basename). Used as:
+    ///   - the `project` argument on every CBM tool call,
+    ///   - the `indexing_state` key for readiness gating,
+    ///   - the disk-cache partition label.
+    pub(crate) fn project_str(&self) -> String {
         self.project
             .clone()
             .unwrap_or_else(|| "default".to_string())
@@ -1256,6 +1433,62 @@ impl GraphBridge {
     }
 }
 
+/// Derive CBM's canonical project ID from a repository path.
+///
+/// Verified against the CBM 0.8.1 wire contract (`index_repository` response +
+/// `list_projects`):
+///   - `C:/Users/MNasty/Desktop/RustContextLayerAI`
+///     → `C-Users-MNasty-Desktop-RustContextLayerAI`
+///   - `C:/Users/MNasty/AppData/Local/Temp/CleanCtx_Probe.Repo`
+///     → `C-Users-MNasty-AppData-Local-Temp-CleanCtx_Probe.Repo` (dots/underscores kept)
+///   - `C:/Users/MNasty/AppData/Local/Temp/My space_probe`
+///     → `C-Users-MNasty-AppData-Local-Temp-My-space_probe` (space → dash)
+///
+/// Algorithm: every character outside `[A-Za-z0-9._-]` becomes `-`, runs of
+/// `-` collapse, and leading/trailing `-` are trimmed. The directory basename
+/// is NEVER used as a project ID.
+pub(crate) fn cbm_project_slug(canonical_root: &Path) -> String {
+    let raw = canonical_root.to_string_lossy();
+    let mut out = String::with_capacity(raw.len());
+    let mut last_dash = false;
+    for c in raw.chars() {
+        if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
+            out.push(c);
+            last_dash = false;
+        } else if !last_dash && !out.is_empty() {
+            out.push('-');
+            last_dash = true;
+        } else if out.is_empty() {
+            // Leading separator — skip without emitting a dash.
+            last_dash = true;
+        }
+    }
+    while out.ends_with('-') {
+        out.pop();
+    }
+    if out.is_empty() {
+        "default".to_string()
+    } else {
+        out
+    }
+}
+
+/// Register a repository root in the bridge's authoritative identity maps.
+///
+/// Returns the canonical CBM slug for `root`. Both maps are updated:
+/// `project_ids` (root → slug) and `project_paths` (slug → root), so indexing,
+/// readiness checks, queries, and proxy calls all resolve to one identity.
+fn insert_cbm_project(
+    project_ids: &mut HashMap<PathBuf, String>,
+    project_paths: &mut HashMap<String, PathBuf>,
+    root: &Path,
+) -> String {
+    let slug = cbm_project_slug(root);
+    project_paths.insert(slug.clone(), root.to_path_buf());
+    project_ids.insert(root.to_path_buf(), slug.clone());
+    slug
+}
+
 fn resolve_cbm_binary(config: &CbmConfig) -> Option<PathBuf> {
     // 1. Config path (explicit user override)
     if let Some(ref path) = config.binary_path {
@@ -1429,6 +1662,8 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(states)),
+            project_ids: HashMap::new(),
+            project_paths: HashMap::new(),
             last_error: None,
         };
         // Pre-seed the symbol_importance cache entry
@@ -1468,6 +1703,8 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(HashMap::new())),
+            project_ids: HashMap::new(),
+            project_paths: HashMap::new(),
             last_error: None,
         };
         // Seed a cache entry so is_available() is true (client is None).
@@ -1506,6 +1743,8 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(states)),
+            project_ids: HashMap::new(),
+            project_paths: HashMap::new(),
             last_error: None,
         };
         let ttl = Duration::from_secs(3600);

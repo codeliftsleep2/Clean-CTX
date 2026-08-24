@@ -283,7 +283,8 @@ impl McpState {
         // (avoiding after-move borrows).
         let cbm_config = config.cbm.clone();
         let project_root = crate::mcp::server::find_project_root().clone();
-        let (graph_bridge, cbm_status) = Self::init_cbm_bridge(&cbm_config, &project_root);
+        let (graph_bridge, cbm_status) =
+            Self::init_cbm_bridge(&cbm_config, &project_root, &config.additional_roots);
         let proxy_port = config.proxy.port;
 
         Self {
@@ -327,8 +328,17 @@ impl McpState {
     fn init_cbm_bridge(
         cbm_config: &crate::cbm::CbmConfig,
         project_root: &std::path::Path,
+        additional_roots: &[String],
     ) -> (Option<crate::cbm::GraphBridge>, crate::cbm::CbmStatus) {
-        let mut bridge = crate::cbm::GraphBridge::try_create(cbm_config, project_root);
+        // Every configured additional root becomes its own CBM project: one
+        // subprocess, one async index per root, each tracked under its own
+        // canonical CBM slug (see `GraphBridge::try_create_with_roots`).
+        let extras: Vec<std::path::PathBuf> = additional_roots
+            .iter()
+            .map(std::path::PathBuf::from)
+            .collect();
+        let mut bridge =
+            crate::cbm::GraphBridge::try_create_with_roots(cbm_config, project_root, &extras);
 
         // Resolve the disk-cache DB path by scope precedence.
         let cache_db_path = cbm_config
