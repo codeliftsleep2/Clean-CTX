@@ -87,9 +87,13 @@ fn expired_cache_entry_is_evicted() {
     );
 
     // get_symbol_importance_mut calls check_cache("symbol_importance")
-    // which finds the expired entry, evicts it, then fails the query
+    // which finds the expired entry, evicts it, then fails the query.
+    // F11: the failure now propagates as Err instead of an empty map.
     let result = bridge.get_symbol_importance_mut();
-    assert!(result.is_empty(), "Should return empty map with no CBM");
+    assert!(
+        result.is_err(),
+        "F11: failed query must be Err, not a fake-empty Ok"
+    );
     // The expired entry must be gone from cache
     assert!(
         bridge.cache.get("symbol_importance").is_none(),
@@ -373,10 +377,12 @@ fn circuit_breaker_opens_after_three_failures() {
         "Bridge should mimic circuit-open state when CBM disabled"
     );
 
-    // All queries should return empty (graceful degradation)
-    assert!(bridge.get_symbol_importance_mut().is_empty());
-    assert!(bridge.get_dead_code().is_empty());
-    assert!(bridge.get_architecture().is_none());
+    // F11: intel queries propagate failures as Err; the user-facing
+    // wrappers (search/trace) keep their graceful empty + take_last_error
+    // behavior, which handlers translate into error responses.
+    assert!(bridge.get_symbol_importance_mut().is_err());
+    assert!(bridge.get_dead_code().is_err());
+    assert!(bridge.get_architecture().is_err());
     assert!(bridge.search("test").is_empty());
     assert!(bridge.trace_path("a", "b").is_empty());
 
@@ -447,7 +453,9 @@ fn p0_2_regression_mock_returns_cached_data() {
     );
 
     let mut bridge = new_mock(data);
-    let result = bridge.get_symbol_importance_mut();
+    let result = bridge
+        .get_symbol_importance_mut()
+        .expect("cached importance must hydrate without error");
     assert_eq!(result.len(), 1, "Should return 1 cached symbol");
     assert!(
         result.contains_key("UserService"),
@@ -488,18 +496,19 @@ fn test_get_call_edges_from_cache() {
             ("CallerA".into(), "CalleeB".into()),
             ("CallerC".into(), "CalleeD".into()),
         ],
-        vec![],
         std::collections::HashMap::new(),
         vec![],
     );
-    let edges = bridge.get_call_edges();
+    let edges = bridge
+        .get_call_edges()
+        .expect("cached call_edges must hydrate without error");
     assert_eq!(edges.len(), 2);
     assert!(edges.contains(&("CallerA".into(), "CalleeB".into())));
     assert!(edges.contains(&("CallerC".into(), "CalleeD".into())));
 }
 
 #[test]
-fn test_get_call_edges_unavailable_returns_empty() {
+fn test_get_call_edges_unavailable_is_error() {
     use crate::cbm::GraphBridge;
     use crate::cbm::config::CbmConfig;
     let config = CbmConfig {
@@ -507,40 +516,15 @@ fn test_get_call_edges_unavailable_returns_empty() {
         ..Default::default()
     };
     let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
-    assert!(bridge.get_call_edges().is_empty());
-}
-
-// ── I-B8: get_dataflow_edges ────────────────────────────────────────
-
-#[test]
-fn test_get_dataflow_edges_from_cache() {
-    use crate::cbm::bridge::test_helpers::new_mock_with_edges;
-    let mut bridge = new_mock_with_edges(
-        vec![],
-        vec![
-            ("M1".into(), "T1".into(), "reads".into()),
-            ("M2".into(), "T2".into(), "writes".into()),
-        ],
-        std::collections::HashMap::new(),
-        vec![],
+    assert!(
+        bridge.get_call_edges().is_err(),
+        "F11: unavailable CBM must be Err, not empty Ok"
     );
-    let edges = bridge.get_dataflow_edges();
-    assert_eq!(edges.len(), 2);
-    assert!(edges.contains(&("M1".into(), "T1".into(), "reads".into())));
-    assert!(edges.contains(&("M2".into(), "T2".into(), "writes".into())));
 }
 
-#[test]
-fn test_get_dataflow_edges_unavailable_returns_empty() {
-    use crate::cbm::GraphBridge;
-    use crate::cbm::config::CbmConfig;
-    let config = CbmConfig {
-        enabled: false,
-        ..Default::default()
-    };
-    let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
-    assert!(bridge.get_dataflow_edges().is_empty());
-}
+// ── F10: get_dataflow_edges was REMOVED (CBM 0.8.1 has no DATAFLOW edge
+// type and USAGE/WRITES are not equivalents). The reintroduction guard
+// lives in src/tests/cbm/graph_intel.rs.
 
 // ── I-B10: resolve_cross_language_endpoint ──────────────────────────
 

@@ -283,8 +283,10 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
     if !ensure_indexed_or_error(id, bridge) {
         return;
     }
+    // F11: get_architecture now returns Result — failures are translated
+    // into an error response instead of being conflated with empty data.
     match bridge.get_architecture() {
-        Some(arch) => {
+        Ok(arch) => {
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": {
@@ -294,28 +296,15 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
                 }
             }));
         }
-        None => {
-            // Distinguish "query failed" (surface the error) from a genuine
-            // empty architecture (report 0 modules).
-            if let Some(err) = bridge.take_last_error() {
-                send_response(&serde_json::json!({
-                    "jsonrpc": "2.0", "id": id,
-                    "result": {
-                        "content": [{ "type": "text", "text": format!("CBM architecture query failed: {err}") }],
-                        "error": err.to_string(),
-                        "cbm_status": status.summary()
-                    }
-                }));
-            } else {
-                send_response(&serde_json::json!({
-                    "jsonrpc": "2.0", "id": id,
-                    "result": {
-                        "content": [{ "type": "text", "text": "Architecture overview not available." }],
-                        "modules": [], "dependencies": [],
-                        "cbm_status": status.summary()
-                    }
-                }));
-            }
+        Err(err) => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": format!("CBM architecture query failed: {err}") }],
+                    "error": err.to_string(),
+                    "cbm_status": status.summary()
+                }
+            }));
         }
     }
 }

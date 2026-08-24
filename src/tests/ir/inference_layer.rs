@@ -678,18 +678,6 @@ fn test_enrich_from_cbm_populates_edges_and_annotations() {
             ("CallerA".to_string(), "CalleeB".to_string()),
             ("CallerC".to_string(), "CalleeD".to_string()),
         ],
-        vec![
-            (
-                "MethodX".to_string(),
-                "TargetY".to_string(),
-                "reads".to_string(),
-            ),
-            (
-                "MethodZ".to_string(),
-                "TargetW".to_string(),
-                "writes".to_string(),
-            ),
-        ],
         {
             let mut m = HashMap::new();
             m.insert(
@@ -710,10 +698,12 @@ fn test_enrich_from_cbm_populates_edges_and_annotations() {
     );
 
     let mut layer = InferenceLayer::new();
-    layer.enrich_from_cbm(Some(&mut bridge));
+    layer
+        .enrich_from_cbm(Some(&mut bridge))
+        .expect("mock-backed enrichment must succeed");
 
-    // 2 call edges + 2 dataflow edges
-    assert_eq!(layer.inferred_edges.len(), 4);
+    // F10: only CALLS edges exist now (DATAFLOW removed with CBM 0.8.1).
+    assert_eq!(layer.inferred_edges.len(), 2);
 
     // All CBM-derived edges have confidence 0.75 and source Cbm
     for edge in &layer.inferred_edges {
@@ -739,25 +729,6 @@ fn test_enrich_from_cbm_populates_edges_and_annotations() {
             .any(|e| e.from == "CallerC" && e.to == "CalleeD")
     );
 
-    // Verify dataflow edges (reads → DataFlowRead, writes → DataFlowWrite)
-    let reads: Vec<&InferenceEdge> = layer
-        .inferred_edges
-        .iter()
-        .filter(|e| e.edge_type == InferenceEdgeType::DataFlowRead)
-        .collect();
-    assert_eq!(reads.len(), 1);
-    assert_eq!(reads[0].from, "MethodX");
-    assert_eq!(reads[0].to, "TargetY");
-
-    let writes: Vec<&InferenceEdge> = layer
-        .inferred_edges
-        .iter()
-        .filter(|e| e.edge_type == InferenceEdgeType::DataFlowWrite)
-        .collect();
-    assert_eq!(writes.len(), 1);
-    assert_eq!(writes[0].from, "MethodZ");
-    assert_eq!(writes[0].to, "TargetW");
-
     // Verify importance annotation
     let imp = layer.all_annotations_for("Sym1");
     assert_eq!(imp.len(), 1);
@@ -778,25 +749,56 @@ fn test_enrich_from_cbm_populates_edges_and_annotations() {
 #[test]
 fn test_enrich_from_cbm_none_bridge_is_noop() {
     let mut layer = InferenceLayer::new();
-    layer.enrich_from_cbm(None);
+    // Not applicable (no bridge) is Ok, not an error — invariant C2.
+    layer
+        .enrich_from_cbm(None)
+        .expect("None bridge is not a failure");
     assert!(layer.inferred_edges.is_empty());
     assert!(layer.annotations.is_empty());
 }
 
 #[test]
 fn test_enrich_from_cbm_empty_bridge_is_noop() {
-    let mut bridge = new_mock_with_edges(vec![], vec![], HashMap::new(), vec![]);
+    let mut bridge = new_mock_with_edges(vec![], HashMap::new(), vec![]);
     let mut layer = InferenceLayer::new();
-    layer.enrich_from_cbm(Some(&mut bridge));
+    layer
+        .enrich_from_cbm(Some(&mut bridge))
+        .expect("mock-backed enrichment must succeed");
     assert!(layer.inferred_edges.is_empty());
     assert!(layer.annotations.is_empty());
+}
+
+/// F11 PROPAGATION: when the CBM client fails (mock has no subprocess and
+/// no cached entries), `enrich_from_cbm` must return Err — it must NEVER
+/// convert the failure into an empty-but-successful enrichment.
+#[test]
+fn test_enrich_from_cbm_propagates_cbm_failure() {
+    use crate::cbm::bridge::test_helpers::new_mock_empty;
+
+    // new_mock_empty(): status Available, client None, cache empty → every
+    // intel query hits the missing client and returns Err.
+    let mut bridge = new_mock_empty();
+    assert!(
+        bridge.is_available(),
+        "fixture sanity: mock reports Available"
+    );
+
+    let mut layer = InferenceLayer::new();
+    let result = layer.enrich_from_cbm(Some(&mut bridge));
+    assert!(
+        result.is_err(),
+        "F11 REGRESSION: enrich_from_cbm swallowed a CBM failure into empty data"
+    );
+    assert!(
+        layer.inferred_edges.is_empty() && layer.annotations.is_empty(),
+        "a failed enrichment must not leave partial data behind"
+    );
 }
 
 #[test]
 fn test_enrich_from_cbm_does_not_duplicate_existing_edges() {
     let mut bridge = new_mock_with_edges(
         vec![("A".to_string(), "B".to_string())],
-        vec![],
         HashMap::new(),
         vec![],
     );
@@ -811,7 +813,9 @@ fn test_enrich_from_cbm_does_not_duplicate_existing_edges() {
         source: InferenceSource::Structural,
     });
 
-    layer.enrich_from_cbm(Some(&mut bridge));
+    layer
+        .enrich_from_cbm(Some(&mut bridge))
+        .expect("mock-backed enrichment must succeed");
 
     // 1 structural + 1 CBM edge
     assert_eq!(layer.inferred_edges.len(), 2);
@@ -827,55 +831,4 @@ fn test_enrich_from_cbm_does_not_duplicate_existing_edges() {
         .collect();
     assert_eq!(structural.len(), 1);
     assert_eq!(cbm.len(), 1);
-}
-
-#[test]
-fn test_enrich_from_cbm_direction_normalization() {
-    // CBM may report direction as "WRITES", "DATAFLOW_WRITE", "write_to",
-    // "READS", "DATAFLOW_READ", or even "DATAFLOW" (no direction info).
-    // Anything containing "write" (case-insensitive) is a write; everything
-    // else defaults to read.
-    let mut bridge = new_mock_with_edges(
-        vec![],
-        vec![
-            ("M1".to_string(), "T1".to_string(), "WRITES".to_string()),
-            (
-                "M2".to_string(),
-                "T2".to_string(),
-                "DATAFLOW_WRITE".to_string(),
-            ),
-            ("M3".to_string(), "T3".to_string(), "write_to".to_string()),
-            ("M4".to_string(), "T4".to_string(), "READS".to_string()),
-            ("M5".to_string(), "T5".to_string(), "DATAFLOW".to_string()),
-        ],
-        HashMap::new(),
-        vec![],
-    );
-
-    let mut layer = InferenceLayer::new();
-    layer.enrich_from_cbm(Some(&mut bridge));
-
-    assert_eq!(layer.inferred_edges.len(), 5);
-
-    let writes: Vec<&InferenceEdge> = layer
-        .inferred_edges
-        .iter()
-        .filter(|e| e.edge_type == InferenceEdgeType::DataFlowWrite)
-        .collect();
-    let reads: Vec<&InferenceEdge> = layer
-        .inferred_edges
-        .iter()
-        .filter(|e| e.edge_type == InferenceEdgeType::DataFlowRead)
-        .collect();
-
-    // "WRITES", "DATAFLOW_WRITE", "write_to" → 3 writes
-    assert_eq!(writes.len(), 3, "expected 3 write edges");
-    // "READS", "DATAFLOW" → 2 reads (DATAFLOW has no "write" substring)
-    assert_eq!(reads.len(), 2, "expected 2 read edges");
-
-    // Verify the write edges are from M1, M2, M3
-    let write_methods: Vec<&str> = writes.iter().map(|e| e.from.as_str()).collect();
-    assert!(write_methods.contains(&"M1"));
-    assert!(write_methods.contains(&"M2"));
-    assert!(write_methods.contains(&"M3"));
 }

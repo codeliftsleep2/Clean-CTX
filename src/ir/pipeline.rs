@@ -917,7 +917,19 @@ impl IRPass for InferenceLayerPass {
     fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
         let mut layer = InferenceLayer::new();
         let mut guard = self.cbm_bridge.lock().unwrap_or_else(|p| p.into_inner());
-        layer.enrich_from_cbm(guard.as_mut());
+        match layer.enrich_from_cbm(guard.as_mut()) {
+            Ok(()) => {}
+            // F11: enrichment failures propagate out of the layer and are
+            // owned here. CBM is a strictly-additive enrichment source
+            // (invariant C1/C2): a graph hiccup must never fail compilation,
+            // but it must also never be mistaken for "no enrichment data".
+            // Log loudly and continue with the un-enriched layer.
+            Err(e) => {
+                eprintln!(
+                    "[clean-ctx-ir] CBM inference enrichment failed — continuing without enrichment: {e}"
+                );
+            }
+        }
         state.inference_layer = Some(layer);
         Ok(())
     }

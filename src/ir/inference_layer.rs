@@ -138,25 +138,36 @@ impl InferenceLayer {
     /// Enrich this layer with CBM knowledge-graph data.
     ///
     /// R-43b Phase 3: Consumed by `InferenceLayerPass` (Pass 6) after local
-    /// graph construction. No-op when the bridge is `None` or unavailable.
+    /// graph construction. A `None` bridge or an unavailable bridge is not
+    /// an error — enrichment is simply not applicable and `Ok(())` is
+    /// returned (invariant C2).
     ///
-    /// All CBM-derived edges and annotations carry `confidence = 0.75` and
-    /// `source = InferenceSource::Cbm` (invariant C3). This method never
-    /// writes into the core `CoreOp` instruction stream (invariant C1).
+    /// AUDIT FIX (F11): CBM failures now propagate as [`CbmError::Err`].
+    /// The layer NEVER converts a CBM failure into empty data — callers own
+    /// the failure policy. All CBM-derived edges and annotations carry
+    /// `confidence = 0.75` and `source = InferenceSource::Cbm`
+    /// (invariant C3). This method never writes into the core `CoreOp`
+    /// instruction stream (invariant C1).
     ///
     /// Populates:
     ///   - Cross-file CALLS edges → `inferred_edges`
-    ///   - Cross-file DATAFLOW edges → `inferred_edges` (reads/writes)
     ///   - Symbol importance → `annotations["importance"]`
     ///   - Dead code → `annotations["dead_code"]`
-    pub fn enrich_from_cbm(&mut self, bridge: Option<&mut GraphBridge>) {
+    ///
+    /// DATAFLOW edges are NOT populated: the edge type does not exist in
+    /// CBM 0.8.1 (see the F10 limitation note in `GraphBridge`).
+    pub fn enrich_from_cbm(
+        &mut self,
+        bridge: Option<&mut GraphBridge>,
+    ) -> Result<(), crate::cbm::client::CbmError> {
         let bridge = match bridge {
             Some(b) if b.is_available() => b,
-            _ => return,
+            // Not applicable — not a failure.
+            _ => return Ok(()),
         };
 
         // Cross-file CALLS edges (confidence = 0.75)
-        for (caller, callee) in bridge.get_call_edges() {
+        for (caller, callee) in bridge.get_call_edges()? {
             self.inferred_edges.push(InferenceEdge {
                 edge_type: InferenceEdgeType::Calls,
                 from: caller,
@@ -166,28 +177,8 @@ impl InferenceLayer {
             });
         }
 
-        // Cross-file DATAFLOW edges (confidence = 0.75)
-        for (method, target, direction) in bridge.get_dataflow_edges() {
-            // Robust direction detection: CBM may report the relationship
-            // label as "reads"/"writes" (lowercase), "READ"/"WRITE",
-            // "DATAFLOW_READ"/"DATAFLOW_WRITE", or "write_to"/"read_from".
-            // Anything containing "write" (case-insensitive) is a write.
-            let edge_type = if direction.to_ascii_lowercase().contains("write") {
-                InferenceEdgeType::DataFlowWrite
-            } else {
-                InferenceEdgeType::DataFlowRead
-            };
-            self.inferred_edges.push(InferenceEdge {
-                edge_type,
-                from: method,
-                to: target,
-                confidence: 0.75,
-                source: InferenceSource::Cbm,
-            });
-        }
-
         // Symbol importance (confidence = 0.75)
-        for (name, info) in bridge.get_symbol_importance_mut() {
+        for (name, info) in bridge.get_symbol_importance_mut()? {
             self.annotations
                 .entry(name)
                 .or_default()
@@ -200,7 +191,7 @@ impl InferenceLayer {
         }
 
         // Dead code (confidence = 0.75)
-        for entry in bridge.get_dead_code() {
+        for entry in bridge.get_dead_code()? {
             self.annotations
                 .entry(entry.symbol.clone())
                 .or_default()
@@ -211,6 +202,8 @@ impl InferenceLayer {
                     source: InferenceSource::Cbm,
                 });
         }
+
+        Ok(())
     }
 }
 

@@ -6,3 +6,4 @@
 mod regression;
 mod integration;
 mod e2e;
+mod graph_intel;

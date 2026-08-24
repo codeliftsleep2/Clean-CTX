@@ -793,9 +793,14 @@ impl GraphBridge {
             .unwrap_or_else(|| "default".to_string())
     }
 
-    pub fn get_symbol_importance_mut(&mut self) -> HashMap<String, SymbolImportance> {
+    /// Per-symbol importance scores derived from CBM caller counts.
+    ///
+    /// Errors (CBM unavailable / failed / rejected the query) propagate as
+    /// [`CbmError::Err`] — an `Ok(map)` is always a valid, complete result.
+    pub fn get_symbol_importance_mut(
+        &mut self,
+    ) -> Result<HashMap<String, SymbolImportance>, CbmError> {
         let key = "symbol_importance".to_string();
-        let project = self.project_str();
         if self.check_cache(&key) {
             return serde_json::from_value(
                 self.cache
@@ -805,40 +810,45 @@ impl GraphBridge {
                     .data
                     .clone(),
             )
-            .unwrap_or_default();
+            .map_err(|e| CbmError::ParseError(format!("cached symbol_importance: {e}")));
         }
-        let result = self.query(move |c| c.get_symbol_importance(&project, Some(1)));
-        match result {
-            Ok(symbols) => {
-                let map: HashMap<_, _> = symbols
-                    .iter()
-                    .filter_map(|e| {
-                        Some((
-                            e["name"].as_str()?.to_string(),
-                            SymbolImportance {
-                                symbol: e["name"].as_str()?.to_string(),
-                                score: e["importance"].as_f64().unwrap_or(0.0),
-                                file: e["file"].as_str().unwrap_or("").to_string(),
-                            },
-                        ))
-                    })
-                    .collect();
-                self.cache_insert(&key, &map);
-                map
-            }
-            Err(_) => HashMap::new(),
-        }
+        let project = self.project_str();
+        let symbols = self.query(move |c| c.get_symbol_importance(&project, Some(1)))?;
+        let map: HashMap<_, _> = symbols
+            .iter()
+            .filter_map(|e| {
+                Some((
+                    e["name"].as_str()?.to_string(),
+                    SymbolImportance {
+                        symbol: e["name"].as_str()?.to_string(),
+                        score: e["importance"].as_f64().unwrap_or(0.0),
+                        file: e["file"].as_str().unwrap_or("").to_string(),
+                    },
+                ))
+            })
+            .collect();
+        self.cache_insert(&key, &map);
+        Ok(map)
     }
 
-    /// Blast radius query at depth 1. Uses CBM Cypher to find callers of a symbol.
+    /// Blast radius at depth 1: files containing direct callers of a symbol.
     ///
     /// H-01/M-04 fix: Replaced invalid `search_graph` name_pattern with valid Cypher
     /// query_graph call. Previous code passed `"depends_on:{sym}"` as a name_pattern
     /// regex, which CBM treated literally and returned zero matches.
-    pub fn get_blast_radius(&mut self, symbol: &str, _depth: usize) -> Vec<String> {
+    ///
+    /// AUDIT FIX (F1): the WHERE clause previously referenced an undeclared
+    /// variable (`m.name`) — live CBM fail-opens on invalid WHERE clauses and
+    /// returned EVERY CALLS edge in the project as the "blast radius".
+    ///
+    /// `_depth` is accepted for API compatibility; CBM's single-hop CALLS
+    /// match is depth 1.
+    pub fn get_blast_radius(
+        &mut self,
+        symbol: &str,
+        _depth: usize,
+    ) -> Result<Vec<String>, CbmError> {
         let key = format!("blast:{symbol}");
-        let project = self.project_str();
-        let sym = symbol.to_string();
         if self.check_cache(&key) {
             return serde_json::from_value(
                 self.cache
@@ -848,29 +858,40 @@ impl GraphBridge {
                     .data
                     .clone(),
             )
-            .unwrap_or_default();
+            .map_err(|e| CbmError::ParseError(format!("cached blast radius: {e}")));
         }
-        let escaped = sym.replace('\'', "\\'");
+        let escaped = symbol.replace('\'', "\\'");
         let cypher = format!(
-            "MATCH (caller:Function)-[:CALLS]->(f:Function) WHERE m.name = '{escaped}' RETURN caller.name, caller.file_path"
+            "MATCH (caller:Function)-[:CALLS]->(f:Function) WHERE f.name = '{escaped}' RETURN caller.name, caller.file_path"
         );
-        let result = self.query(move |c| c.query_graph(&cypher, &project));
-        match result {
-            Ok(rows) => {
-                let files: Vec<_> = rows
-                    .iter()
-                    .filter_map(|r| r.get(1).and_then(|v| v.as_str().map(String::from)))
-                    .collect();
-                self.cache_insert(&key, &files);
-                files
-            }
-            Err(_) => vec![],
-        }
+        let project = self.project_str();
+        let rows = self.query(move |c| c.query_graph(&cypher, &project))?;
+        let files: Vec<_> = rows
+            .iter()
+            .filter_map(|r| r.get(1).and_then(|v| v.as_str().map(String::from)))
+            .collect();
+        self.cache_insert(&key, &files);
+        Ok(files)
     }
 
-    pub fn get_dead_code(&mut self) -> Vec<DeadCodeEntry> {
+    /// Dead-code candidates: `Function` and `Method` nodes with no callers
+    /// that are not entry points.
+    ///
+    /// AUDIT FIX (F3): only `(f:Function)` was scanned, so dead class
+    /// methods — the majority of TS/C#/Java symbols — were invisible.
+    /// CBM 0.8.1's Cypher dialect has no verified UNION support here, so
+    /// both labels are queried separately and merged (functions first).
+    ///
+    /// An `Ok(vec![])` means the graph genuinely has no dead candidates;
+    /// failures propagate as [`CbmError::Err`].
+    pub fn get_dead_code(&mut self) -> Result<Vec<DeadCodeEntry>, CbmError> {
+        const DEAD_CODE_CYPHER: fn(&str) -> String = |label| {
+            format!(
+                "MATCH (n:{label}) WHERE n.in_degree = 0 AND n.is_entry_point = false \
+                     RETURN n.name, n.file_path"
+            )
+        };
         let key = "dead_code".to_string();
-        let project = self.project_str();
         if self.check_cache(&key) {
             return serde_json::from_value(
                 self.cache
@@ -880,26 +901,31 @@ impl GraphBridge {
                     .data
                     .clone(),
             )
-            .unwrap_or_default();
+            .map_err(|e| CbmError::ParseError(format!("cached dead_code: {e}")));
         }
-        let result = self.query(move |c| c.get_dead_code(&project));
-        match result {
-            Ok(entries) => {
-                let dead: Vec<DeadCodeEntry> = entries
-                    .iter()
-                    .filter_map(|e| {
-                        Some(DeadCodeEntry {
-                            symbol: e["name"].as_str()?.to_string(),
-                            file: e["file"].as_str().unwrap_or("").to_string(),
-                            reason: e["reason"].as_str().unwrap_or("unknown").to_string(),
-                        })
-                    })
-                    .collect();
-                self.cache_insert(&key, &dead);
-                dead
+        let project = self.project_str();
+        let mut entries = Vec::new();
+        for label in ["Function", "Method"] {
+            let rows = self.query({
+                let project = project.clone();
+                move |c| c.query_graph(&DEAD_CODE_CYPHER(label), &project)
+            })?;
+            for row in &rows {
+                if let Some(name) = row.first().and_then(|v| v.as_str()) {
+                    entries.push(DeadCodeEntry {
+                        symbol: name.to_string(),
+                        file: row
+                            .get(1)
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        reason: "no callers".to_string(),
+                    });
+                }
             }
-            Err(_) => vec![],
         }
+        self.cache_insert(&key, &entries);
+        Ok(entries)
     }
 
     /// Get all CALLS edges from CBM's knowledge graph.
@@ -907,9 +933,8 @@ impl GraphBridge {
     ///
     /// R-43b Phase 3: Consumed by `InferenceLayer::enrich_from_cbm()` to
     /// populate cross-file call edges (confidence = 0.75). Cached with TTL.
-    pub fn get_call_edges(&mut self) -> Vec<(String, String)> {
+    pub fn get_call_edges(&mut self) -> Result<Vec<(String, String)>, CbmError> {
         let key = "call_edges".to_string();
-        let project = self.project_str();
         if self.check_cache(&key) {
             return serde_json::from_value(
                 self.cache
@@ -919,37 +944,55 @@ impl GraphBridge {
                     .data
                     .clone(),
             )
-            .unwrap_or_default();
+            .map_err(|e| CbmError::ParseError(format!("cached call_edges: {e}")));
         }
         let cypher = "MATCH (a:Function)-[:CALLS]->(b:Function) RETURN a.name, b.name".to_string();
-        let result = self.query(move |c| c.query_graph(&cypher, &project));
-        match result {
-            Ok(rows) => {
-                let edges: Vec<(String, String)> = rows
-                    .iter()
-                    .filter_map(|r| {
-                        let from = r.first()?.as_str()?.to_string();
-                        let to = r.get(1)?.as_str()?.to_string();
-                        Some((from, to))
-                    })
-                    .collect();
-                self.cache_insert(&key, &edges);
-                edges
-            }
-            Err(_) => vec![],
-        }
+        let project = self.project_str();
+        let rows = self.query(move |c| c.query_graph(&cypher, &project))?;
+        let edges: Vec<(String, String)> = rows
+            .iter()
+            .filter_map(|r| {
+                let from = r.first()?.as_str()?.to_string();
+                let to = r.get(1)?.as_str()?.to_string();
+                Some((from, to))
+            })
+            .collect();
+        self.cache_insert(&key, &edges);
+        Ok(edges)
     }
 
-    /// Get all dataflow edges from CBM's knowledge graph.
-    /// Returns `(method, target, direction)` triples where direction is
-    /// "reads" or "writes".
+    // ── CBM 0.8.1 LIMITATION (AUDIT F10) ────────────────────────────
+    //
+    // The former `get_dataflow_edges()` queried edge type `DATAFLOW`,
+    // which does not exist in CBM 0.8.1's schema (edge types: USAGE,
+    // DEFINES, CALLS, DECORATES, DEFINES_METHOD, TESTS, WRITES,
+    // CONFIGURES, IMPORTS — verified via get_graph_schema on a live
+    // index). It therefore always returned an empty result and was
+    // removed rather than left as a silently-dead query path.
+    //
+    // Why USAGE/WRITES are NOT substitutes:
+    //   - `USAGE` is reference tracking (`callee` property), not value
+    //     flow — it has no read/write direction.
+    //   - `WRITES` records field assignments only (e.g.
+    //     `bridge.rs → disk_cache`); there is no READS counterpart, so
+    //     read-side dataflow can never be reconstructed from it.
+    //
+    // If a future CBM version introduces DATAFLOW (or directional
+    // READS/WRITES dataflow edges), reintroduce the query and its
+    // InferenceLayer consumption; the audit suite in
+    // src/tests/cbm/graph_intel.rs pins the absence so the change is
+    // noticed.
+
+    /// Get the architecture overview from CBM (packages → modules,
+    /// boundaries → dependencies).
     ///
-    /// R-43b Phase 3: Consumed by `InferenceLayer::enrich_from_cbm()` to
-    /// populate cross-file dataflow edges (confidence = 0.75). Cached with TTL.
-    pub fn get_dataflow_edges(&mut self) -> Vec<(String, String, String)> {
-        let key = "dataflow_edges".to_string();
-        let project = self.project_str();
+    /// AUDIT FIX (F11): previously returned `None` for both "failed" and
+    /// every other non-success path, conflating errors with missing data;
+    /// failures now propagate as [`CbmError::Err`].
+    pub fn get_architecture(&mut self) -> Result<ArchitectureOverview, CbmError> {
+        let key = "architecture".to_string();
         if self.check_cache(&key) {
+            // Cache hit is a successful query.
             return serde_json::from_value(
                 self.cache
                     .get(&key)
@@ -958,65 +1001,16 @@ impl GraphBridge {
                     .data
                     .clone(),
             )
-            .unwrap_or_default();
+            .map_err(|e| CbmError::ParseError(format!("cached architecture: {e}")));
         }
-        let cypher =
-            "MATCH (m:Function)-[r:DATAFLOW]->(t) RETURN m.name, t.name, type(r)".to_string();
-        let result = self.query(move |c| c.query_graph(&cypher, &project));
-        match result {
-            Ok(rows) => {
-                let edges: Vec<(String, String, String)> = rows
-                    .iter()
-                    .filter_map(|r| {
-                        let method = r.first()?.as_str()?.to_string();
-                        let target = r.get(1)?.as_str()?.to_string();
-                        let direction = r.get(2)?.as_str().unwrap_or("reads").to_string();
-                        Some((method, target, direction))
-                    })
-                    .collect();
-                self.cache_insert(&key, &edges);
-                edges
-            }
-            Err(_) => vec![],
-        }
-    }
-
-    pub fn get_architecture(&mut self) -> Option<ArchitectureOverview> {
-        let key = "architecture".to_string();
         let project = self.project_str();
-        if self.check_cache(&key) {
-            // Cache hit is a successful query — clear any stale error so a
-            // prior failure is never re-surfaced after a good result.
-            let result = serde_json::from_value(
-                self.cache
-                    .get(&key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .ok();
-            self.set_last_error(None);
-            return result;
-        }
-        let result = self.query(move |c| c.get_architecture(&project));
-        match result {
-            Ok(arch) => {
-                self.set_last_error(None);
-                // CBM 0.8.1 emits packages/boundaries (not modules/
-                // dependencies) — map through the verified wire-schema
-                // parser instead of reading keys that never exist.
-                let ov = parse_architecture_response(&arch);
-                self.cache_insert(&key, &ov);
-                Some(ov)
-            }
-            Err(e) => {
-                // Surface the failure so handlers don't report "0 modules,
-                // 0 deps" when CBM is still indexing or unavailable.
-                self.set_last_error(Some(e));
-                None
-            }
-        }
+        let arch = self.query(move |c| c.get_architecture(&project))?;
+        // CBM 0.8.1 emits packages/boundaries (not modules/
+        // dependencies) — map through the verified wire-schema
+        // parser instead of reading keys that never exist.
+        let ov = parse_architecture_response(&arch);
+        self.cache_insert(&key, &ov);
+        Ok(ov)
     }
 
     /// Resolve a cross-language endpoint for a method name (Angular
@@ -1755,16 +1749,14 @@ pub mod test_helpers {
         bridge
     }
 
-    /// Create a mock GraphBridge pre-seeded with call edges, dataflow edges,
+    /// Create a mock GraphBridge pre-seeded with call edges,
     /// symbol importance, and dead code for exercising
     /// `InferenceLayer::enrich_from_cbm()`.
     ///
-    /// R-43b Phase 3: Pre-seeds the `call_edges`, `dataflow_edges`,
-    /// `symbol_importance`, and `dead_code` cache entries so the mock serves
-    /// canned data without a real CBM binary.
+    /// AUDIT F10: the former `dataflow_edges` parameter was removed along
+    /// with the dead DATAFLOW query path (CBM 0.8.1 limitation).
     pub fn new_mock_with_edges(
         call_edges: Vec<(String, String)>,
-        dataflow_edges: Vec<(String, String, String)>,
         symbol_importance: HashMap<String, SymbolImportance>,
         dead_code: Vec<DeadCodeEntry>,
     ) -> GraphBridge {
@@ -1790,14 +1782,6 @@ pub mod test_helpers {
             "call_edges".to_string(),
             CachedGraphData {
                 data: call_json,
-                expires_at: Instant::now() + ttl,
-            },
-        );
-        let df_json = serde_json::to_value(&dataflow_edges).unwrap_or_default();
-        bridge.cache.insert(
-            "dataflow_edges".to_string(),
-            CachedGraphData {
-                data: df_json,
                 expires_at: Instant::now() + ttl,
             },
         );

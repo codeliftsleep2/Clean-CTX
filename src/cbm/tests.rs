@@ -11,3 +11,8 @@ mod integration;
 
 #[path = "../tests/cbm/e2e.rs"]
 mod e2e;
+
+// Graph-intelligence layer audit (symbol importance, dead code, blast
+// radius, architecture, caching / project isolation).
+#[path = "../tests/cbm/graph_intel.rs"]
+mod graph_intel;

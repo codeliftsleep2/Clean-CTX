@@ -139,11 +139,6 @@ fn test_inference_layer_pass_with_cbm_enriches_layer() {
 
     let bridge = new_mock_with_edges(
         vec![("CallerA".to_string(), "CalleeB".to_string())],
-        vec![(
-            "MethodX".to_string(),
-            "TargetY".to_string(),
-            "reads".to_string(),
-        )],
         {
             let mut m = HashMap::new();
             m.insert(
@@ -165,8 +160,8 @@ fn test_inference_layer_pass_with_cbm_enriches_layer() {
     assert!(result.is_ok());
 
     let layer = ctx.inference_layer.expect("inference layer should be set");
-    // 1 call edge + 1 dataflow edge
-    assert_eq!(layer.inferred_edges.len(), 2);
+    // F10: 1 call edge (DATAFLOW enrichment removed with CBM 0.8.1)
+    assert_eq!(layer.inferred_edges.len(), 1);
     // importance annotation
     assert!(layer.has_annotation_key("importance"));
 }

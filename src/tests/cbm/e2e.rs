@@ -332,21 +332,24 @@ fn e2e_bridge_graceful_degradation_all_queries() {
         "Bridge should be unavailable when CBM disabled"
     );
 
-    // All queries should return empty/default results, NOT panic
+    // F11: intelligence queries now propagate failures as Err — a failed
+    // query must never masquerade as "valid query, zero results". The
+    // user-facing wrappers (search/trace/query_graph) keep their graceful
+    // empty results with take_last_error() diagnostics.
     let importance = bridge.get_symbol_importance_mut();
     assert!(
-        importance.is_empty(),
-        "Symbol importance should be empty without CBM"
+        importance.is_err(),
+        "Symbol importance should fail without CBM, not return empty Ok"
     );
 
     let dead = bridge.get_dead_code();
-    assert!(dead.is_empty(), "Dead code should be empty without CBM");
+    assert!(dead.is_err(), "Dead code should fail without CBM");
 
     let arch = bridge.get_architecture();
-    assert!(arch.is_none(), "Architecture should be None without CBM");
+    assert!(arch.is_err(), "Architecture should fail without CBM");
 
     let blast = bridge.get_blast_radius("test_func", 1);
-    assert!(blast.is_empty(), "Blast radius should be empty without CBM");
+    assert!(blast.is_err(), "Blast radius should fail without CBM");
 
     let search = bridge.search("test");
     assert!(search.is_empty(), "Search should be empty without CBM");
@@ -1085,7 +1088,7 @@ function createFixture(data) { return data; }
         b.invalidate_cache();
         let arch = b
             .get_architecture()
-            .expect("get_architecture must return Some");
+            .unwrap_or_else(|e| panic!("get_architecture must succeed on the fixture: {e}"));
         eprintln!(
             "  {} module(s), {} dep(s)",
             arch.modules.len(),

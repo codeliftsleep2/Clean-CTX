@@ -17,9 +17,19 @@ use crate::cbm::config::CbmStatus;
 pub enum CbmError {
     LaunchError(String),
     ConnectionLost(String),
-    RpcError { code: i64, message: String },
+    RpcError {
+        code: i64,
+        message: String,
+    },
     Timeout(Duration),
     ParseError(String),
+    /// CBM reported a tool-level failure inside a successful JSON-RPC
+    /// envelope (`result.isError = true` + error payload). See
+    /// [`check_soft_error`].
+    ToolError {
+        tool: String,
+        message: String,
+    },
 }
 
 impl std::fmt::Display for CbmError {
@@ -30,6 +40,9 @@ impl std::fmt::Display for CbmError {
             CbmError::RpcError { code, message } => write!(f, "CBM RPC error ({code}): {message}"),
             CbmError::Timeout(d) => write!(f, "CBM query timed out after {d:?}"),
             CbmError::ParseError(msg) => write!(f, "CBM parse error: {msg}"),
+            CbmError::ToolError { tool, message } => {
+                write!(f, "CBM {tool} failed: {message}")
+            }
         }
     }
 }
@@ -75,6 +88,7 @@ pub struct CbmClient {
 /// Non-retryable errors:
 /// - `LaunchError` — binary missing, retry won't help
 /// - `ParseError` — malformed response, retry won't help
+/// - `ToolError` — CBM rejected the request semantically, retry won't help
 /// - `RpcError` with code -32601 (Method not found) — programming error
 pub(crate) fn is_retryable(error: &CbmError) -> bool {
     matches!(
@@ -83,6 +97,43 @@ pub(crate) fn is_retryable(error: &CbmError) -> bool {
             | CbmError::Timeout(_)
             | CbmError::RpcError { code: -32603, .. }
     )
+}
+
+/// Soft-error gate for parsed CBM tool results.
+///
+/// CBM signals tool-level failures inside a SUCCESSFUL JSON-RPC result:
+///
+/// ```json
+/// {"isError": true,
+///  "content": [{"type": "text", "text": "<body>"}]}
+/// ```
+///
+/// where `<body>` is either a JSON object carrying an `"error"` string key
+/// (e.g. `"project not found or not indexed"`) or a plain-text diagnostic
+/// (e.g. Cypher parser output). Without this gate such failures would be
+/// indistinguishable from valid empty results.
+///
+/// Pure function so tests can pin the exact wire shapes.
+pub(crate) fn check_soft_error(tool_name: &str, result: &Value) -> Result<(), CbmError> {
+    if result.get("isError").and_then(Value::as_bool) != Some(true) {
+        return Ok(());
+    }
+    let text = result["content"][0]["text"].as_str().unwrap_or("");
+    let message = serde_json::from_str::<Value>(text)
+        .ok()
+        .and_then(|v| v.get("error").and_then(Value::as_str).map(str::to_string))
+        .unwrap_or_else(|| {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                "unknown CBM tool failure".to_string()
+            } else {
+                trimmed.to_string()
+            }
+        });
+    Err(CbmError::ToolError {
+        tool: tool_name.to_string(),
+        message,
+    })
 }
 
 impl CbmClient {
@@ -429,10 +480,17 @@ impl CbmClient {
                                 message: error["message"].as_str().unwrap_or("unknown").into(),
                             });
                         }
-                        return resp
+                        // Soft-error gate: CBM signals tool failures inside a
+                        // SUCCESSFUL JSON-RPC result via `result.isError` +
+                        // an error payload in `content[0].text`. Map them onto
+                        // CbmError so callers never conflate "failed" with
+                        // "valid query, zero results".
+                        let result = resp
                             .get("result")
                             .cloned()
-                            .ok_or_else(|| CbmError::ParseError("missing result".into()));
+                            .ok_or_else(|| CbmError::ParseError("missing result".into()))?;
+                        check_soft_error(tool_name, &result)?;
+                        return Ok(result);
                     }
                     // Not yet complete JSON — continue reading lines
                 }
