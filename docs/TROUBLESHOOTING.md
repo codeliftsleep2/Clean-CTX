@@ -2,7 +2,7 @@
 
 > **Owner:** Problem-solving + error codes + diagnostic commands · **Status:** Living reference
 
-**Last updated:** 2026-06-07
+**Last updated:** 2026-08-24
 
 ---
 
@@ -149,6 +149,31 @@ Report the crash with the stack trace and reproduction steps.
 **Cause:** The config is loaded once at server startup and cached in a `OnceLock`. The server has no file-watch hot-reload.
 
 **Fix:** Restart the MCP server (restart your IDE or the MCP host process).
+
+---
+
+### Graph queries return "project not found or not indexed"
+
+**Symptom:** Raw `cbm_proxy` calls fail with:
+
+```text
+e:project not found or not indexed
+hint:Use list_projects to see all indexed projects, then pass the project name.
+```
+
+**Cause:** The `project` value doesn't match CBM's canonical project ID. CBM derives project IDs from the **canonical repository path**, never the directory name. `RustContextLayerAI` (a directory basename) is **not** a valid project ID — the real ID for `C:\Users\MNasty\Desktop\RustContextLayerAI` is the canonical slug:
+
+```text
+C:/Users/MNasty/Desktop/RustContextLayerAI  →  C-Users-MNasty-Desktop-RustContextLayerAI
+```
+
+**Fix:**
+1. Call `list_projects` to list the exact IDs CBM knows (it is project-independent and always works)
+2. Pass that exact slug via `parameters.project`, or pass the repository path via `arguments.workspaceRoot` / `arguments.project` and let Clean-CTX resolve it to the canonical slug
+
+**Note — two kinds of proxy calls:**
+- **Project-independent** (`list_projects`, `get_cbm_status`): need no project, never gated on indexing state.
+- **Project-targeted** (`search_graph`, `query_graph`, `trace_path`, `get_architecture`): need a project. The built-in wrappers resolve the active workspace root automatically; raw `cbm_proxy` calls without an explicit project are forwarded unchanged and CBM rejects them with the error above.
 
 ---
 

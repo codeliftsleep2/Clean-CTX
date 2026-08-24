@@ -653,9 +653,18 @@ Each compression event is tagged with a `SavingsDomain` for the dashboard:
 
 ### Project Identity & Multi-Root Lifecycle
 
-CBM derives each project ID itself from the canonical repo path (`index_repository(repo_path, mode)` takes no project parameter — the verified CBM 0.8.1 wire contract). Clean-CTX mirrors this exactly: every configured root (primary + `additional_roots`) is canonicalized into its CBM slug, all roots are served by one shared CBM subprocess, and background indexing starts for every root at bridge construction. Indexing/readiness state is tracked independently per project, graph queries and `cbm_proxy` resolve targets through this root→project mapping, and project-independent tools (e.g. `list_projects`) bypass the readiness gate. Directory basenames are never used as project identities.
+> **Architectural rule:** Never derive or invent a CBM project identifier independently of the canonical-root mapping. CBM's canonical project slug is the single source of identity for indexing, readiness, querying, proxy routing, and cache partitioning.
+
+CBM derives each project ID itself from the canonical repo path (`index_repository(repo_path, mode)` takes no project parameter — the verified CBM 0.8.1 wire contract), e.g. `C:/Users/MNasty/Desktop/RustContextLayerAI` → `C-Users-MNasty-Desktop-RustContextLayerAI`. Clean-CTX mirrors this exactly: a two-way map in the bridge (`project_ids` / `project_paths`) binds every configured root to its slug, and that single identity drives everything downstream — background indexing, per-project readiness state, graph-query and `cbm_proxy` target resolution, and the disk-graph-cache partition label. Directory basenames (e.g. `RustContextLayerAI`) are never valid project identities; explicit overrides resolve through the root→project mapping, and unknown names are rejected by CBM itself ("project not found or not indexed"). Project-independent tools (e.g. `list_projects`) bypass the readiness gate entirely.
 
 Normative details: **CBM-ID-001** in `docs/ARCHITECTURAL_INVARIANTS.md`.
+
+### Subprocess & Indexing Lifecycle
+
+- **One CBM subprocess per `McpState`.** The bridge launches CBM once at construction; every project shares those stdio pipes.
+- **Indexing starts asynchronously during bridge construction.** `try_create_with_roots` spawns one background `index_repository(repo_path, "fast")` task per root before the first request arrives.
+- **Multiple roots are indexed concurrently.** Each root's task runs independently and records progress under that root's own slug.
+- **Requests wait on their own project's indexing state, never globally.** A call targeting project X consults X's readiness only (`ensure_indexed_for`); another root that is still indexing does not block it.
 
 ## Angular Meta-Layer (Phase 1 + 2 + 3)
 
