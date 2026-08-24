@@ -245,3 +245,27 @@ If none of the above resolves your issue:
 **Resolution:** This is an upstream CBM limitation and not a Clean-CTX bug. Clean-CTX does not require aggregation — all production queries filter by specific node properties and return individual rows. If you need summary data, paginate through results client-side.
 
 **Also applies to:** MATCH (n) RETURN n, count(*) (and similar aggregate patterns) — use RETURN n LIMIT N instead.
+
+### Blast radius / caller lists look wrong or too large
+
+**Symptom:** `get_blast_radius` (or a raw CALLS query) returns callers for the entire project instead of one symbol's callers.
+
+**Cause:** Historical bug - the Cypher filtered on an undeclared variable (`m.name`). CBM does not reject invalid WHERE clauses; it fail-opens and returns every matching row. Fixed in the 2026-08-24 audit (`f.name`); a live regression test pins the result to the exact ground-truth caller set.
+
+### Dead code misses class methods
+
+**Symptom:** Dead-code output lists only free functions; dead class methods never appear.
+
+**Cause:** Pre-audit implementation scanned only `:Function` nodes. The current implementation scans `Function` AND `Method` labels and merges results - covered by a live set-equality test in `src/tests/cbm/graph_intel.rs`.
+
+### DATAFLOW queries return nothing
+
+**Symptom:** Cypher over `DATAFLOW` edges yields empty results.
+
+**Cause:** Expected behavior - CBM 0.8.1 has no DATAFLOW edge type, and its USAGE/WRITES edges are not read-aware equivalents. Clean-CTX ships no dataflow enrichment; local program-graph `DataFlowRead`/`DataFlowWrite` edges are independent of CBM. A guard test fails automatically if a future CBM introduces DATAFLOW edges.
+
+### .razor symbols missing from graph queries
+
+**Symptom:** Searches for Razor components/views return nothing even though the repository contains `.razor` files.
+
+**Cause:** Verified upstream limitation - CBM 0.8.1 creates no Razor nodes. There is nothing for Clean-CTX to configure; track upstream.

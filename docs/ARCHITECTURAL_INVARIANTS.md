@@ -140,6 +140,17 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
 
+### CBM-E-001 Explicit CBM Error Propagation
+
+| Property | Value |
+|----------|-------|
+| **Intent** | CBM unavailability or failure must never masquerade as legitimate empty graph data. |
+| **Invariant** | Every graph-intelligence bridge method returns `Result<_, CbmError>`. `Ok(empty)` is reserved for valid zero-result queries; any CBM-reported tool failure (`result.isError` envelope), transport fault, timeout, or open circuit surfaces as `Err(CbmError)`. Downstream consumers (intelligence layer, inference pass, MCP handlers) propagate or explicitly handle `Err`; none may convert it into empty success data. The pipeline-level failure policy is fixed: log loudly and continue without enrichment - CBM is strictly additive to the IR. |
+| **Enforcement** | `check_soft_error()` maps isError envelopes to `CbmError::ToolError` in the parsed transport path before callers observe them; deterministic fixtures pin the envelope shape; live probes assert `Err` on unknown projects vs `Ok(empty)` for valid no-result queries. |
+| **Authority** | `src/cbm/client.rs` (`CbmError::ToolError`, `check_soft_error`), `src/cbm/bridge.rs` (Result signatures), `src/ir/inference_layer.rs`, `src/ir/pipeline.rs`, `src/tests/cbm/graph_intel.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
 ---
 
 ## Architectural Debt

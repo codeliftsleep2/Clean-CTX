@@ -5,6 +5,8 @@
 **Roadmap IDs:** R-43a (Phase 1, v0.3.0), R-43b (Phases 2-6, v0.4.0)  
 **Goal:** Evolve the Compiler-IR from a strong structural representation into a behavioral reasoning substrate while keeping CBM optional.
 
+> **Status update (2026-08-24):** This plan is implemented and partially superseded. CBM 0.8.1 exposes no `DATAFLOW` edge type, so the planned CBM dataflow enrichment (`GraphBridge::get_dataflow_edges()`, CBM augmentation of `find_dataflow_sources`) was removed; enrichment consumes CALLS edges plus importance/dead-code annotations only, and local program-graph dataflow edges remain the sole dataflow source. All graph-intelligence bridge methods now return `Result<_, CbmError>` (`Ok(empty)` = zero results, `Err` = CBM failure). Code sketches below are historical design artifacts, not current API.
+
 ---
 
 ## Table of Contents

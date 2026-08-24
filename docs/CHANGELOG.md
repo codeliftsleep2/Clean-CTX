@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [Unreleased] - 2026-08-24 - CBM Graph-Intelligence Audit Fixes
+
+### Fixed
+
+- **F1 (HIGH) - blast radius returned every CALLS edge in the project.** The `get_blast_radius()` Cypher filtered on an undeclared variable (`m.name`). CBM fail-opens on invalid WHERE clauses - it returns the full row set instead of erroring - so every symbol appeared to touch every file. The query now filters on `f.name`, and a live regression test pins reported caller-files to the exact ground-truth caller set computed independently on the same client.
+- **F3 (MED) - dead-code detection ignored class Methods.** Only `:Function` nodes were scanned, leaving dead Methods (the majority of TS/C#/Java symbols) invisible. `get_dead_code()` now scans `Function` AND `Method` labels and merges the results; a live test asserts exact set-equality against the merged two-label ground truth.
+- **F11 (MED) - CBM tool failures surfaced as confident empty results.** CBM signals tool failures inside successful JSON-RPC results (`result.isError=true` plus an inner error body). These envelopes were never mapped to `CbmError`. Added `CbmError::ToolError { tool, message }` plus a pure `check_soft_error()` gate in the parsed transport path.
+- **F10 (MED) - removed the dead DATAFLOW enrichment path.** CBM 0.8.1 exposes no `DATAFLOW` edge type, and its `USAGE`/`WRITES` edges are not equivalents (no read direction). Documented as a verified upstream limitation, with a reintroduction guard that fails if a future CBM version ever exposes DATAFLOW edges.
+
+### Added
+
+- **Result-propagating graph-intelligence APIs.** All five bridge queries (`get_symbol_importance_mut()`, `get_blast_radius()`, `get_dead_code()`, `get_call_edges()`, `get_architecture()`) return `Result<_, CbmError>`. Contract: `Ok(empty)` = a valid query with zero results; `Err` = CBM failure (transport fault, timeout, open circuit, or CBM-reported tool error). `InferenceLayer::enrich_from_cbm()` propagates `Err` instead of converting failure into empty data; `InferenceLayerPass` owns the failure policy (log loudly, continue without enrichment - CBM stays strictly additive); `handle_get_architecture()` returns an explicit error response.
+- **Live audit suite** `src/tests/cbm/graph_intel.rs` - 9 probes (serial `cbm_live`), each spawning a fresh CBM subprocess and re-indexing first (fresh process, fresh index): blast-radius truth set, unknown-project `Err` vs valid `Ok(empty)`, dual-label dead-code equality, DATAFLOW absence guard, wire-shape pins (`in_degree` cells arrive as JSON strings), deterministic soft-error fixtures, architecture parsing, and disk-cache project isolation across project switches.
+- **CBM compatibility/limitations documentation** verified live against 0.8.1: supported node labels and edge types, absent DATAFLOW edge type, absent Razor nodes, aggregation-free Cypher subset, fail-open behavior on invalid WHERE clauses, and wire quirks.
+
+### Changed
+
+- Mock helper `new_mock_with_edges()` dropped its dataflow parameter; regression/e2e/inference-layer/pipeline tests updated to the new Result semantics.
+- Documentation refreshed across four areas (graph intelligence, multi-root lifecycle, CBM compatibility/limitations, testing/verification); stale claims of working DATAFLOW enrichment removed rather than caveated; stale test counts corrected everywhere (previously 2,263 in general docs, 1,512 in SECURITY.md).
+
+### Verification
+
+- Fresh-process/fresh-index live audit against a rebuilt CBM binary: all 9 audit probes green; self-contained multilingual fixture green through step 16 including cross-language resolution and primary-project health after project switches.
+- `cargo fmt --all -- --check` clean; `cargo clippy --all-targets -- -D warnings` zero warnings.
+- `cargo test --workspace --all-targets --all-features`: **2,481 passed / 0 failed / 5 ignored** (core library 2,141 + CLI binary 11 + proxy crate 329: lib 155, bin harness 155, audit-regression 18, e2e integration 1).
+
+---
+
 ## [0.3.1] — 2026-08-23 — C-22 Canonical Source-Span Contract & Multi-Class Fix
 
 ### Added

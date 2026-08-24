@@ -521,7 +521,7 @@ cargo test -p clean-ctx-proxy --test audit_regression
 cargo test -p clean-ctx-proxy --test integration_test
 ```
 
-The test suite includes 243 tests: 112 unit tests, 18 audit regression tests (covering all FAANG-principal code review findings), and 1 end-to-end integration test with a mock upstream server.
+The proxy test suite comprises 329 passing checks across its cargo targets: 155 unit tests on the library (mirrored by the binary target's 155-test harness), 18 audit regression tests (covering all FAANG-principal code review findings), and 1 end-to-end integration test with a mock upstream server.
 
 ## Limitations
 

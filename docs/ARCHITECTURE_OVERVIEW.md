@@ -665,6 +665,42 @@ Normative details: **CBM-ID-001** in `docs/ARCHITECTURAL_INVARIANTS.md`.
 - **Indexing starts asynchronously during bridge construction.** `try_create_with_roots` spawns one background `index_repository(repo_path, "fast")` task per root before the first request arrives.
 - **Multiple roots are indexed concurrently.** Each root's task runs independently and records progress under that root's own slug.
 - **Requests wait on their own project's indexing state, never globally.** A call targeting project X consults X's readiness only (`ensure_indexed_for`); another root that is still indexing does not block it.
+- **Construction-time indexing is the supported path.** Bridges come into existence through `try_create` / `try_create_with_roots`, which start background indexing immediately. There is no separate manual index trigger in the contract.
+- **`project_str()` refers to the primary root.** Untargeted/default queries address the primary root's CBM project.
+- **Additional roots require resolving/selecting their CBM project before querying.** Pass the root's path (or its canonical slug) explicitly - built-in wrappers resolve it through `resolve_project_id`; raw `cbm_proxy` calls accept `parameters.project`.
+
+### Graph Intelligence API & Error Semantics
+
+Five bridge queries power the intelligence features - `get_symbol_importance_mut()`, `get_blast_radius()`, `get_dead_code()`, `get_call_edges()`, `get_architecture()` - and all five return `Result<_, CbmError>`:
+
+- **`Ok(empty)` means a valid query with zero results** (e.g. a symbol with no callers). It is never used as a stand-in for failure.
+- **`Err` means CBM failed** - transport fault, timeout, open circuit, or a tool error reported by CBM itself. Callers must never treat `Err` as "no data".
+- Tool failures travel inside successful JSON-RPC responses (`result.isError=true` with an inner error payload). The client's transport maps these envelopes to `CbmError::ToolError { tool, message }` via `check_soft_error()` before any caller observes them, so failure semantics are uniform across the raw and parsed paths.
+
+Behavior notes (each verified live against CBM 0.8.1):
+
+- **Blast radius** returns the depth-1 caller-file set, pinned by a live test to equal the ground-truth caller set computed independently on the same client. An earlier Cypher draft filtered on the wrong variable; because CBM fail-opens on invalid WHERE clauses instead of erroring, the bug silently returned every CALLS edge in the project.
+- **Dead code covers BOTH `Function` and `Method` node labels.** Scanning only `Function` misses most TS/C#/Java symbols. A live test asserts exact set equality between production output and the merged two-label ground truth.
+- **Circuit breaker ordering:** the client opens after 3 consecutive failures. The first failing query carries CBM's own semantic message (e.g. "project not found"); subsequent ones report circuit-open until the cooldown elapses. Error-message assertions must account for this ordering.
+- The inference layer treats `Err` as skip-enrichment: `InferenceLayerPass` logs loudly and continues without CBM data. CBM remains strictly additive to the IR, and failures never fabricate empty success values.
+
+### CBM Compatibility & Verified Limitations (0.8.1)
+
+Everything below was verified against live CBM 0.8.1 probes, not assumed:
+
+| Area | Status |
+|------|--------|
+| Node labels | `Class`, `Method`, `Function`, `File` (including web assets: JS/HTML/TS/CSS) confirmed present |
+| Edge types | `CALLS` and `DEFINES_METHOD` confirmed in live probes; **no `DATAFLOW` edge type exists in 0.8.1** |
+| Razor support | None - `.razor` files/symbols do not appear in the graph |
+| Dataflow enrichment | Unavailable (no DATAFLOW edges). Local program-graph `DataFlowRead`/`DataFlowWrite` edges are Clean-CTX-local and unaffected |
+| Cypher subset | No aggregation functions (COUNT/GROUP BY/SUM/AVG) - see [Troubleshooting](TROUBLESHOOTING.md) |
+| Invalid queries | CBM fail-opens: a WHERE clause referencing an undeclared variable returns the full row set rather than an error. Production Cypher is constructed internally and guarded by truth-set tests |
+| Wire quirks | `in_degree` cells serialize as JSON strings through `query_graph`; stderr carries `level=` log noise alongside JSON-RPC |
+
+If a future CBM release adds DATAFLOW edges, the reintroduction guard in
+`src/tests/cbm/graph_intel.rs` fails deliberately - dataflow enrichment can then
+be re-designed explicitly, not silently assumed.
 
 ## Angular Meta-Layer (Phase 1 + 2 + 3)
 

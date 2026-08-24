@@ -768,7 +768,20 @@ Tests follow these conventions:
 cargo test                          # All tests
 cargo test fidelity                 # Tests matching "fidelity"
 cargo test -- --ignored             # Integration tests (tagged with #[ignore])
+cargo test cbm::tests               # Full CBM suite incl. live probes
+cargo test --workspace --all-targets --all-features   # Full verification gate
 ```
+
+### Live-CBM semantic tests
+
+CBM-facing behavior is protected by two layers in `src/tests/cbm/`:
+
+- **Deterministic regression tests** pin the live-captured CBM wire contract so an upstream CBM upgrade cannot silently break us: `in_degree` cells arrive as JSON strings through `query_graph`; tool failures arrive as `result.isError=true` envelopes inside successful JSON-RPC results; there is no `DATAFLOW` edge type in CBM 0.8.1 (a guard fails if one ever appears).
+- **Live probes** (`src/tests/cbm/graph_intel.rs`, serial `cbm_live`) spawn a real CBM subprocess per probe and re-index from scratch first (fresh process, fresh index), then assert semantic truth: blast radius equals the ground-truth caller set, unknown projects return `Err` while valid zero-result queries return `Ok(empty)`, dead code covers both `Function` and `Method` labels, and project switches never poison the disk cache.
+
+The self-contained multilingual fixture (`src/tests/cbm/e2e.rs`) builds a temp-dir polyglot project (Rust/C#/Java/TS/JS/HTML/CSS), indexes it, exercises language discovery, web-file nodes and C# cross-language resolution, switches back to the primary project, and asserts the primary stays healthy.
+
+Treat this suite as the authority on upstream CBM behavior: if a live probe fails after a CBM upgrade, the upgrade changed the wire contract or semantics - update the pins deliberately, never silently.
 
 ---
 
@@ -894,7 +907,7 @@ Every pull request must pass these checks:
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test`** — all 2,263 tests pass
+3. **`cargo test --workspace --all-targets --all-features`** — all 2,481 workspace tests pass (2,141 core library)
 4. **`cargo audit`** — no known security vulnerabilities
 5. **No new `#![allow(...)]`** annotations without a `// SAFETY:` or `// Phase N:` comment
 6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
