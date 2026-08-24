@@ -477,7 +477,7 @@ Clean-CTX normally rejects file paths outside a single trusted workspace root (t
 - When a path fails all boundary checks, the error message now shows the effective workspace root(s) checked, helping you diagnose configuration issues.
 - When CBM integration is enabled, each root (primary + additional) becomes **its own CBM graph project** under one shared CBM subprocess. Every root is indexed automatically in the background at startup, and readiness is tracked per project — one root still indexing never blocks queries against another.
 - Additional roots can be targeted independently: pass the root's path via `workspaceRoot` or an explicit `project` on `cbm_proxy` calls (a root path or its canonical CBM slug both resolve). With no explicit target, the built-in wrapper tools operate on the active workspace root's project.
-- CBM project identities are canonical-path-derived slugs (e.g. `C:\dev\LinguaForge` → `C-dev-LinguaForge`), never plain directory basenames. Normative details: **CBM-ID-001** in `docs/ARCHITECTURAL_INVARIANTS.md`; see [Troubleshooting](TROUBLESHOOTING.md) if a query returns *"project not found or not indexed"*.
+- CBM project identities are canonical-path-derived slugs (e.g. `C:\dev\MyApp` → `C-dev-MyApp`), never plain directory basenames. Normative details: **CBM-ID-001** in `docs/ARCHITECTURAL_INVARIANTS.md`; see [Troubleshooting](TROUBLESHOOTING.md) if a query returns *"project not found or not indexed"*.
 
 **Use case:** A container repo whose `.clean-ctx.json` lives at `C:\containers\fe` but whose source code lives in sibling repos like `C:\containers\api\src`. Without `additional_roots`, the boundary check rejects files in `C:\containers\api\src` because they're outside the primary root (`C:\containers\fe`).
 
