@@ -39,3 +39,6 @@ test_audit5.log
 docs/SESSION_HANDOFF_*.md
 # CBM fixture captures (personal machine, not committed)
 src/tests/cbm/fixtures/
+
+# Personal audit probe paths (machine-specific)
+.clean-ctx/audit-paths.toml

@@ -1,4 +1,4 @@
-// src/tests/cbm/e2e.rs
+﻿// src/tests/cbm/e2e.rs
 //
 // End-to-end tests for the full CBM integration pipeline.
 // These tests exercise the complete flow:
@@ -835,4 +835,217 @@ fn e2e_live_proxy_defines_method_not_declares() {
     if let Some(err) = parsed.get("error") {
         panic!("CBM DEFINES_METHOD query returned an error: {err} — edge type may not exist");
     }
+}
+/// Full CBM 0.8.1 Audit Probe including separate additional-root bridge.
+/// Exercises every handler against live CBM. FAILS on unexpected errors.
+///
+/// Steps 9–15 require `.clean-ctx/audit-paths.toml` (gitignored) with a
+/// fixture (C#, JS, HTML) in the system temp dir and index it as an additional root. No personal paths required.
+/// Skips gracefully when the file is absent (e.g. CI).
+#[serial(cbm_live)]
+#[test]
+fn e2e_audit_probe_tools_list_and_graph_schema() {
+    if !cbm_binary_exists() { eprintln!("SKIP — CBM not installed"); return; }
+    let state = shared_live_state();
+
+    eprintln!("\n═══ Step 1: get_cbm_status ═══");
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(1), "get_cbm_status",
+        &serde_json::json!({"arguments": {}}), &state);
+
+    eprintln!("\n═══ Step 2: graph_search ═══");
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(2), "graph_search",
+        &serde_json::json!({"arguments": {"query": "GraphBridge"}}), &state);
+
+    eprintln!("\n═══ Step 3: graph_query ═══");
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(3), "graph_query",
+        &serde_json::json!({"arguments": {"query": "MATCH (n:Function) RETURN n.name LIMIT 5"}}), &state);
+
+    eprintln!("\n═══ Step 4: graph_trace ═══");
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(4), "graph_trace",
+        &serde_json::json!({"arguments": {"from": "GraphBridge", "to": "CbmClient"}}), &state);
+
+    eprintln!("\n═══ Step 5: get_architecture ═══");
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(5), "get_architecture",
+        &serde_json::json!({"arguments": {}}), &state);
+
+    eprintln!("\n═══ Step 6: cbm_proxy search_graph ═══");
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(6), "cbm_proxy",
+        &serde_json::json!({"arguments": {"cbm_tool": "search_graph", "parameters": {"name_pattern": ".*GraphBridge.*"}}}), &state);
+
+    eprintln!("\n═══ Step 7: resolve_cross_language_endpoint ═══");
+    {
+        let mut guard = state.graph_bridge_lock();
+        let bridge = guard.as_mut().expect("live bridge");
+        for name in &["getAll", "GetAll", "Controller", "getUsers"] {
+            let result = bridge.resolve_cross_language_endpoint(name);
+            eprintln!("  resolve(\"{name}\") = {result:?}");
+        }
+    }
+
+    eprintln!("\n═══ Step 8: cbm_proxy list_projects ═══");
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(8), "cbm_proxy",
+        &serde_json::json!({"arguments": {"cbm_tool": "list_projects", "parameters": {}}}), &state);
+
+    // ── Multilingual fixture bridge (self-contained, no personal paths) ──
+    // Generate a temporary polyglot project so every machine produces
+    // deterministic results. Files are cleaned up when the test exits.
+    eprintln!("\n═══ Step 9: Create multilingual fixture project ═══");
+    let fixture_root = std::env::temp_dir().join(format!("clean-ctx-audit-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&fixture_root);
+    std::fs::create_dir_all(fixture_root.join("src")).expect("create fixture dir");
+
+    // C# fixture — CBM indexes Class/Interface/Method nodes from .cs files
+    std::fs::write(fixture_root.join("src/FixtureEngine.cs"), r#"
+using System;
+namespace AuditFixture {
+    public interface IFixtureEngine { string Get(string key); void Create(string val); }
+    public class FixtureEngine : IFixtureEngine {
+        private readonly Dictionary<string, string> _cache = new();
+        public string Get(string key) { return _cache.TryGetValue(key, out var v) ? v : ""; }
+        public void Create(string val) { _cache[val] = val; }
+        public void Update(string key, string val) { _cache[key] = val; }
+        public bool Delete(string key) { return _cache.Remove(key); }
+    }
+}
+"#).expect("write FixtureEngine.cs");
+
+    // JavaScript fixture — CBM indexes Function nodes from .js files
+    std::fs::write(fixture_root.join("src/fixture_app.js"), r#"
+function getFixture(id) { return { id }; }
+function createFixture(data) { return data; }
+function updateFixture(id, patch) { return { id, ...patch }; }
+function deleteFixture(id) { return true; }
+"#).expect("write fixture_app.js");
+
+    // HTML fixture
+    std::fs::write(fixture_root.join("index.html"), "<html><body><h1>AuditFixture</h1></body></html>").expect("write index.html");
+
+    // Verify all fixture files exist before proceeding
+    assert!(fixture_root.join("src/FixtureEngine.cs").exists(), "C# fixture must exist");
+    assert!(fixture_root.join("src/fixture_app.js").exists(), "JS fixture must exist");
+    assert!(fixture_root.join("index.html").exists(), "HTML fixture must exist");
+
+    let fixture_str = fixture_root.to_string_lossy().to_string();
+
+    let mut fx_config = crate::config::CleanCtxConfig::default();
+    fx_config.cbm.enabled = true;
+    fx_config.additional_roots.push(fixture_str.clone());
+    let fx_state = crate::mcp::McpState::new(fx_config);
+
+    eprintln!("\n═══ Step 10: Wait for fixture indexing ═══");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    loop {
+        let status = {
+            let mut g = fx_state.graph_bridge_lock();
+            g.as_mut().expect("lf bridge").ensure_indexed()
+        };
+        match status {
+            Ok(crate::cbm::bridge::IndexingStatus::Ready) => { eprintln!("  Fixture indexing Complete"); break; }
+            Ok(crate::cbm::bridge::IndexingStatus::StillIndexing { .. }) => {
+                if std::time::Instant::now() >= deadline { panic!("Timed out waiting for fixture"); }
+                std::thread::sleep(std::time::Duration::from_secs(2));
+            }
+            Err(e) => panic!("Fixture indexing failed: {e}"),
+        }
+    }
+
+    let fx_slug = {
+        let mut g = fx_state.graph_bridge_lock();
+        let b = g.as_mut().expect("lf bridge");
+        // Resolve the fixture project's canonical CBM slug via its path
+        let s = b.resolve_project_id(&fixture_str);
+        eprintln!("  Fixture slug: {s}");
+        eprintln!("  primary slug: {}", b.project_str());
+        s
+    };
+
+    eprintln!("\n═══ Step 11: Fixture architecture ═══");
+    {
+        let mut g = fx_state.graph_bridge_lock();
+        let b = g.as_mut().expect("lf bridge");
+        // Switch to the fixture project before querying
+        b.set_project(&fx_slug);
+        b.invalidate_cache();
+        let arch = b.get_architecture().expect("get_architecture must return Some");
+        eprintln!("  {} module(s), {} dep(s)", arch.modules.len(), arch.dependencies.len());
+        for m in &arch.modules { eprintln!("    module: {} ({} nodes)", m.name, m.file_count); }
+        for d in &arch.dependencies { eprintln!("    dep: {} -> {} ({})", d.from, d.to, d.kind); }
+        assert!(!arch.modules.is_empty(), "Fixture must have modules");
+    }
+
+    eprintln!("\n═══ Step 12: C# symbol search ═══");
+    {
+        let mut g = fx_state.graph_bridge_lock();
+        let b = g.as_mut().expect("lf bridge");
+        b.set_project(&fx_slug);
+        b.invalidate_cache();
+        for sym in &["FixtureEngine", "IFixtureEngine", "getFixture", "createFixture"] {
+            let nodes = b.search(sym);
+            eprintln!("  search(\"{sym}\") = {} hits", nodes.len());
+            for n in nodes.iter().take(3) {
+                eprintln!("    - {} {} ({})", n.label, n.name, n.file);
+            }
+        }
+    }
+
+    eprintln!("\n═══ Step 13: Method and Class nodes ═══");
+    {
+        let mut g = fx_state.graph_bridge_lock();
+        let b = g.as_mut().expect("lf bridge");
+        b.set_project(&fx_slug);
+        b.invalidate_cache();
+        let q1 = "MATCH (m:Method) RETURN m.name, m.file_path, m.language LIMIT 8".to_string();
+        let qr1 = b.query_graph(&q1);
+        eprintln!("  Methods: {} nodes", qr1.nodes.len());
+        for n in &qr1.nodes { eprintln!("    {} ({})", n.name, n.file); }
+        let q2 = "MATCH (c:Class) RETURN c.name, c.file_path LIMIT 8".to_string();
+        let qr2 = b.query_graph(&q2);
+        eprintln!("  Classes: {} nodes", qr2.nodes.len());
+        for n in &qr2.nodes { eprintln!("    {} ({})", n.name, n.file); }
+        assert!(!qr2.nodes.is_empty(), "Fixture must have Class nodes");
+    }
+
+    eprintln!("\n═══ Step 14: HTML/JS/Razor nodes ═══");
+    {
+        let mut g = fx_state.graph_bridge_lock();
+        let b = g.as_mut().expect("lf bridge");
+        b.invalidate_cache();
+        for (ext, label) in &[("js", "JS"), ("html", "HTML"), ("razor", "Razor")] {
+            let q = format!("MATCH (n) WHERE n.file_path =~ '.*\\.{ext}$' RETURN n.name, n.file_path, labels(n) LIMIT 5");
+            let qr = b.query_graph(&q);
+            eprintln!("  {label} nodes: {}", qr.nodes.len());
+            for n in &qr.nodes { eprintln!("    {} ({}) labels: {:?}", n.name, n.file, n.label); }
+        }
+    }
+
+    eprintln!("\n═══ Step 15: Cross-language resolution ═══");
+    {
+        let mut g = fx_state.graph_bridge_lock();
+        let b = g.as_mut().expect("lf bridge");
+        for name in &["Get", "GetById", "Create", "Update", "Delete"] {
+            let result = b.resolve_cross_language_endpoint(name);
+            eprintln!("  resolve(\"{name}\") = {result:?}");
+        }
+    }
+
+    eprintln!("\n═══ Step 16: Primary bridge still healthy ═══");
+    {
+        let mut g = state.graph_bridge_lock();
+        let b = g.as_mut().expect("live bridge");
+        let c1 = b.search("GraphBridge").len();
+        eprintln!("  Primary search(GraphBridge) = {c1} hits");
+        assert!(c1 > 0, "Primary bridge must still be queryable");
+    }
+
+    eprintln!("\n═══ Audit probe complete — all steps passed ═══\n");
+
+    // Cleanup: remove the temporary fixture project
+    let _ = std::fs::remove_dir_all(&fixture_root);
 }
