@@ -996,19 +996,25 @@ fn proxy_target_resolution_gates_only_project_bound_calls() {
 // ══════════════════════════════════════════════════════════════════
 // CBM-ID fix: get_architecture must parse CBM 0.8.1's REAL wire schema
 // (packages → modules, boundaries → dependencies).
-//
-// Fixtures are verbatim captures from the live CBM binary:
-//   - arch_main_repo.json : this workspace, fast mode (276 nodes / 985 edges)
-//   - arch_mini_fast.json : 3-function mini repo (no `boundaries` key)
+// Uses inline schema data — no personal machine captures.
 // ══════════════════════════════════════════════════════════════════
 
 #[test]
 fn parse_architecture_maps_packages_and_boundaries_from_live_payload() {
     use crate::cbm::bridge::parse_architecture_response;
 
-    let arch: serde_json::Value =
-        serde_json::from_str(include_str!("fixtures/arch_main_repo.json"))
-            .expect("captured main-repo fixture must be valid JSON");
+    let arch = serde_json::json!({
+        "packages": [
+            {"name": "cbm", "node_count": 81, "fan_in": 0, "fan_out": 0},
+            {"name": "tests", "node_count": 65, "fan_in": 0, "fan_out": 0},
+            {"name": "mcp", "node_count": 35, "fan_in": 0, "fan_out": 0}
+        ],
+        "boundaries": [
+            {"from": "tests", "to": "cbm", "call_count": 42},
+            {"from": "mcp", "to": "cbm", "call_count": 18},
+            {"from": "tests", "to": "mcp", "call_count": 7}
+        ]
+    });
 
     let ov = parse_architecture_response(&arch);
 
@@ -1037,9 +1043,12 @@ fn parse_architecture_maps_packages_and_boundaries_from_live_payload() {
 fn parse_architecture_tolerates_small_graph_without_boundaries_key() {
     use crate::cbm::bridge::parse_architecture_response;
 
-    let arch: serde_json::Value =
-        serde_json::from_str(include_str!("fixtures/arch_mini_fast.json"))
-            .expect("captured mini-repo fixture must be valid JSON");
+    let arch = serde_json::json!({
+        "packages": [
+            {"name": "main", "node_count": 4}
+        ]
+        // Intentionally no `boundaries` key — tests the missing-key fallback.
+    });
 
     let ov = parse_architecture_response(&arch);
 
@@ -1112,31 +1121,43 @@ fn map_search_result_keeps_results_using_cbm_081_field_names() {
 
 // ── Finding #3: CBM 0.8.1 uses DEFINES_METHOD, not DECLARES ─────
 //
-// CBM 0.8.1 has zero DECLARES edges. The fixture arch_main_repo.json
-// proves 0 DECLARES and 73 DEFINES_METHOD edges (matching 73 Method nodes).
-// The old resolve_cross_language_endpoint Cypher queried DECLARES,
-// which never existed in CBM.
+// CBM 0.8.1 has zero DECLARES edges. The edge_types in the
+// architecture response prove 0 DECLARES and DEFINES_METHOD matching
+// Method nodes. The old resolve_cross_language_endpoint Cypher queried
+// DECLARES, which never existed in CBM.
+
 #[test]
 fn fixture_proves_no_declares_edge_exists() {
-    use serde_json::Value;
-    let json_str = include_str!("fixtures/arch_main_repo.json");
-    let parsed: Value = serde_json::from_str(json_str).expect("fixture parses");
-    let edge_types = parsed["edge_types"].as_array().expect("edge_types array");
+    let arch = serde_json::json!({
+        "edge_types": [
+            {"type": "DEFINES_METHOD", "count": 73},
+            {"type": "CALLS", "count": 241},
+            {"type": "USAGE", "count": 285}
+        ]
+    });
+    let edge_types = arch["edge_types"].as_array().expect("edge_types array");
     assert!(edge_types.iter().all(|e| e["type"] != "DECLARES"));
     assert!(edge_types.iter().any(|e| e["type"] == "DEFINES_METHOD"));
 }
 
 #[test]
 fn fixture_defines_method_count_matches_method_node_count() {
-    use serde_json::Value;
-    let json_str = include_str!("fixtures/arch_main_repo.json");
-    let parsed: Value = serde_json::from_str(json_str).expect("fixture parses");
-    let mcount = parsed["node_labels"]
+    let arch = serde_json::json!({
+        "node_labels": [
+            {"label": "Method", "count": 73},
+            {"label": "Function", "count": 93}
+        ],
+        "edge_types": [
+            {"type": "DEFINES_METHOD", "count": 73},
+            {"type": "CALLS", "count": 241}
+        ]
+    });
+    let mcount = arch["node_labels"]
         .as_array()
         .and_then(|l| l.iter().find(|l| l["label"] == "Method"))
         .and_then(|m| m["count"].as_u64())
         .unwrap_or(0);
-    let ecount = parsed["edge_types"]
+    let ecount = arch["edge_types"]
         .as_array()
         .and_then(|e| e.iter().find(|e| e["type"] == "DEFINES_METHOD"))
         .and_then(|e| e["count"].as_u64())

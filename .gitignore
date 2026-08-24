@@ -37,5 +37,5 @@ test_audit5.log
 
 # Local session handoff documents (not for commit)
 docs/SESSION_HANDOFF_*.md
-src/tests/cbm/fixtures/arch_mini_fast.json
-src/tests/cbm/fixtures/arch_main_repo.json
+# CBM fixture captures (personal machine, not committed)
+src/tests/cbm/fixtures/
