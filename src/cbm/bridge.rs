@@ -852,7 +852,7 @@ impl GraphBridge {
         }
         let escaped = sym.replace('\'', "\\'");
         let cypher = format!(
-            "MATCH (caller:Function)-[:CALLS]->(f:Function) WHERE f.name = '{escaped}' RETURN caller.name, caller.file_path"
+            "MATCH (caller:Function)-[:CALLS]->(f:Function) WHERE m.name = '{escaped}' RETURN caller.name, caller.file_path"
         );
         let result = self.query(move |c| c.query_graph(&cypher, &project));
         match result {
@@ -1053,7 +1053,7 @@ impl GraphBridge {
         }
 
         let escaped = method_name.replace('\'', "\\'");
-        // Join the declaring Class node (e.g. `UserController`) so the
+        // CBM 0.8.1 uses DEFINES_METHOD edges between Class and Method
         // result is `"{Class}.{Method}"`. Prefer Controller classes.
         // We call the client directly (via `self.query`) to get the raw
         // `{columns, rows}` — the generic `query_graph` flattens rows to
@@ -1061,29 +1061,29 @@ impl GraphBridge {
         // the exact method name (case-sensitive) so we never return an
         // arbitrary fuzzy match.
         let cypher = format!(
-            "MATCH (c:Class)-[:DECLARES]->(f:Function) \
-             WHERE f.name = '{escaped}' AND f.file_path =~ '.*\\.cs$' \
-             RETURN f.name, c.name LIMIT 5"
+            "MATCH (c:Class)-[:DEFINES_METHOD]->(m:Method) \
+             WHERE m.name = '{escaped}' AND m.file_path =~ '.*\\.cs$' \
+             RETURN m.name, c.name LIMIT 5"
         );
         let rows = self.query(move |c| c.query_graph(&cypher, &project));
         let result: Option<String> = match rows {
             Ok(rows) => {
-                // rows are Vec<Vec<Value>>: [f.name, c.name].
+                // rows are Vec<Vec<Value>>: [m.name, c.name].
                 // Prefer a row whose class name contains "Controller".
                 let controller_hit = rows.iter().find_map(|row| {
-                    let fname = row.first().and_then(|v| v.as_str())?;
+                    let mname = row.first().and_then(|v| v.as_str())?;
                     let cname = row.get(1).and_then(|v| v.as_str())?;
                     if cname.contains("Controller") {
-                        Some(format!("{cname}.{fname}"))
+                        Some(format!("{cname}.{mname}"))
                     } else {
                         None
                     }
                 });
                 controller_hit.or_else(|| {
                     rows.first().and_then(|row| {
-                        let fname = row.first().and_then(|v| v.as_str())?;
+                        let mname = row.first().and_then(|v| v.as_str())?;
                         let cname = row.get(1).and_then(|v| v.as_str())?;
-                        Some(format!("{cname}.{fname}"))
+                        Some(format!("{cname}.{mname}"))
                     })
                 })
             }
@@ -1189,8 +1189,7 @@ impl GraphBridge {
         match result {
             Ok(nodes) => {
                 self.set_last_error(None);
-                let gn: Vec<GraphNode> =
-                    nodes.iter().filter_map(map_search_result).collect();
+                let gn: Vec<GraphNode> = nodes.iter().filter_map(map_search_result).collect();
                 self.cache_insert(&key, &gn);
                 gn
             }

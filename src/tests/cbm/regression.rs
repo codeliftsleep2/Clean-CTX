@@ -1109,3 +1109,37 @@ fn map_search_result_keeps_results_using_cbm_081_field_names() {
         "qualified_name maps to id"
     );
 }
+
+// ── Finding #3: CBM 0.8.1 uses DEFINES_METHOD, not DECLARES ─────
+//
+// CBM 0.8.1 has zero DECLARES edges. The fixture arch_main_repo.json
+// proves 0 DECLARES and 73 DEFINES_METHOD edges (matching 73 Method nodes).
+// The old resolve_cross_language_endpoint Cypher queried DECLARES,
+// which never existed in CBM.
+#[test]
+fn fixture_proves_no_declares_edge_exists() {
+    use serde_json::Value;
+    let json_str = include_str!("fixtures/arch_main_repo.json");
+    let parsed: Value = serde_json::from_str(json_str).expect("fixture parses");
+    let edge_types = parsed["edge_types"].as_array().expect("edge_types array");
+    assert!(edge_types.iter().all(|e| e["type"] != "DECLARES"));
+    assert!(edge_types.iter().any(|e| e["type"] == "DEFINES_METHOD"));
+}
+
+#[test]
+fn fixture_defines_method_count_matches_method_node_count() {
+    use serde_json::Value;
+    let json_str = include_str!("fixtures/arch_main_repo.json");
+    let parsed: Value = serde_json::from_str(json_str).expect("fixture parses");
+    let mcount = parsed["node_labels"]
+        .as_array()
+        .and_then(|l| l.iter().find(|l| l["label"] == "Method"))
+        .and_then(|m| m["count"].as_u64())
+        .unwrap_or(0);
+    let ecount = parsed["edge_types"]
+        .as_array()
+        .and_then(|e| e.iter().find(|e| e["type"] == "DEFINES_METHOD"))
+        .and_then(|e| e["count"].as_u64())
+        .unwrap_or(0);
+    assert_eq!(ecount, mcount);
+}

@@ -1,4 +1,4 @@
-# Clean-CTX — Troubleshooting Guide
+﻿# Clean-CTX — Troubleshooting Guide
 
 > **Owner:** Problem-solving + error codes + diagnostic commands · **Status:** Living reference
 
@@ -233,3 +233,15 @@ If none of the above resolves your issue:
    - Full error output (including any `RUST_BACKTRACE`)
    - Steps to reproduce
    - Input data (redacted if necessary)
+
+---
+
+### CBM Cypher aggregation limitations
+
+**Symptom:** CBM 0.8.1's Cypher engine does not support aggregation functions like COUNT, GROUP BY, SUM, or AVG. Queries using these functions return empty or error results.
+
+**Cause:** CBM uses a limited Cypher subset for graph queries. Aggregation is a Neo4j Cypher feature not present in CBM 0.8.1.
+
+**Resolution:** This is an upstream CBM limitation and not a Clean-CTX bug. Clean-CTX does not require aggregation — all production queries filter by specific node properties and return individual rows. If you need summary data, paginate through results client-side.
+
+**Also applies to:** MATCH (n) RETURN n, count(*) (and similar aggregate patterns) — use RETURN n LIMIT N instead.
