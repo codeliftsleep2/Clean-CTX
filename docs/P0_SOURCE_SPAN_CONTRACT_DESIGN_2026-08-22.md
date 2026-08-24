@@ -1,4 +1,4 @@
-﻿﻿# P0 Design: Canonical Decorator/Annotation/Attribute-Inclusive Class Source Contract
+﻿# P0 Design: Canonical Decorator/Annotation/Attribute-Inclusive Class Source Contract
 
 **Date:** 2026-08-22
 **Status:** ✅ IMPLEMENTED All recommendations shipped (commits `c422961`, `0552e8a`)
