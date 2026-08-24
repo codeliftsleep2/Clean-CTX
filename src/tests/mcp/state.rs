@@ -3,20 +3,17 @@
 // Tests for McpState: creation, warnings, source cache
 
 use super::*;
-use crate::config::CleanCtxConfig;
 
 #[test]
 fn state_new_creates_empty_registries() {
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
     // Warnings should be empty
     assert!(state.drain_warnings().is_empty());
 }
 
 #[test]
 fn push_and_drain_warnings() {
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
     state.push_warning("test warning 1");
     state.push_warning("test warning 2");
     assert_eq!(state.warnings.lock().unwrap().len(), 2);
@@ -30,8 +27,7 @@ fn push_and_drain_warnings() {
 
 #[test]
 fn drain_warnings_on_empty_returns_empty() {
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
     let drained = state.drain_warnings();
     assert!(drained.is_empty());
 }
@@ -39,8 +35,7 @@ fn drain_warnings_on_empty_returns_empty() {
 #[test]
 fn read_source_caches_file_content() {
     use std::sync::Arc;
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
     // Read a known file
     let result = state.read_source("src/lib.rs");
     assert!(result.is_ok());
@@ -54,16 +49,14 @@ fn read_source_caches_file_content() {
 
 #[test]
 fn read_source_nonexistent_file_returns_error() {
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
     let result = state.read_source("/nonexistent/file/path.rs");
     assert!(result.is_err());
 }
 
 #[test]
 fn state_accessor_mut_methods() {
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
     // Verify accessor methods return the correct types
     let _dict = state.dict_lock().get_or_create_alias("test.rs".to_string());
     let _cache = state.cache_write();

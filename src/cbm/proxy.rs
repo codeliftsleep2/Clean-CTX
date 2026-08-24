@@ -127,7 +127,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
                     }
                 }
                 _ => {
-                    // query_graph, get_architecture, detect_changes, index_project:
+                    // query_graph, get_architecture, detect_changes, index_repository:
                     // `query` and `project` map directly to CBM names.
                     if let Some(q) = params["arguments"]["query"].as_str() {
                         default.insert("query".into(), Value::String(q.to_string()));

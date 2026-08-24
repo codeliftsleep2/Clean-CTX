@@ -613,10 +613,13 @@ impl CbmClient {
             .collect())
     }
 
-    /// Trigger indexing of a project in CBM.
-    /// This tells CBM to scan and index the project's source files.
-    pub fn index_project(&mut self, project: &str) -> Result<Value, CbmError> {
-        self.call_tool("index_project", serde_json::json!({"project": project}))
+    /// Trigger indexing of a repository in CBM 0.8.1+.
+    /// Uses `index_repository` with `repo_path` and `mode` parameters.
+    pub fn index_repository(&mut self, repo_path: &str, mode: &str) -> Result<Value, CbmError> {
+        self.call_tool(
+            "index_repository",
+            serde_json::json!({"repo_path": repo_path, "mode": mode}),
+        )
     }
 }
 

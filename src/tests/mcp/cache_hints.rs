@@ -1,5 +1,4 @@
 use super::*;
-use crate::config::CleanCtxConfig;
 use crate::mcp::McpState;
 
 // ── Phase 1: CacheConfig tests ─────────────────────────────────────
@@ -90,7 +89,7 @@ fn test_compute_workspace_breaker() {
 /// Verify that inject_cache_breakpoints skips when cache is disabled.
 #[test]
 fn test_cache_disabled_skips_injection() {
-    let mut config = CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.cache.enabled = false; // disable cache
     let state = McpState::new(config);
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
@@ -114,7 +113,7 @@ fn test_cache_disabled_skips_injection() {
 /// Verify that inject_cache_breakpoints correctly injects a system_prompt breakpoint.
 #[test]
 fn test_inject_system_prompt_hint() {
-    let state = McpState::new(CleanCtxConfig::default());
+    let state = McpState::new(crate::tests::test_config());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
     inject_cache_breakpoints(
@@ -143,7 +142,7 @@ fn test_inject_system_prompt_hint() {
 /// Verify that inject_cache_breakpoints correctly injects a tools breakpoint.
 #[test]
 fn test_inject_tools_hint() {
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
     inject_cache_breakpoints(&mut response, &state, "tools", "1h", "tools-v1", None);
@@ -159,7 +158,7 @@ fn test_inject_tools_hint() {
 /// Verify that inject_cache_breakpoints correctly injects a baseline breakpoint.
 #[test]
 fn test_inject_baseline_hint() {
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
     let breaker = compute_baseline_breaker("compressed text here");
@@ -181,7 +180,7 @@ fn test_inject_baseline_hint() {
 /// Verify that inject_cache_breakpoints correctly injects a tail breakpoint with "rolling" breaker.
 #[test]
 fn test_inject_tail_hint() {
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
     inject_cache_breakpoints(&mut response, &state, "tail", "5m", "rolling", None);
@@ -203,7 +202,7 @@ fn test_inject_tail_hint() {
 /// Verify that the same region+breaker combo is not injected twice (dedup).
 #[test]
 fn test_emitted_dedup() {
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
     // First call — should be a miss
@@ -222,7 +221,7 @@ fn test_emitted_dedup() {
 /// Verify that cache metrics accumulate correctly across multiple calls.
 #[test]
 fn test_cache_metrics_accumulate() {
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": {} });
 
     // Two different breakpoints
@@ -334,7 +333,7 @@ fn test_generate_vocabulary_text() {
 /// to the top level.
 #[test]
 fn test_meta_not_in_response_root() {
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     // Full JSON-RPC response — simulating what callers pass
     let mut response = serde_json::json!({
         "jsonrpc": "2.0",
@@ -372,7 +371,7 @@ fn test_meta_not_in_response_root() {
 /// region), but _meta must still be inside result.
 #[test]
 fn test_multiple_calls_meta_stays_in_result() {
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let mut response = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,

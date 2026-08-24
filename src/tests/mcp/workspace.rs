@@ -24,6 +24,7 @@ fn compress_workspace_dir_respects_exclude_patterns() {
     );
 
     let mut config = CleanCtxConfig::default();
+    config.cbm.enabled = false;
     // F-12: use a glob pattern (`skip-me*`) to match the filename
     // prefix. The new segment-based matcher no longer does bare
     // substring matching, so `"skip-me"` would not match `"skip-me.ts"`.
@@ -76,8 +77,7 @@ fn workspace_emits_alias_cross_reference() {
         "export class Alpha { run(): void {} }\n",
     );
 
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
     let result = compress_workspace_dir(dir_path.to_str().unwrap(), Fidelity::Low, &state)
         .expect("workspace compress should succeed");
@@ -109,8 +109,7 @@ fn workspace_shares_aliases_with_per_file_tool() {
         "export class Shared { hello(): string { return ''; } }\n",
     );
 
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
     // First, compress via the per-file tool path (simulated inline).
     let file_path = dir_path.join("shared.ts");
@@ -232,8 +231,7 @@ fn compress_pass_emits_per_file_section() {
         "export class MyService { run(): void {} }\n",
     );
 
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
     let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
         .expect("workspace compress should succeed");
@@ -268,8 +266,7 @@ fn bundle_pass_emits_phi_bundle_and_footer() {
         ".root { color: red; }",
     );
 
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
     let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
         .expect("workspace compress should succeed");
@@ -296,8 +293,7 @@ fn graph_pass_emits_phi_graph_section() {
          export class LoggerService { log(msg: string) {} }\n",
     );
 
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
     let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
         .expect("workspace compress should succeed");
@@ -350,8 +346,7 @@ fn compress_workspace_caches_result() {
         "export class Alpha { run(): void {} }\n",
     );
 
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
     // First call: cache miss, normal compression
     let result1 = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
@@ -393,8 +388,7 @@ fn compress_workspace_cache_key_includes_fidelity() {
         "export class Beta { process(): string { return ''; } }\n",
     );
 
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
     // Compress at Low fidelity: uses global symbol two-pass approach
     let low_result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
@@ -450,8 +444,7 @@ export const loadUsers$ = createEffect(() =>
 "#,
     );
 
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
     let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
         .expect("workspace compress with NgRx should succeed (graceful degradation)");

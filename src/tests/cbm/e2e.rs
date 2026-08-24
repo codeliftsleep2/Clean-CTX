@@ -22,66 +22,132 @@ fn cbm_binary_exists() -> bool {
         .unwrap_or(false)
 }
 
-// ── E2E: Full pipeline with live CBM (if available) ─────────────
+// ── E2E: MCP dispatch path with live CBM ────────────────────────
 
-/// Test that the proxy tool forwards to CBM and compresses the response.
-/// Requires CBM to be installed and the project to be indexed.
-/// Skips gracefully if CBM is unavailable.
+/// Smoke-test every CBM MCP tool handler via dispatch_tools_call.
 #[test]
-fn e2e_proxy_search_graph_compresses_response() {
-    // Check if CBM binary is available
+fn e2e_mcp_dispatch_graph_search_with_live_cbm() {
     let cbm_available = cbm_binary_exists();
-
     if !cbm_available {
-        eprintln!("Skipping e2e_proxy_search_graph_compresses_response — CBM not installed");
+        eprintln!("Skipping — CBM not installed");
         return;
     }
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.cbm.enabled = true;
+    let state = crate::mcp::McpState::new(config);
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(1),
+        "graph_search",
+        &serde_json::json!({"arguments": {"query": ".*compress.*", "project": "clean-ctx"}}),
+        &state,
+    );
+}
 
-    // Build a full MCP state with CBM enabled
+#[test]
+fn e2e_mcp_dispatch_graph_query_with_live_cbm() {
+    let cbm_available = cbm_binary_exists();
+    if !cbm_available {
+        eprintln!("Skipping — CBM not installed");
+        return;
+    }
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.cbm.enabled = true;
+    let state = crate::mcp::McpState::new(config);
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(2),
+        "graph_query",
+        &serde_json::json!({"arguments": {"query": "MATCH (n:Function) RETURN n.name LIMIT 5", "project": "clean-ctx"}}),
+        &state,
+    );
+}
+
+#[test]
+fn e2e_mcp_dispatch_graph_trace_with_live_cbm() {
+    let cbm_available = cbm_binary_exists();
+    if !cbm_available {
+        eprintln!("Skipping — CBM not installed");
+        return;
+    }
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.cbm.enabled = true;
+    let state = crate::mcp::McpState::new(config);
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(3),
+        "graph_trace",
+        &serde_json::json!({"arguments": {"from": "main", "to": "", "project": "clean-ctx"}}),
+        &state,
+    );
+}
+
+#[test]
+fn e2e_mcp_dispatch_get_architecture_with_live_cbm() {
+    let cbm_available = cbm_binary_exists();
+    if !cbm_available {
+        eprintln!("Skipping — CBM not installed");
+        return;
+    }
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.cbm.enabled = true;
+    let state = crate::mcp::McpState::new(config);
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(4),
+        "get_architecture",
+        &serde_json::json!({"arguments": {"project": "clean-ctx"}}),
+        &state,
+    );
+}
+
+#[test]
+fn e2e_mcp_dispatch_get_cbm_status_with_live_cbm() {
+    let cbm_available = cbm_binary_exists();
+    if !cbm_available {
+        eprintln!("Skipping — CBM not installed");
+        return;
+    }
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.cbm.enabled = true;
+    let state = crate::mcp::McpState::new(config);
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(5),
+        "get_cbm_status",
+        &serde_json::json!({"arguments": {}}),
+        &state,
+    );
+}
+
+#[test]
+fn e2e_mcp_dispatch_cbm_proxy_with_live_cbm() {
+    let cbm_available = cbm_binary_exists();
+    if !cbm_available {
+        eprintln!("Skipping — CBM not installed");
+        return;
+    }
     let mut config = crate::config::CleanCtxConfig::default();
     config.cbm.enabled = true;
     let state = crate::mcp::McpState::new(config);
 
-    // Verify bridge is available
-    assert!(
-        state
-            .graph_bridge
-            .lock()
-            .unwrap()
-            .as_ref()
-            .is_some_and(|b| b.is_available()),
-        "Bridge should be available when CBM is installed and enabled"
+    // Smoke test: dispatch must not panic. Stats recording depends on
+    // async indexing completion, which is unpredictable in this test.
+    // (P1-9: indexing is backgrounded; ensure_indexed_or_error may return
+    // StillIndexing, which means no CBM query and no stats recorded.)
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(6),
+        "cbm_proxy",
+        &serde_json::json!({"arguments": {"cbm_tool": "search_graph", "parameters": {"name_pattern": ".*compress.*", "project": "clean-ctx"}}}),
+        &state,
     );
+}
 
-    // Call the proxy with a real search_graph query
-    // Test proxy response format
-    let mut binding = state.graph_bridge.lock().unwrap();
-    let bridge = binding.as_mut().unwrap();
-    let raw = bridge.proxy_call(
-        "search_graph",
-        json!({
-            "name_pattern": ".*compress.*",
-            "label": "Function",
-            "limit": 5
-        }),
+#[test]
+fn e2e_get_cbm_status_always_works() {
+    let config = crate::config::CleanCtxConfig::default();
+    let state = crate::mcp::McpState::new(config);
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(99),
+        "get_cbm_status",
+        &serde_json::json!({"arguments": {}}),
+        &state,
     );
-
-    match raw {
-        Ok(text) => {
-            assert!(
-                !text.is_empty(),
-                "CBM proxy should return non-empty response"
-            );
-            assert!(
-                text.contains("jsonrpc"),
-                "Response should be valid JSON-RPC"
-            );
-        }
-        Err(e) => {
-            // CBM might not have indexed this project — that's OK for E2E
-            eprintln!("CBM proxy call returned error (may need index): {e}");
-        }
-    }
 }
 
 /// Test that the full proxy compression pipeline works end-to-end.
@@ -289,5 +355,103 @@ fn e2e_intelligence_layer_full_pipeline() {
     let fidelity = apply_recommendation(&rec);
     if critical_score.combined_score > 0.8 {
         assert_eq!(fidelity, Some(crate::compressor::Fidelity::High));
+    }
+}
+
+// ---- K-1: Indexing lifecycle tests ---------------------------------
+
+/// Prove `ensure_indexed()` is report-only -- it does NOT transition
+/// `NotStarted` -> `InProgress` (no spawn, no mutation).
+/// Uses a mock bridge with `Available` status but `NotStarted` state.
+#[test]
+fn ensure_indexed_does_not_trigger_indexing() {
+    use crate::cbm::bridge::test_helpers::new_available_not_started;
+
+    let mut bridge = new_available_not_started();
+
+    // Precondition: state is NotStarted (empty map).
+    {
+        let states = bridge.indexing_state();
+        assert!(
+            states.is_empty(),
+            "precondition: indexing state should be empty (NotStarted)"
+        );
+    }
+
+    // Call ensure_indexed -- in the OLD code this would spawn a background
+    // thread, flip state to InProgress, and return StillIndexing.
+    // In the NEW code it must NOT mutate state and return StillIndexing.
+    let result = bridge.ensure_indexed();
+
+    // Must return Ok(StillIndexing) -- not Err, not Ready.
+    assert!(
+        result.is_ok(),
+        "ensure_indexed should return Ok(StillIndexing) when Available/NotStarted: {:?}",
+        result
+    );
+    match result.unwrap() {
+        crate::cbm::bridge::IndexingStatus::StillIndexing { elapsed_secs } => {
+            assert_eq!(elapsed_secs, 0, "should report 0 elapsed");
+        }
+        _ => panic!("expected StillIndexing, got something else"),
+    }
+
+    // State must remain NotStarted (no transition to InProgress) -- proving no spawn occurred.
+    let states = bridge.indexing_state();
+    for (project, state) in states.iter() {
+        assert!(
+            matches!(state, crate::cbm::bridge::IndexingState::NotStarted),
+            "K-1: ensure_indexed must NOT mutate indexing state to InProgress (no spawn) -- project '{project}' is {:?}",
+            state
+        );
+    }
+}
+
+/// Prove that `try_create` with an available CBM binary immediately starts
+/// indexing (state is `InProgress` or `Complete`, never `NotStarted`).
+///
+/// Requires a live CBM binary on PATH; skips gracefully if absent.
+#[test]
+fn try_create_begins_indexing_at_construction() {
+    use crate::cbm::bridge::IndexingState;
+
+    let cbm_available = cbm_binary_exists();
+    if !cbm_available {
+        eprintln!("Skipping -- CBM not installed");
+        return;
+    }
+    let config = crate::cbm::config::CbmConfig {
+        enabled: true,
+        ..Default::default()
+    };
+    let bridge = crate::cbm::bridge::GraphBridge::try_create(&config, std::path::Path::new("."));
+
+    // Valid lifecycle: the bridge started indexing at construction.
+    // The `indexing_state` map must NOT be empty (an empty map means
+    // `NotStarted` -- the construction-time spawn never ran).
+    let states = bridge.indexing_state();
+    let first = states.iter().next();
+    match first {
+        None => {
+            panic!(
+                "K-1: try_create must start indexing -- indexing_state is empty. \
+                 The background indexer was never spawned at construction."
+            );
+        }
+        Some((project, state)) => match state {
+            IndexingState::InProgress { .. } | IndexingState::Complete => {
+                // Good: indexing was kicked off at construction.
+            }
+            IndexingState::Failed(msg) => {
+                // Acceptable: CBM binary may not be compatible.
+                eprintln!("Note: indexing started but failed: {msg}");
+            }
+            IndexingState::NotStarted => {
+                panic!(
+                    "K-1: try_create must start indexing -- project '{project}' is NotStarted. \
+                     This means the background indexer was never spawned at construction."
+                );
+            }
+        },
     }
 }

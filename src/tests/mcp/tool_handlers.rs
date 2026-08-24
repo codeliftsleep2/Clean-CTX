@@ -103,8 +103,7 @@ fn parse_fidelity_arg_invalid_returns_error() {
 
 #[test]
 fn handle_context_stats_smoke() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
     let params = json!({ "arguments": {} });
     // Should not panic
@@ -113,8 +112,7 @@ fn handle_context_stats_smoke() {
 
 #[test]
 fn handle_list_sessions_smoke() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
     let params = json!({ "arguments": {} });
     // Should not panic
@@ -123,8 +121,7 @@ fn handle_list_sessions_smoke() {
 
 #[test]
 fn handle_context_history_smoke() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
     let params = json!({ "arguments": {} });
     // Should not panic
@@ -133,8 +130,7 @@ fn handle_context_history_smoke() {
 
 #[test]
 fn handle_save_context_smoke() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
     let params = json!({ "arguments": { "filePath": "/nonexistent.ts" } });
     // Should not panic (returns error for nonexistent file, but doesn't panic)
@@ -143,8 +139,7 @@ fn handle_save_context_smoke() {
 
 #[test]
 fn handle_restore_context_smoke() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
     let params = json!({ "arguments": { "filePath": "/nonexistent.ts" } });
     // Should not panic
@@ -153,8 +148,7 @@ fn handle_restore_context_smoke() {
 
 #[test]
 fn handle_purge_old_deltas_smoke() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
     let params = json!({ "arguments": { "days": 30 } });
     // Should not panic
@@ -165,8 +159,7 @@ fn handle_purge_old_deltas_smoke() {
 
 #[test]
 fn handle_compress_code_context_with_fallback() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
     // Use nonexistent file — should fall back to text pipeline gracefully
     let params = json!({ "arguments": { "filePath": "/nonexistent/file.ts", "fidelity": "low" } });
@@ -176,8 +169,7 @@ fn handle_compress_code_context_with_fallback() {
 
 #[test]
 fn handle_delta_code_context_no_baseline() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
     let params = json!({ "arguments": { "filePath": "/nonexistent/file.ts", "fidelity": "low" } });
     // Should not panic — stores baseline IR, returns "no baseline" message
@@ -191,8 +183,7 @@ fn handle_delta_code_context_no_baseline() {
 #[test]
 fn inject_baseline_breakpoint_helper_injects_hint() {
     use crate::mcp::tool_helpers::inject_baseline_breakpoint;
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let mut response = serde_json::json!({
         "jsonrpc": "2.0", "id": 1,
         "result": { "content": [{ "type": "text", "text": "compressed output" }] }
@@ -221,8 +212,7 @@ fn inject_baseline_breakpoint_helper_injects_hint() {
 #[test]
 fn inject_tail_breakpoint_helper_injects_hint() {
     use crate::mcp::tool_helpers::inject_tail_breakpoint;
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let mut response = serde_json::json!({
         "jsonrpc": "2.0", "id": 1,
         "result": { "content": [{ "type": "text", "text": "delta output" }] }
@@ -249,7 +239,7 @@ fn inject_tail_breakpoint_helper_injects_hint() {
 #[test]
 fn inject_baseline_breakpoint_skips_when_cache_disabled() {
     use crate::mcp::tool_helpers::inject_baseline_breakpoint;
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.cache.enabled = false;
     let state = crate::mcp::McpState::new(config);
     let mut response = serde_json::json!({
@@ -266,7 +256,7 @@ fn inject_baseline_breakpoint_skips_when_cache_disabled() {
 #[test]
 fn inject_tail_breakpoint_skips_when_cache_disabled() {
     use crate::mcp::tool_helpers::inject_tail_breakpoint;
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.cache.enabled = false;
     let state = crate::mcp::McpState::new(config);
     let mut response = serde_json::json!({
@@ -283,8 +273,7 @@ fn inject_tail_breakpoint_skips_when_cache_disabled() {
 // REGRESSION: The cached-IR fast path in `delta_code_context` must not panic.
 #[test]
 fn delta_code_context_cached_ir_path_does_not_panic() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
@@ -295,8 +284,7 @@ fn delta_code_context_cached_ir_path_does_not_panic() {
 // REGRESSION: The "No changes" path in `delta_text_context` must not panic.
 #[test]
 fn delta_text_context_no_changes_path_does_not_panic() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
@@ -306,8 +294,7 @@ fn delta_text_context_no_changes_path_does_not_panic() {
 
 #[test]
 fn handle_delta_text_context_no_baseline() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
     let params = json!({ "arguments": { "filePath": "/nonexistent/file.ts", "fidelity": "low" } });
     // Should not panic — stores text delta baseline, returns full output
@@ -316,8 +303,7 @@ fn handle_delta_text_context_no_baseline() {
 
 #[test]
 fn handle_apply_delta_no_baseline() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
     let params = json!({ "arguments": { "delta": { "file": "α1", "from": 1, "to": 2, "ops": { "+": [], "-": [], "~": [] } } } });
     // Should not panic — returns "UnknownFile" error
@@ -601,8 +587,7 @@ fn render_hierarchical_for_llm_injects_do_not_panic() {
 
 #[test]
 fn mcp_state_llm_text_cache_insert_and_read() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     // Insert into cache
     state
         .llm_text_cache_lock()
@@ -617,15 +602,13 @@ fn mcp_state_llm_text_cache_insert_and_read() {
 
 #[test]
 fn mcp_state_llm_text_cache_miss_returns_none() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     assert!(!state.llm_text_cache_lock().contains_key("nonexistent"));
 }
 
 #[test]
 fn mcp_state_llm_text_cache_clear_on_new() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     // Fresh state should have empty cache
     assert!(state.llm_text_cache_lock().is_empty());
 }
@@ -722,8 +705,7 @@ fn resolve_file_path_with_workspace_root() {
 
 #[test]
 fn handle_compress_code_context_accepts_relative_path() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
@@ -737,8 +719,7 @@ fn handle_compress_code_context_accepts_relative_path() {
 // the handler reads it without panicking.
 #[test]
 fn handle_compress_workspace_accepts_workspace_root() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params = serde_json::json!({
         "arguments": {
@@ -754,8 +735,7 @@ fn handle_compress_workspace_accepts_workspace_root() {
 
 #[test]
 fn handle_delta_code_context_accepts_relative_path() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
@@ -764,8 +744,7 @@ fn handle_delta_code_context_accepts_relative_path() {
 
 #[test]
 fn handle_delta_text_context_accepts_relative_path() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
@@ -774,8 +753,7 @@ fn handle_delta_text_context_accepts_relative_path() {
 
 #[test]
 fn handle_diff_code_context_accepts_relative_path() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
@@ -784,8 +762,7 @@ fn handle_diff_code_context_accepts_relative_path() {
 
 #[test]
 fn handle_restore_context_accepts_relative_path() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
@@ -794,8 +771,7 @@ fn handle_restore_context_accepts_relative_path() {
 
 #[test]
 fn handle_provide_code_context_accepts_relative_path() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "overview" } });
@@ -922,8 +898,7 @@ fn contract_fields_delegates_to_focused_none() {
 /// stdout, we verify the handler path is exercised without panic.
 #[test]
 fn provide_code_context_edit_intent_does_not_panic() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params = serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "intent": "edit" } });
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
@@ -933,8 +908,7 @@ fn provide_code_context_edit_intent_does_not_panic() {
 /// not panic (the edit-mode IR path with verbatim bodies).
 #[test]
 fn provide_code_context_explicit_edit_fidelity_does_not_panic() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "edit" } });
@@ -945,8 +919,7 @@ fn provide_code_context_explicit_edit_fidelity_does_not_panic() {
 /// not panic (the handler should return -32602, not crash).
 #[test]
 fn provide_code_context_invalid_fidelity_does_not_panic() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "full" } });
@@ -958,8 +931,7 @@ fn provide_code_context_invalid_fidelity_does_not_panic() {
 /// Verbatim short-circuit in `handle_provide_code_context`.
 #[test]
 fn provide_code_context_verbatim_fidelity_does_not_panic() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
@@ -969,8 +941,7 @@ fn provide_code_context_verbatim_fidelity_does_not_panic() {
 /// Verbatim short-circuit in `handle_compress_code_context` must not panic.
 #[test]
 fn compress_code_context_verbatim_fidelity_does_not_panic() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "verbatim" } });
@@ -981,8 +952,7 @@ fn compress_code_context_verbatim_fidelity_does_not_panic() {
 /// fidelity must not panic (the new focused-render path).
 #[test]
 fn provide_code_context_focus_methods_does_not_panic() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params = serde_json::json!({
         "arguments": {
@@ -998,8 +968,7 @@ fn provide_code_context_focus_methods_does_not_panic() {
 /// and should degrade gracefully.
 #[test]
 fn provide_code_context_focus_methods_empty_does_not_panic() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params = serde_json::json!({
         "arguments": {
@@ -1017,8 +986,7 @@ fn provide_code_context_focus_methods_empty_does_not_panic() {
 
 #[test]
 fn blast_radius_disabled_by_default_does_not_panic() {
-    let config = crate::config::CleanCtxConfig::default();
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
@@ -1028,7 +996,7 @@ fn blast_radius_disabled_by_default_does_not_panic() {
 
 #[test]
 fn blast_radius_enabled_does_not_panic_without_cbm() {
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.intelligence.blast_radius_enabled = true;
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);
@@ -1040,7 +1008,7 @@ fn blast_radius_enabled_does_not_panic_without_cbm() {
 
 #[test]
 fn blast_radius_delta_mode_does_not_panic() {
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.intelligence.blast_radius_enabled = true;
     let state = crate::mcp::McpState::new(config);
     let id = serde_json::json!(1);

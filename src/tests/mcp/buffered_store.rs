@@ -466,7 +466,7 @@ fn make_state(db_name: &str) -> (crate::mcp::McpState, TempDir) {
     let tmp = TempDir::new().expect("failed to create temp dir");
     let db_path = tmp.path().join(db_name);
 
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.persistence.enabled = true;
     config.persistence.db_path = db_path.to_string_lossy().to_string();
 
@@ -542,7 +542,7 @@ fn test_integration_simulate_restart_stats_recovery() {
 
     // ── Session 1: compress a file ──
     {
-        let mut config = crate::config::CleanCtxConfig::default();
+        let mut config = crate::tests::test_config();
         config.persistence.enabled = true;
         config.persistence.db_path = db_path.to_string_lossy().to_string();
         let state = crate::mcp::McpState::new(config);
@@ -580,7 +580,7 @@ fn test_integration_simulate_restart_stats_recovery() {
 
     // ── Session 2: open NEW state pointing at same DB ──
     {
-        let mut config = crate::config::CleanCtxConfig::default();
+        let mut config = crate::tests::test_config();
         config.persistence.enabled = true;
         config.persistence.db_path = db_path.to_string_lossy().to_string();
         let state = crate::mcp::McpState::new(config);

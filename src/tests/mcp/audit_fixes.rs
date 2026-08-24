@@ -16,6 +16,7 @@ fn make_state(db_name: &str) -> (crate::mcp::McpState, TempDir) {
 
     // Build a config with persistence enabled
     let mut config = crate::config::CleanCtxConfig::default();
+    config.cbm.enabled = false;
     config.persistence.enabled = true;
     config.persistence.db_path = db_path_str;
 
@@ -69,7 +70,7 @@ fn audit2_dispatch_returns_after_inline_arm() {
     // block and NOT in the registry, the registry should never trigger.
     // We verify by calling decompress_code_context (only in match block)
     // and confirming it doesn't also hit the registry.
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params = serde_json::json!({
         "arguments": { "compressedText": "// test" }
@@ -178,6 +179,7 @@ fn audit5_list_sessions_disabled_returns_result() {
     // return a result (not an error).
     // Create a config with persistence explicitly disabled.
     let mut config = crate::config::CleanCtxConfig::default();
+    config.cbm.enabled = false;
     config.persistence.enabled = false;
     let state = crate::mcp::McpState::new(config);
 
@@ -202,7 +204,7 @@ fn audit5_list_sessions_disabled_returns_result() {
 fn audit6_ir_context_read_helper_works() {
     // FAANG audit P1 #5: ir_context_read() should return a read guard
     // with a poisoned-recovery pattern.
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
 
     // ir_context_read should return a valid read guard
     let guard = state.ir_context_read();
@@ -369,7 +371,7 @@ fn audit10_tool_handlers_wired_and_compiles() {
 fn audit11_helper_methods_compile() {
     // Compilation regression: if any helper signature changes, this test
     // fails to compile, catching the regression immediately.
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let _alias = state.get_or_create_alias("test.rs".to_string());
     let _footer = state.format_dict_footer();
     let _dict = state.dict_lock();

@@ -216,8 +216,9 @@ impl GraphBridge {
             .canonicalize()
             .unwrap_or_else(|_| project_root.to_path_buf());
 
-        Self {
-            status: if client.is_some() {
+        let is_available = client.is_some();
+        let mut bridge = Self {
+            status: if is_available {
                 CbmStatus::Available
             } else {
                 CbmStatus::Unavailable
@@ -231,7 +232,24 @@ impl GraphBridge {
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(HashMap::new())),
             last_error: None,
+        };
+
+        // K-1: Start indexing immediately when CBM launched successfully.
+        //
+        // Previously indexing was deferred until the first CBM-dependent
+        // request called `ensure_indexed()`, which blocked/spawned lazily.
+        // Worse, the MANUAL construction in this method (via the `Self { }`
+        // literal) used to pre-seed `indexing_state` to `Complete`, hiding the
+        // cold-start problem: on a fresh session with a warm disk cache the
+        // first graph query would still return empty results until indexing
+        // finished. Now the background indexer begins as soon as the bridge is
+        // constructed, so by the time a request arrives the graph is ready (or
+        // `ensure_indexed()` reports `StillIndexing` and the agent retries).
+        if is_available {
+            bridge.start_indexing();
         }
+
+        bridge
     }
 
     /// Attach a disk cache store to this bridge. Called by `McpState` after
@@ -338,16 +356,17 @@ impl GraphBridge {
     /// Called automatically on startup when CBM is available.
     /// Returns Ok(()) if indexing was triggered successfully, or Err if CBM is unavailable.
     ///
-    /// P1-9: This now dispatches indexing to a background thread.
-    /// The caller receives `StillIndexing` from `ensure_indexed()` and
-    /// the actual index_project call happens asynchronously.
-    pub fn index_project(&mut self) -> Result<(), CbmError> {
+    /// K-1: Indexing is now started by `start_indexing()` in a background thread
+    /// at bridge construction. This method is kept as a public API for manual
+    /// re-indexing (e.g. after `set_project` or `invalidate_cache`).
+    pub fn index_repository(&mut self) -> Result<(), CbmError> {
         if !self.is_available() {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
         let project = self.project_str();
         eprintln!("[clean-ctx-cbm] Indexing project: {project}");
-        // Call CBM's index_project tool to trigger indexing
+        // Call CBM's index_repository tool to trigger indexing
+        let repo_path = self.project_root.to_string_lossy().to_string();
         let client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
         let _result = match client_guard.as_ref() {
             Some(_c) => {
@@ -355,7 +374,10 @@ impl GraphBridge {
                 drop(client_guard);
                 let mut cg = self.client.lock().unwrap_or_else(|p| p.into_inner());
                 let client = cg.as_mut().unwrap();
-                client.call_tool("index_project", serde_json::json!({"project": project}))
+                client.call_tool(
+                    "index_repository",
+                    serde_json::json!({"repo_path": repo_path, "mode": "fast"}),
+                )
             }
             None => return Err(CbmError::LaunchError("CBM not available".into())),
         }?;
@@ -363,62 +385,39 @@ impl GraphBridge {
         Ok(())
     }
 
-    /// Ensure the project is indexed before issuing queries.
+    /// Start project indexing in a background thread.
     ///
-    /// P1-9: **Non-blocking rewrite.** If indexing has not started,
-    /// spawns a background thread to perform the actual pipe I/O and
-    /// returns `StillIndexing` immediately. Callers (tool handlers)
-    /// respond to the agent with a "retry later" message instead of
-    /// blocking the entire dispatcher thread.
-    pub fn ensure_indexed(&mut self) -> Result<IndexingStatus, CbmError> {
-        // Guard before touching any state: when CBM is unavailable (disabled,
-        // binary missing, launch failed), return the same error on every call.
-        // Without this guard the first call would spawn a doomed background
-        // indexing thread (returning Ok(StillIndexing)) whose failure then
-        // flips the state to `Failed`, so the second call returns Err — a
-        // non-idempotent, thread-wasting bug (AUDIT-9 regression).
-        if !self.is_available() {
-            return Err(CbmError::LaunchError("CBM not available".into()));
-        }
+    /// K-1: Extracted from `ensure_indexed()` so indexing can begin at bridge
+    /// construction (`try_create`) rather than lazily on the first query.
+    ///
+    /// Marks this project's state `InProgress` and spawns a dedicated thread
+    /// that performs the actual `index_repository(repo_path, "fast")` pipe I/O,
+    /// then transitions the state to `Complete` or `Failed`. The thread flips
+    /// the circuit breaker via `record_failure()` on error.
+    fn start_indexing(&mut self) {
         let project = self.project_str();
-        let mut states = self
-            .indexing_state
-            .lock()
-            .unwrap_or_else(|p| p.into_inner());
-        let state = states
-            .entry(project.clone())
-            .or_insert(IndexingState::NotStarted);
 
-        match state {
-            IndexingState::Complete => return Ok(IndexingStatus::Ready),
-            IndexingState::InProgress { started_at } => {
-                let elapsed = started_at.elapsed().as_secs();
-                if elapsed > 60 {
-                    *state = IndexingState::Failed("indexing timed out after 60s".into());
-                    return Err(CbmError::LaunchError("indexing timed out".into()));
-                }
-                return Ok(IndexingStatus::StillIndexing {
-                    elapsed_secs: elapsed,
-                });
-            }
-            IndexingState::Failed(msg) => {
-                return Err(CbmError::LaunchError(msg.clone()));
-            }
-            IndexingState::NotStarted => {} // fall through to spawn
+        // Mark as in-progress before spawning (so concurrent calls see it).
+        {
+            let mut states = self
+                .indexing_state
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
+            let state = states
+                .entry(project.clone())
+                .or_insert(IndexingState::NotStarted);
+            *state = IndexingState::InProgress {
+                started_at: Instant::now(),
+            };
         }
 
-        // Mark as in-progress before spawning (so concurrent calls see it)
-        *state = IndexingState::InProgress {
-            started_at: Instant::now(),
-        };
-        drop(states);
-
-        // Clone Arc handles for the background thread
+        // Clone Arc handles for the background thread.
         let client_arc = Arc::clone(&self.client);
         let state_arc = Arc::clone(&self.indexing_state);
         let _status = self.status.clone();
+        let repo_path = self.project_root.to_string_lossy().to_string();
 
-        // Spawn background indexing thread
+        // Spawn background indexing thread.
         std::thread::Builder::new()
             .name("cbm-indexer".into())
             .spawn(move || {
@@ -436,9 +435,10 @@ impl GraphBridge {
                     };
                     match client_guard.as_mut() {
                         Some(client) => {
-                            match client
-                                .call_tool("index_project", serde_json::json!({"project": project}))
-                            {
+                            match client.call_tool(
+                                "index_repository",
+                                serde_json::json!({"repo_path": repo_path, "mode": "fast"}),
+                            ) {
                                 Ok(_) => {
                                     eprintln!("[clean-ctx-cbm] Project indexed successfully");
                                     Ok(())
@@ -468,7 +468,7 @@ impl GraphBridge {
                         *s = IndexingState::Complete;
                     }
                     Err(e) => {
-                        // Record failure for circuit breaker
+                        // Record failure for circuit breaker.
                         if let Ok(mut cg) = client_arc.lock() {
                             if let Some(ref mut c) = *cg {
                                 c.record_failure();
@@ -479,8 +479,57 @@ impl GraphBridge {
                 }
             })
             .ok();
+    }
 
-        Ok(IndexingStatus::StillIndexing { elapsed_secs: 0 })
+    /// Ensure the project is indexed before issuing queries.
+    ///
+    /// K-1: **Report-only rewrite. Indexing is started at bridge construction
+    /// (`try_create` → `start_indexing`), so this method no longer spawns a
+    /// background indexing thread.** It only reports the current state:
+    ///
+    /// - `InProgress` → `StillIndexing` (retry later); times out after 60s.
+    /// - `Complete`   → `Ready`.
+    /// - `Failed`     → `Err`.
+    ///
+    /// `NotStarted` is treated as freshly-launched so the caller retries; this
+    /// avoids duplicating the construction-time spawn while never blocking.
+    pub fn ensure_indexed(&mut self) -> Result<IndexingStatus, CbmError> {
+        // Guard before touching any state: when CBM is unavailable (disabled,
+        // binary missing, launch failed), return the same error on every call.
+        // (AUDIT-9 regression: previously the first call could spawn a doomed
+        // background thread when unavailable.)
+        if !self.is_available() {
+            return Err(CbmError::LaunchError("CBM not available".into()));
+        }
+        let project = self.project_str();
+        let mut states = self
+            .indexing_state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        let state = states
+            .entry(project.clone())
+            .or_insert(IndexingState::NotStarted);
+
+        match state {
+            IndexingState::Complete => Ok(IndexingStatus::Ready),
+            IndexingState::InProgress { started_at } => {
+                let elapsed = started_at.elapsed().as_secs();
+                if elapsed > 60 {
+                    *state = IndexingState::Failed("indexing timed out after 60s".into());
+                    Err(CbmError::LaunchError("indexing timed out".into()))
+                } else {
+                    Ok(IndexingStatus::StillIndexing {
+                        elapsed_secs: elapsed,
+                    })
+                }
+            }
+            IndexingState::Failed(msg) => Err(CbmError::LaunchError(msg.clone())),
+            // Construction-time `start_indexing()` marks the state InProgress
+            // before the thread runs; if we observe NotStarted (e.g. the thread
+            // hasn't flipped state yet), report as freshly started so the caller
+            // retries instead of blocking or double-spawning.
+            IndexingState::NotStarted => Ok(IndexingStatus::StillIndexing { elapsed_secs: 0 }),
+        }
     }
 
     /// Access the indexing state map for inspection (e.g., get_cbm_status handler).
@@ -1399,6 +1448,37 @@ pub mod test_helpers {
     /// symbol_importance cache returns empty).
     pub fn new_mock_empty() -> GraphBridge {
         new_mock(HashMap::new())
+    }
+
+    /// Create a mock GraphBridge that is `Available` but whose indexing state
+    /// is `NotStarted` (a state that only exists transiently before the
+    /// construction-time `start_indexing()` thread flips it to `InProgress`).
+    ///
+    /// K-1: Used to prove `ensure_indexed()` is **report-only** — it must NOT
+    /// transition `NotStarted` → `InProgress` (i.e. it must not spawn an
+    /// indexing thread). The old behavior spawned on `NotStarted`.
+    pub fn new_available_not_started() -> GraphBridge {
+        let bridge = GraphBridge {
+            client: Arc::new(Mutex::new(None)),
+            cache: DashMap::new(),
+            status: CbmStatus::Available,
+            cache_ttl: 3600,
+            project: Some("test-project".to_string()),
+            project_root: PathBuf::from("."),
+            disk_cache: None,
+            graph_version: String::new(),
+            indexing_state: Arc::new(Mutex::new(HashMap::new())),
+            last_error: None,
+        };
+        // Seed a cache entry so is_available() is true (client is None).
+        bridge.cache.insert(
+            "__available__".to_string(),
+            CachedGraphData {
+                data: serde_json::json!("available"),
+                expires_at: Instant::now() + Duration::from_secs(3600),
+            },
+        );
+        bridge
     }
 
     /// Create a mock GraphBridge pre-seeded with call edges, dataflow edges,

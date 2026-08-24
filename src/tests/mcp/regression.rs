@@ -866,7 +866,7 @@ fn make_state(db_name: &str) -> (crate::mcp::McpState, TempDir) {
     let tmp = TempDir::new().expect("failed to create temp dir");
     let db_path = tmp.path().join(db_name);
 
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.persistence.enabled = true;
     config.persistence.db_path = db_path.to_string_lossy().to_string();
 
@@ -890,7 +890,7 @@ fn regression_c1_workspace_tokenizer_created_once() {
     std::fs::write(dir_path.join("a.rs"), "pub struct Foo { }").unwrap();
     std::fs::write(dir_path.join("b.rs"), "pub struct Bar { }").unwrap();
 
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.persistence.enabled = false;
     let state = crate::mcp::McpState::new(config);
 
@@ -1001,7 +1001,7 @@ fn regression_h1_token_savings_estimates_breakpoint_only() {
     // We verify this by checking that the returned savings is small
     // (proportional to the breakpoint) rather than large (proportional
     // to the full response).
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
 
     // Create a large response to make the difference obvious
     let large_content = "x".repeat(10000);
@@ -1053,7 +1053,7 @@ fn regression_h1_token_savings_estimates_breakpoint_only() {
 fn regression_m1_cache_section_shown_when_disabled() {
     // M-1 fix: context_stats dashboard should always show the cache
     // section, with "Status: disabled" when cache is off.
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.cache.enabled = false;
     let state = crate::mcp::McpState::new(config);
 
@@ -1195,7 +1195,7 @@ fn regression_e2e_cache_metrics_through_full_workflow() {
 /// result, never at the response root level.
 #[test]
 fn regression_meta_not_in_tools_list_root() {
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.cache.enabled = true;
     let state = crate::mcp::McpState::new(config);
 
@@ -1218,7 +1218,7 @@ fn regression_meta_not_in_tools_list_root() {
 /// result, never at the response root level.
 #[test]
 fn regression_meta_not_in_prompts_list_root() {
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.cache.enabled = true;
     let state = crate::mcp::McpState::new(config);
 
@@ -1237,7 +1237,7 @@ fn regression_meta_not_in_prompts_list_root() {
 /// _meta.cache_hints inside result, never at the response root level.
 #[test]
 fn regression_meta_not_in_cleanctx_prompt_root() {
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.cache.enabled = true;
     let state = crate::mcp::McpState::new(config);
 
@@ -1256,7 +1256,7 @@ fn regression_meta_not_in_cleanctx_prompt_root() {
 /// _meta.cache_hints inside result, never at the response root level.
 #[test]
 fn regression_meta_not_in_vocabulary_prompt_root() {
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.cache.enabled = true;
     let state = crate::mcp::McpState::new(config);
 
@@ -1281,7 +1281,7 @@ fn regression_meta_not_in_vocabulary_prompt_root() {
 #[test]
 fn regression_meta_placement_json_structure_valid() {
     // Build a realistic response tree like the handlers produce
-    let state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let mut response = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -1341,7 +1341,7 @@ fn regression_cbm_proxy_meta_in_result() {
     // CBM proxy sends responses via send_response, which goes to stdout.
     // We verify the handler runs without panicking — the _meta placement
     // is validated by the inject_cache_breakpoints unit tests above.
-    let mut state = crate::mcp::McpState::new(crate::config::CleanCtxConfig::default());
+    let mut state = crate::mcp::McpState::new(crate::tests::test_config());
     state.cbm_status = crate::cbm::CbmStatus::Unavailable;
     let id = serde_json::json!(1);
     let params = serde_json::json!({
