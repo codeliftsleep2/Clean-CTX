@@ -176,7 +176,7 @@ pub(crate) fn compress_workspace_dir(
     // Phase 4: Resolve relative `dir_path` against the caller's CWD, not
     // the process-global project root. This enables cross-repo workspace
     // compression in workspace-mode setups (e.g. `fe/src` from a parent
-    // `Outcomes/` workspace root). Absolute paths pass through unchanged.
+    // `Test/` workspace root). Absolute paths pass through unchanged.
     let resolved_dir = if Path::new(dir_path).is_absolute() {
         dir_path.to_string()
     } else {

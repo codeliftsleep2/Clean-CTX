@@ -367,7 +367,7 @@ pub struct CleanCtxConfig {
     ///
     /// Example `.clean-ctx.json`:
     /// ```json
-    /// { "additional_roots": ["C:\\Users\\me\\source\\repos\\Outcomes"] }
+    /// { "additional_roots": ["C:\\Users\\me\\source\\repos\\Test"] }
     /// ```
     #[serde(default)]
     pub additional_roots: Vec<String>,

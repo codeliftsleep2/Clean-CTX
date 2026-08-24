@@ -546,13 +546,13 @@ Clean-CTX supports both a **central** config (one `.clean-ctx.json` shared acros
 Place `.clean-ctx.json` at a common **parent** directory of all your repos:
 
 ```
-C:\Outcomes\.clean-ctx.json      ← shared central config
-C:\Outcomes\fe\
-C:\Outcomes\API\
-C:\Outcomes\Functions\
+C:\Test\.clean-ctx.json      ← shared central config
+C:\Test\fe\
+C:\Test\API\
+C:\Test\Functions\
 ```
 
-When VS Code opens the `C:\Outcomes` workspace, the walk-up from CWD finds the config immediately. When any single repo is opened alone (e.g. `C:\Outcomes\fe`), the walk-up from its `Cargo.toml` anchors the project root at `C:\Outcomes\fe`, and `CleanCtxConfig::load` **continues walking up** from there — finding `C:\Outcomes\.clean-ctx.json` on the way.
+When VS Code opens the `C:\Test` workspace, the walk-up from CWD finds the config immediately. When any single repo is opened alone (e.g. `C:\Test\fe`), the walk-up from its `Cargo.toml` anchors the project root at `C:\Test\fe`, and `CleanCtxConfig::load` **continues walking up** from there — finding `C:\Test\.clean-ctx.json` on the way.
 
 > **Note:** The config walk-up only looks **up**, never at sibling directories. If your central config lives in a repo that is a sibling of the repos you're working on (e.g. `C:\source\repos\clean-ctx\.clean-ctx.json` used from `C:\source\repos\repo-A`), the walk-up from `repo-A` cannot see it. Use `CLEAN_CTX_PROJECT_ROOT` for this layout.
 
