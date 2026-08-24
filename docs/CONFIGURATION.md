@@ -475,6 +475,7 @@ Clean-CTX normally rejects file paths outside a single trusted workspace root (t
 - The boundary check in `resolve_file_path_checked` compares the requested file path against the primary workspace root first (fast path), then against each entry in `additional_roots`.
 - Each additional root is canonicalized lazily at check time (not config load time), so a path that doesn't exist on the current machine is silently skipped rather than erroring the whole config.
 - When a path fails all boundary checks, the error message now shows the effective workspace root(s) checked, helping you diagnose configuration issues.
+- When CBM integration is enabled, every root (primary + additional) also becomes its own CBM graph project under one shared CBM subprocess: all roots are indexed in the background at startup, readiness is tracked per project, and graph queries resolve to the matching project automatically. See **CBM-ID-001** in `docs/ARCHITECTURAL_INVARIANTS.md`.
 
 **Use case:** A container repo whose `.clean-ctx.json` lives at `C:\containers\fe` but whose source code lives in sibling repos like `C:\containers\api\src`. Without `additional_roots`, the boundary check rejects files in `C:\containers\api\src` because they're outside the primary root (`C:\containers\fe`).
 

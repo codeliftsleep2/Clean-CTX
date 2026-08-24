@@ -651,6 +651,12 @@ Each compression event is tagged with a `SavingsDomain` for the dashboard:
 
 **Graceful degradation:** If CBM is unavailable, the intelligence layer falls back to IR-only PageRank. Compression never fails due to CBM issues.
 
+### Project Identity & Multi-Root Lifecycle
+
+CBM derives each project ID itself from the canonical repo path (`index_repository(repo_path, mode)` takes no project parameter — the verified CBM 0.8.1 wire contract). Clean-CTX mirrors this exactly: every configured root (primary + `additional_roots`) is canonicalized into its CBM slug, all roots are served by one shared CBM subprocess, and background indexing starts for every root at bridge construction. Indexing/readiness state is tracked independently per project, graph queries and `cbm_proxy` resolve targets through this root→project mapping, and project-independent tools (e.g. `list_projects`) bypass the readiness gate. Directory basenames are never used as project identities.
+
+Normative details: **CBM-ID-001** in `docs/ARCHITECTURAL_INVARIANTS.md`.
+
 ## Angular Meta-Layer (Phase 1 + 2 + 3)
 
 The Meta-Layer is **purely additive** — it never modifies the existing TS compaction output. It only appends a `Φ` block below the existing compacted class. Non-Angular files pay zero overhead (byte-identical output).

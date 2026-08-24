@@ -51,7 +51,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | Property | Value |
 |----------|-------|
 | **Intent** | Canonical IR must not contain invalid references or structurally inconsistent instructions. |
-| **Invariant** | Valid IR passes `DefaultValidator` without E001â€“E010 violations. Invalid IR (dangling references, orphaned methods, inconsistent effect/context annotations) is detected. |
+| **Invariant** | Valid IR passes `DefaultValidator` without E001–E010 violations. Invalid IR (dangling references, orphaned methods, inconsistent effect/context annotations) is detected. |
 | **Enforcement** | `DefaultValidator` implementing `IRValidator` trait. 10 unit tests (one per rule) plus edge-case tests for empty IR and error display. |
 | **Authority** | `src/ir/validator.rs` (rules), `src/tests/ir/validator.rs` (tests) |
 | **Type** | ENFORCED (test) |
@@ -125,6 +125,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Enforcement** | `class_source_from_capture_c22_identity` test asserts `class_source_from_capture` reconstructs the capture from source + `CapEntry`. `MetaLayerPass::run()` in `src/ir/pipeline.rs` filters type-root captures from `state.captures`. Multi-class cross-contamination tests (9 tests across Angular/Spring/.NET at Low/Medium/High) verify per-class isolation — a class's `@Component`/`@RestController`/`[ApiController]` marker never leaks to sibling classes. |
 | **Authority** | `src/meta_util.rs` (`class_source_from_capture`), `src/ir/pipeline.rs` (`MetaLayerPass::run`), `src/layers/registry.rs` (`run_meta_layers_pipeline`), `src/tests/meta_util.rs` (C-22 identity test), `src/tests/compression/pipeline.rs` (multi-class tests) |
 | **Type** | ENFORCED (test + structural) |
+| **Gate** | `cargo test` |
+
+---
+
+### CBM-ID-001 Canonical CBM Project Identity & Multi-Root Lifecycle
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Every CBM graph query must address the project CBM actually indexed, regardless of how many repos are configured. |
+| **Invariant** | (1) A CBM project identity is the slug derived from the canonical repo path (`cbm_project_slug()`), never a directory basename. (2) Every configured root (primary + `additional_roots`) maps to its own CBM project ID via the bridge's two-way identity map (`project_ids` / `project_paths`). (3) One CBM subprocess serves all configured roots. (4) Indexing begins asynchronously at bridge construction for every root (`start_indexing_roots()`). (5) Indexing/readiness state is tracked independently per CBM project; untracked projects pass through as ready rather than dead-ending in a permanent gate. (6) Graph queries and `cbm_proxy` resolve targets through the root/project mapping (`resolve_project_id`) and never invent a dirname-based identity. (7) Project-independent CBM tools (e.g. `list_projects`) bypass the indexing gate entirely. (8) The verified CBM 0.8.1 wire contract is preserved: `index_repository(repo_path, mode)` takes no project parameter — CBM derives the ID from the canonical path. |
+| **Enforcement** | Regression tests covering: slug fidelity against live-captured CBM responses; per-root registration for primary + additional roots; dirname/path overrides canonicalizing instead of diverging; per-project readiness isolation with untracked pass-through; single-root backward compatibility; proxy gate scoping (project-less calls skip the gate). |
+| **Authority** | `src/cbm/bridge.rs` (`cbm_project_slug`, `try_create_with_roots`, `resolve_project_id`, `ensure_indexed_for`), `src/cbm/proxy.rs` (`resolve_proxy_target_project`), `src/tests/cbm/regression.rs` |
+| **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
 
 ---

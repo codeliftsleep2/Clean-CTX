@@ -1,7 +1,7 @@
-﻿# P0 Design: Canonical Decorator/Annotation/Attribute-Inclusive Class Source Contract
+﻿﻿# P0 Design: Canonical Decorator/Annotation/Attribute-Inclusive Class Source Contract
 
 **Date:** 2026-08-22
-**Status:** âœ… IMPLEMENTED All recommendations shipped (commits `c422961`, `0552e8a`)
+**Status:** ✅ IMPLEMENTED All recommendations shipped (commits `c422961`, `0552e8a`)
 **Audience:** Historical record design preserved for reference; implementation is the source of truth
 
 ---
@@ -54,12 +54,12 @@ extend `SymbolInfo`, and does **not** change `CoreOp::DefClass`.
 
 ```
 run_capture_pipeline
-    â†“
+    ↓
 Vec<CapEntry>
-    â†“
+    ↓
 PassContext.captures          (C-22: existing identity, now populated)
-    â”œâ”€â”€ CoreIRPass `→`. CoreOp::DefClass(name)
-    â””â”€â”€ MetaLayerPass `→`. CapEntry `→`. canonical source span `→`. meta-layer registry
+    ├── CoreIRPass `→`. CoreOp::DefClass(name)
+    └── MetaLayerPass `→`. CapEntry `→`. canonical source span `→`. meta-layer registry
 ```
 
 Detailed call chain:
@@ -114,8 +114,8 @@ compress_file_with_source (compression/pipeline.rs:110-255)
         output_lines.push(format_class_entry(&cap.text, ...))      // compacted
         class_captures.push(decorator_inclusive_class_text(src,cap))
           `→`. find_decorator_inclusive_start(...)   // TS-only (@Name(...))
-            // Java: `@RestController` `→`. None `→`. falls back to cap.text  âŒ
-            // C#:   `[ApiController]` `→`. None `→`. falls back to cap.text  âŒ
+            // Java: `@RestController` `→`. None `→`. falls back to cap.text  ❌
+            // C#:   `[ApiController]` `→`. None `→`. falls back to cap.text  ❌
       `→`. registry.run_meta_layers_pipeline(source, class_captures) // TS fixed, others broken
   `→`. Φ blocks appended (lines 212-221, 292-303, 655-665)
 ```
@@ -146,7 +146,7 @@ for Java/C# also improves this consumer.
 `captures: Vec<CapEntry>` (pipeline.rs:95-96) as the canonical capture
 identity from the capture pipeline, but `CoreIRPass` keeps the batch in a
 local `let captures` (pipeline.rs:457-477) and never populates
-`state.captures`. `MetaLayerPass` therefore cannot reach the source span â€”
+`state.captures`. `MetaLayerPass` therefore cannot reach the source span —
 it can only recover the compacted name.
 
 ---
@@ -184,7 +184,7 @@ pub fn find_class_source_start(source: &str, type_keyword_pos: usize) -> usize;
    for non-decorated classes). Use the `modifiers` lists in
    `compaction::modifiers` as the authoritative keyword set.
 6. Once an `@` / `[` is found, continue backward over BOTH annotations and
-   modifiers until the previous non-whitespace token is not a continuation â€”
+   modifiers until the previous non-whitespace token is not a continuation —
    stacked C# attributes (`[A]\n[B]\npublic class`) and Java annotations.
 7. Return the final `start`.
 
@@ -241,7 +241,7 @@ Consumers:
 | `mcp/workspace_util.rs::extract_class_blocks` (L205-239) | TS-only `find_decorator_inclusive_start` | same new helper (trilingual) |
 
 The registry API `run_meta_layers_pipeline(source, class_captures: &[String],
-â€¦)` stays **identical** only the caller-side text changes from names to
+…)` stays **identical** only the caller-side text changes from names to
 full source.
 
 ### 5.1 Change list (design)
@@ -249,7 +249,7 @@ full source.
 **A. `src/meta_util.rs`**
 - Extend `find_decorator_inclusive_start` (now a thin wrapper) OR replace it
   with `find_class_source_start` + `class_source_text<'a>(source, &CapEntry)`.
-- Keep the current TS path behavior byte-for-byte for decorated TS â€”
+- Keep the current TS path behavior byte-for-byte for decorated TS —
   existing Angular tests stay green (e.g.
   `src/tests/compression/pipeline.rs::compress_text_emits_angular_component_markers`).
 
@@ -298,7 +298,7 @@ full source.
 **C. `src/compression/pipeline.rs`**
 - Replace the private `decorator_inclusive_class_text` (L793-814) call in
   `build_output_lines` with the canonical `class_source_from_capture`.
-- Delete the private helper (only duplicate TS-only special case â€”
+- Delete the private helper (only duplicate TS-only special case —
   the single-source contract eliminates it).
 
 **D. `src/mcp/workspace_util.rs`**
@@ -421,9 +421,9 @@ All tests under `src/tests/` per the existing `#[path]` modules.
 - **C# attribute span**: `[ApiController]` literal `[`/`]` backward scan
   with `find_matching_brace` (string-aware, bracket-depth). Robust to
   multi-line `[ApiController,\n Route(..)]`.
-- **Java multi-line annotations**: `@RequestMapping(...)` with newline args â€”
+- **Java multi-line annotations**: `@RequestMapping(...)` with newline args —
   handled by the balanced-paren step (string-aware).
-- **Java member annotations**: guard against a stray `)` from a *method* â€”
+- **Java member annotations**: guard against a stray `)` from a *method* —
   only descend a balanced paren group directly attached to an `@` identifier.
 - **Modifier chain**: only walk known modifier keywords; stop otherwise;
   confirm against `compaction::modifiers`.
