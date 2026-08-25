@@ -451,9 +451,35 @@ See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for per-edit breakdowns, cachin
 
 ---
 
-## Opcode Reference
+## Response Notation (SCHEMA v2 — primary)
 
-### Built-in Primitives (34 opcodes, always available)
+Every `provide_code_context` / `compress_code_context` / `restore_context` response starts with this legend and uses the structural grammar below:
+
+```
+// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias
+```
+
+| Symbol | Meaning |
+|--------|---------|
+| `// ── Name ──` | opens a class scope |
+| `cl:` | class-level flags |
+| `X <Parent>` | extends |
+| `I <Iface…>` | implements |
+| `F name:type` | field |
+| `M name(+N)` | method (`+N` = overload by param count) |
+| `→ p:name:type …` / `→ type` | parameters / return type |
+| `fl:` | method flags: `IF LOOP RET THROW ASYNC GEN EXPORT STATIC PRIVATE PROTECTED ABSTRACT UNSAFE` |
+| `$ alias module [names]` | import |
+| `T alias = Type` | type alias |
+| `P NAME [args]` | structural pattern (CTOR, OBSERVABLE, GETTER, SETTER…) |
+
+**High fidelity** adds `cf:` (control flow), `df:` (reads/writes), `se:` (side effect), `ec:` (execution context). **Edit fidelity appends each focused method's verbatim source body** — byte-exact. Types render exactly as captured.
+
+### Legacy notation — `$` opcodes & `⊕` markers (text-compressor pipeline only)
+
+The tables below are produced **only** by `compress_workspace` manifests and `delta_text_context` baselines (decoded via `decompress_code_context`) — never by interactive responses. Fidelity-dependent: `⊕` at Medium/High; Low replaces them with `§` micro-codes (`§I`=⊕guard, `§L`=⊕loop, `§E`=⊕⇒, `§P`=$ctor) plus custom `$1…$N` symbols (§SYM footer).
+
+### Built-in Primitives (34 opcodes)
 
 | Opcode | Token | Opcode | Token | Opcode | Token |
 |--------|-------|--------|-------|--------|-------|
@@ -469,7 +495,7 @@ See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for per-edit breakdowns, cachin
 | `$if` | interface | `$ty` | type | `$nl` | null |
 | `$ud` | undefined | `$fm` | from | `$im` | import |
 
-### Behavior Markers
+### Behavior markers (legacy Medium/High body text)
 
 | Marker | Meaning |
 |--------|---------|
@@ -604,8 +630,8 @@ File: `settings.json` (Zed settings)
 ## MCP Prompts
 
 The `cleanctx-notation` prompt provides system-level instructions to the AI explaining how to read and write Clean-CTX compressed notation. When loaded, the AI learns:
-- How to interpret all opcodes (`$c`, `$ctor`, `$s`, etc.)
-- How to interpret behavior markers (`⊕guard`, `⊕loop`, `⊕!throw`, `⊕⇒`)
+- How to interpret the PRIMARY response notation (SCHEMA v2: `X/M/F/I/$` structure letters, `fl:` behavior flags, High-fidelity `cf:/df:/se:/ec:` metadata, verbatim bodies at Edit fidelity)
+- How to decode the LEGACY text-pipeline notation (`$c`, `$ctor`, `$s`, `⊕guard`, `⊕loop`) found only in `compress_workspace` / `delta_text_context` output
 - How to interpret Angular and Spring Boot Meta-Layer markers
 - To respond in compressed form when appropriate
 - To never output raw opcode tables or metadata sections

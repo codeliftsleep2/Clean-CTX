@@ -39,6 +39,13 @@ Clean-CTX-native single-unit editing per `docs/plans/APPLY_EDIT_PLAN.md`: an age
 - Follow-up fix cycle (Allman body boundaries): RED reproduced first (`expected 161 bytes, actual 165 bytes` = exactly the 4-space indent), GREEN after the brace-delimited choke-point fix; focused `edit::spans` and full gate re-verified.
 - Second follow-up fix cycle (EOL-width rejections): RED reproduced first (`expected 137 / actual 143` = exactly the body's 6 internal separators counted 2-vs-1 bytes), GREEN after EOL-insensitive verification + file-convention splice adaptation; `edit::spans` grew to 9 tests (3 transport regressions incl. content-change guard); full gate re-verified clean after clippy doc-lint fixes. Suite totals moved 2,513 → 2,522 workspace (2,173 → 2,182 core).
 
+### Documentation
+
+- **SYSTEM_PROMPT notation corrected to match delivered output.** Investigation confirmed the primary LLM-facing path renders SCHEMA v2 (`X`/`M`/`F`/`I` structure letters, `fl:` flags, High-fidelity `cf:/df:/se:/ec:`, verbatim bodies at Edit) while the prompt taught the retired `$`-opcode/`⊕`-marker tables from the legacy text compressor. SYSTEM_PROMPT now teaches SCHEMA v2 as PRIMARY; the `$` primitive table and `⊕` markers moved into an explicitly scoped "Legacy Notation (text-compressor pipeline)" section naming their only producers (`compress_workspace`, `delta_text_context`) and fidelity behavior (`⊕` at Medium/High, `§` micro-codes at Low). Example replaced with a real SCHEMA v2 fragment. Contract regression tests added (`src/tests/mcp/prompts.rs`, wired as `prompts_tests`): legend presence, High/Edit coverage, and ordering enforcement that every retired token appears only after the legacy-section header — silent drift back to the retired vocabulary now fails CI.
+- README "Opcode Reference" split into **Response Notation (SCHEMA v2 — primary)** + scoped **Legacy notation** subsection (tables preserved for decoding); MCP Prompts bullets updated likewise.
+- `ANGULAR_META_LAYER.md` / `DOTNET_META_LAYER.md` prefix tables annotated with notation-scope callouts (legacy vs SCHEMA v2 vs current `Φ` meta vocabulary).
+- README version banner and QA-gate table test counts refreshed to 2,522 / 2,182 (date-stamped 2026-08-25) and R-45 `apply_edit` added to the feature list.
+
 ---
 
 ## [Unreleased] - 2026-08-25 - Non-CBM Tool Audit Fix Cycle

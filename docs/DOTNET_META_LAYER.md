@@ -30,6 +30,8 @@
 | `α / β / γ` | Path aliases — file references | `α7` = `/path/to/file.cs` |
 | `Φ` (new) | Framework-annotation markers | `Φctrl:`, `Φef:`, `Φhub:`, `Φmap:`, `Φsvc:`, `Φdi:` |
 
+> **Notation scope:** `$xx` opcodes and `⊕` markers are emitted by the LEGACY text compressor (`compress_workspace` manifests, `delta_text_context`; `⊕` at Medium/High, `§` micro-codes at Low) and decoded by `decompress_code_context`. Interactive `provide_code_context` / `compress_code_context` responses use SCHEMA v2 notation instead (`X`/`M`/`F`/`I` structure letters, `fl:` flag codes, `@` meta annotations). The `Φ` framework vocabulary itself remains current for .NET meta output.
+
 ---
 
 ## Proposed .NET Φ Markers
