@@ -188,6 +188,18 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### EDIT-001 apply_edit Unit Verification & EOL Preservation
+
+| Property | Value |
+|----------|-------|
+| **Intent** | `apply_edit`'s optimistic-concurrency verification must be robust to transport-level line-ending normalization while never altering the file's stored ending convention. |
+| **Invariant** | EOL representation may differ across transport, but after normalization to the target file's convention, `expectedOldText` must match the tracked target bytes exactly. Incoming replacement/insertion text is adapted to the FILE's measured EOL convention before splicing — endings are never rewritten as a side effect and never mixed. Content differences beyond EOL width remain hard rejections. |
+| **Enforcement** | `edit::spans::{crlf_file_accepts_lf_normalized_copy_and_preserves_crlf_on_disk, lf_file_accepts_crlf_padded_copy_and_preserves_lf_on_disk, content_changes_are_still_rejected_regardless_of_eol}` — both transport directions plus a forged-content guard; the acceptance tests were RED pre-fix with exact newline-count deltas. |
+| **Authority** | `src/edit/apply.rs` (`verify_expected`, `to_unit_eol`, `unit_is_crlf`) |
+| **Type** | ENFORCED (test) |
+
+---
+
 ## Architectural Debt
 
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)

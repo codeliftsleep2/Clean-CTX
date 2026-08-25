@@ -215,3 +215,20 @@ Shipping `apply_edit` server-side doesn't automatically save anything — an age
 **Safety held:** both rejected attempts wrote nothing to disk (`git status`/`git diff` clean after each) — the mismatch gate correctly refused rather than silently overwriting, it's just comparing against a miscounted expectation.
 
 **Impact:** as shipped, `replace_body`/`delete` on a multi-line unit in an LF-encoded file will very likely reject byte-perfect `expectedOldText`, defeating v1's core promise for what is probably the majority of real-world source files.
+
+---
+
+**✅ RESOLVED (2026-08-25) — root-caused as TWO independent defects. The CRLF-width span-miscount hypothesis above was DISPROVEN by trace:**
+
+No line-ending arithmetic exists anywhere in the span/length path. Proof: `run_capture_pipeline` guarantees `raw_text == source[node.start_byte..node.end_byte]`; `CoreOp::Body` spans are copied verbatim into `UnitRecord` and `MethodNode.body_start/body_end`; outcome spans/deltas echo measured widths; no production code contains an EOL transform. The reported symptom class had two actual causes:
+
+1. **Allman body boundaries** — `locate_method_body()` backed up to the start of the line when `{` sat alone, embedding leading indentation in tracked bodies; every natural `{`..`}` extraction was permanently rejected (byte-exact gate holding throughout). Fixed brace-delimited; see Implementation Notes post-launch correction. RED repro: `expected 161 / actual 165` = exactly the 4-space indent.
+2. **Transport-level EOL normalization** — see Investigation #2 below.
+
+### Investigation #2: EOL-width rejections after the boundary fix
+
+- **Root cause:** transport-level EOL normalization between rendered/transmitted edit text and the file's stored line-ending convention. Editors, clipboards, and LLM clients collapse CRLF↔LF, so a content-identical copy arrived with 1-byte separators against the file's tracked 2-byte ones; the byte-exact gate refused with `actual − expected == number_of_internal_separators`. RED repro: `expected 137 / actual 143` = exactly the fixture body's 6 internal newlines.
+- **Not the cause:** span calculation (spans verbatim from tree-sitter node offsets; invariant `Body.text == source[span]` pinned byte-exact across LF/CRLF/multibyte/C#-attribute/expression fixtures), CRLF-width arithmetic (none exists in any length/offset computation), stale cache (`read_source` always returns freshly read bytes whenever mtime/size change), or the previously fixed Allman brace indentation (independent defect, closed above).
+- **Fix location:** `src/edit/apply.rs`, at the edit verification/write boundary ONLY — `verify_expected()` compares content modulo EOL width (mismatch payloads keep RAW bytes); operation planning adapts incoming `newText`/`unitText` to the target unit's measured EOL convention before splicing. Span math, IR emission, wire formats, and the syntax gate untouched; the earlier brace-delimited fix is preserved verbatim.
+- **Invariant:** EOL representation may differ across transport, but after normalization to the target file's convention, `expectedOldText` must match the tracked target bytes exactly. Bytes written to disk always follow the FILE's existing EOL convention — endings are never rewritten as a side effect and never mixed. Content differences beyond EOL width remain hard rejections.
+- **Enforcement:** `src/tests/edit/spans.rs::{crlf_file_accepts_lf_normalized_copy_and_preserves_crlf_on_disk, lf_file_accepts_crlf_padded_copy_and_preserves_lf_on_disk, content_changes_are_still_rejected_regardless_of_eol}` — both transport directions plus a forged-content guard; the first two were RED pre-fix with the exact newline-count delta. Formalized as **EDIT-001** in `docs/ARCHITECTURAL_INVARIANTS.md`.
