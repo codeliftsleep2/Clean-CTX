@@ -907,7 +907,7 @@ Every pull request must pass these checks:
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test --workspace --all-targets --all-features`** — all 2,497 workspace tests pass (2,157 core library)
+3. **`cargo test --workspace --all-targets --all-features`** — all 2,507 workspace tests pass (2,167 core library)
 4. **`cargo audit`** — no known security vulnerabilities
 5. **No new `#![allow(...)]`** annotations without a `// SAFETY:` or `// Phase N:` comment
 6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail

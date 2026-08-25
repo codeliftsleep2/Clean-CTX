@@ -21,6 +21,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Relationship-shaped projections now report their edges INSTEAD of column-0 nodes (strict positional semantics); node-only projections are byte-for-byte unchanged. Node deduplication, file-path population, and endpoint normalization are deliberately NOT included — tracked as separate findings. No public API, cache-key, or compression changes; cached `cypher:*` entries remain deserializable (populated edges reuse the existing serialized `edges` key).
 
+### Verification
+
+- Fresh-process live probes for both wire contracts green over synthetic fixture repos: typed CALLS projections surface edges end-to-end (endpoint cells exactly as projected — bare under `.name`, qualified under `.qualified_name`), node-only projections unchanged; verbatim raw-capture fixtures pin the strict positional conversion deterministically.
+- `cargo fmt --all -- --check` clean; `cargo clippy --all-targets -- -D warnings` zero warnings.
+- `cargo test --workspace --all-targets --all-features`: **2,507 passed / 0 failed / 5 ignored** (core library 2,167 + CLI binary 11 + proxy crate 329: lib 155, bin harness 155, audit-regression 18, e2e integration 1), including `e2e_cbm_multiroot_multilingual_integration`.
+
 ---
 
 ## [0.4.0] - 2026-08-24 - CBM Graph-Intelligence & Trace-Wire Audits
