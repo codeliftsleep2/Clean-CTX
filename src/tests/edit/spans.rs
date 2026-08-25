@@ -347,6 +347,134 @@ fn lf_expression_bodies_and_braces_in_strings_hold_invariant() {
     assert_span_invariant(&source, &ir);
 }
 
+// ── Line-ending transport regression ──────────────────────────────────
+//
+// The reported residual: on CRLF files, a content-identical body copy
+// whose separators were collapsed to LF in transport (editors /
+// clipboards / LLM clients normalize) is rejected with
+// `actual == expected + number_of_newlines` — indistinguishable from
+// "counting each separator as 2 bytes instead of 1".
+//
+// Contract under test:
+//   1. Verification compares content MODULO EOL width.
+//   2. Bytes written to disk always follow the FILE's existing EOL
+//      convention (incoming text is adapted; endings are never
+//      rewritten as a side effect, never mixed).
+
+/// CRLF file + LF-normalized copy → accepted, file stays uniformly CRLF.
+#[test]
+fn crlf_file_accepts_lf_normalized_copy_and_preserves_crlf_on_disk() {
+    let source = ts_crlf_source();
+    let body_start = source.find("{\r\n    const trimmed").expect("body opener");
+    let body_end = source
+        .find("\r\n  }\r\n\r\n  count()")
+        .expect("body closer")
+        + "\r\n  }".len();
+    let exact = source[body_start..body_end].to_string();
+
+    // Simulate transport normalization: every CRLF collapses to LF.
+    let lf_only = exact.replace("\r\n", "\n");
+    assert_ne!(lf_only, exact, "fixture sanity: normalization must bite");
+
+    let ir = compile_edit(&source, "crlf_transport");
+    let units = UnitTable::from_instructions(&ir.instructions);
+    let report = apply::apply(
+        &source,
+        &units,
+        &[EditOperation::ReplaceBody {
+            target: "OrderService.processOrder".to_string(),
+            expected_old_text: lf_only,
+            new_text: "{\n    return 'ok';\n  }".to_string(),
+        }],
+    )
+    .expect("LF-normalized copy of a CRLF unit must be accepted");
+
+    let out = &report.new_source;
+    assert!(out.contains("return 'ok';"));
+    // Uniformly CRLF: every LF is half of a CRLF pair — no bare LF, no
+    // mixed endings introduced by the splice.
+    assert_eq!(
+        out.matches("\r\n").count(),
+        out.matches('\n').count(),
+        "written file must not contain bare LF outside CRLF pairs"
+    );
+
+    // Outcome accounting must reflect the ADAPTED (CRLF) replacement
+    // width, not the caller's LF form: adapted replacement is
+    // "{\r\n    return 'ok';\r\n  }".
+    let adapted_new = "{\r\n    return 'ok';\r\n  }";
+    let expected_delta = adapted_new.len() as i64 - exact.len() as i64;
+    assert_eq!(report.operations[0].byte_delta, expected_delta);
+}
+
+/// Reverse direction: LF file + CRLF-padded copy → accepted, file stays
+/// uniformly LF.
+#[test]
+fn lf_file_accepts_crlf_padded_copy_and_preserves_lf_on_disk() {
+    let source = ts_lf_source();
+    let body_start = source.find("{\n    const trimmed").expect("body opener");
+    let body_end = source.find("\n  }\n\n  count()").expect("body closer") + "\n  }".len();
+    let exact = source[body_start..body_end].to_string();
+
+    let crlf_padded = exact.replace('\n', "\r\n");
+    assert_ne!(crlf_padded, exact);
+
+    let ir = compile_edit(&source, "lf_transport");
+    let units = UnitTable::from_instructions(&ir.instructions);
+    let report = apply::apply(
+        &source,
+        &units,
+        &[EditOperation::ReplaceBody {
+            target: "OrderService.processOrder".to_string(),
+            expected_old_text: crlf_padded,
+            new_text: "{\r\n    return 'ok';\r\n  }".to_string(),
+        }],
+    )
+    .expect("CRLF-padded copy of an LF unit must be accepted");
+
+    let out = &report.new_source;
+    assert!(out.contains("return 'ok';"));
+    assert!(
+        !out.contains("\r\n"),
+        "written LF file must not gain CRLF pairs"
+    );
+    let adapted_new = "{\n    return 'ok';\n  }";
+    let expected_delta = adapted_new.len() as i64 - exact.len() as i64;
+    assert_eq!(report.operations[0].byte_delta, expected_delta);
+}
+
+/// EOL insensitivity must not weaken concurrency semantics: a genuine
+/// CONTENT change (beyond line-ending width) is still rejected.
+#[test]
+fn content_changes_are_still_rejected_regardless_of_eol() {
+    let source = ts_crlf_source();
+    let body_start = source.find("{\r\n    const trimmed").expect("body opener");
+    let body_end = source
+        .find("\r\n  }\r\n\r\n  count()")
+        .expect("body closer")
+        + "\r\n  }".len();
+    let mut stale = source[body_start..body_end].to_string();
+    stale = stale.replace("return trimmed;", "return FORGED;");
+    let stale_lf = stale.replace("\r\n", "\n");
+
+    let ir = compile_edit(&source, "crlf_guard");
+    let units = UnitTable::from_instructions(&ir.instructions);
+    let err = apply::apply(
+        &source,
+        &units,
+        &[EditOperation::ReplaceBody {
+            target: "OrderService.processOrder".to_string(),
+            expected_old_text: stale_lf,
+            new_text: "{\n    return 'x';\n  }".to_string(),
+        }],
+    )
+    .expect_err("forged content must still be rejected");
+    assert!(
+        matches!(err, crate::edit::apply::EditError::Mismatch { .. }),
+        "expected Mismatch, got {err:?}"
+    );
+}
+
 /// ── Diagnostic probe (CI-inert) ─────────────────────────────────────
 ///
 /// Reconciles the exact byte counts on a REAL reported file. No-op

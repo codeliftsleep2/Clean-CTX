@@ -5,11 +5,15 @@
 //
 // Guarantees, in order:
 //   1. Unit-level optimistic concurrency — the bytes about to be replaced
-//      must equal the caller's expected text exactly (plan Design step 2/3).
+//      must match the caller's expected text exactly, MODULO line-ending
+//      width (transport layers normalize CRLF↔LF; see `verify_expected`).
 //   2. Non-overlap — operations in one batch must touch disjoint ranges.
 //   3. Syntax gate — the spliced result must parse cleanly under the
 //      file's tree-sitter grammar BEFORE any bytes hit disk (plan step 4,
 //      hard and non-bypassable).
+//   4. EOL preservation — incoming text is adapted to the FILE's line
+//      ending convention before splicing; endings are never rewritten as
+//      a side effect and never mixed.
 //
 // This module never touches disk or session state; callers own I/O.
 
@@ -141,7 +145,7 @@ pub fn apply(
                     target: target.clone(),
                     start: record.start_byte,
                     end: record.end_byte,
-                    new_text: new_text.clone(),
+                    new_text: to_unit_eol(unit_is_crlf(&record.text, source), new_text),
                 }
             }
             EditOperation::Delete {
@@ -162,14 +166,14 @@ pub fn apply(
                 target: anchor.clone(),
                 start: record.end_byte,
                 end: record.end_byte,
-                new_text: unit_text.clone(),
+                new_text: to_unit_eol(unit_is_crlf(&record.text, source), unit_text),
             },
             EditOperation::InsertBefore { anchor, unit_text } => PlannedEdit {
                 kind: "insert_before",
                 target: anchor.clone(),
                 start: record.start_byte,
                 end: record.start_byte,
-                new_text: unit_text.clone(),
+                new_text: to_unit_eol(unit_is_crlf(&record.text, source), unit_text),
             },
         };
         planned.push(planned_edit);
@@ -178,12 +182,49 @@ pub fn apply(
     splice(source, planned)
 }
 
+/// Canonical form for line-ending-insensitive comparison: every CRLF
+/// pair collapses to LF.
+fn eol_normalized(s: &str) -> String {
+    s.replace("\r\n", "\n")
+}
+
+/// Rewrite `text` into the EOL convention of the unit being touched.
+///
+/// Transport layers (editors, clipboards, LLM clients) routinely
+/// normalize line endings, so a caller's text may arrive in the opposite
+/// convention from the file. Splices always use the FILE's convention —
+/// endings are never rewritten as a side effect and never mixed.
+/// Idempotent for text already in the target convention.
+fn to_unit_eol(crlf: bool, text: &str) -> String {
+    if crlf {
+        // Canonicalize down first so already-CRLF input stays exact.
+        text.replace("\r\n", "\n").replace('\n', "\r\n")
+    } else {
+        text.replace("\r\n", "\n")
+    }
+}
+
+/// Whether the unit being touched uses CRLF separators. Units without
+/// any separator fall back to the whole-file convention — measured from
+/// the actual source, never assumed.
+fn unit_is_crlf(unit_text: &str, source: &str) -> bool {
+    if unit_text.contains('\r') {
+        true
+    } else if unit_text.contains('\n') {
+        false
+    } else {
+        source.contains("\r\n")
+    }
+}
+
 /// Optimistic-concurrency check: current unit bytes must equal the caller's
-/// expectation byte-for-byte. Verification is unit-granular (the invariant
+/// expectation CONTENT-wise, modulo line-ending width (raw bytes are kept
+/// in mismatch payloads so callers see the file's real representation).
+/// Verification is unit-granular (the invariant
 /// that actually matters) — not the whole-file recheck the client host's
 /// native write tool performs.
 fn verify_expected(target: &str, actual: &str, expected: &str) -> Result<(), EditError> {
-    if actual == expected {
+    if eol_normalized(actual) == eol_normalized(expected) {
         return Ok(());
     }
     Err(EditError::Mismatch {
