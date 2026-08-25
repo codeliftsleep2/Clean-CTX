@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed (during this cycle)
 
 - The first implementation of this fix used a strict positional/arity rule (exactly-three-cell uniform rows ⇒ `[from, type, to]`). Live shape auditing proved that rule semantically dangerous: a uniform numeric triple like `RETURN f.name, f.in_degree, f.out_degree` would fabricate an edge labelled `"10"`. Retired before release in favor of column-shape-driven extraction; `CbmClient::query_graph` now returns the full `{columns, rows}` table (`QueryRows`) so callers can interpret the semantic projection instead of guessing from arity.
+- **CI flake (`decompression` proptest, run 32805773191)** — unrelated to CBM work, pre-existing: `word_boundary_replace_never_panics` asserted `!result.is_empty() || text.is_empty()`, a FALSE invariant — an empty replacement over a pattern covering the whole text legitimately yields `""` (removal semantics pinned by its own sibling test). Proptest's per-run randomized inputs eventually drew the counterexample on linux. The function was never wrong; the property was. Corrected to assert the actual contract (no panic + sound size bound); verified green at 5,000 cases per property.
 
 ### Changed
 

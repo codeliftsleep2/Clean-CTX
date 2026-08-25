@@ -20,7 +20,20 @@ use crate::decompression::decompressor::word_boundary_replace;
 use proptest::prelude::*;
 
 proptest! {
-    /// Invariant: word_boundary_replace never panics on any input.
+    /// Invariant: word_boundary_replace never panics on any input, and the
+    /// output stays within a sound size bound.
+    ///
+    /// CI FLAKE FIX (2026-08-25, run 32805773191): this property previously
+    /// asserted `!result.is_empty() || text.is_empty()` — a FALSE invariant.
+    /// An empty replacement with a pattern covering the whole text
+    /// legitimately produces an empty result (removal semantics pinned by
+    /// `word_boundary_replace_empty_replacement_removes_pattern` below), so
+    /// proptest's randomized inputs eventually hit e.g.
+    /// `word_boundary_replace("a", "a", "")` == `""`. The function was never
+    /// wrong; the property was. The no-panic guarantee is the actual target
+    /// of this test; the size bound holds because every replaced occurrence
+    /// consumes at least one input byte, so output bytes can never exceed
+    /// passthrough bytes plus one replacement per input byte.
     #[test]
     fn word_boundary_replace_never_panics(
         text in "\\PC{0,20}",
@@ -28,8 +41,8 @@ proptest! {
         replacement in "\\PC{0,5}",
     ) {
         let result = word_boundary_replace(&text, &pattern, &replacement);
-        // Result should be a valid string (no panics)
-        prop_assert!(!result.is_empty() || text.is_empty());
+        // Reaching this point proves no panic; assert the size contract.
+        prop_assert!(result.len() <= text.len() + replacement.len() * text.len());
     }
 
     /// Invariant: word_boundary_replace with empty pattern returns original text.
