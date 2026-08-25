@@ -405,6 +405,7 @@ fn live_typed_graph_query_returns_caller_callee_rows() {
         client
             .query_graph(&cypher, &project)
             .expect("typed query_graph must execute on the live CBM")
+            .rows
     };
     let hit = rows.iter().any(|r| {
         r.first().and_then(|v| v.as_str()) == Some("tw_probe_caller")

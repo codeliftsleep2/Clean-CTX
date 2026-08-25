@@ -52,6 +52,22 @@ impl std::error::Error for CbmError {}
 /// Maximum response size from CBM (4 MB safety bound).
 pub const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 
+/// The full `query_graph` wire table: echoed projection `columns` plus the
+/// row matrix.
+///
+/// CBM-WIRE-002 (verified live 2026-08-24): `columns` echo the RETURN
+/// expressions verbatim — including whitespace (`"type( r )"`), but with
+/// any `AS` alias REPLACING the expression entirely (`type(r) AS rel_kind`
+/// echoes as `"rel_kind"`, erasing the semantic marker). Callers that
+/// interpret projection shapes must consume this struct, never rows alone.
+#[derive(Debug, Clone, Default)]
+pub struct QueryRows {
+    /// Projection expressions as echoed by CBM, in RETURN order.
+    pub columns: Vec<String>,
+    /// Row cells; every cell of a column corresponds to `columns[i]`.
+    pub rows: Vec<Vec<Value>>,
+}
+
 /// JSON-RPC 2.0 client over stdin/stdout subprocess.
 pub struct CbmClient {
     child: Child,
@@ -691,26 +707,33 @@ impl CbmClient {
 
     /// Execute a Cypher-like query against the CBM knowledge graph.
     ///
-    /// Returns rows as `Vec<Vec<Value>>` where each inner vec is a row of column values.
-    /// CBM wraps results in `{columns, rows}` format.
-    pub fn query_graph(
-        &mut self,
-        cypher: &str,
-        project: &str,
-    ) -> Result<Vec<Vec<Value>>, CbmError> {
+    /// Returns the full wire table as [`QueryRows`] — both `columns` and
+    /// `rows`. CBM wraps results in `{columns, rows, total}`; the echoed
+    /// `columns` carry the semantic projection (e.g. a verbatim `type(r)`
+    /// marker) and MUST NOT be discarded by callers that interpret shapes.
+    pub fn query_graph(&mut self, cypher: &str, project: &str) -> Result<QueryRows, CbmError> {
         let r = self.call_tool(
             "query_graph",
             serde_json::json!({"query": cypher, "project": project}),
         )?;
         let inner = self.parse_cbm_response(&r)?;
-        Ok(inner["rows"]
+        let columns = inner["columns"]
+            .as_array()
+            .map(|cs| {
+                cs.iter()
+                    .map(|c| c.as_str().unwrap_or_default().to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let rows = inner["rows"]
             .as_array()
             .map(|rows| {
                 rows.iter()
                     .filter_map(|row| row.as_array().cloned())
                     .collect()
             })
-            .unwrap_or_default())
+            .unwrap_or_default();
+        Ok(QueryRows { columns, rows })
     }
 
     /// Get symbol importance (caller count) from CBM via Cypher query.
@@ -727,8 +750,9 @@ impl CbmClient {
             "MATCH (f:Function) WHERE f.in_degree >= {} RETURN f.name, f.file_path, f.in_degree, f.out_degree ORDER BY f.in_degree DESC",
             min
         );
-        let rows = self.query_graph(&cypher, project)?;
-        Ok(rows
+        let table = self.query_graph(&cypher, project)?;
+        Ok(table
+            .rows
             .into_iter()
             .map(|row| {
                 let name = row
@@ -768,8 +792,9 @@ impl CbmClient {
     /// `in_degree = 0` and `is_entry_point = false` are dead code.
     pub fn get_dead_code(&mut self, project: &str) -> Result<Vec<Value>, CbmError> {
         let cypher = "MATCH (f:Function) WHERE f.in_degree = 0 AND f.is_entry_point = false RETURN f.name, f.file_path".to_string();
-        let rows = self.query_graph(&cypher, project)?;
-        Ok(rows
+        let table = self.query_graph(&cypher, project)?;
+        Ok(table
+            .rows
             .into_iter()
             .map(|row| {
                 serde_json::json!({

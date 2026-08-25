@@ -139,37 +139,62 @@ pub(crate) fn filter_trace_edges(
 }
 
 /// Convert CBM `{columns, rows}` query results into a [`QueryResult`] using
-/// the strict positional convention (wire contract CBM-WIRE-002, verified
-/// against verbatim live captures 2026-08-24):
+/// the COLUMN-SHAPE convention (wire contract CBM-WIRE-002, verified against
+/// verbatim live captures 2026-08-24):
 ///
-/// - EXACTLY three cells per row, uniform across ALL rows, is interpreted as
-///   `[from, relationship-type, to]` and becomes one [`GraphEdge`] per row
-///   (`label` = the type cell). Nodes are deliberately NOT synthesized for
-///   this shape: a relationship-shaped projection IS its edges.
-/// - Every other projection shape (0/1/2/4+ cells, mixed arities, empty
-///   result) keeps the legacy mapping: one node per row from column 0,
-///   no edges.
+/// - A projection is relationship-shaped IFF it contains exactly ONE column
+///   echoing a literal `type(...)` expression (whitespace-tolerant:
+///   `"type( r )"` matches; aliased `type(r) AS kind` echoes as `"kind"`
+///   and is intentionally UNDETECTABLE — CBM erases the marker).
+/// - Relationship-shaped projections become one [`GraphEdge`] per row:
+///   endpoints are the FIRST and LAST non-type projected columns, the type
+///   cell becomes `label`, and every other projected column maps into
+///   `properties` keyed by its echoed column text with the actual projected
+///   value preserved. Scrambled 5/6/N-column orders work purely from the
+///   column metadata — arity and position are never consulted.
+/// - No unaliased `type(...)` column ⇒ node fallback REGARDLESS of column
+///   count. Arbitrary uniform triples (e.g. `[name, in_degree, out_degree]`)
+///   must NEVER fabricate edges — the previous arity rule produced a fake
+///   edge labelled `"10"` for exactly that shape.
 ///
 /// Deliberately NOT done here (tracked as separate findings): node
 /// deduplication and file-path population — repeated nodes and empty
-/// `file` fields pass through exactly as before. Non-string cells become
-/// empty strings; rows are never skipped or reordered.
-pub(crate) fn convert_query_rows(rows: &[Vec<Value>]) -> QueryResult {
-    let uniform_triples = !rows.is_empty() && rows.iter().all(|row| row.len() == 3);
-    if uniform_triples {
-        let edges = rows
-            .iter()
-            .map(|row| GraphEdge {
-                from: row[0].as_str().unwrap_or_default().to_string(),
-                to: row[2].as_str().unwrap_or_default().to_string(),
-                label: row[1].as_str().unwrap_or_default().into(),
-                properties: HashMap::new(),
-            })
-            .collect();
-        return QueryResult {
-            nodes: vec![],
-            edges,
-        };
+/// `file` fields pass through exactly as before. Endpoint/label cells are
+/// extracted as strings (non-strings become empty); property cells keep
+/// their projected JSON value verbatim. Rows are never skipped or reordered.
+pub(crate) fn convert_query_rows(columns: &[String], rows: &[Vec<Value>]) -> QueryResult {
+    if columns.len() >= 3 {
+        if let Some(type_idx) = single_type_column(columns) {
+            // Defensive: every row must line up with the echoed columns,
+            // otherwise the projection metadata cannot be trusted.
+            if rows.iter().all(|row| row.len() == columns.len()) {
+                let endpoints: Vec<usize> = (0..columns.len()).filter(|&i| i != type_idx).collect();
+                let from_idx = endpoints[0];
+                let to_idx = endpoints[endpoints.len() - 1];
+                let edges = rows
+                    .iter()
+                    .map(|row| {
+                        let mut properties = HashMap::new();
+                        for &prop_idx in &endpoints[1..endpoints.len() - 1] {
+                            // Preserve the projected JSON value verbatim
+                            // (wire cells are strings; native values would
+                            // pass through unharmed).
+                            properties.insert(columns[prop_idx].clone(), row[prop_idx].clone());
+                        }
+                        GraphEdge {
+                            from: row[from_idx].as_str().unwrap_or_default().to_string(),
+                            to: row[to_idx].as_str().unwrap_or_default().to_string(),
+                            label: row[type_idx].as_str().unwrap_or_default().into(),
+                            properties,
+                        }
+                    })
+                    .collect();
+                return QueryResult {
+                    nodes: vec![],
+                    edges,
+                };
+            }
+        }
     }
     let nodes = rows
         .iter()
@@ -189,6 +214,29 @@ pub(crate) fn convert_query_rows(rows: &[Vec<Value>]) -> QueryResult {
         nodes,
         edges: vec![],
     }
+}
+
+/// Locate THE relationship-type column of an echoed projection.
+///
+/// Matches a literal `type(...)` expression case-insensitively with inner
+/// whitespace tolerated (CBM echoes `"type( r )"` verbatim). Returns `Some`
+/// only when EXACTLY ONE such column exists — zero means node-shaped, and
+/// more than one means the projection's semantics are ambiguous, so we
+/// refuse to guess. An `AS` alias replaces the whole expression in the echo
+/// (`type(r) AS rel_kind` ⇒ `"rel_kind"`), which by design makes aliased
+/// relationship projections indistinguishable from ordinary scalars here.
+fn single_type_column(columns: &[String]) -> Option<usize> {
+    let hits: Vec<usize> = columns
+        .iter()
+        .enumerate()
+        .filter(|(_, col)| {
+            let flat: String = col.chars().filter(|c| !c.is_whitespace()).collect();
+            let lower = flat.to_lowercase();
+            lower.starts_with("type(") && lower.ends_with(')')
+        })
+        .map(|(i, _)| i)
+        .collect();
+    if hits.len() == 1 { Some(hits[0]) } else { None }
 }
 
 pub(crate) fn parse_architecture_response(arch: &Value) -> ArchitectureOverview {
@@ -968,8 +1016,9 @@ impl GraphBridge {
             "MATCH (caller:Function)-[:CALLS]->(f:Function) WHERE f.name = '{escaped}' RETURN caller.name, caller.file_path"
         );
         let project = self.project_str();
-        let rows = self.query(move |c| c.query_graph(&cypher, &project))?;
-        let files: Vec<_> = rows
+        let table = self.query(move |c| c.query_graph(&cypher, &project))?;
+        let files: Vec<_> = table
+            .rows
             .iter()
             .filter_map(|r| r.get(1).and_then(|v| v.as_str().map(String::from)))
             .collect();
@@ -1009,11 +1058,11 @@ impl GraphBridge {
         let project = self.project_str();
         let mut entries = Vec::new();
         for label in ["Function", "Method"] {
-            let rows = self.query({
+            let table = self.query({
                 let project = project.clone();
                 move |c| c.query_graph(&DEAD_CODE_CYPHER(label), &project)
             })?;
-            for row in &rows {
+            for row in &table.rows {
                 if let Some(name) = row.first().and_then(|v| v.as_str()) {
                     entries.push(DeadCodeEntry {
                         symbol: name.to_string(),
@@ -1051,8 +1100,9 @@ impl GraphBridge {
         }
         let cypher = "MATCH (a:Function)-[:CALLS]->(b:Function) RETURN a.name, b.name".to_string();
         let project = self.project_str();
-        let rows = self.query(move |c| c.query_graph(&cypher, &project))?;
-        let edges: Vec<(String, String)> = rows
+        let table = self.query(move |c| c.query_graph(&cypher, &project))?;
+        let edges: Vec<(String, String)> = table
+            .rows
             .iter()
             .filter_map(|r| {
                 let from = r.first()?.as_str()?.to_string();
@@ -1162,12 +1212,12 @@ impl GraphBridge {
              WHERE m.name = '{escaped}' AND m.file_path =~ '.*\\.cs$' \
              RETURN m.name, c.name LIMIT 5"
         );
-        let rows = self.query(move |c| c.query_graph(&cypher, &project));
-        let result: Option<String> = match rows {
-            Ok(rows) => {
+        let table = self.query(move |c| c.query_graph(&cypher, &project));
+        let result: Option<String> = match table {
+            Ok(table) => {
                 // rows are Vec<Vec<Value>>: [m.name, c.name].
                 // Prefer a row whose class name contains "Controller".
-                let controller_hit = rows.iter().find_map(|row| {
+                let controller_hit = table.rows.iter().find_map(|row| {
                     let mname = row.first().and_then(|v| v.as_str())?;
                     let cname = row.get(1).and_then(|v| v.as_str())?;
                     if cname.contains("Controller") {
@@ -1177,7 +1227,7 @@ impl GraphBridge {
                     }
                 });
                 controller_hit.or_else(|| {
-                    rows.first().and_then(|row| {
+                    table.rows.first().and_then(|row| {
                         let mname = row.first().and_then(|v| v.as_str())?;
                         let cname = row.get(1).and_then(|v| v.as_str())?;
                         Some(format!("{cname}.{mname}"))
@@ -1215,16 +1265,18 @@ impl GraphBridge {
         }
         let result = self.query(move |c| c.query_graph(&q, &project));
         match result {
-            Ok(rows) => {
+            Ok(table) => {
                 self.set_last_error(None);
-                // Wire contract (CBM-WIRE-002): strict positional conversion —
-                // see `convert_query_rows`. The previous implementation claimed
-                // to interpret rows "as either node or edge data" but only ever
-                // read column 0 into nodes while `edges` was a literal empty
-                // vec, so every relationship-shaped Cypher collapsed to
-                // "N node(s), 0 edge(s)" while the raw proxy path surfaced the
-                // very same rows intact.
-                let r = convert_query_rows(&rows);
+                // Wire contract (CBM-WIRE-002): column-shape conversion —
+                // see `convert_query_rows`. The projection's echoed columns
+                // decide the interpretation; row arity is never consulted
+                // and arbitrary uniform triples are NEVER fabricated into
+                // edges. (The original pre-fix implementation read only
+                // column 0 while `edges` stayed a literal empty vec, so
+                // every relationship-shaped Cypher collapsed to
+                // "N node(s), 0 edge(s)" while the raw proxy path surfaced
+                // the very same rows intact.)
+                let r = convert_query_rows(&table.columns, &table.rows);
                 self.cache_insert(&key, &r);
                 r
             }

@@ -215,6 +215,7 @@ fn live_wire_in_degree_cells_are_json_numbers() {
                 &project,
             )
             .expect("live query_graph")
+            .rows
     };
     assert!(!rows.is_empty(), "graph must contain called functions");
     for row in &rows {
@@ -252,7 +253,8 @@ fn live_symbol_importance_scores_are_nonzero_and_bounded() {
                  ORDER BY f.in_degree DESC LIMIT 1",
                 &project,
             )
-            .expect("live query_graph");
+            .expect("live query_graph")
+            .rows;
         rows[0][0].as_str().expect("name cell").to_string()
     };
 
@@ -308,7 +310,8 @@ fn live_blast_radius_matches_true_caller_files() {
                  RETURN f.name LIMIT 1",
                 &project,
             )
-            .expect("seed query");
+            .expect("seed query")
+            .rows;
         let sym = seed[0][0].as_str().expect("symbol").to_string();
         let rows = client
             .query_graph(
@@ -318,7 +321,8 @@ fn live_blast_radius_matches_true_caller_files() {
                 ),
                 &project,
             )
-            .expect("ground-truth caller query");
+            .expect("ground-truth caller query")
+            .rows;
         let files: Vec<String> = rows
             .iter()
             .filter_map(|r| r.get(1).and_then(|v| v.as_str()).map(String::from))
@@ -374,7 +378,8 @@ fn live_dead_code_detection_covers_methods() {
                     ),
                     &project,
                 )
-                .expect("ground-truth dead query");
+                .expect("ground-truth dead query")
+                .rows;
             for row in rows {
                 let name = row.first().and_then(|v| v.as_str()).unwrap_or_default();
                 let file = row.get(1).and_then(|v| v.as_str()).unwrap_or_default();
@@ -457,6 +462,7 @@ fn live_dataflow_edge_type_still_absent_reintroduction_guard() {
                 &project,
             )
             .expect("DATAFLOW probe query")
+            .rows
     };
     assert!(
         dataflow_rows.is_empty(),
