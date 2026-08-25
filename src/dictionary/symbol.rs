@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use crate::compression::opcodes::{is_primitive_opcode, PRIMITIVE_OPCODES};
+use crate::compression::opcodes::{PRIMITIVE_OPCODES, is_primitive_opcode};
 
 /// Trim a token string to the canonical form used for symbol registration
 /// and lookup. Strips surrounding punctuation that is part of the syntax
@@ -22,7 +22,10 @@ use crate::compression::opcodes::{is_primitive_opcode, PRIMITIVE_OPCODES};
 /// `SymbolDictionary::register` and `apply_symbol_compression`.
 pub fn tokenize_for_symbols(s: &str) -> &str {
     s.trim_matches(|c: char| {
-        matches!(c, '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>' | ':' | ';' | ',' | '.')
+        matches!(
+            c,
+            '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>' | ':' | ';' | ',' | '.'
+        )
     })
 }
 
@@ -147,7 +150,9 @@ impl SymbolDictionary {
     pub fn format_footer(&self) -> String {
         if self.reverse.len() <= 32 {
             // Only show opcodes that aren't built-in primitives (IDs >= 1 after primitives)
-            let custom: Vec<_> = self.reverse.iter()
+            let custom: Vec<_> = self
+                .reverse
+                .iter()
                 .filter(|(opcode, _)| !is_primitive_opcode(opcode))
                 .collect();
 

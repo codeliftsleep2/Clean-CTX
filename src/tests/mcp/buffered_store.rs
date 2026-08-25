@@ -3,9 +3,9 @@
 // Tests for BufferedStore: auto-flush threshold, transaction batching,
 // fallback file creation, and re-import from fallback files.
 
+use base64::Engine;
 use std::path::Path;
 use tempfile::TempDir;
-use base64::Engine;
 
 use crate::compression::Fidelity;
 use crate::mcp::buffered_store::BufferedStore;
@@ -16,8 +16,7 @@ use crate::mcp::sqlite_store::SqliteStore;
 /// with a temporary directory as project root.
 fn make_store() -> (BufferedStore, TempDir) {
     let tmp = TempDir::new().expect("failed to create temp dir");
-    let store = SqliteStore::open(Path::new(":memory:"))
-        .expect("failed to open in-memory SQLite");
+    let store = SqliteStore::open(Path::new(":memory:")).expect("failed to open in-memory SQLite");
     let buffered = BufferedStore::new(store, tmp.path().to_path_buf());
     (buffered, tmp)
 }
@@ -29,7 +28,13 @@ fn test_queue_save_context_and_flush() {
     let (store, _tmp) = make_store();
 
     store.queue_save_context(
-        "/test/file.ts", Fidelity::Low, "compressed", b"ir_data", "hash1", 0, 0,
+        "/test/file.ts",
+        Fidelity::Low,
+        "compressed",
+        b"ir_data",
+        "hash1",
+        0,
+        0,
     );
     // Should have 1 pending op
     assert_eq!(store.pending_count(), 1);
@@ -50,7 +55,13 @@ fn test_queue_append_delta_and_flush() {
 
     // First save a context to have a valid context_id
     store.queue_save_context(
-        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1", 0, 0,
+        "/test/file.ts",
+        Fidelity::Low,
+        "compressed",
+        b"",
+        "hash1",
+        0,
+        0,
     );
     store.flush();
 
@@ -71,7 +82,13 @@ fn test_queue_clear_file_and_flush() {
 
     // Save a context first
     store.queue_save_context(
-        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1", 0, 0,
+        "/test/file.ts",
+        Fidelity::Low,
+        "compressed",
+        b"",
+        "hash1",
+        0,
+        0,
     );
     store.flush();
 
@@ -99,7 +116,8 @@ fn test_auto_flush_at_threshold() {
             "compressed",
             b"",
             &format!("hash_{}", i),
-            0, 0,
+            0,
+            0,
         );
     }
 
@@ -119,16 +137,26 @@ fn test_auto_flush_at_threshold() {
 fn test_context_store_save_and_load() {
     let (mut store, _tmp) = make_store();
 
-    let id = store.save_context(
-        "/test/file.ts", Fidelity::Medium, "compressed output", None, "hash1", 0, 0,
-    ).expect("save_context should succeed");
+    let id = store
+        .save_context(
+            "/test/file.ts",
+            Fidelity::Medium,
+            "compressed output",
+            None,
+            "hash1",
+            0,
+            0,
+        )
+        .expect("save_context should succeed");
     assert_eq!(id, "ctx-hash1");
 
     // pending should have the op
     assert_eq!(store.pending_count(), 1);
 
     // load_latest flushes first, then reads from SQLite
-    let meta = store.load_latest("/test/file.ts").expect("load_latest should succeed");
+    let meta = store
+        .load_latest("/test/file.ts")
+        .expect("load_latest should succeed");
     assert!(meta.is_some());
     let meta = meta.unwrap();
     assert_eq!(meta.file_path, "/test/file.ts");
@@ -141,9 +169,9 @@ fn test_context_store_has_context() {
 
     assert!(!store.has_context("/test/file.ts"));
 
-    store.save_context(
-        "/test/file.ts", Fidelity::Low, "out", None, "h1", 0, 0,
-    ).unwrap();
+    store
+        .save_context("/test/file.ts", Fidelity::Low, "out", None, "h1", 0, 0)
+        .unwrap();
     store.flush();
 
     assert!(store.has_context("/test/file.ts"));
@@ -153,16 +181,18 @@ fn test_context_store_has_context() {
 fn test_context_store_delta_count() {
     let (mut store, _tmp) = make_store();
 
-    store.save_context(
-        "/test/file.ts", Fidelity::Low, "out", None, "h1", 0, 0,
-    ).unwrap();
+    store
+        .save_context("/test/file.ts", Fidelity::Low, "out", None, "h1", 0, 0)
+        .unwrap();
     store.flush();
 
     // No deltas yet
     assert_eq!(store.delta_count("ctx-h1"), 0);
 
     // Append a delta
-    store.append_delta("ctx-h1", b"payload", Some("edit")).unwrap();
+    store
+        .append_delta("ctx-h1", b"payload", Some("edit"))
+        .unwrap();
     store.flush();
 
     assert_eq!(store.delta_count("ctx-h1"), 1);
@@ -172,9 +202,9 @@ fn test_context_store_delta_count() {
 fn test_context_store_clear_file() {
     let (mut store, _tmp) = make_store();
 
-    store.save_context(
-        "/test/file.ts", Fidelity::Low, "out", None, "h1", 0, 0,
-    ).unwrap();
+    store
+        .save_context("/test/file.ts", Fidelity::Low, "out", None, "h1", 0, 0)
+        .unwrap();
     store.flush();
 
     assert!(store.has_context("/test/file.ts"));
@@ -219,7 +249,13 @@ fn test_flush_is_idempotent() {
     let (store, _tmp) = make_store();
 
     store.queue_save_context(
-        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1", 0, 0,
+        "/test/file.ts",
+        Fidelity::Low,
+        "compressed",
+        b"",
+        "hash1",
+        0,
+        0,
     );
 
     let flushed1 = store.flush();
@@ -245,7 +281,13 @@ fn test_fallback_dir_is_created_on_flush_failure() {
 
     // Normal flush should not create the fallback dir
     store.queue_save_context(
-        "/test/file.ts", Fidelity::Low, "compressed", b"", "hash1", 0, 0,
+        "/test/file.ts",
+        Fidelity::Low,
+        "compressed",
+        b"",
+        "hash1",
+        0,
+        0,
     );
     store.flush();
 
@@ -274,10 +316,7 @@ fn test_fallback_file_format() {
     });
 
     let fallback_file = fallback_dir.join("op_0_0000000000000000.json");
-    std::fs::write(
-        &fallback_file,
-        serde_json::to_string_pretty(&json).unwrap(),
-    ).unwrap();
+    std::fs::write(&fallback_file, serde_json::to_string_pretty(&json).unwrap()).unwrap();
 
     // Re-import should pick it up on next flush
     store.flush();
@@ -296,7 +335,13 @@ fn test_fallback_append_delta_reimport() {
 
     // First save a context to SQLite so the delta has a valid parent
     store.queue_save_context(
-        "/test/delta.ts", Fidelity::Low, "baseline", b"", "delta_hash", 0, 0,
+        "/test/delta.ts",
+        Fidelity::Low,
+        "baseline",
+        b"",
+        "delta_hash",
+        0,
+        0,
     );
     store.flush();
 
@@ -313,10 +358,7 @@ fn test_fallback_append_delta_reimport() {
     });
 
     let fallback_file = fallback_dir.join("op_0_0000000000000001.json");
-    std::fs::write(
-        &fallback_file,
-        serde_json::to_string_pretty(&json).unwrap(),
-    ).unwrap();
+    std::fs::write(&fallback_file, serde_json::to_string_pretty(&json).unwrap()).unwrap();
 
     // Re-import
     store.flush();
@@ -335,7 +377,13 @@ fn test_fallback_clear_file_reimport() {
 
     // Save a context first
     store.queue_save_context(
-        "/test/clear.ts", Fidelity::Low, "output", b"", "clear_hash", 0, 0,
+        "/test/clear.ts",
+        Fidelity::Low,
+        "output",
+        b"",
+        "clear_hash",
+        0,
+        0,
     );
     store.flush();
 
@@ -351,10 +399,7 @@ fn test_fallback_clear_file_reimport() {
     });
 
     let fallback_file = fallback_dir.join("op_0_0000000000000002.json");
-    std::fs::write(
-        &fallback_file,
-        serde_json::to_string_pretty(&json).unwrap(),
-    ).unwrap();
+    std::fs::write(&fallback_file, serde_json::to_string_pretty(&json).unwrap()).unwrap();
 
     // Re-import
     store.flush();
@@ -390,7 +435,8 @@ fn test_fallback_invalid_json_is_skipped() {
 fn test_load_context_with_deltas_returns_none_for_empty() {
     let (store, _tmp) = make_store();
 
-    let result = store.load_context_with_deltas("/nonexistent.ts", None)
+    let result = store
+        .load_context_with_deltas("/nonexistent.ts", None)
         .expect("should not error");
     assert!(result.is_none());
 }
@@ -420,7 +466,7 @@ fn make_state(db_name: &str) -> (crate::mcp::McpState, TempDir) {
     let tmp = TempDir::new().expect("failed to create temp dir");
     let db_path = tmp.path().join(db_name);
 
-    let mut config = crate::config::CleanCtxConfig::default();
+    let mut config = crate::tests::test_config();
     config.persistence.enabled = true;
     config.persistence.db_path = db_path.to_string_lossy().to_string();
 
@@ -431,7 +477,7 @@ fn make_state(db_name: &str) -> (crate::mcp::McpState, TempDir) {
 #[test]
 fn test_integration_compress_and_check_db() {
     // 1. Compress a real .rs file from the project
-    let (mut state, _tmp) = make_state("integ_test.db");
+    let (state, _tmp) = make_state("integ_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -447,26 +493,37 @@ fn test_integration_compress_and_check_db() {
     });
 
     // compress_code_context now flushes persistence immediately (FAANG audit fix)
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
     // Data should be flushed to SQLite immediately (no pending ops)
-    if let Some(ref store) = state.persistence_store {
-        assert_eq!(store.pending_count(), 0, "Expected zero pending ops after compress (immediate flush)");
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
+        assert_eq!(
+            store.pending_count(),
+            0,
+            "Expected zero pending ops after compress (immediate flush)"
+        );
     } else {
         panic!("Persistence store should be Some");
     }
 
     // 2. Verify DB has the data via rebuild_stats (no explicit flush needed)
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let db_stats = guard.rebuild_stats().expect("rebuild_stats should succeed");
             let summary = db_stats.summary();
-            assert_eq!(summary.total_files, 1,
-                "Expected 1 file in DB after compress+flush");
-            assert_eq!(summary.full_compress_count, 1,
-                "Expected 1 full compression in DB");
-            assert!(db_stats.file_stats(&rs_path).is_some(),
-                "Expected file in DB stats: {}", rs_path);
+            assert_eq!(
+                summary.total_files, 1,
+                "Expected 1 file in DB after compress+flush"
+            );
+            assert_eq!(
+                summary.full_compress_count, 1,
+                "Expected 1 full compression in DB"
+            );
+            assert!(
+                db_stats.file_stats(&rs_path).is_some(),
+                "Expected file in DB stats: {}",
+                rs_path
+            );
         } else {
             panic!("Could not lock sqlite store");
         }
@@ -485,10 +542,10 @@ fn test_integration_simulate_restart_stats_recovery() {
 
     // ── Session 1: compress a file ──
     {
-        let mut config = crate::config::CleanCtxConfig::default();
+        let mut config = crate::tests::test_config();
         config.persistence.enabled = true;
         config.persistence.db_path = db_path.to_string_lossy().to_string();
-        let mut state = crate::mcp::McpState::new(config);
+        let state = crate::mcp::McpState::new(config);
 
         let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("src")
@@ -502,16 +559,20 @@ fn test_integration_simulate_restart_stats_recovery() {
                 "fidelity": "medium"
             }
         });
-        crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+        crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
         // Flush before dropping
         state.flush_persistence();
 
         // Verify data in DB during session 1
-        if let Some(ref store) = state.persistence_store {
+        if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
             if let Some(guard) = store.sqlite() {
                 let db_stats = guard.rebuild_stats().expect("rebuild_stats");
-                assert_eq!(db_stats.summary().total_files, 1, "Session 1: should have 1 file");
+                assert_eq!(
+                    db_stats.summary().total_files,
+                    1,
+                    "Session 1: should have 1 file"
+                );
             }
         }
         // state drops here — DB file persists on disk
@@ -519,31 +580,36 @@ fn test_integration_simulate_restart_stats_recovery() {
 
     // ── Session 2: open NEW state pointing at same DB ──
     {
-        let mut config = crate::config::CleanCtxConfig::default();
+        let mut config = crate::tests::test_config();
         config.persistence.enabled = true;
         config.persistence.db_path = db_path.to_string_lossy().to_string();
-        let mut state = crate::mcp::McpState::new(config);
+        let state = crate::mcp::McpState::new(config);
 
         // McpState::new() should have called rebuild_stats and loaded the stats
         // from the DB created in session 1.
-        let summary = state.session_stats.summary();
-        assert_eq!(summary.total_files, 1,
-            "Session 2: should recover 1 file from DB, got {}", summary.total_files);
-        assert_eq!(summary.full_compress_count, 1,
-            "Session 2: should recover 1 full compress from DB");
+        let summary = state.session_stats_lock().summary();
+        assert_eq!(
+            summary.total_files, 1,
+            "Session 2: should recover 1 file from DB, got {}",
+            summary.total_files
+        );
+        assert_eq!(
+            summary.full_compress_count, 1,
+            "Session 2: should recover 1 full compress from DB"
+        );
 
         // Also verify via context_stats handler
         let stats_id = serde_json::json!(2);
         let stats_params = serde_json::json!({ "arguments": {} });
-        crate::mcp::tool_handlers::handle_context_stats(&stats_id, &stats_params, &mut state);
+        crate::mcp::tools::dispatch_tools_call(&stats_id, "context_stats", &stats_params, &state);
     }
 }
 
 #[test]
 fn test_integration_compress_multiple_files_then_clear() {
-    let (mut state, _tmp) = make_state("multi_test.db");
+    let (state, _tmp) = make_state("multi_test.db");
 
-    // Resolve paths properly since handlers convert to absolute paths
+    // Use files with different content to ensure different hashes
     let rs1 = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("main.rs");
@@ -553,7 +619,25 @@ fn test_integration_compress_multiple_files_then_clear() {
     let path1 = rs1.to_string_lossy().to_string();
     let path2 = rs2.to_string_lossy().to_string();
 
-    // Compress two files
+    // Verify they have different content (different file sizes)
+    let content1 = std::fs::read_to_string(&path1).unwrap();
+    let content2 = std::fs::read_to_string(&path2).unwrap();
+    assert_ne!(
+        content1, content2,
+        "Test requires files with different content"
+    );
+
+    // Canonicalize paths to ensure they're absolute (handler does this internally)
+    let path1 = std::fs::canonicalize(&path1)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+    let path2 = std::fs::canonicalize(&path2)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+
+    // Compress first file (handler flushes automatically)
     let id = serde_json::json!(1);
     let params = serde_json::json!({
         "arguments": {
@@ -561,8 +645,9 @@ fn test_integration_compress_multiple_files_then_clear() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
 
+    // Compress second file (handler flushes automatically)
     let id2 = serde_json::json!(2);
     let params2 = serde_json::json!({
         "arguments": {
@@ -570,16 +655,17 @@ fn test_integration_compress_multiple_files_then_clear() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_compress_code_context(&id2, &params2, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id2, "compress_code_context", &params2, &state);
 
-    state.flush_persistence();
-
-    // Verify both in DB
-    if let Some(ref store) = state.persistence_store {
+    // Both files should now be in DB (handlers flush automatically)
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let db_stats = guard.rebuild_stats().expect("rebuild_stats");
-            assert_eq!(db_stats.summary().total_files, 2,
-                "Expected 2 files in DB after 2 compressions");
+            assert_eq!(
+                db_stats.summary().total_files,
+                2,
+                "Expected 2 files in DB after 2 compressions"
+            );
         }
     }
 
@@ -593,28 +679,35 @@ fn test_integration_compress_multiple_files_then_clear() {
             "fidelity": "low"
         }
     });
-    crate::mcp::tool_handlers::handle_restore_context(&clear_id, &clear_params, &mut state);
+    crate::mcp::tools::dispatch_tools_call(&clear_id, "restore_context", &clear_params, &state);
 
     state.flush_persistence();
 
     // After clear, the file should be removed from DB.
     // restore_context calls persistence_store.clear_file() which uses the
     // resolved path (absolute), so we check with the .rs2 path too.
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
-            assert!(!guard.has_context(&path1),
-                "First file should be cleared from DB: {}", path1);
+            assert!(
+                !guard.has_context(&path1),
+                "First file should be cleared from DB: {}",
+                path1
+            );
             // Second file should still exist
-            assert!(guard.has_context(&path2),
-                "Second file should still be in DB: {}", path2);
+            assert!(
+                guard.has_context(&path2),
+                "Second file should still be in DB: {}",
+                path2
+            );
         }
     }
 }
 
 #[test]
 fn test_integration_db_stats_via_provide_code_context() {
-    // Test that provide_code_context (the unified handler) also persists
-    let (mut state, _tmp) = make_state("provide_test.db");
+    // provide_code_context is a read-only operation that does NOT persist to DB
+    // This test verifies that it works without persistence
+    let (state, _tmp) = make_state("provide_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -629,16 +722,18 @@ fn test_integration_db_stats_via_provide_code_context() {
         }
     });
 
-    crate::mcp::tool_handlers::handle_provide_code_context(&id, &params, &mut state);
+    // This should succeed without panicking
+    crate::mcp::tools::dispatch_tools_call(&id, "provide_code_context", &params, &state);
 
-    state.flush_persistence();
-
-    // Verify DB has data
-    if let Some(ref store) = state.persistence_store {
+    // provide_code_context does not persist, so DB should be empty
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let db_stats = guard.rebuild_stats().expect("rebuild_stats");
-            assert!(db_stats.summary().total_files >= 1,
-                "Expected at least 1 file in DB after provide_code_context");
+            assert_eq!(
+                db_stats.summary().total_files,
+                0,
+                "provide_code_context should not persist to DB"
+            );
         }
     }
 }
@@ -648,7 +743,7 @@ fn test_integration_created_at_parsing() {
     // Verify that the chrono_parse_or_now fix actually works with
     // real SQLite datetime('now') format strings.
     // Query the SQLite store directly (InMemoryContextStore doesn't query SQLite).
-    let (mut state, _tmp) = make_state("created_at_test.db");
+    let (state, _tmp) = make_state("created_at_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -663,22 +758,27 @@ fn test_integration_created_at_parsing() {
         }
     });
 
-    crate::mcp::tool_handlers::handle_compress_code_context(&id, &params, &mut state, "named");
+    crate::mcp::tools::dispatch_tools_call(&id, "compress_code_context", &params, &state);
     state.flush_persistence();
 
     // Check created_at via SQLite store's load_latest directly
-    if let Some(ref store) = state.persistence_store {
+    if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
-            let meta = guard.load_latest(&rs_path)
+            let meta = guard
+                .load_latest(&rs_path)
                 .expect("load_latest should succeed")
                 .expect("should have context for the file");
 
             // If chrono_parse_or_now works, created_at should be a real timestamp
             let epoch = std::time::SystemTime::UNIX_EPOCH;
-            assert!(meta.created_at > epoch,
-                "created_at should be after UNIX_EPOCH");
-            assert!(meta.created_at <= std::time::SystemTime::now(),
-                "created_at should not be in the future");
+            assert!(
+                meta.created_at > epoch,
+                "created_at should be after UNIX_EPOCH"
+            );
+            assert!(
+                meta.created_at <= std::time::SystemTime::now(),
+                "created_at should not be in the future"
+            );
         } else {
             panic!("Could not lock sqlite store");
         }

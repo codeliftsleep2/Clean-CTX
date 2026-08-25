@@ -3,7 +3,10 @@ use super::*;
 #[test]
 fn build_global_symbol_table_basic() {
     let bodies = vec![
-        ("file1.ts".to_string(), "Service Observable HttpClient".to_string()),
+        (
+            "file1.ts".to_string(),
+            "Service Observable HttpClient".to_string(),
+        ),
         ("file2.ts".to_string(), "Service HttpClient".to_string()),
     ];
     let table = build_global_symbol_table(&bodies);
@@ -24,15 +27,15 @@ fn build_global_symbol_table_empty_files() {
 #[test]
 fn encode_with_global_symbols_at_low() {
     let bodies = vec![
-        ("file1.ts".to_string(), "Service Observable HttpClient".to_string()),
+        (
+            "file1.ts".to_string(),
+            "Service Observable HttpClient".to_string(),
+        ),
         ("file2.ts".to_string(), "Service HttpClient".to_string()),
     ];
     let mut table = build_global_symbol_table(&bodies);
-    let (encoded, footer) = encode_with_global_symbols(
-        &mut table,
-        "Service Observable HttpClient",
-        Fidelity::Low,
-    );
+    let (encoded, footer) =
+        encode_with_global_symbols(&mut table, "Service Observable HttpClient", Fidelity::Low);
     // All three tokens should be encoded with global opcodes
     assert!(!encoded.contains("Service"));
     assert!(!encoded.contains("Observable"));
@@ -49,15 +52,10 @@ fn encode_with_global_symbols_at_low() {
 
 #[test]
 fn encode_with_global_symbols_skips_at_medium() {
-    let bodies = vec![
-        ("file1.ts".to_string(), "Service Observable".to_string()),
-    ];
+    let bodies = vec![("file1.ts".to_string(), "Service Observable".to_string())];
     let mut table = build_global_symbol_table(&bodies);
-    let (encoded, footer) = encode_with_global_symbols(
-        &mut table,
-        "Service Observable",
-        Fidelity::Medium,
-    );
+    let (encoded, footer) =
+        encode_with_global_symbols(&mut table, "Service Observable", Fidelity::Medium);
     // At medium fidelity, should return unchanged
     assert_eq!(encoded, "Service Observable");
     assert!(footer.is_empty());
@@ -66,7 +64,10 @@ fn encode_with_global_symbols_skips_at_medium() {
 #[test]
 fn encode_with_global_symbols_multiple_files() {
     let bodies = vec![
-        ("file1.ts".to_string(), "Service Observable HttpClient".to_string()),
+        (
+            "file1.ts".to_string(),
+            "Service Observable HttpClient".to_string(),
+        ),
         ("file2.ts".to_string(), "Service HttpClient".to_string()),
     ];
     let mut table = build_global_symbol_table(&bodies);
@@ -86,16 +87,29 @@ fn encode_with_global_symbols_multiple_files() {
     assert!(refs2.contains("§GSYM"));
 
     // File 1 uses all 3 symbols, file 2 uses only 2
-    let ids1: Vec<&str> = refs1.trim().split(' ').next_back().unwrap().split(',').collect();
-    let ids2: Vec<&str> = refs2.trim().split(' ').next_back().unwrap().split(',').collect();
+    let ids1: Vec<&str> = refs1
+        .trim()
+        .split(' ')
+        .next_back()
+        .unwrap()
+        .split(',')
+        .collect();
+    let ids2: Vec<&str> = refs2
+        .trim()
+        .split(' ')
+        .next_back()
+        .unwrap()
+        .split(',')
+        .collect();
     assert!(ids1.len() > ids2.len());
 }
 
 #[test]
 fn encode_with_global_symbols_deterministic() {
-    let bodies = vec![
-        ("file1.ts".to_string(), "Service Observable HttpClient".to_string()),
-    ];
+    let bodies = vec![(
+        "file1.ts".to_string(),
+        "Service Observable HttpClient".to_string(),
+    )];
     let mut table1 = build_global_symbol_table(&bodies);
     let mut table2 = build_global_symbol_table(&bodies);
 

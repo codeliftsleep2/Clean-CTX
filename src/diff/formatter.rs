@@ -34,7 +34,13 @@ pub fn format_diff(actions: &[DiffAction], fidelity: Fidelity) -> String {
             if matches!(action.kind, DiffKind::Unchanged) {
                 let _ = writeln!(out, "= {} (unchanged)", action.label);
             } else {
-                let _ = write!(out, "{} {} {}", action.kind.symbol(), action.label, action.detail);
+                let _ = write!(
+                    out,
+                    "{} {} {}",
+                    action.kind.symbol(),
+                    action.label,
+                    action.detail
+                );
                 out.push('\n');
             }
             current_class = Some(action.label.clone());
@@ -42,16 +48,74 @@ pub fn format_diff(actions: &[DiffAction], fidelity: Fidelity) -> String {
             let indent = if fidelity == Fidelity::Low { "" } else { "  " };
             match action.kind {
                 DiffKind::Modified => {
-                    let _ = writeln!(out, "{}{} {} ~ {}", indent, action.kind.symbol(), action.label, action.detail);
-                    if !action.previous_detail.is_empty() {
-                        let _ = writeln!(out, "{}    was: {}", indent, action.previous_detail);
+                    // G2-5 audit: use the differ's reason_hint to label the
+                    // change correctly. A markers-only change (same sig)
+                    // is now "(markers changed)" — previously it was
+                    // mislabeled "(body changed)".
+                    if action.target == DiffTarget::Method && !action.reason_hint.is_empty() {
+                        match action.reason_hint.as_str() {
+                            "body" => {
+                                let _ = writeln!(
+                                    out,
+                                    "{}{} {} (body changed)",
+                                    indent,
+                                    action.kind.symbol(),
+                                    action.label
+                                );
+                            }
+                            "markers" => {
+                                let _ = writeln!(
+                                    out,
+                                    "{}{} {} (markers changed)",
+                                    indent,
+                                    action.kind.symbol(),
+                                    action.label
+                                );
+                            }
+                            _ => {
+                                let _ = writeln!(
+                                    out,
+                                    "{}{} {} ~ {}",
+                                    indent,
+                                    action.kind.symbol(),
+                                    action.label,
+                                    action.detail
+                                );
+                                if !action.previous_detail.is_empty() {
+                                    let _ = writeln!(
+                                        out,
+                                        "{}    was: {}",
+                                        indent, action.previous_detail
+                                    );
+                                }
+                            }
+                        }
+                    } else {
+                        let _ = writeln!(
+                            out,
+                            "{}{} {} ~ {}",
+                            indent,
+                            action.kind.symbol(),
+                            action.label,
+                            action.detail
+                        );
+                        if !action.previous_detail.is_empty() {
+                            let _ = writeln!(out, "{}    was: {}", indent, action.previous_detail);
+                        }
                     }
                 }
                 DiffKind::Unchanged => {
                     let _ = writeln!(out, "{}{} {}", indent, action.kind.symbol(), action.detail);
                 }
                 _ => {
-                    let _ = writeln!(out, "{}{} {} {}", indent, action.kind.symbol(), action.label, action.detail);
+                    let _ = writeln!(
+                        out,
+                        "{}{} {} {}",
+                        indent,
+                        action.kind.symbol(),
+                        action.label,
+                        action.detail
+                    );
                 }
             }
         }

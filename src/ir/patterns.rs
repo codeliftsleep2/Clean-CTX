@@ -21,8 +21,8 @@
 //
 // A pattern that doesn't match falls through unchanged (zero regression).
 
-use super::opcodes::CoreOp;
 use super::layers::PatternRecognizer;
+use super::opcodes::CoreOp;
 
 /// A compressed pattern op.
 ///
@@ -75,32 +75,47 @@ pub enum PatternOp {
     },
     /// `DEF_M + FLAGS(OVERRIDE)` → single op.
     /// Wire: `["PAT", "OVERRIDE", class_id, method_id]`
-    Override {
-        class_id: String,
-        method_id: String,
-    },
+    Override { class_id: String, method_id: String },
     /// A pattern that was recognised but the constructor had no params —
     /// still useful to flag so the LLM knows it's a ctor.
     /// Wire: `["PAT", "EMPTY_CTOR", class_id, method_id]`
-    EmptyConstructor {
-        class_id: String,
-        method_id: String,
-    },
+    EmptyConstructor { class_id: String, method_id: String },
 }
 
 impl PatternOp {
     /// Convert to a positional `Vec<String>` for the wire.
     pub fn to_tuple(&self) -> Vec<String> {
         match self {
-            PatternOp::Constructor { class_id, method_id, deps } => {
-                let mut t = vec!["PAT".into(), "CTOR".into(), class_id.clone(), method_id.clone()];
+            PatternOp::Constructor {
+                class_id,
+                method_id,
+                deps,
+            } => {
+                let mut t = vec![
+                    "PAT".into(),
+                    "CTOR".into(),
+                    class_id.clone(),
+                    method_id.clone(),
+                ];
                 t.extend(deps.iter().cloned());
                 t
             }
-            PatternOp::EmptyConstructor { class_id, method_id } => {
-                vec!["PAT".into(), "EMPTY_CTOR".into(), class_id.clone(), method_id.clone()]
+            PatternOp::EmptyConstructor {
+                class_id,
+                method_id,
+            } => {
+                vec![
+                    "PAT".into(),
+                    "EMPTY_CTOR".into(),
+                    class_id.clone(),
+                    method_id.clone(),
+                ]
             }
-            PatternOp::Observable { class_id, method_id, return_type } => {
+            PatternOp::Observable {
+                class_id,
+                method_id,
+                return_type,
+            } => {
                 vec![
                     "PAT".into(),
                     "OBSERVABLE".into(),
@@ -109,7 +124,11 @@ impl PatternOp {
                     return_type.clone(),
                 ]
             }
-            PatternOp::Promise { class_id, method_id, return_type } => {
+            PatternOp::Promise {
+                class_id,
+                method_id,
+                return_type,
+            } => {
                 vec![
                     "PAT".into(),
                     "PROMISE".into(),
@@ -118,7 +137,11 @@ impl PatternOp {
                     return_type.clone(),
                 ]
             }
-            PatternOp::Getter { class_id, method_id, property } => {
+            PatternOp::Getter {
+                class_id,
+                method_id,
+                property,
+            } => {
                 vec![
                     "PAT".into(),
                     "GETTER".into(),
@@ -127,7 +150,11 @@ impl PatternOp {
                     property.clone(),
                 ]
             }
-            PatternOp::Setter { class_id, method_id, property } => {
+            PatternOp::Setter {
+                class_id,
+                method_id,
+                property,
+            } => {
                 vec![
                     "PAT".into(),
                     "SETTER".into(),
@@ -136,7 +163,10 @@ impl PatternOp {
                     property.clone(),
                 ]
             }
-            PatternOp::Override { class_id, method_id } => {
+            PatternOp::Override {
+                class_id,
+                method_id,
+            } => {
                 vec![
                     "PAT".into(),
                     "OVERRIDE".into(),
@@ -159,27 +189,57 @@ impl PatternOp {
         let method_id = tuple.get(3)?.clone();
         match tuple[1].as_str() {
             "CTOR" => {
-                let deps = if tuple.len() > 4 { tuple[4..].to_vec() } else { Vec::new() };
-                Some(PatternOp::Constructor { class_id, method_id, deps })
+                let deps = if tuple.len() > 4 {
+                    tuple[4..].to_vec()
+                } else {
+                    Vec::new()
+                };
+                Some(PatternOp::Constructor {
+                    class_id,
+                    method_id,
+                    deps,
+                })
             }
-            "EMPTY_CTOR" => Some(PatternOp::EmptyConstructor { class_id, method_id }),
+            "EMPTY_CTOR" => Some(PatternOp::EmptyConstructor {
+                class_id,
+                method_id,
+            }),
             "OBSERVABLE" => {
                 let return_type = tuple.get(4)?.clone();
-                Some(PatternOp::Observable { class_id, method_id, return_type })
+                Some(PatternOp::Observable {
+                    class_id,
+                    method_id,
+                    return_type,
+                })
             }
             "PROMISE" => {
                 let return_type = tuple.get(4)?.clone();
-                Some(PatternOp::Promise { class_id, method_id, return_type })
+                Some(PatternOp::Promise {
+                    class_id,
+                    method_id,
+                    return_type,
+                })
             }
             "GETTER" => {
                 let property = tuple.get(4)?.clone();
-                Some(PatternOp::Getter { class_id, method_id, property })
+                Some(PatternOp::Getter {
+                    class_id,
+                    method_id,
+                    property,
+                })
             }
             "SETTER" => {
                 let property = tuple.get(4)?.clone();
-                Some(PatternOp::Setter { class_id, method_id, property })
+                Some(PatternOp::Setter {
+                    class_id,
+                    method_id,
+                    property,
+                })
             }
-            "OVERRIDE" => Some(PatternOp::Override { class_id, method_id }),
+            "OVERRIDE" => Some(PatternOp::Override {
+                class_id,
+                method_id,
+            }),
             _ => None,
         }
     }
@@ -315,16 +375,19 @@ impl CompressingPatternRecognizer {
 impl PatternRecognizer for CompressingPatternRecognizer {
     fn recognize(&self, instructions: &[CoreOp]) -> Vec<CoreOp> {
         let merged = self.compress_merged(instructions);
-        merged.into_iter().map(|item| match item {
-            MergeItem::Passthrough(op) => op,
-            MergeItem::Pattern(pat) => {
-                let tuple = pat.to_tuple();
-                // tuple[0] is "PAT", tuple[1] is pattern name, rest are args
-                let name = tuple.get(1).cloned().unwrap_or_default();
-                let args = tuple.into_iter().skip(2).collect();
-                CoreOp::Pattern(name, args)
-            }
-        }).collect()
+        merged
+            .into_iter()
+            .map(|item| match item {
+                MergeItem::Passthrough(op) => op,
+                MergeItem::Pattern(pat) => {
+                    let tuple = pat.to_tuple();
+                    // tuple[0] is "PAT", tuple[1] is pattern name, rest are args
+                    let name = tuple.get(1).cloned().unwrap_or_default();
+                    let args = tuple.into_iter().skip(2).collect();
+                    CoreOp::Pattern(name, args)
+                }
+            })
+            .collect()
     }
 }
 
@@ -354,42 +417,92 @@ pub enum MergeItem {
     Pattern(PatternOp),
 }
 
-// ── Pattern recognisers (consumptive) ─────────────────────────────────
+// ── Centralized flag consumption helpers ──────────────────────────────
+
+/// Count consecutive `Flags(method_id, _)` ops starting at `offset` in `slice`.
+/// Returns the number of trailing Flags ops that reference `method_id`.
+fn count_trailing_flags(slice: &[CoreOp], offset: usize, method_id: &str) -> usize {
+    let mut count = 0;
+    while offset + count < slice.len() {
+        match &slice[offset + count] {
+            CoreOp::Flags(mid, _) if mid == method_id => count += 1,
+            _ => break,
+        }
+    }
+    count
+}
 
 /// Try to match and consume a pattern at the start of `slice`.
-/// Returns `(pattern, instructions_consumed)` on success.
+///
+/// Centralized wrapper that enforces the invariant:
+/// > A pattern consuming `DefMethod(Mx)` must consume/handle all immediately
+/// > adjacent `Flags(Mx, ...)` before and after its span.
+///
+/// This handles leading flags (emitted by the additive `CodePatternRecognizer`)
+/// and trailing flags (emitted by language-layer passes) for EVERY consumptive
+/// pattern, preventing orphaned Flags ops (E003) regardless of which pattern
+/// matches.
 fn try_compress_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     if slice.is_empty() {
         return None;
     }
 
-    // CTOR + injectable deps
-    if let Some(result) = try_ctor_pattern(slice) {
-        return Some(result);
+    // Step 1: Find the first non-Flags op to determine the method_id.
+    // Leading Flags ops from the additive CodePatternRecognizer (e.g.
+    // FLAGS(Mx, ["CTOR"])) may precede DefMethod.
+    let first_non_flags = {
+        let mut idx = 0;
+        while idx < slice.len() {
+            match &slice[idx] {
+                CoreOp::Flags(_, _) => idx += 1,
+                _ => break,
+            }
+        }
+        idx
+    };
+
+    // If everything is Flags, there's no pattern to match.
+    if first_non_flags >= slice.len() {
+        return None;
     }
-    // Empty constructor
-    if let Some(result) = try_empty_ctor_pattern(slice) {
-        return Some(result);
+
+    // Extract method_id from the first non-Flags op (must be DefMethod for
+    // any pattern to match).
+    let method_id = match &slice[first_non_flags] {
+        CoreOp::DefMethod(_, mid, _) => mid.clone(),
+        _ => return None,
+    };
+
+    // Step 2: Verify all leading Flags ops reference this method_id.
+    // If any leading flag belongs to a different method, do NOT consume it.
+    for flag in slice.iter().take(first_non_flags) {
+        if let CoreOp::Flags(mid, _) = flag {
+            if mid != &method_id {
+                return None;
+            }
+        }
     }
-    // Observable / Promise
-    if let Some(result) = try_observable_pattern(slice) {
-        return Some(result);
+
+    // Step 3: Try each pattern on the slice starting after leading flags.
+    let inner_slice = &slice[first_non_flags..];
+    let result = try_ctor_pattern(inner_slice)
+        .or_else(|| try_empty_ctor_pattern(inner_slice))
+        .or_else(|| try_observable_pattern(inner_slice))
+        .or_else(|| try_promise_pattern(inner_slice))
+        .or_else(|| try_getter_pattern(inner_slice))
+        .or_else(|| try_setter_pattern(inner_slice))
+        .or_else(|| try_override_pattern(inner_slice));
+
+    // Step 4: If a pattern matched, consume trailing Flags ops for the
+    // same method_id. This prevents orphaned Flags (E003) from language-layer
+    // flags (PRIVATE, STATIC, EXPORT, etc.) that follow the method body.
+    if let Some((pat, inner_consumed)) = result {
+        let trailing = count_trailing_flags(slice, first_non_flags + inner_consumed, &method_id);
+        let total_consumed = first_non_flags + inner_consumed + trailing;
+        Some((pat, total_consumed))
+    } else {
+        None
     }
-    if let Some(result) = try_promise_pattern(slice) {
-        return Some(result);
-    }
-    // Accessors
-    if let Some(result) = try_getter_pattern(slice) {
-        return Some(result);
-    }
-    if let Some(result) = try_setter_pattern(slice) {
-        return Some(result);
-    }
-    // Override
-    if let Some(result) = try_override_pattern(slice) {
-        return Some(result);
-    }
-    None
 }
 
 /// Returns true if the method name is a recognized constructor name.
@@ -398,20 +511,22 @@ fn try_compress_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
 /// `layers/patterns.rs` can also use it, ensuring both recognizers
 /// match the same set of constructor names.
 pub fn is_constructor_name(name: &str) -> bool {
-    matches!(name, "constructor" | "new" | "__init__" | "initialize" | "ctor")
+    matches!(
+        name,
+        "constructor" | "new" | "__init__" | "initialize" | "ctor"
+    )
 }
 
-/// CTOR pattern: `DEF_M(constructor) [+ Flags(Mid, ["CTOR"])] + Param* + Return + INJECTS` → 1 op.
+/// CTOR pattern: `DEF_M(constructor) + Param* + Return + INJECTS` → 1 op.
 ///
-/// F-FULL-03/F-FULL-09: The consumptive recognizer is aware of the additive
-/// `CodePatternRecognizer`'s CTOR `Flags` op that may immediately precede
-/// the `DefMethod`. If present, it consumes the `Flags` op as part of the
-/// matched span, preventing orphan `Flags(M1, ["CTOR"])` ops from remaining
-/// in the stream after the `DefMethod` has been consumed.
+/// NOTE: Leading/trailing Flags ops are handled by the centralized
+/// `try_compress_pattern` wrapper. This function receives a slice that
+/// starts at `DefMethod` and returns consumed count for the body only.
 fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     if slice.is_empty() {
         return None;
     }
+
     let (class_id, method_id) = match &slice[0] {
         CoreOp::DefMethod(cid, mid, name) if is_constructor_name(name) => {
             (cid.clone(), mid.clone())
@@ -420,22 +535,11 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     };
 
     // Walk forward, collecting params + return + (optional) INJECTS
-    let mut idx = 1;
+    let mut idx = 1; // skip DEF_M
     let mut param_count = 0;
     let mut saw_return = false;
     let mut saw_injects = false;
     let mut deps: Vec<String> = Vec::new();
-
-    // F-FULL-03/F-FULL-09: Consume any trailing CTOR Flags op that the
-    // additive CodePatternRecognizer emitted before the method body.
-    // This prevents orphan Flags(M1, ["CTOR"]) ops in the final stream.
-    if idx < slice.len() {
-        if let CoreOp::Flags(mid, flags) = &slice[idx] {
-            if mid == &method_id && flags.contains(&"CTOR".to_string()) {
-                idx += 1;
-            }
-        }
-    }
 
     while idx < slice.len() {
         match &slice[idx] {
@@ -472,10 +576,13 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         return None;
     }
 
-    let consumed = idx;
     Some((
-        PatternOp::Constructor { class_id, method_id, deps },
-        consumed,
+        PatternOp::Constructor {
+            class_id,
+            method_id,
+            deps,
+        },
+        idx,
     ))
 }
 
@@ -493,7 +600,10 @@ fn try_empty_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     if let CoreOp::Return(mid, _) = &slice[1] {
         if mid == &method_id {
             return Some((
-                PatternOp::EmptyConstructor { class_id, method_id },
+                PatternOp::EmptyConstructor {
+                    class_id,
+                    method_id,
+                },
                 2,
             ));
         }
@@ -515,18 +625,20 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         _ => return None,
     };
     // Must be Promise-like and have an ASYNC flag
-    let is_promise_like =
-        return_type == "$P" || return_type.contains("Promise") || return_type.contains("Observable");
+    let is_promise_like = return_type == "$P"
+        || return_type.contains("Promise")
+        || return_type.contains("Observable");
     if !is_promise_like {
         return None;
     }
     match &slice[2] {
-        CoreOp::Flags(mid, flags)
-            if mid == &method_id
-                && flags.iter().any(|f| f == "ASYNC") =>
-        {
+        CoreOp::Flags(mid, flags) if mid == &method_id && flags.iter().any(|f| f == "ASYNC") => {
             Some((
-                PatternOp::Observable { class_id, method_id, return_type },
+                PatternOp::Observable {
+                    class_id,
+                    method_id,
+                    return_type,
+                },
                 3,
             ))
         }
@@ -546,8 +658,7 @@ fn try_promise_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     };
     match &slice[1] {
         CoreOp::Return(mid, ty) if mid == &method_id => {
-            let is_promise_like =
-                ty == "$P" || ty.contains("Promise") || ty.contains("Observable");
+            let is_promise_like = ty == "$P" || ty.contains("Promise") || ty.contains("Observable");
             if is_promise_like {
                 Some((
                     PatternOp::Promise {
@@ -584,11 +695,7 @@ fn try_getter_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     // Optionally consume a trailing Return
     let consumed = if slice.len() >= 2 {
         if let CoreOp::Return(mid, _) = &slice[1] {
-            if mid == &method_id {
-                2
-            } else {
-                1
-            }
+            if mid == &method_id { 2 } else { 1 }
         } else {
             1
         }
@@ -596,7 +703,11 @@ fn try_getter_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         1
     };
     Some((
-        PatternOp::Getter { class_id, method_id, property },
+        PatternOp::Getter {
+            class_id,
+            method_id,
+            property,
+        },
         consumed,
     ))
 }
@@ -634,7 +745,11 @@ fn try_setter_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         }
     }
     Some((
-        PatternOp::Setter { class_id, method_id, property },
+        PatternOp::Setter {
+            class_id,
+            method_id,
+            property,
+        },
         idx,
     ))
 }
@@ -651,7 +766,10 @@ fn try_override_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     match &slice[1] {
         CoreOp::Flags(mid, flags) if mid == &method_id && flags.iter().any(|f| f == "OVERRIDE") => {
             Some((
-                PatternOp::Override { class_id, method_id },
+                PatternOp::Override {
+                    class_id,
+                    method_id,
+                },
                 2,
             ))
         }

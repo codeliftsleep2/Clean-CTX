@@ -42,7 +42,10 @@ fn calculate_savings_smoke_test() {
     let meta = calculate_savings(raw, compressed, None);
 
     assert!(meta.raw_tokens > 0, "raw token count must be > 0");
-    assert!(meta.compressed_tokens > 0, "compressed token count must be > 0");
+    assert!(
+        meta.compressed_tokens > 0,
+        "compressed token count must be > 0"
+    );
     assert!(
         (0.0..=100.0).contains(&meta.savings_percentage),
         "savings_percentage out of range: {}",

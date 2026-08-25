@@ -133,8 +133,15 @@ public class ApiController {
 
 #[test]
 fn test_all_mapping_annotations() {
-    for annotation in &["@GetMapping", "@PostMapping", "@PutMapping", "@DeleteMapping", "@PatchMapping"] {
-        let source = format!(r#"
+    for annotation in &[
+        "@GetMapping",
+        "@PostMapping",
+        "@PutMapping",
+        "@DeleteMapping",
+        "@PatchMapping",
+    ] {
+        let source = format!(
+            r#"
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.{0};
 
@@ -143,7 +150,38 @@ public class TestController {{
     {0}("/test")
     public void test() {{}}
 }}
-"#, annotation);
+"#,
+            annotation
+        );
         assert!(is_spring_file(&source), "Failed to detect {}", annotation);
     }
+}
+
+#[test]
+fn rejects_comment_with_annotation_name() {
+    // A-11: Comments should not trigger Spring detection
+    let source = r#"
+        // TODO: add @RestController when ready
+        public class PlainJavaClass {
+            private String name;
+        }
+    "#;
+    assert!(
+        !is_spring_file(source),
+        "Comment with @RestController should not trigger detection"
+    );
+}
+
+#[test]
+fn rejects_string_literal_with_annotation_name() {
+    // A-11: String literals should not trigger Spring detection
+    let source = r#"
+        public class PlainJavaClass {
+            private String message = "Use @Service to define a service";
+        }
+    "#;
+    assert!(
+        !is_spring_file(source),
+        "String literal with @Service should not trigger detection"
+    );
 }

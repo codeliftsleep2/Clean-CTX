@@ -64,13 +64,13 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
         // ── Phase 2: Pipe-Level Interception Proxy ───────────────────
         serde_json::json!({
             "name": "cbm_proxy",
-            "description": "**Primary CBM integration point.** Forwards a query to CBM, intercepts the raw ~5000-token structural response at the pipe level, compresses it down to ~1100 tokens, and returns the compressed result. Use this instead of calling CBM directly. Only available when codebase-memory-mcp is installed.",
+            "description": "**Primary CBM integration point.** Forwards a query to CBM, intercepts the raw ~5000-token structural response at the pipe level, compresses it down to ~1100 tokens, and returns the compressed result. `cbm_tool` must be a real CBM tool name: 'search_graph', 'query_graph', 'trace_path', or 'get_architecture'. Use this instead of calling CBM directly. Only available when codebase-memory-mcp is installed.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "cbm_tool": { "type": "string", "description": "CBM tool to call: 'graph_search', 'graph_query', 'graph_trace', 'get_architecture', 'get_symbol_importance', 'get_dead_code'. Default: 'graph_search'." },
-                    "parameters": { "type": "object", "description": "Parameters to pass to the CBM tool. For graph_search: { 'query': string, 'project': string }. For graph_trace: { 'from': string, 'to': string, 'project': string }. For others: { 'project': string }." },
-                    "query": { "type": "string", "description": "Shorthand: query to pass to CBM (used when parameters is not set)." },
+                    "cbm_tool": { "type": "string", "description": "CBM tool to call (must be a real CBM tool): 'search_graph', 'query_graph', 'trace_path', 'get_architecture'. Default: 'search_graph'. NOTE: get_symbol_importance/get_dead_code are implemented internally via query_graph and are NOT CBM tools." },
+                    "parameters": { "type": "object", "description": "Parameters to pass to CBM using CBM-native names. search_graph: { 'name_pattern': string, 'project': string }. query_graph: { 'query': string, 'project': string }. trace_path: { 'function_name': string, 'direction': string (inbound|outbound|both), 'depth': int, 'project': string }. get_architecture: { 'project': string }." },
+                    "query": { "type": "string", "description": "Shorthand: query text passed to CBM (mapped to name_pattern for search_graph, query for query_graph)." },
                     "project": { "type": "string", "description": "Shorthand: CBM project name (used when parameters is not set)." }
                 },
                 "required": []

@@ -16,8 +16,9 @@ target
 #vscode files
 /*.vscode
 
-#local clean-ctx folder
+#local clean-ctx folder and config file
 /*.clean-ctx
+/.clean-ctx.json
 
 #Extra Docs
 /extradocs
@@ -28,3 +29,16 @@ target
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Local AI assistant configuration (user-specific, not for commit)
+.clinerules
+clippy_audit5.log
+test_audit5.log
+
+# Local session handoff documents (not for commit)
+docs/SESSION_HANDOFF_*.md
+# CBM fixture captures (personal machine, not committed)
+src/tests/cbm/fixtures/
+
+# Personal audit probe paths (machine-specific)
+.clean-ctx/audit-paths.toml

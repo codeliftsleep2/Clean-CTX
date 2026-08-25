@@ -117,13 +117,7 @@ mod tests {
         assert!(!handle.is_present());
 
         let mut builder = SpringGraphBuilder::new();
-        builder.register_class(
-            "UserController",
-            "α1",
-            ClassKind::Controller,
-            &[],
-            &[],
-        );
+        builder.register_class("UserController", "α1", ClassKind::Controller, &[], &[]);
         let graph = builder.build();
 
         handle.set(graph);
@@ -137,13 +131,7 @@ mod tests {
     fn test_with_graph() {
         let handle = SpringGraphHandle::new();
         let mut builder = SpringGraphBuilder::new();
-        builder.register_class(
-            "UserService",
-            "α2",
-            ClassKind::Service,
-            &[],
-            &[],
-        );
+        builder.register_class("UserService", "α2", ClassKind::Service, &[], &[]);
         let graph = builder.build();
         handle.set(graph);
 

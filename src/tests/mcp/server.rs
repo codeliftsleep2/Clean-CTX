@@ -16,7 +16,10 @@ fn read_normal_line() {
     let result = read_request_line(&mut handle).expect("should produce a line");
     let line = result.expect("line should be Ok");
 
-    assert_eq!(line, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}");
+    assert_eq!(
+        line,
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"
+    );
 }
 
 #[test]
@@ -67,7 +70,11 @@ fn read_request_at_exact_cap_is_ok() {
     let result = read_request_line(&mut handle).expect("expected a result (not EOF)");
     let line = result.expect("a line at the cap should be accepted");
 
-    assert_eq!(line.len(), body_size, "line should be returned with newline stripped");
+    assert_eq!(
+        line.len(),
+        body_size,
+        "line should be returned with newline stripped"
+    );
 }
 
 #[test]
@@ -85,24 +92,28 @@ fn read_recovers_after_oversize() {
     assert!(first.is_err(), "first line should be rejected as oversize");
 
     let second = read_request_line(&mut handle).unwrap().unwrap();
-    assert_eq!(
-        second,
-        "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}"
-    );
+    assert_eq!(second, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}");
 }
 
 #[test]
 fn empty_input_returns_none() {
     let mut handle = Cursor::new(Vec::<u8>::new());
     let result = read_request_line(&mut handle);
-    assert!(result.is_none(), "empty stdin should produce None (clean EOF)");
+    assert!(
+        result.is_none(),
+        "empty stdin should produce None (clean EOF)"
+    );
 }
 
 #[test]
 fn find_project_root_returns_valid_path() {
     let root = super::find_project_root();
     // The project root should exist and contain Cargo.toml
-    assert!(root.exists(), "project root should exist: {}", root.display());
+    assert!(
+        root.exists(),
+        "project root should exist: {}",
+        root.display()
+    );
     assert!(
         root.join("Cargo.toml").exists() || root.join(".clean-ctx.json").exists(),
         "project root should contain Cargo.toml or .clean-ctx.json: {}",
@@ -115,5 +126,8 @@ fn find_project_root_is_stable() {
     // Calling twice should return the same path (OnceLock)
     let root1 = super::find_project_root();
     let root2 = super::find_project_root();
-    assert_eq!(root1, root2, "find_project_root should return the same path on repeated calls");
+    assert_eq!(
+        root1, root2,
+        "find_project_root should return the same path on repeated calls"
+    );
 }

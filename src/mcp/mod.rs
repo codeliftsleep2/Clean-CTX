@@ -11,12 +11,11 @@
 //   - workspace  : workspace-level operations (compress_workspace_dir, collect_source_files)
 //   - state      : per-session state shared by all tool handlers (F-05)
 
-mod handlers;
-pub(crate) mod tool_handlers;
-pub(crate) mod tool_helpers;
 pub(crate) mod buffered_store;
 pub(crate) mod cache_hints;
 pub(crate) mod context_store;
+pub mod dispatcher;
+mod handlers;
 pub(crate) mod heuristics;
 pub(crate) mod prompts;
 pub(crate) mod proxy_stats;
@@ -25,6 +24,8 @@ mod server;
 pub(crate) mod session_stats;
 pub(crate) mod sqlite_store;
 pub(crate) mod state;
+pub(crate) mod tool_handlers;
+pub(crate) mod tool_helpers;
 pub(crate) mod tools;
 pub(crate) mod workspace;
 pub(crate) mod workspace_util;
@@ -36,6 +37,19 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     server::run()
 }
 
-#[cfg(test)]
+// Regression and audit-fix tests compress src/main.rs and other .rs files,
+// so they require the "rust" feature to be enabled.
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/regression.rs"]
 mod regression;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../tests/mcp/audit_fixes.rs"]
+mod audit_fixes;
+
+// Black-box E2E tests that spawn the built binary and exchange JSON-RPC.
+// Tests are `#[ignore]` by default (require `cargo build` first); run with
+// `cargo test -- --ignored`.
+#[cfg(test)]
+#[path = "../tests/mcp/e2e_server.rs"]
+mod e2e_server;

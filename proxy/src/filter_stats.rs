@@ -110,11 +110,13 @@ impl FilterStats {
     }
 
     /// Get stats for a specific program.
+    #[allow(dead_code)]
     pub fn for_program(&self, program: &str) -> Option<&ProgramFilterStats> {
         self.programs.get(program)
     }
 
     /// Get a summary string for the dashboard.
+    #[allow(dead_code)]
     pub fn summary(&self) -> String {
         if self.total_applications == 0 {
             return "  No filter applications recorded.".to_string();
@@ -185,7 +187,10 @@ mod tests {
         stats.record_application("npm", 2000, 30, 400, 6);
 
         assert_eq!(stats.total_applications, 3);
-        assert_eq!(stats.total_tokens_saved, (500 - 25) + (300 - 10) + (2000 - 30));
+        assert_eq!(
+            stats.total_tokens_saved,
+            (500 - 25) + (300 - 10) + (2000 - 30)
+        );
 
         let cargo_stats = stats.for_program("cargo").unwrap();
         assert_eq!(cargo_stats.applications, 2);

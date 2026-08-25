@@ -8,12 +8,18 @@
 // Raw HTML content is NEVER included — only the structural summary.
 //
 // The output is a single-line shape summary suitable for a `Φtpl:`
-// marker in the workspace manifest.
+// marker in the workspace manifest (Low fidelity), or a multi-line
+// structural rendering (Medium/High fidelity) via `to_marker_lines`.
 
+#[cfg(feature = "angular")]
 use std::sync::OnceLock;
+#[cfg(feature = "angular")]
 use tree_sitter::{Language, Parser};
 
+use crate::compression::Fidelity;
+
 /// Default maximum nesting depth for tag extraction.
+#[cfg(feature = "angular")]
 const DEFAULT_DEPTH: usize = 4;
 
 /// Cached tree-sitter `Language` (F-ANG-18). `tree_sitter_html::language()`
@@ -24,9 +30,54 @@ const DEFAULT_DEPTH: usize = 4;
 ///
 /// We keep a fresh `Parser` per call (parsers hold mutable state and
 /// are not `Sync`), but the `Language` is immutable and thread-safe.
+#[cfg(feature = "angular")]
 fn html_language() -> &'static Language {
     static LANG: OnceLock<Language> = OnceLock::new();
-    LANG.get_or_init(tree_sitter_html::language)
+    LANG.get_or_init(|| tree_sitter_html::LANGUAGE.into())
+}
+
+/// A single template element with its Angular bindings.
+///
+/// Used for Medium/High fidelity rendering where we need to know
+/// which bindings belong to which tag.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TemplateElement {
+    /// The tag name (e.g. `div`, `app-user-card`).
+    pub tag: String,
+    /// Property bindings: `[prop]="expr"` → `("prop", "expr")`.
+    pub prop_bindings: Vec<(String, String)>,
+    /// Event bindings: `(event)="handler"` → `("event", "handler")`.
+    pub event_bindings: Vec<(String, String)>,
+    /// Two-way bindings: `[(model)]="value"` → `("model", "value")`.
+    pub two_way_bindings: Vec<(String, String)>,
+    /// Structural directives: `*ngIf`, `*ngFor`, etc.
+    pub structural_directives: Vec<String>,
+    /// Whether this is a custom element (contains a hyphen).
+    pub is_custom: bool,
+}
+
+impl TemplateElement {
+    /// Render this element as a compact line for Medium/High fidelity.
+    pub fn render(&self) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        for dir in &self.structural_directives {
+            parts.push(format!("*{}", dir));
+        }
+        for (name, expr) in &self.two_way_bindings {
+            parts.push(format!("[({})]=\"{}\"", name, expr));
+        }
+        for (name, expr) in &self.prop_bindings {
+            parts.push(format!("[{}]=\"{}\"", name, expr));
+        }
+        for (name, expr) in &self.event_bindings {
+            parts.push(format!("({})=\"{}\"", name, expr));
+        }
+        if parts.is_empty() {
+            format!("<{}>", self.tag)
+        } else {
+            format!("<{} {}>", self.tag, parts.join(" "))
+        }
+    }
 }
 
 /// Structural shape of an Angular template, suitable for a one-line
@@ -59,6 +110,19 @@ pub struct TemplateShape {
     pub defer_blocks: Vec<String>,
     /// F-FULL-13: marker for parser failure on corrupt input.
     pub parse_failed: bool,
+    // --- Fidelity-gated rendering (ANGULAR_HTML_COMPRESSION_PLAN) ---
+    /// Structured elements with their bindings (for Medium/High fidelity).
+    pub elements: Vec<TemplateElement>,
+    /// `@if` / `*ngIf` condition expressions.
+    pub if_conditions: Vec<String>,
+    /// `@for` / `*ngFor` loop descriptors: `(var, iterable)`.
+    pub for_loops: Vec<(String, String)>,
+    /// Property binding expressions: `[prop]="expr"` → `("prop", "expr")`.
+    pub prop_binding_exprs: Vec<(String, String)>,
+    /// Event binding expressions: `(event)="handler"` → `("event", "handler")`.
+    pub event_binding_exprs: Vec<(String, String)>,
+    /// Two-way binding expressions: `[(model)]="value"` → `("model", "value")`.
+    pub two_way_binding_exprs: Vec<(String, String)>,
 }
 
 impl TemplateShape {
@@ -132,6 +196,134 @@ impl TemplateShape {
             format!("Φtpl:{}", parts.join(" "))
         }
     }
+
+    /// Format as fidelity-gated marker lines.
+    ///
+    /// - `Fidelity::Low` → single-line shape summary (current behavior)
+    /// - `Fidelity::Medium` → multi-line structural Angular semantics
+    /// - `Fidelity::High` → near-full template with HTML scaffolding stripped
+    pub fn to_marker_lines(&self, fidelity: Fidelity) -> Vec<String> {
+        if self.parse_failed {
+            return vec!["Φtpl:PARSE_ERROR".to_string()];
+        }
+        // Empty template → single "Φtpl:empty" line at all fidelities.
+        if self.tags.is_empty()
+            && self.control_flow_blocks.is_empty()
+            && self.defer_blocks.is_empty()
+            && self.let_declarations.is_empty()
+            && self.structural_directives.is_empty()
+            && self.prop_bindings.is_empty()
+            && self.event_bindings.is_empty()
+            && self.two_way_bindings.is_empty()
+            && self.interpolation_count == 0
+        {
+            return vec!["Φtpl:empty".to_string()];
+        }
+        match fidelity {
+            Fidelity::Low => vec![self.to_marker_line()],
+            Fidelity::Medium => self.to_medium_lines(),
+            Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => self.to_high_lines(),
+        }
+    }
+
+    /// Medium fidelity: multi-line structural Angular semantics.
+    /// Preserves control-flow conditions, loop variables/iterables,
+    /// custom elements with their binding expressions, and structural
+    /// directives. HTML scaffolding (div/span nesting, CSS classes) is
+    /// stripped.
+    fn to_medium_lines(&self) -> Vec<String> {
+        let mut lines: Vec<String> = Vec::new();
+        lines.push("Φtpl:".to_string());
+
+        // Control-flow blocks with conditions.
+        for cond in &self.if_conditions {
+            lines.push(format!("@if({})", cond));
+        }
+        for (var, iter) in &self.for_loops {
+            lines.push(format!("@for({} of {})", var, iter));
+        }
+        for block in &self.control_flow_blocks {
+            if block != "if" && block != "for" {
+                lines.push(format!("@{}", block));
+            }
+        }
+        for defer in &self.defer_blocks {
+            lines.push(format!("@defer({})", defer));
+        }
+        if !self.let_declarations.is_empty() {
+            lines.push("@let".to_string());
+        }
+
+        // Custom elements with their bindings.
+        for el in &self.elements {
+            if el.is_custom {
+                lines.push(el.render());
+            }
+        }
+
+        // Structural directives (legacy).
+        for dir in &self.structural_directives {
+            lines.push(format!("*{}", dir));
+        }
+
+        // Binding expressions (limit to 4 each for readability).
+        for (name, expr) in self.two_way_binding_exprs.iter().take(4) {
+            lines.push(format!("[({})]=\"{}\"", name, expr));
+        }
+        for (name, expr) in self.prop_binding_exprs.iter().take(4) {
+            lines.push(format!("[{}]=\"{}\"", name, expr));
+        }
+        for (name, expr) in self.event_binding_exprs.iter().take(4) {
+            lines.push(format!("({})=\"{}\"", name, expr));
+        }
+
+        if lines.len() == 1 {
+            lines.push("empty".to_string());
+        }
+        lines
+    }
+
+    /// High fidelity: near-full template with HTML scaffolding stripped.
+    /// Preserves all elements, all bindings, all conditions, all event
+    /// handlers, and all component inputs/outputs.
+    fn to_high_lines(&self) -> Vec<String> {
+        let mut lines: Vec<String> = Vec::new();
+        lines.push("Φtpl:".to_string());
+
+        // All control-flow blocks with conditions.
+        for cond in &self.if_conditions {
+            lines.push(format!("@if({})", cond));
+        }
+        for (var, iter) in &self.for_loops {
+            lines.push(format!("@for({} of {})", var, iter));
+        }
+        for block in &self.control_flow_blocks {
+            if block != "if" && block != "for" {
+                lines.push(format!("@{}", block));
+            }
+        }
+        for defer in &self.defer_blocks {
+            lines.push(format!("@defer({})", defer));
+        }
+        if !self.let_declarations.is_empty() {
+            lines.push("@let".to_string());
+        }
+
+        // All elements with all bindings.
+        for el in &self.elements {
+            lines.push(el.render());
+        }
+
+        // Interpolation count.
+        if self.interpolation_count > 0 {
+            lines.push(format!("{{{{}}}}x{}", self.interpolation_count));
+        }
+
+        if lines.len() == 1 {
+            lines.push("empty".to_string());
+        }
+        lines
+    }
 }
 
 /// Extract the structural shape of an Angular template from its
@@ -140,11 +332,19 @@ impl TemplateShape {
 /// Uses tree-sitter-html for parsing. The `depth` parameter
 /// controls how many levels of nesting to extract tags from
 /// (default: 4). Setting depth to 0 extracts only the root element.
+///
+/// This function is only available when the `angular` feature is enabled.
+/// When disabled, it returns an empty `TemplateShape`.
+#[cfg(feature = "angular")]
 pub fn extract_template_shape(html: &str) -> TemplateShape {
     extract_template_shape_with_depth(html, DEFAULT_DEPTH)
 }
 
 /// Extract template shape with a custom depth limit.
+///
+/// This function is only available when the `angular` feature is enabled.
+/// When disabled, it returns an empty `TemplateShape` with `parse_failed` set to false.
+#[cfg(feature = "angular")]
 pub fn extract_template_shape_with_depth(html: &str, depth: usize) -> TemplateShape {
     let mut shape = TemplateShape::default();
 
@@ -153,7 +353,7 @@ pub fn extract_template_shape_with_depth(html: &str, depth: usize) -> TemplateSh
     }
 
     let mut parser = Parser::new();
-    parser.set_language(*html_language()).ok();
+    parser.set_language(html_language()).ok();
     let tree = match parser.parse(html.as_bytes(), None) {
         Some(t) => t,
         None => {
@@ -183,6 +383,16 @@ pub fn extract_template_shape_with_depth(html: &str, depth: usize) -> TemplateSh
     shape.control_flow_blocks.dedup();
     shape.defer_blocks.sort();
     shape.defer_blocks.dedup();
+    shape.if_conditions.sort();
+    shape.if_conditions.dedup();
+    shape.for_loops.sort();
+    shape.for_loops.dedup();
+    shape.prop_binding_exprs.sort();
+    shape.prop_binding_exprs.dedup();
+    shape.event_binding_exprs.sort();
+    shape.event_binding_exprs.dedup();
+    shape.two_way_binding_exprs.sort();
+    shape.two_way_binding_exprs.dedup();
 
     shape
 }
@@ -205,6 +415,7 @@ pub fn extract_template_shape_with_depth(html: &str, depth: usize) -> TemplateSh
 ///     attribute
 ///       attribute_name
 /// ```
+#[cfg(feature = "angular")]
 fn walk_node(
     node: tree_sitter::Node,
     source: &str,
@@ -264,6 +475,7 @@ fn walk_node(
 /// (`<app-heavy />`) as an `element` wrapping a `self_closing_tag`
 /// child, rather than having a `start_tag` child. We must check for
 /// both structures.
+#[cfg(feature = "angular")]
 fn process_element_node(
     node: tree_sitter::Node,
     source: &str,
@@ -284,13 +496,38 @@ fn process_element_node(
         shape.tags.push(tag_name.clone());
         // Custom elements contain a hyphen.
         if tag_name.contains('-') {
-            shape.custom_elements.push(tag_name);
+            shape.custom_elements.push(tag_name.clone());
         }
-    }
 
-    // Extract attributes from the start_tag child.
-    if let Some(start_tag) = find_child(node, "start_tag") {
-        extract_attributes(start_tag, source, shape);
+        // Build a structured element for Medium/High fidelity.
+        let is_custom = tag_name.contains('-');
+        let mut element = TemplateElement {
+            tag: tag_name,
+            is_custom,
+            ..Default::default()
+        };
+
+        // Extract attributes from the start_tag child.
+        if let Some(start_tag) = find_child(node, "start_tag") {
+            let attrs = extract_attributes(start_tag, source, shape);
+            for (name, value) in attrs {
+                if let Some(v) = value {
+                    if name.starts_with("[(") && name.ends_with(")]") {
+                        let inner = &name[2..name.len() - 2];
+                        element.two_way_bindings.push((inner.to_string(), v));
+                    } else if name.starts_with('[') && name.ends_with(']') {
+                        let inner = &name[1..name.len() - 1];
+                        element.prop_bindings.push((inner.to_string(), v));
+                    } else if name.starts_with('(') && name.ends_with(')') {
+                        let inner = &name[1..name.len() - 1];
+                        element.event_bindings.push((inner.to_string(), v));
+                    } else if let Some(dir) = name.strip_prefix('*') {
+                        element.structural_directives.push(dir.to_string());
+                    }
+                }
+            }
+        }
+        shape.elements.push(element);
     }
 
     // Recurse into child elements (not start_tag/end_tag).
@@ -299,10 +536,7 @@ fn process_element_node(
         for child in node.named_children(&mut cursor) {
             let child_kind = child.kind();
             // Only recurse into element and text nodes, skip start_tag, end_tag.
-            if child_kind == "element"
-                || child_kind == "text"
-                || child_kind == "self_closing_tag"
-            {
+            if child_kind == "element" || child_kind == "text" || child_kind == "self_closing_tag" {
                 walk_node(child, source, max_depth, current_depth + 1, shape);
             }
         }
@@ -310,12 +544,9 @@ fn process_element_node(
 }
 
 /// Process a `self_closing_tag` node (e.g. `<app-avatar />`).
-fn process_self_closing_tag_node(
-    node: tree_sitter::Node,
-    source: &str,
-    shape: &mut TemplateShape,
-) {
-    // Extract tag name directly from the self_closing_tag node.
+#[cfg(feature = "angular")]
+fn process_self_closing_tag_node(node: tree_sitter::Node, source: &str, shape: &mut TemplateShape) {
+    let mut element: Option<TemplateElement> = None;
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         let child_kind = child.kind();
@@ -325,27 +556,79 @@ fn process_self_closing_tag_node(
                 if tag.contains('-') {
                     shape.custom_elements.push(tag.to_string());
                 }
+                element = Some(TemplateElement {
+                    tag: tag.to_string(),
+                    is_custom: tag.contains('-'),
+                    ..Default::default()
+                });
             }
         } else if child_kind == "attribute" {
-            // Extract attribute name.
+            // Extract attribute name and value.
             let mut inner_cursor = child.walk();
+            let mut attr_name = None;
+            let mut attr_value = None;
             for inner in child.children(&mut inner_cursor) {
                 if inner.kind() == "attribute_name" {
-                    if let Ok(attr) = inner.utf8_text(source.as_bytes()) {
-                        capture_attribute(attr, shape);
+                    attr_name = inner
+                        .utf8_text(source.as_bytes())
+                        .ok()
+                        .map(|s| s.to_string());
+                } else if inner.kind() == "quoted_attribute_value"
+                    || inner.kind() == "attribute_value"
+                {
+                    attr_value = inner
+                        .utf8_text(source.as_bytes())
+                        .ok()
+                        .map(|s| s.trim_matches('"').trim_matches('\'').to_string());
+                }
+            }
+            if let Some(name) = attr_name {
+                capture_attribute(&name, attr_value.as_deref(), shape);
+                if let Some(ref mut el) = element {
+                    if let Some(v) = attr_value {
+                        if name.starts_with("[(") && name.ends_with(")]") {
+                            let inner = &name[2..name.len() - 2];
+                            el.two_way_bindings.push((inner.to_string(), v));
+                        } else if name.starts_with('[') && name.ends_with(']') {
+                            let inner = &name[1..name.len() - 1];
+                            el.prop_bindings.push((inner.to_string(), v));
+                        } else if name.starts_with('(') && name.ends_with(')') {
+                            let inner = &name[1..name.len() - 1];
+                            el.event_bindings.push((inner.to_string(), v));
+                        } else if let Some(dir) = name.strip_prefix('*') {
+                            el.structural_directives.push(dir.to_string());
+                        }
                     }
-                    break;
                 }
             }
         }
     }
+    if let Some(el) = element {
+        shape.elements.push(el);
+    }
 }
 
 /// Capture an attribute name into the appropriate binding/directive category.
-fn capture_attribute(attr_name: &str, shape: &mut TemplateShape) {
+#[cfg(feature = "angular")]
+fn capture_attribute(attr_name: &str, attr_value: Option<&str>, shape: &mut TemplateShape) {
     // Structural directives: *ngIf, *ngFor, *ngSwitch, etc.
     if let Some(directive) = attr_name.strip_prefix('*') {
         shape.structural_directives.push(directive.to_string());
+        // Capture condition/loop expressions for Medium/High fidelity.
+        if directive == "ngIf" {
+            if let Some(v) = attr_value {
+                shape.if_conditions.push(v.to_string());
+            }
+        } else if directive == "ngFor" {
+            if let Some(v) = attr_value {
+                // Parse "let item of items"
+                if let Some(of_idx) = v.find(" of ") {
+                    let var = v[..of_idx].trim().trim_start_matches("let ").trim();
+                    let iter = v[of_idx + 4..].trim();
+                    shape.for_loops.push((var.to_string(), iter.to_string()));
+                }
+            }
+        }
         return;
     }
 
@@ -353,6 +636,11 @@ fn capture_attribute(attr_name: &str, shape: &mut TemplateShape) {
     if attr_name.starts_with("[(") && attr_name.ends_with(")]") {
         let inner = &attr_name[2..attr_name.len() - 2];
         shape.two_way_bindings.push(inner.to_string());
+        if let Some(v) = attr_value {
+            shape
+                .two_way_binding_exprs
+                .push((inner.to_string(), v.to_string()));
+        }
         return;
     }
 
@@ -360,6 +648,11 @@ fn capture_attribute(attr_name: &str, shape: &mut TemplateShape) {
     if attr_name.starts_with('[') && attr_name.ends_with(']') {
         let inner = &attr_name[1..attr_name.len() - 1];
         shape.prop_bindings.push(inner.to_string());
+        if let Some(v) = attr_value {
+            shape
+                .prop_binding_exprs
+                .push((inner.to_string(), v.to_string()));
+        }
         return;
     }
 
@@ -367,6 +660,11 @@ fn capture_attribute(attr_name: &str, shape: &mut TemplateShape) {
     if attr_name.starts_with('(') && attr_name.ends_with(')') {
         let inner = &attr_name[1..attr_name.len() - 1];
         shape.event_bindings.push(inner.to_string());
+        if let Some(v) = attr_value {
+            shape
+                .event_binding_exprs
+                .push((inner.to_string(), v.to_string()));
+        }
     }
 }
 
@@ -375,6 +673,7 @@ fn capture_attribute(attr_name: &str, shape: &mut TemplateShape) {
 /// Uses word-boundary heuristics: the `@keyword` must be preceded by
 /// start-of-text, whitespace, `{`, or `}`; and followed by whitespace,
 /// `(`, `{`, `;`, or end-of-text.
+#[cfg(feature = "angular")]
 fn contains_at_keyword(text: &str, keyword: &str) -> bool {
     let needle = format!("@{}", keyword);
     let mut search_start = 0;
@@ -393,8 +692,13 @@ fn contains_at_keyword(text: &str, keyword: &str) -> bool {
             true
         } else {
             let ch = text.as_bytes()[after_pos];
-            ch == b' ' || ch == b'\t' || ch == b'\n' || ch == b'\r'
-                || ch == b'(' || ch == b'{' || ch == b';'
+            ch == b' '
+                || ch == b'\t'
+                || ch == b'\n'
+                || ch == b'\r'
+                || ch == b'('
+                || ch == b'{'
+                || ch == b';'
         };
         if before_ok && after_ok {
             return true;
@@ -406,8 +710,49 @@ fn contains_at_keyword(text: &str, keyword: &str) -> bool {
     false
 }
 
+/// Extract the condition expression from an `@if (cond)` block.
+#[cfg(feature = "angular")]
+fn extract_at_if_condition(text: &str) -> Option<String> {
+    let idx = text.find("@if")?;
+    let rest = &text[idx + 3..];
+    let rest = rest.trim_start();
+    if let Some(rest) = rest.strip_prefix('(') {
+        if let Some(end) = rest.find(')') {
+            let cond = rest[..end].trim();
+            if !cond.is_empty() {
+                return Some(cond.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Extract the loop descriptor from an `@for (var of iter; track key)` block.
+#[cfg(feature = "angular")]
+fn extract_at_for_loop(text: &str) -> Option<(String, String)> {
+    let idx = text.find("@for")?;
+    let rest = &text[idx + 4..];
+    let rest = rest.trim_start();
+    if let Some(rest) = rest.strip_prefix('(') {
+        if let Some(end) = rest.find(')') {
+            let inner = &rest[..end];
+            let parts: Vec<&str> = inner.split(';').collect();
+            let first = parts[0].trim();
+            if let Some(of_idx) = first.find(" of ") {
+                let var = first[..of_idx].trim();
+                let iter = first[of_idx + 4..].trim();
+                if !var.is_empty() && !iter.is_empty() {
+                    return Some((var.to_string(), iter.to_string()));
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Check if `text` contains `@defer (on <trigger>)` and return
 /// the trigger name(s) found.
+#[cfg(feature = "angular")]
 fn extract_defer_triggers(text: &str) -> Vec<String> {
     let mut triggers = Vec::new();
     let mut search_start = 0;
@@ -435,6 +780,7 @@ fn extract_defer_triggers(text: &str) -> Vec<String> {
 
 /// Extract modern Angular syntax tokens (@if, @for, @switch, @defer,
 /// @let, etc.) from a text node.
+#[cfg(feature = "angular")]
 fn extract_modern_syntax_from_text(text: &str, shape: &mut TemplateShape) {
     // --- Control-flow blocks (non-defer) ---
 
@@ -460,6 +806,24 @@ fn extract_modern_syntax_from_text(text: &str, shape: &mut TemplateShape) {
         shape.control_flow_blocks.push("default".to_string());
     }
 
+    // --- @if / @for condition & loop extraction (Medium/High fidelity) ---
+    // FAANG AUDIT: gate these behind the same word-boundary check as the
+    // `control_flow_blocks` detection above. Previously `extract_at_if_condition`
+    // / `extract_at_for_loop` used a bare `text.find("@if")` / `text.find("@for")`
+    // which would match `@if`/`@for` inside string literals (e.g. `{{ "@if (x)" }}`)
+    // or identifiers, producing false control-flow markers even though
+    // `control_flow_blocks` (via `contains_at_keyword`) correctly rejected them.
+    if contains_at_keyword(text, "if") {
+        if let Some(cond) = extract_at_if_condition(text) {
+            shape.if_conditions.push(cond);
+        }
+    }
+    if contains_at_keyword(text, "for") {
+        if let Some((var, iter)) = extract_at_for_loop(text) {
+            shape.for_loops.push((var, iter));
+        }
+    }
+
     // --- @defer blocks (separate category) ---
     // Extract named triggers: @defer (on viewport), @defer (on idle), etc.
     let had_triggers = !extract_defer_triggers(text).is_empty();
@@ -468,7 +832,8 @@ fn extract_modern_syntax_from_text(text: &str, shape: &mut TemplateShape) {
     }
     // Detect bare @defer (no trigger) — only if no trigger was found in
     // this text node.
-    if contains_at_keyword(text, "defer") && !contains_at_keyword(text, "deferred") && !had_triggers {
+    if contains_at_keyword(text, "defer") && !contains_at_keyword(text, "deferred") && !had_triggers
+    {
         shape.defer_blocks.push("default".to_string());
     }
 
@@ -486,17 +851,17 @@ fn extract_modern_syntax_from_text(text: &str, shape: &mut TemplateShape) {
 }
 
 /// Find the first child of `node` with the given kind.
+#[cfg(feature = "angular")]
 fn find_child<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
     let mut cursor = node.walk();
-    node.children(&mut cursor).find(|&child| child.kind() == kind)
+    node.children(&mut cursor)
+        .find(|&child| child.kind() == kind)
 }
 
 /// Extract the tag name from an `element` node by finding its
 /// `start_tag` child and then the `tag_name` within it.
-fn extract_tag_name_from_element(
-    node: tree_sitter::Node,
-    source: &str,
-) -> Option<String> {
+#[cfg(feature = "angular")]
+fn extract_tag_name_from_element(node: tree_sitter::Node, source: &str) -> Option<String> {
     let start_tag = find_child(node, "start_tag")?;
     let mut cursor = start_tag.walk();
     for child in start_tag.children(&mut cursor) {
@@ -511,12 +876,15 @@ fn extract_tag_name_from_element(
 }
 
 /// Extract Angular-specific attributes (bindings, directives) from
-/// a `start_tag` node.
+/// a `start_tag` node. Returns `(name, value)` pairs for element
+/// construction. Also populates the flat `TemplateShape` fields.
+#[cfg(feature = "angular")]
 fn extract_attributes(
     start_tag: tree_sitter::Node,
     source: &str,
     shape: &mut TemplateShape,
-) {
+) -> Vec<(String, Option<String>)> {
+    let mut attrs = Vec::new();
     let mut cursor = start_tag.walk();
     for child in start_tag.children(&mut cursor) {
         if child.kind() != "attribute" {
@@ -542,10 +910,30 @@ fn extract_attributes(
             }
         };
 
-        capture_attribute(&attr_name, shape);
+        // Get the attribute_value child (if any).
+        // tree-sitter-html 0.23 uses `quoted_attribute_value` for
+        // `="value"` and `attribute_value` for bare values.
+        let attr_value = {
+            let mut inner_cursor = child.walk();
+            let mut found = None;
+            for inner in child.children(&mut inner_cursor) {
+                if inner.kind() == "quoted_attribute_value" || inner.kind() == "attribute_value" {
+                    found = inner
+                        .utf8_text(source.as_bytes())
+                        .ok()
+                        .map(|s| s.trim_matches('"').trim_matches('\'').to_string());
+                    break;
+                }
+            }
+            found
+        };
+
+        capture_attribute(&attr_name, attr_value.as_deref(), shape);
+        attrs.push((attr_name, attr_value));
     }
+    attrs
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "angular"))]
 #[path = "../tests/angular_meta/template.rs"]
 mod tests;

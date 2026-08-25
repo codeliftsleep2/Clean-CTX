@@ -19,9 +19,9 @@
 //   @=meta  X=extends  I=implements  F=field  M=method
 //   $=import  →=scope  fl:=flags  cl:=class-flags  P=pattern  T=type-alias
 
-use std::collections::HashMap;
+use super::hierarchical::{ClassNode, HierarchicalIR, PatternEntry};
 use crate::compression::Fidelity;
-use super::hierarchical::{HierarchicalIR, ClassNode, PatternEntry};
+use std::collections::{HashMap, HashSet};
 
 /// Render a `HierarchicalIR` into compact LLM-optimized text.
 ///
@@ -30,21 +30,40 @@ use super::hierarchical::{HierarchicalIR, ClassNode, PatternEntry};
 ///
 /// # Fidelity behavior
 ///
-/// | Aspect | Low | Medium | High |
-/// |--------|-----|--------|------|
-/// | Fields | Space-separated, same line | One per line | One per line |
-/// | Methods | Minimal (name + flags) | Params shown | Params shown |
-/// | Meta `@` | Always | Always | Always |
-/// | `X`/`I` | Always | Always | Always |
-/// | Patterns | Always | Always | Always |
-/// | Imports | Always | Always | Always |
-/// | Type aliases | Always | Always | Always |
+/// | Aspect | Low | Medium | High | Edit | Verbatim |
+/// |--------|-----|--------|------|------|----------|
+/// | Fields | Space-separated, same line | One per line | One per line | One per line | One per line |
+/// | Methods | Minimal (name + flags) | Params shown | Params shown | Params shown + verbatim bodies | Full raw source |
+/// | Meta `@` | Always | Always | Always | Always | Always |
+/// | `X`/`I` | Always | Always | Always | Always | Always |
+/// | Patterns | Always | Always | Always | Always | Always |
+/// | Imports | Always | Always | Always | Always | Always |
+/// | Type aliases | Always | Always | Always | Always | Always |
 ///
 /// # Overloaded method disambiguation
 ///
 /// When a class has multiple methods with the same name, `+N` is appended
 /// where N is the parameter count (e.g., `M find(+1)`, `M find(+3)`).
 pub fn render_hierarchical_for_llm(hir: &HierarchicalIR, fidelity: Fidelity) -> String {
+    render_hierarchical_for_llm_focused(hir, fidelity, None)
+}
+
+/// Render a `HierarchicalIR` into compact LLM-optimized text, optionally
+/// restricting which methods get full verbatim bodies at `Fidelity::Edit`.
+///
+/// When `focus` is `Some(set)`, only methods whose names appear in the set
+/// receive their full byte-exact body at Edit fidelity; all other methods
+/// are rendered signature-only (the same path used for non-Edit fidelities).
+/// When `focus` is `None`, every method's body is rendered — identical to
+/// [`render_hierarchical_for_llm`].
+///
+/// This is strictly additive: callers that don't need symbol targeting can
+/// keep using [`render_hierarchical_for_llm`] unchanged.
+pub fn render_hierarchical_for_llm_focused(
+    hir: &HierarchicalIR,
+    fidelity: Fidelity,
+    focus: Option<&HashSet<String>>,
+) -> String {
     let mut output = String::new();
 
     // ── SCHEMA v2 header ──
@@ -52,7 +71,7 @@ pub fn render_hierarchical_for_llm(hir: &HierarchicalIR, fidelity: Fidelity) -> 
 
     // ── Classes ──
     for class in &hir.classes {
-        render_class(&mut output, class, fidelity);
+        render_class(&mut output, class, fidelity, focus);
     }
 
     // ── Imports ──
@@ -83,7 +102,12 @@ pub fn render_hierarchical_for_llm(hir: &HierarchicalIR, fidelity: Fidelity) -> 
 }
 
 /// Render a single class node.
-fn render_class(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
+fn render_class(
+    output: &mut String,
+    class: &ClassNode,
+    fidelity: Fidelity,
+    focus: Option<&HashSet<String>>,
+) {
     // Class boundary
     output.push_str(&format!("// ── {} ──\n", class.name));
 
@@ -113,7 +137,7 @@ fn render_class(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
     render_fields(output, class, fidelity);
 
     // Methods — with overload disambiguation
-    render_methods(output, class, fidelity);
+    render_methods(output, class, fidelity, focus);
 }
 
 /// Render fields for a class.
@@ -128,16 +152,20 @@ fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
     match fidelity {
         Fidelity::Low => {
             // Space-separated on one line
-            let field_strs: Vec<String> = class.fields.iter().map(|f| {
-                if let Some(ft) = &f.field_type {
-                    format!("{}:{}", f.name, ft)
-                } else {
-                    f.name.clone()
-                }
-            }).collect();
+            let field_strs: Vec<String> = class
+                .fields
+                .iter()
+                .map(|f| {
+                    if let Some(ft) = &f.field_type {
+                        format!("{}:{}", f.name, ft)
+                    } else {
+                        f.name.clone()
+                    }
+                })
+                .collect();
             output.push_str(&format!("F {}\n", field_strs.join(" ")));
         }
-        Fidelity::Medium | Fidelity::High => {
+        Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
             // One per line
             for field in &class.fields {
                 if let Some(ft) = &field.field_type {
@@ -154,7 +182,16 @@ fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
 ///
 /// First pass: count occurrences of each method name.
 /// Second pass: emit with `+N` for duplicates.
-fn render_methods(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
+///
+/// At `Fidelity::Edit`, a method's full verbatim body is appended only when
+/// `focus` is `None` (every method) or the method's name is in the focus set.
+/// Non-focused methods fall through to the signature-only rendering path.
+fn render_methods(
+    output: &mut String,
+    class: &ClassNode,
+    fidelity: Fidelity,
+    focus: Option<&HashSet<String>>,
+) {
     if class.methods.is_empty() {
         return;
     }
@@ -196,15 +233,19 @@ fn render_methods(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
 
             // Params (shown in Medium/High, hidden in Low unless overloaded)
             if has_params && (fidelity != Fidelity::Low || count > 1) {
-                let param_strs: Vec<String> = method.params.iter().map(|p| {
-                    if p.len() >= 3 {
-                        format!("{}:{}", p[2], p[1])
-                    } else if p.len() >= 2 {
-                        format!("{}:{}", p[0], p[1])
-                    } else {
-                        p[0].clone()
-                    }
-                }).collect();
+                let param_strs: Vec<String> = method
+                    .params
+                    .iter()
+                    .map(|p| {
+                        if p.len() >= 3 {
+                            format!("{}:{}", p[2], p[1])
+                        } else if p.len() >= 2 {
+                            format!("{}:{}", p[0], p[1])
+                        } else {
+                            p[0].clone()
+                        }
+                    })
+                    .collect();
                 output.push_str(&format!(" p:{}", param_strs.join(" ")));
             }
 
@@ -214,9 +255,76 @@ fn render_methods(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
             }
 
             // Flags
-            if has_flags {
-                let flags = method.flags.as_ref().unwrap();
-                output.push_str(&format!(" fl:{}", flags.join(",")));
+            if let Some(flags) = &method.flags {
+                if !flags.is_empty() {
+                    output.push_str(&format!(" fl:{}", flags.join(",")));
+                }
+            }
+        }
+
+        // Control-flow metadata at High fidelity (Gap 1 fix)
+        if fidelity == Fidelity::High && !method.control_flow.is_empty() {
+            let cf_strs: Vec<String> = method
+                .control_flow
+                .iter()
+                .map(|cf| {
+                    if cf.len() >= 2 {
+                        format!("{}:{}", cf[0], cf[1])
+                    } else {
+                        cf.join(":")
+                    }
+                })
+                .collect();
+            output.push_str(&format!(" cf:{}", cf_strs.join(",")));
+        }
+
+        // Data-flow metadata at High fidelity (Gap 1 fix).
+        // Rendered as `df:reads:config,writes:users` — same inline pattern
+        // as control-flow so the LLM sees semantic read/write pairs.
+        if fidelity == Fidelity::High && !method.data_flow.is_empty() {
+            let df_strs: Vec<String> = method
+                .data_flow
+                .iter()
+                .map(|df| {
+                    if df.len() >= 2 {
+                        format!("{}:{}", df[0], df[1])
+                    } else {
+                        df.join(":")
+                    }
+                })
+                .collect();
+            output.push_str(&format!(" df:{}", df_strs.join(",")));
+        }
+
+        // Side-effect annotation at High fidelity (Gap 1 fix).
+        // e.g. `se:mutation` — quickly tells the LLM whether a method is
+        // pure, performs I/O, mutates state, is async, or is transactional.
+        if fidelity == Fidelity::High {
+            if let Some(se) = &method.side_effect {
+                output.push_str(&format!(" se:{}", se));
+            }
+        }
+
+        // Execution-context annotation at High fidelity (Gap 1 fix).
+        // e.g. `ec:async` — tells the agent the runtime context without
+        // a full body read.
+        if fidelity == Fidelity::High {
+            if let Some(ec) = &method.execution_context {
+                output.push_str(&format!(" ec:{}", ec));
+            }
+        }
+
+        // Verbatim method body at Edit fidelity (byte-exact for replace_in_file).
+        // When `focus` is `Some(set)`, only methods whose names are in the
+        // set get their full body; all others are signature-only.
+        if fidelity == Fidelity::Edit && focus.is_none_or(|f| f.contains(&method.name)) {
+            if let Some(body) = &method.body {
+                output.push('\n');
+                output.push_str(body);
+                // Ensure trailing newline before next method
+                if !body.ends_with('\n') {
+                    output.push('\n');
+                }
             }
         }
 

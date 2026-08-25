@@ -13,6 +13,7 @@ Thank you for your interest in contributing! Clean-CTX is an open-source project
 - [Performance Guide](docs/PERFORMANCE.md) — benchmarks and optimization
 - [Security Guide](docs/SECURITY.md) — compliance and hardening
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) — common issues
+- [Configuration Guide](docs/CONFIGURATION.md) — config precedence, env vars, resource limits
 - [Changelog](docs/CHANGELOG.md) — version history
 - [Roadmap](docs/ROADMAP.md) — future plans and priorities
 
@@ -45,18 +46,19 @@ Every pull request **must** pass these checks. The full checklist is in [`PULL_R
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test`** — all 1,035 tests pass
+3. **`cargo test --workspace --all-targets --all-features`** — all 2,513 workspace tests pass
 4. **`cargo audit`** — no known security vulnerabilities
-5. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
-6. **No `let _ = ...` dead-code suppression** — remove the unused variable instead
-7. **No `#![allow(...)]`** annotations without a `// SAFETY:` or `// Phase N:` comment
+5. **`scripts/check-tree-sitter-versions.ps1`** — all tree-sitter crates share the same `tree-sitter-language` ABI version
+6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
+7. **No `let _ = ...` dead-code suppression** — remove the unused variable instead
+8. **No `#![allow(...)]` annotations** without a `// SAFETY:` or `// Phase N:` comment
 
 ---
 
 ## Pre-commit Checklist
 
 ```bash
-cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo audit --ignore RUSTSEC-2025-0009
+cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo audit --ignore RUSTSEC-2025-0009 && pwsh -ExecutionPolicy Bypass ./scripts/check-tree-sitter-versions.ps1
 ```
 
 ---
@@ -166,7 +168,6 @@ See [Developer Documentation → Testing Conventions](docs/DEVELOPER_DOCUMENTATI
 | `docs/SECURITY.md` | Enterprise admins | Compliance, hardening, deployment |
 | `docs/TROUBLESHOOTING.md` | Users | Common issues and resolutions |
 | `docs/CHANGELOG.md` | All | Version history |
-| `docs/INTELLIGENCE_LAYER_PLAN.md` | Architects | Intelligence Layer: PageRank scoring, blast radius, token budget packing |
 | `docs/ROADMAP.md` | Contributors | Future plans and priorities |
 
 ---

@@ -39,4 +39,7 @@ pub enum ProxyError {
     #[error("Invalid status: {0}")]
     Status(#[from] hyper::http::status::InvalidStatusCode),
 
+    /// Invalid proxy configuration.
+    #[error("Configuration error: {0}")]
+    Config(String),
 }

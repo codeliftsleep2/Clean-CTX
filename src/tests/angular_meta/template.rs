@@ -3,73 +3,68 @@
 // Tests for the Angular-syntax template extractor.
 // Includes both legacy (Tier 2) and modern (Phase 2.5) syntax.
 
-use crate::angular_meta::template::{extract_template_shape, extract_template_shape_with_depth, TemplateShape};
+use crate::angular_meta::template::{
+    TemplateShape, extract_template_shape, extract_template_shape_with_depth,
+};
 
+// NOISE REDUCTION (2026-08-25): AST-dump debug tests commented out — their
+// sole purpose was printing tree-sitter parse trees on every run. Uncomment
+// locally when debugging template parsing.
+//
 /// Debug: dump tree-sitter-html AST to understand node types.
-#[test]
-fn dump_html_ast() {
-    let html = r#"<div><span>Hello</span></div>"#;
-    let language = tree_sitter_html::language();
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(language).unwrap();
-    let tree = parser.parse(html.as_bytes(), None).unwrap();
-    let root = tree.root_node();
-    fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
-        let text = node
-            .utf8_text(source.as_bytes())
-            .unwrap_or("<error>");
-        let truncated = if text.len() > 40 {
-            &text[..40]
-        } else {
-            text
-        };
-        eprintln!(
-            "{}{:?} [named={}] \"{}\"",
-            " ".repeat(indent),
-            node.kind(),
-            node.is_named(),
-            truncated
-        );
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            print_node(child, source, indent + 2);
-        }
-    }
-    print_node(root, html, 0);
-}
-
+// #[test]
+// fn dump_html_ast() {
+//     let html = r#"<div><span>Hello</span></div>"#;
+//     let language = tree_sitter_html::LANGUAGE.into();
+//     let mut parser = tree_sitter::Parser::new();
+//     parser.set_language(&language).unwrap();
+//     let tree = parser.parse(html.as_bytes(), None).unwrap();
+//     let root = tree.root_node();
+//     fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
+//         let text = node.utf8_text(source.as_bytes()).unwrap_or("<error>");
+//         let truncated = if text.len() > 40 { &text[..40] } else { text };
+//         eprintln!(
+//             "{}{:?} [named={}] \"{}\"",
+//             " ".repeat(indent),
+//             node.kind(),
+//             node.is_named(),
+//             truncated
+//         );
+//         let mut cursor = node.walk();
+//         for child in node.children(&mut cursor) {
+//             print_node(child, source, indent + 2);
+//         }
+//     }
+//     print_node(root, html, 0);
+// }
+//
 /// Debug: dump AST for Angular template with bindings.
-#[test]
-fn dump_angular_template_ast() {
-    let html = r#"<div *ngIf="show"><app-card [title]="name" (click)="handler()"></app-card></div>"#;
-    let language = tree_sitter_html::language();
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(language).unwrap();
-    let tree = parser.parse(html.as_bytes(), None).unwrap();
-    let root = tree.root_node();
-    fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
-        let text = node
-            .utf8_text(source.as_bytes())
-            .unwrap_or("<error>");
-        let truncated = if text.len() > 50 {
-            &text[..50]
-        } else {
-            text
-        };
-        eprintln!(
-            "{}{:?} [named={}] \"{}\"",
-            " ".repeat(indent),
-            node.kind(),
-            node.is_named(),
-            truncated
-        );
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            print_node(child, source, indent + 2);
-        }
-    }
-    print_node(root, html, 0);
-}
+// #[test]
+// fn dump_angular_template_ast() {
+//     let html =
+//         r#"<div *ngIf="show"><app-card [title]="name" (click)="handler()"></app-card></div>"#;
+//     let language = tree_sitter_html::LANGUAGE.into();
+//     let mut parser = tree_sitter::Parser::new();
+//     parser.set_language(&language).unwrap();
+//     let tree = parser.parse(html.as_bytes(), None).unwrap();
+//     let root = tree.root_node();
+//     fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
+//         let text = node.utf8_text(source.as_bytes()).unwrap_or("<error>");
+//         let truncated = if text.len() > 50 { &text[..50] } else { text };
+//         eprintln!(
+//             "{}{:?} [named={}] \"{}\"",
+//             " ".repeat(indent),
+//             node.kind(),
+//             node.is_named(),
+//             truncated
+//         );
+//         let mut cursor = node.walk();
+//         for child in node.children(&mut cursor) {
+//             print_node(child, source, indent + 2);
+//         }
+//     }
+//     print_node(root, html, 0);
+// }
 
 // ===== Legacy syntax tests (Tier 2) =====
 
@@ -487,4 +482,57 @@ fn complex_modern_template_all_features() {
     assert!(line.contains("@defer(viewport)"));
     assert!(line.contains("@defer(placeholder)"));
     assert!(line.contains("@let"));
+}
+
+/// FAANG AUDIT regression: `@if`/`@for` inside string literals or
+/// identifiers must NOT be captured into `if_conditions`/`for_loops`.
+///
+/// Previously `extract_at_if_condition` / `extract_at_for_loop` used a
+/// bare `text.find("@if")` / `text.find("@for")` which matched `@if`/`@for`
+/// inside string literals (e.g. `{{ "@if (x)" }}`) or identifiers like
+/// `@formatter`, producing false control-flow markers even though
+/// `control_flow_blocks` (via `contains_at_keyword`) correctly rejected them.
+#[test]
+fn at_if_for_inside_string_not_captured() {
+    // `@if`/`@for` appear only inside a string literal and an identifier.
+    let html = r#"<div>{{ "@if (x)" }} {{ "@for (y of z)" }} @formatter</div>"#;
+    let shape = extract_template_shape(html);
+
+    // The word-boundary check must reject these — no control-flow blocks.
+    assert!(
+        shape.control_flow_blocks.is_empty(),
+        "string-literal @if/@for must not be detected as control flow: {:?}",
+        shape.control_flow_blocks
+    );
+    assert!(
+        shape.if_conditions.is_empty(),
+        "string-literal @if must not be captured as a condition: {:?}",
+        shape.if_conditions
+    );
+    assert!(
+        shape.for_loops.is_empty(),
+        "string-literal @for must not be captured as a loop: {:?}",
+        shape.for_loops
+    );
+}
+
+/// FAANG AUDIT regression: real `@if`/`@for` blocks ARE captured into
+/// `if_conditions`/`for_loops` (the positive case for the word-boundary fix).
+#[test]
+fn at_if_for_blocks_captured() {
+    let html = r#"@if (isLoading) { <div>Loading</div> } @for (item of items; track item.id) { <p>{{ item.name }}</p> }"#;
+    let shape = extract_template_shape(html);
+
+    assert!(
+        shape.if_conditions.contains(&"isLoading".to_string()),
+        "real @if condition should be captured: {:?}",
+        shape.if_conditions
+    );
+    assert!(
+        shape
+            .for_loops
+            .contains(&("item".to_string(), "items".to_string())),
+        "real @for loop should be captured: {:?}",
+        shape.for_loops
+    );
 }

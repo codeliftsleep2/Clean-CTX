@@ -4,8 +4,8 @@
 
 #[cfg(test)]
 mod rust_compression_tests {
-    use crate::compression::language::{language_for_extension, looks_like_rust};
     use crate::compression::Fidelity;
+    use crate::compression::language::{language_for_extension, looks_like_rust};
 
     #[test]
     fn test_rs_extension_detection() {
@@ -100,8 +100,8 @@ mod rust_compression_tests {
     #[test]
     fn test_rust_compress_file_pipeline() {
         use crate::cache::LocalStateCache;
-        use crate::dictionary::PathDictionary;
         use crate::compression::pipeline::compress_file_with_source;
+        use crate::dictionary::PathDictionary;
         use std::path::PathBuf;
 
         let mut dict = PathDictionary::new();
@@ -132,9 +132,14 @@ mod rust_compression_tests {
             &mut dict,
             &mut cache,
             Fidelity::Low,
+            None,
         );
 
-        assert!(result.is_ok(), "compress_file_with_source should succeed for .rs: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "compress_file_with_source should succeed for .rs: {:?}",
+            result.err()
+        );
         let output = result.unwrap();
         assert!(!output.is_empty(), "output should not be empty");
         assert!(
@@ -153,8 +158,8 @@ mod rust_compression_tests {
     #[test]
     fn test_rust_compress_medium_fidelity() {
         use crate::cache::LocalStateCache;
-        use crate::dictionary::PathDictionary;
         use crate::compression::pipeline::compress_file_with_source;
+        use crate::dictionary::PathDictionary;
         use std::path::PathBuf;
 
         let mut dict = PathDictionary::new();
@@ -172,9 +177,14 @@ mod rust_compression_tests {
             &mut dict,
             &mut cache,
             Fidelity::Medium,
+            None,
         );
 
-        assert!(result.is_ok(), "Medium fidelity for .rs should succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Medium fidelity for .rs should succeed: {:?}",
+            result.err()
+        );
         let output = result.unwrap();
         assert!(output.contains("Simple"), "output should contain 'Simple'");
     }

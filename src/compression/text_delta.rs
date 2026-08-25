@@ -184,11 +184,7 @@ impl TextDeltaComputer {
     /// 1. If baseline exists, compute delta
     /// 2. Store new snapshot and increment version
     /// 3. Return the delta with correct from/to versions
-    pub fn compute_and_store(
-        &mut self,
-        file: &str,
-        new_lines: Vec<String>,
-    ) -> Option<TextDelta> {
+    pub fn compute_and_store(&mut self, file: &str, new_lines: Vec<String>) -> Option<TextDelta> {
         let baseline_exists = self.snapshots.contains_key(file);
         if !baseline_exists {
             self.store_snapshot(file, new_lines);
@@ -211,11 +207,7 @@ impl TextDeltaComputer {
             mods,
         };
 
-        if delta.is_empty() {
-            None
-        } else {
-            Some(delta)
-        }
+        if delta.is_empty() { None } else { Some(delta) }
     }
 }
 
@@ -231,7 +223,10 @@ pub fn apply_text_delta(baseline: &[String], delta: &TextDelta) -> Result<Vec<St
         if let Some(pos) = result.iter().position(|l| l == del) {
             result.remove(pos);
         } else {
-            return Err(format!("Cannot apply delta: line not found for removal: {}", del));
+            return Err(format!(
+                "Cannot apply delta: line not found for removal: {}",
+                del
+            ));
         }
     }
 
@@ -240,7 +235,10 @@ pub fn apply_text_delta(baseline: &[String], delta: &TextDelta) -> Result<Vec<St
         if let Some(pos) = result.iter().position(|l| l == old) {
             result[pos] = new.clone();
         } else {
-            return Err(format!("Cannot apply delta: line not found for modification: {}", old));
+            return Err(format!(
+                "Cannot apply delta: line not found for modification: {}",
+                old
+            ));
         }
     }
 
@@ -303,14 +301,16 @@ fn diff_lines(old: &[String], new: &[String]) -> (Vec<String>, Vec<String>, Vec<
 
     // Positional modification detection: find lines at similar positions
     // that differ (not already accounted for by add/del)
-    let old_remaining: Vec<&str> = old.iter()
+    let old_remaining: Vec<&str> = old
+        .iter()
         .filter(|l| {
             let cnt = old_freq.get(l.as_str()).copied().unwrap_or(0);
             cnt > 0
         })
         .map(|l| l.as_str())
         .collect();
-    let new_remaining: Vec<&str> = new.iter()
+    let new_remaining: Vec<&str> = new
+        .iter()
         .filter(|l| {
             let cnt = new_freq.get(l.as_str()).copied().unwrap_or(0);
             cnt > 0

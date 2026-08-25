@@ -1,6 +1,7 @@
 # Clean-CTX — Security Guide
 
-**Last updated:** 2026-06-07
+> **Owner:** Security model + hardening + compliance · **Status:** Living reference
+> **Last updated:** 2026-08-24
 
 ---
 
@@ -36,7 +37,7 @@ Clean-CTX is designed for **air-gapped environments** with restrictive firewall 
 |-------------|--------|--------|
 | Unsafe code | ✅ **ZERO** | `#![forbid(unsafe_code)]` would pass |
 | Clippy warnings | ✅ 0 | `cargo clippy --all-targets -- -D warnings` passes |
-| Test coverage | ✅ 1,035 tests | All tests pass; fuzz-style edge cases covered |
+| Test coverage | ✅ 2,513 tests across all workspace targets (2,184 clean-ctx: 2,173 library + 11 CLI binary; 329 proxy crate: 155 lib + 155 bin harness + 18 audit regression + 1 e2e integration) | All pass under `cargo test --workspace --all-targets --all-features`; includes live-CBM regression probes and fuzz-style edge cases |
 
 ### Data Handling
 

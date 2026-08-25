@@ -13,9 +13,85 @@
 // orchestrators map the result to a tree-sitter `Language` + query
 // string.
 
+use std::sync::OnceLock;
 use tree_sitter::Language;
 
 use crate::queries;
+
+/// Thread-safe wrapper around `tree_sitter_typescript::LANGUAGE_TYPESCRIPT`.
+/// Uses `OnceLock` to ensure only one thread ever initializes the WASM parser,
+/// preventing the Windows deadlock that occurs when multiple threads race to
+/// initialize tree-sitter's internal `OnceLock` simultaneously.
+///
+/// Returns `Some(Language)` when the feature is enabled, `None` otherwise.
+pub fn safe_typescript_language() -> Option<Language> {
+    #[cfg(feature = "typescript")]
+    {
+        static LANG: OnceLock<Language> = OnceLock::new();
+        Some(
+            LANG.get_or_init(|| tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
+                .clone(),
+        )
+    }
+    #[cfg(not(feature = "typescript"))]
+    {
+        None
+    }
+}
+
+/// Thread-safe wrapper around `tree_sitter_c_sharp::LANGUAGE`.
+///
+/// Returns `Some(Language)` when the feature is enabled, `None` otherwise.
+pub fn safe_csharp_language() -> Option<Language> {
+    #[cfg(feature = "csharp")]
+    {
+        static LANG: OnceLock<Language> = OnceLock::new();
+        Some(
+            LANG.get_or_init(|| tree_sitter_c_sharp::LANGUAGE.into())
+                .clone(),
+        )
+    }
+    #[cfg(not(feature = "csharp"))]
+    {
+        None
+    }
+}
+
+/// Thread-safe wrapper around `tree_sitter_rust::LANGUAGE`.
+///
+/// Returns `Some(Language)` when the feature is enabled, `None` otherwise.
+pub fn safe_rust_language() -> Option<Language> {
+    #[cfg(feature = "rust")]
+    {
+        static LANG: OnceLock<Language> = OnceLock::new();
+        Some(
+            LANG.get_or_init(|| tree_sitter_rust::LANGUAGE.into())
+                .clone(),
+        )
+    }
+    #[cfg(not(feature = "rust"))]
+    {
+        None
+    }
+}
+
+/// Thread-safe wrapper around `tree_sitter_java::LANGUAGE`.
+///
+/// Returns `Some(Language)` when the feature is enabled, `None` otherwise.
+pub fn safe_java_language() -> Option<Language> {
+    #[cfg(feature = "java")]
+    {
+        static LANG: OnceLock<Language> = OnceLock::new();
+        Some(
+            LANG.get_or_init(|| tree_sitter_java::LANGUAGE.into())
+                .clone(),
+        )
+    }
+    #[cfg(not(feature = "java"))]
+    {
+        None
+    }
+}
 
 /// Returns `true` if the source text looks like C#. The heuristic is
 /// deliberately narrow: C# has very distinctive keywords (`namespace`,
@@ -23,6 +99,9 @@ use crate::queries;
 /// in TypeScript / JavaScript source. A `.cs` file containing only
 /// strings or comments is rare; if that ever happens, the diff path
 /// will fall back to TypeScript on its second pass.
+///
+/// NOTE: This function is retained for backward compatibility but the
+/// primary dispatch now goes through `LayerRegistry::global()`.
 pub fn looks_like_csharp(source: &str) -> bool {
     source.contains("namespace ")
         || source.contains("using System")
@@ -50,8 +129,7 @@ pub fn looks_like_rust(source: &str) -> bool {
 
     // Count all signals
     let signals = [
-        has_fn, has_struct, has_enum, has_impl, has_trait,
-        has_pub, has_use, has_mod,
+        has_fn, has_struct, has_enum, has_impl, has_trait, has_pub, has_use, has_mod,
     ]
     .iter()
     .filter(|&&x| x)
@@ -112,10 +190,19 @@ pub fn looks_like_java(source: &str) -> bool {
 
     // Count all signals
     let signals = [
-        has_package, has_import_java, has_import_javax, has_import_jakarta,
-        has_import_spring, has_override, has_interface,
-        has_class, has_public, has_private, has_protected,
-        has_extends, has_implements,
+        has_package,
+        has_import_java,
+        has_import_javax,
+        has_import_jakarta,
+        has_import_spring,
+        has_override,
+        has_interface,
+        has_class,
+        has_public,
+        has_private,
+        has_protected,
+        has_extends,
+        has_implements,
     ]
     .iter()
     .filter(|&&x| x)
@@ -135,15 +222,48 @@ pub fn looks_like_java(source: &str) -> bool {
 /// query reference is safe because `crate::queries::TS_QUERY`,
 /// `crate::queries::CS_QUERY`, `crate::queries::RS_QUERY`, and
 /// `crate::queries::JAVA_QUERY` are all `'static` `&str` constants.
+///
+/// NOTE: This function now delegates to `LayerRegistry::global()` for
+/// feature-aware dispatch. When a language feature is disabled, the
+/// registry skips that language and falls back to TypeScript (if available).
 pub fn detect_language(source: &str) -> (Language, &'static str) {
-    if looks_like_csharp(source) {
-        (tree_sitter_c_sharp::language(), queries::CS_QUERY)
-    } else if looks_like_rust(source) {
-        (tree_sitter_rust::language(), queries::RS_QUERY)
-    } else if looks_like_java(source) {
-        (tree_sitter_java::language(), queries::JAVA_QUERY)
+    let registry = crate::layers::LayerRegistry::global();
+
+    // Try to find a matching language layer via content heuristic
+    if crate::compression::language::looks_like_csharp(source) {
+        if let Some(layer) = registry.language_layer("csharp") {
+            if let Some(lang) = layer.language_ptr() {
+                return (lang, queries::CS_QUERY);
+            }
+        }
+    } else if crate::compression::language::looks_like_rust(source) {
+        if let Some(layer) = registry.language_layer("rust") {
+            if let Some(lang) = layer.language_ptr() {
+                return (lang, queries::RS_QUERY);
+            }
+        }
+    } else if crate::compression::language::looks_like_java(source) {
+        if let Some(layer) = registry.language_layer("java") {
+            if let Some(lang) = layer.language_ptr() {
+                return (lang, queries::JAVA_QUERY);
+            }
+        }
+    }
+
+    // Fallback to TypeScript (only if the feature is enabled)
+    if let Some(lang) = safe_typescript_language() {
+        (lang, queries::TS_QUERY)
+    } else if let Some(lang) = safe_csharp_language() {
+        (lang, queries::CS_QUERY)
+    } else if let Some(lang) = safe_rust_language() {
+        (lang, queries::RS_QUERY)
+    } else if let Some(lang) = safe_java_language() {
+        (lang, queries::JAVA_QUERY)
     } else {
-        (tree_sitter_typescript::language_typescript(), queries::TS_QUERY)
+        // This should never happen in practice (at least one language should be enabled)
+        panic!(
+            "No language features enabled. Enable at least one of: typescript, csharp, rust, java"
+        );
     }
 }
 
@@ -156,20 +276,33 @@ pub fn detect_language(source: &str) -> (Language, &'static str) {
 /// CommonJS `require()` calls are not captured, `function` keyword
 /// definitions are not recognised). Use `.ts` for full support, or open
 /// an issue requesting JavaScript grammar integration.
+///
+/// NOTE: This function now delegates to `LayerRegistry::global()` for
+/// feature-aware dispatch. When a language feature is disabled, the
+/// extension is not recognized.
 pub fn language_for_extension(extension: &str) -> Option<(Language, &'static str)> {
-    match extension {
-        "ts" => Some((tree_sitter_typescript::language_typescript(), queries::TS_QUERY)),
-        "cs" => Some((tree_sitter_c_sharp::language(), queries::CS_QUERY)),
-        "rs" => Some((tree_sitter_rust::language(), queries::RS_QUERY)),
-        "java" => Some((tree_sitter_java::language(), queries::JAVA_QUERY)),
-        _ => None,
-    }
+    let registry = crate::layers::LayerRegistry::global();
+
+    registry
+        .language_layer_for_extension(extension)
+        .and_then(|layer| {
+            layer.language_ptr().map(|lang| {
+                // Return the appropriate query for this language
+                match layer.name() {
+                    "typescript" => (lang, queries::TS_QUERY),
+                    "csharp" => (lang, queries::CS_QUERY),
+                    "rust" => (lang, queries::RS_QUERY),
+                    "java" => (lang, queries::JAVA_QUERY),
+                    _ => (lang, queries::TS_QUERY), // fallback
+                }
+            })
+        })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/compression/language.rs"]
 mod tests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/compression/rust.rs"]
 mod rust_tests;

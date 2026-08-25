@@ -60,6 +60,36 @@ fn rejects_plain_typescript() {
 }
 
 #[test]
+fn rejects_comment_with_decorator_name() {
+    // A-11: Comments should not trigger Angular detection
+    let src = r#"
+        // TODO: remove @Component when refactoring
+        export class SampleService {
+            private isReady: boolean = false;
+        }
+    "#;
+    assert!(
+        !is_angular_file(src),
+        "Comment with @Component should not trigger detection"
+    );
+}
+
+#[test]
+fn rejects_string_literal_with_decorator_name() {
+    // A-11: String literals should not trigger Angular detection
+    let src = r#"
+        const message = "Use @Component to define a component";
+        export class SampleService {
+            private isReady: boolean = false;
+        }
+    "#;
+    assert!(
+        !is_angular_file(src),
+        "String literal with @Component should not trigger detection"
+    );
+}
+
+#[test]
 fn rejects_react_component() {
     let src = r#"
         import React from 'react';

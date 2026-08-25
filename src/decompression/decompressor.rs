@@ -46,6 +46,13 @@ pub(crate) fn is_word_char(c: char) -> bool {
 /// `"$ctor"`) the inner `find` is cheap; the outer loop is
 /// `O(len(text) + num_replacements)`.
 pub(crate) fn word_boundary_replace(text: &str, pattern: &str, replacement: &str) -> String {
+    // Empty pattern guard: find("") never terminates (it matches at
+    // every position with zero width, so the loop can never advance
+    // `start` past 0). Short-circuit immediately.
+    if pattern.is_empty() {
+        return text.to_string();
+    }
+
     let mut result = String::with_capacity(text.len());
     let mut start = 0;
 
@@ -105,17 +112,20 @@ impl Decompressor {
             let trimmed = line.trim();
             if (trimmed.starts_with('α') || trimmed.starts_with('β') || trimmed.starts_with('γ'))
                 && trimmed.contains(" = ")
-                && let Some(eq_pos) = trimmed.find(" = ") {
-                    let alias = trimmed[..eq_pos].trim().to_string();
-                    let path = trimmed[eq_pos + 3..].trim().to_string();
-                    self.path_aliases.insert(alias, path);
-                }
-            if trimmed.starts_with('$') && trimmed.contains(" = ")
-                && let Some(eq_pos) = trimmed.find(" = ") {
-                    let opcode = trimmed[..eq_pos].trim().to_string();
-                    let token = trimmed[eq_pos + 3..].trim().to_string();
-                    self.custom_symbols.insert(opcode, token);
-                }
+                && let Some(eq_pos) = trimmed.find(" = ")
+            {
+                let alias = trimmed[..eq_pos].trim().to_string();
+                let path = trimmed[eq_pos + 3..].trim().to_string();
+                self.path_aliases.insert(alias, path);
+            }
+            if trimmed.starts_with('$')
+                && trimmed.contains(" = ")
+                && let Some(eq_pos) = trimmed.find(" = ")
+            {
+                let opcode = trimmed[..eq_pos].trim().to_string();
+                let token = trimmed[eq_pos + 3..].trim().to_string();
+                self.custom_symbols.insert(opcode, token);
+            }
         }
         // F-15: rebuild the sorted opcode list once so `decompress()`
         // does not have to sort per line.
@@ -130,10 +140,12 @@ impl Decompressor {
             self.sorted_opcodes.push((opcode.clone(), token.clone()));
         }
         for (&opcode, &token) in &self.builtin_opcodes {
-            self.sorted_opcodes.push((opcode.to_string(), token.to_string()));
+            self.sorted_opcodes
+                .push((opcode.to_string(), token.to_string()));
         }
         // Longest opcode first so partial matches don't shadow longer ones.
-        self.sorted_opcodes.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
+        self.sorted_opcodes
+            .sort_by_key(|b| std::cmp::Reverse(b.0.len()));
     }
 
     pub fn decompress(&self, compressed: &str) -> String {
@@ -142,11 +154,24 @@ impl Decompressor {
 
         for line in compressed.lines() {
             let trimmed = line.trim();
+            // Non-CBM audit 2026-08-25 #8: `// ── ClassName ──` lines are
+            // STRUCTURAL class-boundary markers emitted by the IR LLM
+            // renderer, not disposable comments. Dropping them turned a
+            // multi-class skeleton into an unattributed flat field list —
+            // strictly less information than the compressed input had.
+            // Preserve them verbatim so round-trips keep class attribution.
+            if trimmed.starts_with("// ──") {
+                output.push_str(trimmed);
+                output.push('\n');
+                continue;
+            }
             // F-FULL-18: Skip ALL comment lines (starting with //) before
             // checking section starts. This prevents accidental section
             // detection on commented-out metadata like `// §PATHMAP`.
-            if trimmed.starts_with("// ---") || trimmed.starts_with("// Raw")
-                || trimmed.starts_with("// Fidelity") || trimmed.starts_with("// [CACHE")
+            if trimmed.starts_with("// ---")
+                || trimmed.starts_with("// Raw")
+                || trimmed.starts_with("// Fidelity")
+                || trimmed.starts_with("// [CACHE")
                 || trimmed.starts_with("//")
             {
                 continue;
@@ -156,7 +181,9 @@ impl Decompressor {
                 continue;
             }
             if skip_section {
-                if trimmed.is_empty() { skip_section = false; }
+                if trimmed.is_empty() {
+                    skip_section = false;
+                }
                 continue;
             }
 
@@ -200,8 +227,10 @@ impl Decompressor {
         let mut skip = false;
         for line in text.lines() {
             let trimmed = line.trim();
-            if trimmed.starts_with("// ---") || trimmed.starts_with("// Raw")
-                || trimmed.starts_with("// Fidelity") || trimmed.starts_with("// [CACHE")
+            if trimmed.starts_with("// ---")
+                || trimmed.starts_with("// Raw")
+                || trimmed.starts_with("// Fidelity")
+                || trimmed.starts_with("// [CACHE")
             {
                 continue;
             }
@@ -209,7 +238,9 @@ impl Decompressor {
                 skip = !skip;
                 continue;
             }
-            if skip { continue; }
+            if skip {
+                continue;
+            }
             result.push_str(line);
             result.push('\n');
         }
@@ -226,4 +257,6 @@ impl Decompressor {
 #[path = "../tests/decompression/decompressor.rs"]
 mod integration_tests;
 
-
+#[cfg(test)]
+#[path = "../tests/proptest/decompressor.rs"]
+mod proptest_tests;

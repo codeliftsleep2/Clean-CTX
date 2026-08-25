@@ -2,7 +2,7 @@
 //
 // Tests for the §ΦMAP footer formatter.
 
-use crate::angular_meta::footer::{format_bundle_footer, BundleEntry, FooterBuilder};
+use crate::angular_meta::footer::{BundleEntry, FooterBuilder, format_bundle_footer};
 
 #[test]
 fn format_bundle_footer_returns_empty_for_no_entries() {

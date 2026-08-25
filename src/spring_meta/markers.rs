@@ -65,7 +65,9 @@ pub enum PhiLineKind {
 impl PhiLineKind {
     /// The `Φ` marker prefix for this kind (e.g. `"Φrest:"`).
     /// For prefix-less tokens (`ΦBUNDLE`, `ΦMAP`) the colon is omitted.
-    #[allow(dead_code)]
+    /// Used by `expand_phi_in_line` (production when `spring_boot` is
+    /// enabled) and by tests (`src/tests/spring_meta/markers_tests.rs`).
+    #[cfg_attr(not(feature = "spring_boot"), allow(dead_code))]
     pub fn marker_prefix(self) -> &'static str {
         match self {
             Self::RestController => "Φrest:",
@@ -110,28 +112,31 @@ impl PhiLineKind {
     /// before shorter ones to prevent partial-match issues in string
     /// replacement (defensive — the current vocabulary has no overlaps,
     /// but this ordering is cheap insurance).
-    #[allow(dead_code)]
+    /// Used by `expand_phi_in_line` and by tests.
+    #[cfg_attr(not(feature = "spring_boot"), allow(dead_code))]
     pub fn all_in_expand_order() -> &'static [PhiLineKind] {
         &[
-            Self::RestController, // Φrest:   (6 chars)
-            Self::Controller,     // Φctrl:   (6 chars)
-            Self::Repository,     // Φrepo:   (6 chars)
-            Self::Configuration,  // Φconf:   (6 chars)
-            Self::RequestMapping, // Φmap:    (5 chars)
-            Self::Service,        // Φsvc:    (5 chars)
-            Self::Autowired,      // Φaut:    (5 chars)
-            Self::Value,          // Φval:    (5 chars)
-            Self::Bean,           // Φbean:   (6 chars)
+            Self::RestController,          // Φrest:   (6 chars)
+            Self::Controller,              // Φctrl:   (6 chars)
+            Self::Repository,              // Φrepo:   (6 chars)
+            Self::Configuration,           // Φconf:   (6 chars)
+            Self::RequestMapping,          // Φmap:    (5 chars)
+            Self::Service,                 // Φsvc:    (5 chars)
+            Self::Autowired,               // Φaut:    (5 chars)
+            Self::Value,                   // Φval:    (5 chars)
+            Self::Bean,                    // Φbean:   (6 chars)
             Self::ConfigurationProperties, // Φprop: (6 chars)
-            Self::Graph,          // Φgraph:  (7 chars)
-            Self::PropertiesFile, // Φpropf:  (7 chars)
-            Self::Bundle,         // ΦBUNDLE  (8 chars)
-            Self::Map,            // ΦMAP     (5 chars)
+            Self::Graph,                   // Φgraph:  (7 chars)
+            Self::PropertiesFile,          // Φpropf:  (7 chars)
+            Self::Bundle,                  // ΦBUNDLE  (8 chars)
+            Self::Map,                     // ΦMAP     (5 chars)
         ]
     }
 
     /// Look up a [`PhiLineKind`] by its marker token string (without
     /// the trailing colon/binding). Returns `None` for unknown tokens.
+    /// Consumed only by `expand_phi` below, which is test-facing.
+    #[allow(dead_code)]
     pub fn from_token(token: &str) -> Option<PhiLineKind> {
         match token {
             "Φrest" => Some(Self::RestController),
@@ -153,6 +158,7 @@ impl PhiLineKind {
     }
 
     /// Returns the token string (without trailing `:`) for a given kind.
+    /// Used by tests (`src/tests/spring_meta/markers_tests.rs`).
     #[allow(dead_code)]
     pub fn token(self) -> &'static str {
         match self {
@@ -185,6 +191,7 @@ impl PhiLineKind {
 /// wrappers that create the struct and call `.render()`.
 pub trait PhiLine {
     /// The kind of this marker.
+    /// Used by tests to verify marker round-trips.
     #[allow(dead_code)]
     fn kind(&self) -> PhiLineKind;
 
@@ -390,12 +397,20 @@ impl std::fmt::Display for RequestMappingMapping {
 
 /// Build a `Φrest:<ClassName> [map=…]` marker line.
 pub fn build_rest_controller_line(class_name: &str, mappings: &[RequestMappingMapping]) -> String {
-    RestControllerLine { class_name, mappings }.render()
+    RestControllerLine {
+        class_name,
+        mappings,
+    }
+    .render()
 }
 
 /// Build a `Φctrl:<ClassName> [map=…]` marker line.
 pub fn build_controller_line(class_name: &str, mappings: &[RequestMappingMapping]) -> String {
-    ControllerLine { class_name, mappings }.render()
+    ControllerLine {
+        class_name,
+        mappings,
+    }
+    .render()
 }
 
 /// Build a `Φsvc:<ClassName>` marker line.
@@ -415,7 +430,11 @@ pub fn build_configuration_line(class_name: &str) -> String {
 
 /// Build a `Φmap:<ClassName> map=[…]` marker line.
 pub fn build_request_mapping_line(class_name: &str, mappings: &[RequestMappingMapping]) -> String {
-    RequestMappingLine { class_name, mappings }.render()
+    RequestMappingLine {
+        class_name,
+        mappings,
+    }
+    .render()
 }
 
 /// Build a `Φaut:<fieldName>` marker line.
@@ -456,7 +475,9 @@ pub fn build_configuration_properties_line(class_name: &str) -> String {
 ///
 /// Adding a new marker to the vocabulary only requires updating
 /// [`PhiLineKind`] — this function is generic and needs no edits.
-#[allow(dead_code)]
+/// Called by `decompression::markers::expand_phi_in_line` when the
+/// `spring_boot` feature is enabled; always used by tests.
+#[cfg_attr(not(feature = "spring_boot"), allow(dead_code))]
 pub fn expand_phi_in_line(line: &str) -> String {
     let mut s = line.to_string();
     for &kind in PhiLineKind::all_in_expand_order() {
@@ -476,8 +497,8 @@ pub fn expand_phi_in_line(line: &str) -> String {
 ///
 /// Adding a new marker to the vocabulary only requires updating
 /// [`PhiLineKind`] — this function is generic and needs no edits.
+/// Used by tests (`src/tests/spring_meta/markers_tests.rs`).
 #[allow(dead_code)]
 pub fn expand_phi(token: &str) -> Option<&'static str> {
     PhiLineKind::from_token(token).map(|k| k.expansion())
 }
-

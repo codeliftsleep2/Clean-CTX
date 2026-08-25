@@ -10,13 +10,13 @@
 //   3. Render human-readable output from current state
 //   4. Validate version chains to prevent out-of-order application
 
-use std::collections::HashMap;
-use super::delta::IRDelta;
 use super::compiler::CompiledIR;
+use super::delta::IRDelta;
+use super::delta::{key_tuple_from_tuple, primary_key_from_tuple};
 use super::render::ir_to_text;
 use super::wire::op_to_tuple;
-use super::delta::{primary_key_from_tuple, key_tuple_from_tuple};
 use crate::compression::Fidelity;
+use std::collections::HashMap;
 
 /// Errors during delta application.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,7 +43,11 @@ impl std::fmt::Display for DeltaError {
             DeltaError::SymbolNotFound(sym) => write!(f, "symbol not found: {}", sym),
             DeltaError::DuplicateSymbol(sym) => write!(f, "duplicate symbol: {}", sym),
             DeltaError::NonMonotonicVersion { from, to } => {
-                write!(f, "non-monotonic version: delta from {} to {} must be strictly increasing", from, to)
+                write!(
+                    f,
+                    "non-monotonic version: delta from {} to {} must be strictly increasing",
+                    from, to
+                )
             }
         }
     }
@@ -107,7 +111,7 @@ impl FileState {
             // Use swap_remove (O(1)) — removes the instruction by swapping
             // it with the last element, then popping.
             self.instructions.swap_remove(idx);
-            
+
             // If the removed element was not the last one, update the index
             // for the element that was swapped into position `idx`.
             if idx < self.instructions.len() {
@@ -115,7 +119,7 @@ impl FileState {
                 let swapped_key = primary_key_from_tuple(swapped);
                 self.index.insert(swapped_key, idx);
             }
-            
+
             true
         } else {
             false
@@ -181,6 +185,10 @@ pub struct ContextState {
     files: HashMap<String, FileState>,
     /// Current global version (monotonic, across all files)
     version: u64,
+    /// A-08: Source hashes for detecting unchanged files and avoiding
+    /// unnecessary recompilation. Key is path alias, value is SHA-256
+    /// hash of the source content at the time of last compilation.
+    source_hashes: HashMap<String, String>,
 }
 
 impl ContextState {
@@ -189,6 +197,7 @@ impl ContextState {
         Self {
             files: HashMap::new(),
             version: 0,
+            source_hashes: HashMap::new(),
         }
     }
 
@@ -199,11 +208,19 @@ impl ContextState {
     /// it is overwritten with the new IR.
     ///
     /// The global version is updated to max(current, ir.version).
-    pub fn load_ir(&mut self, ir: CompiledIR) {
+    ///
+    /// A-08: Accepts an optional source hash to track whether the file
+    /// has changed since last compilation.
+    pub fn load_ir(&mut self, ir: CompiledIR, source_hash: Option<String>) {
         let file_id = ir.file_id.clone();
         let version = ir.version;
         self.files.insert(file_id, FileState::from_compiled(&ir));
         self.version = self.version.max(version);
+
+        // A-08: Store source hash if provided
+        if let Some(hash) = source_hash {
+            self.source_hashes.insert(ir.file_id, hash);
+        }
     }
 
     /// Apply a delta to update state for a specific file.
@@ -226,7 +243,9 @@ impl ContextState {
     ///
     /// `Ok(to_version)` on success, where `to_version` is the delta's target version.
     pub fn apply(&mut self, delta: IRDelta) -> Result<u64, DeltaError> {
-        let file = self.files.get_mut(&delta.file)
+        let file = self
+            .files
+            .get_mut(&delta.file)
             .ok_or_else(|| DeltaError::UnknownFile(delta.file.clone()))?;
 
         // Validate version chain
@@ -268,9 +287,10 @@ impl ContextState {
             } else if let Some(patches) = &mod_op.patches {
                 // Field-patch format (Idea #3) — apply patches to the existing instruction
                 let key = primary_key_from_tuple(&mod_op.key);
-                let idx = *file.index.get(&key).ok_or_else(|| {
-                    DeltaError::SymbolNotFound(key.clone())
-                })?;
+                let idx = *file
+                    .index
+                    .get(&key)
+                    .ok_or_else(|| DeltaError::SymbolNotFound(key.clone()))?;
                 let instruction = &mut file.instructions[idx];
                 for patch in patches {
                     if patch.field_index < instruction.len() {
@@ -321,6 +341,25 @@ impl ContextState {
     /// Check if a file is tracked in state.
     pub fn has_file(&self, file_id: &str) -> bool {
         self.files.contains_key(file_id)
+    }
+
+    /// A-08: Check if the source for a file has changed since last compilation.
+    ///
+    /// Returns `true` if the file is not tracked (no baseline to compare against),
+    /// or if the provided source hash matches the stored hash (file unchanged).
+    /// Returns `false` if the file is tracked but the hash doesn't match (file changed).
+    pub fn is_source_unchanged(&self, file_id: &str, source_hash: &str) -> bool {
+        match self.source_hashes.get(file_id) {
+            None => true, // No baseline hash - treat as unchanged (first compile)
+            Some(stored_hash) => stored_hash == source_hash, // Compare hashes
+        }
+    }
+
+    /// A-08: Get the stored source hash for a file.
+    ///
+    /// Returns `None` if the file is not tracked or no hash was stored.
+    pub fn get_source_hash(&self, file_id: &str) -> Option<&String> {
+        self.source_hashes.get(file_id)
     }
 
     /// Get the version of a specific file.

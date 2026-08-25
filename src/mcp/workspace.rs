@@ -28,28 +28,103 @@
 // class block extraction, manifest formatting, constants) are
 // extracted to `workspace_util.rs`.
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use crate::compression::Fidelity;
 use crate::compression::pipeline::compress_source;
 use crate::compression::workspace_symbols::build_global_symbol_table;
 use crate::mcp::McpState;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
+
+// Phase 5: Angular meta-layer imports are gated by the `angular` feature.
+// When disabled, these modules are not compiled and the bundling/graph
+// passes become no-ops.
+#[cfg(feature = "angular")]
 use crate::angular_meta::bundler;
+#[cfg(feature = "angular")]
 use crate::angular_meta::decorators;
+#[cfg(feature = "angular")]
 use crate::angular_meta::footer::FooterBuilder;
+#[cfg(feature = "angular")]
 use crate::angular_meta::graph::GraphCollector;
-use crate::angular_meta::template;
+#[cfg(feature = "angular")]
 use crate::angular_meta::style;
+#[cfg(feature = "angular")]
+use crate::angular_meta::template;
+#[cfg(feature = "angular")]
+use std::sync::Arc;
 
 use super::workspace_util::{
-    COMPRESSIBLE_EXTENSIONS,
-    collect_source_files,
-    extract_class_blocks,
-    format_manifest_header,
-    format_manifest_footer,
-    triplet_name,
-    PassContextRef,
+    COMPRESSIBLE_EXTENSIONS, collect_source_files, format_manifest_header,
 };
+#[cfg(feature = "angular")]
+use super::workspace_util::{PassContextRef, extract_class_blocks, triplet_name};
+
+// format_manifest_footer is only available when angular is enabled
+#[cfg(feature = "angular")]
+use super::workspace_util::format_manifest_footer;
+
+/// F-22: Workspace compression result cache.
+///
+/// Computes a content hash from file paths + mtimes/sizes. If the hash
+/// matches a previous call, returns the cached `WorkspaceResult` instantly
+/// without re-compressing.
+///
+/// Invalidation: any file change (new, modified, deleted) produces a
+/// different hash → cache miss.
+struct WorkspaceCache {
+    /// Maps content hash → serialized WorkspaceResult
+    cache: std::collections::HashMap<u64, WorkspaceResult>,
+}
+
+impl WorkspaceCache {
+    fn new() -> Self {
+        Self {
+            cache: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Compute a content hash from directory path, fidelity, file paths and their metadata.
+    /// This is used as the cache key — any file change or fidelity switch produces a different hash.
+    fn compute_hash(dir_path: &str, fidelity: &Fidelity, entries: &[String]) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        dir_path.hash(&mut hasher);
+        // Include fidelity in the hash so different fidelity levels don't collide
+        format!("{:?}", fidelity).hash(&mut hasher);
+
+        // Sort for determinism
+        let mut sorted = entries.to_vec();
+        sorted.sort();
+
+        for entry in &sorted {
+            entry.hash(&mut hasher);
+            // Add mtime and size to the hash so file modifications invalidate the cache
+            if let Ok(meta) = std::fs::metadata(entry) {
+                if let Ok(mtime) = meta.modified() {
+                    if let Ok(d) = mtime.duration_since(SystemTime::UNIX_EPOCH) {
+                        d.as_secs().hash(&mut hasher);
+                        d.subsec_nanos().hash(&mut hasher);
+                    }
+                }
+                meta.len().hash(&mut hasher);
+            }
+        }
+
+        hasher.finish()
+    }
+
+    fn get(&self, hash: u64) -> Option<&WorkspaceResult> {
+        self.cache.get(&hash)
+    }
+
+    fn set(&mut self, hash: u64, result: WorkspaceResult) {
+        self.cache.insert(hash, result);
+    }
+}
+
+/// Thread-safe holder for the workspace cache.
+static WORKSPACE_CACHE: std::sync::Mutex<Option<WorkspaceCache>> = std::sync::Mutex::new(None);
 
 /// Structured result of a workspace compression pass.
 #[derive(Debug, Clone)]
@@ -88,13 +163,65 @@ struct PassContext {
 pub(crate) fn compress_workspace_dir(
     dir_path: &str,
     fidelity: Fidelity,
-    state: &mut McpState,
+    state: &McpState,
 ) -> Result<WorkspaceResult, Box<dyn std::error::Error>> {
-    let mut manifest = format_manifest_header(dir_path, fidelity, state);
+    let _span = tracing::info_span!(
+        "compress_workspace",
+        dir_path = %dir_path,
+        fidelity = %format!("{:?}", fidelity),
+    )
+    .entered();
+    let overall_start = std::time::Instant::now();
+
+    // Phase 4: Resolve relative `dir_path` against the caller's CWD, not
+    // the process-global project root. This enables cross-repo workspace
+    // compression in workspace-mode setups (e.g. `fe/src` from a parent
+    // `Test/` workspace root). Absolute paths pass through unchanged.
+    let resolved_dir = if Path::new(dir_path).is_absolute() {
+        dir_path.to_string()
+    } else {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(dir_path).to_string_lossy().into_owned())
+            .unwrap_or_else(|_| dir_path.to_string())
+    };
+
+    // F-22: Check workspace result cache before doing any work.
+    // We collect entries first to compute the cache key, but if we get
+    // a cache hit, we skip the entire compression pipeline.
+    let mut all_entries: Vec<String> = Vec::new();
+    collect_source_files(&resolved_dir, &mut all_entries);
+    let file_count = all_entries.len();
+    let cache_hash = WorkspaceCache::compute_hash(&resolved_dir, &fidelity, &all_entries);
+
+    if let Ok(guard) = WORKSPACE_CACHE.lock() {
+        if let Some(ref cache) = *guard {
+            if let Some(cached) = cache.get(cache_hash) {
+                #[cfg(debug_assertions)]
+                eprintln!(
+                    "[compress_workspace_dir] Cache HIT for {} ({} files)",
+                    resolved_dir,
+                    all_entries.len()
+                );
+                tracing::info!(
+                    file_count = file_count,
+                    cached = true,
+                    "compress_workspace cache hit"
+                );
+                return Ok(cached.clone());
+            }
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    eprintln!(
+        "[compress_workspace_dir] Cache MISS for {} ({} files)",
+        resolved_dir,
+        all_entries.len()
+    );
+
+    let mut manifest = format_manifest_header(&resolved_dir, fidelity, state);
 
     // File collection + exclusion.
-    let mut all_entries: Vec<String> = Vec::new();
-    collect_source_files(dir_path, &mut all_entries);
     let mut excluded: Vec<(String, Vec<String>)> = Vec::new();
     let kept: Vec<String> = all_entries
         .into_iter()
@@ -108,12 +235,43 @@ pub(crate) fn compress_workspace_dir(
         })
         .collect();
 
+    // A-13: Check workspace file count against configured limit
+    let file_count = kept.len() + excluded.len();
+    if let Err(e) = state
+        .config
+        .resource_limits
+        .check_workspace_file_count(file_count)
+    {
+        return Err(e.into());
+    }
+
     let mut ctx = PassContext {
         kept,
         errors: Vec::new(),
         excluded,
         warnings: Vec::new(),
     };
+
+    // A-13: Estimate memory usage and check against limit
+    // Rough estimate: each file will need ~2x its size in memory during compression
+    // (source + compressed output + AST structures)
+    let estimated_memory: usize = ctx
+        .kept
+        .iter()
+        .filter_map(|path| {
+            std::fs::metadata(path)
+                .ok()
+                .map(|meta| (meta.len() * 2) as usize)
+        })
+        .sum();
+
+    if let Err(e) = state
+        .config
+        .resource_limits
+        .check_memory_usage(estimated_memory)
+    {
+        return Err(e.into());
+    }
 
     // Phase III (Idea #9): At Low fidelity, use the two-pass approach
     // with global symbol deduplication. This builds a workspace-level
@@ -126,15 +284,19 @@ pub(crate) fn compress_workspace_dir(
         compress_pass(fidelity, state, &mut ctx, &mut manifest);
     }
 
-    let footer_builder = bundle_pass(state, &ctx, &mut manifest);
-    graph_pass(state, &mut ctx, &mut manifest);
+    // Angular-specific passes are only available when the feature is enabled
+    #[cfg(feature = "angular")]
+    {
+        let footer_builder = bundle_pass(state, &ctx, &mut manifest);
+        graph_pass(state, &mut ctx, &mut manifest);
 
-    // Build a PassContextRef for format_manifest_footer
-    let ctx_ref = PassContextRef {
-        excluded: &ctx.excluded,
-        errors: &ctx.errors,
-    };
-    format_manifest_footer(state, &ctx_ref, footer_builder, &mut manifest);
+        // Build a PassContextRef for format_manifest_footer
+        let ctx_ref = PassContextRef {
+            excluded: &ctx.excluded,
+            errors: &ctx.errors,
+        };
+        format_manifest_footer(state, &ctx_ref, footer_builder, &mut manifest);
+    }
 
     // F-FINAL-06: Merge the per-pass warnings collected in
     // `ctx.warnings` into the session-level buffer so the
@@ -145,12 +307,34 @@ pub(crate) fn compress_workspace_dir(
     let mut warnings = ctx.warnings;
     warnings.extend(state.drain_warnings());
 
-    Ok(WorkspaceResult {
+    let result = WorkspaceResult {
         manifest,
         errors: ctx.errors,
         excluded: ctx.excluded,
         warnings,
-    })
+    };
+
+    let total_ms = overall_start.elapsed().as_millis() as u64;
+    tracing::info!(
+        dir_path = %dir_path,
+        file_count = file_count,
+        total_ms = total_ms,
+        errors = result.errors.len(),
+        excluded = result.excluded.len(),
+        "compress_workspace complete"
+    );
+
+    // F-22: Store result in cache for future calls
+    if let Ok(mut guard) = WORKSPACE_CACHE.lock() {
+        if guard.is_none() {
+            *guard = Some(WorkspaceCache::new());
+        }
+        if let Some(ref mut cache) = *guard {
+            cache.set(cache_hash, result.clone());
+        }
+    }
+
+    Ok(result)
 }
 
 /// Per-file compression pass. Compresses ts/js/cs files and emits
@@ -165,7 +349,7 @@ pub(crate) fn compress_workspace_dir(
 /// eliminates the redundant I/O that was the bottleneck.
 fn compress_pass(
     fidelity: Fidelity,
-    state: &mut McpState,
+    state: &McpState,
     ctx: &mut PassContext,
     manifest: &mut String,
 ) {
@@ -183,39 +367,73 @@ fn compress_pass(
         .cloned()
         .collect();
 
+    #[cfg(debug_assertions)]
+    eprintln!(
+        "[compress_pass] Starting compression of {} files",
+        compressible.len()
+    );
+
     // C-1 fix: Create tokenizer once before the loop instead of per-file.
-    let ws_tok = crate::tokenizer::create_tokenizer(
-        crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
-    ).ok();
+    let ws_tok = crate::tokenizer::create_tokenizer(crate::tokenizer::resolve_tokenizer_kind(
+        None,
+        Some(&state.config.tokenizer.to_string()),
+    ))
+    .ok();
     let ws_tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = ws_tok.as_deref();
 
-    for entry in &compressible {
+    // F-21: Pre-assign aliases deterministically.
+    // Before parallel work, iterate all files sequentially to assign α1, α2…αN
+    // in a stable order. Once assigned, `get_or_create_alias` is a read-only
+    // HashMap lookup (no mutation), safe for parallel calls.
+    {
+        let mut dict_guard = state.dict_lock();
+        for entry in &compressible {
+            dict_guard.get_or_create_alias(entry.clone());
+        }
+    }
+
+    // F-20: Parallelize per-file compression with Rayon.
+    // Alias lookups are now deterministic (pre-assigned above).
+    use rayon::prelude::*;
+    use std::sync::Mutex;
+    let manifest_mutex = Mutex::new(manifest);
+    let errors_mutex = Mutex::new(&mut ctx.errors);
+
+    compressible.par_iter().for_each(|entry| {
         // Pre-read via source_cache so bundle_pass/graph_pass
         // get cache hits instead of re-reading from disk.
         let source_arc = state.read_source(entry).ok();
         let source_ref = source_arc.as_ref().map(|s| s.as_str());
 
+        let mut dict_guard = state.dict_lock();
+        let mut cache_guard = state.cache_write();
+
         match compress_file_with_source(
             PathBuf::from(&entry),
             source_ref,
-            &mut state.dict,
-            &mut state.cache,
+            &mut dict_guard,
+            &mut cache_guard,
             fidelity,
+            Some(&state.config),
         ) {
             Ok(compressed) => {
-                let alias = state.dict.get_or_create_alias(entry.clone());
-                manifest.push_str(&format!(
+                // Alias already pre-assigned — this is a read-only lookup.
+                let alias = dict_guard.get_or_create_alias(entry.clone());
+                let mut manifest_guard = manifest_mutex.lock().unwrap_or_else(|p| p.into_inner());
+                manifest_guard.push_str(&format!(
                     "// ===== FILE: {} =====\n// α alias: {}\n",
                     entry, alias
                 ));
-                manifest.push_str(&compressed);
-                manifest.push('\n');
+                manifest_guard.push_str(&compressed);
+                manifest_guard.push('\n');
 
                 // Record per-file stats for workspace compression (MED-2 fix: use pluggable tokenizer)
                 let ws_source = source_ref.unwrap_or("");
-                let ws_raw = super::tool_helpers::count_tokens_with_tokenizer(ws_source, ws_tok_ref);
-                let ws_compressed = super::tool_helpers::count_tokens_with_tokenizer(&compressed, ws_tok_ref);
-                state.session_stats.record_compression(
+                let ws_raw =
+                    super::tool_helpers::count_tokens_with_tokenizer(ws_source, ws_tok_ref);
+                let ws_compressed =
+                    super::tool_helpers::count_tokens_with_tokenizer(&compressed, ws_tok_ref);
+                state.record_compression(
                     entry,
                     ws_raw,
                     ws_compressed,
@@ -227,11 +445,13 @@ fn compress_pass(
                 );
             }
             Err(e) => {
-                ctx.errors.push((entry.clone(), e.to_string()));
-                manifest.push_str(&format!("// ERROR compressing {}: {}\n\n", entry, e));
+                let mut errors_guard = errors_mutex.lock().unwrap_or_else(|p| p.into_inner());
+                errors_guard.push((entry.clone(), e.to_string()));
+                let mut manifest_guard = manifest_mutex.lock().unwrap_or_else(|p| p.into_inner());
+                manifest_guard.push_str(&format!("// ERROR compressing {}: {}\n\n", entry, e));
             }
         }
-    }
+    });
 }
 
 /// Two-pass compression with global symbol deduplication (Phase III, Idea #9).
@@ -241,7 +461,7 @@ fn compress_pass(
 ///         dictionary, emit global §GSYM dictionary in manifest header.
 fn compress_pass_with_global_symbols(
     fidelity: Fidelity,
-    state: &mut McpState,
+    state: &McpState,
     ctx: &mut PassContext,
     manifest: &mut String,
 ) {
@@ -271,9 +491,11 @@ fn compress_pass_with_global_symbols(
     let mut entries: Vec<CompressedEntry> = Vec::new();
 
     // C-1 fix: Create tokenizer once before the loop instead of per-file.
-    let gs_tok = crate::tokenizer::create_tokenizer(
-        crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
-    ).ok();
+    let gs_tok = crate::tokenizer::create_tokenizer(crate::tokenizer::resolve_tokenizer_kind(
+        None,
+        Some(&state.config.tokenizer.to_string()),
+    ))
+    .ok();
     let gs_tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = gs_tok.as_deref();
 
     for entry in &compressible {
@@ -282,27 +504,37 @@ fn compress_pass_with_global_symbols(
             Ok(arc) => (*arc).clone(),
             Err(e) => {
                 ctx.errors.push((entry.clone(), e.to_string()));
-                manifest.push_str(&format!(
-                    "// ERROR reading {}: {}\n\n",
-                    entry, e
-                ));
+                manifest.push_str(&format!("// ERROR reading {}: {}\n\n", entry, e));
                 continue;
             }
         };
 
-        // Compress without per-file symbol compression.
-        match compress_source(&source_code, entry, &mut state.dict, &mut state.cache, fidelity) {
+        let mut dict_guard = state.dict_lock();
+        let mut cache_guard = state.cache_write();
+
+        match compress_source(
+            &source_code,
+            entry,
+            &mut dict_guard,
+            &mut cache_guard,
+            fidelity,
+            Some(&state.config),
+            Some(&state.config.type_aliases),
+        ) {
             Ok(compressed) => {
-                let alias = state.dict.get_or_create_alias(entry.clone());
+                // Use the already-held dict_guard instead of re-locking through state
+                let alias = dict_guard.get_or_create_alias(entry.clone());
                 // Extract the body from the compressed output.
                 // The compressed output has the report header + body.
                 // We need the body for global symbol encoding.
                 let body = extract_body_from_compressed(&compressed);
 
                 // Record per-file stats for global-symbol workspace compression (MED-2 fix: use pluggable tokenizer)
-                let gs_raw = super::tool_helpers::count_tokens_with_tokenizer(&source_code, gs_tok_ref);
-                let gs_compressed = super::tool_helpers::count_tokens_with_tokenizer(&compressed, gs_tok_ref);
-                state.session_stats.record_compression(
+                let gs_raw =
+                    super::tool_helpers::count_tokens_with_tokenizer(&source_code, gs_tok_ref);
+                let gs_compressed =
+                    super::tool_helpers::count_tokens_with_tokenizer(&compressed, gs_tok_ref);
+                state.record_compression(
                     entry,
                     gs_raw,
                     gs_compressed,
@@ -322,10 +554,7 @@ fn compress_pass_with_global_symbols(
             }
             Err(e) => {
                 ctx.errors.push((entry.clone(), e.to_string()));
-                manifest.push_str(&format!(
-                    "// ERROR compressing {}: {}\n\n",
-                    entry, e
-                ));
+                manifest.push_str(&format!("// ERROR compressing {}: {}\n\n", entry, e));
             }
         }
     }
@@ -428,13 +657,18 @@ fn extract_header_from_compressed(compressed: &str) -> String {
 /// Bundling pass. Resolves Angular file triplets (*.component.ts →
 /// .html + .scss), extracts template/style shape summaries, and
 /// emits `ΦBUNDLE` groups with a `§ΦMAP` footer.
-fn bundle_pass(
-    state: &mut McpState,
-    ctx: &PassContext,
-    manifest: &mut String,
-) -> FooterBuilder {
+///
+/// This function is only available when the `angular` feature is enabled.
+/// When disabled, it returns an empty `FooterBuilder` stub.
+#[cfg(feature = "angular")]
+fn bundle_pass(state: &McpState, ctx: &PassContext, manifest: &mut String) -> FooterBuilder {
     let mut footer_builder = FooterBuilder::new();
     let mut bundle_count = 0usize;
+    // ANGULAR_HTML_COMPRESSION_PLAN: use the config's default fidelity
+    // for template rendering. The workspace pass doesn't receive an
+    // explicit fidelity, so we use the config default (Low for the
+    // single-line shape summary, Medium/High for structural output).
+    let fidelity = state.config.default_fidelity;
 
     let compressible: Vec<&String> = ctx
         .kept
@@ -457,23 +691,26 @@ fn bundle_pass(
         };
 
         // F-FULL-10: Use raw paths for alias keys for deterministic results.
-        let component_alias = state.dict.get_or_create_alias(entry.to_string());
+        let component_alias = state.get_or_create_alias(entry.to_string());
         let mut file_aliases = vec![component_alias];
         let mut tpl_summary = None;
         let mut sty_summary = None;
 
         if let Some(ref tpl_path) = triplet.template {
-            let a = state.dict.get_or_create_alias(tpl_path.to_string_lossy().to_string());
+            let a = state.get_or_create_alias(tpl_path.to_string_lossy().to_string());
             file_aliases.push(a);
             // F-FINAL-01: Use the shared source cache so files already
             // read in compress_pass / graph_pass are not re-read here.
             if let Ok(content) = state.read_source(&tpl_path.to_string_lossy()) {
                 let shape = template::extract_template_shape(&content);
-                tpl_summary = Some(shape.to_marker_line());
+                // Fidelity-gated rendering: Low → single-line summary,
+                // Medium/High → multi-line structural output.
+                let lines = shape.to_marker_lines(fidelity);
+                tpl_summary = Some(lines.join("\n"));
             }
         }
         if let Some(ref sty_path) = triplet.style {
-            let a = state.dict.get_or_create_alias(sty_path.to_string_lossy().to_string());
+            let a = state.get_or_create_alias(sty_path.to_string_lossy().to_string());
             file_aliases.push(a);
             // F-FINAL-01: Same shared-cache fix as the template branch.
             if let Ok(content) = state.read_source(&sty_path.to_string_lossy()) {
@@ -482,7 +719,7 @@ fn bundle_pass(
             }
         }
 
-        let _bundle_alias = state.dict.get_or_create_bundle_alias(triplet_name(path));
+        let _bundle_alias = state.get_or_create_bundle_alias(triplet_name(path));
         bundle_count += 1;
         manifest.push_str(&format!(
             "// ===== Φ{}: {} =====\n",
@@ -498,12 +735,7 @@ fn bundle_pass(
         }
         manifest.push('\n');
 
-        footer_builder.register_bundle(
-            triplet_name(path),
-            file_aliases,
-            tpl_summary,
-            sty_summary,
-        );
+        footer_builder.register_bundle(triplet_name(path), file_aliases, tpl_summary, sty_summary);
     }
 
     footer_builder
@@ -517,7 +749,11 @@ fn bundle_pass(
 /// push non-fatal warnings (currently: duplicate Angular class
 /// names from `AngularGraphBuilder`) into `ctx.warnings` for the
 /// orchestrator to merge into the JSON-RPC response.
-fn graph_pass(state: &mut McpState, ctx: &mut PassContext, manifest: &mut String) {
+///
+/// This function is only available when the `angular` feature is enabled.
+/// When disabled, it is a no-op.
+#[cfg(feature = "angular")]
+fn graph_pass(state: &McpState, ctx: &mut PassContext, manifest: &mut String) {
     let compressible: Vec<&String> = ctx
         .kept
         .iter()
@@ -545,11 +781,25 @@ fn graph_pass(state: &mut McpState, ctx: &mut PassContext, manifest: &mut String
             Ok(s) => s,
             Err(_) => continue,
         };
+
+        // Phase 5: Collect NgRx cross-layer edges even for files that
+        // aren't "Angular" in the decorator sense (e.g. actions/selectors
+        // files have no @Injectable decorator but import @ngrx/store).
+        // Use the workspace's configured fidelity (not hardcoded Medium).
+        let ngrx_fidelity = state.config.default_fidelity;
+        if let Some(ngrx_shape) =
+            crate::angular_meta::ngrx::extract_ngrx_shape(&source_code, ngrx_fidelity)
+        {
+            for (from, to, kind) in ngrx_shape.to_graph_edges() {
+                graph_collector.add_ngrx_edge(&from, &to, kind);
+            }
+        }
+
         if !crate::angular_meta::detect::is_angular_file(&source_code) {
             continue;
         }
         // F-FULL-10: Use raw path for alias key for deterministic alias.
-        let file_alias = state.dict.get_or_create_alias((*entry).clone());
+        let file_alias = state.get_or_create_alias((*entry).clone());
 
         let class_captures: Vec<String> = extract_class_blocks(&source_code);
         for raw_class in &class_captures {
@@ -569,6 +819,49 @@ fn graph_pass(state: &mut McpState, ctx: &mut PassContext, manifest: &mut String
         file_contents.insert((*entry).clone(), source_code);
     }
 
+    // Phase 5: Resolve EffectService edges to cross-language .NET
+    // endpoints via CBM (when available and enabled by config). This
+    // wires the `Φeffect:loadUsers$ → UserController.GetAll@α12` edge.
+    // Graceful skip: when CBM is unavailable or `cross_layer_cbm` is
+    // disabled, no EffectEndpoint edges are added and no error is raised.
+    let cross_layer_cbm = state
+        .config
+        .meta_layers
+        .get("angular")
+        .map(|c| c.ngrx.cross_layer_cbm)
+        .unwrap_or(true);
+    if cross_layer_cbm {
+        let effect_service_edges: Vec<(String, String)> = graph_collector
+            .ngrx_edges
+            .iter()
+            .filter(|e| e.kind == crate::angular_meta::graph::NgRxEdgeKind::EffectService)
+            .map(|e| (e.from.clone(), e.to.clone()))
+            .collect();
+        if !effect_service_edges.is_empty() {
+            if let Some(bridge) = state.graph_bridge_lock().as_mut() {
+                for (from, service_call) in effect_service_edges {
+                    // Extract the method name from the service call
+                    // (e.g. `UserService.getUsers()` → `getUsers`).
+                    let method_name = service_call
+                        .split('.')
+                        .next_back()
+                        .map(|s| s.trim_end_matches(')').trim().to_string())
+                        .unwrap_or_default();
+                    if method_name.is_empty() {
+                        continue;
+                    }
+                    if let Some(endpoint) = bridge.resolve_cross_language_endpoint(&method_name) {
+                        graph_collector.add_ngrx_edge(
+                            &from,
+                            &endpoint,
+                            crate::angular_meta::graph::NgRxEdgeKind::EffectEndpoint,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     let mut angular_graph = graph_collector.build_graph();
 
     // F-FINAL-06: Drain the graph's warnings (currently: duplicate
@@ -577,15 +870,13 @@ fn graph_pass(state: &mut McpState, ctx: &mut PassContext, manifest: &mut String
     // field. This replaces the previous `eprintln!` in the builder.
     ctx.warnings.extend(angular_graph.take_warnings());
 
-    state.angular_graph.set(angular_graph.clone());
+    state.angular_graph_lock().set(angular_graph.clone());
 
     // Emit graph lines using cached file content (F-ANG-04).
     for source_code in file_contents.values() {
         let class_captures: Vec<String> = extract_class_blocks(source_code);
         for raw_class in &class_captures {
-            if let Some((class_name, _, _, _, _)) =
-                decorators::extract_graph_entries(raw_class)
-            {
+            if let Some((class_name, _, _, _, _)) = decorators::extract_graph_entries(raw_class) {
                 if let Some(graph_line) = angular_graph.format_graph_line(&class_name) {
                     manifest.push_str(&format!("// {}\n", graph_line));
                 }
@@ -596,6 +887,57 @@ fn graph_pass(state: &mut McpState, ctx: &mut PassContext, manifest: &mut String
     manifest.push_str(&angular_graph.format_graph_footer());
 }
 
-#[cfg(test)]
+// Stub implementations when `angular` feature is disabled.
+// These return empty/no-op results so the orchestrator doesn't need
+// to change its call sites.
+
+/// Stub FooterBuilder for when Angular is disabled.
+/// Provides the same API but all methods are no-ops.
+#[cfg(not(feature = "angular"))]
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default)]
+pub struct FooterBuilder {
+    _private: (),
+}
+
+#[cfg(not(feature = "angular"))]
+#[allow(dead_code)]
+impl FooterBuilder {
+    pub fn new() -> Self {
+        Self { _private: () }
+    }
+
+    pub fn register_bundle(
+        &mut self,
+        _name: String,
+        _aliases: Vec<String>,
+        _template: Option<String>,
+        _style: Option<String>,
+    ) {
+        // no-op
+    }
+
+    pub fn is_empty(&self) -> bool {
+        true
+    }
+
+    pub fn format_footer(&self) -> String {
+        String::new()
+    }
+}
+
+#[cfg(not(feature = "angular"))]
+#[allow(dead_code)]
+fn bundle_pass(_state: &McpState, _ctx: &PassContext, _manifest: &mut String) -> FooterBuilder {
+    FooterBuilder::new()
+}
+
+#[cfg(not(feature = "angular"))]
+#[allow(dead_code)]
+fn graph_pass(_state: &McpState, _ctx: &mut PassContext, _manifest: &mut String) {
+    // no-op
+}
+
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/workspace.rs"]
 mod tests;

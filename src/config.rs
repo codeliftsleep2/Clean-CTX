@@ -1,10 +1,11 @@
 // src/config.rs — Project-level configuration for Clean-CTX
 // Reads .clean-ctx.json from the project root for custom settings
 
+use crate::compression::Fidelity;
+use crate::tokenizer::TokenizerKind;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
-use crate::tokenizer::TokenizerKind;
 
 // ── Smart defaults for intent-based fidelity selection ──────────────
 
@@ -18,19 +19,19 @@ use crate::tokenizer::TokenizerKind;
 pub struct SmartDefaults {
     /// Fidelity for refactoring tasks — requires full structural detail.
     #[serde(default = "default_sd_refactor")]
-    pub refactor: String,
+    pub refactor: Fidelity,
     /// Fidelity for overview/summary tasks — maximum compression.
     #[serde(default = "default_sd_overview")]
-    pub overview: String,
+    pub overview: Fidelity,
     /// Fidelity for debugging tasks — balanced detail vs compression.
     #[serde(default = "default_sd_debug")]
-    pub debug: String,
+    pub debug: Fidelity,
     /// Fidelity for editing tasks — maximum compression, delta-friendly.
     #[serde(default = "default_sd_edit")]
-    pub edit: String,
+    pub edit: Fidelity,
     /// Fidelity for implementation tasks — moderate detail.
     #[serde(default = "default_sd_implement")]
-    pub implement: String,
+    pub implement: Fidelity,
 }
 
 impl Default for SmartDefaults {
@@ -45,11 +46,21 @@ impl Default for SmartDefaults {
     }
 }
 
-fn default_sd_refactor() -> String { "high".to_string() }
-fn default_sd_overview() -> String { "low".to_string() }
-fn default_sd_debug() -> String { "medium".to_string() }
-fn default_sd_edit() -> String { "low".to_string() }
-fn default_sd_implement() -> String { "medium".to_string() }
+fn default_sd_refactor() -> Fidelity {
+    Fidelity::High
+}
+fn default_sd_overview() -> Fidelity {
+    Fidelity::Low
+}
+fn default_sd_debug() -> Fidelity {
+    Fidelity::Medium
+}
+fn default_sd_edit() -> Fidelity {
+    Fidelity::Edit
+}
+fn default_sd_implement() -> Fidelity {
+    Fidelity::Medium
+}
 
 // ── Heuristics configuration ───────────────────────────────────────
 
@@ -77,7 +88,6 @@ pub struct HeuristicsConfig {
     pub use_angular_meta: bool,
 
     // ── V2: Auto-classify thresholds ──────────────────────────────
-
     /// Min imports to classify as "service/complex" (High fidelity).
     #[serde(default = "default_complex_import_threshold")]
     pub complex_import_threshold: usize,
@@ -97,6 +107,18 @@ pub struct HeuristicsConfig {
     /// Whether to check DB for prior fidelity on file re-visits.
     #[serde(default = "default_true")]
     pub session_aware_fidelity: bool,
+    /// Auto-select Edit fidelity for implementation/service files
+    /// when no explicit intent/fidelity is given. When true, files
+    /// classified as Service or Implementation get `Fidelity::Edit`
+    /// so method bodies are carried verbatim for safe edits.
+    #[serde(default = "default_true")]
+    pub auto_edit_mode: bool,
+    /// File classes that auto-select Edit fidelity when `auto_edit_mode`
+    /// is on and no explicit intent/fidelity is given. Class names match
+    /// the `FileClass` variants as lowercase strings ("service",
+    /// "implementation", etc.). Defaults to ["service", "implementation"].
+    #[serde(default = "default_edit_auto_classifications")]
+    pub edit_auto_classifications: Vec<String>,
 }
 
 impl Default for HeuristicsConfig {
@@ -111,15 +133,76 @@ impl Default for HeuristicsConfig {
             high_lines: default_high_lines(),
             auto_classify: default_true(),
             session_aware_fidelity: default_true(),
+            auto_edit_mode: default_true(),
+            edit_auto_classifications: default_edit_auto_classifications(),
         }
     }
 }
 
-fn default_large_file_threshold() -> usize { 300 }
-fn default_complex_import_threshold() -> usize { 15 }
-fn default_complex_fn_threshold() -> usize { 10 }
-fn default_medium_lines() -> usize { 300 }
-fn default_high_lines() -> usize { 500 }
+fn default_edit_auto_classifications() -> Vec<String> {
+    vec!["service".to_string(), "implementation".to_string()]
+}
+
+fn default_large_file_threshold() -> usize {
+    300
+}
+fn default_complex_import_threshold() -> usize {
+    15
+}
+fn default_complex_fn_threshold() -> usize {
+    10
+}
+fn default_medium_lines() -> usize {
+    300
+}
+fn default_high_lines() -> usize {
+    500
+}
+
+// ── Resource limits ───────────────────────────────────────────────
+
+/// Resource limits and memory guardrails.
+///
+/// Controls maximum file sizes, workspace file counts, and memory
+/// usage to prevent OOM crashes on large codebases. When limits are
+/// exceeded, graceful error messages are returned instead of crashes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceLimits {
+    /// Maximum file size in bytes. Files larger than this are skipped
+    /// with a warning. Default: 10 MB.
+    #[serde(default = "default_max_file_size")]
+    pub max_file_size_bytes: usize,
+
+    /// Maximum number of files in a workspace. Workspaces with more
+    /// files are rejected with an error. Default: 10,000.
+    #[serde(default = "default_max_workspace_files")]
+    pub max_workspace_files: usize,
+
+    /// Maximum memory usage in bytes for compression operations.
+    /// When exceeded, compression is aborted gracefully. Default: 512 MB.
+    #[serde(default = "default_max_memory_bytes")]
+    pub max_memory_bytes: usize,
+}
+
+impl Default for ResourceLimits {
+    fn default() -> Self {
+        Self {
+            max_file_size_bytes: default_max_file_size(),
+            max_workspace_files: default_max_workspace_files(),
+            max_memory_bytes: default_max_memory_bytes(),
+        }
+    }
+}
+
+fn default_max_file_size() -> usize {
+    10 * 1024 * 1024
+} // 10 MB
+fn default_max_workspace_files() -> usize {
+    10_000
+}
+fn default_max_memory_bytes() -> usize {
+    512 * 1024 * 1024
+} // 512 MB
 
 // ── Cache configuration ──────────────────────────────────────────
 
@@ -189,11 +272,21 @@ impl Default for CacheConfig {
     }
 }
 
-fn default_cache_enabled() -> bool { true }
-fn default_stable_ttl() -> String { "1h".to_string() }
-fn default_tail_ttl() -> String { "5m".to_string() }
-fn default_vocab_version() -> String { "v1".to_string() }
-fn default_tool_version() -> String { "v1".to_string() }
+fn default_cache_enabled() -> bool {
+    true
+}
+fn default_stable_ttl() -> String {
+    "1h".to_string()
+}
+fn default_tail_ttl() -> String {
+    "5m".to_string()
+}
+fn default_vocab_version() -> String {
+    "v1".to_string()
+}
+fn default_tool_version() -> String {
+    "v1".to_string()
+}
 
 // ── Persistence configuration (placeholder) ────────────────────────
 
@@ -221,6 +314,10 @@ pub struct PersistenceConfig {
 impl Default for PersistenceConfig {
     fn default() -> Self {
         Self {
+            // Persistence is ON by default — cross-session compression
+            // history is a core feature. The A-14 CI detection auto-disables
+            // persistence in CI environments (CI=true, TF_BUILD, etc.) to
+            // prevent SQLite file lock contention in parallel test runs.
             enabled: true,
             auto_save: default_true(),
             max_history_days: default_max_history_days(),
@@ -229,8 +326,12 @@ impl Default for PersistenceConfig {
     }
 }
 
-fn default_max_history_days() -> u32 { 30 }
-fn default_db_path() -> String { ".clean-ctx/persistence.db".to_string() }
+fn default_max_history_days() -> u32 {
+    30
+}
+fn default_db_path() -> String {
+    ".clean-ctx/persistence.db".to_string()
+}
 
 // ── Main config struct ─────────────────────────────────────────────
 
@@ -243,7 +344,7 @@ pub struct CleanCtxConfig {
 
     /// Fidelity override per file extension
     #[serde(default)]
-    pub fidelity_overrides: BTreeMap<String, String>,
+    pub fidelity_overrides: BTreeMap<String, Fidelity>,
 
     /// File/directory patterns to exclude from compression.
     ///
@@ -256,13 +357,28 @@ pub struct CleanCtxConfig {
     #[serde(default)]
     pub exclude_patterns: Vec<String>,
 
+    /// Additional workspace roots to scan for cross-file symbol resolution.
+    ///
+    /// Each entry is an absolute path to a directory that should be
+    /// treated as part of the workspace for type detection, symbol
+    /// compression, and CBM graph queries. Paths are validated at
+    /// check time; a path that doesn't exist is silently skipped rather
+    /// than erroring the whole config.
+    ///
+    /// Example `.clean-ctx.json`:
+    /// ```json
+    /// { "additional_roots": ["C:\\Users\\me\\source\\repos\\Test"] }
+    /// ```
+    #[serde(default)]
+    pub additional_roots: Vec<String>,
+
     /// Custom behavior markers: marker → description
     #[serde(default)]
     pub custom_markers: BTreeMap<String, String>,
 
     /// Default fidelity level if not specified
     #[serde(default = "default_fidelity")]
-    pub default_fidelity: String,
+    pub default_fidelity: Fidelity,
 
     /// Whether to enable diff-aware compression
     #[serde(default = "default_true")]
@@ -320,6 +436,10 @@ pub struct CleanCtxConfig {
     #[serde(default)]
     pub cache: CacheConfig,
 
+    /// Resource limits and memory guardrails.
+    #[serde(default)]
+    pub resource_limits: ResourceLimits,
+
     /// CBM (codebase-memory-mcp) integration configuration.
     /// Controls how Clean-CTX discovers, launches, and communicates
     /// with the CBM server for graph intelligence.
@@ -332,6 +452,16 @@ pub struct CleanCtxConfig {
     /// fidelity for high- or low-importance files.
     #[serde(default)]
     pub intelligence: IntelligenceConfig,
+
+    /// Observability configuration for metrics export.
+    #[serde(default)]
+    pub observability: ObservabilityConfig,
+
+    /// Proxy auto-start configuration. When `auto_start` is `true`,
+    /// the MCP server spawns the `clean-ctx-proxy` binary as a child
+    /// process on startup and terminates it on shutdown.
+    #[serde(default)]
+    pub proxy: ProxyAutoStartConfig,
 }
 
 /// Intelligence Layer configuration.
@@ -352,14 +482,166 @@ pub struct IntelligenceConfig {
     /// (zero overhead).
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Enable blast radius analysis (depth-1 affected files).
+    /// When enabled, the compression output includes depth-1 affected
+    /// files from CBM with context-aware fidelity selection.
+    #[serde(default)]
+    pub blast_radius_enabled: bool,
+    /// Maximum number of blast radius files to include per request.
+    /// Prevents token explosion from highly-connected symbols.
+    /// Default: 10 files.
+    #[serde(default = "default_max_blast_radius")]
+    pub max_blast_radius_files: usize,
 }
 
 impl Default for IntelligenceConfig {
     fn default() -> Self {
         Self {
             enabled: true,
+            blast_radius_enabled: false,
+            max_blast_radius_files: 10,
         }
     }
+}
+
+fn default_max_blast_radius() -> usize {
+    10
+}
+
+/// Observability configuration for metrics export.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObservabilityConfig {
+    /// Enable periodic metrics export to stdout. Default: false.
+    #[serde(default)]
+    pub export_metrics: bool,
+    /// Interval in seconds between metrics snapshots. Default: 60.
+    #[serde(default = "default_export_interval")]
+    pub export_interval_secs: u64,
+}
+
+impl Default for ObservabilityConfig {
+    fn default() -> Self {
+        Self {
+            export_metrics: false,
+            export_interval_secs: default_export_interval(),
+        }
+    }
+}
+
+fn default_export_interval() -> u64 {
+    60
+}
+
+// ── Proxy auto-start configuration ────────────────────────────────
+
+/// Auto-start configuration for the Clean-CTX proxy.
+///
+/// When `auto_start` is `true`, the MCP server spawns the `clean-ctx-proxy`
+/// binary as a child process on startup, maps each field to the proxy's
+/// environment variables (see `proxy/src/config.rs`), and terminates the
+/// child on shutdown. Defaults mirror the proxy's env-var defaults so an
+/// empty JSON block behaves identically to an unconfigured proxy.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProxyAutoStartConfig {
+    /// Master switch. When `true`, the MCP server spawns the proxy on
+    /// startup and terminates it on shutdown. Default: `false`.
+    #[serde(default)]
+    pub auto_start: bool,
+    /// Port to bind (always 127.0.0.1). Maps to `PORT`. Default: 8787.
+    #[serde(default = "default_proxy_port")]
+    pub port: u16,
+    /// Enable cache_control breakpoint injection (Anthropic only).
+    /// Maps to `AUTO_CACHE`. Default: `false`.
+    #[serde(default)]
+    pub auto_cache: bool,
+    /// TTL for the rolling-tail breakpoint. Maps to `TAIL_TTL`.
+    /// Default: "5m".
+    #[serde(default = "default_proxy_tail_ttl")]
+    pub tail_ttl: String,
+    /// Comma-separated tool names to remove from request bodies.
+    /// Maps to `DROP_TOOLS`. Default: empty.
+    #[serde(default)]
+    pub drop_tools: Vec<String>,
+    /// Strip ANSI escape codes from tool results. Maps to `STRIP_ANSI`.
+    /// Default: `false`.
+    #[serde(default)]
+    pub strip_ansi: bool,
+    /// Truncate Bash tool output at "Committing changes". Maps to
+    /// `TRIM_BASH_GIT`. Default: `false`.
+    #[serde(default)]
+    pub trim_bash_git: bool,
+    /// Override the model name in every request. Maps to `MODEL_OVERRIDE`.
+    /// Default: none.
+    #[serde(default)]
+    pub model_override: Option<String>,
+    /// Enable secret scrubbing in tool results. Maps to `SCRUB_SECRETS`.
+    /// Default: `false`.
+    #[serde(default)]
+    pub scrub_secrets: bool,
+    /// Enable TOML-based tool output filtering. Maps to `TOOL_FILTERS`.
+    /// Default: `false`.
+    #[serde(default)]
+    pub tool_filters: bool,
+    /// Dedicated upstream URL. Maps to `PROXY_UPSTREAM_URL`.
+    /// Default: none (the proxy falls back to `https://api.anthropic.com`).
+    #[serde(default)]
+    pub upstream_url: Option<String>,
+    /// Optional API key for `X-Api-Key` header authentication.
+    /// Maps to `PROXY_API_KEY`. Default: none.
+    #[serde(default)]
+    pub api_key: Option<String>,
+    /// Per-client requests per second. Maps to `RATE_LIMIT_RPS`.
+    /// Default: 60.
+    #[serde(default = "default_proxy_rate_limit_rps")]
+    pub rate_limit_rps: f64,
+    /// Per-client burst window size. Maps to `RATE_LIMIT_BURST`.
+    /// Default: 10.
+    #[serde(default = "default_proxy_rate_limit_burst")]
+    pub rate_limit_burst: f64,
+    /// Startup grace period in milliseconds before the spawner declares
+    /// a freshly-spawned proxy dead. Slow disks or antivirus scanners can
+    /// delay binary startup past the default 300ms; raise this if you see
+    /// spurious "exited shortly after start" warnings. Default: 300.
+    #[serde(default = "default_proxy_start_grace_ms")]
+    pub start_grace_ms: u64,
+}
+
+impl Default for ProxyAutoStartConfig {
+    fn default() -> Self {
+        Self {
+            auto_start: false,
+            port: default_proxy_port(),
+            auto_cache: false,
+            tail_ttl: default_proxy_tail_ttl(),
+            drop_tools: Vec::new(),
+            strip_ansi: false,
+            trim_bash_git: false,
+            model_override: None,
+            scrub_secrets: false,
+            tool_filters: false,
+            upstream_url: None,
+            api_key: None,
+            rate_limit_rps: default_proxy_rate_limit_rps(),
+            rate_limit_burst: default_proxy_rate_limit_burst(),
+            start_grace_ms: default_proxy_start_grace_ms(),
+        }
+    }
+}
+
+fn default_proxy_port() -> u16 {
+    8787
+}
+fn default_proxy_tail_ttl() -> String {
+    "5m".to_string()
+}
+fn default_proxy_rate_limit_rps() -> f64 {
+    60.0
+}
+fn default_proxy_rate_limit_burst() -> f64 {
+    10.0
+}
+fn default_proxy_start_grace_ms() -> u64 {
+    300
 }
 
 /// Per-framework Meta-Layer configuration.
@@ -377,16 +659,125 @@ pub struct MetaLayerConfig {
     /// of the meta-layer entirely (zero overhead).
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// RxJS sub-layer config (Angular Ecosystem Deepening Phase 1).
+    #[serde(default)]
+    pub rxjs: RxJsConfig,
+    /// NgRx sub-layer config (Angular Ecosystem Deepening Phase 2).
+    #[serde(default)]
+    pub ngrx: NgRxConfig,
+    /// Signals sub-layer config (Angular Ecosystem Deepening Phase 3).
+    #[serde(default)]
+    pub signals: SignalsConfig,
+    /// Routing sub-layer config (Angular Ecosystem Deepening Phase 4).
+    #[serde(default)]
+    pub routing: RoutingConfig,
 }
 
 impl Default for MetaLayerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            rxjs: RxJsConfig::default(),
+            ngrx: NgRxConfig::default(),
+            signals: SignalsConfig::default(),
+            routing: RoutingConfig::default(),
+        }
+    }
+}
+
+/// RxJS sub-layer configuration (Angular Ecosystem Deepening Phase 1).
+///
+/// All fields are optional and `#[serde(default)]` so existing
+/// `.clean-ctx.json` files remain backward-compatible.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RxJsConfig {
+    /// Master switch for the RxJS meta-layer. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Only emit `ΦpipeRx:` blocks when the pipe chain has at least
+    /// this many operators (default 2). Prevents noise from trivial
+    /// single-operator chains.
+    #[serde(default = "default_min_pipe_operators")]
+    pub min_pipe_operators: usize,
+}
+
+impl Default for RxJsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            min_pipe_operators: 2,
+        }
+    }
+}
+
+/// NgRx sub-layer configuration (Angular Ecosystem Deepening Phase 2).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NgRxConfig {
+    /// Master switch for the NgRx meta-layer. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Include `Φdispatch:` call sites in Medium/High output (default true).
+    #[serde(default = "default_true")]
+    pub include_dispatch_sites: bool,
+    /// Include `Φselect:` call sites in Medium/High output (default true).
+    #[serde(default = "default_true")]
+    pub include_select_sites: bool,
+    /// Include entity adapter default selectors in `Φentity:` block
+    /// (default true).
+    #[serde(default = "default_true")]
+    pub entity_selectors: bool,
+    /// Enable CBM cross-language effect→endpoint resolution
+    /// (workspace + CBM only, default true).
+    #[serde(default = "default_true")]
+    pub cross_layer_cbm: bool,
+}
+
+impl Default for NgRxConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            include_dispatch_sites: true,
+            include_select_sites: true,
+            entity_selectors: true,
+            cross_layer_cbm: true,
+        }
+    }
+}
+
+/// Signals sub-layer configuration (Angular Ecosystem Deepening Phase 3).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignalsConfig {
+    /// Master switch for the Signals meta-layer. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for SignalsConfig {
     fn default() -> Self {
         Self { enabled: true }
     }
 }
 
-fn default_fidelity() -> String {
-    "low".to_string()
+/// Routing sub-layer configuration (Angular Ecosystem Deepening Phase 4).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoutingConfig {
+    /// Master switch for the Routing meta-layer. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for RoutingConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+fn default_min_pipe_operators() -> usize {
+    2
+}
+
+fn default_fidelity() -> Fidelity {
+    Fidelity::Low
 }
 
 fn default_true() -> bool {
@@ -399,6 +790,7 @@ impl Default for CleanCtxConfig {
             type_aliases: BTreeMap::new(),
             fidelity_overrides: BTreeMap::new(),
             exclude_patterns: Vec::new(),
+            additional_roots: Vec::new(),
             custom_markers: BTreeMap::new(),
             default_fidelity: default_fidelity(),
             diff_compression: default_true(),
@@ -411,8 +803,11 @@ impl Default for CleanCtxConfig {
             auto_delta: default_true(),
             tokenizer: TokenizerKind::default(),
             cache: CacheConfig::default(),
+            resource_limits: ResourceLimits::default(),
             cbm: crate::cbm::CbmConfig::default(),
             intelligence: IntelligenceConfig::default(),
+            observability: ObservabilityConfig::default(),
+            proxy: ProxyAutoStartConfig::default(),
         }
     }
 }
@@ -422,40 +817,137 @@ impl Default for CleanCtxConfig {
 /// effect (the config is treated as immutable for the session).
 static CONFIG_PATH: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
 
+impl ResourceLimits {
+    /// Validate a file size against the configured limit.
+    /// Returns `Ok(())` if the file is within limits, or an error message
+    /// if it exceeds the maximum allowed size.
+    pub fn check_file_size(&self, size: u64) -> Result<(), String> {
+        if size > self.max_file_size_bytes as u64 {
+            Err(format!(
+                "File size {} bytes exceeds maximum allowed size of {} bytes ({} MB). \
+                 Consider using compress_workspace or the streaming variant for large files.",
+                size,
+                self.max_file_size_bytes,
+                self.max_file_size_bytes / (1024 * 1024)
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate a workspace file count against the configured limit.
+    /// Returns `Ok(())` if the workspace is within limits, or an error
+    /// message if it exceeds the maximum allowed file count.
+    pub fn check_workspace_file_count(&self, count: usize) -> Result<(), String> {
+        if count > self.max_workspace_files {
+            Err(format!(
+                "Workspace contains {} files, which exceeds the maximum allowed count of {} files. \
+                 Please reduce the workspace size or adjust the `resource_limits.max_workspace_files` \
+                 setting in `.clean-ctx.json`.",
+                count, self.max_workspace_files
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate memory usage against the configured limit.
+    /// Returns `Ok(())` if the estimated memory usage is within limits,
+    /// or an error message if it exceeds the maximum allowed memory.
+    pub fn check_memory_usage(&self, estimated_bytes: usize) -> Result<(), String> {
+        if estimated_bytes > self.max_memory_bytes {
+            Err(format!(
+                "Estimated memory usage {} bytes exceeds maximum allowed memory of {} bytes ({} MB). \
+                 Consider processing files in smaller batches or adjusting the \
+                 `resource_limits.max_memory_bytes` setting in `.clean-ctx.json`.",
+                estimated_bytes,
+                self.max_memory_bytes,
+                self.max_memory_bytes / (1024 * 1024)
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl CleanCtxConfig {
     /// Load configuration from the project directory, walking up to find `.clean-ctx.json`
     pub fn load(start_dir: &Path) -> Self {
-        if let Some(config_path) = Self::find_config(start_dir) {
+        let mut config = if let Some(config_path) = Self::find_config(start_dir) {
             match std::fs::read_to_string(&config_path) {
-                Ok(content) => {
-                    match serde_json::from_str(&content) {
-                        Ok(config) => {
-                            eprintln!("[clean-ctx] Loaded config from: {}", config_path.display());
-                            config
-                        }
-                        Err(e) => {
-                            eprintln!("[clean-ctx] Warning: Failed to parse {}: {}", config_path.display(), e);
-                            Self::default()
-                        }
+                Ok(content) => match serde_json::from_str(&content) {
+                    Ok(config) => {
+                        eprintln!("[clean-ctx] Loaded config from: {}", config_path.display());
+                        config
                     }
-                }
+                    Err(e) => {
+                        eprintln!(
+                            "[clean-ctx] Warning: Failed to parse {}: {}",
+                            config_path.display(),
+                            e
+                        );
+                        Self::default()
+                    }
+                },
                 Err(e) => {
-                    eprintln!("[clean-ctx] Warning: Failed to read {}: {}", config_path.display(), e);
+                    eprintln!(
+                        "[clean-ctx] Warning: Failed to read {}: {}",
+                        config_path.display(),
+                        e
+                    );
                     Self::default()
                 }
             }
         } else {
             Self::default()
+        };
+
+        // A-14: Auto-disable persistence in CI environments to prevent
+        // stale persistence.db from leaking between CI builds.
+        // Checks common CI environment variables: CI, TF_BUILD, GITHUB_ACTIONS, GITLAB_CI
+        if config.persistence.enabled && Self::is_ci_environment() {
+            eprintln!(
+                "[clean-ctx] CI environment detected — disabling persistence to prevent stale database issues"
+            );
+            config.persistence.enabled = false;
         }
+
+        config
     }
 
     /// Walk up from start_dir looking for `.clean-ctx.json`.
     /// Result is cached in a process-global `OnceLock` so subsequent calls
     /// do not touch the filesystem.
-    pub(crate) fn find_config(start_dir: &Path) -> Option<PathBuf> {
+    pub fn find_config(start_dir: &Path) -> Option<PathBuf> {
         CONFIG_PATH
             .get_or_init(|| Self::find_config_uncached(start_dir))
             .clone()
+    }
+
+    /// Check if running in a CI/CD environment by detecting common CI env vars.
+    ///
+    /// A-14: Used to auto-disable persistence in CI to prevent stale
+    /// `persistence.db` from leaking between builds and causing SQLite
+    /// file lock contention in parallel test runs.
+    ///
+    /// P1-8: Previously checked `CI == "true"` only. Now checks for any
+    /// non-empty CI value (`"true"`, `"1"`, `"yes"`, etc.) since different
+    /// CI systems set CI to different values. Also checks Bitbucket Pipelines
+    /// and Buildkite which were missing from the original list.
+    pub fn is_ci_environment() -> bool {
+        // CI is the most universal CI variable — set by GitHub Actions,
+        // GitLab CI, CircleCI, Travis CI, Bitbucket Pipelines, Buildkite, etc.
+        // Some set it to "true", others to "1" or "yes".
+        std::env::var("CI").is_ok_and(|v| !v.is_empty() && v != "false")
+            || std::env::var("TF_BUILD").is_ok()
+            || std::env::var("GITHUB_ACTIONS").is_ok()
+            || std::env::var("GITLAB_CI").is_ok()
+            || std::env::var("JENKINS_URL").is_ok()
+            || std::env::var("CIRCLECI").is_ok()
+            || std::env::var("TRAVIS").is_ok()
+            // Additional CI systems
+            || std::env::var("BITBUCKET_BUILD_NUMBER").is_ok()
+            || std::env::var("BUILDKITE").is_ok()
     }
 
     /// Uncached directory walk — called exactly once via [`find_config`].
@@ -521,7 +1013,8 @@ impl CleanCtxConfig {
                 {
                     tier2_matched = true;
                 }
-                if !pattern.contains('*') && !pattern.contains('?')
+                if !pattern.contains('*')
+                    && !pattern.contains('?')
                     && file_name.contains(pattern.as_str())
                 {
                     tier2_matched = true;
@@ -540,8 +1033,8 @@ impl CleanCtxConfig {
     }
 
     /// Get fidelity override for a file extension
-    pub fn get_fidelity_for_extension(&self, ext: &str) -> Option<&str> {
-        self.fidelity_overrides.get(ext).map(|s| s.as_str())
+    pub fn get_fidelity_for_extension(&self, ext: &str) -> Option<Fidelity> {
+        self.fidelity_overrides.get(ext).copied()
     }
 
     /// Generate a default config file content
@@ -551,11 +1044,14 @@ impl CleanCtxConfig {
     }
 }
 
+/// P1-7: Made `pub(crate)` so heuristics.rs and other modules use this
+/// single implementation instead of duplicating the logic.
+///
 /// Minimal glob matcher supporting `*` (matches any non-separator characters)
 /// and `?` (matches exactly one non-separator character). All other characters
 /// are matched literally. This is intentionally simple — full `globset` support
 /// can be added later if needed.
-fn glob_match(pattern: &str, text: &str) -> bool {
+pub(crate) fn glob_match(pattern: &str, text: &str) -> bool {
     glob_match_impl(pattern.as_bytes(), text.as_bytes())
 }
 
@@ -563,7 +1059,7 @@ fn glob_match_impl(pattern: &[u8], text: &[u8]) -> bool {
     let mut pi = 0;
     let mut ti = 0;
     let mut star_pi = None; // pattern position after last '*'
-    let mut star_ti = 0;    // text position when '*' was matched
+    let mut star_ti = 0; // text position when '*' was matched
 
     while ti < text.len() {
         if pi < pattern.len() && pattern[pi] == b'*' {
@@ -592,3 +1088,7 @@ fn glob_match_impl(pattern: &[u8], text: &[u8]) -> bool {
 #[cfg(test)]
 #[path = "tests/config.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tests/proptest/glob_matcher.rs"]
+mod proptest_tests;

@@ -20,6 +20,8 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use crate::compression::graph_utils::{find_cycles, has_cycle, transitive_dependencies};
+
 /// The kind of Spring Boot class that can be registered in the graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ClassKind {
@@ -58,10 +60,6 @@ pub struct SpringGraphBuilder {
     classes: HashMap<String, ClassEntry>,
     /// endpoint path → className (for REST endpoint lookup).
     endpoints: HashMap<String, String>,
-    /// className → set of classNames that inject this class.
-    /// Built by [`SpringGraphBuilder::build`].
-    #[allow(dead_code)]
-    injected_by: HashMap<String, BTreeSet<String>>,
 }
 
 impl SpringGraphBuilder {
@@ -70,7 +68,6 @@ impl SpringGraphBuilder {
         Self {
             classes: HashMap::new(),
             endpoints: HashMap::new(),
-            injected_by: HashMap::new(),
         }
     }
 
@@ -99,7 +96,8 @@ impl SpringGraphBuilder {
         // Register endpoints for controller.
         if let ClassKind::Controller = kind {
             for endpoint in endpoints {
-                self.endpoints.insert(endpoint.path.clone(), class_name.to_string());
+                self.endpoints
+                    .insert(endpoint.path.clone(), class_name.to_string());
             }
         }
     }
@@ -163,9 +161,9 @@ impl SpringGraph {
     /// graph. Returns `None` if the type is not found (unresolved or
     /// external dependency).
     pub fn resolve_inject_type(&self, type_name: &str) -> Option<String> {
-        self.classes.get(type_name).map(|entry| {
-            format!("{}@{}", entry.class_name, entry.file_alias)
-        })
+        self.classes
+            .get(type_name)
+            .map(|entry| format!("{}@{}", entry.class_name, entry.file_alias))
     }
 
     /// Resolve a REST endpoint path to its controller file-aliased
@@ -291,10 +289,7 @@ impl SpringGraph {
                 ClassKind::Repository => "Φrepo:",
                 ClassKind::Configuration => "Φconf:",
             };
-            s.push_str(&format!(
-                "    {}injects=[",
-                dep_marker
-            ));
+            s.push_str(&format!("    {}injects=[", dep_marker));
             let resolved_injects: Vec<String> = entry
                 .injects
                 .iter()
@@ -324,11 +319,133 @@ impl SpringGraph {
         s
     }
 
+    /// Check if the graph contains a cycle using DFS.
+    ///
+    /// Returns `true` if at least one cycle is detected.
+    /// Uses three-color DFS (white/gray/black) for O(V+E) performance.
+    pub fn has_cycle(&self) -> bool {
+        let class_names: Vec<String> = self.classes.keys().cloned().collect();
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (name.as_str(), i))
+            .collect();
+
+        let node_count = class_names.len();
+        if node_count == 0 {
+            return false;
+        }
+
+        let adj_fn = |i: usize| {
+            let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
+            if let Some(entry) = self.classes.get(name) {
+                entry
+                    .injects
+                    .iter()
+                    .filter_map(|injected| name_to_idx.get(injected.as_str()))
+                    .copied()
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            }
+        };
+
+        has_cycle(node_count, adj_fn)
+    }
+
+    /// Find all cycles in the graph using DFS.
+    ///
+    /// Returns a list of cycles, each represented as a path of node IDs.
+    /// If no cycles exist, returns an empty `Vec`.
+    pub fn find_cycles(&self) -> Vec<Vec<String>> {
+        let class_names: Vec<String> = self.classes.keys().cloned().collect();
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (name.as_str(), i))
+            .collect();
+
+        let node_count = class_names.len();
+        if node_count == 0 {
+            return Vec::new();
+        }
+
+        let adj_fn = |i: usize| {
+            let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
+            if let Some(entry) = self.classes.get(name) {
+                entry
+                    .injects
+                    .iter()
+                    .filter_map(|injected| name_to_idx.get(injected.as_str()))
+                    .copied()
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            }
+        };
+
+        let label_fn = |i: usize| {
+            class_names
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| format!("unknown_{}", i))
+        };
+
+        find_cycles(node_count, adj_fn, label_fn)
+    }
+
+    /// Compute transitive dependencies for a node up to a given depth.
+    ///
+    /// Returns all reachable node IDs by following inject edges outward from `class_name`.
+    /// - `depth=1` → direct dependencies only
+    /// - `depth=2` → dependencies of dependencies
+    /// - `depth=0` or negative → all transitive dependencies (BFS to completion)
+    pub fn transitive_dependencies(&self, class_name: &str, depth: i32) -> Vec<String> {
+        if !self.classes.contains_key(class_name) {
+            return Vec::new();
+        }
+
+        let class_names: Vec<String> = self.classes.keys().cloned().collect();
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (name.as_str(), i))
+            .collect();
+
+        let start_idx = name_to_idx[class_name];
+        let node_count = class_names.len();
+
+        let adj_fn = |i: usize| {
+            let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
+            if let Some(entry) = self.classes.get(name) {
+                entry
+                    .injects
+                    .iter()
+                    .filter_map(|injected| name_to_idx.get(injected.as_str()))
+                    .copied()
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            }
+        };
+
+        let indices = transitive_dependencies(start_idx, depth, node_count, adj_fn);
+        indices
+            .into_iter()
+            .filter_map(|i| class_names.get(i))
+            .cloned()
+            .collect()
+    }
+
     /// Check if the graph is empty (no Spring classes registered).
     pub fn is_empty(&self) -> bool {
         self.classes.is_empty()
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/spring_meta/graph.rs"]
+mod tests;
 
 /// Helper type for building a batch of graph entries during the
 /// per-file compression pass.
@@ -350,7 +467,9 @@ pub struct GraphEntry {
 
 impl GraphCollector {
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     /// Register a class for later graph building.
@@ -396,4 +515,3 @@ impl GraphCollector {
         self.entries.len()
     }
 }
-

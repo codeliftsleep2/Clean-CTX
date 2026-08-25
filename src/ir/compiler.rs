@@ -2,6 +2,11 @@
 //
 // IR Compiler — translates tree-sitter captures into Core IR instructions.
 //
+// The compiler is now an orchestration boundary. Production compilation
+// stages are implemented in PassPipeline passes (src/ir/pipeline.rs).
+// IRCompiler::compile_inner() constructs a PassContext, configures the
+// pipeline, and delegates compilation to PassPipeline::run().
+//
 // Phase A: IR Core — the compiler reuses the existing capture pipeline
 // (`run_capture_pipeline`) but emits `Vec<CoreOp>` instructions instead
 // of formatted text strings.
@@ -17,13 +22,10 @@
 //   - F-31: `id_counter` is `u64` (not `u32`) to avoid arithmetic overflow
 //           after 4,294,967,295 instructions.
 
-use crate::compaction::{extract_class_name, extract_field, extract_method_sig, extract_rust_struct_name};
-use crate::compression::capture_pipeline::run_capture_pipeline;
+use super::layers::{LanguageLayer, PatternRecognizer};
+use super::opcodes::CoreOp;
+use super::pipeline::{PassContext, PassPipeline};
 use crate::compression::Fidelity;
-use super::layers::{LanguageLayer, LayerContext, MetaLayer, PatternRecognizer};
-use super::opcodes::*;
-use super::symbol_table::SymbolKind;
-use super::compiler_methods::resolve_forward_aliases;
 
 /// The compiled IR for a single file.
 #[derive(Debug, Clone)]
@@ -67,24 +69,19 @@ impl std::error::Error for CompileError {}
 
 /// IR Compiler — translates tree-sitter captures into Core IR instructions.
 ///
-/// The compiler now owns pluggable layers (F-01, F-02, F-03):
-///   - Language layers process language-specific captures (extends, implements, flags)
-///   - Meta layers extract framework-specific patterns (Angular decorators, etc.)
-///   - Pattern recognizers compress instruction streams into compact ops
+/// The compiler is now primarily an orchestration boundary. It owns the
+/// language layers and pattern recognizers, constructs a PassContext,
+/// configures and runs the PassPipeline, and returns the resulting CompiledIR.
+///
+/// Individual compilation stages are implemented in the corresponding
+/// IRPass implementations in src/ir/pipeline.rs.
 pub struct IRCompiler {
     /// Running instruction counter for ID generation (F-31: `u64` instead
     /// of `u32` to avoid arithmetic overflow at 4,294,967,295 instructions).
+    /// Used by compiler_methods.rs helpers and test code.
     id_counter: u64,
-    /// Current method being processed (F-27: O(1) tracking instead of O(n) search)
-    current_method: Option<String>,
-    /// Current method's accumulated flags (F-28: O(1) push instead of O(n) search)
-    current_method_flags: Vec<String>,
-    /// Current class ID (set when processing a class capture)
-    current_class: Option<String>,
     /// Language-specific layers (Layer 2)
     language_layers: Vec<Box<dyn LanguageLayer>>,
-    /// Framework meta layers (Layer 3)
-    meta_layers: Vec<Box<dyn MetaLayer>>,
     /// Pattern recognizers (Layer 4)
     pattern_recognizers: Vec<Box<dyn PatternRecognizer>>,
 }
@@ -93,11 +90,7 @@ impl IRCompiler {
     pub fn new() -> Self {
         Self {
             id_counter: 0,
-            current_method: None,
-            current_method_flags: Vec::new(),
-            current_class: None,
             language_layers: Vec::new(),
-            meta_layers: Vec::new(),
             pattern_recognizers: Vec::new(),
         }
     }
@@ -105,11 +98,6 @@ impl IRCompiler {
     /// Add a language layer (Layer 2).
     pub fn add_language_layer(&mut self, layer: Box<dyn LanguageLayer>) {
         self.language_layers.push(layer);
-    }
-
-    /// Add a meta layer (Layer 3).
-    pub fn add_meta_layer(&mut self, layer: Box<dyn MetaLayer>) {
-        self.meta_layers.push(layer);
     }
 
     /// Add a pattern recognizer (Layer 4).
@@ -135,370 +123,121 @@ impl IRCompiler {
         fidelity: Fidelity,
         skip_set: Option<&std::collections::HashSet<String>>,
     ) -> Result<CompiledIR, CompileError> {
-        // Reset per-compilation state
-        self.current_method = None;
-        self.current_method_flags = Vec::new();
-        self.current_class = None;
-        let mut layer_context = LayerContext::new(source, fidelity);
-
-        let captures = run_capture_pipeline(
+        self.compile_inner(
+            source,
+            file_id,
             language,
             query_string,
-            source,
             fidelity,
-            |capture_name, raw, fidelity| {
-                // Use the existing compaction functions to normalize captured
-                // text, same as the text-based pipeline does. This ensures
-                // class names are extracted, method signatures are compacted,
-                // and fields are properly formatted.
-                match capture_name {
-                    "class.root" => Some(extract_class_name(raw)),
-                    // Rust type declarations: extract clean names
-                    "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
-                        Some(extract_rust_struct_name(raw))
-                    }
-                    "method.root" => Some(extract_method_sig(raw, fidelity)),
-                    "field.root" => Some(extract_field(raw, fidelity)),
-                    _ => Some(raw.to_string()),
-                }
-            },
+            skip_set,
+            None,
         )
-        .map_err(|e| CompileError::Capture(e.to_string()))?;
-
-        let mut instructions = Vec::new();
-
-        // ── Layer 1: Core IR emission ──────────────────────────────────
-        // Also invokes Layer 2 (LanguageLayer::process_capture) for each capture.
-        for cap in &captures {
-            // CBM filter-first: skip low-importance symbols before emitting
-            // any IR ops. Uses the same should_skip_capture logic as the
-            // text compression pipeline for consistent behavior.
-            if let Some(skip) = skip_set {
-                if !skip.is_empty() && crate::compression::pipeline::should_skip_capture(cap, skip) {
-                    continue;
-                }
-            }
-            match cap.name.as_str() {
-                // ── Type/capture-based actions ───────────────────────
-                // Each arm either:
-                //   A) Emits DefClass and sets up class context (for type-like captures)
-                //   B) Emits DefMethod (for method/constructor captures)
-                //   C) Emits DefField (for field captures)
-                //   D) Emits Import/TypeAlias (for import/type captures)
-                //   E) Accumulates flags (for control flow captures)
-                //   F) Passes through to language layers (for other captures)
-                //
-                // Type-like captures (emit DefClass):
-                //   class.root        - TS/C#/Java classes
-                //   interface.root    - TS/C#/Java interfaces
-                //   struct.root       - Rust structs, C# structs
-                //   enum.root         - TS/Rust/Java/C# enums
-                //   trait.root        - Rust traits
-                //   record.root       - Java/C# records
-                //
-                // Method-like captures (emit DefMethod):
-                //   method.root       - methods in all languages
-                //   constructor.root  - Java/C# constructors
-                //   func.root         - TS/JS standalone functions
-                //   arrow.root        - TS/JS arrow functions
-
-                // ── Type-like: DefClass + class context setup ────────
-                "class.root" | "interface.root" | "struct.root" | "enum.root" | "trait.root" | "record.root" => {
-                    let class_id = self.next_id("C");
-                    instructions.push(CoreOp::DefClass(
-                        class_id.clone(),
-                        cap.text.clone(),
-                    ));
-                    self.current_class = Some(class_id.clone());
-                    layer_context.current_class = Some(class_id.clone());
-                    layer_context.current_class_name = Some(cap.raw_text.clone());
-                    layer_context.current_class_bare_name = Some(cap.text.clone());
-
-                    layer_context.symbol_table_mut().register(
-                        class_id.clone(),
-                        cap.text.clone(),
-                        SymbolKind::Class,
-                        file_id,
-                    );
-
-                    // Invoke language layers for type-like captures.
-                    for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.raw_text,
-                            &mut layer_context,
-                        );
-                        instructions.extend(layer_ops);
-                    }
-                }
-                // Rust impl blocks: emit trait impls with a class context.
-                // If no current class exists, emit a DefClass for the self-type.
-                "impl.root" => {
-                    if self.current_class.is_none() {
-                        let self_type = cap.text.split(':').next()
-                            .unwrap_or(&cap.text)
-                            .to_string();
-                        if !self_type.is_empty() {
-                            let class_id = self.next_id("C");
-                            instructions.push(CoreOp::DefClass(
-                                class_id.clone(),
-                                self_type.clone(),
-                            ));
-                            self.current_class = Some(class_id.clone());
-                            layer_context.current_class = Some(class_id);
-                            layer_context.current_class_name = Some(cap.raw_text.clone());
-                            layer_context.current_class_bare_name = Some(self_type);
-                        }
-                    }
-
-                    for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.raw_text,
-                            &mut layer_context,
-                        );
-                        instructions.extend(layer_ops);
-                    }
-                }
-                // ── Method-like: DefMethod + method context setup ────
-                "method.root" | "constructor.root" | "func.root" | "arrow.root" => {
-                    let class_id = match &self.current_class {
-                        Some(cid) => cid.clone(),
-                        None => {
-                            // No class context: for standalone functions (func.root),
-                            // emit as a standalone method with a synthetic class.
-                            if cap.name == "func.root" || cap.name == "arrow.root" {
-                                // Create a synthetic class for the file
-                                let synt_id = self.next_id("C");
-                                instructions.push(CoreOp::DefClass(
-                                    synt_id.clone(),
-                                    format!("__file_{}", file_id),
-                                ));
-                                self.current_class = Some(synt_id.clone());
-                                layer_context.current_class = Some(synt_id.clone());
-                                layer_context.current_class_name = Some(format!("__file_{}", file_id));
-                                layer_context.current_class_bare_name = Some(format!("__file_{}", file_id));
-                                synt_id
-                            } else {
-                                // F-29: Skip method captures outside a class
-                                continue;
-                            }
-                        }
-                    };
-
-                    // Flush pending flags from previous method (F-28)
-                    self.flush_method_flags(&mut instructions);
-
-                    let method_id = self.next_id("M");
-                    self.current_method = Some(method_id.clone());
-                    layer_context.current_method = Some(method_id.clone());
-                    layer_context.current_method_name = Some(cap.text.clone());
-
-                    self.emit_method_ir(
-                        &mut instructions,
-                        &class_id,
-                        &method_id,
-                        &cap.text,
-                    );
-
-                    // Invoke language layers for method-like captures.
-                    for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.raw_text,
-                            &mut layer_context,
-                        );
-                        instructions.extend(layer_ops);
-                    }
-                }
-                // ── Field captures ───────────────────────────────────
-                "field.root" => {
-                    let class_id = match &self.current_class {
-                        Some(cid) => cid.clone(),
-                        None => {
-                            // F-29: Skip field captures outside a class
-                            continue;
-                        }
-                    };
-                    let field_id = self.next_id("F");
-                    instructions.push(CoreOp::DefField(
-                        class_id,
-                        field_id.clone(),
-                        cap.text.clone(),
-                    ));
-
-                    for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.text,
-                            &mut layer_context,
-                        );
-                        instructions.extend(layer_ops);
-                    }
-                }
-                // ── Import and package captures ──────────────────────
-                "import.root" | "package.root" => {
-                    self.emit_import_ir(&mut instructions, &cap.text);
-
-                    for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.text,
-                            &mut layer_context,
-                        );
-                        instructions.extend(layer_ops);
-                    }
-                }
-                // ── Type alias captures (Rust `type Foo = Bar` and TS `type Foo = ...`) ──
-                "type.root" => {
-                    let alias_id = self.next_id("T");
-                    instructions.push(CoreOp::TypeAlias(
-                        alias_id,
-                        cap.text.clone(),
-                    ));
-
-                    for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.text,
-                            &mut layer_context,
-                        );
-                        instructions.extend(layer_ops);
-                    }
-                }
-                // ── Rust mod declarations: structural pass-through ──
-                "mod.root" => {
-                    for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.text,
-                            &mut layer_context,
-                        );
-                        instructions.extend(layer_ops);
-                    }
-                }
-                // ── Control flow captures → FLAGS accumulation ──────
-                "if.root" => {
-                    if self.current_method.is_some()
-                        && !self.current_method_flags.contains(&FLAG_IF.to_string())
-                    {
-                        self.current_method_flags.push(FLAG_IF.to_string());
-                    }
-                }
-                "for.root" | "while.root" | "loop.root" => {
-                    if self.current_method.is_some()
-                        && !self.current_method_flags.contains(&FLAG_LOOP.to_string())
-                    {
-                        self.current_method_flags.push(FLAG_LOOP.to_string());
-                    }
-                }
-                "return.root" => {
-                    if self.current_method.is_some()
-                        && !self.current_method_flags.contains(&FLAG_RET.to_string())
-                    {
-                        self.current_method_flags.push(FLAG_RET.to_string());
-                    }
-                }
-                "throw.root" => {
-                    if self.current_method.is_some()
-                        && !self.current_method_flags.contains(&FLAG_THROW.to_string())
-                    {
-                        self.current_method_flags.push(FLAG_THROW.to_string());
-                    }
-                }
-                "do.root" | "try.root" | "switch.root" | "match.root" => {
-                    // Additional control flow: do-while, try-catch, switch,
-                    // Rust match expressions. Accumulate IF flag as a general
-                    // branching marker.
-                    if self.current_method.is_some()
-                        && !self.current_method_flags.contains(&FLAG_IF.to_string())
-                    {
-                        self.current_method_flags.push(FLAG_IF.to_string());
-                    }
-                }
-                // ── Pass-through to language layers for any other capture ──
-                _ => {
-                    for ll in self.language_layers.iter_mut() {
-                        let layer_ops = ll.process_capture(
-                            &cap.name,
-                            &cap.text,
-                            &mut layer_context,
-                        );
-                        instructions.extend(layer_ops);
-                    }
-                }
-            }
-        }
-
-        // Flush any remaining method flags (F-28)
-        self.flush_method_flags(&mut instructions);
-
-        // Call LanguageLayer::finalize for each language layer
-        for ll in self.language_layers.iter_mut() {
-            let layer_ops = ll.finalize(&mut layer_context);
-            instructions.extend(layer_ops);
-        }
-
-        // ── Layer 3: Meta-layer pass (F-02) ────────────────────────────
-        // Collect class names from the instruction stream for meta extraction
-        let class_names: Vec<String> = instructions
-            .iter()
-            .filter_map(|op| {
-                if let CoreOp::DefClass(_, name) = op {
-                    Some(name.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        for ml in self.meta_layers.iter_mut() {
-            let meta_ops = ml.extract(source, &class_names, fidelity);
-            instructions.extend(meta_ops);
-        }
-
-        // ── Layer 4: Pattern recognition (F-03) ────────────────────────
-        for pr in self.pattern_recognizers.iter() {
-            let pattern_ops = pr.recognize(&instructions);
-            // Replace instructions with recognized output
-            instructions = pattern_ops;
-        }
-
-        // ── F-FULL-08: Forward-declaration alias resolution ────────────
-        // Post-process the IR stream to resolve Extends/Implements ops
-        // whose target is a raw class name (no alias ID prefix like "C1").
-        // This handles forward references where class B extends class A
-        // but A is defined later in the file.
-        resolve_forward_aliases(&mut instructions);
-
-        Ok(CompiledIR {
-            file_id: file_id.to_string(),
-            instructions,
-            version: 1,
-        })
     }
 
-    /// Flush accumulated method flags into a FLAGS instruction (F-28).
-    fn flush_method_flags(&mut self, instructions: &mut Vec<CoreOp>) {
-        if let Some(method_id) = self.current_method.take() {
-            if !self.current_method_flags.is_empty() {
-                let flags = std::mem::take(&mut self.current_method_flags);
-                instructions.push(CoreOp::Flags(method_id, flags));
-            }
-        }
-        self.current_method_flags.clear();
+    /// Compile with symbol targeting (`focus`).
+    ///
+    /// `focus`: optional set of method names that should receive full
+    /// verbatim bodies at `Edit` fidelity. When `Some(set)`, only methods
+    /// whose parsed name is in the set get their body extracted into the IR
+    /// (`CoreOp::Body`); all other methods are emitted signature-only. This
+    /// mirrors the render-time gate in `render_llm.rs` and avoids extracting
+    /// and storing body text for methods that will be filtered out at render
+    /// time — a memory/CPU optimization. When `None`, every method's body is
+    /// extracted (legacy behavior, byte-identical to `compile`).
+    ///
+    /// `#[allow(clippy::too_many_arguments)]`: mirrors the existing `compile`
+    /// signature (7 args) plus the `focus` set (8 total). Grouping the
+    /// compile inputs into a struct would churn every call site; the allow is
+    /// scoped to this one symbol-targeting entry point.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compile_focused(
+        &mut self,
+        source: &str,
+        file_id: &str,
+        language: tree_sitter::Language,
+        query_string: &str,
+        fidelity: Fidelity,
+        skip_set: Option<&std::collections::HashSet<String>>,
+        focus: Option<&std::collections::HashSet<String>>,
+    ) -> Result<CompiledIR, CompileError> {
+        self.compile_inner(
+            source,
+            file_id,
+            language,
+            query_string,
+            fidelity,
+            skip_set,
+            focus,
+        )
     }
 
-    /// Reset the ID counter (for deterministic testing).
-    pub fn reset_counter(&mut self) {
-        self.id_counter = 0;
-    }
-
+    /// Compile with a compiler-managed ID counter and no transfer of layers.
+    /// Used by the compiler_methods.rs migration artifacts that still
+    /// reference `IRCompiler::next_id()` for ID generation.
+    #[allow(dead_code)]
     pub(super) fn next_id(&mut self, prefix: &str) -> String {
         self.id_counter += 1;
         format!("{}{}", prefix, self.id_counter)
     }
 
+    /// Reset the ID counter (for deterministic testing).
+    #[allow(dead_code)]
+    pub fn reset_counter(&mut self) {
+        self.id_counter = 0;
+    }
+
+    /// Shared implementation for `compile` and `compile_focused`.
+    ///
+    /// Constructs a PassContext, configures the PassPipeline, and delegates
+    /// compilation to the pipeline. The resulting instruction stream is
+    /// wrapped in a CompiledIR and returned.
+    #[allow(clippy::too_many_arguments)]
+    fn compile_inner(
+        &mut self,
+        source: &str,
+        file_id: &str,
+        language: tree_sitter::Language,
+        query_string: &str,
+        fidelity: Fidelity,
+        skip_set: Option<&std::collections::HashSet<String>>,
+        focus: Option<&std::collections::HashSet<String>>,
+    ) -> Result<CompiledIR, CompileError> {
+        // Construct PassContext with per-compilation state
+        let mut ctx = PassContext::new(source.to_string(), file_id.to_string(), fidelity);
+        ctx.language = Some(language);
+        ctx.query_string = query_string.to_string();
+        ctx.skip_set = skip_set.cloned();
+        ctx.focus = focus.cloned();
+
+        // Transfer ownership of language layers and pattern recognizers
+        // to the PassContext for the duration of this compilation.
+        let compiler_layers = std::mem::take(&mut self.language_layers);
+        let compiler_recognizers = std::mem::take(&mut self.pattern_recognizers);
+        ctx.set_language_layers(compiler_layers);
+        ctx.set_pattern_recognizers(compiler_recognizers);
+
+        // Build and run the default production pipeline
+        let pipeline = PassPipeline::default_production();
+        pipeline.run(&mut ctx).map_err(|e| {
+            // Map PassError to the appropriate CompileError variant
+            if e.pass_name == "core_ir" && e.message.contains("capture pipeline error") {
+                CompileError::Capture(e.message)
+            } else {
+                CompileError::Layer(e.message)
+            }
+        })?;
+
+        // Return ownership of language layers and pattern recognizers
+        // back to the compiler for reuse in subsequent compilations.
+        self.language_layers = std::mem::take(&mut ctx.language_layers);
+        self.pattern_recognizers = std::mem::take(&mut ctx.pattern_recognizers);
+
+        Ok(CompiledIR {
+            file_id: file_id.to_string(),
+            instructions: ctx.instructions,
+            version: 1,
+        })
+    }
 }
 
 impl Default for IRCompiler {

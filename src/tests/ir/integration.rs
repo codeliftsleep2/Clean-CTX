@@ -6,9 +6,9 @@
 
 use crate::ir::compiler::{CompiledIR, IRCompiler};
 use crate::ir::delta::DeltaComputer;
+use crate::ir::opcodes::CoreOp;
 use crate::ir::replay::ContextState;
 use crate::ir::wire::ir_to_wire;
-use crate::ir::opcodes::CoreOp;
 
 // ── helpers ────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ fn state_replay_full_cycle() {
     // Build IR, load into state, render pretty, verify state.
     let ir1 = make_simple_ir("file1", "C1", "M1");
     let mut state = ContextState::new();
-    state.load_ir(ir1.clone());
+    state.load_ir(ir1.clone(), None);
 
     assert_eq!(state.file_version("file1"), Some(1));
     assert!(state.has_file("file1"));
@@ -44,7 +44,10 @@ fn state_replay_full_cycle() {
     let pretty = state.render_pretty("file1", crate::compression::Fidelity::Low);
     assert!(pretty.is_some(), "Should render from state");
     let pretty = pretty.unwrap();
-    assert!(pretty.contains("SampleService"), "pretty output should contain class name");
+    assert!(
+        pretty.contains("SampleService"),
+        "pretty output should contain class name"
+    );
 }
 
 // ── Wire Format Integration ───────────────────────────────────────
@@ -108,7 +111,7 @@ fn delta_computer_with_state() {
 
     // Now apply the delta to a state machine
     let mut state = ContextState::new();
-    state.load_ir(ir1);
+    state.load_ir(ir1, None);
     let result = state.apply(delta);
     assert!(result.is_ok(), "delta should apply cleanly");
     assert_eq!(result.unwrap(), 2);

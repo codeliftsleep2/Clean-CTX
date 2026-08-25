@@ -22,12 +22,15 @@ pub fn compact_import(text: &str, fidelity: Fidelity) -> String {
         }
         Fidelity::Medium => {
             // Collapse spaces inside braces, keep path
-            
-            line
-                .replace("{ ", "{")
+
+            line.replace("{ ", "{")
                 .replace(" }", "}")
                 .replace(", ", ",")
         }
+        // C-12 (FAANG audit): At Edit/Verbatim the import must be byte-exact
+        // (including the trailing semicolon and any multi-line form) so
+        // `replace_in_file` SEARCH blocks match. High keeps the stripped form.
+        Fidelity::Edit | Fidelity::Verbatim => text.to_string(),
         Fidelity::High => line.to_string(),
     }
 }
@@ -42,21 +45,18 @@ pub fn compact_import(text: &str, fidelity: Fidelity) -> String {
 pub fn extract_import_names(line: &str) -> String {
     // Named imports: { A, B }
     if let (Some(open), Some(close)) = (line.find('{'), line.find('}'))
-        && open < close {
-            return line[open + 1..close]
-                .split(',')
-                .map(|s| {
-                    // Handle "Foo as Bar" aliases — keep the alias
-                    s.split(" as ")
-                     .last()
-                     .unwrap_or(s)
-                     .trim()
-                     .to_string()
-                })
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>()
-                .join(",");
-        }
+        && open < close
+    {
+        return line[open + 1..close]
+            .split(',')
+            .map(|s| {
+                // Handle "Foo as Bar" aliases — keep the alias
+                s.split(" as ").last().unwrap_or(s).trim().to_string()
+            })
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(",");
+    }
 
     // Namespace import: import * as NS from '...'
     if let Some(as_pos) = line.find("* as ") {

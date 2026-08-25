@@ -129,15 +129,10 @@ impl FooterBuilder {
 
 /// Natural-order comparator that sorts `"Φ2"` before `"Φ10"`.
 fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
-    let num_a: Option<usize> = a
-        .strip_prefix('Φ')
-        .and_then(|s| s.parse().ok());
-    let num_b: Option<usize> = b
-        .strip_prefix('Φ')
-        .and_then(|s| s.parse().ok());
+    let num_a: Option<usize> = a.strip_prefix('Φ').and_then(|s| s.parse().ok());
+    let num_b: Option<usize> = b.strip_prefix('Φ').and_then(|s| s.parse().ok());
     match (num_a, num_b) {
         (Some(na), Some(nb)) => na.cmp(&nb),
         _ => a.cmp(b),
     }
 }
-

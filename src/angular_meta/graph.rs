@@ -39,6 +39,8 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use crate::compression::graph_utils::{find_cycles, has_cycle, transitive_dependencies};
+
 /// The kind of Angular class that can be registered in the graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ClassKind {
@@ -47,6 +49,56 @@ pub enum ClassKind {
     Directive,
     Pipe,
     Module,
+}
+
+/// The kind of an NgRx cross-layer graph edge (Phase 5 of the Angular
+/// Ecosystem Deepening). These wire NgRx store artifacts — actions,
+/// reducers, effects, selectors, and components — into the DI graph so
+/// the LLM can trace `dispatch(loadUsers)` → `loadUsers$ effect` →
+/// `UserService.getUsers()` → `.NET UserController.GetAll()` as a single
+/// semantic chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NgRxEdgeKind {
+    /// `Φaction:loadUsers` → `Φreducer:users` (via `on(loadUsers)` handler).
+    ActionReducer,
+    /// `Φaction:loadUsers` → `Φeffect:loadUsers$` (via `ofType(loadUsers)`).
+    ActionEffect,
+    /// `Φeffect:loadUsers$` → `UserService@α3` (via `switchMap(() => svc.getAll())`).
+    EffectService,
+    /// `Φeffect:loadUsers$` → `Φaction:loadUsersSuccess` (via `map(...)`).
+    EffectAction,
+    /// `UserComponent@α7` → `Φngrx:UserFeature` (via `Store<AppState>` DI).
+    ComponentStore,
+    /// `UserComponent@α7` → `Φselector:selectAllUsers` (via `store.select(...)`).
+    ComponentSelector,
+    /// `Φeffect:loadUsers$` → `UserController.GetAll@α12` (CBM cross-language).
+    EffectEndpoint,
+}
+
+impl NgRxEdgeKind {
+    /// The `Φ` marker prefix for this edge kind.
+    pub fn marker_prefix(self) -> &'static str {
+        match self {
+            Self::ActionReducer => "Φact→red:",
+            Self::ActionEffect => "Φact→eff:",
+            Self::EffectService => "Φeff→svc:",
+            Self::EffectAction => "Φeff→act:",
+            Self::ComponentStore => "Φcmp→store:",
+            Self::ComponentSelector => "Φcmp→sel:",
+            Self::EffectEndpoint => "Φeff→endpoint:",
+        }
+    }
+}
+
+/// A single NgRx cross-layer graph edge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NgRxEdge {
+    /// The source node (e.g. `Φaction:loadUsers`, `UserComponent@α7`).
+    pub from: String,
+    /// The target node (e.g. `Φreducer:users`, `UserService@α3`).
+    pub to: String,
+    /// The edge kind.
+    pub kind: NgRxEdgeKind,
 }
 
 /// Metadata for a single Angular class registered in the graph.
@@ -95,6 +147,10 @@ pub struct AngularGraphBuilder {
     /// `register_class` (currently: duplicate class name).
     /// Propagated to the `AngularGraph` by `build()`.
     pub(crate) warnings: Vec<String>,
+    /// NgRx cross-layer edges (Phase 5). Collected via
+    /// [`add_ngrx_edge`](Self::add_ngrx_edge) and propagated to the
+    /// resolved graph by `build()`.
+    ngrx_edges: Vec<NgRxEdge>,
 }
 
 impl AngularGraphBuilder {
@@ -104,7 +160,22 @@ impl AngularGraphBuilder {
             classes: HashMap::new(),
             selectors: HashMap::new(),
             warnings: Vec::new(),
+            ngrx_edges: Vec::new(),
         }
+    }
+
+    /// Record an NgRx cross-layer edge (Phase 5 of the Angular
+    /// Ecosystem Deepening). These are appended to the resolved graph
+    /// and emitted in the `§ΦGRAPH` footer as `// Φact→red: …` style
+    /// lines, enabling the LLM to trace
+    /// `dispatch(loadUsers)` → `loadUsers$ effect` →
+    /// `UserService.getUsers()` → `.NET UserController.GetAll()`.
+    pub fn add_ngrx_edge(&mut self, from: &str, to: &str, kind: NgRxEdgeKind) {
+        self.ngrx_edges.push(NgRxEdge {
+            from: from.to_string(),
+            to: to.to_string(),
+            kind,
+        });
     }
 
     /// Register a class in the graph. If the class name already exists
@@ -185,6 +256,8 @@ impl AngularGraphBuilder {
             // into `WorkspaceResult.warnings` (and ultimately the
             // JSON-RPC `_warnings` field).
             warnings: self.warnings,
+            // Phase 5: propagate collected NgRx edges.
+            ngrx_edges: self.ngrx_edges,
             // Builder-side invariant: every `AngularGraph` produced by
             // `build()` is resolved. The flag is kept (privately) so
             // query methods can assert the invariant without forcing
@@ -239,6 +312,10 @@ pub struct AngularGraph {
     /// construction path). Kept for `is_resolved` symmetry and to
     /// allow `pub(crate)` direct construction in tests.
     resolved: bool,
+    /// NgRx cross-layer edges (Phase 5). Populated via the builder's
+    /// [`add_ngrx_edge`](AngularGraphBuilder::add_ngrx_edge) and emitted
+    /// in [`format_graph_footer`](Self::format_graph_footer).
+    ngrx_edges: Vec<NgRxEdge>,
 }
 
 impl AngularGraph {
@@ -284,9 +361,9 @@ impl AngularGraph {
         if !self.resolved {
             return None;
         }
-        self.classes.get(type_name).map(|entry| {
-            format!("{}@{}", entry.class_name, entry.file_alias)
-        })
+        self.classes
+            .get(type_name)
+            .map(|entry| format!("{}@{}", entry.class_name, entry.file_alias))
     }
 
     /// Resolve a custom-element tag name to its component file-aliased
@@ -369,6 +446,129 @@ impl AngularGraph {
         self.classes.values().collect()
     }
 
+    /// Iterate over all collected NgRx cross-layer edges (Phase 5).
+    pub fn ngrx_edges(&self) -> &[NgRxEdge] {
+        &self.ngrx_edges
+    }
+
+    /// Check if the graph contains a cycle using DFS.
+    ///
+    /// Returns `true` if at least one cycle is detected.
+    /// Uses three-color DFS (white/gray/black) for O(V+E) performance.
+    pub fn has_cycle(&self) -> bool {
+        let class_names: Vec<String> = self.classes.keys().cloned().collect();
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (name.as_str(), i))
+            .collect();
+
+        let node_count = class_names.len();
+        if node_count == 0 {
+            return false;
+        }
+
+        let adj_fn = |i: usize| {
+            let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
+            if let Some(entry) = self.classes.get(name) {
+                entry
+                    .injects
+                    .iter()
+                    .filter_map(|injected| name_to_idx.get(injected.as_str()))
+                    .copied()
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            }
+        };
+
+        has_cycle(node_count, adj_fn)
+    }
+
+    /// Find all cycles in the graph using DFS.
+    ///
+    /// Returns a list of cycles, each represented as a path of node IDs.
+    /// If no cycles exist, returns an empty `Vec`.
+    pub fn find_cycles(&self) -> Vec<Vec<String>> {
+        let class_names: Vec<String> = self.classes.keys().cloned().collect();
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (name.as_str(), i))
+            .collect();
+
+        let node_count = class_names.len();
+        if node_count == 0 {
+            return Vec::new();
+        }
+
+        let adj_fn = |i: usize| {
+            let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
+            if let Some(entry) = self.classes.get(name) {
+                entry
+                    .injects
+                    .iter()
+                    .filter_map(|injected| name_to_idx.get(injected.as_str()))
+                    .copied()
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            }
+        };
+
+        let label_fn = |i: usize| {
+            class_names
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| format!("unknown_{}", i))
+        };
+
+        find_cycles(node_count, adj_fn, label_fn)
+    }
+
+    /// Compute transitive dependencies for a node up to a given depth.
+    ///
+    /// Returns all reachable node IDs by following inject edges outward from `class_name`.
+    /// - `depth=1` → direct dependencies only
+    /// - `depth=2` → dependencies of dependencies
+    /// - `depth=0` or negative → all transitive dependencies (BFS to completion)
+    pub fn transitive_dependencies(&self, class_name: &str, depth: i32) -> Vec<String> {
+        if !self.classes.contains_key(class_name) {
+            return Vec::new();
+        }
+
+        let class_names: Vec<String> = self.classes.keys().cloned().collect();
+        let name_to_idx: HashMap<&str, usize> = class_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (name.as_str(), i))
+            .collect();
+
+        let start_idx = name_to_idx[class_name];
+        let node_count = class_names.len();
+
+        let adj_fn = |i: usize| {
+            let name = class_names.get(i).map(|s| s.as_str()).unwrap_or("");
+            if let Some(entry) = self.classes.get(name) {
+                entry
+                    .injects
+                    .iter()
+                    .filter_map(|injected| name_to_idx.get(injected.as_str()))
+                    .copied()
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            }
+        };
+
+        let indices = transitive_dependencies(start_idx, depth, node_count, adj_fn);
+        indices
+            .into_iter()
+            .filter_map(|i| class_names.get(i))
+            .cloned()
+            .collect()
+    }
+
     /// Format the full `§ΦGRAPH` footer section for the workspace
     /// manifest. Returns an empty string if the graph has no entries.
     pub fn format_graph_footer(&self) -> String {
@@ -400,10 +600,7 @@ impl AngularGraph {
                 ClassKind::Pipe => "Φpipe:",
                 ClassKind::Module => "Φmod:",
             };
-            s.push_str(&format!(
-                "    {}injects=[",
-                dep_marker
-            ));
+            s.push_str(&format!("    {}injects=[", dep_marker));
             let resolved_injects: Vec<String> = entry
                 .injects
                 .iter()
@@ -435,6 +632,27 @@ impl AngularGraph {
             }
         }
 
+        // Phase 5: NgRx cross-layer edges. These are emitted as raw
+        // `Φ` markers (no `//` prefix) so they are consistent with the
+        // rest of the `§ΦGRAPH` footer.
+        //
+        // NOTE: The `Φact→red:`/`Φeff→svc:` edge markers are NOT part of
+        // any `PhiMarker` vocabulary — they are graph-edge labels emitted
+        // only in the `§ΦGRAPH` footer. They are intentionally NOT
+        // expanded by `expand_phi_in_line` (the decompressor leaves them
+        // as-is). The `→` (U+2192) is already human-readable.
+        if !self.ngrx_edges.is_empty() {
+            s.push_str("\n// NgRx cross-layer edges\n");
+            for edge in &self.ngrx_edges {
+                s.push_str(&format!(
+                    "  {} {} → {}\n",
+                    edge.kind.marker_prefix(),
+                    edge.from,
+                    edge.to
+                ));
+            }
+        }
+
         s
     }
 }
@@ -449,6 +667,9 @@ impl AngularGraph {
 pub struct GraphCollector {
     /// List of (class_name, file_alias, kind, selector, injects, pipe_name)
     pub entries: Vec<GraphEntry>,
+    /// NgRx cross-layer edges (Phase 5). Propagated to the builder in
+    /// [`build_graph`](Self::build_graph).
+    pub ngrx_edges: Vec<NgRxEdge>,
 }
 
 /// A single graph entry collected during compression.
@@ -464,7 +685,20 @@ pub struct GraphEntry {
 
 impl GraphCollector {
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+            ngrx_edges: Vec::new(),
+        }
+    }
+
+    /// Record an NgRx cross-layer edge (Phase 5). These are flushed
+    /// into the `AngularGraph` by [`build_graph`](Self::build_graph).
+    pub fn add_ngrx_edge(&mut self, from: &str, to: &str, kind: NgRxEdgeKind) {
+        self.ngrx_edges.push(NgRxEdge {
+            from: from.to_string(),
+            to: to.to_string(),
+            kind,
+        });
     }
 
     /// Register a class for later graph building.
@@ -506,6 +740,10 @@ impl GraphCollector {
                 entry.pipe_name.as_deref(),
             );
         }
+        // Phase 5: propagate collected NgRx edges.
+        for edge in &self.ngrx_edges {
+            builder.add_ngrx_edge(&edge.from, &edge.to, edge.kind);
+        }
         builder.build()
     }
 
@@ -531,3 +769,7 @@ mod di_tests;
 #[cfg(test)]
 #[path = "../tests/angular_meta/selector_linkage.rs"]
 mod selector_tests;
+
+#[cfg(test)]
+#[path = "../tests/angular_meta/graph_ngrx.rs"]
+mod ngrx_tests;

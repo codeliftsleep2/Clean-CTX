@@ -4,7 +4,7 @@
 // Handles: class, interface, enum, record, constructor, package declarations.
 
 use crate::compaction::expression::compact_expression;
-use crate::compaction::modifiers::{strip_modifiers, MODIFIERS_CLASS};
+use crate::compaction::modifiers::{MODIFIERS_CLASS, strip_modifiers};
 use crate::compression::Fidelity;
 
 /// Extract a Java type name from interface, enum, or record declarations.
@@ -92,10 +92,7 @@ pub fn extract_java_constructor_sig(text: &str, fidelity: Fidelity) -> String {
                         .map(|p| {
                             let p = p.trim();
                             // Take first word as type name
-                            p.split_whitespace()
-                                .next()
-                                .unwrap_or(p)
-                                .to_string()
+                            p.split_whitespace().next().unwrap_or(p).to_string()
                         })
                         .filter(|s| !s.is_empty())
                         .collect();
@@ -111,6 +108,10 @@ pub fn extract_java_constructor_sig(text: &str, fidelity: Fidelity) -> String {
             // Fallback: just compact the expression
             compact_expression(sig_line, fidelity)
         }
+        // C-12 (FAANG audit): At Edit/Verbatim the constructor must be
+        // byte-exact (including the body) so `replace_in_file` SEARCH
+        // blocks match. High keeps the signature only.
+        Fidelity::Edit | Fidelity::Verbatim => text.to_string(),
         Fidelity::High => sig_line.to_string(),
     }
 }
@@ -135,6 +136,10 @@ pub fn compact_java_package(text: &str, fidelity: Fidelity) -> String {
                 line.to_string()
             }
         }
+        // C-12 (FAANG audit): At Edit/Verbatim the package declaration must
+        // be byte-exact (including the trailing semicolon) so
+        // `replace_in_file` SEARCH blocks match.
+        Fidelity::Edit | Fidelity::Verbatim => text.to_string(),
         Fidelity::Medium | Fidelity::High => line.to_string(),
     }
 }
@@ -172,7 +177,7 @@ pub fn format_java_type_entry(
                 format!("{} {} {{ {} }}", type_keyword, name, fields.join("; "))
             }
         }
-        Fidelity::High => {
+        Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
             if fields.is_empty() {
                 format!("{} {} {{", type_keyword, name)
             } else {

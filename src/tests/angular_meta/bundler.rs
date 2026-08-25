@@ -2,30 +2,32 @@
 //
 // Tests for the file-triplet bundler.
 
-use crate::angular_meta::bundler::{
-    is_component_ts, resolve_bundle_group, resolve_triplet,
-};
+use crate::angular_meta::bundler::{is_component_ts, resolve_bundle_group, resolve_triplet};
 use std::path::{Path, PathBuf};
 
 /// Debug: check if the test fixture files exist and what paths resolve to.
+///
+/// NOISE REDUCTION (2026-08-25): body commented out — this test existed
+/// purely to print path-resolution diagnostics and fired on every run.
+/// Uncomment locally when debugging fixture path resolution.
 #[test]
 fn debug_bundler_paths() {
-    let ts_path = Path::new("src/test_files/angular/user-card.component.ts");
-    eprintln!("ts exists: {}", ts_path.exists());
-    eprintln!("ts parent: {:?}", ts_path.parent());
-    eprintln!("ts stem: {:?}", ts_path.file_stem());
-
-    if let Some(parent) = ts_path.parent() {
-        let html = parent.join("user-card.component.html");
-        let scss = parent.join("user-card.component.scss");
-        eprintln!("html candidate: {:?} exists={}", html, html.exists());
-        eprintln!("scss candidate: {:?} exists={}", scss, scss.exists());
-
-        // Also try canonicalize
-        if let Ok(canon) = std::fs::canonicalize(ts_path) {
-            eprintln!("ts canonical: {:?}", canon);
-        }
-    }
+    // let ts_path = Path::new("src/test_files/angular/user-card.component.ts");
+    // eprintln!("ts exists: {}", ts_path.exists());
+    // eprintln!("ts parent: {:?}", ts_path.parent());
+    // eprintln!("ts stem: {:?}", ts_path.file_stem());
+    //
+    // if let Some(parent) = ts_path.parent() {
+    //     let html = parent.join("user-card.component.html");
+    //     let scss = parent.join("user-card.component.scss");
+    //     eprintln!("html candidate: {:?} exists={}", html, html.exists());
+    //     eprintln!("scss candidate: {:?} exists={}", scss, scss.exists());
+    //
+    //     // Also try canonicalize
+    //     if let Ok(canon) = std::fs::canonicalize(ts_path) {
+    //         eprintln!("ts canonical: {:?}", canon);
+    //     }
+    // }
 }
 
 #[test]

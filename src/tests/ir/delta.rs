@@ -42,12 +42,25 @@ fn delta_add_method() {
     current.version = 2;
 
     // Add a new method M2
-    current.instructions.push(CoreOp::DefMethod("C1".into(), "M2".into(), "newMethod".into()));
-    current.instructions.push(CoreOp::Param("M2".into(), "P2".into(), "$n".into(), "count".into()));
-    current.instructions.push(CoreOp::Return("M2".into(), "$v".into()));
+    current.instructions.push(CoreOp::DefMethod(
+        "C1".into(),
+        "M2".into(),
+        "newMethod".into(),
+    ));
+    current.instructions.push(CoreOp::Param(
+        "M2".into(),
+        "P2".into(),
+        "$n".into(),
+        "count".into(),
+    ));
+    current
+        .instructions
+        .push(CoreOp::Return("M2".into(), "$v".into()));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.file, "a1");
     assert_eq!(delta.from, 1);
@@ -72,11 +85,17 @@ fn delta_add_field() {
     let mut current = baseline.clone();
     current.version = 2;
 
-    current.instructions.push(CoreOp::DefField("C1".into(), "F1".into(), "items".into()));
-    current.instructions.push(CoreOp::FieldType("F1".into(), "$n".into()));
+    current
+        .instructions
+        .push(CoreOp::DefField("C1".into(), "F1".into(), "items".into()));
+    current
+        .instructions
+        .push(CoreOp::FieldType("F1".into(), "$n".into()));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.adds.len(), 2, "should have 2 additions");
     assert!(delta.ops.adds.iter().any(|t| t[0] == "DEF_F"));
@@ -89,11 +108,19 @@ fn delta_add_class() {
     let mut current = baseline.clone();
     current.version = 2;
 
-    current.instructions.push(CoreOp::DefClass("C2".into(), "AnotherService".into()));
-    current.instructions.push(CoreOp::DefMethod("C2".into(), "M3".into(), "doStuff".into()));
+    current
+        .instructions
+        .push(CoreOp::DefClass("C2".into(), "AnotherService".into()));
+    current.instructions.push(CoreOp::DefMethod(
+        "C2".into(),
+        "M3".into(),
+        "doStuff".into(),
+    ));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.adds.len(), 2, "should have 2 additions");
 }
@@ -116,14 +143,20 @@ fn delta_remove_method() {
     });
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert!(delta.ops.adds.is_empty(), "should have no additions");
     assert!(delta.ops.mods.is_empty(), "should have no modifications");
     assert!(!delta.ops.dels.is_empty(), "should have deletions");
 
     // Should remove DefMethod, Param, Return, and Flags for M1
-    assert_eq!(delta.ops.dels.len(), 4, "should remove 4 instructions (DEF_M, SIG, RET, FLAGS)");
+    assert_eq!(
+        delta.ops.dels.len(),
+        4,
+        "should remove 4 instructions (DEF_M, SIG, RET, FLAGS)"
+    );
 }
 
 #[test]
@@ -133,10 +166,14 @@ fn delta_remove_import() {
     current.version = 2;
 
     // Remove the import instruction
-    current.instructions.retain(|op| !matches!(op, CoreOp::Import(_, _, _)));
+    current
+        .instructions
+        .retain(|op| !matches!(op, CoreOp::Import(_, _, _)));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.dels.len(), 1, "should have 1 deletion");
     assert_eq!(delta.ops.dels[0][0], "IMP");
@@ -160,7 +197,9 @@ fn delta_modify_method_name() {
     }
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert!(delta.ops.adds.is_empty(), "should have no additions");
     assert_eq!(delta.ops.mods.len(), 1, "should have 1 modification");
@@ -169,10 +208,15 @@ fn delta_modify_method_name() {
     // Verify the modification
     let mod_op = &delta.ops.mods[0];
     assert_eq!(mod_op.key, vec!["DEF_M", "C1", "M1"]);
-    assert_eq!(mod_op.replace, Some(vec![
-        "DEF_M".to_string(), "C1".to_string(),
-        "M1".to_string(), "renamedMethod".to_string(),
-    ]));
+    assert_eq!(
+        mod_op.replace,
+        Some(vec![
+            "DEF_M".to_string(),
+            "C1".to_string(),
+            "M1".to_string(),
+            "renamedMethod".to_string(),
+        ])
+    );
 }
 
 #[test]
@@ -191,12 +235,17 @@ fn delta_modify_return_type() {
     }
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.mods.len(), 1, "should have 1 modification");
     let mod_op = &delta.ops.mods[0];
     assert_eq!(mod_op.key, vec!["RET", "M1"]);
-    assert_eq!(mod_op.replace, Some(vec!["RET".to_string(), "M1".to_string(), "$s".to_string()]));
+    assert_eq!(
+        mod_op.replace,
+        Some(vec!["RET".to_string(), "M1".to_string(), "$s".to_string()])
+    );
 }
 
 #[test]
@@ -216,14 +265,22 @@ fn delta_modify_param_type() {
     }
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.mods.len(), 1, "should have 1 modification");
     assert_eq!(delta.ops.mods[0].key, vec!["SIG", "M1", "P1"]);
-    assert_eq!(delta.ops.mods[0].replace, Some(vec![
-        "SIG".to_string(), "M1".to_string(), "P1".to_string(),
-        "$n".to_string(), "count".to_string(),
-    ]));
+    assert_eq!(
+        delta.ops.mods[0].replace,
+        Some(vec![
+            "SIG".to_string(),
+            "M1".to_string(),
+            "P1".to_string(),
+            "$n".to_string(),
+            "count".to_string(),
+        ])
+    );
 }
 
 #[test]
@@ -242,14 +299,22 @@ fn delta_modify_flags() {
     }
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.mods.len(), 1, "should have 1 modification");
     assert_eq!(delta.ops.mods[0].key, vec!["FLAGS", "M1"]);
-    assert_eq!(delta.ops.mods[0].replace, Some(vec![
-        "FLAGS".to_string(), "M1".to_string(),
-        "IF".to_string(), "LOOP".to_string(), "THROW".to_string(),
-    ]));
+    assert_eq!(
+        delta.ops.mods[0].replace,
+        Some(vec![
+            "FLAGS".to_string(),
+            "M1".to_string(),
+            "IF".to_string(),
+            "LOOP".to_string(),
+            "THROW".to_string(),
+        ])
+    );
 }
 
 // ── No Change Detection ─────────────────────────────────────────
@@ -273,8 +338,13 @@ fn delta_version_chain() {
 
     let mut v2 = v1.clone();
     v2.version = 2;
-    v2.instructions.push(CoreOp::DefMethod("C1".into(), "M2".into(), "addedInV2".into()));
-    v2.instructions.push(CoreOp::Return("M2".into(), "$v".into()));
+    v2.instructions.push(CoreOp::DefMethod(
+        "C1".into(),
+        "M2".into(),
+        "addedInV2".into(),
+    ));
+    v2.instructions
+        .push(CoreOp::Return("M2".into(), "$v".into()));
 
     let mut v3 = v2.clone();
     v3.version = 3;
@@ -314,8 +384,13 @@ fn delta_version_chain() {
 #[test]
 fn delta_add_remove_modify() {
     let mut v1 = baseline_ir("a1", 1);
-    v1.instructions.push(CoreOp::DefMethod("C1".into(), "M2".into(), "toRemove".into()));
-    v1.instructions.push(CoreOp::Return("M2".into(), "$v".into()));
+    v1.instructions.push(CoreOp::DefMethod(
+        "C1".into(),
+        "M2".into(),
+        "toRemove".into(),
+    ));
+    v1.instructions
+        .push(CoreOp::Return("M2".into(), "$v".into()));
     v1.version = 1;
 
     let mut v2 = v1.clone();
@@ -329,8 +404,10 @@ fn delta_add_remove_modify() {
     });
 
     // Add M3
-    v2.instructions.push(CoreOp::DefMethod("C1".into(), "M3".into(), "added".into()));
-    v2.instructions.push(CoreOp::Return("M3".into(), "$s".into()));
+    v2.instructions
+        .push(CoreOp::DefMethod("C1".into(), "M3".into(), "added".into()));
+    v2.instructions
+        .push(CoreOp::Return("M3".into(), "$s".into()));
 
     // Modify M1
     for op in &mut v2.instructions {
@@ -349,9 +426,22 @@ fn delta_add_remove_modify() {
     assert!(!delta.ops.mods.is_empty(), "should have modifications");
 
     // Verify specific ops
-    assert!(delta.ops.dels.iter().any(|t| t[1] == "M2"), "M2 should be in deletions");
-    assert!(delta.ops.adds.iter().any(|t| t[2] == "M3"), "M3 should be in additions");
-    assert!(delta.ops.mods.iter().any(|m| m.key.len() > 2 && m.key[2] == "M1"), "M1 should be in modifications");
+    assert!(
+        delta.ops.dels.iter().any(|t| t[1] == "M2"),
+        "M2 should be in deletions"
+    );
+    assert!(
+        delta.ops.adds.iter().any(|t| t[2] == "M3"),
+        "M3 should be in additions"
+    );
+    assert!(
+        delta
+            .ops
+            .mods
+            .iter()
+            .any(|m| m.key.len() > 2 && m.key[2] == "M1"),
+        "M1 should be in modifications"
+    );
 }
 
 // ── JSON Serialization ──────────────────────────────────────────
@@ -361,10 +451,16 @@ fn delta_json_serialization_add() {
     let baseline = baseline_ir("a1", 1);
     let mut current = baseline.clone();
     current.version = 2;
-    current.instructions.push(CoreOp::DefMethod("C1".into(), "M2".into(), "newMethod".into()));
+    current.instructions.push(CoreOp::DefMethod(
+        "C1".into(),
+        "M2".into(),
+        "newMethod".into(),
+    ));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     let json = serde_json::to_value(&delta).expect("should serialize to JSON");
 
@@ -374,7 +470,10 @@ fn delta_json_serialization_add() {
     assert!(json["ops"]["+"].is_array(), "should have adds array");
     assert!(json["ops"]["~"].is_array(), "should have mods array");
     assert!(json["ops"]["-"].is_array(), "should have dels array");
-    assert!(!json["ops"]["+"].as_array().unwrap().is_empty(), "adds should not be empty");
+    assert!(
+        !json["ops"]["+"].as_array().unwrap().is_empty(),
+        "adds should not be empty"
+    );
 }
 
 #[test]
@@ -392,7 +491,9 @@ fn delta_json_serialization_mod() {
     }
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
     let json = serde_json::to_value(&delta).expect("should serialize to JSON");
 
     let mods = json["ops"]["~"].as_array().unwrap();
@@ -406,10 +507,14 @@ fn delta_json_serialization_del() {
     let baseline = baseline_ir("a1", 1);
     let mut current = baseline.clone();
     current.version = 2;
-    current.instructions.retain(|op| !matches!(op, CoreOp::Import(_, _, _)));
+    current
+        .instructions
+        .retain(|op| !matches!(op, CoreOp::Import(_, _, _)));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
     let json = serde_json::to_value(&delta).expect("should serialize to JSON");
 
     let dels = json["ops"]["-"].as_array().unwrap();
@@ -423,8 +528,12 @@ fn delta_json_serialization_round_trip() {
     let mut current = baseline.clone();
     current.version = 3;
     // Add, remove, modify
-    current.instructions.push(CoreOp::DefMethod("C1".into(), "M2".into(), "added".into()));
-    current.instructions.retain(|op| !matches!(op, CoreOp::Import(_, _, _)));
+    current
+        .instructions
+        .push(CoreOp::DefMethod("C1".into(), "M2".into(), "added".into()));
+    current
+        .instructions
+        .retain(|op| !matches!(op, CoreOp::Import(_, _, _)));
     for op in &mut current.instructions {
         if let CoreOp::Return(mid, ty) = op {
             if mid == "M1" {
@@ -434,7 +543,9 @@ fn delta_json_serialization_round_trip() {
     }
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
     let json = serde_json::to_value(&delta).expect("serialize");
     let restored: IRDelta = serde_json::from_value(json).expect("deserialize");
 
@@ -457,10 +568,14 @@ fn delta_empty_instructions() {
     };
     let mut current = baseline.clone();
     current.version = 2;
-    current.instructions.push(CoreOp::DefClass("C1".into(), "NewClass".into()));
+    current
+        .instructions
+        .push(CoreOp::DefClass("C1".into(), "NewClass".into()));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.adds.len(), 1, "should have 1 addition");
     assert!(delta.ops.dels.is_empty(), "should have no deletions");
@@ -490,11 +605,17 @@ fn delta_interface_added() {
     let mut current = baseline.clone();
     current.version = 2;
 
-    current.instructions.push(CoreOp::DefInterface("I1".into(), "MyInterface".into()));
-    current.instructions.push(CoreOp::Implements("C1".into(), "I1".into()));
+    current
+        .instructions
+        .push(CoreOp::DefInterface("I1".into(), "MyInterface".into()));
+    current
+        .instructions
+        .push(CoreOp::Implements("C1".into(), "I1".into()));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.adds.len(), 2, "should have 2 additions");
     assert!(delta.ops.adds.iter().any(|t| t[0] == "DEF_I"));
@@ -507,10 +628,14 @@ fn delta_extends_added() {
     let mut current = baseline.clone();
     current.version = 2;
 
-    current.instructions.push(CoreOp::Extends("C1".into(), "C2".into()));
+    current
+        .instructions
+        .push(CoreOp::Extends("C1".into(), "C2".into()));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.adds.len(), 1);
     assert_eq!(delta.ops.adds[0], vec!["EXT", "C1", "C2"]);
@@ -522,10 +647,14 @@ fn delta_injects_added() {
     let mut current = baseline.clone();
     current.version = 2;
 
-    current.instructions.push(CoreOp::Injects("C1".into(), vec!["S1".into(), "S2".into()]));
+    current
+        .instructions
+        .push(CoreOp::Injects("C1".into(), vec!["S1".into(), "S2".into()]));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.adds.len(), 1);
     assert_eq!(delta.ops.adds[0], vec!["INJECTS", "C1", "S1", "S2"]);
@@ -537,10 +666,14 @@ fn delta_type_alias_added() {
     let mut current = baseline.clone();
     current.version = 2;
 
-    current.instructions.push(CoreOp::TypeAlias("T1".into(), "UserId".into()));
+    current
+        .instructions
+        .push(CoreOp::TypeAlias("T1".into(), "UserId".into()));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.adds.len(), 1);
     assert_eq!(delta.ops.adds[0], vec!["TYPE", "T1", "UserId"]);
@@ -553,10 +686,14 @@ fn delta_class_flags_modified() {
     current.version = 2;
 
     // Add class-level flags
-    current.instructions.push(CoreOp::ClassFlags("C1".into(), vec!["EXPORT".into()]));
+    current
+        .instructions
+        .push(CoreOp::ClassFlags("C1".into(), vec!["EXPORT".into()]));
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.adds.len(), 1);
     assert_eq!(delta.ops.adds[0], vec!["FLAGS_C", "C1", "EXPORT"]);
@@ -565,8 +702,12 @@ fn delta_class_flags_modified() {
 #[test]
 fn delta_field_type_modified() {
     let mut baseline = baseline_ir("a1", 1);
-    baseline.instructions.push(CoreOp::DefField("C1".into(), "F1".into(), "count".into()));
-    baseline.instructions.push(CoreOp::FieldType("F1".into(), "$n".into()));
+    baseline
+        .instructions
+        .push(CoreOp::DefField("C1".into(), "F1".into(), "count".into()));
+    baseline
+        .instructions
+        .push(CoreOp::FieldType("F1".into(), "$n".into()));
     baseline.version = 1;
 
     let mut current = baseline.clone();
@@ -582,12 +723,19 @@ fn delta_field_type_modified() {
     }
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
 
     assert_eq!(delta.ops.mods.len(), 1);
-    assert_eq!(delta.ops.mods[0].replace, Some(vec![
-        "FIELD_T".to_string(), "F1".to_string(), "$s".to_string(),
-    ]));
+    assert_eq!(
+        delta.ops.mods[0].replace,
+        Some(vec![
+            "FIELD_T".to_string(),
+            "F1".to_string(),
+            "$s".to_string(),
+        ])
+    );
 }
 
 // ── F-10: IMPL Reordering (Set Semantics) ───────────────────────
@@ -626,7 +774,10 @@ fn delta_impl_reorder_no_false_positive() {
     let delta = computer.compute(&baseline, &current);
 
     // Set semantics: same interface set, no delta
-    assert!(delta.is_none(), "IMPL reorder should produce no delta (set semantics)");
+    assert!(
+        delta.is_none(),
+        "IMPL reorder should produce no delta (set semantics)"
+    );
 }
 
 #[test]
@@ -651,7 +802,9 @@ fn delta_impl_add_interface() {
     };
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
     assert_eq!(delta.ops.adds.len(), 1);
     assert_eq!(delta.ops.adds[0], vec!["IMPL", "C1", "B"]);
 }
@@ -692,10 +845,18 @@ fn delta_flags_two_methods_no_collision() {
     }
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
     assert_eq!(delta.ops.mods.len(), 1);
     assert_eq!(delta.ops.mods[0].key, vec!["FLAGS", "M1"]);
-    assert!(delta.ops.mods[0].replace.as_ref().unwrap().contains(&"THROW".to_string()));
+    assert!(
+        delta.ops.mods[0]
+            .replace
+            .as_ref()
+            .unwrap()
+            .contains(&"THROW".to_string())
+    );
     // M2's flags should be untouched
     assert!(delta.ops.adds.is_empty());
     assert!(delta.ops.dels.is_empty());
@@ -729,13 +890,20 @@ fn delta_injects_dep_change_replaces() {
     }
 
     let computer = DeltaComputer::new();
-    let delta = computer.compute(&baseline, &current).expect("delta should be Some");
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
     assert_eq!(delta.ops.mods.len(), 1);
     assert_eq!(delta.ops.mods[0].key, vec!["INJECTS", "C1"]);
-    assert_eq!(delta.ops.mods[0].replace, Some(vec![
-        "INJECTS".to_string(), "C1".to_string(),
-        "S2".to_string(), "S3".to_string(),
-    ]));
+    assert_eq!(
+        delta.ops.mods[0].replace,
+        Some(vec![
+            "INJECTS".to_string(),
+            "C1".to_string(),
+            "S2".to_string(),
+            "S3".to_string(),
+        ])
+    );
     assert!(delta.ops.adds.is_empty());
     assert!(delta.ops.dels.is_empty());
 }
@@ -746,7 +914,10 @@ fn delta_injects_dep_change_replaces() {
 fn test_primary_key_from_tuple() {
     use crate::ir::delta::primary_key_from_tuple;
 
-    assert_eq!(primary_key_from_tuple(["DEF_C".into(), "C1".into(), "Foo".into()].as_slice()), "DEF_C:C1");
+    assert_eq!(
+        primary_key_from_tuple(["DEF_C".into(), "C1".into(), "Foo".into()].as_slice()),
+        "DEF_C:C1"
+    );
     assert_eq!(
         primary_key_from_tuple(["DEF_M".into(), "C1".into(), "M1".into(), "bar".into()].as_slice()),
         "DEF_M:C1:M1"
@@ -756,7 +927,16 @@ fn test_primary_key_from_tuple() {
         "DEF_F:C1:F1"
     );
     assert_eq!(
-        primary_key_from_tuple(["SIG".into(), "M1".into(), "P1".into(), "$s".into(), "name".into()].as_slice()),
+        primary_key_from_tuple(
+            [
+                "SIG".into(),
+                "M1".into(),
+                "P1".into(),
+                "$s".into(),
+                "name".into()
+            ]
+            .as_slice()
+        ),
         "SIG:M1:P1"
     );
     assert_eq!(
@@ -768,7 +948,9 @@ fn test_primary_key_from_tuple() {
         "FLAGS:M1"
     );
     assert_eq!(
-        primary_key_from_tuple(["IMP".into(), "IM1".into(), "rxjs".into(), "map".into()].as_slice()),
+        primary_key_from_tuple(
+            ["IMP".into(), "IM1".into(), "rxjs".into(), "map".into()].as_slice()
+        ),
         "IMP:IM1"
     );
     assert!(primary_key_from_tuple([].as_slice()).is_empty());
@@ -791,4 +973,345 @@ fn test_key_tuple_from_tuple() {
         vec!["IMPL", "C1", "I1"]
     );
     assert!(key_tuple_from_tuple([].as_slice()).is_empty());
+}
+
+// ── R-43a: Semantic Intent Detection ────────────────────────────
+//
+// `DeltaComputer::compute()` now populates `IRDelta.intent` with a
+// high-level `SemanticIntent` describing *what* changed, beyond the
+// structural diff. These tests verify each detection path.
+
+use crate::ir::delta::SemanticIntent;
+
+#[test]
+fn intent_rename_method() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Rename M1 from "processData" to "renamedMethod"
+    for op in &mut current.instructions {
+        if let CoreOp::DefMethod(_cid, mid, name) = op {
+            if mid == "M1" {
+                *name = "renamedMethod".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::RenameSymbol {
+            old_name,
+            new_name,
+            kind,
+        }) => {
+            assert_eq!(old_name, "processData");
+            assert_eq!(new_name, "renamedMethod");
+            assert_eq!(kind, "method");
+        }
+        other => panic!("expected RenameSymbol, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_rename_class() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    for op in &mut current.instructions {
+        if let CoreOp::DefClass(cid, name) = op {
+            if cid == "C1" {
+                *name = "RenamedService".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::RenameSymbol {
+            old_name,
+            new_name,
+            kind,
+        }) => {
+            assert_eq!(old_name, "SampleService");
+            assert_eq!(new_name, "RenamedService");
+            assert_eq!(kind, "class");
+        }
+        other => panic!("expected RenameSymbol, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_rename_field() {
+    let mut baseline = baseline_ir("a1", 1);
+    baseline.instructions.push(CoreOp::DefField(
+        "C1".into(),
+        "F1".into(),
+        "oldField".into(),
+    ));
+    baseline.version = 1;
+
+    let mut current = baseline.clone();
+    current.version = 2;
+    for op in &mut current.instructions {
+        if let CoreOp::DefField(_cid, fid, name) = op {
+            if fid == "F1" {
+                *name = "newField".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::RenameSymbol {
+            old_name,
+            new_name,
+            kind,
+        }) => {
+            assert_eq!(old_name, "oldField");
+            assert_eq!(new_name, "newField");
+            assert_eq!(kind, "field");
+        }
+        other => panic!("expected RenameSymbol, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_add_method() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    current.instructions.push(CoreOp::DefMethod(
+        "C1".into(),
+        "M2".into(),
+        "newMethod".into(),
+    ));
+    current
+        .instructions
+        .push(CoreOp::Return("M2".into(), "$v".into()));
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::AddMethod { class, method_name }) => {
+            assert_eq!(class, "C1");
+            assert_eq!(method_name, "newMethod");
+        }
+        other => panic!("expected AddMethod, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_remove_method() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Remove M1 method instructions
+    current.instructions.retain(|op| match op {
+        CoreOp::DefMethod(_, mid, _) => mid != "M1",
+        CoreOp::Param(mid, _, _, _) => mid != "M1",
+        CoreOp::Return(mid, _) => mid != "M1",
+        CoreOp::Flags(tid, _) => tid != "M1",
+        _ => true,
+    });
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::RemoveMethod { class, method_name }) => {
+            assert_eq!(class, "C1");
+            assert_eq!(method_name, "processData");
+        }
+        other => panic!("expected RemoveMethod, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_change_return_type() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Change return type of M1 from "$b" to "$s"
+    for op in &mut current.instructions {
+        if let CoreOp::Return(mid, ty) = op {
+            if mid == "M1" {
+                *ty = "$s".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::ChangeReturnType {
+            method,
+            old_type,
+            new_type,
+        }) => {
+            assert_eq!(method, "M1");
+            assert_eq!(old_type, "$b");
+            assert_eq!(new_type, "$s");
+        }
+        other => panic!("expected ChangeReturnType, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_change_signature_param_type() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Change param type from "$s" to "$n"
+    for op in &mut current.instructions {
+        if let CoreOp::Param(mid, pid, ty, _name) = op {
+            if mid == "M1" && pid == "P1" {
+                *ty = "$n".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::ChangeSignature {
+            method,
+            field_changed,
+        }) => {
+            assert_eq!(method, "M1");
+            assert_eq!(field_changed, "param_type");
+        }
+        other => panic!("expected ChangeSignature, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_add_injection() {
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    current
+        .instructions
+        .push(CoreOp::Injects("C1".into(), vec!["S1".into()]));
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::AddInjection { class, dependency }) => {
+            assert_eq!(class, "C1");
+            assert_eq!(dependency, "S1");
+        }
+        other => panic!("expected AddInjection, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_add_injection_to_existing() {
+    // Adding a dependency to an existing INJECTS op (key in both base and cur).
+    // The doc comment claims this is handled — verify it produces AddInjection.
+    let mut baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    // Baseline has INJECTS C1 -> [S1]; current adds S2.
+    baseline
+        .instructions
+        .push(CoreOp::Injects("C1".into(), vec!["S1".into()]));
+    current
+        .instructions
+        .retain(|op| !matches!(op, CoreOp::Injects(_, _)));
+    current
+        .instructions
+        .push(CoreOp::Injects("C1".into(), vec!["S1".into(), "S2".into()]));
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::AddInjection { class, dependency }) => {
+            assert_eq!(class, "C1");
+            assert_eq!(
+                dependency, "S2",
+                "should report the newly-added dep, not the existing one"
+            );
+        }
+        other => panic!("expected AddInjection, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_change_signature_param_name() {
+    // Changing a param's name (not type) should yield ChangeSignature with
+    // field_changed = "param_name".
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    for op in &mut current.instructions {
+        if let CoreOp::Param(mid, pid, _ty, name) = op {
+            if mid == "M1" && pid == "P1" {
+                *name = "renamedInput".to_string();
+            }
+        }
+    }
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    match delta.intent {
+        Some(SemanticIntent::ChangeSignature {
+            method,
+            field_changed,
+        }) => {
+            assert_eq!(method, "M1");
+            assert_eq!(field_changed, "param_name");
+        }
+        other => panic!("expected ChangeSignature, got: {:?}", other),
+    }
+}
+
+#[test]
+fn intent_none_for_identical_ir() {
+    let baseline = baseline_ir("a1", 1);
+    let current = baseline.clone();
+    let computer = DeltaComputer::new();
+    let delta = computer.compute(&baseline, &current);
+    assert!(delta.is_none(), "identical IR should produce no delta");
+}
+
+#[test]
+fn intent_none_for_import_only_change() {
+    // Adding an import is not a recognized semantic intent — should be None.
+    let baseline = baseline_ir("a1", 1);
+    let mut current = baseline.clone();
+    current.version = 2;
+    current
+        .instructions
+        .push(CoreOp::Import("IM2".into(), "fs".into(), "readFile".into()));
+
+    let computer = DeltaComputer::new();
+    let delta = computer
+        .compute(&baseline, &current)
+        .expect("delta should be Some");
+    assert!(
+        delta.intent.is_none(),
+        "import-only change should have no semantic intent"
+    );
 }

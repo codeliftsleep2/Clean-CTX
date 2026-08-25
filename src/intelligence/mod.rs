@@ -12,10 +12,13 @@
 // This module is entirely self-contained. It consumes data from both
 // `crate::ir` and `crate::cbm` but owns all logic.
 
-pub mod pagerank;
 pub mod blast_radius;
+pub mod budget;
 pub mod fidelity;
+pub mod knapsack;
+pub mod pagerank;
 
-pub use pagerank::compute_pagerank;
 pub use blast_radius::compute_blast_radius;
-pub use fidelity::{cbm_informed_fidelity, FidelityRecommendation};
+pub use fidelity::{FidelityRecommendation, cbm_informed_fidelity};
+pub use knapsack::{RankedSymbol, pack_to_budget, sort_by_rank};
+pub use pagerank::compute_pagerank;

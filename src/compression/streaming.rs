@@ -12,17 +12,16 @@ use std::path::PathBuf;
 use crate::analytics::calculate_savings;
 use crate::cache::LocalStateCache;
 use crate::compaction::{
-    compact_expression, extract_class_name, extract_field,
-    extract_method_sig,
+    compact_expression, extract_class_name, extract_field, extract_method_sig,
 };
-use crate::compression::capture_pipeline::run_capture_pipeline;
-use crate::compression::language::language_for_extension;
-use crate::compression::pipeline::{assemble_body, build_output_lines};
-use crate::compression::report::{format_compacted_body, format_final_output};
-use crate::compression::micro_opcodes::apply_micro_opcodes;
-use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
+use crate::compression::capture_pipeline::run_capture_pipeline;
+use crate::compression::language::language_for_extension;
+use crate::compression::micro_opcodes::apply_micro_opcodes;
+use crate::compression::pipeline::{assemble_body, build_output_lines};
+use crate::compression::report::{format_compacted_body, format_final_output};
+use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::dictionary::PathDictionary;
 
 /// A progress event emitted by streaming compression. The `progress` is in
@@ -41,12 +40,17 @@ pub struct CompressionProgress {
 /// Reads the source file in chunks, reports progress via a caller-provided
 /// callback, and delegates all structural logic to the shared pipeline
 /// helpers.
+///
+/// `config` is threaded through to the meta-layer registry so per-framework
+/// `enabled` flags and sub-layer settings are honored. When `None`, all
+/// meta-layers run with their defaults.
 pub fn compress_file_streaming<F>(
     file: PathBuf,
     dict: &mut PathDictionary,
     cache: &mut LocalStateCache,
     fidelity: Fidelity,
     chunk_bytes: usize,
+    config: Option<&crate::config::CleanCtxConfig>,
     mut on_progress: F,
 ) -> Result<String, Box<dyn std::error::Error>>
 where
@@ -66,7 +70,10 @@ where
     on_progress(CompressionProgress {
         progress: 0.0,
         phase: "reading".to_string(),
-        partial: Some(format!("// Streaming read: {} ({} bytes)", path_alias, total_bytes)),
+        partial: Some(format!(
+            "// Streaming read: {} ({} bytes)",
+            path_alias, total_bytes
+        )),
     })?;
 
     let f = fs::File::open(&file)?;
@@ -76,12 +83,18 @@ where
     let mut bytes_read: usize = 0;
     loop {
         let n = reader.read(&mut buf)?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         let chunk = std::str::from_utf8(&buf[..n])
             .map_err(|e| format!("Invalid UTF-8 in source file: {}", e))?;
         source_code.push_str(chunk);
         bytes_read += n;
-        let p = if total_bytes > 0 { (bytes_read as f64 / total_bytes as f64) * 0.2 } else { 0.2 };
+        let p = if total_bytes > 0 {
+            (bytes_read as f64 / total_bytes as f64) * 0.2
+        } else {
+            0.2
+        };
         on_progress(CompressionProgress {
             progress: p,
             phase: "reading".to_string(),
@@ -171,7 +184,12 @@ where
         );
         return Ok(format!(
             "// --- Token Optimization Report --- \n// Raw Tokens: {} | Retained Tokens: {} | Waste Reduced: {:.2}%\n// Fidelity: {:?}\n// {}\n{}",
-            meta.raw_tokens, meta.compressed_tokens, meta.savings_percentage, fidelity, ratio_report, cached_notice
+            meta.raw_tokens,
+            meta.compressed_tokens,
+            meta.savings_percentage,
+            fidelity,
+            ratio_report,
+            cached_notice
         ));
     }
 
@@ -217,7 +235,7 @@ where
     // F-04: `build_output_lines` now returns `BuildOutputResult` with
     // real counts; we destructure only what we need here.
     let total_captures = all_captures.len();
-    let built = build_output_lines(&all_captures, &source_code, fidelity, None);
+    let built = build_output_lines(&all_captures, &source_code, fidelity, None, config);
     for idx in 0..total_captures {
         let p = 0.4 + (idx as f64 / total_captures.max(1) as f64) * 0.5;
         on_progress(CompressionProgress {
@@ -228,10 +246,24 @@ where
     }
 
     let mut body_content = assemble_body(&built.output_lines, fidelity);
-    // Angular Meta-Layer (Phase 1): inject the Φ block into the body
-    // BEFORE symbol compression so the `Φ` markers stay untouched.
-    if let Some(block) = &built.meta_block {
-        body_content.push_str(&block.render());
+    // C-11: at Edit/Verbatim the Φ meta blocks must NOT be injected (they
+    // would corrupt byte-exact method bodies). Mirrors the guard already
+    // present in `compress_file_with_source`.
+    //
+    // Meta-Layer blocks (Angular, Spring Boot, .NET): inject the Φ blocks
+    // into the body BEFORE symbol compression so the `Φ` markers stay
+    // untouched. Previously only the Angular block was appended — the
+    // Spring and .NET blocks were silently dropped in this path.
+    if fidelity != Fidelity::Edit && fidelity != Fidelity::Verbatim {
+        if let Some(block) = &built.meta_block {
+            body_content.push_str(&block.render());
+        }
+        if let Some(block) = &built.spring_meta_block {
+            body_content.push_str(&block.render());
+        }
+        if let Some(block) = &built.dotnet_meta_block {
+            body_content.push_str(&block.render());
+        }
     }
 
     // Phase III (Idea #11 — Micro-Opcode Table for Text):

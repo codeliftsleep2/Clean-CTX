@@ -3,10 +3,10 @@
 // Tests for the `Φ` marker construction and expansion.
 
 use crate::angular_meta::markers::{
-    build_component_line, build_directive_line, build_injects_line, build_input_line,
-    build_model_line, build_module_line, build_output_line, build_pipe_line, build_service_line,
-    expand_phi, expand_phi_in_line, ComponentFields, InjectsLine, InputLine, ModelLine, ModuleLine,
-    OutputLine, PhiLine, PhiLineKind, PipeLine, ServiceLine,
+    ComponentFields, InjectsLine, InputLine, ModelLine, ModuleLine, OutputLine, PhiLine,
+    PhiLineKind, PipeLine, ServiceLine, build_component_line, build_directive_line,
+    build_injects_line, build_input_line, build_model_line, build_module_line, build_output_line,
+    build_pipe_line, build_service_line, expand_phi, expand_phi_in_line,
 };
 
 #[test]
@@ -117,7 +117,10 @@ fn injects_line_joins_types() {
 fn expand_phi_in_line_rewrites_component_marker() {
     let line = "Φcmp:UserCard sel=app-user-card tpl=./user-card.component.html";
     let expanded = expand_phi_in_line(line);
-    assert_eq!(expanded, "@Component UserCard sel=app-user-card tpl=./user-card.component.html");
+    assert_eq!(
+        expanded,
+        "@Component UserCard sel=app-user-card tpl=./user-card.component.html"
+    );
 }
 
 #[test]
@@ -173,7 +176,9 @@ fn phi_in_line_rewrite_is_idempotent_only_known_tokens() {
 #[test]
 fn phi_line_kind_uniqueness() {
     let all_kinds = PhiLineKind::all_in_expand_order();
-    assert_eq!(all_kinds.len(), 14, "expected 14 PhiLineKind variants");
+    // ANGULAR_HTML_COMPRESSION_PLAN: added TemplateBinding, TemplateDirective,
+    // TemplateComponent — 14 original + 3 new = 17.
+    assert_eq!(all_kinds.len(), 17, "expected 17 PhiLineKind variants");
 
     // Check that marker_prefix is unique across all variants.
     let mut prefixes = std::collections::HashSet::new();
@@ -211,10 +216,7 @@ fn phi_vocab_is_bijective() {
     for &kind in PhiLineKind::all_in_expand_order() {
         let exp = kind.expansion();
         if let Some(&prev) = exp_to_kind.get(exp) {
-            panic!(
-                "expansion {:?} maps to both {:?} and {:?}",
-                exp, prev, kind
-            );
+            panic!("expansion {:?} maps to both {:?} and {:?}", exp, prev, kind);
         }
         exp_to_kind.insert(exp, kind);
     }
@@ -224,10 +226,7 @@ fn phi_vocab_is_bijective() {
     for &kind in PhiLineKind::all_in_expand_order() {
         let prefix = kind.marker_prefix();
         if let Some(&prev) = prefix_to_kind.get(prefix) {
-            panic!(
-                "prefix {:?} maps to both {:?} and {:?}",
-                prefix, prev, kind
-            );
+            panic!("prefix {:?} maps to both {:?} and {:?}", prefix, prev, kind);
         }
         prefix_to_kind.insert(prefix, kind);
     }

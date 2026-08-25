@@ -1,7 +1,10 @@
 # Clean-CTX — Architecture Overview
 
-**Version:** 0.2.0-rc1
-**Last updated:** 2026-06-22 (added CBM filter-first architecture, per-domain stats, prompt cache breakpoints)
+> **Owner:** System + module architecture · **Status:** Living reference
+> **Version:** 0.4.0
+> **Last updated:** 2026-08-07 (R-44 complete: Angular HTML template compression, PrimeNG markers, GitDiff integration)
+>
+> **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
 
 ---
 
@@ -42,6 +45,8 @@
 │  ┌──────────────────────────────────────────────────┐   │
 │  │ IR Subsystem (Compiler IR + Delta Transport)     │   │
 │  │  compile → wire → string_table → delta → replay  │   │
+│  │  exec_semantics → program_graph → inference →    │   │
+│  │  validation → query                              │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
@@ -55,10 +60,73 @@
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
+│  │ Spring Boot Meta-Layer (Φ markers + graph)       │   │
+│  │   detect → annotations → markers → graph         │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ .NET Meta-Layer (Φ markers + graph)              │   │
+│  │   detect → attributes → markers → graph          │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  All meta-layers dispatched via LayerRegistry:          │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ LayerRegistry (singleton)                        │   │
+│  │   MetaLayer::is_applicable() → detect framework  │   │
+│  │   MetaLayer::enrich(source, class_captures, ...) │   │
+│  │     → class_captures derived per C-22 from       │   │
+│  │       PassContext.captures, NOT DefClass.name    │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐   │
 │  │ MCP Prompts (cleanctx-notation + dashboard)      │   │
 │  └──────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
 ```
+
+### A-09: Production-Grade Multi-Threaded Request Dispatch
+
+The MCP server uses a **crossbeam_channel thread pool** with configurable worker count (default: auto-detect CPU count) to handle concurrent JSON-RPC requests without blocking the stdin reader:
+
+```
+stdin reader thread           Dispatcher thread pool (N workers)
+┌──────────────────┐           ┌───────────────────────────────────┐
+│  read_line()     │           │  Worker 1: compress file          │
+│  parse JSON-RPC  │  enqueue  │  Worker 2: context_stats (read)   │
+│  → dispatcher    │──────────→│  Worker 3: CBM query (wait)       │
+│  → read next     │           │  Worker 4: workspace compress     │
+└──────────────────┘           └───────────────────────────────────┘
+                                               │
+                                   ┌───────────▼─────────────┐
+                                   │     RwLock<McpState>    │  
+                                   │     Parallel reads,     │  
+                                   │     Serial writes       │ 
+                                   └────────────┬────────────┘
+                                                │
+                                   ┌────────────▼────────┐
+                                   │  Stdout writer      │ │
+                                      Dedicated thread, 
+                                      no interleaving    
+                                   └────────────────┘
+```
+
+**How it works:**
+
+1. **Stdin reader thread** — reads one JSON-RPC line at a time, parses it, and enqueues via `dispatcher.spawn()`. Never waits for completion.
+2. **Worker threads** — bounded crossbeam_channel queue with configurable depth (default: 1000). Workers acquire `RwLock` write access for compression, read access for stats/queries.
+3. **Panic recovery** — `catch_unwind` wraps every handler. Poisoned RwLock locks are reclaimed via `poisoned.into_inner()`.
+4. **Dedicated stdout writer** — a separate thread serializes JSON responses, preventing interleaving.
+
+**Configuration:**
+```json
+{
+  "dispatcher": { "worker_count": 8, "max_queue_depth": 2000 }
+}
+```
+
+**Why this matters:** Before A-09, a slow CBM query or large file compression blocked ALL subsequent requests. The dispatcher also includes request tracing with IDs, timestamps, slow-request logging (5s threshold), and graceful shutdown with configurable timeout.
+
+**See:** `src/mcp/dispatcher.rs` (312 lines, 6+ unit tests)
 
 ---
 
@@ -152,7 +220,7 @@ The zero-touch workflow is the **recommended entry point** for any file-related 
 
 ## Persistence Layer
 
-The persistence layer provides **cross-session persistence** for compression contexts via SQLite. It is enabled by setting the `CLEANCTX_PERSISTENCE_DB` environment variable.
+The persistence layer provides **cross-session persistence** for compression contexts via SQLite. It is **enabled by default** (stored in `.clean-ctx/persistence.db` relative to the project root) and can be disabled in `.clean-ctx.json` with `"persistence": { "enabled": false }`. See [`docs/CONFIGURATION.md`](CONFIGURATION.md) for the full persistence configuration reference.
 
 ```
      provide_code_context(file)
@@ -184,8 +252,8 @@ The persistence layer provides **cross-session persistence** for compression con
 
 - **Non-fatal persistence**: All DB writes are fire-and-forget with `eprintln!` warnings — compression never fails due to DB issues.
 - **Content-hash deterministic IDs**: `ctx-{sha256_hex}` ensures idempotent saves (same content → same ID → UPSERT).
-- **No Mutex**: MCP server is single-threaded (stdin/stdout loop), so no concurrent access protection needed.
-- **Lazy initialization**: DB only opens if `CLEANCTX_PERSISTENCE_DB` env var is set — zero overhead for users who don't need persistence.
+- **Thread-safe state**: `McpState` is wrapped in `RwLock` for the A-09 multi-threaded dispatcher — parallel reads, serial writes.
+- **Lazy initialization**: DB only opens when persistence is enabled — zero overhead for users who don't need persistence.
 - **`binary_wire::encode/decode`**: IR is serialized/deserialized as BLOBs; `file_id` and `version` are restored from DB columns on load.
 
 ### Tools
@@ -208,11 +276,19 @@ src/
 │
 ├── mcp/                          # MCP server layer (JSON-RPC stdio)
 │   ├── mod.rs                    # run() entry point + persistence init
-│   ├── server.rs                 # Stdin/stdout loop (F-02: line-size cap)
+│   ├── server.rs                 # Stdin/stdout loop (F-02: line-size cap, A-09: dispatcher enqueue)
+│   ├── dispatcher.rs             # Thread-pool dispatcher (A-09: rayon + Arc<Mutex<McpState>>)
 │   ├── router.rs                 # JSON-RPC method dispatch
 │   ├── handlers.rs               # initialize, tools/list, prompts/list
 │   ├── tools.rs                  # Tool definitions + get_tool_definitions()
-│   ├── tool_handlers.rs          # Tool handler implementations (handle_*)
+│   ├── tool_handlers/            # Tool handler implementations (handle_*)
+│   │   ├── mod.rs              # Tool handler module root
+│   │   ├── core.rs             # Core tool handlers (compress, decompress, diff, delta)
+│   │   ├── registry.rs         # Tool handler registry
+│   │   ├── traits.rs           # Tool handler trait definitions
+│   │   ├── context/            # Context-related tool handlers
+│   │   ├── persistence/        # Persistence-related tool handlers
+│   │   └── stats/              # Stats-related tool handlers
 │   ├── tool_helpers.rs           # Shared helper functions for tool handlers
 │   ├── prompts.rs                # cleanctx-notation + dashboard prompt content
 │   ├── workspace.rs              # compress_workspace_dir + collect_source_files
@@ -222,7 +298,9 @@ src/
 │   ├── context_store.rs          # ContextStore trait + InMemoryContextStore
 │   ├── sqlite_store.rs           # SqliteStore (SQLite-backed ContextStore)
 │   ├── buffered_store.rs         # BufferedStore (three-tier persistence wrapper)
-│   └── session_stats.rs          # SessionStats + dashboard rendering
+│   ├── session_stats.rs          # SessionStats + dashboard rendering
+│   ├── cache_hints.rs          # Cache hint generation for JSON-RPC responses
+│   └── proxy_stats.rs          # Proxy statistics fetcher (GET /stats endpoint)
 │
 ├── compression/                  # Core compression engine
 │   ├── mod.rs                    # Public API: compress_file, CompressionProgress
@@ -254,6 +332,11 @@ src/
 │   ├── positional.rs             # Positional encoding for compact IR format
 │   ├── render.rs                 # IR rendering to text
 │   ├── binary_wire.rs            # Binary wire format for IR transport
+│   ├── program_graph.rs          # R-43b: Local program graph (structural edges only, no CBM)
+│   ├── inference_layer.rs        # R-43b: InferenceLayer — ephemeral, never serialized, confidence-scored
+│   ├── pipeline.rs               # R-43b: IRPass trait + PassPipeline (composable 7-pass pipeline)
+│   ├── validator.rs              # R-43b: IRValidator + DefaultValidator (10 rules, E001-E010)
+│   ├── query.rs                  # R-43b: IRQueryEngine — local + CBM-enriched queries with confidence
 │   ├── patterns.rs               # CompressingPatternRecognizer
 │   └── layers/
 │       ├── mod.rs
@@ -568,6 +651,57 @@ Each compression event is tagged with a `SavingsDomain` for the dashboard:
 
 **Graceful degradation:** If CBM is unavailable, the intelligence layer falls back to IR-only PageRank. Compression never fails due to CBM issues.
 
+### Project Identity & Multi-Root Lifecycle
+
+> **Architectural rule:** Never derive or invent a CBM project identifier independently of the canonical-root mapping. CBM's canonical project slug is the single source of identity for indexing, readiness, querying, proxy routing, and cache partitioning.
+
+CBM derives each project ID itself from the canonical repo path (`index_repository(repo_path, mode)` takes no project parameter — the verified CBM 0.8.1 wire contract), e.g. `C:/Users/MNasty/Desktop/RustContextLayerAI` → `C-Users-MNasty-Desktop-RustContextLayerAI`. Clean-CTX mirrors this exactly: a two-way map in the bridge (`project_ids` / `project_paths`) binds every configured root to its slug, and that single identity drives everything downstream — background indexing, per-project readiness state, graph-query and `cbm_proxy` target resolution, and the disk-graph-cache partition label. Directory basenames (e.g. `RustContextLayerAI`) are never valid project identities; explicit overrides resolve through the root→project mapping, and unknown names are rejected by CBM itself ("project not found or not indexed"). Project-independent tools (e.g. `list_projects`) bypass the readiness gate entirely.
+
+Normative details: **CBM-ID-001** in `docs/ARCHITECTURAL_INVARIANTS.md`.
+
+### Subprocess & Indexing Lifecycle
+
+- **One CBM subprocess per `McpState`.** The bridge launches CBM once at construction; every project shares those stdio pipes.
+- **Indexing starts asynchronously during bridge construction.** `try_create_with_roots` spawns one background `index_repository(repo_path, "fast")` task per root before the first request arrives.
+- **Multiple roots are indexed concurrently.** Each root's task runs independently and records progress under that root's own slug.
+- **Requests wait on their own project's indexing state, never globally.** A call targeting project X consults X's readiness only (`ensure_indexed_for`); another root that is still indexing does not block it.
+- **Construction-time indexing is the supported path.** Bridges come into existence through `try_create` / `try_create_with_roots`, which start background indexing immediately. There is no separate manual index trigger in the contract.
+- **`project_str()` refers to the primary root.** Untargeted/default queries address the primary root's CBM project.
+- **Additional roots require resolving/selecting their CBM project before querying.** Pass the root's path (or its canonical slug) explicitly - built-in wrappers resolve it through `resolve_project_id`; raw `cbm_proxy` calls accept `parameters.project`.
+
+### Graph Intelligence API & Error Semantics
+
+Five bridge queries power the intelligence features - `get_symbol_importance_mut()`, `get_blast_radius()`, `get_dead_code()`, `get_call_edges()`, `get_architecture()` - and all five return `Result<_, CbmError>`:
+
+- **`Ok(empty)` means a valid query with zero results** (e.g. a symbol with no callers). It is never used as a stand-in for failure.
+- **`Err` means CBM failed** - transport fault, timeout, open circuit, or a tool error reported by CBM itself. Callers must never treat `Err` as "no data".
+- Tool failures travel inside successful JSON-RPC responses (`result.isError=true` with an inner error payload). The client's transport maps these envelopes to `CbmError::ToolError { tool, message }` via `check_soft_error()` before any caller observes them, so failure semantics are uniform across the raw and parsed paths.
+
+Behavior notes (each verified live against CBM 0.8.1):
+
+- **Blast radius** returns the depth-1 caller-file set, pinned by a live test to equal the ground-truth caller set computed independently on the same client. An earlier Cypher draft filtered on the wrong variable; because CBM fail-opens on invalid WHERE clauses instead of erroring, the bug silently returned every CALLS edge in the project.
+- **Dead code covers BOTH `Function` and `Method` node labels.** Scanning only `Function` misses most TS/C#/Java symbols. A live test asserts exact set equality between production output and the merged two-label ground truth.
+- **Circuit breaker ordering:** the client opens after 3 consecutive failures. The first failing query carries CBM's own semantic message (e.g. "project not found"); subsequent ones report circuit-open until the cooldown elapses. Error-message assertions must account for this ordering.
+- The inference layer treats `Err` as skip-enrichment: `InferenceLayerPass` logs loudly and continues without CBM data. CBM remains strictly additive to the IR, and failures never fabricate empty success values.
+
+### CBM Compatibility & Verified Limitations (0.8.1)
+
+Everything below was verified against live CBM 0.8.1 probes, not assumed:
+
+| Area | Status |
+|------|--------|
+| Node labels | `Class`, `Method`, `Function`, `File` (including web assets: JS/HTML/TS/CSS) confirmed present |
+| Edge types | `CALLS` and `DEFINES_METHOD` confirmed in live probes; **no `DATAFLOW` edge type exists in 0.8.1** |
+| Razor support | None - `.razor` files/symbols do not appear in the graph |
+| Dataflow enrichment | Unavailable (no DATAFLOW edges). Local program-graph `DataFlowRead`/`DataFlowWrite` edges are Clean-CTX-local and unaffected |
+| Cypher subset | No aggregation functions (COUNT/GROUP BY/SUM/AVG) - see [Troubleshooting](TROUBLESHOOTING.md) |
+| Invalid queries | CBM fail-opens: a WHERE clause referencing an undeclared variable returns the full row set rather than an error. Production Cypher is constructed internally and guarded by truth-set tests |
+| Wire quirks | `in_degree` cells serialize as JSON strings through `query_graph`; stderr carries `level=` log noise alongside JSON-RPC |
+
+If a future CBM release adds DATAFLOW edges, the reintroduction guard in
+`src/tests/cbm/graph_intel.rs` fails deliberately - dataflow enrichment can then
+be re-designed explicitly, not silently assumed.
+
 ## Angular Meta-Layer (Phase 1 + 2 + 3)
 
 The Meta-Layer is **purely additive** — it never modifies the existing TS compaction output. It only appends a `Φ` block below the existing compacted class. Non-Angular files pay zero overhead (byte-identical output).
@@ -708,7 +842,7 @@ These are embedded in the `Φtpl:` marker line (`@if`, `@for`) or emit their own
 
 **Config:** `meta_layers.angular.enabled` in `.clean-ctx.json` (default: on)
 
-**Dependencies:** `tree-sitter-html = "=0.20.0"` (Phase 2+)
+**Dependencies:** `tree-sitter-html = "0.23"` (Phase 2+)
 
 ---
 
@@ -780,7 +914,7 @@ See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for full per-edit breakdown and the 
 - Largest source file: ~170 lines (down from 913)
 - Zero network dependencies
 - Zero `unsafe` blocks
-- 1,306 tests passing (unit + integration + E2E + proxy regression tests)
+- Current test count owned by `CHANGELOG.md`
 
 > **ℹ️ Cache System Separation:** Clean-CTX has **two independent cache systems** with different scopes and configuration paths:
 > 1. **MCP Server `CacheConfig`** (in `.clean-ctx.json`) — Controls `_meta.cache_hints` annotations in JSON-RPC responses. These annotations tell the LLM which parts of compressed output are cacheable (stable vocabulary, tool definitions, persisted baselines). Configuration is via the `cache` key in `.clean-ctx.json`.

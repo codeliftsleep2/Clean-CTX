@@ -15,6 +15,7 @@ pub mod filters;
 pub mod logger;
 pub mod pipeline;
 pub mod platform;
+pub mod rate_limiter;
 pub mod scrub;
 pub mod scrub_patterns;
 pub mod server;

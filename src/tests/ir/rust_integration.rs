@@ -117,7 +117,10 @@ fn rust_struct_produces_def_class() {
     );
     // Verify the DefClass name is the extracted name, not raw text
     let user_service = classes.iter().find(|n| **n == "UserService");
-    assert!(user_service.is_some(), "DefClass should contain extracted name 'UserService'");
+    assert!(
+        user_service.is_some(),
+        "DefClass should contain extracted name 'UserService'"
+    );
 }
 
 #[test]
@@ -235,9 +238,10 @@ fn rust_async_method_produces_async_flag() {
         }
     "#;
     let ir = compile_rust(source);
-    let has_async = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"ASYNC".to_string()))
-    });
+    let has_async = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"ASYNC".to_string())));
     assert!(has_async, "async method should produce ASYNC flag");
 }
 
@@ -250,9 +254,10 @@ fn rust_pub_method_produces_export_flag() {
         }
     "#;
     let ir = compile_rust(source);
-    let has_export = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"EXPORT".to_string()))
-    });
+    let has_export = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"EXPORT".to_string())));
     assert!(has_export, "pub method should produce EXPORT flag");
 }
 
@@ -265,9 +270,10 @@ fn rust_unsafe_method_produces_unsafe_flag() {
         }
     "#;
     let ir = compile_rust(source);
-    let has_unsafe = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"UNSAFE".to_string()))
-    });
+    let has_unsafe = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"UNSAFE".to_string())));
     assert!(has_unsafe, "unsafe method should produce UNSAFE flag");
 }
 
@@ -286,7 +292,10 @@ fn rust_method_with_all_flags() {
             flags.contains(&"EXPORT".to_string())
         })
     });
-    assert!(has_flags, "pub async method should produce both ASYNC and EXPORT flags");
+    assert!(
+        has_flags,
+        "pub async method should produce both ASYNC and EXPORT flags"
+    );
 }
 
 // ── Class-Level Flags ──────────────────────────────────────────────
@@ -299,10 +308,13 @@ fn rust_pub_struct_produces_class_flags() {
         }
     "#;
     let ir = compile_rust(source);
-    let has_class_flags = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(_, flags) if flags.contains(&"EXPORT".to_string()))
-    });
-    assert!(has_class_flags, "pub struct should produce EXPORT class flag");
+    let has_class_flags = ir.instructions.iter().any(
+        |op| matches!(op, CoreOp::ClassFlags(_, flags) if flags.contains(&"EXPORT".to_string())),
+    );
+    assert!(
+        has_class_flags,
+        "pub struct should produce EXPORT class flag"
+    );
 }
 
 #[test]
@@ -313,10 +325,13 @@ fn rust_unsafe_trait_produces_class_flags() {
         }
     "#;
     let ir = compile_rust(source);
-    let has_class_flags = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(_, flags) if flags.contains(&"UNSAFE".to_string()))
-    });
-    assert!(has_class_flags, "unsafe trait should produce UNSAFE class flag");
+    let has_class_flags = ir.instructions.iter().any(
+        |op| matches!(op, CoreOp::ClassFlags(_, flags) if flags.contains(&"UNSAFE".to_string())),
+    );
+    assert!(
+        has_class_flags,
+        "unsafe trait should produce UNSAFE class flag"
+    );
 }
 
 // ── Derive Attributes ──────────────────────────────────────────────
@@ -334,14 +349,19 @@ fn rust_derive_not_in_defclass() {
     // attributes are separate AST nodes. The `extract_rust_struct_name` function
     // strips the struct keyword, so the DefClass name is just "MyStruct".
     // Derives are processed separately via RustLayer::extract_derives.
-    let has_def_class = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::DefClass(_, name) if name == "MyStruct")
-    });
-    assert!(has_def_class, "struct should produce DefClass with name 'MyStruct'");
+    let has_def_class = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::DefClass(_, name) if name == "MyStruct"));
+    assert!(
+        has_def_class,
+        "struct should produce DefClass with name 'MyStruct'"
+    );
     // The struct should still be recognized even though derives aren't in the text
-    let has_struct_name = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::DefClass(_, _))
-    });
+    let has_struct_name = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::DefClass(_, _)));
     assert!(has_struct_name, "should have at least one DefClass");
 }
 
@@ -379,11 +399,15 @@ fn rust_crate_visibility_produces_class_flags() {
     "#;
     let ir = compile_rust(source);
     // pub(crate) should produce an EXPORT flag (it's a restricted pub)
-    let has_class_flags = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(_, _))
-    });
+    let has_class_flags = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::ClassFlags(_, _)));
     // The class should at least be defined
-    let has_class = ir.instructions.iter().any(|op| matches!(op, CoreOp::DefClass(..)));
+    let has_class = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::DefClass(..)));
     assert!(has_class, "pub(crate) struct should produce DefClass");
     // pub(crate) contains "pub " so the RustLayer should detect it
     // But the class flags depend on whether extract_method_flags sees "pub "
@@ -398,7 +422,14 @@ fn rust_compilation_with_medium_fidelity() {
     let (language, query) = detect_language(source);
     let mut compiler = rust_compiler();
     let ir = compiler
-        .compile(source, "test_medium", language, query, Fidelity::Medium, None)
+        .compile(
+            source,
+            "test_medium",
+            language,
+            query,
+            Fidelity::Medium,
+            None,
+        )
         .expect("Rust medium fidelity compilation should succeed");
     assert!(
         !ir.instructions.is_empty(),
@@ -443,7 +474,7 @@ fn rust_compiler_counter_is_deterministic() {
 
     let mut c1 = rust_compiler();
     let ir1 = c1
-        .compile(source, "f", language, query, Fidelity::Low, None)
+        .compile(source, "f", language.clone(), query, Fidelity::Low, None)
         .unwrap();
 
     let mut c2 = rust_compiler();
@@ -498,9 +529,17 @@ fn rust_multiple_structs_all_captured() {
             }
         })
         .collect();
-    assert!(classes.contains(&"Alpha"), "should have Alpha: {:?}", classes);
+    assert!(
+        classes.contains(&"Alpha"),
+        "should have Alpha: {:?}",
+        classes
+    );
     assert!(classes.contains(&"Beta"), "should have Beta: {:?}", classes);
-    assert!(classes.contains(&"Gamma"), "should have Gamma: {:?}", classes);
+    assert!(
+        classes.contains(&"Gamma"),
+        "should have Gamma: {:?}",
+        classes
+    );
 }
 
 #[test]
@@ -522,9 +561,21 @@ fn rust_mixed_struct_enum_trait_all_captured() {
             }
         })
         .collect();
-    assert!(classes.contains(&"MyStruct"), "should have MyStruct: {:?}", classes);
-    assert!(classes.contains(&"MyEnum"), "should have MyEnum: {:?}", classes);
-    assert!(classes.contains(&"MyTrait"), "should have MyTrait: {:?}", classes);
+    assert!(
+        classes.contains(&"MyStruct"),
+        "should have MyStruct: {:?}",
+        classes
+    );
+    assert!(
+        classes.contains(&"MyEnum"),
+        "should have MyEnum: {:?}",
+        classes
+    );
+    assert!(
+        classes.contains(&"MyTrait"),
+        "should have MyTrait: {:?}",
+        classes
+    );
 }
 
 // ── Generics ───────────────────────────────────────────────────────
@@ -603,10 +654,14 @@ fn rust_sample_trait_impl_produces_implements() {
 #[test]
 fn rust_sample_async_methods_have_flags() {
     let ir = compile_sample();
-    let has_async = ir.instructions.iter().any(|op| {
-        matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"ASYNC".to_string()))
-    });
-    assert!(has_async, "sample has async get_user — should produce ASYNC flag");
+    let has_async = ir
+        .instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"ASYNC".to_string())));
+    assert!(
+        has_async,
+        "sample has async get_user — should produce ASYNC flag"
+    );
 }
 
 // ── Phase C Regression Tests (P5) ─────────────────────────────────
@@ -629,7 +684,14 @@ fn rust_standalone_inherent_impl_produces_def_class() {
     let (language, query) = detect_language(source);
     let mut compiler = rust_compiler();
     let ir = compiler
-        .compile(source, "test_standalone", language, query, Fidelity::Low, None)
+        .compile(
+            source,
+            "test_standalone",
+            language,
+            query,
+            Fidelity::Low,
+            None,
+        )
         .expect("compilation should succeed");
 
     let class_names: Vec<&str> = ir
@@ -674,7 +736,14 @@ fn rust_standalone_trait_impl_produces_def_class_and_implements() {
     let (language, query) = detect_language(source);
     let mut compiler = rust_compiler();
     let ir = compiler
-        .compile(source, "test_standalone_trait", language, query, Fidelity::Low, None)
+        .compile(
+            source,
+            "test_standalone_trait",
+            language,
+            query,
+            Fidelity::Low,
+            None,
+        )
         .expect("compilation should succeed");
 
     let class_names: Vec<&str> = ir
@@ -772,7 +841,10 @@ fn rust_plain_struct_no_cfg_flag() {
             flags.iter().any(|f| f.starts_with("CFG("))
         })
     });
-    assert!(!has_cfg_flag, "struct without #[cfg(...)] should NOT produce CFG flag");
+    assert!(
+        !has_cfg_flag,
+        "struct without #[cfg(...)] should NOT produce CFG flag"
+    );
 }
 
 /// Regression: extract_generic_params must be called at Medium fidelity.

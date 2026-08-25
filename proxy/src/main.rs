@@ -11,7 +11,9 @@
 //
 // Environment variables (all optional):
 //   PORT               : Local port (default: 8787)
-//   ANTHROPIC_BASE_URL : Upstream URL (default: https://api.anthropic.com)
+//   PROXY_UPSTREAM_URL : Upstream URL (dedicated; takes precedence)
+//   COPILOT_BRIDGE_URL : Alias for the Copilot bridge upstream
+//   ANTHROPIC_BASE_URL : Legacy upstream URL (default: https://api.anthropic.com)
 //   AUTO_CACHE         : Enable cache injection (1/true)
 //   TAIL_TTL           : Tail breakpoint TTL (default: "5m")
 //   DROP_TOOLS         : Comma-separated tool names to drop
@@ -21,22 +23,23 @@
 //   LOG_BODIES         : Log request/response bodies (1/true)
 //   LOG_DIR            : Log directory (default: .clean-ctx/proxy-logs)
 
+mod cache;
+mod community_filters;
 mod config;
 mod error;
-mod cache;
-mod transform;
-mod logger;
-mod server;
-mod scrub;
-mod scrub_patterns;
-mod filter_rules;
-mod filters;
-mod filter_registry;
-mod community_filters;
-mod filter_stats;
 mod filter_loader;
+mod filter_registry;
+mod filter_rules;
+mod filter_stats;
+mod filters;
+mod logger;
 mod pipeline;
 mod platform;
+mod rate_limiter;
+mod scrub;
+mod scrub_patterns;
+mod server;
+mod transform;
 
 use tokio::sync::watch;
 use tracing::info;
@@ -51,27 +54,54 @@ async fn main() -> Result<(), ProxyError> {
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info"))
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .init();
 
     // Parse configuration from environment
     let config = ProxyConfig::from_env();
 
+    // Validate configuration (rejects self-forwarding loops).
+    config.validate()?;
+
+    // Print non-fatal configuration warnings (e.g. AUTO_CACHE against a local bridge)
+    // BEFORE the banner so they're visible without box-formatting truncation.
+    for warning in config.warnings() {
+        println!("⚠  {warning}");
+        info!("[proxy] WARNING: {}", warning);
+    }
+
     println!("╔═══════════════════════════════════════════════════════════╗");
     println!("║     Clean-CTX Anthropic Proxy                           ║");
     println!("╠═══════════════════════════════════════════════════════════╣");
-    println!("║  Listen:     http://127.0.0.1:{}                        ", config.port);
-    println!("║  Upstream:   {}           ", config.upstream_url);
-    println!("║  Auto-cache: {}                                    ", if config.auto_cache { "ON " } else { "OFF" });
+    println!(
+        "║  Listen:     http://127.0.0.1:{:<24}             ",
+        config.port
+    );
+    println!("║  Upstream:   {:<34} ", config.upstream_url);
+    if config.upstream_url.contains("127.0.0.1") || config.upstream_url.contains("localhost") {
+        println!("║              (local upstream — e.g. Copilot bridge)          ");
+    }
+    println!(
+        "║  Auto-cache: {}                                    ",
+        if config.auto_cache { "ON " } else { "OFF" }
+    );
     if config.auto_cache {
-        println!("║  Tail TTL:   {}                                       ", config.tail_ttl);
+        println!(
+            "║  Tail TTL:   {}                                       ",
+            config.tail_ttl
+        );
     }
     if !config.drop_tools.is_empty() {
-        println!("║  Drop tools: {}                              ", config.drop_tools.join(", "));
+        println!(
+            "║  Drop tools: {}                              ",
+            config.drop_tools.join(", ")
+        );
     }
-    println!("║  Strip ANSI: {}                                    ", if config.strip_ansi { "ON " } else { "OFF" });
+    println!(
+        "║  Strip ANSI: {}                                    ",
+        if config.strip_ansi { "ON " } else { "OFF" }
+    );
     if config.trim_bash_git {
         println!("║  Bash trim:  ON                                     ");
     }
@@ -100,7 +130,10 @@ async fn main() -> Result<(), ProxyError> {
 
     // Start the server
     info!("Starting proxy server on 127.0.0.1:{}", config.port);
-    info!("Set ANTHROPIC_BASE_URL=http://127.0.0.1:{} in your client", config.port);
+    info!(
+        "Set ANTHROPIC_BASE_URL=http://127.0.0.1:{} in your client",
+        config.port
+    );
 
     run_server(config, shutdown_rx).await?;
 

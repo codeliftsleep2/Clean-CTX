@@ -142,6 +142,7 @@ pub struct CompiledFilter {
     pub match_command: Regex,
     pub priority: i32,
     pub strip_ansi: bool,
+    #[allow(dead_code)]
     pub filter_stderr: bool,
     pub reduce_json: bool,
     pub replace: Vec<CompiledReplace>,
@@ -153,6 +154,7 @@ pub struct CompiledFilter {
     pub tail_lines: Option<usize>,
     pub max_lines: Option<usize>,
     pub on_empty: Option<String>,
+    #[allow(dead_code)]
     pub user_config_key: Option<String>,
 }
 
@@ -182,6 +184,7 @@ pub struct CompiledGroupBy {
 
 /// Inline conformance test (compiled).
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CompiledFilterTest {
     pub name: String,
     pub input: Option<String>,
@@ -223,7 +226,9 @@ pub fn compile_filter_file(
             Ok(mut compiled) => {
                 // Sort strip_lines and keep_lines for stable matching
                 compiled.strip_lines.sort_by_key(|a| a.as_str().len());
-                compiled.keep_lines.sort_by_key(|b| std::cmp::Reverse(b.as_str().len()));
+                compiled
+                    .keep_lines
+                    .sort_by_key(|b| std::cmp::Reverse(b.as_str().len()));
 
                 let tests = file
                     .tests
@@ -245,7 +250,10 @@ pub fn compile_filter_file(
 }
 
 /// Compile a single filter rule definition.
-fn compile_filter(name: &str, def: &FilterRuleDef) -> Result<CompiledFilter, Vec<FilterCompileError>> {
+fn compile_filter(
+    name: &str,
+    def: &FilterRuleDef,
+) -> Result<CompiledFilter, Vec<FilterCompileError>> {
     let mut errors = Vec::new();
 
     let match_command = compile_regex(name, "match_command", &def.match_command, &mut errors);
@@ -255,11 +263,16 @@ fn compile_filter(name: &str, def: &FilterRuleDef) -> Result<CompiledFilter, Vec
         .iter()
         .enumerate()
         .filter_map(|(i, r)| {
-            compile_regex_opt(name, &format!("replace[{i}].pattern"), &r.pattern, &mut errors)
-                .map(|pattern| CompiledReplace {
-                    pattern,
-                    replacement: r.replacement.clone(),
-                })
+            compile_regex_opt(
+                name,
+                &format!("replace[{i}].pattern"),
+                &r.pattern,
+                &mut errors,
+            )
+            .map(|pattern| CompiledReplace {
+                pattern,
+                replacement: r.replacement.clone(),
+            })
         })
         .collect();
 
@@ -268,17 +281,19 @@ fn compile_filter(name: &str, def: &FilterRuleDef) -> Result<CompiledFilter, Vec
         .iter()
         .enumerate()
         .filter_map(|(i, m)| {
-            compile_regex_opt(name, &format!("match_output[{i}].pattern"), &m.pattern, &mut errors)
-                .map(|pattern| CompiledMatchOutput {
-                    pattern,
-                    message: m.message.clone(),
-                    unless: m
-                        .unless
-                        .as_ref()
-                        .and_then(|u| {
-                            compile_regex_opt(name, &format!("match_output[{i}].unless"), u, &mut errors)
-                        }),
-                })
+            compile_regex_opt(
+                name,
+                &format!("match_output[{i}].pattern"),
+                &m.pattern,
+                &mut errors,
+            )
+            .map(|pattern| CompiledMatchOutput {
+                pattern,
+                message: m.message.clone(),
+                unless: m.unless.as_ref().and_then(|u| {
+                    compile_regex_opt(name, &format!("match_output[{i}].unless"), u, &mut errors)
+                }),
+            })
         })
         .collect();
 
@@ -301,13 +316,11 @@ fn compile_filter(name: &str, def: &FilterRuleDef) -> Result<CompiledFilter, Vec
         .collect();
 
     let group_by = def.group_by.as_ref().and_then(|gb| {
-        compile_regex_opt(name, "group_by.key", &gb.key, &mut errors).map(|key| {
-            CompiledGroupBy {
-                key,
-                max_per_group: gb.max_per_group,
-                max_groups: gb.max_groups,
-                omit_label: gb.omit_label.clone(),
-            }
+        compile_regex_opt(name, "group_by.key", &gb.key, &mut errors).map(|key| CompiledGroupBy {
+            key,
+            max_per_group: gb.max_per_group,
+            max_groups: gb.max_groups,
+            omit_label: gb.omit_label.clone(),
         })
     });
 

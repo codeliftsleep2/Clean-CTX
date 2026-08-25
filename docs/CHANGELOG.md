@@ -1,4 +1,4 @@
-# Clean-CTX — Changelog
+﻿# Clean-CTX — Changelog
 
 **All notable changes to this project will be documented in this file.**
 
@@ -6,7 +6,434 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [0.1.7] — Unreleased
+## [Unreleased] - 2026-08-25 - Non-CBM Tool Audit Fix Cycle
+
+Evidence-driven fix cycle over the 2026-08-25 non-CBM tool audit. Every fix was reproduced with a failing regression test before implementation.
+
+### Fixed
+
+- **`diff_commits` emitted access modifiers as changed-class labels** (`~ class internal`, `~ class public`). Two compounding label-derivation defects: (1) `MODIFIERS_CLASS` lacked `internal `, so `strip_modifiers` stopped immediately on `internal static class Foo` and the first whitespace token became the "name"; (2) the diff snapshot builder routed `struct.root`/`enum.root` through `extract_rust_struct_name` for ALL languages — that helper only strips Rust visibility prefixes, so `public enum Foo` labeled as `public`. Fixes: `internal ` added to `MODIFIERS_CLASS`; `enum `/`struct ` keyword stripping added to `extract_class_name`/`extract_class_meta`; `diff::builder::try_build_with` now receives its parser label and routes non-Rust struct/enum/trait/impl through the shared class-name extractor while Rust keeps byte-identical behavior. Unchanged-class rendering untouched.
+- **`compress_workspace` at Low fidelity lost method identifiers** for C# signatures like `internal static async Task<(A section, …, Guid requestId)> CreateRecordWithDefaults(…)`, rendering them as `internal static async Task(scope)`. Mechanism: with a named tuple return type whose last element is lowercase, `is_csharp_return_type(tokens[len-2])` misfires and the fallback split the WHOLE signature at the first `<`, yielding the type prefix as the "name". Fix: when the parameter list is located structurally (`find_method_params`), the name is the last whitespace token before it regardless of naming convention; the no-parameter-list legacy fallback is preserved; Medium/High/Edit outputs are pinned unchanged by test.
+- **Alias registry path fragmentation**: the same physical file could hold two aliases (visible as duplicate `α` entries in `§PATHMAP`) because alias keys used the raw caller-supplied string while handlers mix absolute and workspace-relative spellings. Fix: `PathDictionary::get_or_create_alias` now resolves keys via canonicalize-or-fallback (Windows verbatim `\\?\` prefix stripped for readable PATHMAP output); exact-string repeats fast-path without filesystem access. Alias-keyed state (IR context versions, text-delta baselines, LLM text cache) converges onto one identity per file.
+- **`decompress_code_context` destroyed class boundaries on round-trip**: the blanket skip-all-`//`-comments rule removed the IR renderer's structural `// ── ClassName ──` markers, turning a multi-class skeleton into an unattributed flat field list. Boundary markers are now preserved verbatim; opcode expansion around them is unchanged.
+- **`list_sessions` returned a static `"Persistence DB active."` status line** despite promising an enumeration. The persistence model has NO session concept (the `sessions` table is dead schema nothing writes), so instead of inventing session data the tool now lists what genuinely exists: one row per persisted file context (path, fidelity, token counts, delta count, last-update timestamp) via new `SqliteStore::list_contexts()` + `BufferedStore` passthrough; description corrected accordingly.
+- **`context_stats` clamped negative savings to `0.0%`**: compression can legitimately COST tokens (small file / unfocused edit fidelity). Per-file, domain-aggregate and session-total percentages are now signed — the dashboard shows the true negative figure while raw/compressed token measurements are untouched.
+
+### Changed
+
+- **`delta_text_context` contract made explicit**: the tool is a text-based diff strategy for the SAME source-code registry as `delta_code_context` — not a generic text tool. Description and README row updated to state the code-only scope; no behavior change.
+- Documented (no code change) that `diff_code_context` maintains its own baseline local to itself (canonical path + fidelity), independent of `provide_code_context`/`compress_code_context` (audit finding #8), and that bare `F` field markers at low fidelity remain intentional compression semantics, not a defect (audit finding #7).
+
+### Added
+
+- Regression suites: gitdiff end-to-end label tests (changed internal class + unchanged sibling in one file); compaction tests for modifier/keyword extraction and compound-signature fidelity pins; diff-builder language-split tests (C# internal class, C# enum, Rust enum guard); alias identity convergence + unresolvable-fallback tests; decompression multi-class boundary round-trip; `SqliteStore::list_contexts` store tests; `src/tests/mcp/tool_contracts.rs` pins locking both corrected tool descriptions and the enumeration behavior.
+
+### Verification
+
+- Focused regression suites green under default features AND `--features rust` (the diff-builder module is feature-gated).
+- Full gate: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, complete workspace test suite.
+
+---
+
+## [Unreleased] - 2026-08-24 - Typed graph_query Edge Extraction
+
+### Fixed
+
+- **Typed `graph_query` reported "N node(s), 0 edge(s)" for every relationship-returning Cypher.** `GraphBridge::query_graph()` read only column 0 of each result row into nodes while its `edges` field was a literal empty vec — despite the doc comment claiming rows were interpreted "as either node or edge data". Live side-by-side on an indexed project: the same `MATCH (a)-[r:CALLS]->(b) RETURN a.name, type(r), b.name LIMIT 5` returned full CALLS rows through `cbm_proxy(query_graph)` while the typed path collapsed them into duplicated column-0 nodes. The client (`CbmClient::query_graph`) was always correct; the bridge now converts via pure `convert_query_rows()`. Defect previously documented as FAANG audit M-03 and CBM_API_AUDIT open question #4; never implemented until now.
+
+### Added
+
+- Column-shape wire convention (**invariant `CBM-WIRE-002`**, docs/ARCHITECTURAL_INVARIANTS.md): a projection is relationship-shaped IFF it contains exactly ONE echoed literal `type(...)` column (whitespace-tolerant — CBM echoes `"type( r )"` verbatim). Relationship projections become edges: endpoints = FIRST and LAST non-type projected columns (projection order rules), type cell → `label`, every other projected column → `GraphEdge.properties` keyed by echoed column text with values preserved verbatim. Scrambled 5/6/N-column orders resolve purely from column metadata. ALIAS PIN: an `AS` alias REPLACES the whole expression in the echo (`type(r) AS rel_kind` ⇒ `"rel_kind"`), making aliased type() projections intentionally indistinguishable from ordinary scalars at the typed layer — they fall back to nodes by design and must never be reverse-engineered. Undirected `-[]-` projections supported and return all relationship types verbatim.
+- Regression suite `src/tests/cbm/query_wire.rs` (18 tests): verbatim raw-capture fixtures for EIGHT verified shapes (directed CALLS, undirected mixed DEFINES/DECORATES/USAGE, qualified endpoints, aliased-type, 5-column, 6-column scrambled with trailing file_path, type-first, numeric triple `[name, in_degree, out_degree]`, whitespace variant) + policy pins (numeric-triple-never-fabricates, multiple-type-columns refuse to guess, row/column misalignment fallback, empty results, duplicates pass through untouched) + four fresh-process `serial(cbm_live)` probes over a SYNTHETIC fixture repo (3-column baseline edge, wide scrambled projection with property mapping, aliased+numeric fabrication guards, node-only control).
+
+### Fixed (during this cycle)
+
+- The first implementation of this fix used a strict positional/arity rule (exactly-three-cell uniform rows ⇒ `[from, type, to]`). Live shape auditing proved that rule semantically dangerous: a uniform numeric triple like `RETURN f.name, f.in_degree, f.out_degree` would fabricate an edge labelled `"10"`. Retired before release in favor of column-shape-driven extraction; `CbmClient::query_graph` now returns the full `{columns, rows}` table (`QueryRows`) so callers can interpret the semantic projection instead of guessing from arity.
+- **CI flake (`decompression` proptest, run 32805773191)** — unrelated to CBM work, pre-existing: `word_boundary_replace_never_panics` asserted `!result.is_empty() || text.is_empty()`, a FALSE invariant — an empty replacement over a pattern covering the whole text legitimately yields `""` (removal semantics pinned by its own sibling test). Proptest's per-run randomized inputs eventually drew the counterexample on linux. The function was never wrong; the property was. Corrected to assert the actual contract (no panic + sound size bound); verified green at 5,000 cases per property.
+
+### Changed
+
+- Relationship-shaped projections now report their edges INSTEAD of column-0 nodes (column-shape semantics); no-type(...) projections keep the legacy node mapping byte-for-byte REGARDLESS of column count. Node deduplication, file-path population, and endpoint normalization are deliberately NOT included — tracked as separate findings. No public API, cache-key, or compression changes; cached `cypher:*` entries remain deserializable (populated edges reuse the existing serialized `edges` key).
+
+### Verification
+
+- Fresh-process live probes green over synthetic fixture repos: typed CALLS projections surface edges end-to-end (endpoint cells exactly as projected — bare under `.name`, qualified under `.qualified_name`), wide scrambled 4-column projection maps middle columns into properties, aliased type() and numeric-triple projections stay node-shaped; verbatim raw-capture fixtures pin the column-shape conversion deterministically across all eight captured shapes.
+- `cargo fmt --all -- --check` clean; `cargo clippy --all-targets -- -D warnings` zero warnings.
+- `cargo test --workspace --all-targets --all-features`: **2,513 passed / 0 failed / 5 ignored** (core library 2,173 + CLI binary 11 + proxy crate 329: lib 155, bin harness 155, audit-regression 18, e2e integration 1), including `e2e_cbm_multiroot_multilingual_integration`.
+
+### Test-output noise reduction
+
+- Commented out per-run debug output in the test fixtures: the multilingual audit probe's Step 1–16 narration and result dumps (`src/tests/cbm/e2e.rs`), path-resolution dumps (`debug_bundler_paths`), AST-dump tests (`dump_html_ast`, `dump_angular_template_ast` — removed from the active count, −2), the P0-1 dispatcher progress line, and the `[TIMING]` compression line. Root cause of the largest flood fixed structurally: three `observability::tracing` tests raced to install a process-global DEBUG-level tracing subscriber for the whole suite; their env-mutating bodies are commented out with rationale. Skip/error-path diagnostics (e.g. "Skipping — CBM not installed") intentionally retained.
+
+---
+
+## [0.4.0] - 2026-08-24 - CBM Graph-Intelligence & Trace-Wire Audits
+
+### Fixed
+
+- **F1 (HIGH) - blast radius returned every CALLS edge in the project.** The `get_blast_radius()` Cypher filtered on an undeclared variable (`m.name`). CBM fail-opens on invalid WHERE clauses - it returns the full row set instead of erroring - so every symbol appeared to touch every file. The query now filters on `f.name`, and a live regression test pins reported caller-files to the exact ground-truth caller set computed independently on the same client.
+- **F3 (MED) - dead-code detection ignored class Methods.** Only `:Function` nodes were scanned, leaving dead Methods (the majority of TS/C#/Java symbols) invisible. `get_dead_code()` now scans `Function` AND `Method` labels and merges the results; a live test asserts exact set-equality against the merged two-label ground truth.
+- **F11 (MED) - CBM tool failures surfaced as confident empty results.** CBM signals tool failures inside successful JSON-RPC results (`result.isError=true` plus an inner error body). These envelopes were never mapped to `CbmError`. Added `CbmError::ToolError { tool, message }` plus a pure `check_soft_error()` gate in the parsed transport path.
+- **F10 (MED) - removed the dead DATAFLOW enrichment path.** CBM 0.8.1 exposes no `DATAFLOW` edge type, and its `USAGE`/`WRITES` edges are not equivalents (no read direction). Documented as a verified upstream limitation, with a reintroduction guard that fails if a future CBM version ever exposes DATAFLOW edges.
+- **Trace-wire (HIGH) - typed `graph_trace` always returned zero edges.** `CbmClient::trace_path()` parsed a phantom `inner["edges"]` key. CBM 0.8.1 answers `trace_path` with directional `callers` / `callees` arrays whose entries carry exactly `name`, `qualified_name`, and `hop` (a JSON number); there is no `edges` key. New pure `extract_trace_edges()` normalizes the real shape into `{from, to, label}` edge objects: endpoints canonicalize `qualified_name` → bare `name`, only `hop: 1` entries convert (deeper hops are flat BFS discoveries without parent linkage and are never turned into invented relationships), exact duplicate edges dedupe preserving first-seen CBM order, and `__file__` module pseudo-callers pass through untouched. Function-not-found soft errors surface as `Err(CbmError::ToolError)` before parsing (F11 gate) - failure is never a valid empty result.
+- **Trace-direction - inbound-only relationships were undiscoverable.** `GraphBridge::trace_path(from, to)` hardcoded outbound whenever both endpoints were supplied. Outbound is now attempted first (byte-for-byte pre-fix behavior for outbound-reachable pairs; no-target calls still sweep `both`); when the outbound attempt succeeds but yields no edge touching the target, a single inbound fallback discovers callee ← caller relationships. Errors are never swapped for the other direction.
+
+### Added
+
+- **Result-propagating graph-intelligence APIs.** All five bridge queries (`get_symbol_importance_mut()`, `get_blast_radius()`, `get_dead_code()`, `get_call_edges()`, `get_architecture()`) return `Result<_, CbmError>`. Contract: `Ok(empty)` = a valid query with zero results; `Err` = CBM failure (transport fault, timeout, open circuit, or CBM-reported tool error). `InferenceLayer::enrich_from_cbm()` propagates `Err` instead of converting failure into empty data; `InferenceLayerPass` owns the failure policy (log loudly, continue without enrichment - CBM stays strictly additive); `handle_get_architecture()` returns an explicit error response.
+- **Live audit suite** `src/tests/cbm/graph_intel.rs` - 9 probes (serial `cbm_live`), each spawning a fresh CBM subprocess and re-indexing first (fresh process, fresh index): blast-radius truth set, unknown-project `Err` vs valid `Ok(empty)`, dual-label dead-code equality, DATAFLOW absence guard, wire-shape pins (`in_degree` cells arrive as JSON strings), deterministic soft-error fixtures, architecture parsing, and disk-cache project isolation across project switches.
+- **CBM compatibility/limitations documentation** verified live against 0.8.1: supported node labels and edge types, absent DATAFLOW edge type, absent Razor nodes, aggregation-free Cypher subset, fail-open behavior on invalid WHERE clauses, and wire quirks.
+- **Wire-contract regression suite** `src/tests/cbm/trace_wire.rs` - 16 tests registered in both mod mirrors: verbatim raw captures pin the parser against inbound/outbound/both/deep-hop/function-not-found envelopes; synthetic policy pins cover endpoint fallback identity, exact-duplicate dedupe ordering, absent-array leniency, hop filtering, and M-01 boundary strictness (`regression_bare_to_name_with_qualified_endpoint_is_retained`; partial/multi-segment targets match nothing); four fresh-process `serial(cbm_live)` probes run over a SYNTHETIC temp-dir fixture repo (caller -> callee is the only relationship; nothing derives from this repository): typed `graph_query` CALLS rows, two-endpoint outbound preservation, single-endpoint inbound discovery, and two-endpoint inbound-only discovery via the fallback.
+- **Architectural invariant `CBM-WIRE-001`** in `docs/ARCHITECTURAL_INVARIANTS.md` - the verified CBM 0.8.1 trace_path wire contract is now normative: `inner["edges"]` is not a valid response shape and must never be assumed by any parser, wrapper, or fixture.
+
+### Changed
+
+- Mock helper `new_mock_with_edges()` dropped its dataflow parameter; regression/e2e/inference-layer/pipeline tests updated to the new Result semantics.
+- Documentation refreshed across four areas (graph intelligence, multi-root lifecycle, CBM compatibility/limitations, testing/verification); stale claims of working DATAFLOW enrichment removed rather than caveated; stale test counts corrected everywhere (previously 2,263 in general docs, 1,512 in SECURITY.md).
+- **M-01 target-predicate boundary normalization.** CBM identifies symbols by QUALIFIED names while `graph_trace` accepts bare names; the post-filter now matches exact-equal OR final-dot-segment endpoints (partial/multi-segment targets match nothing), so a bare-to name retains edges whose wire endpoints are qualified. Public API signatures, cache keys, handler output contracts, compression, and graph_query semantics are otherwise unchanged.
+- Stale `trace_path` / `get_architecture` wire-shape rows corrected in `extradocs/CBM_API_AUDIT_AND_PHASE2_PLAN.md` (on-disk reference copy; `extradocs/` is untracked by design).
+
+### Verification
+
+- Fresh-process/fresh-index live audit against a rebuilt CBM binary: all 9 audit probes green; self-contained multilingual fixture green through step 16 including cross-language resolution and primary-project health after project switches.
+- Trace-wire audit verified separately: verbatim raw-capture fixtures (fresh subprocess) pin the parser deterministically, and four fresh-process live probes over a synthetic temp-dir fixture prove typed `graph_query` CALLS rows, outbound preservation, single-endpoint inbound discovery, and the two-endpoint inbound-only fallback regression.
+- `cargo fmt --all -- --check` clean; `cargo clippy --all-targets -- -D warnings` zero warnings.
+- `cargo test --workspace --all-targets --all-features`: **2,497 passed / 0 failed / 5 ignored** (core library 2,157 + CLI binary 11 + proxy crate 329: lib 155, bin harness 155, audit-regression 18, e2e integration 1).
+
+---
+
+## [0.3.1] — 2026-08-23 — C-22 Canonical Source-Span Contract & Multi-Class Fix
+
+### Added
+
+#### C-22: Canonical Decorator/Annotation/Attribute-Inclusive Class Source Contract
+
+- **Architectural invariant established:** `MetaLayerPass` derives class source spans from `PassContext.captures` (the canonical `CapEntry` capture identity) — NOT from `CoreOp::DefClass.name`. This eliminates the semantic corruption where `DefClass.name` carried full source text instead of a class name.
+- **`class_source_from_capture()`** in `src/meta_util.rs` — trilingual backward scan for TS `@Name(...)`, Java `@Name`, C# `[Name]`. Non-decorated classes use the declaration-keyword byte as fallback (backward compatible).
+- **`MetaLayer::enrich()`** now receives `class_captures: &[String]` directly, eliminating the `DefClass.name` round-trip that previously corrupted framework marker detection for Java and C# meta-layers.
+- **Architectural debt resolved:** P0 design document (`docs/P0_SOURCE_SPAN_CONTRACT_DESIGN_2026-08-22.md`) marked as IMPLEMENTED with all 5 recommended steps complete.
+
+#### R-43b: Multi-Class-Per-File Support & Per-Class Isolation
+
+- **Cross-contamination fix:** Three architectural defects allowed markers to leak between classes in multi-class files:
+  1. `find_class_source_start` backward scan could walk past preceding class's closing `}`
+  2. `find_class_body_open` only scanned for `class ` keyword (missing `interface`/`enum`/`record`/`struct`)
+  3. `MetaLayer::enrich` extracted `class_captures` from `DefClass.name` (a semantic round-trip)
+- **Class boundary guard:** `find_class_source_start` now stops at a closing `}` — `}` is never a valid annotation prefix.
+- **Type-aware body scanning:** `find_class_body_open` handles all type keywords (`class`, `interface`, `enum`, `record`, `struct`) for Spring Boot and Angular.
+- **Per-class metadata invariant:** A meta-layer may inspect only the exact source span belonging to the type it is enriching. It must never infer ownership from neighboring or whole-file text.
+
+#### Multi-Class Verification Tests (9 new)
+
+- **Java/Spring Boot (3 tests):** `MultiClassFixture.java` (6 classes) — verifies `@RestController`/`@Service` markers don't leak to `AppConfig` or `HealthController` at Low/Medium/High.
+- **TypeScript/Angular (3 tests):** `MultiClassFixture.ts` (5 classes) — verifies `@Component`/`@Injectable` markers don't cross-contaminate at Low/Medium/High.
+- **C#/.NET (3 tests):** `MultiClassFixture.cs` (5 classes) — verifies `[ApiController]` markers don't leak to `NotificationHub` or `InventoryDbContext` at Low/Medium/High.
+- Each test asserts document-order preservation and per-class marker isolation through the production `compress_text` pipeline.
+
+### Fixed
+
+- **UTF-8 encoding corruption** in 4 test assertions (`src/tests/compression/pipeline.rs`): mojibake (corrupt `0xCE+0xA6`→`Φ`, `0xCE+0xB1`→`α`, `0xC2+0xA7`→`§`) caused false-negative failures in `compress_text_with_aliases_medium_fidelity`, `compress_text_with_aliases_high_fidelity`, `compress_text_emits_angular_component_markers`, and `compress_text_emits_angular_injectable_markers`. Restored via `git checkout` and re-appended with explicit UTF-8 encoding.
+
+### Changed
+
+- `docs/ARCHITECTURAL_INVARIANTS.md` — C-22 added as ENFORCED invariant.
+- `docs/ARCHITECTURE_OVERVIEW.md` — System diagram now shows Spring Boot and .NET meta-layer boxes plus the `LayerRegistry` dispatch pattern.
+- `docs/COMPILER_IR.md` — §3.1 pipeline description updated to include `DotNetMetaLayer`, C-22 class-captures derivation, and multi-class invariant. §9 meta-layer table expanded with .NET and full Angular ecosystem markers.
+- `docs/P0_SOURCE_SPAN_CONTRACT_DESIGN_2026-08-22.md` — Status changed from DESIGN ONLY to IMPLEMENTED; Executive Summary table updated to reflect all three meta-layers producing markers on both IR and text paths.
+- `extradocs/FAANG_AUDIT_FINDINGS.md` — P0-4 (dual meta-layer systems) marked as resolved.
+- All 406 existing tests remain green.
+
+### Version history
+
+| Version | Date | Highlights |
+|---------|------|------------|
+| 0.3.1 | 2026-08-23 | **Architectural fixes.** C-22 canonical source-span contract, R-43b multi-class per-class isolation, class boundary guards, type-aware body scanning, 9 multi-class verification tests |
+
+---
+
+## [0.3.0] — 2026-08-12 — Angular Ecosystem Deepening (R-23/R-24/R-25)
+
+### Added
+
+#### RxJS Meta-Layer (R-24) — `src/angular_meta/rx.rs`
+- New `RxJsKind` marker namespace (`Φobs:`, `Φsubject:`, `ΦpipeRx:`, `Φmap:`, `Φtap:`, `Φfilter:`, `Φcatch:`, `Φfinalize:`, `Φdelay:`, `Φcombine:`, `Φshare:`, `Φto:`, `Φwith:`, `Φscan:`, `Φdistinct:`, `Φretry:`) with `PhiMarker` impl
+- `RxShape` struct + `extract_rx_shape()` — import-gated on `from 'rxjs'` / `rxjs/operators`
+- Observable field detection (type annotations, `$` suffix, creation functions, service calls), subject instantiations (`Subject`/`BehaviorSubject`/`ReplaySubject`/`AsyncSubject` with initial value), pipe chains (`.pipe(` with depth/string-aware body capture), static combinators (`combineLatest`/`forkJoin`/`merge`/`zip`/`race`)
+- `render(fidelity)` / `render_with_config(fidelity, min_pipe_operators)` — pipe chains suppressed below the configurable operator threshold (default 2)
+
+#### NgRx Meta-Layer (R-23) — `src/angular_meta/ngrx.rs`
+- New `NgRxKind` marker namespace (`Φngrx:`, `Φaction:`, `Φreducer:`, `Φeffect:`, `Φselector:`, `Φentity:`, `Φstore:`, `Φdispatch:`, `Φselect:`) with `PhiMarker` impl
+- `NgRxShape` struct + `extract_ngrx_shape()` — import-gated on `@ngrx/store|effects|entity|data` with barrel-import fallback
+- Action creators, reducers (standalone + inline `createReducer` in `createFeature`), effects (source action → service call → success/failure action, `{ dispatch: false }`), selectors, entity adapters, Store DI, dispatch/select call sites (multi-line + string-aware)
+- NgRx Data `EntityCollectionServiceBase<T>` → `Φentity:T (data-layer)` (auto-generated CRUD)
+- Cross-layer graph edges (`NgRxEdgeKind`) wired into `AngularGraph` via `to_graph_edges()`: Action→Reducer, Action→Effect, Effect→Service, Effect→Action, Component→Store, Component→Selector
+
+#### Signals Meta-Layer — `src/angular_meta/signals.rs`
+- New `SignalKind` marker namespace (`Φsignal:`, `Φcomputed:`, `Φsig-effect:`, `ΦtoSignal:`, `ΦtoObservable:`, `ΦlinkedSignal:`) with `PhiMarker` impl
+- `SignalShape` + `extract_signal_shape()` — import-gated on `@angular/core` + signal function usage
+- `signal()` / `computed()` / `effect()` / `toSignal()` / `toObservable()` / `linkedSignal()` declarations; `effect()` disambiguated from NgRx `createEffect` (identifier-preceded guard)
+
+#### Routing Meta-Layer — `src/angular_meta/routing.rs`
+- New `RouteKind` marker namespace (`Φroute:`, `Φguard:`, `Φresolver:`) with `PhiMarker` impl
+- `RouteShape` + `extract_route_shape()` — import-gated on `@angular/router`
+- `Routes` arrays, `RouterModule.forRoot/forChild`, lazy `loadComponent`/`loadChildren`, class + function guards, class + function resolvers; field-order-agnostic object-key parsing with escape-aware quoted paths
+
+#### Shared infra
+- `src/meta_util.rs` — layer-agnostic string/depth-aware parsing primitives: `split_top_level`, `find_matching_brace`, `find_first_top_level`, `find_enclosing_brace`, `collect_call_body`, `consume_call_expression`, `extract_first_quoted`, `extract_entity_type`, `extract_decl_name`, `is_inside_comment_or_string` (Round-8 structural refactor + Round-11)
+- `src/angular_meta/phi.rs` — generic `PhiMarker` trait + `PHI_EXPANDERS` registry (registering a new sub-layer is a 1-line change)
+- `src/angular_meta/util.rs` — re-export shim for the meta-layers
+- Config sub-layers (`RxJsConfig`, `NgRxConfig`, `SignalsConfig`, `RoutingConfig`) honored via `render_with_config`; `layers/meta/mod.rs` threads them through `run_meta_layer_with_config`
+
+### Fixed
+
+#### Round-7 → Round-11 FAANG audits (the 4 extraction layers)
+- **Round-7:** string-aware pipe/brace scans (`collect_call_body`), named effects, multi-line call sites, depth-aware combinator args
+- **Round-8:** structural refactor — all string/depth parsing centralized into `src/meta_util.rs`; no per-layer hand-rolled scanners
+- **Round-9:** type-annotated assignment names (`users$: Observable<T> = this.http.get(...)` → `Φobs:users$`, not the type token), array-map false-positive guard in effect success-action detection, partial-identifier guard in signals (`= signalName(` ≠ `signal()`)
+- **Round-10:** string-aware `@Component` scanner (`find_matching_brace`), comment-skip guards for `path:`/`implements`/`Resolve<`, nearest-class lookup in `class_name_before`, flaky timing-test fix (`audit8_state_new_is_fast`)
+- **Round-11:** systematic comment/string-awareness — new `is_inside_comment_or_string` threaded through every scan site (rx, ngrx, signals, routing); `is_routes_context` gate in routing so `path:` in an unrelated object literal is not treated as a route; 16 new regression tests
+
+### Tests
+- `src/tests/angular_meta/rx.rs` — 26 tests (observable/subject/combinator/pipe/fidelity/marker round-trip + Round-9/11 regressions)
+- `src/tests/angular_meta/ngrx.rs` — 24 tests (actions/reducers/effects/selectors/entity/data-layer/inline-feature/marker round-trip + Round-9/10/11 regressions)
+- `src/tests/angular_meta/signals.rs` — 21 tests (signal/computed/effect/toSignal/toObservable/linked/render + Round-9/11 regressions)
+- `src/tests/angular_meta/routing.rs` — 23 tests (routes/guards/resolvers/fidelity + Round-10/11 regressions)
+- `src/tests/angular_meta/graph_ngrx.rs` — 7 cross-layer graph tests
+- `src/tests/angular_meta/util.rs` — 6 new `is_inside_comment_or_string` tests
+- Flagged tests: `ngrx` optional-method syntaxes (`OptionalMethod`) and `missing_docs` gates verified
+
+**Verification:** 2,263 tests passing (up from 2,141), 0 clippy warnings under `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
+
+---
+
+## [0.3.0] — 2026-08-07 — Angular HTML Template Compression
+
+### Added
+
+#### R-44: Angular HTML Template Compression
+- New `src/angular_meta/template_compress.rs` module — fidelity-gated Angular template compression entry point:
+  - `compress_template(html, fidelity)` — Low → single-line shape summary, Medium → multi-line structural Angular semantics, High → near-full template with HTML scaffolding stripped
+  - `compress_template_to_string(html, fidelity)` — joined-string convenience wrapper
+  - `compress_template_with_prime_ng(html, fidelity)` — appends PrimeNG `Φp-<name>:` markers
+  - `is_prime_ng_component(tag)` / `extract_prime_ng_markers(shape)` — PrimeNG pattern recognition (Phase 4)
+- `TemplateShape::to_marker_lines(fidelity)` in `src/angular_meta/template.rs` — fidelity-gated rendering:
+  - Low → byte-identical to existing `to_marker_line()` (non-regression)
+  - Medium → preserves `@if(cond)`, `@for(var of iter)`, custom elements with binding expressions, structural directives
+  - High → preserves all elements, all bindings, all conditions, all event handlers, interpolation count
+  - Empty template → `["Φtpl:empty"]` at all fidelities
+- `TemplateShape` extended with: `elements` (structured `TemplateElement`), `if_conditions`, `for_loops`, `prop_binding_exprs`, `event_binding_exprs`, `two_way_binding_exprs`
+- `TemplateElement` struct with `render()` — compact per-element line with bindings/directives
+- `PhiLineKind` extended with `TemplateBinding` (`Φtbind:`), `TemplateDirective` (`Φtdir:`), `TemplateComponent` (`Φtcmp:`) — full vocabulary wiring (marker_prefix, expansion, expand order, token lookup)
+- `src/angular_meta/mod.rs` — exports `template_compress` module; `run_meta_layer()` uses `shape.to_marker_lines(fidelity)`
+
+#### R-44 Phase 2: GitDiff Integration
+- `src/gitdiff/engine.rs` — `.component.html` files routed through the Angular template compressor:
+  - `is_angular_template(path)` — detects `.component.html` (feature-gated)
+  - `diff_two_contents()` — modified `.component.html` files produce compressed old/new template change-sets (not line-count deltas)
+  - `compress_added_file()` — added `.component.html` files emit compressed template skeleton
+
+#### R-44 Phase 3: Heuristics + provide_code_context Integration
+- `src/mcp/heuristics.rs`:
+  - `is_angular_template_path()` — detects `.component.html`
+  - `classify_file()` — `.component.html` classified as `FileClass::Implementation` with `Fidelity::Medium` default (checked before Config classification)
+  - `resolve_fidelity()` — `intent="edit"` on `.component.html` → `Fidelity::High` (template editing trigger)
+- `src/mcp/tool_handlers/core.rs` — `handle_provide_code_context()` routes `.component.html` files through `compress_template_with_prime_ng()`:
+  - Fidelity resolution: explicit arg > edit-intent High > Medium default
+  - Records compression stats to the `angular_template` domain
+  - Persists to SQLite DB (`queue_save_context` + `flush_persistence`) so `context_stats` and cross-session dashboards report Angular template savings
+  - Injects baseline cache breakpoint
+
+#### R-44 Phase 4: PrimeNG Pattern Recognition
+- `Φp-<name>:` markers for PrimeNG components (`p-table`, `p-card`, `p-message`, etc.)
+- `is_prime_ng_component()` operates on `custom_elements` (tags containing a hyphen) — safe from `<p>`/`<picture>` false-positives
+
+#### Dashboard: `angular_template` domain
+- `src/mcp/session_stats.rs` — `angular_template` domain added to the per-domain breakdown rendering (`Angular Templates: {raw} → {comp} ({savings}%↓)`)
+
+### Fixed
+- **Word-boundary bug** in `src/angular_meta/template.rs`: `@if`/`@for` inside string literals (e.g. `{{ "@if (x)" }}`) or identifiers (e.g. `@formatter`) were falsely captured into `if_conditions`/`for_loops`. Gated extraction behind the same `contains_at_keyword` word-boundary check used for `control_flow_blocks`. Added regression tests.
+- **Persistence gap** in `src/mcp/tool_handlers/core.rs`: `.component.html` compressions were recorded in-memory but never persisted to the SQLite DB. Added `queue_save_context` + `flush_persistence`.
+
+### Tests
+- `src/tests/angular_meta/template_compress.rs` (new) — 17 tests: Low/Medium/High fidelity rendering, PrimeNG detection/markers, empty-template edge cases
+- `src/tests/angular_meta/template.rs` — 2 new regression tests for the word-boundary fix
+- `src/tests/angular_meta/markers.rs` — `phi_line_kind_uniqueness` updated to 17 variants
+- `src/tests/mcp/heuristics.rs` — 3 new tests for `.component.html` classification + edit-intent fidelity
+- `src/tests/gitdiff/engine.rs` — 2 new tests for `.component.html` diff change-sets
+- `src/tests/mcp/session_stats.rs` — 1 new test for `angular_template` domain rendering
+
+**Verification:** 2,141 tests passing, 0 clippy warnings. Live E2E verified: `provide_code_context` on `.component.html` returns fidelity-gated output with PrimeNG markers + baseline breakpoint. Measured compression: High 47.4% byte / 34.2% token reduction, Medium 32.1% byte reduction.
+
+---
+
+## [0.3.0] — 2026-08-04 — IR Evolution: Execution Semantics & Behavioral Reasoning
+
+### Added
+
+#### R-43a: Execution Semantics (Phase 1)
+- 4 new `CoreOp` variants in `src/ir/opcodes.rs`:
+  - `DataFlow` (`DATAFLOW`) — tracks which symbols a method reads/writes
+  - `ControlFlow` (`CTRL`) — control flow constructs (if, loop, match, try, await, return)
+  - `SideEffect` (`EFFECT`) — method side-effect type (pure, io, mutation, async, transaction)
+  - `ExecutionContext` (`CTX`) — method execution context (sync, async, thread_bound, transaction_scope, realtime)
+- Full wire-format support across all 6 encodings: named, positional, binary, hierarchical, string_table, and compact delta abbreviations (DF/CT/EF/CX)
+- `primary_key`/`key_tuple`/`primary_key_from_tuple`/`key_tuple_from_tuple` match arms for all 4 new variants
+- `SemanticIntent` enum + `intent` field on `IRDelta` — high-level semantic delta metadata
+- **Semantic intent detection** in `DeltaComputer::compute()`: rename (class/method/field), add/remove method, change return type, change signature, add injection
+- **Compact delta intent preservation** — `CompactDelta` now carries `intent` through encode → decode (previously dropped)
+- Language-layer behavioral extraction:
+  - Rust: async/unsafe/io → SideEffect + ExecutionContext; match/loop/if/return → ControlFlow
+  - C#: IAsyncEnumerable, SignalR Hub, DbSet, SaveChangesAsync, TransactionScope, IDisposable → behavioral ops
+  - TypeScript: RxJS subscribe/pipe, async, Observable, @Injectable → behavioral ops
+- `IRValidator` behavioral consistency checks (EFFECT("async") ↔ CTX("async"), orphan method refs)
+
+#### R-43b: Program Graph + Inference Layer + Pipeline + Validation + Query (Phases 2-6)
+- `src/ir/program_graph.rs` — lightweight local program graph (Calls, Extends, Implements, Injects, DataFlowRead/Write edges)
+- `src/ir/inference_layer.rs` — ephemeral inference layer with confidence scores (1.0 structural / 0.75 CBM / 0.5 heuristic)
+- `src/ir/pipeline.rs` — composable `IRPass` pipeline (Core → Language → Meta → Execution → Program Graph → Inference → Validation)
+- `src/ir/validator.rs` — structural + behavioral invariant validation
+- `src/ir/query.rs` — queryable IR (e.g. `find_async_methods`)
+- All modules wired into `src/ir/mod.rs` and re-exported
+
+#### R-43b Phase 3: Inference Layer CBM Enrichment
+- `InferenceLayer::enrich_from_cbm()` — consumes CBM graph data into the ephemeral inference layer (cross-file CALLS edges, DATAFLOW read/write edges → `inferred_edges`; symbol importance + dead code → `annotations`)
+- `GraphBridge::get_call_edges()` — returns `(caller, callee)` pairs for all CALLS relationships (TTL-cached)
+- `GraphBridge::get_dataflow_edges()` — returns `(method, target, direction)` triples for DATAFLOW relationships (TTL-cached)
+- `InferenceLayerPass` now accepts an optional CBM bridge via `InferenceLayerPass::with_cbm()`, wiring enrichment into Pass 6 of the pipeline
+- All CBM-derived data carries `confidence = 0.75` and `source = Cbm` (invariant C3); no-op when CBM is unavailable (invariant C2)
+- Mock test helper `new_mock_with_edges()` pre-seeds call/dataflow/importance/dead-code cache entries for deterministic tests
+
+#### R-12: Multi-file / Git-Commit Diff
+- New `diff_commits` MCP tool — diffs an entire workspace between two git refs in one call (`fromRef` required, `toRef` defaults to working tree)
+- New `src/gitdiff/` module:
+  - `refs.rs` — strict ref validation (`^[A-Za-z0-9][A-Za-z0-9._/\-~]*$`, rejects flag injection) + `rev-parse --verify` resolution
+  - `runner.rs` — safe `git` subprocess execution with `--end-of-options` (never shell-interpolated)
+  - `workspace.rs` — `collect_changed_files` via `git diff --name-status --find-renames` (Added/Deleted/Modified/Renamed classification, path validation)
+  - `engine.rs` — `gitdiff_workspace()` orchestrator: per-file AST diff for compressible files (ts/js/cs), line-count fallback for non-compressible, compact skeleton for added files, one-line entry for deleted, rename pairing
+- `§GITDIFF <from>..<to> (N files)` header + per-file `┌ FILE αN <path> (+A -D ~M)` sections
+- Security: strict ref allowlist, `resolve_file_path_checked` XPIA mitigation, no-shell Command execution, fail-closed structured errors
+- Resource limits: changed-file count capped by `resource_limits.max_workspace_files`, per-file size by `resource_limits.max_file_size_bytes` (excess → `_meta.skipped`)
+- Tests: 30 `src/gitdiff` unit tests (real temp repos) + black-box e2e dispatch test (`test_e2e_diff_commits`, `#[ignore]`)
+
+### Changed
+- `DeltaComputer::compute()` now populates `IRDelta.intent` with detected semantic intent
+- `CompactDelta` gained an `intent` field (serde `skip_serializing_if` — absent when `None`)
+- `InferenceLayerPass` changed from a unit struct to a struct holding `Mutex<Option<GraphBridge>>`; `new()` still builds an empty layer, `with_cbm()` enables CBM enrichment
+- Test count increased with semantic-intent detection tests and compact intent round-trip tests
+
+### Version history
+| Version | Date | Highlights |
+|---------|------|------------|
+| 0.3.0 | 2026-08-04 | **IR Evolution.** Execution semantics (DataFlow/ControlFlow/SideEffect/ExecutionContext), semantic delta intent, program graph, inference layer, pass pipeline, validation, query |
+
+---
+
+## [0.2.1-rc2] — 2026-07-03 — Meta-Layer Expansion & FAANG Hardening
+
+### Added
+
+#### .NET / C# Meta-Layer (R-35)
+- Full `dotnet` feature gate with 38 Φ markers mirroring the Angular/Spring architecture
+- `src/dotnet_meta/`: `controller.rs`, `service.rs`, `middleware.rs`, `endpoint.rs`, `attribute.rs`, `model.rs`, `mapper.rs`, `config.rs`, `entity.rs`, `program.rs`, `event.rs`, `background.rs`, `filter.rs`, `signalr.rs`, `health.rs`, `cors.rs`, `auth.rs`, `validation.rs`, `logging.rs`, `swagger.rs`, `fluent.rs`, `mediatr.rs`, `efcore.rs`, `serialize.rs`, `metric.rs`, `graphql.rs`, `grpc.rs`, `caching.rs`, `polly.rs`, `detect.rs`, `markers.rs`, `mod.rs`
+- `.cs` file extension support in compression pipeline, feature-gated tests
+
+#### Dual Meta-Layer Analysis (R-41/R-42)
+- `docs/DUAL_META_LAYER_ANALYSIS.md` — Comprehensive analysis of Angular + Spring Boot + .NET meta-layers with opcode inventory, fidelity tables, and feature-gate audit
+- Angular: 24 opcodes (Φcmp, Φsvc, Φmod, Φdir, Φpipe, Φin, Φout, Φmodel, Φinj, Φtpl, Φsty, Φbundle, Φgraph, Φlet, ⊕guard, ⊕sync, $a, $o, $m, $b, $P, $R, Φmap)
+- Spring Boot: 38 opcodes (7 primary ⊕ stereotypes + 31 request mapping + config + profile + test + lifecycle + messaging markers)
+- .NET: 30 opcodes (28 per-class Φ markers + controller routing + service DI)
+
+#### A-08 Token Efficiency Audit Resolution
+- Sliding context window proxy with configurable `CONTEXT_WINDOW_TOKENS` and `SLIDING_WINDOW_OVERLAP`
+- Tool output aging: `max_age_seconds` (default 1800s) drops stale tool results outside the retention window
+- Token budget enforcement: `target_tokens` soft cap trims oldest assistant-tool pairs that overflow the budget
+- Cross-reference path cache: `extract_path_strings` caches extracted paths to avoid re-parsing large tool outputs
+- `proxy/tests/audit_regression.rs` — 18 regression tests covering all audit findings
+
+### Fixed
+
+#### Feature-Gate Consistency (P1-9)
+- All angular-only imports, types, and functions across 8 files correctly gated behind `#[cfg(feature = "angular")]`:
+  - `workspace.rs`: `Arc`, `bundler`, `decorators`, `FooterBuilder`, `GraphCollector`, `template`, `style`, `extract_class_blocks`, `triplet_name`, `PassContextRef`, `format_manifest_footer`
+  - `workspace_util.rs`: `format_manifest_footer`, `PassContextRef`, `triplet_name`, `extract_class_blocks`, `find_next_class_keyword`, `find_decorator_start`, angular crate imports
+  - `template.rs`: `OnceLock`, `Language`, `Parser`, `DEFAULT_DEPTH`, and all tree-sitter helper functions
+  - `decorators.rs`: `inline_template` field and `extract_graph_entries` annotated with `#[allow(dead_code)]`
+- Non-angular stub implementations (`FooterBuilder`, `bundle_pass`, `graph_pass`) annotated with `#[allow(dead_code)]` where structurally necessary
+- All 1489 tests pass under `--all-features` with zero clippy warnings
+
+#### Clippy Warnings
+- `server.rs`: `walk_up_for_project_root` takes `&Path` instead of `&PathBuf` (clippy::ptr_arg)
+- `bridge.rs`: unused variables `c` and `status` prefixed with underscore
+- `tools.rs`: `inline_tool_names` annotated with `#[allow(dead_code)]`
+- `heuristics.rs`: empty line after doc comment merged into preceding comment
+
+### Changed
+- Proxy now includes sliding context window transform with configurable token budget and overlap
+- Documentation updated: `docs/DUAL_META_LAYER_ANALYSIS.md`, `docs/FAANG_AUDIT_FINDINGS.md`
+- Test count: 1,489 tests all passing, 0 clippy warnings
+
+### Version history
+| Version | Date | Highlights |
+|---------|------|------------|
+| 0.2.1-rc2 | 2026-07-03 | **Meta-Layer expansion.** .NET/C# meta-layer, Dual Meta-Layer analysis, A-08 sliding window proxy, P1-9 feature-gate hardening — 1,489 tests, 0 clippy warnings |
+
+---
+
+## [0.2.1-rc1] — 2026-06-30 — Foundation Complete
+
+### Added
+
+#### F-19: Streaming workspace walk (walkdir)
+- Replaced recursive `collect_source_files_inner` with `WalkDir::new(root).max_depth(32).follow_links(false)`
+- Streaming iteration eliminates collect-then-sort pattern
+- Pre-allocates path aliases during single-threaded file-collection step
+- Respects `MAX_WALK_DEPTH`, skips hidden dirs/node_modules/target/dist
+- Regression test: symlink loop protection + depth limit verification
+
+#### F-20: Rayon parallelization for `compress_workspace`
+- Applied `par_iter()` to the per-file compression loop in `compress_pass`
+- Shared manifest/errors wrapped in `Mutex` for thread-safe appending
+- Pre-assigned aliases (F-21) ensure read-only HashMap lookups in parallel phase
+- 38 workspace tests passing
+
+#### F-21: Deterministic alias assignment
+- Pre-assigns α1, α2…αN aliases sequentially before the parallel Rayon loop
+- Once assigned, `get_or_create_alias` is a read-only lookup (no mutation, safe for concurrent access)
+- Prevents non-deterministic aliases caused by thread scheduling variance
+
+#### F-22: Workspace compression result caching
+- `WorkspaceCache` stores complete `WorkspaceResult` keyed by content hash of file paths + mtimes/sizes + fidelity
+- Cache check at top of `compress_workspace_dir` returns cached result instantly on HIT
+- Lazy initialization: cache created on first MISS, stored for future calls
+- Thread-safe via `static Mutex<Option<WorkspaceCache>>`
+- Regression test: same-fidelity cache HIT + cross-fidelity cache MISS verification
+
+#### A-14: CI/CD awareness
+- `is_ci_environment()` detects 7 CI env vars: `CI`, `TF_BUILD`, `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CIRCLECI`, `TRAVIS`
+- Auto-disables persistence when CI is detected, preventing stale `persistence.db` between builds
+
+#### A-13: Resource limits and memory guardrails
+- `ResourceLimits` struct with `max_file_size_bytes` (10 MB), `max_workspace_files` (10,000), `max_memory_bytes` (512 MB)
+- Validation methods return descriptive error messages instead of OOM crashes
+- Wired into `compress_workspace_dir` (file count + memory checks) and proxy body buffers
+
+#### A-15: Configuration precedence documentation
+- Precedence rules documented in `docs/CONFIGURATION.md`: tool arg > env var > config file > default
+- Complete `.clean-ctx.json` example, env var reference, resource limits docs, CI/CD behavior, debug instructions
+
+### Fixed
+- F-22 cache key now includes `fidelity` in the hash to prevent cross-fidelity cache collisions
+- clippy `single_match` warning in `WorkspaceCache::compute_hash`
+
+### Changed
+- Documentation updated: README.md, ARCHITECTURE_OVERVIEW.md, SECURITY.md, ROADMAP.md
+- ROADMAP.md reorganized: Foundation section marked ✅ COMPLETE, all 11 FAANG items moved to Completed section
+- Test count: 1,512 tests (1,371 unit + 18 audit regression + 1 integration + 123 proxy)
+- Clippy: 0 warnings across all targets
+
+---
+
+## [0.1.7] — 2026-06-20
 
 ### Added
 
@@ -88,27 +515,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Workspace cache breakpoint**: `compress_workspace` now injects a baseline cache hint keyed on a SHA-256 hash of the manifest, so the entire workspace scan result is cacheable across sessions.
 - **Cache metrics in context_history**: Per-file cache breakpoint status and session hit rate now shown in `context_history` output (both single-file and all-files modes).
 - **Pluggable tokenizer for cache savings**: `inject_cache_breakpoints` now accepts an optional `&dyn Tokenizer` for accurate token savings estimates on cache hits. When a tokenizer is available, the full response JSON is tokenized; otherwise falls back to the rough `chars/4` heuristic.
-
-### Changed
-- `handle_tools_list`, `handle_prompts_list`, `handle_prompts_get` now take `&mut McpState` for cache hint injection
-- `inject_cache_breakpoints` signature extended with 6th parameter: `tokenizer: Option<&dyn Tokenizer>`
-- All persistence `save_context` calls in `handle_provide_code_context` (both FullCompress and DeltaTransport paths) now use the pluggable tokenizer for accurate token counts instead of the `estimate_tokens` chars/4 heuristic
-- `compute_workspace_breaker` no longer has `#[allow(dead_code)]` — it's wired into the `compress_workspace` handler (manifests hashed directly)
-- `handle_context_history` now emits per-file cache breakpoint status and session-level cache hit rate
-- Tokenizer parsed earlier in `handle_provide_code_context` so both persistence and cache breakpoints use real token counts
-
-### Fixed
-- All remaining `estimate_tokens()` call sites in `handle_provide_code_context` persistence blocks replaced with pluggable tokenizer counts
-
-### Test count
-- 1006/1006 tests pass
-- 0 new clippy warnings (1 pre-existing `too_many_arguments` on `queue_save_context`, 1 pre-existing `compute_workspace_breaker` dead-code suppression)
-
-## [0.1.6] — 2026-06-10
-
-### Added
-
-#### Zero-Touch Workflow
 - `src/mcp/heuristics.rs` — New heuristics engine that automatically selects optimal fidelity and compression strategy based on file characteristics, explicit intent, and existing baselines
 - `src/mcp/session_stats.rs` — Session statistics tracking with per-file metrics (raw/compressed tokens, savings %, delta count, strategy, Angular detection) and dashboard rendering (text + JSON formats)
 - `src/mcp/tools.rs` — Four new zero-touch workflow tools:
@@ -134,6 +540,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 #### FAANG Audit — Zero-Touch Workflow
 - `docs/FAANG_AUDIT_ZERO_TOUCH.md` — Complete audit of zero-touch workflow and persistence layer with 4 issues found and fixed
+
+### Changed
+- `handle_tools_list`, `handle_prompts_list`, `handle_prompts_get` now take `&mut McpState` for cache hint injection
+- `inject_cache_breakpoints` signature extended with 6th parameter: `tokenizer: Option<&dyn Tokenizer>`
+- All persistence `save_context` calls in `handle_provide_code_context` (both FullCompress and DeltaTransport paths) now use the pluggable tokenizer for accurate token counts instead of the `estimate_tokens` chars/4 heuristic
+- `compute_workspace_breaker` no longer has `#[allow(dead_code)]` — it's wired into the `compress_workspace` handler (manifests hashed directly)
+- `handle_context_history` now emits per-file cache breakpoint status and session-level cache hit rate
+- Tokenizer parsed earlier in `handle_provide_code_context` so both persistence and cache breakpoints use real token counts
 
 ### Fixed
 
@@ -379,7 +793,13 @@ This project follows [Semantic Versioning](https://semver.org/). Major version z
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 0.1.7 | Unreleased | Prompt cache optimization — 1006 tests, 0 clippy warnings |
+| 0.4.0 | 2026-08-24 | **CBM Graph-Intelligence & Trace-Wire Audits.** Blast-radius CALLS-edge fail-open fixed; Result-propagating intel APIs (`Ok(empty)` vs `Err(ToolError)`); dual-label dead code; dead DATAFLOW path removed; typed `graph_trace` parses the real callers/callees wire contract (phantom `edges` key eliminated); inbound-fallback direction determination; M-01 qualified/bare boundary normalization — invariant `CBM-WIRE-001`, 16-test `trace_wire.rs` suite, 2,497 tests, 0 clippy warnings |
+| 0.3.0 | 2026-08-12 | **Angular Ecosystem Deepening (R-23/R-24/R-25).** RxJS/NgRx/Signals/Routing meta-layers, cross-layer NgRx graph edges, Round-7→Round-11 FAANG audit hardening — 2,263 tests, 0 clippy warnings |
+| 0.3.0 | 2026-08-07 | **Angular HTML Template Compression (R-44).** Fidelity-gated `.component.html` compression, PrimeNG markers, GitDiff integration, `angular_template` dashboard domain — 2,141 tests, 0 clippy warnings |
+| 0.3.0 | 2026-08-04 | **IR Evolution (R-43a + R-43b).** Execution semantics, program graph, inference layer, pass pipeline, validation, query, semantic delta intent |
+| 0.2.1-rc2 | 2026-07-03 | **Meta-Layer expansion.** .NET/C# meta-layer, Dual Meta-Layer analysis, A-08 sliding window proxy, P1-9 feature-gate hardening — 1,489 tests, 0 clippy warnings |
+| 0.2.1-rc1 | 2026-06-30 | **Foundation complete.** A-09 through A-15, F-19 through F-22 — 1,512 tests, 0 clippy warnings |
+| 0.1.7 | 2026-06-20 | Multi-platform proxy, tool output filtering (R-38), secret scrubbing (R-37), pluggable tokenizers (R-19), Java/Rust language layers (R-01d/R-01c) |
 | 0.1.6 | 2026-06-10 | Zero-touch workflow + SQLite persistence + XHTML fix + inline template — 798 tests, 0 clippy warnings |
 | 0.1.5 | 2026-06-08 | FAANG Audit Compiler IR Phase E (F-30 through F-47) — 318 tests, 0 clippy warnings |
 | 0.1.4 | 2026-06-08 | Tracks C+D: Phi marker centralisation + god-function split — 301 tests, 0 clippy warnings |

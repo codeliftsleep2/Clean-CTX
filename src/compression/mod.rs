@@ -22,6 +22,7 @@
 //   - `streaming`         : Streaming variant with progress callbacks
 
 pub(crate) mod capture_pipeline;
+pub(crate) mod graph_utils;
 pub(crate) mod markers;
 pub(crate) mod micro_opcodes;
 pub(crate) mod opcodes;
@@ -31,9 +32,14 @@ pub(crate) mod scope_defaults;
 pub(crate) mod streaming;
 pub(crate) mod symbol_compression;
 pub(crate) mod text_delta;
-pub(crate) mod workspace_symbols;
-pub mod language;
+// R-02: Type-aware compression — replaces configured type names with
+// short alias tokens (`UserId` → `$uid`) and emits a reversible `§TA`
+// footer. Wired into `compress_file_with_source`, `compress_text`, and
+// `compress_source` in `pipeline.rs`.
 pub mod fidelity;
+pub mod language;
+pub(crate) mod type_aliases;
+pub(crate) mod workspace_symbols;
 
 // Re-export shared types for downstream callers.
 //
@@ -49,4 +55,4 @@ pub use language::{detect_language, language_for_extension, looks_like_csharp};
 
 // Re-export the orchestrator entry points and the progress type.
 pub use pipeline::compress_file;
-pub use streaming::{compress_file_streaming, CompressionProgress};
+pub use streaming::{CompressionProgress, compress_file_streaming};

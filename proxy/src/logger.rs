@@ -34,7 +34,13 @@ pub fn sanitize_request(body: &Value) -> Value {
 
     // Redact API key if present as a top-level field
     if let Some(obj) = sanitized.as_object_mut() {
-        for key in &["x_api_key", "x-api-key", "api_key", "anthropic_api_key", "authorization"] {
+        for key in &[
+            "x_api_key",
+            "x-api-key",
+            "api_key",
+            "anthropic_api_key",
+            "authorization",
+        ] {
             if obj.contains_key(*key) {
                 obj.insert(key.to_string(), Value::String("[REDACTED]".to_string()));
             }
@@ -55,8 +61,7 @@ pub async fn log_request(
     tokio::fs::create_dir_all(log_dir).await?;
 
     let sanitized = sanitize_request(body);
-    let json_str = serde_json::to_string_pretty(&sanitized)
-        .unwrap_or_else(|_| "{}".to_string());
+    let json_str = serde_json::to_string_pretty(&sanitized).unwrap_or_else(|_| "{}".to_string());
 
     let file_path = log_dir.join(format!("{req_id}.req.json"));
     let mut file = tokio::fs::File::create(&file_path).await?;
@@ -67,6 +72,27 @@ pub async fn log_request(
 
     info!("[log] Request body written to {:?}", file_path);
     Ok(())
+}
+
+/// Sanitize a response body for safe logging.
+///
+/// LLM responses (Anthropic/OpenAI) are JSON. We parse the JSON and
+/// redact known secret-bearing fields — the same way `sanitize_request`
+/// handles requests. Non-JSON responses (e.g. streaming bytes) are
+/// returned unchanged; the caller is responsible for not enabling
+/// LOG_BODIES=1 on untrusted production traffic.
+///
+/// SECURITY: A raw response can echo back sensitive content from tool
+/// results (credentials, PII). This sanitization pass prevents that
+/// content from being written to cleartext log files.
+pub fn sanitize_response(body: &[u8]) -> Vec<u8> {
+    // Try to parse as JSON — if it's JSON, redact secret-bearing fields.
+    if let Ok(value) = serde_json::from_slice::<Value>(body) {
+        let sanitized = sanitize_request(&value);
+        return serde_json::to_vec(&sanitized).unwrap_or_else(|_| body.to_vec());
+    }
+    // Non-JSON body — return unchanged (streaming/etc.).
+    body.to_vec()
 }
 
 /// Write a response body to a log file.
@@ -80,11 +106,12 @@ pub async fn log_response(
     tokio::fs::create_dir_all(log_dir).await?;
 
     let file_path = log_dir.join(format!("{req_id}.resp.log"));
+    let sanitized = sanitize_response(body);
     let mut file = tokio::fs::File::create(&file_path).await?;
-    file.write_all(body).await?;
+    file.write_all(&sanitized).await?;
 
     stats.responses_logged += 1;
-    stats.bytes_written += body.len() as u64;
+    stats.bytes_written += sanitized.len() as u64;
 
     info!("[log] Response body written to {:?}", file_path);
     Ok(())

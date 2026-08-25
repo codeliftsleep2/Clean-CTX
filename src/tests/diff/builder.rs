@@ -123,3 +123,60 @@ fn build_snapshot_parses_rust_full_file() {
         names
     );
 }
+
+// ── Non-CBM Tool Audit 2026-08-25, finding #1 ────────────────────────
+//
+// The diff snapshot builder routes `struct.root`/`enum.root` through
+// `extract_rust_struct_name` for ALL languages. That helper only strips
+// Rust visibility prefixes (`pub `, `pub(crate) `, `pub(super) `), so a
+// C# declaration like `public enum PriorityLevel` produced the label
+// `public`, which `diff_commits` then rendered as `~ class public`.
+// Non-Rust class-like declarations must go through the shared
+// `extract_class_name`; Rust behavior must stay exactly as-is.
+
+#[test]
+fn build_snapshot_csharp_internal_static_class_gets_identifier() {
+    let src = r#"
+        namespace MyApp.Tests.Support
+        {
+            internal static class TestDataFactory
+            {
+                internal static void Warmup() { }
+            }
+        }
+    "#;
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot for C# internal class");
+    assert!(!snap.classes.is_empty(), "should detect TestDataFactory");
+    assert_eq!(
+        snap.classes[0].name, "TestDataFactory",
+        "access modifier must never become the class label"
+    );
+}
+
+#[test]
+fn build_snapshot_csharp_enum_gets_identifier_not_visibility_token() {
+    let src = r#"
+        namespace MyApp.Core
+        {
+            public enum PriorityLevel
+            {
+                Low,
+                High
+            }
+        }
+    "#;
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot for C# enum");
+    assert!(!snap.classes.is_empty(), "should detect PriorityLevel enum");
+    assert_eq!(
+        snap.classes[0].name, "PriorityLevel",
+        "enum label must be the identifier, not a visibility modifier"
+    );
+}
+
+#[test]
+fn build_snapshot_rust_enum_behavior_unchanged() {
+    // Guards the language split: Rust enums keep their existing path.
+    let src = "pub enum Status {\n    Active,\n}\n";
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot for Rust enum");
+    assert_eq!(snap.classes[0].name, "Status");
+}

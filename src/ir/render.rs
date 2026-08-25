@@ -9,9 +9,9 @@
 // This produces output that is byte-identical (or close) to the existing
 // `compress_code_context` tool, enabling backward compatibility.
 
-use crate::compression::Fidelity;
 use super::opcodes::CoreOp;
 use super::wire::op_to_tuple;
+use crate::compression::Fidelity;
 
 /// Render IR instructions (as canonical `CoreOp`s) to human-readable text.
 ///
@@ -45,7 +45,7 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                         output.push_str(&format!("$c {}", name));
                         current_class = true;
                     }
-                    Fidelity::Medium | Fidelity::High => {
+                    Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                         if current_class {
                             output.push('\n');
                         }
@@ -88,7 +88,7 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                     Fidelity::Low | Fidelity::Medium => {
                         output.push_str(&format!(" {}", markers.join(" ")));
                     }
-                    Fidelity::High => {
+                    Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                         output.push_str(&format!(" {{ {} }}", markers.join(" ")));
                     }
                 }
@@ -100,11 +100,8 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                     Fidelity::Low => {
                         output.push_str(&format!("$im {}.$fm{};", named, module));
                     }
-                    Fidelity::Medium | Fidelity::High => {
-                        output.push_str(&format!(
-                            "import {{ {} }} from '{}';\n",
-                            named, module
-                        ));
+                    Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
+                        output.push_str(&format!("import {{ {} }} from '{}';\n", named, module));
                     }
                 }
             }
@@ -114,7 +111,7 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                     Fidelity::Low => {
                         output.push_str(&format!("{};", name));
                     }
-                    Fidelity::Medium | Fidelity::High => {
+                    Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                         output.push_str(&format!("  {};\n", name));
                     }
                 }
@@ -125,7 +122,7 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                     Fidelity::Low => {
                         output.push_str(&format!("$if {};", name));
                     }
-                    Fidelity::Medium | Fidelity::High => {
+                    Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                         output.push_str(&format!("interface {} {{}}\n", name));
                     }
                 }

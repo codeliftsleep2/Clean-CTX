@@ -34,10 +34,22 @@ fn format_final_output_uses_compact_header_for_low() {
     let body = "// --- Compacted Layout (Low Fidelity): α1 ---\n$c C1";
     let out = format_final_output(source, body, Fidelity::Low, 1, 1, 0);
     // Compact format: §raw:compressed:pct|L|classes:methods:imports§
-    assert!(out.starts_with('§'), "Low fidelity output should start with §");
-    assert!(out.contains("|L|"), "Low fidelity output should contain |L|");
-    assert!(out.contains("|1:1:0§"), "Compact header should contain |1:1:0§");
-    assert!(out.contains(body), "Compact header should be followed by body");
+    assert!(
+        out.starts_with('§'),
+        "Low fidelity output should start with §"
+    );
+    assert!(
+        out.contains("|L|"),
+        "Low fidelity output should contain |L|"
+    );
+    assert!(
+        out.contains("|1:1:0§"),
+        "Compact header should contain |1:1:0§"
+    );
+    assert!(
+        out.contains(body),
+        "Compact header should be followed by body"
+    );
 }
 
 #[test]
@@ -45,8 +57,10 @@ fn format_final_output_uses_verbose_header_for_medium() {
     let source = "class Foo { bar() {} }";
     let body = "// --- Enhanced Layout (Medium Fidelity): α1 ---\nclass C1";
     let out = format_final_output(source, body, Fidelity::Medium, 1, 1, 0);
-    assert!(out.starts_with("// --- Token Optimization Report"),
-            "Medium fidelity should use verbose header");
+    assert!(
+        out.starts_with("// --- Token Optimization Report"),
+        "Medium fidelity should use verbose header"
+    );
     assert!(out.contains("// Fidelity: Medium"));
 }
 
@@ -55,8 +69,10 @@ fn format_final_output_uses_verbose_header_for_high() {
     let source = "class Foo { bar() {} }";
     let body = "// --- Full Layout (High Fidelity): α1 ---\nclass C1";
     let out = format_final_output(source, body, Fidelity::High, 1, 1, 0);
-    assert!(out.starts_with("// --- Token Optimization Report"),
-            "High fidelity should use verbose header");
+    assert!(
+        out.starts_with("// --- Token Optimization Report"),
+        "High fidelity should use verbose header"
+    );
     assert!(out.contains("// Fidelity: High"));
 }
 
@@ -99,20 +115,38 @@ fn parse_compact_header_zero_percentage() {
 
 #[test]
 fn parse_compact_header_missing_delimiters() {
-    assert!(parse_compact_header("245:67:72.6|L|3:12:5").is_none(), "Missing § should fail");
-    assert!(parse_compact_header("§245:67:72.6|L|3:12:5").is_none(), "Missing trailing § should fail");
+    assert!(
+        parse_compact_header("245:67:72.6|L|3:12:5").is_none(),
+        "Missing § should fail"
+    );
+    assert!(
+        parse_compact_header("§245:67:72.6|L|3:12:5").is_none(),
+        "Missing trailing § should fail"
+    );
 }
 
 #[test]
 fn parse_compact_header_wrong_part_count() {
-    assert!(parse_compact_header("§245:67:72.6|L|3:12:5|extra§").is_none(), "Extra part should fail");
-    assert!(parse_compact_header("§245:67:72.6|L§").is_none(), "Missing counts should fail");
+    assert!(
+        parse_compact_header("§245:67:72.6|L|3:12:5|extra§").is_none(),
+        "Extra part should fail"
+    );
+    assert!(
+        parse_compact_header("§245:67:72.6|L§").is_none(),
+        "Missing counts should fail"
+    );
 }
 
 #[test]
 fn parse_compact_header_non_numeric_fields() {
-    assert!(parse_compact_header("§abc:67:72.6|L|3:12:5§").is_none(), "Non-numeric raw should fail");
-    assert!(parse_compact_header("§245:67:72.6|L|a:12:5§").is_none(), "Non-numeric class should fail");
+    assert!(
+        parse_compact_header("§abc:67:72.6|L|3:12:5§").is_none(),
+        "Non-numeric raw should fail"
+    );
+    assert!(
+        parse_compact_header("§245:67:72.6|L|a:12:5§").is_none(),
+        "Non-numeric class should fail"
+    );
 }
 
 #[test]
@@ -132,16 +166,28 @@ fn format_savings_pct_fractional() {
 #[test]
 fn format_compact_cache_hit_format() {
     let out = format_compact_cache_hit(245, 67, 72.6, "α1");
-    assert!(out.starts_with('§'), "Compact cache hit should start with §");
+    assert!(
+        out.starts_with('§'),
+        "Compact cache hit should start with §"
+    );
     assert!(out.contains("|C|"), "Compact cache hit should contain |C|");
-    assert!(out.contains("α1§"), "Compact cache hit should contain alias");
-    assert!(out.contains("// [CACHE_HIT]"), "Should contain cache hit notice");
+    assert!(
+        out.contains("α1§"),
+        "Compact cache hit should contain alias"
+    );
+    assert!(
+        out.contains("// [CACHE_HIT]"),
+        "Should contain cache hit notice"
+    );
 }
 
 #[test]
 fn format_compact_cache_hit_integer_percentage() {
     let out = format_compact_cache_hit(100, 50, 50.0, "α2");
-    assert!(out.contains("§100:50:50|C|α2§"), "Integer percentage format incorrect");
+    assert!(
+        out.contains("§100:50:50|C|α2§"),
+        "Integer percentage format incorrect"
+    );
 }
 
 #[test]
@@ -153,7 +199,10 @@ fn format_compact_header_counts_roundtrip() {
     // Extract the first line (the header)
     let first_line = out.lines().next().unwrap();
     let parsed = parse_compact_header(first_line);
-    assert!(parsed.is_some(), "Should round-trip through parse_compact_header");
+    assert!(
+        parsed.is_some(),
+        "Should round-trip through parse_compact_header"
+    );
     let (raw, compressed, _pct, classes, methods, imports) = parsed.unwrap();
     assert_eq!(classes, 3);
     assert_eq!(methods, 0);

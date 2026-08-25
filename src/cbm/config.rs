@@ -5,12 +5,37 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Where the CBM graph cache DB is stored.
+///
+/// - `Global` (default): one shared DB across all workspaces, partitioned by
+///   `project_root`. Survives across workspaces and process restarts.
+/// - `PerWorkspace`: one DB per project, stored under that project's
+///   `.clean-ctx/` directory. Isolated per repo.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CacheScope {
+    /// One shared DB across all workspaces (default).
+    #[default]
+    Global,
+    /// One DB per project, stored under that project's `.clean-ctx/` dir.
+    PerWorkspace,
+}
+
 /// CBM integration configuration, loaded from `.clean-ctx.json` `cbm` key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CbmConfig {
     /// Path to the `codebase-memory-mcp` binary. When `None`, auto-detect on PATH.
     #[serde(default)]
     pub binary_path: Option<String>,
+
+    /// Where the CBM graph cache DB is stored. Default: `Global`.
+    #[serde(default)]
+    pub cache_scope: CacheScope,
+
+    /// Explicit path to the CBM graph cache DB. When set, overrides
+    /// `cache_scope` resolution. Default: `None` (use scope-based path).
+    #[serde(default)]
+    pub cache_db_path: Option<String>,
 
     /// Automatically launch CBM as subprocess on first graph query. Default: `true`.
     #[serde(default = "default_auto_launch")]
@@ -35,31 +60,58 @@ pub struct CbmConfig {
     /// Log directory for CBM proxy logs. Relative to project root.
     #[serde(default = "default_log_dir")]
     pub log_dir: String,
+
+    /// Maximum consecutive failures before circuit breaker opens. Default: 3.
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+
+    /// Cooldown in seconds before circuit breaker resets to half-open. Default: 30.
+    #[serde(default = "default_circuit_cooldown_secs")]
+    pub circuit_cooldown_secs: u64,
 }
 
 impl Default for CbmConfig {
     fn default() -> Self {
         Self {
             binary_path: None,
+            cache_scope: CacheScope::default(),
+            cache_db_path: None,
             auto_launch: default_auto_launch(),
             cache_ttl: default_cache_ttl(),
             enabled: default_enabled(),
             query_timeout_ms: default_query_timeout_ms(),
             cbm_min_version: None,
             log_dir: default_log_dir(),
+            max_retries: default_max_retries(),
+            circuit_cooldown_secs: default_circuit_cooldown_secs(),
         }
     }
 }
 
-fn default_auto_launch() -> bool { true }
-fn default_cache_ttl() -> u64 { 300 }
-fn default_enabled() -> bool { true }
-fn default_query_timeout_ms() -> u64 { 30000 }
-fn default_log_dir() -> String { ".clean-ctx/cbm-logs".to_string() }
+fn default_auto_launch() -> bool {
+    true
+}
+fn default_cache_ttl() -> u64 {
+    300
+}
+fn default_enabled() -> bool {
+    true
+}
+fn default_query_timeout_ms() -> u64 {
+    30000
+}
+fn default_log_dir() -> String {
+    ".clean-ctx/cbm-logs".to_string()
+}
+fn default_max_retries() -> u32 {
+    3
+}
+fn default_circuit_cooldown_secs() -> u64 {
+    30
+}
 
 /// Status of the CBM integration, surfaced via `get_cbm_status` and `context_stats`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum CbmStatus {
     Available,
     Degraded(String),
@@ -80,4 +132,3 @@ impl CbmStatus {
         }
     }
 }
-

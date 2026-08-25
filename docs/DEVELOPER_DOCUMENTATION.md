@@ -1,7 +1,9 @@
 # Clean-CTX — Developer Documentation
 
-**Version:** 0.1.6
-**Last updated:** 2026-06-10
+> **Owner:** How-to-extend (languages/tools/opcodes/Φ markers) + opcode/marker vocabulary + build/test gates · **Status:** Living reference
+> **Version:** 0.4.0 · **Last updated:** 2026-08-24
+>
+> **Test count:** see `docs/CHANGELOG.md` for the current workspace test count.
 
 ---
 
@@ -33,18 +35,38 @@
 git clone https://github.com/codeliftsleep2/Clean-CTX.git
 cd Clean-CTX
 
-# Build (debug)
+# Build (debug) with all default features
 cargo build
 
-# Build (release)
+# Build (release) with default features
 cargo build --release
 
-# Run tests
-cargo test
+# Build with only specific languages (smaller binary, faster compile)
+cargo build --release --no-default-features --features typescript,angular
+
+# Build with .NET meta-layer (in defaults)
+cargo build --release
+
+# Run tests with all features
+cargo test --all-features
 
 # Run linter (must pass before PR)
 cargo clippy --all-targets -- -D warnings
 ```
+
+**Feature flag system:**
+
+The binary uses Cargo feature flags to select which languages and meta-layers to compile. See `Cargo.toml` `[features]` for the full dependency tree.
+
+| Feature | Implies | Default | Includes |
+|---------|---------|---------|----------|
+| `typescript` | — | ✅ | Base TypeScript/JavaScript tree-sitter grammar |
+| `csharp` | — | ✅ | Base C# tree-sitter grammar |
+| `rust` | — | ❌ | Base Rust tree-sitter grammar |
+| `java` | — | ❌ | Base Java tree-sitter grammar |
+| `angular` | `typescript` | ✅ | Components, Services, DI, Pipes, Directives, Modules, Input/Output, Template/Shape extraction, Style extraction, NgRx, RxJS, Signals, PrimeNG, Bundle graph |
+| `spring_boot` | `java` | ❌ | RestController, Controller, Service, Repository, Configuration, RequestMapping, Autowired, Value, Bean, ConfigurationProperties, Cross-file graph |
+| `dotnet` | `csharp` | ✅ | ASP.NET Core (Controllers, Actions, Routes, Auth), EF Core (DbContext, DbSet, Entities), SignalR (Hubs, Clients, Streaming), AutoMapper (Profiles, Mappings), JSON Serialization, DI, Validation, Identity, Caching, Logging, Cross-file graph |
 
 **Prerequisites:**
 - Rust 1.85+ (edition 2024)
@@ -338,18 +360,37 @@ For the full protocol specification, state machine lifecycle, and all phase impl
 
 ## Adding a New Language
 
-Adding a new language to Clean-CTX requires changes in 4 locations. Here is the step-by-step guide.
+Adding a new language to Clean-CTX requires changes in 5 locations. Here is the step-by-step guide.
 
-### Step 1: Add the tree-sitter grammar dependency
+### Step 1: Add the Cargo feature flag and tree-sitter grammar dependency
 
-In `Cargo.toml`, add the new grammar:
+In `Cargo.toml`, add the new feature flag and grammar:
 
 ```toml
-# SAFETY: Must match tree-sitter 0.20.x ABI.
-tree-sitter-python = "=0.20.0"
+[features]
+# ...existing features...
+python = ["dep:tree-sitter-python"]  # NEW: language feature
+
+[dependencies]
+# SAFETY: Must match tree-sitter ABI via tree-sitter-sys.
+tree-sitter-python = { version = "0.23", optional = true }  # NEW
 ```
 
-### Step 2: Add tree-sitter queries
+The feature flag must be added to the `[features]` section so users can toggle it at build time:
+```bash
+cargo build --release --no-default-features --features python
+```
+
+### Step 2: Register the language in `src/layers/registry.rs`
+
+In `src/layers/registry.rs`, add the new language layer behind its feature flag:
+
+```rust
+#[cfg(feature = "python")]
+reg.languages.push(Box::new(crate::layers::language::PythonLayer::new()));
+```
+
+### Step 3: Add tree-sitter queries
 
 In `src/queries.rs`, add the query patterns for the new language:
 
@@ -676,42 +717,23 @@ See [`docs/ANGULAR_META_LAYER.md`](ANGULAR_META_LAYER.md) for the reference impl
 
 ## Configuration System
 
-The `CleanCtxConfig` struct (in `src/config.rs`) is loaded from `.clean-ctx.json` at the project root:
+The `CleanCtxConfig` struct (in `src/config.rs`) is loaded from `.clean-ctx.json` at the project root. The **complete configuration reference** — including the full `.clean-ctx.json` schema, precedence rules, environment variables, resource limits, persistence, heuristics, meta-layers, intelligence layer, type aliases, cache, and proxy lifecycle — is documented in **[`docs/CONFIGURATION.md`](CONFIGURATION.md)**, which is the single source of truth for configuration.
 
-```json
-{
-    "exclude_patterns": ["dist", "node_modules", "*.spec.ts"],
-    "fidelity_overrides": {
-        ".cs": "medium",
-        ".test.ts": "high"
-    },
-    "default_fidelity": "medium",
-    "type_aliases": {
-        "UserId": "string",
-        "JsonObject": "Record<string, unknown>"
-    },
-    "custom_markers": {
-        "$custom": "Custom marker description"
-    },
-    "diff_compression": true,
-    "workspace_type_detection": true
-}
-```
-
-The config is:
-- Loaded once at server startup (cached in a `OnceLock`)
+Key facts for developers:
+- Config is loaded once at server startup (cached in a `OnceLock`)
 - Shared across all tools via `McpState.config`
 - Immutable for the session — edits require a server restart
+- Precedence: tool argument > environment variable > config file > default
 
-### Exclusion globs
+### Adding a New Config Field
 
-Exclusion patterns use a simple two-tier matcher:
+To add a new field to `.clean-ctx.json`:
 
-| Pattern Type | Example | Matching Behavior |
-|-------------|---------|-------------------|
-| Plain name | `"dist"` | Matches any path segment literally named `dist` (NOT `distribute`) |
-| Dot pattern | `".test."` | Substring match against the file name, so `".test."` matches `file.test.ts` |
-| Glob pattern | `"*.spec.ts"` | Standard `*`/`?` glob match against the file name |
+1. Add the field to the `CleanCtxConfig` struct in `src/config.rs` with a sensible default
+2. Add the serde `#[serde(default)]` attribute so old config files continue to work (backward compatible)
+3. Wire the field into the relevant subsystem (heuristics, compression, proxy, etc.)
+4. Document the field in `docs/CONFIGURATION.md` (the source of truth)
+5. Add tests in `src/tests/config.rs`
 
 ---
 
@@ -746,7 +768,20 @@ Tests follow these conventions:
 cargo test                          # All tests
 cargo test fidelity                 # Tests matching "fidelity"
 cargo test -- --ignored             # Integration tests (tagged with #[ignore])
+cargo test cbm::tests               # Full CBM suite incl. live probes
+cargo test --workspace --all-targets --all-features   # Full verification gate
 ```
+
+### Live-CBM semantic tests
+
+CBM-facing behavior is protected by two layers in `src/tests/cbm/`:
+
+- **Deterministic regression tests** pin the live-captured CBM wire contract so an upstream CBM upgrade cannot silently break us: `in_degree` cells arrive as JSON strings through `query_graph`; tool failures arrive as `result.isError=true` envelopes inside successful JSON-RPC results; there is no `DATAFLOW` edge type in CBM 0.8.1 (a guard fails if one ever appears).
+- **Live probes** (`src/tests/cbm/graph_intel.rs`, serial `cbm_live`) spawn a real CBM subprocess per probe and re-index from scratch first (fresh process, fresh index), then assert semantic truth: blast radius equals the ground-truth caller set, unknown projects return `Err` while valid zero-result queries return `Ok(empty)`, dead code covers both `Function` and `Method` labels, and project switches never poison the disk cache.
+
+The self-contained multilingual fixture (`src/tests/cbm/e2e.rs`) builds a temp-dir polyglot project (Rust/C#/Java/TS/JS/HTML/CSS), indexes it, exercises language discovery, web-file nodes and C# cross-language resolution, switches back to the primary project, and asserts the primary stays healthy.
+
+Treat this suite as the authority on upstream CBM behavior: if a live probe fails after a CBM upgrade, the upgrade changed the wire contract or semantics - update the pins deliberately, never silently.
 
 ---
 
@@ -778,13 +813,101 @@ Output includes a per-edit table (50 rows × 8 columns), final summary with per-
 
 ---
 
+## Observability (A-04)
+
+Clean-CTX uses structured tracing and in-memory metrics for observability. The `observability` module at `src/observability/` provides the infrastructure.
+
+### Initialization
+
+Tracing is initialized once at MCP server startup via `crate::observability::init_tracing()` (called in `src/mcp/server.rs`). It configures the `tracing-subscriber` from environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLEAN_CTX_LOG` | `info` | Log level |
+| `CLEAN_CTX_LOG_FORMAT` | `text` | Output format (`json` or `text`) |
+| `CLEAN_CTX_LOG_FILTER` | — | Fine-grained filter (e.g. `warn,clean_ctx=debug`) |
+
+Example usage:
+```bash
+# JSON structured logging
+CLEAN_CTX_LOG_FORMAT=json clean-ctx
+
+# Debug for clean_ctx module only
+CLEAN_CTX_LOG_FILTER=warn,clean_ctx=debug clean-ctx
+```
+
+### Adding a New Metric
+
+1. **Add a field** to `MetricsRegistry` in `src/observability/metrics.rs`:
+   - Use `Histogram` for latency/size measurements (has `record()` and `record_duration()`)
+   - Use `Counter` for event counts
+   - Use `Gauge` for current values (workers, queue depth)
+
+2. **Initialize** in `MetricsRegistry::new()`:
+   - Histograms: `Histogram::latency_default()` (fixed buckets) or `Histogram::latency_exponential()` (powers of 2)
+   - Counters/gauges: `Counter::new()` / `Gauge::new(initial)`
+
+3. **Snapshot** in `MetricsRegistry::snapshot()`:
+   - Add the field to `MetricsSnapshot` struct
+   - Record it in the snapshot method body
+
+4. **Record** at the point of measurement:
+   - `registry.some_histogram.record(value)` or `.record_duration(duration)`
+   - `registry.some_counter.increment(delta)`
+   - `registry.some_gauge.set(value)` or `.add(delta)`
+
+### Tracing Spans
+
+Key spans are instrumented in hot paths:
+
+| Span | Location | Attributes |
+|------|----------|------------|
+| `provide_code_context` | `src/mcp/tool_handlers/core.rs` | `file_path`, `fidelity`, `strategy`, `cbm_status`, phase timings |
+| `compress_workspace` | `src/mcp/workspace.rs` | `dir_path`, `fidelity`, `file_count`, `total_ms` |
+| `cbm_proxy_call` | `src/cbm/bridge.rs` | `tool_name`, `latency_ms`, `output_len`, `is_ok` |
+| Dispatcher spans | `src/mcp/dispatcher.rs` | queue wait + execution time histograms |
+
+### Structured Events
+
+Use the `tracing::info!` macro with key-value pairs:
+```rust
+tracing::info!(
+    heuristics_ms = heuristics_ms,
+    compile_ms = compile_ms,
+    raw_tokens = raw_tokens,
+    savings_pct = savings_pct,
+    "provide_code_context complete"
+);
+```
+
+### Error Categories
+
+Use `ErrorCategory` enum instead of free-form strings for metrics:
+```rust
+use crate::observability::metrics::ErrorCategory;
+registry.record_error(ErrorCategory::CbmTimeout);
+```
+
+Available categories: `CompressionFail`, `DeltaApplyError`, `CbmTimeout`, `CbmQueryFail`, `IoError`, `ParseError`, `Internal`.
+
+### Dashboard
+
+Call `context_stats` with no arguments to view the metrics dashboard, which includes:
+- Operations summary (compressions, deltas, CBM queries, workspace scans)
+- Latency histograms (compression, delta, CBM)
+- File size distribution
+- Resource gauges (active workers, queue depth)
+- Error counts by category
+
+For a verbose metrics dump (JSON format), use the `MetricsSnapshot` which implements `Serialize`.
+
 ## Code Quality Gates
 
 Every pull request must pass these checks:
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test`** — all 1,035 tests pass
+3. **`cargo test --workspace --all-targets --all-features`** — all 2,513 workspace tests pass (2,173 core library)
 4. **`cargo audit`** — no known security vulnerabilities
 5. **No new `#![allow(...)]`** annotations without a `// SAFETY:` or `// Phase N:` comment
 6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail

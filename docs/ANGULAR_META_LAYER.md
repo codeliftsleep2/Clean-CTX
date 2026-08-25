@@ -1,6 +1,8 @@
-# Angular Meta-Layer Plan
+# Angular Meta-Layer — Design & Marker Vocabulary
 
-> **Status:** 🚧 Phase 1 ✅ · Phase 2 ✅ · Phase 2.5 ✅ · Phase 3 ✅ · **Last updated:** 2026-06-07
+> **Owner:** Angular Meta-Layer design (Phases 1–4) · **Status:** Living per-layer reference (shipped)
+>
+> **Ship status:** see `docs/ROADMAP.md` (R-22 ✅). **Test counts / audit rounds:** see `docs/CHANGELOG.md`. **Ecosystem Deepening (RxJS/NgRx/Signals/Routing):** see `docs/ANGULAR_ECOSYSTEM_DEEPENING.md`.
 >
 
 ---
@@ -204,7 +206,7 @@ You will know Phase 2 is complete when **all** of the following are true:
 | `§ΦMAP` footer lists bundles | ✅ | `footer.rs` + `footer::tests` (8 tests) |
 | All 229 tests pass | ✅ | `cargo test` |
 | `cargo clippy` clean | ✅ | `cargo clippy --all-targets -- -D warnings` |
-| `tree-sitter-html` is only new dep | ✅ | `Cargo.toml` pinned at `=0.20.0` |
+| `tree-sitter-html` is only new dep | ✅ | `Cargo.toml` — `tree-sitter-html = "0.23"` |
 | Zero overhead for non-Angular files | ✅ | `is_angular_file()` gates all Phase 2 logic |
 
 **Bugs found and fixed during Phase 2 implementation:**
@@ -440,6 +442,51 @@ You will know Phase 3 is complete when **all** of the following are true:
 
 ---
 
+## Phase 4 — Fidelity-Gated HTML Template Compression (Implemented)
+
+### Goal
+
+Extend the existing template extraction (`template.rs`) with fidelity-gated rendering that preserves Angular semantic content (bindings, conditions, loop variables, component inputs/outputs) while stripping HTML scaffolding (CSS classes, decorative div/span nesting, style attributes). Integrate with `diff_commits` for AST-level HTML diffs and `provide_code_context` for single-file template compression.
+
+### Motivation
+
+Angular HTML templates are not generic HTML — they are a domain-specific language layered on top of HTML. The structural HTML is noise for LLM consumption; the Angular bindings, directives, event handlers, control-flow conditions, and component references are the semantic signal. A typical Angular component template is 100–300 lines of HTML; the compressed Medium-fidelity output is 10–15 lines of semantic markers.
+
+### Status
+
+✅ **Implemented in v0.3.0 (2026-08-07).** Tracked as **R-44** in `docs/ROADMAP.md`. The implementation plan lives in `extradocs/ANGULAR_HTML_COMPRESSION_PLAN.md` (local planning doc, gitignored).
+
+### What Was Already in Place (pre-R-44)
+
+- `tree-sitter-html` (0.23) was already a dependency via the `angular` feature
+- `TemplateShape` in `template.rs` already captured all Angular semantics (tags, bindings, directives, control flow, custom elements)
+- `to_marker_line()` already produced a single-line `Φtpl:` summary
+- The `Fidelity` enum (Low/Medium/High) was wired through the compression pipeline
+- `bundle_pass()` in `workspace.rs` already extracted template shape for external `.component.html` files
+- `diff_commits` engine already handled non-compressible files with line-count fallback
+
+### What R-44 Added (all now implemented)
+
+1. **Fidelity-gated rendering:** `TemplateShape::to_marker_lines(fidelity)` — Low (single-line, byte-identical to `to_marker_line()`), Medium (multi-line structural), High (near-full)
+2. **Condition/loop detail:** `if_conditions` / `for_loops` capture *what condition* (`@if (isLoading)`) and *what loop variable/iterable* (`@for (item of items)`)
+3. **Binding expressions:** `prop_binding_exprs` / `event_binding_exprs` / `two_way_binding_exprs` capture expressions (`[title]="user.name"`)
+4. **GitDiff HTML support:** `.component.html` files route through the template compressor in `diff_two_contents()` and `compress_added_file()` (AST-level change-sets)
+5. **Single-file template compression:** `provide_code_context` routes `.component.html` through `compress_template_with_prime_ng()` with DB persistence + baseline cache breakpoint
+6. **PrimeNG markers:** `Φp-<name>:` markers for `p-table`, `p-card`, `p-message`, etc.
+
+### Implementation Phases (all ✅ complete)
+
+| Phase | Description | Effort | Status |
+|-------|-------------|--------|--------|
+| 1 | Fidelity-gated template rendering (`template_compress.rs`, `to_marker_lines(fidelity)`) | 2-3 days | ✅ |
+| 2 | GitDiff integration (AST-level HTML diffs) | 1 day | ✅ |
+| 3 | Heuristics + `provide_code_context` integration | 1 day | ✅ |
+| 4 | PrimeNG pattern recognition (`Φp-*` markers) | 0.5 day | ✅ |
+
+**New markers added in Phase 4:** `Φtbind:` (template binding), `Φtdir:` (template directive), `Φtcmp:` (template component), `Φp-<name>:` (PrimeNG component). `TemplateShape::to_marker_lines(fidelity)` produces Low (single-line), Medium (multi-line structural), High (near-full) output. `.component.html` files route through `compress_template_with_prime_ng()` in `provide_code_context`, with DB persistence and baseline cache breakpoint injection.
+
+---
+
 ## Cross-Phase Non-Goals (deliberately deferred)
 
 - **Other frameworks** (React, Vue, Svelte) — same `MetaLayer` trait can host them, but each gets its own `src/angular_meta/`-equivalent module. R-22b/c/d in ROADMAP.
@@ -447,6 +494,7 @@ You will know Phase 3 is complete when **all** of the following are true:
 - **Cross-file non-DI dependencies** (e.g. utility functions imported across files) — outside the Meta-Layer's scope; handled by future R-11 (cross-file symbol resolution).
 - **Hot-reload of the graph** — the graph is rebuilt per workspace call; no incremental updates yet.
 - **Persistence** — `AngularGraph` is in-memory only; no disk cache.
+- **Generic HTML compression** — only Angular-specific template compression is in scope (R-44). Generic HTML files without Angular bindings are not compressed.
 
 ---
 

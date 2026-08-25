@@ -10,8 +10,8 @@
 // - Model detection (which models belong to this platform)
 
 pub mod anthropic;
-pub mod openai;
 pub mod generic;
+pub mod openai;
 
 use serde_json::Value;
 
@@ -19,15 +19,18 @@ use serde_json::Value;
 pub trait PlatformAdapter: Send + Sync {
     /// Extract tool result text from a message block.
     /// Returns (tool_name, tool_output_text) or None if not a tool result.
+    #[allow(dead_code)]
     fn extract_tool_result(&self, block: &Value) -> Option<(String, String)>;
 
     /// Check if a message block is a tool result.
     fn is_tool_result(&self, block: &Value) -> bool;
 
     /// Get the endpoint path to intercept (e.g., "/v1/messages", "/v1/chat/completions").
+    #[allow(dead_code)]
     fn intercept_path(&self) -> &str;
 
     /// Get platform-specific headers to inject into requests.
+    #[allow(dead_code)]
     fn platform_headers(&self) -> Vec<(String, String)>;
 
     /// Check if a model name matches this platform.

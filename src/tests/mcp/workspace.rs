@@ -16,11 +16,7 @@ fn create_ts_file(dir: &Path, name: &str, content: &str) {
 fn compress_workspace_dir_respects_exclude_patterns() {
     let dir = TempDir::new().unwrap();
     let dir_path = dir.path().to_path_buf();
-    create_ts_file(
-        dir.path(),
-        "keep.ts",
-        "export class A { foo(): void {} }\n",
-    );
+    create_ts_file(dir.path(), "keep.ts", "export class A { foo(): void {} }\n");
     create_ts_file(
         dir.path(),
         "skip-me.ts",
@@ -28,18 +24,15 @@ fn compress_workspace_dir_respects_exclude_patterns() {
     );
 
     let mut config = CleanCtxConfig::default();
+    config.cbm.enabled = false;
     // F-12: use a glob pattern (`skip-me*`) to match the filename
     // prefix. The new segment-based matcher no longer does bare
     // substring matching, so `"skip-me"` would not match `"skip-me.ts"`.
     config.exclude_patterns.push("skip-me*".to_string());
-    let mut state = McpState::new(config);
+    let state = McpState::new(config);
 
-    let result = compress_workspace_dir(
-        dir_path.to_str().unwrap(),
-        Fidelity::Low,
-        &mut state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir_path.to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     let manifest = &result.manifest;
     // The kept file shows up in the manifest.
@@ -84,15 +77,10 @@ fn workspace_emits_alias_cross_reference() {
         "export class Alpha { run(): void {} }\n",
     );
 
-    let config = CleanCtxConfig::default();
-    let mut state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
-    let result = compress_workspace_dir(
-        dir_path.to_str().unwrap(),
-        Fidelity::Low,
-        &mut state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir_path.to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     let manifest = &result.manifest;
     // The manifest should contain the per-file alias line.
@@ -121,36 +109,32 @@ fn workspace_shares_aliases_with_per_file_tool() {
         "export class Shared { hello(): string { return ''; } }\n",
     );
 
-    let config = CleanCtxConfig::default();
-    let mut state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
     // First, compress via the per-file tool path (simulated inline).
     let file_path = dir_path.join("shared.ts");
     let compressed = crate::compressor::compress_file(
         file_path.clone(),
-        &mut state.dict,
-        &mut state.cache,
+        &mut state.dict_lock(),
+        &mut state.cache_write(),
         Fidelity::Low,
+        None,
     )
     .expect("per-file compress should succeed");
 
     // The per-file result should contain an alias.
-    assert!(compressed.contains('α'), "per-file output should contain alias");
+    assert!(
+        compressed.contains('α'),
+        "per-file output should contain alias"
+    );
 
     // Now compress the workspace — it should reuse the same alias.
-    let result = compress_workspace_dir(
-        dir_path.to_str().unwrap(),
-        Fidelity::Low,
-        &mut state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir_path.to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     // Both the per-file output and workspace manifest should have
     // the same alias for the same file.
-    let per_file_alias = compressed
-        .lines()
-        .find(|l| l.contains('α'))
-        .unwrap();
+    let per_file_alias = compressed.lines().find(|l| l.contains('α')).unwrap();
     let workspace_alias_line = result
         .manifest
         .lines()
@@ -182,11 +166,7 @@ fn collect_source_files_survives_symlink_loop() {
     // Create a subdirectory with a real .ts file.
     let sub = dir_path.join("sub");
     fs::create_dir(&sub).unwrap();
-    create_ts_file(
-        &sub,
-        "good.ts",
-        "export class Good {}\n",
-    );
+    create_ts_file(&sub, "good.ts", "export class Good {}\n");
 
     // Create a symlink loop: loop_dir -> dir_path/sub/loop_dir
     // (which we're about to create).
@@ -251,15 +231,10 @@ fn compress_pass_emits_per_file_section() {
         "export class MyService { run(): void {} }\n",
     );
 
-    let config = CleanCtxConfig::default();
-    let mut state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
-    let result = compress_workspace_dir(
-        dir.path().to_str().unwrap(),
-        Fidelity::Low,
-        &mut state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     assert!(
         result.manifest.contains("FILE:"),
@@ -285,17 +260,16 @@ fn bundle_pass_emits_phi_bundle_and_footer() {
         "@Component({selector:'app-my'}) export class MyComp {}",
     );
     create_ts_file(dir.path(), "my-comp.component.html", "<div>hello</div>");
-    create_ts_file(dir.path(), "my-comp.component.scss", ".root { color: red; }");
+    create_ts_file(
+        dir.path(),
+        "my-comp.component.scss",
+        ".root { color: red; }",
+    );
 
-    let config = CleanCtxConfig::default();
-    let mut state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
-    let result = compress_workspace_dir(
-        dir.path().to_str().unwrap(),
-        Fidelity::Low,
-        &mut state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     // Bundle pass emits §ΦMAP footer when bundles exist.
     assert!(
@@ -319,15 +293,10 @@ fn graph_pass_emits_phi_graph_section() {
          export class LoggerService { log(msg: string) {} }\n",
     );
 
-    let config = CleanCtxConfig::default();
-    let mut state = McpState::new(config);
+    let state = McpState::new(crate::tests::test_config());
 
-    let result = compress_workspace_dir(
-        dir.path().to_str().unwrap(),
-        Fidelity::Low,
-        &mut state,
-    )
-    .expect("workspace compress should succeed");
+    let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress should succeed");
 
     assert!(
         result.manifest.contains("§ΦGRAPH"),
@@ -363,5 +332,192 @@ fn collect_source_files_respects_max_depth() {
         !entries.iter().any(|e| e.contains("deep.ts")),
         "deep.ts should NOT be found (exceeds max depth), got: {:?}",
         entries
+    );
+}
+
+/// F-22: Workspace compression result caching.
+/// Second call with no file changes returns cached result instantly.
+#[test]
+fn compress_workspace_caches_result() {
+    let dir = TempDir::new().unwrap();
+    create_ts_file(
+        dir.path(),
+        "alpha.ts",
+        "export class Alpha { run(): void {} }\n",
+    );
+
+    let state = McpState::new(crate::tests::test_config());
+
+    // First call: cache miss, normal compression
+    let result1 = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("first compress should succeed");
+    assert!(
+        result1.manifest.contains("alpha.ts"),
+        "first call should contain alpha.ts"
+    );
+
+    // Second call with same directory and no file changes: cache hit
+    let result2 = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("second compress should succeed");
+
+    // Both results should be identical
+    assert_eq!(
+        result1.manifest, result2.manifest,
+        "cached result should match original"
+    );
+    assert_eq!(
+        result1.errors.len(),
+        result2.errors.len(),
+        "errors should match"
+    );
+    assert_eq!(
+        result1.excluded.len(),
+        result2.excluded.len(),
+        "excluded should match"
+    );
+}
+
+/// F-22: Different fidelities must produce different cache entries.
+/// Verifies that the cache key includes the fidelity level.
+#[test]
+fn compress_workspace_cache_key_includes_fidelity() {
+    let dir = TempDir::new().unwrap();
+    create_ts_file(
+        dir.path(),
+        "beta.ts",
+        "export class Beta { process(): string { return ''; } }\n",
+    );
+
+    let state = McpState::new(crate::tests::test_config());
+
+    // Compress at Low fidelity: uses global symbol two-pass approach
+    let low_result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("low fidelity compress should succeed");
+    assert!(
+        low_result.manifest.contains("beta.ts"),
+        "low fidelity should contain beta.ts"
+    );
+
+    // Compress at Medium fidelity: uses standard compress_pass
+    let medium_result =
+        compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Medium, &state)
+            .expect("medium fidelity compress should succeed");
+
+    // The manifests should differ because different fidelity paths produce different output
+    // (Low fidelity uses the global symbol two-pass path)
+    assert_ne!(
+        low_result.manifest, medium_result.manifest,
+        "different fidelities should produce different cached results"
+    );
+}
+
+/// I-F4: Cross-layer CBM graceful degradation — NgRx effect file, no bridge.
+#[test]
+fn workspace_ngrx_cross_layer_graceful_degradation() {
+    let dir = TempDir::new().unwrap();
+    // The graph pass only runs when at least one Angular file is detected.
+    // Create an @Injectable() service to trigger the graph pass, plus
+    // an NgRx effects file with EffectService edges.
+    create_ts_file(
+        dir.path(),
+        "user.service.ts",
+        "import { Injectable } from '@angular/core';\n\
+         @Injectable({ providedIn: 'root' })\n\
+         export class UserService { getUsers() {} }\n",
+    );
+    create_ts_file(
+        dir.path(),
+        "user.effects.ts",
+        r#"import { createAction } from '@ngrx/store';
+import { createEffect, ofType } from '@ngrx/effects';
+import { map, switchMap } from 'rxjs/operators';
+
+export const loadUsers = createAction('[User] Load Users');
+
+export const loadUsers$ = createEffect(() =>
+  this.actions$.pipe(
+    ofType(loadUsers),
+    switchMap(() => this.userService.getUsers()),
+    map(users => ({ type: '[User] Load Users Success', users }))
+  )
+);
+"#,
+    );
+
+    let state = McpState::new(crate::tests::test_config());
+
+    let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress with NgRx should succeed (graceful degradation)");
+
+    assert!(
+        result.manifest.contains("§ΦGRAPH"),
+        "manifest should contain ΦGRAPH section:\n{}",
+        result.manifest
+    );
+}
+
+/// I-F4 + I-B10: Cross-layer CBM with mock bridge — Endpoint resolved.
+#[test]
+fn workspace_ngrx_cross_layer_with_mock_bridge_resolves_endpoint() {
+    use crate::cbm::CbmStatus;
+    use crate::cbm::bridge::{CachedGraphData, test_helpers::new_mock_empty};
+
+    let dir = TempDir::new().unwrap();
+    // Angular service to trigger the graph pass.
+    create_ts_file(
+        dir.path(),
+        "user.service.ts",
+        "import { Injectable } from '@angular/core';\n\
+         @Injectable({ providedIn: 'root' })\n\
+         export class UserService { getUsers() {} }\n",
+    );
+    create_ts_file(
+        dir.path(),
+        "user.effects.ts",
+        r#"import { createAction } from '@ngrx/store';
+import { createEffect, ofType } from '@ngrx/effects';
+import { map, switchMap } from 'rxjs/operators';
+
+export const loadUsers = createAction('[User] Load Users');
+
+export const loadUsers$ = createEffect(() =>
+  this.actions$.pipe(
+    ofType(loadUsers),
+    switchMap(() => this.userService.getUsers()),
+    map(users => ({ type: '[User] Load Users Success', users }))
+  )
+);
+"#,
+    );
+
+    let mut config = CleanCtxConfig::default();
+    config.cbm.enabled = false; // prevent real CBM launch
+    let mut state = McpState::new(config);
+
+    // Inject mock bridge with endpoint: getUsers → UserController.GetUsers
+    let mock_bridge = new_mock_empty();
+    let cache_data: Option<String> = Some("UserController.GetUsers".into());
+    mock_bridge.cache.insert(
+        "endpoint:getUsers".into(),
+        CachedGraphData {
+            data: serde_json::to_value(&cache_data).unwrap(),
+            expires_at: std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        },
+    );
+    *state.graph_bridge.lock().unwrap() = Some(mock_bridge);
+    state.cbm_status = CbmStatus::Available;
+
+    let result = compress_workspace_dir(dir.path().to_str().unwrap(), Fidelity::Low, &state)
+        .expect("workspace compress with CBM bridge should succeed");
+
+    assert!(
+        result.manifest.contains("§ΦGRAPH"),
+        "manifest should contain ΦGRAPH:\n{}",
+        result.manifest
+    );
+    assert!(
+        result.manifest.contains("Φeff→endpoint:"),
+        "should contain EffectEndpoint edge marker, got:\n{}",
+        result.manifest
     );
 }

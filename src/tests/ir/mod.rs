@@ -16,11 +16,13 @@ mod layers_integration;
 // Rust language support integration tests:
 // Verifies that Rust source files are correctly compiled through the
 // full IR pipeline with the Rust language layer.
+#[cfg(feature = "rust")]
 #[path = "rust_integration.rs"]
 mod rust_integration;
 
 // Rust token tracking integration tests:
 // Verifies that Rust files produce proper token savings through the
 // analytics pipeline and session stats tracking.
+#[cfg(feature = "rust")]
 #[path = "rust_stats_integration.rs"]
 mod rust_stats_integration;

@@ -20,10 +20,44 @@
 // }
 // ```
 
-use std::collections::BTreeMap;
 use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
 use super::wire::op_to_tuple;
+use std::collections::BTreeMap;
+
+/// R-43a: High-level semantic intent of a delta operation.
+/// Provides human-readable context for what changed, beyond the structural diff.
+/// Empty (None) by default — wire format ready for Phase 4 enrichment.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticIntent {
+    RenameSymbol {
+        old_name: String,
+        new_name: String,
+        kind: String, // "class", "method", "field"
+    },
+    AddMethod {
+        class: String,
+        method_name: String,
+    },
+    RemoveMethod {
+        class: String,
+        method_name: String,
+    },
+    ChangeSignature {
+        method: String,
+        field_changed: String, // "return_type", "param_type", "param_name"
+    },
+    AddInjection {
+        class: String,
+        dependency: String,
+    },
+    ChangeReturnType {
+        method: String,
+        old_type: String,
+        new_type: String,
+    },
+}
 
 /// A structured delta between two IR states.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -36,6 +70,10 @@ pub struct IRDelta {
     pub to: u64,
     /// Operations grouped by type
     pub ops: DeltaOps,
+    /// R-43a: optional semantic intent metadata
+    /// Empty (None) by default — wire format ready for Phase 4 enrichment
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intent: Option<SemanticIntent>,
 }
 
 /// Grouped delta operations.
@@ -117,11 +155,7 @@ impl DeltaComputer {
 
     /// Compute the delta between baseline and current IR.
     /// Returns None if both IRs are identical.
-    pub fn compute(
-        &self,
-        baseline: &CompiledIR,
-        current: &CompiledIR,
-    ) -> Option<IRDelta> {
+    pub fn compute(&self, baseline: &CompiledIR, current: &CompiledIR) -> Option<IRDelta> {
         let base_indexed = index_instructions(&baseline.instructions);
         let cur_indexed = index_instructions(&current.instructions);
 
@@ -159,13 +193,179 @@ impl DeltaComputer {
             return None;
         }
 
+        let intent = detect_semantic_intent(baseline, current);
+
         Some(IRDelta {
             file: current.file_id.clone(),
             from: baseline.version,
             to: current.version,
             ops,
+            intent,
         })
     }
+}
+
+/// Detect the high-level semantic intent of a delta between two IR states.
+///
+/// This examines the structural diff (adds/mods/dels) and produces a
+/// human-readable `SemanticIntent` describing *what* changed, beyond the
+/// raw instruction-level diff. Returns `None` when no single intent can
+/// be confidently identified (e.g. a mixed change with no dominant signal).
+///
+/// R-43a: Phase 1 detection is purely structural and deterministic — it
+/// inspects `CoreOp` streams directly. Phase 4 (R-43b) may enrich this
+/// with CBM cross-file impact metadata.
+///
+/// Detection precedence (first match wins):
+///   1. Rename — a DEF_* op with the same primary key but a different name
+///   2. AddInjection — an INJECTS op present in `current` but not `baseline`
+///   3. AddMethod — a DEF_M op present in `current` but not `baseline`
+///   4. RemoveMethod — a DEF_M op present in `baseline` but not `current`
+///   5. ChangeReturnType — a RET op whose type changed
+///   6. ChangeSignature — a SIG or RET op modified
+///
+/// Because the delta grouping is computed from BTreeMap-indexed instruction
+/// streams, iteration order is deterministic (invariant S4).
+fn detect_semantic_intent(baseline: &CompiledIR, current: &CompiledIR) -> Option<SemanticIntent> {
+    let base_indexed = index_instructions(&baseline.instructions);
+    let cur_indexed = index_instructions(&current.instructions);
+
+    // 1. Rename detection: same primary key, different name operand.
+    //    DEF_C / DEF_M / DEF_F are the named structural ops.
+    for (key, base_insn) in &base_indexed {
+        if let Some(cur_insn) = cur_indexed.get(key) {
+            let intent = match (base_insn, cur_insn) {
+                (CoreOp::DefClass(_, old_name), CoreOp::DefClass(_, new_name))
+                    if old_name != new_name =>
+                {
+                    Some(SemanticIntent::RenameSymbol {
+                        old_name: old_name.clone(),
+                        new_name: new_name.clone(),
+                        kind: "class".to_string(),
+                    })
+                }
+                (CoreOp::DefMethod(_, _, old_name), CoreOp::DefMethod(_, _, new_name))
+                    if old_name != new_name =>
+                {
+                    Some(SemanticIntent::RenameSymbol {
+                        old_name: old_name.clone(),
+                        new_name: new_name.clone(),
+                        kind: "method".to_string(),
+                    })
+                }
+                (CoreOp::DefField(_, _, old_name), CoreOp::DefField(_, _, new_name))
+                    if old_name != new_name =>
+                {
+                    Some(SemanticIntent::RenameSymbol {
+                        old_name: old_name.clone(),
+                        new_name: new_name.clone(),
+                        kind: "field".to_string(),
+                    })
+                }
+                _ => None,
+            };
+            if intent.is_some() {
+                return intent;
+            }
+        }
+    }
+
+    // 2. AddInjection: an INJECTS op gained a dependency. This covers both
+    //    the first-ever injection (key not in baseline) and a dependency
+    //    added to an existing INJECTS op (key in both, deps list grew).
+    for (key, cur_insn) in &cur_indexed {
+        if let CoreOp::Injects(class, cur_deps) = cur_insn {
+            let newly_added = match base_indexed.get(key) {
+                Some(CoreOp::Injects(_, base_deps)) => {
+                    // Existing INJECTS op — find a dep not in the baseline list.
+                    cur_deps.iter().find(|d| !base_deps.contains(d))
+                }
+                _ => {
+                    // First-ever injection — report the first dep.
+                    cur_deps.first()
+                }
+            };
+            if let Some(dep) = newly_added {
+                return Some(SemanticIntent::AddInjection {
+                    class: class.clone(),
+                    dependency: dep.clone(),
+                });
+            }
+        }
+    }
+
+    // 3. AddMethod: DEF_M present in current but not baseline.
+    for (key, cur_insn) in &cur_indexed {
+        if !base_indexed.contains_key(key) {
+            if let CoreOp::DefMethod(class, _, method_name) = cur_insn {
+                return Some(SemanticIntent::AddMethod {
+                    class: class.clone(),
+                    method_name: method_name.clone(),
+                });
+            }
+        }
+    }
+
+    // 4. RemoveMethod: DEF_M present in baseline but not current.
+    for (key, base_insn) in &base_indexed {
+        if !cur_indexed.contains_key(key) {
+            if let CoreOp::DefMethod(class, _, method_name) = base_insn {
+                return Some(SemanticIntent::RemoveMethod {
+                    class: class.clone(),
+                    method_name: method_name.clone(),
+                });
+            }
+        }
+    }
+
+    // 5. ChangeReturnType: RET op whose type changed.
+    for (key, base_insn) in &base_indexed {
+        if let Some(cur_insn) = cur_indexed.get(key) {
+            if let (CoreOp::Return(method, old_type), CoreOp::Return(_, new_type)) =
+                (base_insn, cur_insn)
+            {
+                if old_type != new_type {
+                    return Some(SemanticIntent::ChangeReturnType {
+                        method: method.clone(),
+                        old_type: old_type.clone(),
+                        new_type: new_type.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    // 6. ChangeSignature: SIG (Param) op modified. Return-type changes are
+    //    already reported as ChangeReturnType in step 5, so they are not
+    //    re-matched here (the Return arm would be unreachable dead code).
+    for (key, base_insn) in &base_indexed {
+        if let Some(cur_insn) = cur_indexed.get(key) {
+            if let (CoreOp::Param(method, _, _, _), CoreOp::Param(_, _, _, _)) =
+                (base_insn, cur_insn)
+            {
+                // Determine which field changed.
+                let field_changed = match (base_insn, cur_insn) {
+                    (CoreOp::Param(_, _, base_ty, _), CoreOp::Param(_, _, cur_ty, _))
+                        if base_ty != cur_ty =>
+                    {
+                        "param_type"
+                    }
+                    (CoreOp::Param(_, _, _, base_name), CoreOp::Param(_, _, _, cur_name))
+                        if base_name != cur_name =>
+                    {
+                        "param_name"
+                    }
+                    _ => continue,
+                };
+                return Some(SemanticIntent::ChangeSignature {
+                    method: method.clone(),
+                    field_changed: field_changed.to_string(),
+                });
+            }
+        }
+    }
+
+    None
 }
 
 impl Default for DeltaComputer {
@@ -208,9 +408,19 @@ fn primary_key(op: &CoreOp) -> String {
         CoreOp::Import(alias, _, _) => format!("IMP:{}", alias),
         CoreOp::TypeAlias(alias, _) => format!("TYPE:{}", alias),
         CoreOp::Pattern(name, args) => {
-            // Use pattern name as primary key — args may vary across compilations
-            format!("PAT:{}:{}", name, args.first().map(|s| s.as_str()).unwrap_or("?"))
+            format!(
+                "PAT:{}:{}",
+                name,
+                args.first().map(|s| s.as_str()).unwrap_or("?")
+            )
         }
+        // Edit Mode: Verbatim Method Bodies
+        CoreOp::Body(mid, _) => format!("BODY:{}", mid),
+        // R-43a: Execution Semantics
+        CoreOp::DataFlow(mid, _, _) => format!("DATAFLOW:{}", mid),
+        CoreOp::ControlFlow(mid, _, _) => format!("CTRL:{}", mid),
+        CoreOp::SideEffect(mid, _) => format!("EFFECT:{}", mid),
+        CoreOp::ExecutionContext(mid, _) => format!("CTX:{}", mid),
     }
 }
 
@@ -239,6 +449,13 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
             }
             v
         }
+        // Edit Mode: Verbatim Method Bodies
+        CoreOp::Body(mid, _) => vec!["BODY".into(), mid.clone()],
+        // R-43a: Execution Semantics
+        CoreOp::DataFlow(mid, _, _) => vec!["DATAFLOW".into(), mid.clone()],
+        CoreOp::ControlFlow(mid, _, _) => vec!["CTRL".into(), mid.clone()],
+        CoreOp::SideEffect(mid, _) => vec!["EFFECT".into(), mid.clone()],
+        CoreOp::ExecutionContext(mid, _) => vec!["CTX".into(), mid.clone()],
     }
 }
 
@@ -247,7 +464,10 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
 /// Returns None if the tuples have different opcodes or the same full content.
 /// Returns Some(patches) with an empty vec if the tuples are identical.
 /// Only non-identical fields are included, skipping the opcode (index 0).
-pub fn compute_field_patches(base_tuple: &[String], cur_tuple: &[String]) -> Option<Vec<FieldPatch>> {
+pub fn compute_field_patches(
+    base_tuple: &[String],
+    cur_tuple: &[String],
+) -> Option<Vec<FieldPatch>> {
     if base_tuple.is_empty() || cur_tuple.is_empty() {
         return None;
     }
@@ -297,6 +517,10 @@ pub struct CompactDelta {
     /// Operations
     #[serde(rename = "o")]
     pub ops: CompactOps,
+    /// R-43a: optional semantic intent metadata, preserved through
+    /// the compact encode → decode round-trip.
+    #[serde(rename = "i", skip_serializing_if = "Option::is_none")]
+    pub intent: Option<SemanticIntent>,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -331,6 +555,13 @@ fn abbreviate_opcode(opcode: &str) -> &str {
         "IMP" => "IP",
         "TYPE" => "T",
         "PAT" => "P",
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => "BD",
+        // R-43a: compact abbreviations
+        "DATAFLOW" => "DF",
+        "CTRL" => "CT",
+        "EFFECT" => "EF",
+        "CTX" => "CX",
         _ => opcode,
     }
 }
@@ -353,6 +584,13 @@ fn expand_opcode(abbrev: &str) -> &str {
         "IP" => "IMP",
         "T" => "TYPE",
         "P" => "PAT",
+        // Edit Mode: Verbatim Method Bodies
+        "BD" => "BODY",
+        // R-43a: compact abbreviations
+        "DF" => "DATAFLOW",
+        "CT" => "CTRL",
+        "EF" => "EFFECT",
+        "CX" => "CTX",
         _ => abbrev,
     }
 }
@@ -412,6 +650,7 @@ pub fn compact_encode(delta: &IRDelta) -> CompactDelta {
         file: delta.file.clone(),
         version_range,
         ops,
+        intent: delta.intent.clone(),
     }
 }
 
@@ -478,6 +717,7 @@ pub fn compact_decode(compact: &CompactDelta) -> Option<IRDelta> {
         from,
         to,
         ops: DeltaOps { adds, mods, dels },
+        intent: compact.intent.clone(),
     })
 }
 
@@ -520,14 +760,20 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         "INJECTS" => format!("INJECTS:{}", tuple.get(1).unwrap_or(&String::new())),
         "IMP" => format!("IMP:{}", tuple.get(1).unwrap_or(&String::new())),
         "TYPE" => format!("TYPE:{}", tuple.get(1).unwrap_or(&String::new())),
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => format!("BODY:{}", tuple.get(1).unwrap_or(&String::new())),
+        // R-43a: Execution Semantics
+        "DATAFLOW" => format!("DATAFLOW:{}", tuple.get(1).unwrap_or(&String::new())),
+        "CTRL" => format!("CTRL:{}", tuple.get(1).unwrap_or(&String::new())),
+        "EFFECT" => format!("EFFECT:{}", tuple.get(1).unwrap_or(&String::new())),
+        "CTX" => format!("CTX:{}", tuple.get(1).unwrap_or(&String::new())),
         _ => {
             // F-16: Unknown opcode — fallback produces a key from the full tuple.
-            // This is intentionally conservative: the content-derived key is
-            // a stable primary key (coincidentally), but callers should ensure
-            // all known opcodes are covered above. This branch should only be
-            // reached if a new CoreOp variant is added without updating this match.
             if cfg!(debug_assertions) {
-                eprintln!("[warn] primary_key_from_tuple: unknown opcode '{}'", tuple[0]);
+                eprintln!(
+                    "[warn] primary_key_from_tuple: unknown opcode '{}'",
+                    tuple[0]
+                );
             }
             tuple.join(":")
         }
@@ -571,11 +817,15 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
         "INJECTS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "IMP" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "TYPE" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        // R-43a: Execution Semantics
+        "DATAFLOW" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "CTRL" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "EFFECT" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "CTX" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         _ => {
             // F-17: Unknown opcode — fallback returns the full instruction body.
-            // This is correct by accident (matching by full body is equivalent
-            // to matching by the entire instruction), but it conflates "match key"
-            // with "instruction body". See F-16 for the same pattern.
             if cfg!(debug_assertions) {
                 eprintln!("[warn] key_tuple_from_tuple: unknown opcode '{}'", tuple[0]);
             }

@@ -1,49 +1,60 @@
 // src/mcp/tools.rs
 //
 // Tool definitions and dispatch for the MCP server.
-//
-// Phase 1 (FAANG audit F-03): the three `Fidelity::parse` call sites
-// used to silently down-typo'd input to `Low`. They now use
-// [`parse_fidelity_arg`], which returns a `-32602 Invalid params`
-// JSON-RPC error on unrecognised input.
-//
-// Phase 2 (FAANG audit F-05): the dispatcher now takes `&mut McpState`
-// (which bundles the path dict, cache, and project config) instead of
-// separate dict/cache arguments. Tool handlers consult the user's
-// `exclude_patterns` (via `is_excluded`) and `fidelity_overrides`
-// (via `get_fidelity_for_extension`) before any file I/O.
-//
-// Phase G: Integration & MCP Tools — wires the IR system into the MCP
-// tool interface. `compress_code_context` now includes IR output,
-// `delta_code_context` computes instruction-level deltas, and
-// `apply_delta` allows clients to update state incrementally.
-//
-// Phase 1 Module Split: handlers extracted to `tool_handlers.rs`,
-// shared helpers extracted to `tool_helpers.rs`.
-//
-// Phase 1 (workspace cache): compress_workspace now injects a baseline
-// cache breakpoint keyed on a SHA-256 hash of the manifest, so the
-// entire workspace scan result is cacheable.
+// v0.3.0: Registry-based dispatch for modular handlers, fallback to legacy.
 
-use serde_json::Value;
+use crate::cbm;
 use crate::compressor::Fidelity;
 use crate::decompression::Decompressor;
 use crate::mcp::McpState;
+use crate::mcp::cache_hints::{compute_workspace_breaker, inject_cache_breakpoints};
 use crate::mcp::workspace;
-use crate::mcp::cache_hints::{inject_cache_breakpoints, compute_workspace_breaker};
 use crate::protocol::send_response;
 use crate::tokenizer::{TokenizerKind, resolve_tokenizer_kind};
-use crate::cbm;
+use serde_json::Value;
 
-// Re-import handlers from sibling modules
-use super::tool_handlers::*;
-// Re-export helper for test access (tests use `use super::*`)
+use super::tool_handlers;
+
 #[cfg(test)]
 pub(crate) use super::tool_helpers::diff_code_context_handler;
 
-/// Return the list of tool definitions (for `tools/list`).
+/// Compute the list of supported languages based on enabled Cargo features.
+/// This surfaces to clients which file extensions the binary can actually
+/// process, avoiding "unsupported extension" errors for unbuilt grammars.
+fn supported_languages() -> Vec<&'static str> {
+    let mut langs = Vec::new();
+    if cfg!(feature = "typescript") {
+        langs.push("typescript");
+    }
+    if cfg!(feature = "csharp") {
+        langs.push("csharp");
+    }
+    if cfg!(feature = "rust") {
+        langs.push("rust");
+    }
+    if cfg!(feature = "java") {
+        langs.push("java");
+    }
+    langs
+}
+
+/// Inject the `supportedLanguages` field into each tool's schema so clients
+/// can discover which languages the current binary supports.
+fn inject_supported_languages(mut tools: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+    let supported = supported_languages();
+    for tool in &mut tools {
+        if let Some(obj) = tool.as_object_mut() {
+            obj.insert(
+                "supportedLanguages".to_string(),
+                serde_json::json!(supported),
+            );
+        }
+    }
+    tools
+}
+
 pub(crate) fn tool_list() -> Vec<serde_json::Value> {
-    vec![
+    let tools = vec![
         serde_json::json!({
             "name": "compress_code_context",
             "description": "High-speed local AST compilation, hash-caching, and variable mapping tool.",
@@ -51,16 +62,17 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, .rs, or .java file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%). Default: 'low'." },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%), 'edit' (structural skeleton + verbatim method bodies for safe replace_in_file), 'verbatim' (full raw source, zero compression). Default: 'low'." },
                     "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." },
-                    "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." }
+                    "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
             }
         }),
         serde_json::json!({
             "name": "decompress_code_context",
-            "description": "Expands a compressed structural skeleton back into human-readable format. Reverses opcodes ($c→class), path aliases, and behavior markers (⊕guard→'// conditional branch').",
+            "description": "Expands a compressed structural skeleton back into human-readable format.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -71,192 +83,206 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "compress_workspace",
-            "description": "Compresses all TypeScript, C#, and Rust files in a directory tree. Outputs a manifest of compressed file signatures with shared opcode dictionary.",
+            "description": "Compresses all TypeScript, C#, and Rust files in a directory tree.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "directoryPath": { "type": "string", "description": "Absolute path to the project directory to scan." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, ~70-80%), 'high' (minimal compression, ~50-60%), 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: 'low'." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["directoryPath"]
             }
         }),
         serde_json::json!({
             "name": "diff_code_context",
-            "description": "AST-level diff compression. Returns only the structural deltas (added/removed/modified classes, methods, fields, imports) between the file's previous in-session snapshot and its current state. First call with no baseline stores the snapshot; subsequent calls emit a compact change-set using + / - / ~ / = markers.",
+            "description": "AST-level diff compression.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: 'low'." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
             }
         }),
         serde_json::json!({
             "name": "delta_code_context",
-            "description": "IR-level delta compression. Returns only the structural deltas (added/removed/modified instructions) between the file's previous in-session IR state and its current state, using the structured delta envelope format. First call with no baseline stores the IR; subsequent calls emit a compact delta with + / ~ / - operations.",
+            "description": "IR-level delta compression.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Path to the source file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." },
-                    "workspaceRoot": { "type": "string", "description": "Optional workspace root for relative paths." }
+                    "filePath": { "type": "string" },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
             }
         }),
         serde_json::json!({
             "name": "delta_text_context",
-            "description": "Text-level delta compression. Returns line-level deltas (+added/-removed/~modified) between the file's previous compressed body snapshot and its current state. First call stores the snapshot; subsequent calls emit a compact delta instead of full re-compression. Saves 70-90% on edit sessions.",
+            "description": "Text-level (line-oriented) delta compression for supported source-code files only — same language registry as delta_code_context (.ts/.js/.tsx/.jsx/.cs/.rs/.java). Not for arbitrary text formats such as markdown/json/yaml.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'. Default: 'low'." }
+                    "filePath": { "type": "string" },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
             }
         }),
         serde_json::json!({
             "name": "apply_delta",
-            "description": "Applies an IR delta envelope to the in-session state machine, incrementally updating the tracked IR state without re-compressing. Returns the updated state and re-rendered pretty output.",
+            "description": "Applies an IR delta envelope to the in-session state machine.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "delta": {
-                        "type": "object",
-                        "description": "The IR delta envelope from delta_code_context",
-                        "properties": {
-                            "file": { "type": "string" },
-                            "from": { "type": "integer" },
-                            "to": { "type": "integer" },
-                            "ops": {
-                                "type": "object",
-                                "properties": {
-                                    "+": { "type": "array", "items": { "type": "array" } },
-                                    "~": { "type": "array", "items": { "type": "object" } },
-                                    "-": { "type": "array", "items": { "type": "array" } }
-                                }
-                            }
-                        }
-                    },
-                    "currentVersion": { "type": "integer", "description": "The current version of the file state (must match delta.from)." }
+                    "delta": { "type": "object" },
+                    "currentVersion": { "type": "integer" }
                 },
                 "required": ["delta", "currentVersion"]
             }
         }),
-        // ── Zero-Touch Workflow: provide_code_context ─────────────────
         serde_json::json!({
             "name": "provide_code_context",
-            "description": "Automatically provides the best possible compressed context for a file. This is the RECOMMENDED single entry point for any file-related coding task. First call performs full compression; subsequent calls automatically use delta transport for minimal token usage. Auto-detects Angular files and enables Meta-Layer with Φ markers. Chooses optimal fidelity based on file characteristics and intent. Use this tool for ANY coding task involving code context.",
+            "description": "Automatically provides the best possible compressed context for a file.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Path to the source file." },
-                    "intent": { "type": "string", "description": "Optional intent: 'edit', 'refactor', 'overview', 'debug', 'implement'. Controls fidelity selection.", "enum": ["edit", "refactor", "overview", "debug", "implement"] },
-                    "fidelity": { "type": "string", "description": "Optional explicit fidelity override: 'low', 'medium', 'high'. Overrides intent-based selection." },
-                    "workspaceRoot": { "type": "string", "description": "Optional workspace root for relative paths." },
-                    "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." }
+                    "filePath": { "type": "string" },
+                    "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"], "description": "edit: byte-exact method bodies for safe replace_in_file. refactor: full structural detail. overview: max compression. debug: balanced. implement: moderate detail." },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: config default." },
+                    "focusMethods": { "type": "array", "items": { "type": "string" }, "description": "Optional. When set alongside fidelity: \"edit\", only these method/function names get full verbatim bodies; all other methods in the file are rendered signature-only. Omit to render every method's body (current default behavior)." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." },
+                    "tokenizer": { "type": "string" }
                 },
                 "required": ["filePath"]
             }
         }),
-        // ── Zero-Touch Workflow: restore_context ─────────────────────
         serde_json::json!({
             "name": "restore_context",
-            "description": "Explicitly restores compressed context for a file. Forces full re-compression from on-disk source, clearing any in-memory delta baselines and context store entries. Use when you need a guaranteed fresh context state.",
+            "description": "Explicitly restores compressed context for a file.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Path to the source file." },
-                    "fidelity": { "type": "string", "description": "Compression fidelity: 'low', 'medium', 'high'." }
+                    "filePath": { "type": "string" },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
             }
         }),
-        // ── Zero-Touch Workflow: context_history ────────────────────
         serde_json::json!({
             "name": "context_history",
-            "description": "View compression history and savings for tracked files. Shows per-file version count, delta hit rate, and estimated token savings.",
+            "description": "View compression history and savings for tracked files.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Optional: specific file. If omitted, shows all tracked files." }
+                    "filePath": { "type": "string" }
                 }
             }
         }),
-        // ── Persistence: save_context ─────────────────────────────
         serde_json::json!({
             "name": "save_context",
-            "description": "Explicitly save current in-memory context to the persistence DB. Useful for manual checkpointing before risky edits.",
+            "description": "Explicitly save current in-memory context to the persistence DB.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Optional: specific file to save. If omitted, saves all tracked files." }
+                    "filePath": { "type": "string" }
                 }
             }
         }),
-        // ── Persistence: list_sessions ────────────────────────────
         serde_json::json!({
             "name": "list_sessions",
-            "description": "List all persistence sessions stored in the DB. Shows workspace roots, active contexts, and last active timestamps.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {}
-            }
+            "description": "List all persisted contexts stored in the DB — per-file rows with fidelity, token counts, delta count and last-update time.",
+            "inputSchema": { "type": "object", "properties": {} }
         }),
-        // ── Persistence: replay_history ───────────────────────────
         serde_json::json!({
             "name": "replay_history",
-            "description": "Replay deltas from the DB for a file up to a specific edit sequence. Useful for recovering state after a crash.",
+            "description": "Replay deltas from the DB for a file up to a specific edit sequence.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Path to the source file." },
-                    "targetSequence": { "type": "integer", "description": "Optional: replay up to this edit sequence. If omitted, replays all." },
-                    "fidelity": { "type": "string", "description": "Optional: output fidelity. Default: 'low'." }
+                    "filePath": { "type": "string" },
+                    "targetSequence": { "type": "integer" },
+                    "fidelity": { "type": "string" }
                 },
                 "required": ["filePath"]
             }
         }),
-        // ── Persistence: purge_old_deltas ─────────────────────────
         serde_json::json!({
             "name": "purge_old_deltas",
-            "description": "Purge old delta history from the persistence DB. Use to free space or trim history.",
+            "description": "Purge old delta history from the persistence DB.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "days": { "type": "integer", "description": "Delete deltas older than this many days. Default: 30." },
-                    "filePath": { "type": "string", "description": "Optional: specific file to purge. If omitted, purges all files." }
+                    "days": { "type": "integer" },
+                    "filePath": { "type": "string" }
                 }
             }
         }),
-        // ── Zero-Touch Workflow: context_stats (dashboard) ──────────
         serde_json::json!({
             "name": "context_stats",
-            "description": "View the Clean-CTX dashboard: token savings, compression stats, and session metrics. Shows per-file breakdown and session summary. Use this to monitor compression efficiency at any time.",
+            "description": "View the Clean-CTX dashboard: token savings, compression stats, and session metrics.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "filePath": { "type": "string", "description": "Optional: specific file to show stats for. If omitted, shows full session dashboard." },
-                    "format": { "type": "string", "description": "Output format: 'text' (human-readable, default) or 'json' (structured).", "enum": ["text", "json"] }
+                    "filePath": { "type": "string" },
+                    "format": { "type": "string", "enum": ["text", "json"] }
                 }
+            }
+        }),
+        serde_json::json!({
+            "name": "diff_commits",
+            "description": "Diff an entire workspace between two git refs; emits per-file AST-level change-sets in one call.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "workspaceRoot": { "type": "string", "description": "Optional. Defaults to CWD. Resolved against trusted root." },
+                    "fromRef": { "type": "string", "description": "Required. e.g. HEAD~1, main, abc123, v1.0. Strictly validated." },
+                    "toRef": { "type": "string", "description": "Optional. Defaults to working tree (uncommitted changes)." },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." }
+                },
+                "required": ["fromRef"]
             }
         }),
     ]
     .into_iter()
     .chain(cbm::cbm_tool_list())
-    .collect()
+    .collect();
+    inject_supported_languages(tools)
 }
 
-/// Parse the `fidelity` arg from a `tools/call` params object. On
-/// success, returns the resolved `Fidelity`. On a parse error, sends
-/// a `-32602 Invalid params` JSON-RPC response with the parse error
-/// message and returns `Err(())` — the caller MUST then `return` from
-/// the dispatch.
-pub(crate) fn parse_fidelity_arg(id: &Value, params: &Value) -> Result<Fidelity, ()> {
-    let fidelity_str = params["arguments"]["fidelity"].as_str().unwrap_or("low");
+/// P1-4: Parse fidelity argument from request, falling back to config default.
+///
+/// Uses the user's configured `default_fidelity` instead of hardcoded "low",
+/// ensuring consistency across all tool invocations.
+pub(crate) fn parse_fidelity_arg(
+    id: &Value,
+    params: &Value,
+    config: &crate::config::CleanCtxConfig,
+) -> Result<Fidelity, ()> {
+    let fidelity_str =
+        params["arguments"]["fidelity"]
+            .as_str()
+            .unwrap_or(match config.default_fidelity {
+                Fidelity::Low => "low",
+                Fidelity::Medium => "medium",
+                Fidelity::High => "high",
+                Fidelity::Edit => "edit",
+                Fidelity::Verbatim => "verbatim",
+            });
+
+    // Log when using default
+    if params["arguments"]["fidelity"].is_null() {
+        eprintln!(
+            "[clean-ctx] fidelity not specified, using default: {} (from config)",
+            fidelity_str
+        );
+    }
+
     match Fidelity::parse(fidelity_str) {
         Ok(f) => Ok(f),
         Err(e) => {
@@ -270,27 +296,19 @@ pub(crate) fn parse_fidelity_arg(id: &Value, params: &Value) -> Result<Fidelity,
     }
 }
 
-/// Parse the `tokenizer` arg from a `tools/call` params object.
-///
-/// R-19: resolves the tokenizer kind from the tool argument and
-/// config default. Returns the resolved `TokenizerKind`.
-pub(crate) fn parse_tokenizer_arg(params: &Value, config: &crate::config::CleanCtxConfig) -> TokenizerKind {
+pub(crate) fn parse_tokenizer_arg(
+    params: &Value,
+    config: &crate::config::CleanCtxConfig,
+) -> TokenizerKind {
     let tool_arg = params["arguments"]["tokenizer"].as_str();
     resolve_tokenizer_kind(tool_arg, Some(&config.tokenizer.to_string()))
 }
 
-/// Resolve the effective fidelity for a `(explicit_arg, file_extension)`
-/// pair, consulting the project config for an extension override.
-///
-/// F-05: the resolution order is:
-///   1. The explicit `fidelity` arg (if present and valid).
-///   2. `config.fidelity_overrides[ext]` (if present and valid).
-///   3. The config's `default_fidelity` (if present and valid).
-///   4. `Fidelity::Low` (hard fallback).
-///
-/// Steps 2 and 3 use `parse_or_default` (not `parse`) because a
-/// typo in `.clean-ctx.json` should not be a hard error — it just
-/// falls back to Low with a stderr warning.
+/// Resolve the effective fidelity for a (explicit_arg, file_extension) pair.
+/// Used by tests (`src/tests/mcp/tools.rs`, `src/tests/mcp/tool_handlers.rs`)
+/// and kept for potential future dispatch use. `#[allow(dead_code)]` is
+/// required because this is only consumed by external test modules.
+#[allow(dead_code)]
 pub(crate) fn resolve_fidelity(
     explicit: Option<&str>,
     ext: Option<&str>,
@@ -302,117 +320,146 @@ pub(crate) fn resolve_fidelity(
         return f;
     }
     if let Some(e) = ext
-        && let Some(s) = config.get_fidelity_for_extension(e)
+        && let Some(f) = config.get_fidelity_for_extension(e)
     {
-        return Fidelity::parse_or_default(s);
+        return f;
     }
-    Fidelity::parse_or_default(&config.default_fidelity)
+    config.default_fidelity
 }
 
-/// Dispatch a `tools/call` request for the given tool name.
+static HANDLER_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> =
+    std::sync::OnceLock::new();
+
+fn get_registry() -> &'static tool_handlers::registry::HandlerRegistry {
+    HANDLER_REGISTRY.get_or_init(tool_handlers::registry::create_default_registry)
+}
+
+// P3-3: Handler registry initialization.
+//
+// The registry uses OnceLock for lazy initialization - it's created on first
+// access rather than at load time. This avoids issues with sanitizers,
+// test harnesses, and dynamic linking that #[ctor] can cause.
+//
+// For tests that need eager initialization (e.g., parallel tests on Windows),
+// call `setup_handler_registry_for_tests()` in the test module.
+
+/// P3-3: Force initialization of the handler registry for test setup.
+/// Call this in test modules to avoid OnceLock contention during parallel tests.
+#[cfg(test)]
+pub fn setup_handler_registry_for_tests() {
+    let _ = get_registry();
+}
+
+/// P1-6: Collect all inline-only tool names for verification.
+/// Returns the set of tool names handled by the inline dispatch match arms.
+/// Used by tests (`src/tests/mcp/tools.rs`) to verify no tool is registered
+/// in both inline and registry. `#[allow(dead_code)]` is required because
+/// this is only consumed by the external `src/tests/mcp/tools.rs` module,
+/// which the lib build (non-test) never references.
+#[allow(dead_code)]
+pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
+    use std::collections::HashSet;
+    let mut names = HashSet::new();
+    names.insert("decompress_code_context");
+    names.insert("compress_workspace");
+    names.insert("diff_commits");
+    names.insert("graph_search");
+    names.insert("graph_query");
+    names.insert("graph_trace");
+    names.insert("get_architecture");
+    names.insert("get_cbm_status");
+    names.insert("cbm_proxy");
+    names
+}
+
+/// Dispatch a tools/call request.
+/// v0.3.0: Uses registry-based dispatch for modular handlers, fallback to legacy.
 ///
-/// F-05: takes `&mut McpState` instead of separate dict/cache args.
-pub(crate) fn dispatch_tools_call(
-    id: &Value,
-    tool_name: &str,
-    params: &Value,
-    state: &mut McpState,
-) {
+/// P1-6: All inline-handled tools have early returns. The remaining tools
+/// fall through to the registry. The `inline_tool_names()` function above
+/// enables test-time verification that no tool name appears in both paths.
+pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, state: &McpState) {
+    // Inline dispatch for tools that have special handling requirements
+    // (decompress, compress_workspace, and all CBM tools).
+    // Each arm returns to prevent double-fire if a tool is also registered.
     match tool_name {
-        "compress_code_context" => {
-            let encoding = params["arguments"]["encoding"].as_str().unwrap_or("named");
-            handle_compress_code_context(id, params, state, encoding);
-        }
         "decompress_code_context" => {
             let compressed_text = params["arguments"]["compressedText"].as_str().unwrap_or("");
-
-            // F-FULL-11: Validate compressedText length before processing.
-            // The MCP server's line limit caps the request to ~16 MB, but
-            // a string within that bound can still be large enough to cause
-            // memory pressure. Return a clean error for oversized input.
-            const MAX_DECOMPRESS_BYTES: usize = 4 * 1024 * 1024; // 4 MB
+            const MAX_DECOMPRESS_BYTES: usize = 4 * 1024 * 1024;
             if compressed_text.len() > MAX_DECOMPRESS_BYTES {
                 send_response(&serde_json::json!({
                     "jsonrpc": "2.0",
                     "id": id,
-                    "error": {
-                        "code": -32603,
-                        "message": format!(
-                            "compressedText too large: {} bytes (max {}).",
-                            compressed_text.len(), MAX_DECOMPRESS_BYTES
-                        )
-                    }
+                    "error": { "code": -32603, "message": format!("compressedText too large: {} bytes (max {}).", compressed_text.len(), MAX_DECOMPRESS_BYTES) }
                 }));
                 return;
             }
-
             let mut decompressor = Decompressor::new();
             let decompressed = decompressor.quick_decompress(compressed_text);
-
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": { "content": [{ "type": "text", "text": decompressed }] }
             }));
+            return;
         }
         "compress_workspace" => {
             let dir_path = params["arguments"]["directoryPath"].as_str().unwrap_or(".");
-            let fidelity = match parse_fidelity_arg(id, params) {
+            // XPIA mitigation: reject directory paths outside the trusted workspace root.
+            // Pass the caller-supplied workspaceRoot through so the boundary check
+            // honors it (multi-repo support) instead of pinning to CWD.
+            let workspace_root = params["arguments"]["workspaceRoot"].as_str();
+            let dir_path = match super::tool_helpers::resolve_file_path_checked(
+                dir_path,
+                workspace_root,
+                &state.config.additional_roots,
+            ) {
+                Ok(p) => p,
+                Err(msg) => {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32602, "message": msg }
+                    }));
+                    return;
+                }
+            };
+            let fidelity = match parse_fidelity_arg(id, params, &state.config) {
                 Ok(f) => f,
                 Err(()) => return,
             };
-
-            match workspace::compress_workspace_dir(dir_path, fidelity, state) {
+            match workspace::compress_workspace_dir(&dir_path, fidelity, state) {
                 Ok(result) => {
-                    // F-13: the WorkspaceResult carries the manifest
-                    // plus structured errors/excluded lists. We send
-                    // the manifest as the primary text content; the
-                    // errors are surfaced as a separate JSON field so
-                    // MCP clients can inspect them programmatically.
-                    //
-                    // F-FINAL-04: `excluded` is now `Vec<(String, Vec<String>)>`
-                    // — `(path, matching_patterns)` — so MCP clients can
-                    // debug a misconfigured exclude list.
-                    //
-                    // F-FINAL-06: `warnings` is the per-session warning
-                    // buffer (duplicate class names, etc.) so MCP
-                    // clients can surface non-fatal anomalies.
-                    //
-                    // Phase 1: Inject a workspace-level baseline cache
-                    // breakpoint keyed on a SHA-256 hash of the manifest.
                     let mut response = serde_json::json!({
                         "jsonrpc": "2.0",
                         "id": id,
                         "result": {
                             "content": [{ "type": "text", "text": result.manifest }],
                             "_meta": {
-                                "errors": result.errors.into_iter().map(|(p, e)| {
-                                    serde_json::json!({ "path": p, "error": e })
-                                }).collect::<Vec<_>>(),
-                                "excluded": result.excluded.into_iter().map(|(p, patterns)| {
-                                    serde_json::json!({
-                                        "path": p,
-                                        "matched_patterns": patterns,
-                                    })
-                                }).collect::<Vec<_>>(),
+                                "errors": result.errors.into_iter().map(|(p, e)| serde_json::json!({ "path": p, "error": e })).collect::<Vec<_>>(),
+                                "excluded": result.excluded.into_iter().map(|(p, patterns)| serde_json::json!({ "path": p, "matched_patterns": patterns })).collect::<Vec<_>>(),
                                 "warnings": result.warnings,
                             }
                         }
                     });
-
-                    // Inject workspace baseline cache breakpoint into result._meta, NOT the response root
                     if state.config.cache.enabled {
                         let ttl = state.config.cache.baseline_ttl.clone();
-                        let breaker = compute_workspace_breaker(std::slice::from_ref(&result.manifest));
+                        let breaker =
+                            compute_workspace_breaker(std::slice::from_ref(&result.manifest));
                         let tok_box = crate::tokenizer::create_tokenizer(
-                            crate::tokenizer::resolve_tokenizer_kind(None, Some(&state.config.tokenizer.to_string()))
-                        ).ok();
+                            crate::tokenizer::resolve_tokenizer_kind(
+                                None,
+                                Some(&state.config.tokenizer.to_string()),
+                            ),
+                        )
+                        .ok();
                         let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
                         if let Some(result_obj) = response.get_mut("result") {
-                            inject_cache_breakpoints(result_obj, state, "baseline", &ttl, &breaker, tok_ref);
+                            inject_cache_breakpoints(
+                                result_obj, state, "baseline", &ttl, &breaker, tok_ref,
+                            );
                         }
                     }
-
                     send_response(&response);
                 }
                 Err(e) => {
@@ -423,76 +470,185 @@ pub(crate) fn dispatch_tools_call(
                     }));
                 }
             }
+            return;
         }
-        "diff_code_context" => {
-            handle_diff_code_context(id, params, state);
+        "diff_commits" => {
+            // Resolve the workspace root (XPIA mitigation). Defaults to CWD.
+            // Pass the caller-supplied workspaceRoot through so the boundary
+            // check honors it (multi-repo support) instead of pinning to CWD.
+            let root_arg = params["arguments"]["workspaceRoot"].as_str();
+            let root = match super::tool_helpers::resolve_file_path_checked(
+                root_arg.unwrap_or("."),
+                root_arg,
+                &state.config.additional_roots,
+            ) {
+                Ok(p) => p,
+                Err(msg) => {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32602, "message": msg }
+                    }));
+                    return;
+                }
+            };
+
+            // fromRef is required and strictly validated (flag-injection guard).
+            let from_ref = match params["arguments"]["fromRef"].as_str() {
+                Some(r) => r,
+                None => {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32602, "message": "missing required argument: fromRef" }
+                    }));
+                    return;
+                }
+            };
+            if let Err(e) = crate::gitdiff::validate_ref(from_ref) {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": { "code": -32602, "message": e.to_string() }
+                }));
+                return;
+            }
+
+            // toRef is optional; if present, validate it too.
+            let to_ref = params["arguments"]["toRef"].as_str();
+            if let Some(t) = to_ref
+                && let Err(e) = crate::gitdiff::validate_ref(t)
+            {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": { "code": -32602, "message": e.to_string() }
+                }));
+                return;
+            }
+
+            // Fail-closed: the root must be a git repository.
+            if !crate::gitdiff::is_git_repo(&root) {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": { "code": -32603, "message": format!("not a git repository: {root}") }
+                }));
+                return;
+            }
+
+            let fidelity = match parse_fidelity_arg(id, params, &state.config) {
+                Ok(f) => f,
+                Err(()) => return,
+            };
+
+            // Resource limits from config: cap changed-file count and per-file size.
+            let max_files = Some(state.config.resource_limits.max_workspace_files);
+            let max_file_size = Some(state.config.resource_limits.max_file_size_bytes);
+
+            match crate::gitdiff::gitdiff_workspace(
+                &root,
+                from_ref,
+                to_ref,
+                fidelity,
+                max_files,
+                max_file_size,
+            ) {
+                Ok(summary) => {
+                    let mut response = serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "result": {
+                            "content": [{ "type": "text", "text": summary.manifest }],
+                            "_meta": {
+                                "fileCount": summary.file_count,
+                                "counts": {
+                                    "added": summary.counts.0,
+                                    "deleted": summary.counts.1,
+                                    "modified": summary.counts.2,
+                                    "renamed": summary.counts.3,
+                                },
+                                "skipped": summary.skipped,
+                            }
+                        }
+                    });
+                    if state.config.cache.enabled {
+                        let ttl = state.config.cache.baseline_ttl.clone();
+                        let breaker =
+                            compute_workspace_breaker(std::slice::from_ref(&summary.manifest));
+                        let tok_box = crate::tokenizer::create_tokenizer(
+                            crate::tokenizer::resolve_tokenizer_kind(
+                                None,
+                                Some(&state.config.tokenizer.to_string()),
+                            ),
+                        )
+                        .ok();
+                        let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
+                        if let Some(result_obj) = response.get_mut("result") {
+                            inject_cache_breakpoints(
+                                result_obj, state, "baseline", &ttl, &breaker, tok_ref,
+                            );
+                        }
+                    }
+                    send_response(&response);
+                }
+                Err(e) => {
+                    send_response(&serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32603, "message": e.to_string() }
+                    }));
+                }
+            }
+            return;
         }
-        "delta_code_context" => {
-            handle_delta_code_context(id, params, state);
-        }
-        "delta_text_context" => {
-            handle_delta_text_context(id, params, state);
-        }
-        "apply_delta" => {
-            handle_apply_delta(id, params, state);
-        }
-        // ── Zero-Touch Workflow dispatch ─────────────────────────
-        "provide_code_context" => {
-            handle_provide_code_context(id, params, state);
-        }
-        "restore_context" => {
-            handle_restore_context(id, params, state);
-        }
-        "context_history" => {
-            handle_context_history(id, params, state);
-        }
-        "context_stats" => {
-            handle_context_stats(id, params, state);
-        }
-        // ── Persistence tool dispatch ─────────────────────────
-        "save_context" => {
-            handle_save_context(id, params, state);
-        }
-        "list_sessions" => {
-            handle_list_sessions(id, params, state);
-        }
-        "replay_history" => {
-            handle_replay_history(id, params, state);
-        }
-        "purge_old_deltas" => {
-            handle_purge_old_deltas(id, params, state);
-        }
-        // ── CBM Integration tool dispatch (Phase 1) ──────────────
-        // Handlers live in crate::cbm::handlers — self-contained module.
+        // CBM tools
         "graph_search" => {
             crate::cbm::handlers::handle_graph_search(id, params, state);
+            return;
         }
         "graph_query" => {
             crate::cbm::handlers::handle_graph_query(id, params, state);
+            return;
         }
         "graph_trace" => {
             crate::cbm::handlers::handle_graph_trace(id, params, state);
+            return;
         }
         "get_architecture" => {
             crate::cbm::handlers::handle_get_architecture(id, params, state);
+            return;
         }
         "get_cbm_status" => {
             crate::cbm::handlers::handle_get_cbm_status(id, params, state);
+            return;
         }
-        // ── Phase 2: Pipe-level interception proxy ──────────
         "cbm_proxy" => {
             crate::cbm::proxy::handle_cbm_proxy(id, params, state);
+            return;
         }
-        _ => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": { "code": -32601, "message": format!("Tool not found: {}", tool_name) }
-            }));
-        }
+        // Unknown — fall through to registry
+        _ => {}
     }
+
+    // P1-6: Registry fallback for tools not handled inline above.
+    if let Some(entry) = get_registry().get(tool_name) {
+        (entry.handler)(id, params, state);
+        return;
+    }
+
+    // Unknown tool
+    send_response(&serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "error": { "code": -32601, "message": format!("Tool not found: {}", tool_name) }
+    }));
 }
 
 #[cfg(test)]
 #[path = "../tests/mcp/tools.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/mcp/tool_contracts.rs"]
+mod tool_contracts_tests;

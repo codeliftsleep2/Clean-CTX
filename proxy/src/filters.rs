@@ -16,6 +16,7 @@ pub struct FilterResult {
     pub program: String,
     pub reduction_pct: f32,
     pub truncated: bool,
+    #[allow(dead_code)]
     pub collapsed: bool,
 }
 
@@ -234,7 +235,12 @@ pub fn is_complete_json(s: &str) -> bool {
 }
 
 /// JSON guard: if truncated and content is valid JSON, pass through or omit.
-pub fn json_guard(original: &str, filtered: &str, truncated: bool, reduce_json: bool) -> (String, bool) {
+pub fn json_guard(
+    original: &str,
+    filtered: &str,
+    truncated: bool,
+    reduce_json: bool,
+) -> (String, bool) {
     if !truncated || reduce_json {
         return (filtered.to_string(), truncated);
     }

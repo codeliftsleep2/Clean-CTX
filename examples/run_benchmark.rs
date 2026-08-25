@@ -19,9 +19,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let entries: Vec<(&str, PathBuf)> = vec![
-        ("sample_service.ts", manifest_dir.join("src/test_files/sample_service.ts")),
-        ("LargeService.ts", manifest_dir.join("src/test_files/LargeService.ts")),
-        ("UserManagementService.ts", manifest_dir.join("src/test_files/UserManagementService.ts")),
+        (
+            "sample_service.ts",
+            manifest_dir.join("src/test_files/sample_service.ts"),
+        ),
+        (
+            "LargeService.ts",
+            manifest_dir.join("src/test_files/LargeService.ts"),
+        ),
+        (
+            "UserManagementService.ts",
+            manifest_dir.join("src/test_files/UserManagementService.ts"),
+        ),
     ];
 
     println!("{}", "=".repeat(75));
@@ -41,18 +50,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let raw_tokens = bpe.encode_with_special_tokens(&source).len();
         let line_count = source.lines().count();
 
-        println!("-- {} ({} lines, {} raw tokens) --", name, line_count, raw_tokens);
+        println!(
+            "-- {} ({} lines, {} raw tokens) --",
+            name, line_count, raw_tokens
+        );
         println!();
 
         for (fi, fidelity) in fidelities.iter().enumerate() {
             let mut dict = PathDictionary::new();
             let mut cache = LocalStateCache::new();
-            let compressed_text = compress_file(
-                file_path.clone(),
-                &mut dict,
-                &mut cache,
-                *fidelity,
-            )?;
+            let compressed_text =
+                compress_file(file_path.clone(), &mut dict, &mut cache, *fidelity, None)?;
             let compressed_tokens = bpe.encode_with_special_tokens(&compressed_text).len();
             let saved = raw_tokens.saturating_sub(compressed_tokens);
             let reduction_pct = if raw_tokens > 0 {
@@ -61,7 +69,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 0.0
             };
 
-            println!("  {:<8} | raw={:>5} -> compressed={:>5} | saved={:>5} | {:.2}%",
+            println!(
+                "  {:<8} | raw={:>5} -> compressed={:>5} | saved={:>5} | {:.2}%",
                 format!("{:?}", fidelity),
                 raw_tokens,
                 compressed_tokens,
@@ -87,7 +96,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             0.0
         };
 
-        println!("  {:<8} | total_raw={:>6} total_compressed={:>6} | saved={:>6} | {:.2}%",
+        println!(
+            "  {:<8} | total_raw={:>6} total_compressed={:>6} | saved={:>6} | {:.2}%",
             format!("{:?}", fidelity),
             agg_raw[fi],
             agg_compressed[fi],

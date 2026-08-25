@@ -12,11 +12,11 @@
 //   - Render: render_pretty after state application
 //   - Edge cases: empty IRs, duplicate detection, multi-file state
 
+use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
-use crate::ir::delta::{DeltaComputer, IRDelta, DeltaOps, ModOp, primary_key_from_tuple};
+use crate::ir::delta::{DeltaComputer, DeltaOps, IRDelta, ModOp, primary_key_from_tuple};
 use crate::ir::opcodes::CoreOp;
 use crate::ir::replay::{ContextState, DeltaError, FileState};
-use crate::compression::Fidelity;
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -62,12 +62,19 @@ fn add_method_delta(from: u64, to: u64) -> IRDelta {
         ops: DeltaOps {
             adds: vec![
                 vec!["DEF_M".into(), "C1".into(), "M2".into(), "newMethod".into()],
-                vec!["SIG".into(), "M2".into(), "P2".into(), "$n".into(), "count".into()],
+                vec![
+                    "SIG".into(),
+                    "M2".into(),
+                    "P2".into(),
+                    "$n".into(),
+                    "count".into(),
+                ],
                 vec!["RET".into(), "M2".into(), "$v".into()],
             ],
             mods: vec![],
             dels: vec![],
         },
+        intent: None,
     }
 }
 
@@ -81,12 +88,24 @@ fn remove_method_delta(from: u64, to: u64) -> IRDelta {
             adds: vec![],
             mods: vec![],
             dels: vec![
-                vec!["DEF_M".into(), "C1".into(), "M1".into(), "processData".into()],
-                vec!["SIG".into(), "M1".into(), "P1".into(), "$s".into(), "input".into()],
+                vec![
+                    "DEF_M".into(),
+                    "C1".into(),
+                    "M1".into(),
+                    "processData".into(),
+                ],
+                vec![
+                    "SIG".into(),
+                    "M1".into(),
+                    "P1".into(),
+                    "$s".into(),
+                    "input".into(),
+                ],
                 vec!["RET".into(), "M1".into(), "$b".into()],
                 vec!["FLAGS".into(), "M1".into(), "IF".into(), "LOOP".into()],
             ],
         },
+        intent: None,
     }
 }
 
@@ -100,10 +119,16 @@ fn modify_method_delta(from: u64, to: u64) -> IRDelta {
             adds: vec![],
             mods: vec![ModOp::new_replace(
                 vec!["DEF_M".into(), "C1".into(), "M1".into()],
-                vec!["DEF_M".into(), "C1".into(), "M1".into(), "renamedMethod".into()],
+                vec![
+                    "DEF_M".into(),
+                    "C1".into(),
+                    "M1".into(),
+                    "renamedMethod".into(),
+                ],
             )],
             dels: vec![],
         },
+        intent: None,
     }
 }
 
@@ -144,8 +169,13 @@ fn file_state_append() {
     let ir = baseline_ir("a1", 1);
     let mut fs = FileState::from_compiled(&ir);
 
-    fs.append(vec!["DEF_F".into(), "C1".into(), "F1".into(), "items".into()])
-        .expect("append should succeed");
+    fs.append(vec![
+        "DEF_F".into(),
+        "C1".into(),
+        "F1".into(),
+        "items".into(),
+    ])
+    .expect("append should succeed");
 
     assert_eq!(fs.instructions.len(), 7);
     assert!(fs.index.contains_key("DEF_F:C1:F1"));
@@ -162,7 +192,10 @@ fn file_state_remove_by_key() {
     assert!(removed, "remove should succeed");
 
     assert_eq!(fs.instructions.len(), 5);
-    assert!(!fs.index.contains_key("IMP:IM1"), "index should not contain removed key");
+    assert!(
+        !fs.index.contains_key("IMP:IM1"),
+        "index should not contain removed key"
+    );
 
     // Verify remaining instructions are still correct
     assert_eq!(fs.instructions[0], vec!["DEF_C", "C1", "SampleService"]);
@@ -181,12 +214,22 @@ fn file_state_remove_by_key_swap_remove_preserves_index() {
     let removed = fs.remove_by_key(&["DEF_M".into(), "C1".into(), "M1".into()]);
     assert!(removed, "remove should succeed");
 
-    assert_eq!(fs.instructions.len(), 5, "should have 5 remaining instructions");
+    assert_eq!(
+        fs.instructions.len(),
+        5,
+        "should have 5 remaining instructions"
+    );
 
     // The index entry for Import (which was swapped into index 1) should be correct
-    assert!(fs.index.contains_key("IMP:IM1"), "IMP:IM1 should still be in index");
+    assert!(
+        fs.index.contains_key("IMP:IM1"),
+        "IMP:IM1 should still be in index"
+    );
     let imp_idx = fs.index.get("IMP:IM1").unwrap();
-    assert_eq!(*imp_idx, 1, "Import should now be at index 1 (swapped from last position)");
+    assert_eq!(
+        *imp_idx, 1,
+        "Import should now be at index 1 (swapped from last position)"
+    );
 
     // All remaining keys should be present and point to valid indices
     assert!(fs.index.contains_key("DEF_C:C1"));
@@ -200,11 +243,24 @@ fn file_state_remove_by_key_swap_remove_preserves_index() {
     // Verify no duplicate keys in the index
     let mut seen_instructions = std::collections::HashSet::new();
     for (key, &idx) in &fs.index {
-        assert!(idx < fs.instructions.len(), "index {} out of bounds for key {}", idx, key);
+        assert!(
+            idx < fs.instructions.len(),
+            "index {} out of bounds for key {}",
+            idx,
+            key
+        );
         let insn = &fs.instructions[idx];
         let computed_key = primary_key_from_tuple(insn);
-        assert_eq!(key, &computed_key, "index points to wrong instruction for key {}", key);
-        assert!(seen_instructions.insert(idx), "duplicate index {} in map", idx);
+        assert_eq!(
+            key, &computed_key,
+            "index points to wrong instruction for key {}",
+            key
+        );
+        assert!(
+            seen_instructions.insert(idx),
+            "duplicate index {} in map",
+            idx
+        );
     }
 }
 
@@ -276,11 +332,19 @@ fn file_state_replace_by_key() {
 
     let replaced = fs.replace_by_key(
         &["DEF_M".into(), "C1".into(), "M1".into()],
-        &["DEF_M".into(), "C1".into(), "M1".into(), "renamedMethod".into()],
+        &[
+            "DEF_M".into(),
+            "C1".into(),
+            "M1".into(),
+            "renamedMethod".into(),
+        ],
     );
     assert!(replaced, "replace should succeed");
 
-    assert_eq!(fs.instructions[1], vec!["DEF_M", "C1", "M1", "renamedMethod"]);
+    assert_eq!(
+        fs.instructions[1],
+        vec!["DEF_M", "C1", "M1", "renamedMethod"]
+    );
     // Index should still be valid
     assert!(fs.index.contains_key("DEF_M:C1:M1"));
 }
@@ -354,7 +418,7 @@ fn context_state_new() {
 fn context_state_load_ir() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     assert!(cs.has_file("a1"));
     assert_eq!(cs.version(), 1);
@@ -368,8 +432,8 @@ fn context_state_load_multiple_files() {
     let ir2 = multi_class_ir("b2", 1);
 
     let mut cs = ContextState::new();
-    cs.load_ir(ir1);
-    cs.load_ir(ir2);
+    cs.load_ir(ir1, None);
+    cs.load_ir(ir2, None);
 
     assert!(cs.has_file("a1"));
     assert!(cs.has_file("b2"));
@@ -383,11 +447,15 @@ fn context_state_load_ir_updates_version() {
     let ir_v2 = multi_class_ir("b2", 3);
 
     let mut cs = ContextState::new();
-    cs.load_ir(ir_v1);
+    cs.load_ir(ir_v1, None);
     assert_eq!(cs.version(), 1);
 
-    cs.load_ir(ir_v2);
-    assert_eq!(cs.version(), 3, "global version should be max of all loaded IRs");
+    cs.load_ir(ir_v2, None);
+    assert_eq!(
+        cs.version(),
+        3,
+        "global version should be max of all loaded IRs"
+    );
 }
 
 #[test]
@@ -395,17 +463,15 @@ fn context_state_load_overwrites_existing() {
     let ir_v1 = baseline_ir("a1", 1);
     let ir_v2 = CompiledIR {
         file_id: "a1".to_string(),
-        instructions: vec![
-            CoreOp::DefClass("C1".into(), "NewClass".into()),
-        ],
+        instructions: vec![CoreOp::DefClass("C1".into(), "NewClass".into())],
         version: 2,
     };
 
     let mut cs = ContextState::new();
-    cs.load_ir(ir_v1);
+    cs.load_ir(ir_v1, None);
     assert_eq!(cs.instruction_count("a1").unwrap(), 6);
 
-    cs.load_ir(ir_v2);
+    cs.load_ir(ir_v2, None);
     assert_eq!(cs.instruction_count("a1").unwrap(), 1);
     assert_eq!(cs.version(), 2);
 }
@@ -416,7 +482,7 @@ fn context_state_load_overwrites_existing() {
 fn context_state_apply_add() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     let delta = add_method_delta(1, 2);
     let result = cs.apply(delta).expect("apply should succeed");
@@ -436,13 +502,17 @@ fn context_state_apply_add() {
 fn context_state_apply_remove() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     let delta = remove_method_delta(1, 2);
     let result = cs.apply(delta).expect("apply should succeed");
 
     assert_eq!(result, 2);
-    assert_eq!(cs.instruction_count("a1").unwrap(), 2, "6 base - 4 removals = 2 remaining");
+    assert_eq!(
+        cs.instruction_count("a1").unwrap(),
+        2,
+        "6 base - 4 removals = 2 remaining"
+    );
 
     // Verify M1 instructions are gone
     let ir = cs.get_ir("a1").unwrap();
@@ -456,13 +526,17 @@ fn context_state_apply_remove() {
 fn context_state_apply_modify() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     let delta = modify_method_delta(1, 2);
     let result = cs.apply(delta).expect("apply should succeed");
 
     assert_eq!(result, 2);
-    assert_eq!(cs.instruction_count("a1").unwrap(), 6, "count should remain same after modify");
+    assert_eq!(
+        cs.instruction_count("a1").unwrap(),
+        6,
+        "count should remain same after modify"
+    );
 
     // Verify M1 was renamed
     let ir = cs.get_ir("a1").unwrap();
@@ -474,7 +548,7 @@ fn context_state_apply_modify() {
 fn context_state_apply_combined_delta() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Combined: add, remove, modify in one delta
     let delta = IRDelta {
@@ -482,24 +556,46 @@ fn context_state_apply_combined_delta() {
         from: 1,
         to: 2,
         ops: DeltaOps {
-            adds: vec![
-                vec!["DEF_F".into(), "C1".into(), "F1".into(), "newField".into()],
-            ],
+            adds: vec![vec![
+                "DEF_F".into(),
+                "C1".into(),
+                "F1".into(),
+                "newField".into(),
+            ]],
             mods: vec![ModOp::new_replace(
                 vec!["DEF_M".into(), "C1".into(), "M1".into()],
-                vec!["DEF_M".into(), "C1".into(), "M1".into(), "modifiedMethod".into()],
+                vec![
+                    "DEF_M".into(),
+                    "C1".into(),
+                    "M1".into(),
+                    "modifiedMethod".into(),
+                ],
             )],
-            dels: vec![
-                vec!["IMP".into(), "IM1".into(), "rxjs".into(), "map".into()],
-            ],
+            dels: vec![vec![
+                "IMP".into(),
+                "IM1".into(),
+                "rxjs".into(),
+                "map".into(),
+            ]],
         },
+        intent: None,
     };
 
     cs.apply(delta).expect("combined delta should apply");
 
-    assert_eq!(cs.instruction_count("a1").unwrap(), 6, "6 base - 1 del + 1 add = 6");
-    assert!(cs.get_ir("a1").unwrap().iter().any(|t| t[0] == "DEF_F"), "DEF_F should be present");
-    assert!(!cs.get_ir("a1").unwrap().iter().any(|t| t[0] == "IMP"), "IMP should be removed");
+    assert_eq!(
+        cs.instruction_count("a1").unwrap(),
+        6,
+        "6 base - 1 del + 1 add = 6"
+    );
+    assert!(
+        cs.get_ir("a1").unwrap().iter().any(|t| t[0] == "DEF_F"),
+        "DEF_F should be present"
+    );
+    assert!(
+        !cs.get_ir("a1").unwrap().iter().any(|t| t[0] == "IMP"),
+        "IMP should be removed"
+    );
 }
 
 // ── Error Cases ──────────────────────────────────────────────────
@@ -513,6 +609,7 @@ fn context_state_apply_unknown_file() {
         from: 0,
         to: 1,
         ops: DeltaOps::default(),
+        intent: None,
     };
 
     let result = cs.apply(delta);
@@ -526,7 +623,7 @@ fn context_state_apply_unknown_file() {
 fn context_state_apply_version_mismatch() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Delta targeting version 0 when file is at version 1
     let delta = IRDelta {
@@ -534,6 +631,7 @@ fn context_state_apply_version_mismatch() {
         from: 0,
         to: 2,
         ops: DeltaOps::default(),
+        intent: None,
     };
 
     let result = cs.apply(delta);
@@ -550,7 +648,7 @@ fn context_state_apply_version_mismatch() {
 fn context_state_apply_symbol_not_found_on_remove() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Try to remove an instruction that doesn't exist
     let delta = IRDelta {
@@ -560,10 +658,14 @@ fn context_state_apply_symbol_not_found_on_remove() {
         ops: DeltaOps {
             adds: vec![],
             mods: vec![],
-            dels: vec![
-                vec!["DEF_M".into(), "C1".into(), "M99".into(), "ghostMethod".into()],
-            ],
+            dels: vec![vec![
+                "DEF_M".into(),
+                "C1".into(),
+                "M99".into(),
+                "ghostMethod".into(),
+            ]],
         },
+        intent: None,
     };
 
     let result = cs.apply(delta);
@@ -579,7 +681,7 @@ fn context_state_apply_symbol_not_found_on_remove() {
 fn context_state_apply_symbol_not_found_on_modify() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Try to modify an instruction that doesn't exist
     let delta = IRDelta {
@@ -594,6 +696,7 @@ fn context_state_apply_symbol_not_found_on_modify() {
             )],
             dels: vec![],
         },
+        intent: None,
     };
 
     let result = cs.apply(delta);
@@ -609,7 +712,7 @@ fn context_state_apply_symbol_not_found_on_modify() {
 fn context_state_apply_duplicate_symbol() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Try to add an instruction with a key that already exists
     let delta = IRDelta {
@@ -617,12 +720,16 @@ fn context_state_apply_duplicate_symbol() {
         from: 1,
         to: 2,
         ops: DeltaOps {
-            adds: vec![
-                vec!["DEF_M".into(), "C1".into(), "M1".into(), "duplicate".into()],
-            ],
+            adds: vec![vec![
+                "DEF_M".into(),
+                "C1".into(),
+                "M1".into(),
+                "duplicate".into(),
+            ]],
             mods: vec![],
             dels: vec![],
         },
+        intent: None,
     };
 
     let result = cs.apply(delta);
@@ -640,7 +747,7 @@ fn context_state_apply_duplicate_symbol() {
 fn context_state_sequential_deltas() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // v1 → v2: add method M2
     let delta_1_2 = add_method_delta(1, 2);
@@ -656,7 +763,12 @@ fn context_state_sequential_deltas() {
 
     assert_eq!(cs.file_version("a1").unwrap(), 3);
     assert_eq!(cs.instruction_count("a1").unwrap(), 9); // same count
-    let m1 = cs.get_ir("a1").unwrap().iter().find(|t| t[0] == "DEF_M" && t[2] == "M1").unwrap();
+    let m1 = cs
+        .get_ir("a1")
+        .unwrap()
+        .iter()
+        .find(|t| t[0] == "DEF_M" && t[2] == "M1")
+        .unwrap();
     assert_eq!(m1[3], "renamedMethod");
 
     // v3 → v4: remove M2
@@ -669,21 +781,35 @@ fn context_state_sequential_deltas() {
             mods: vec![],
             dels: vec![
                 vec!["DEF_M".into(), "C1".into(), "M2".into(), "newMethod".into()],
-                vec!["SIG".into(), "M2".into(), "P2".into(), "$n".into(), "count".into()],
+                vec![
+                    "SIG".into(),
+                    "M2".into(),
+                    "P2".into(),
+                    "$n".into(),
+                    "count".into(),
+                ],
                 vec!["RET".into(), "M2".into(), "$v".into()],
             ],
         },
+        intent: None,
     };
     cs.apply(delta_3_4).expect("v3→v4 apply");
 
     assert_eq!(cs.file_version("a1").unwrap(), 4);
     assert_eq!(cs.instruction_count("a1").unwrap(), 6); // back to original count
-    assert!(!cs.get_ir("a1").unwrap().iter().any(|t| t[2] == "M2"), "M2 should be gone");
+    assert!(
+        !cs.get_ir("a1").unwrap().iter().any(|t| t[2] == "M2"),
+        "M2 should be gone"
+    );
 
     // Final state should contain: DEF_C C1, DEF_M M1 (renamed), SIG, RET, FLAGS, no import
     let final_ir = cs.get_ir("a1").unwrap();
     assert!(final_ir.iter().any(|t| t[0] == "DEF_C" && t[1] == "C1"));
-    assert!(final_ir.iter().any(|t| t[0] == "DEF_M" && t[1] == "C1" && t[2] == "M1" && t[3] == "renamedMethod"));
+    assert!(
+        final_ir
+            .iter()
+            .any(|t| t[0] == "DEF_M" && t[1] == "C1" && t[2] == "M1" && t[3] == "renamedMethod")
+    );
     assert!(final_ir.iter().any(|t| t[0] == "SIG" && t[1] == "M1"));
     assert!(final_ir.iter().any(|t| t[0] == "RET" && t[1] == "M1"));
     assert!(final_ir.iter().any(|t| t[0] == "FLAGS" && t[1] == "M1"));
@@ -695,14 +821,17 @@ fn context_state_sequential_deltas() {
 fn context_state_render_pretty() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     let rendered = cs.render_pretty("a1", Fidelity::Low);
     assert!(rendered.is_some(), "should render existing file");
 
     let text = rendered.unwrap();
     // Low fidelity should include $c, method name, etc.
-    assert!(text.contains("$c SampleService"), "low fidelity should show class");
+    assert!(
+        text.contains("$c SampleService"),
+        "low fidelity should show class"
+    );
     assert!(text.contains("processData"), "should contain method name");
 }
 
@@ -717,7 +846,7 @@ fn context_state_render_pretty_nonexistent_file() {
 fn context_state_render_after_apply() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Add a method
     let delta = add_method_delta(1, 2);
@@ -725,7 +854,10 @@ fn context_state_render_after_apply() {
 
     // Render after state change
     let rendered = cs.render_pretty("a1", Fidelity::Low).unwrap();
-    assert!(rendered.contains("newMethod"), "should contain added method name");
+    assert!(
+        rendered.contains("newMethod"),
+        "should contain added method name"
+    );
 }
 
 // ── Multi-file State Tests ───────────────────────────────────────
@@ -736,8 +868,8 @@ fn context_state_multi_file_operations() {
     let ir2 = multi_class_ir("file2", 1);
 
     let mut cs = ContextState::new();
-    cs.load_ir(ir1);
-    cs.load_ir(ir2);
+    cs.load_ir(ir1, None);
+    cs.load_ir(ir2, None);
 
     // Both files loaded
     assert!(cs.has_file("file1"));
@@ -760,7 +892,10 @@ fn context_state_multi_file_operations() {
 
     // file1 should have renamed method
     let file1_ir = cs.get_ir("file1").unwrap();
-    let m1 = file1_ir.iter().find(|t| t[0] == "DEF_M" && t[2] == "M1").unwrap();
+    let m1 = file1_ir
+        .iter()
+        .find(|t| t[0] == "DEF_M" && t[2] == "M1")
+        .unwrap();
     assert_eq!(m1[3], "renamedMethod");
 }
 
@@ -774,7 +909,7 @@ fn context_state_empty_ir() {
         version: 1,
     };
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     assert!(cs.has_file("empty"));
     assert_eq!(cs.instruction_count("empty").unwrap(), 0);
@@ -785,6 +920,7 @@ fn context_state_empty_ir() {
         from: 1,
         to: 2,
         ops: DeltaOps::default(),
+        intent: None,
     };
 
     let result = cs.apply(delta).expect("empty delta should apply");
@@ -798,11 +934,11 @@ fn context_state_version_tracking() {
     assert_eq!(cs.version(), 0);
 
     let ir1 = baseline_ir("a1", 5);
-    cs.load_ir(ir1);
+    cs.load_ir(ir1, None);
     assert_eq!(cs.version(), 5);
 
     let ir2 = multi_class_ir("b2", 3);
-    cs.load_ir(ir2);
+    cs.load_ir(ir2, None);
     assert_eq!(cs.version(), 5, "should stay at max version (5)");
 
     let ir3 = CompiledIR {
@@ -810,7 +946,7 @@ fn context_state_version_tracking() {
         instructions: vec![],
         version: 10,
     };
-    cs.load_ir(ir3);
+    cs.load_ir(ir3, None);
     assert_eq!(cs.version(), 10, "should update to 10");
 }
 
@@ -818,7 +954,7 @@ fn context_state_version_tracking() {
 fn context_state_remove_file() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     assert!(cs.has_file("a1"));
     let removed = cs.remove_file("a1");
@@ -833,7 +969,7 @@ fn context_state_remove_file() {
 fn context_state_file_version() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     assert_eq!(cs.file_version("a1").unwrap(), 1);
     assert!(cs.file_version("nonexistent").is_none());
@@ -848,7 +984,7 @@ fn context_state_file_version() {
 fn context_state_get_ir() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     let ir_ref = cs.get_ir("a1");
     assert!(ir_ref.is_some());
@@ -868,7 +1004,10 @@ fn delta_error_display_unknown_file() {
 
 #[test]
 fn delta_error_display_version_mismatch() {
-    let err = DeltaError::VersionMismatch { expected: 3, got: 1 };
+    let err = DeltaError::VersionMismatch {
+        expected: 3,
+        got: 1,
+    };
     let msg = format!("{}", err);
     assert!(msg.contains("3"));
     assert!(msg.contains("1"));
@@ -904,17 +1043,20 @@ fn full_replay_cycle() {
 
     // Step 2: Load v1 into state
     let mut cs = ContextState::new();
-    cs.load_ir(v1.clone());
+    cs.load_ir(v1.clone(), None);
     assert_eq!(cs.instruction_count("main.ts").unwrap(), 6);
 
     // Step 3-4: Create v2 (modified) and compute delta
     let mut v2 = v1.clone();
     v2.version = 2;
     // Remove import
-    v2.instructions.retain(|op| !matches!(op, CoreOp::Import(_, _, _)));
+    v2.instructions
+        .retain(|op| !matches!(op, CoreOp::Import(_, _, _)));
     // Add field
-    v2.instructions.push(CoreOp::DefField("C1".into(), "F1".into(), "items".into()));
-    v2.instructions.push(CoreOp::FieldType("F1".into(), "$n".into()));
+    v2.instructions
+        .push(CoreOp::DefField("C1".into(), "F1".into(), "items".into()));
+    v2.instructions
+        .push(CoreOp::FieldType("F1".into(), "$n".into()));
     // Rename M1
     for op in &mut v2.instructions {
         if let CoreOp::DefMethod(_, mid, name) = op {
@@ -941,12 +1083,18 @@ fn full_replay_cycle() {
     assert!(final_ir.iter().any(|t| t[0] == "DEF_F" && t[2] == "F1"));
     assert!(final_ir.iter().any(|t| t[0] == "FIELD_T" && t[1] == "F1"));
     // Method renamed
-    let m1 = final_ir.iter().find(|t| t[0] == "DEF_M" && t[2] == "M1").unwrap();
+    let m1 = final_ir
+        .iter()
+        .find(|t| t[0] == "DEF_M" && t[2] == "M1")
+        .unwrap();
     assert_eq!(m1[3], "refactored");
 
     // Render at low fidelity should show updated content
     let rendered = cs.render_pretty("main.ts", Fidelity::Low).unwrap();
-    assert!(rendered.contains("refactored"), "rendered output should have new method name");
+    assert!(
+        rendered.contains("refactored"),
+        "rendered output should have new method name"
+    );
 }
 
 // ── F-22: Add After No-Op Mod ───────────────────────────────────
@@ -961,7 +1109,7 @@ fn full_replay_cycle() {
 fn context_state_apply_no_op_mod_then_add() {
     let ir = baseline_ir("a1", 1);
     let mut cs = ContextState::new();
-    cs.load_ir(ir);
+    cs.load_ir(ir, None);
 
     // Manually construct a delta with a mod that is a no-op
     // (replace equals the original key) plus a real add.
@@ -978,17 +1126,32 @@ fn context_state_apply_no_op_mod_then_add() {
                 // No-op mod: replace equals the existing instruction
                 ModOp::new_replace(
                     vec!["DEF_M".into(), "C1".into(), "M1".into()],
-                    vec!["DEF_M".into(), "C1".into(), "M1".into(), "processData".into()],
+                    vec![
+                        "DEF_M".into(),
+                        "C1".into(),
+                        "M1".into(),
+                        "processData".into(),
+                    ],
                 ),
             ],
             dels: vec![],
         },
+        intent: None,
     };
 
     let result = cs.apply(delta);
-    assert!(result.is_ok(), "no-op mod + add should apply successfully: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "no-op mod + add should apply successfully: {:?}",
+        result
+    );
     assert_eq!(cs.file_version("a1").unwrap(), 2);
-    assert!(cs.get_ir("a1").unwrap().iter().any(|t| t[0] == "DEF_F" && t[2] == "F1"));
+    assert!(
+        cs.get_ir("a1")
+            .unwrap()
+            .iter()
+            .any(|t| t[0] == "DEF_F" && t[2] == "F1")
+    );
 }
 
 // ── F-23: FileState append returns Err for duplicates ────────────
@@ -1009,5 +1172,9 @@ fn file_state_append_duplicate_key_returns_err_f23() {
     }
 
     // Length should be unchanged
-    assert_eq!(fs.instructions.len(), 6, "failed append should not change state");
+    assert_eq!(
+        fs.instructions.len(),
+        6,
+        "failed append should not change state"
+    );
 }

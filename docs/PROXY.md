@@ -1,5 +1,7 @@
 # Clean-CTX Proxy
 
+> **Owner:** Proxy what-it-does + how-to-use · **Status:** Living reference · single source of truth for proxy operation. Auto-start lifecycle lives here (also summarized in `docs/CONFIGURATION.md`).
+
 A Rust HTTP proxy that sits between your LLM client and any AI API (Anthropic, OpenAI, DeepSeek, etc.), automatically injecting prompt-cache breakpoints, compressing verbose tool output, scrubbing secrets, and applying TOML-based filters to reduce token usage by 70-90%.
 
 Works with any client that sends Anthropic-format `POST /v1/messages` or OpenAI-format `POST /v1/chat/completions` requests: Cline, Cursor, Aider, Continue.dev, GitHub Copilot (BYOK), and custom clients.
@@ -149,7 +151,9 @@ All settings are controlled via environment variables. Defaults are sensible for
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8787` | Port to bind on (always `127.0.0.1`) |
-| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Upstream API URL |
+| `PROXY_UPSTREAM_URL` | _(none)_ | **Dedicated upstream URL** (takes precedence over all others). Use this when the client-facing `ANTHROPIC_BASE_URL` must point at the proxy itself. |
+| `COPILOT_BRIDGE_URL` | _(none)_ | Alias for `PROXY_UPSTREAM_URL`. Convenient shorthand when forwarding to a local Copilot bridge (e.g. `http://127.0.0.1:4141`). |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Legacy upstream URL. **Falls back** to the default when the dedicated vars above are set. |
 | `AUTO_CACHE` | `false` | Enable cache breakpoint injection (Anthropic only) |
 | `TAIL_TTL` | `5m` | TTL for the rolling-tail breakpoint |
 | `DROP_TOOLS` | _(none)_ | Comma-separated tool names to remove (e.g. `NotebookEdit,CronCreate`) |
@@ -161,6 +165,9 @@ All settings are controlled via environment variables. Defaults are sensible for
 | `SCRUB_SECRETS` | `false` | Enable secret scrubbing in tool results |
 | `TOOL_FILTERS` | `false` | Enable tool output filtering (TOML-based) |
 | `PLATFORM` | _(auto-detect)_ | Override platform detection (`anthropic`, `openai`, `generic`) |
+| `PROXY_API_KEY` | _(none)_ | Optional API key for `X-Api-Key` header authentication. When set, all requests must include a matching `X-Api-Key` header. Requests with missing/wrong key return `401 Unauthorized`. |
+| `RATE_LIMIT_RPS` | `60` | Per-client requests per second (only enforced when `PROXY_API_KEY` is set). |
+| `RATE_LIMIT_BURST` | `10` | Per-client burst window size — how many requests a client can make in a sudden burst before rate limiting kicks in. |
 
 ### Recommended Setup
 
@@ -174,6 +181,140 @@ This enables all cost-saving features:
 - **ANSI stripping** to remove terminal escape codes from tool results
 - **Secret scrubbing** to redact AWS keys, GitHub tokens, JWTs, etc.
 - **Tool output filtering** to compress verbose cargo/npm/pytest output
+
+### Direct Anthropic (Bypass Copilot)
+
+If you have an **Anthropic Enterprise/Team account managed by your organization**, you likely do **not** have a personal `ANTHROPIC_API_KEY`. Instead, you authenticate via **`claude login`** — an OAuth/SSO flow that opens a browser, signs you in with your org's identity provider, and stores an OAuth token securely in Claude Code's credential store (keychain on Windows/macOS, encrypted file on Linux).
+
+**You never see, know, or store the token.** Claude Code attaches it to every request automatically as `Authorization: Bearer <token>`, and the Clean-CTX proxy forwards that header unchanged to Anthropic (only hop-by-hop headers are filtered — `authorization` passes through, verified by tests).
+
+This path **completely bypasses Copilot** — no copilot-proxy-api bridge, no GitHub token, no Copilot gateway:
+
+```
+Claude Code (CLI or VS Code extension)
+    │  ANTHROPIC_BASE_URL = http://127.0.0.1:8787
+    │  sends its stored OAuth Bearer token automatically
+    ▼
+Clean-CTX Proxy (8787)
+    │  PROXY_UPSTREAM_URL = (not needed — defaults to https://api.anthropic.com)
+    │  AUTO_CACHE=1  →  full cache_control breakpoints (~90% cost savings)
+    │  tool filtering, secret scrubbing, ANSI stripping, sliding window
+    ▼
+api.anthropic.com  (authenticated via your org's SSO Bearer token)
+```
+
+**Setup:**
+
+1. **Log in once** (if you haven't already):
+   ```bash
+   claude login
+   ```
+   Complete the browser/SSO flow. A successful login returns you to an interactive Claude Code prompt.
+
+2. **Run the proxy** — no credentials or upstream vars needed:
+   ```bash
+   AUTO_CACHE=1 STRIP_ANSI=1 SCRUB_SECRETS=1 TOOL_FILTERS=1 \
+   SLIDING_WINDOW=1 clean-ctx-proxy
+   ```
+   The proxy defaults to `https://api.anthropic.com` as its upstream. Do **not** set `ANTHROPIC_BASE_URL` in the proxy's shell (it would cause a self-forwarding loop — the proxy refuses to start with a clear error). If you want to be explicit, set `PROXY_UPSTREAM_URL=https://api.anthropic.com`.
+
+3. **Point Claude Code at the proxy** in `~/.claude/settings.json`:
+   ```json
+   {
+     "env": {
+       "ANTHROPIC_BASE_URL": "http://127.0.0.1:8787"
+     }
+   }
+   ```
+   **No token, no API key, nothing secret** — Claude Code sends its stored OAuth Bearer token to the proxy automatically, and the proxy forwards it to Anthropic.
+
+4. **Verify the proxy is in the path**: run `claude` in the CLI (or launch the VS Code extension) and confirm the proxy's startup banner shows `Upstream: https://api.anthropic.com`. Requests to `POST /v1/messages` will flow through the proxy, where cache breakpoints are injected for ~90% cost savings.
+
+> **Why no `ANTHROPIC_AUTH_TOKEN` here?** `AUTH_TOKEN` is only needed for the Copilot bridge path, where Claude Code needs a placeholder because the bridge (not Claude Code) owns authentication. In the direct Anthropic path, Claude Code's own OAuth token — obtained via `claude login` — is what Anthropic validates, and it travels in the `Authorization` header automatically.
+
+> **Note:** `claude login` requires your org's Anthropic Enterprise plan to have Claude Code access enabled. If login fails with an auth/subscription error, your org's IT admin must enable it — or use the Copilot bridge path below as a fallback.
+
+### Mode Comparison: Direct Anthropic vs Copilot Bridge
+
+| Feature | Direct Anthropic (OAuth/SSO) | Copilot Bridge |
+|---------|------------------------------|----------------|
+| Auth | `claude login` OAuth token (org SSO) — never visible | GitHub token via copilot-proxy-api |
+| Credentials in settings.json | ❌ None | `ANTHROPIC_AUTH_TOKEN: "dummy"` (placeholder) |
+| Copilot dependency | ❌ None — fully bypassed | ✅ Requires copilot-proxy-api bridge |
+| Cache injection (`AUTO_CACHE=1`) | ✅ Full ~90% cost savings | ❌ Stripped by bridge (use `AUTO_CACHE=0`) |
+| Tool filtering / secret scrub / ANSI strip | ✅ | ✅ |
+| Sliding window | ✅ | ✅ (helps stay under Copilot's 2.5 MiB payload ceiling) |
+| Recommended upstream | Default `https://api.anthropic.com` | `PROXY_UPSTREAM_URL=http://127.0.0.1:4141` |
+| Payload ceiling | Anthropic's native limits | Copilot's hard 2.5 MiB ceiling (~500K tokens) |
+
+### GitHub Copilot Enterprise (Claude via Copilot Gateway)
+
+Organizations running **GitHub Copilot Enterprise** serve Claude through Copilot's infrastructure — not AWS Bedrock or Anthropic directly. In this setup `ANTHROPIC_BASE_URL` points at an **ephemeral Copilot relay port** (e.g. `http://127.0.0.1:52644`) that changes every session.
+
+Clean-CTX's proxy intercepts this by sandwiching itself between Claude Code and a **Copilot bridge**:
+
+```
+Claude Code
+    │  ANTHROPIC_BASE_URL = http://127.0.0.1:8787
+    ▼
+Clean-CTX Proxy (8787)
+    │  PROXY_UPSTREAM_URL = http://127.0.0.1:4141
+    │  applies tool filtering, secret scrubbing,
+    │  sliding window (stay under payload ceiling)
+    ▼
+copilot-proxy-api (4141)
+    │  translates Anthropic → Copilot protocol
+    │  handles GitHub Enterprise auth (Bearer token)
+    ▼
+GitHub Copilot Enterprise Gateway
+    │
+    ▼
+Claude via Copilot
+```
+
+**Setup:**
+
+1. **Run the Copilot bridge** on a stable port (4141) with the enterprise account type:
+   ```bash
+   npx copilot-proxy-api@latest start --account-type enterprise
+   ```
+   It handles GitHub Enterprise auth automatically using your GitHub token. The recommended heavy model is `claude-opus-5`; the recommended small/fast model is `claude-sonnet-5` (both report a 1M context window through Copilot).
+
+2. **Point the Clean-CTX proxy at the bridge:**
+   ```bash
+   PROXY_UPSTREAM_URL=http://127.0.0.1:4141 AUTO_CACHE=0 SLIDING_WINDOW=1 \
+   STRIP_ANSI=1 SCRUB_SECRETS=1 TOOL_FILTERS=1 \
+   DROP_TOOLS=NotebookEdit,CronCreate clean-ctx-proxy
+   ```
+   - `AUTO_CACHE=0` is important: the Copilot bridge **strips `cache_control` markers** on translation (it cannot write prompt caches on Copilot's behalf), so cache breakpoint injection yields zero benefit in this mode.
+   - `SLIDING_WINDOW=1` trims old tool outputs before they reach the bridge, helping you stay under Copilot's hard **2.5 MiB payload ceiling** (effective ~500 K tokens).
+
+3. **Point Claude Code at the Clean-CTX proxy** — either the project-level `.claude/settings.json` or `~/.claude/settings.json`:
+   ```json
+   {
+     "env": {
+       "ANTHROPIC_BASE_URL": "http://127.0.0.1:8787",
+       "ANTHROPIC_AUTH_TOKEN": "dummy",
+       "ANTHROPIC_MODEL": "claude-opus-5",
+       "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-5",
+       "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
+       "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+     },
+     "permissions": {
+       "deny": ["WebSearch"]
+     }
+   }
+   ```
+
+The `dummy` auth token is intentional — auth is handled by the Copilot bridge using your GitHub token, not an Anthropic key. The bridge's `Authorization: Bearer` header passes through the proxy untouched (hop-by-hop headers are filtered, all others are forwarded).
+
+> **Why a dedicated `PROXY_UPSTREAM_URL`?** Without it, the proxy inherits the client's `ANTHROPIC_BASE_URL` (which points at the proxy itself for Claude Code). This creates a **self-forwarding loop**. The dedicated var decouples the proxy's upstream target from the client-facing URL, and the proxy refuses to start if it detects this configuration (validation error: `self-forwarding loop detected`).
+
+> **Why `AUTO_CACHE=0`?** The bridge strips `cache_control` markers on translation. The proxy's cache injection is designed for Anthropic's real API and should be disabled in bridge mode. Run with `AUTO_CACHE=1` only when the upstream is `https://api.anthropic.com` directly. The proxy warns at startup if it detects `AUTO_CACHE=1` with a local upstream.
+
+> **Why `DISABLE_NON_ESSENTIAL_MODEL_CALLS` and `deny: ["WebSearch"]`?** The bridge does not implement Anthropic server-side tools (`web_search`, `computer_use`, etc.) because Copilot has no equivalents. These settings stop Claude Code from making non-essential model calls or issuing `web_search` tool requests that the bridge would reject.
+
+> **Note:** Some enterprise Copilot policies block reverse-engineered Copilot API access. Check with IT before investing in this setup.
 
 ## How It Works
 
@@ -380,12 +521,12 @@ cargo test -p clean-ctx-proxy --test audit_regression
 cargo test -p clean-ctx-proxy --test integration_test
 ```
 
-The test suite includes 243 tests: 112 unit tests, 18 audit regression tests (covering all FAANG-principal code review findings), and 1 end-to-end integration test with a mock upstream server.
+The proxy test suite comprises 329 passing checks across its cargo targets: 155 unit tests on the library (mirrored by the binary target's 155-test harness), 18 audit regression tests (covering all FAANG-principal code review findings), and 1 end-to-end integration test with a mock upstream server.
 
 ## Limitations
 
 - **Response streaming**: The proxy buffers the full response from the upstream API before returning it to the client. This means Copilot and other IDEs will see responses as a complete block rather than token-by-token streaming. Response content is fully intact and correct — only the progressive rendering timing is affected.
-- **Copilot requires BYOK**: Default Copilot traffic routes through GitHub's own API gateway and never reaches the proxy. You must configure a custom endpoint as described above.
+- **Copilot requires BYOK or a bridge**: Default Copilot traffic routes through GitHub's own API gateway and never reaches the proxy. You must configure a custom endpoint (BYOK) or use a Copilot bridge (`copilot-proxy-api`) as described in the GitHub Copilot Enterprise section above.
 - **Cache injection is Anthropic-only**: The `cache_control` breakpoint injection only works with Anthropic's API. Other providers don't support this feature.
 
 ## Troubleshooting
@@ -393,8 +534,10 @@ The test suite includes 243 tests: 112 unit tests, 18 audit regression tests (co
 | Symptom | Fix |
 |---------|-----|
 | `ECONNREFUSED` on port 8787 | Proxy isn't running. Start it with `cargo run -p clean-ctx-proxy` |
-| Proxy returns 502 | Upstream URL is wrong or API is unreachable. Check `ANTHROPIC_BASE_URL` |
-| Cache savings not showing | Make sure `AUTO_CACHE=1` is set (Anthropic only) |
+| Proxy refuses to start: `self-forwarding loop detected` | Upstream resolves to the proxy's own port (e.g. `ANTHROPIC_BASE_URL=http://127.0.0.1:8787` inherited by the proxy). Set `PROXY_UPSTREAM_URL` to the real upstream target. |
+| Proxy returns 502 | Upstream URL is wrong or API is unreachable. Check `PROXY_UPSTREAM_URL` (or `ANTHROPIC_BASE_URL` for legacy setups) |
+| Startup warning: `AUTO_CACHE=1 with local upstream` | Cache injection is ineffective against local bridges that strip `cache_control` markers (e.g. copilot-proxy-api). Set `AUTO_CACHE=0` when forwarding to a local bridge; keep `AUTO_CACHE=1` only for `https://api.anthropic.com`. |
+| Cache savings not showing | Make sure `AUTO_CACHE=1` is set (Anthropic only) and the upstream is Anthropic's real API (not a local bridge) |
 | Tools still appear in request | Check `DROP_TOOLS` is set correctly (comma-separated, no spaces) |
 | Copilot not using proxy | Make sure you've configured a custom endpoint in VS Code (not using default GitHub routing) |
 | Response appears all at once | Expected — the proxy buffers responses. Content is correct; only streaming timing differs |

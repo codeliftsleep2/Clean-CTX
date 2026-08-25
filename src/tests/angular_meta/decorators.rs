@@ -73,7 +73,11 @@ fn extracts_injectable_decorator() {
         export class UserService {}
     "#;
     let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
-    assert!(lines.iter().any(|l| l.starts_with("Φsvc:UserService scope=root")));
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("Φsvc:UserService scope=root"))
+    );
 }
 
 #[test]
@@ -138,7 +142,11 @@ fn extracts_input_and_output_decorators() {
     "#;
     let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     assert!(lines.iter().any(|l| l == "Φin:?" || l.starts_with("Φin:")));
-    assert!(lines.iter().any(|l| l == "Φout:?" || l.starts_with("Φout:")));
+    assert!(
+        lines
+            .iter()
+            .any(|l| l == "Φout:?" || l.starts_with("Φout:"))
+    );
 }
 
 #[test]
@@ -255,7 +263,11 @@ fn high_fidelity_emits_phi_injects() {
     "#;
     let lines = lines_to_vec(extract_decorators(raw, Fidelity::High));
     // F-ANG-23: Φinjects: is High-fidelity only.
-    assert!(lines.iter().any(|l| l.starts_with("Φinjects:") && l.contains("HttpClient")));
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("Φinjects:") && l.contains("HttpClient"))
+    );
 }
 
 #[test]
@@ -281,17 +293,21 @@ fn medium_fidelity_omits_phi_injects() {
 #[test]
 fn find_matching_brace_returns_none_on_unclosed_body() {
     // F-ANG-08: no closing `}` — used to return `len-1` (silent
-    // truncation to end of text). Now returns `None`.
+    // truncation to end of text). Now returns `None`. The primitive
+    // lives in the layer-agnostic `meta_util` module (Round-8
+    // structural audit).
     let body = "{ unclosed";
-    assert!(crate::angular_meta::decorators::find_matching_brace(body, 0).is_none());
+    assert!(crate::meta_util::find_matching_brace(body, '{').is_none());
 }
 
 #[test]
 fn consume_call_expression_returns_none_on_unterminated_call() {
     // F-ANG-09: no closing `)` — used to return `(i-open_paren,
-    // text[open_paren+1..i])` (silent EOF). Now returns `None`.
+    // text[open_paren+1..i])` (silent EOF). Now returns `None`. The
+    // primitive lives in the layer-agnostic `meta_util` module
+    // (Round-8 structural audit).
     let text = "(unterminated call";
-    assert!(crate::angular_meta::decorators::consume_call_expression(text, 0).is_none());
+    assert!(crate::meta_util::consume_call_expression(text, 0).is_none());
 }
 
 #[test]
@@ -337,7 +353,9 @@ fn extract_decorators_substitutes_question_mark_for_anonymous_class() {
     let lines = lines_to_vec(extract_decorators(raw, Fidelity::Medium));
     // The class name shows up as `?` in the marker line.
     assert!(
-        lines.iter().any(|l| l.contains("Φcmp:?") || l.contains("Φcmp:?")),
+        lines
+            .iter()
+            .any(|l| l.contains("Φcmp:?") || l.contains("Φcmp:?")),
         "expected Φcmp:? in {:?}",
         lines
     );
@@ -369,5 +387,8 @@ fn extract_decorators_handles_unterminated_decorator_call() {
     // (`consume_call_expression` returns `None`). The function
     // should not panic and should still emit a marker line.
     let result = std::panic::catch_unwind(|| extract_decorators(raw, Fidelity::Medium).is_some());
-    assert!(result.is_ok(), "extract_decorators panicked on malformed input");
+    assert!(
+        result.is_ok(),
+        "extract_decorators panicked on malformed input"
+    );
 }

@@ -26,7 +26,7 @@
 // String indices are serialized as JSON integers (no quotes), which saves
 // ~2 bytes per string reference compared to the quoted-string positional format.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 
 use super::compiler::CompiledIR;
@@ -150,12 +150,7 @@ pub fn encode_op(op: &CoreOp, table: &StringTable) -> Vec<usize> {
 pub fn decode_op(indices: &[usize], table: &StringTable) -> Option<CoreOp> {
     let tuple: Vec<String> = indices
         .iter()
-        .map(|&idx| {
-            table
-                .lookup(idx)
-                .map(|s| s.to_string())
-                .unwrap_or_default()
-        })
+        .map(|&idx| table.lookup(idx).map(|s| s.to_string()).unwrap_or_default())
         .collect();
     tuple_to_op(&tuple)
 }

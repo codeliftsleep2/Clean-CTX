@@ -1,6 +1,8 @@
-# Clean-CTX — Troubleshooting Guide
+﻿# Clean-CTX — Troubleshooting Guide
 
-**Last updated:** 2026-06-07
+> **Owner:** Problem-solving + error codes + diagnostic commands · **Status:** Living reference
+
+**Last updated:** 2026-08-24
 
 ---
 
@@ -150,6 +152,31 @@ Report the crash with the stack trace and reproduction steps.
 
 ---
 
+### Graph queries return "project not found or not indexed"
+
+**Symptom:** Raw `cbm_proxy` calls fail with:
+
+```text
+e:project not found or not indexed
+hint:Use list_projects to see all indexed projects, then pass the project name.
+```
+
+**Cause:** The `project` value doesn't match CBM's canonical project ID. CBM derives project IDs from the **canonical repository path**, never the directory name. `RustContextLayerAI` (a directory basename) is **not** a valid project ID — the real ID for `C:\Users\MNasty\Desktop\RustContextLayerAI` is the canonical slug:
+
+```text
+C:/Users/MNasty/Desktop/RustContextLayerAI  →  C-Users-MNasty-Desktop-RustContextLayerAI
+```
+
+**Fix:**
+1. Call `list_projects` to list the exact IDs CBM knows (it is project-independent and always works)
+2. Pass that exact slug via `parameters.project`, or pass the repository path via `arguments.workspaceRoot` / `arguments.project` and let Clean-CTX resolve it to the canonical slug
+
+**Note — two kinds of proxy calls:**
+- **Project-independent** (`list_projects`, `get_cbm_status`): need no project, never gated on indexing state.
+- **Project-targeted** (`search_graph`, `query_graph`, `trace_path`, `get_architecture`): need a project. The built-in wrappers resolve the active workspace root automatically; raw `cbm_proxy` calls without an explicit project are forwarded unchanged and CBM rejects them with the error above.
+
+---
+
 ### Port conflict when running locally
 
 **Symptom:** Error like "address in use" or "port already bound".
@@ -197,8 +224,8 @@ cargo test parse_typo_rejected
 
 If none of the above resolves your issue:
 
-1. Check the [FAANG audit](FAANG_AUDIT.md) for known edge cases and their fixes
-2. Check the [Architecture Overview](ARCHITECTURE_OVERVIEW.md) for system design context
+1. Check the [Architecture Overview](ARCHITECTURE_OVERVIEW.md) for system design context
+2. Check the [Changelog](CHANGELOG.md) for known edge cases and their fixes
 3. Check the [Developer Documentation](DEVELOPER_DOCUMENTATION.md) for build and test instructions
 4. Open an issue with:
    - Binary version (build date or commit hash)
@@ -206,3 +233,39 @@ If none of the above resolves your issue:
    - Full error output (including any `RUST_BACKTRACE`)
    - Steps to reproduce
    - Input data (redacted if necessary)
+
+---
+
+### CBM Cypher aggregation limitations
+
+**Symptom:** CBM 0.8.1's Cypher engine does not support aggregation functions like COUNT, GROUP BY, SUM, or AVG. Queries using these functions return empty or error results.
+
+**Cause:** CBM uses a limited Cypher subset for graph queries. Aggregation is a Neo4j Cypher feature not present in CBM 0.8.1.
+
+**Resolution:** This is an upstream CBM limitation and not a Clean-CTX bug. Clean-CTX does not require aggregation — all production queries filter by specific node properties and return individual rows. If you need summary data, paginate through results client-side.
+
+**Also applies to:** MATCH (n) RETURN n, count(*) (and similar aggregate patterns) — use RETURN n LIMIT N instead.
+
+### Blast radius / caller lists look wrong or too large
+
+**Symptom:** `get_blast_radius` (or a raw CALLS query) returns callers for the entire project instead of one symbol's callers.
+
+**Cause:** Historical bug - the Cypher filtered on an undeclared variable (`m.name`). CBM does not reject invalid WHERE clauses; it fail-opens and returns every matching row. Fixed in the 2026-08-24 audit (`f.name`); a live regression test pins the result to the exact ground-truth caller set.
+
+### Dead code misses class methods
+
+**Symptom:** Dead-code output lists only free functions; dead class methods never appear.
+
+**Cause:** Pre-audit implementation scanned only `:Function` nodes. The current implementation scans `Function` AND `Method` labels and merges results - covered by a live set-equality test in `src/tests/cbm/graph_intel.rs`.
+
+### DATAFLOW queries return nothing
+
+**Symptom:** Cypher over `DATAFLOW` edges yields empty results.
+
+**Cause:** Expected behavior - CBM 0.8.1 has no DATAFLOW edge type, and its USAGE/WRITES edges are not read-aware equivalents. Clean-CTX ships no dataflow enrichment; local program-graph `DataFlowRead`/`DataFlowWrite` edges are independent of CBM. A guard test fails automatically if a future CBM introduces DATAFLOW edges.
+
+### .razor symbols missing from graph queries
+
+**Symptom:** Searches for Razor components/views return nothing even though the repository contains `.razor` files.
+
+**Cause:** Verified upstream limitation - CBM 0.8.1 creates no Razor nodes. There is nothing for Clean-CTX to configure; track upstream.

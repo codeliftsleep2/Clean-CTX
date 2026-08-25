@@ -6,11 +6,11 @@
 //   2. Record stats via SessionStats::record_compression
 //   3. Verify the dashboard renderer includes the Rust file data
 
-use crate::compression::pipeline::compress_source;
-use crate::compression::Fidelity;
-use crate::dictionary::PathDictionary;
 use crate::analytics::calculate_savings;
 use crate::cache::LocalStateCache;
+use crate::compression::Fidelity;
+use crate::compression::pipeline::compress_source;
+use crate::dictionary::PathDictionary;
 
 /// Test that compressing a Rust file produces non-zero token savings
 /// and that the analytics pipeline works end-to-end for .rs sources.
@@ -41,6 +41,8 @@ fn rust_compressed_output_contains_rust_markers() {
         &mut dict,
         &mut cache,
         Fidelity::Low,
+        None,
+        None,
     )
     .expect("compress_source should succeed for Rust file");
 
@@ -76,6 +78,8 @@ fn rust_session_stats_reports_token_savings() {
         &mut dict,
         &mut cache,
         Fidelity::Medium,
+        None,
+        None,
     )
     .expect("compress_source should succeed");
 
@@ -99,10 +103,7 @@ fn rust_session_stats_reports_token_savings() {
     );
 
     let summary = stats.summary();
-    assert_eq!(
-        summary.total_files, 1,
-        "Should have 1 Rust file in stats"
-    );
+    assert_eq!(summary.total_files, 1, "Should have 1 Rust file in stats");
     assert!(
         summary.total_raw_tokens > 0,
         "Raw token count should be > 0, got {}",
@@ -154,7 +155,8 @@ fn rust_json_dashboard_includes_rust_files() {
     assert_eq!(json["session"]["total_files"], 1, "JSON should show 1 file");
 
     // files is a JSON array in render_dashboard_json
-    let files_arr = json["files"].as_array()
+    let files_arr = json["files"]
+        .as_array()
         .expect("JSON dashboard should have 'files' array");
     assert_eq!(files_arr.len(), 1, "Should have 1 file entry");
 
@@ -162,6 +164,11 @@ fn rust_json_dashboard_includes_rust_files() {
     assert_eq!(rust_entry["raw_tokens"], 1000);
     assert_eq!(rust_entry["compressed_tokens"], 250);
     assert_eq!(rust_entry["fidelity"], "low");
-    assert!(rust_entry["file_path"].as_str().unwrap_or("").contains("rust.rs"),
-        "File path should contain 'rust.rs'");
+    assert!(
+        rust_entry["file_path"]
+            .as_str()
+            .unwrap_or("")
+            .contains("rust.rs"),
+        "File path should contain 'rust.rs'"
+    );
 }

@@ -84,8 +84,7 @@ pub fn bpe() -> &'static CoreBPE {
         // startup. Falling through to `.expect` here is a defence-in-depth
         // measure for the (rare) case where `bpe()` is called without
         // going through startup init.
-        tiktoken_rs::cl100k_base()
-            .expect("cl100k BPE data must be loadable at startup")
+        tiktoken_rs::cl100k_base().expect("cl100k BPE data must be loadable at startup")
     })
 }
 
@@ -102,13 +101,22 @@ pub struct TokenMetadata {
 ///
 /// R-19: The new `tokenizer` parameter allows callers to use o200k,
 /// claude, or llama3 tokenizers for more accurate token counts.
-pub fn calculate_savings(raw_text: &str, compressed_text: &str, tokenizer: Option<&dyn Tokenizer>) -> TokenMetadata {
+pub fn calculate_savings(
+    raw_text: &str,
+    compressed_text: &str,
+    tokenizer: Option<&dyn Tokenizer>,
+) -> TokenMetadata {
     let (raw_tokens, compressed_tokens) = if let Some(tok) = tokenizer {
-        (tok.count_tokens(raw_text), tok.count_tokens(compressed_text))
+        (
+            tok.count_tokens(raw_text),
+            tok.count_tokens(compressed_text),
+        )
     } else {
         let bpe = bpe();
-        (bpe.encode_with_special_tokens(raw_text).len(),
-         bpe.encode_with_special_tokens(compressed_text).len())
+        (
+            bpe.encode_with_special_tokens(raw_text).len(),
+            bpe.encode_with_special_tokens(compressed_text).len(),
+        )
     };
 
     let savings_percentage = if raw_tokens > 0 {

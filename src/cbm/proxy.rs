@@ -12,12 +12,12 @@
 //   6. On compression failure: ALWAYS applies minimum compression, NEVER returns raw
 //   7. Compressed result goes back to the agent
 
-use serde_json::Value;
-use crate::mcp::McpState;
-use crate::mcp::tools::parse_tokenizer_arg;
-use crate::mcp::tool_helpers::count_tokens_with_tokenizer;
-use crate::protocol::send_response;
 use crate::cbm::json_compress::compress_cbm_response;
+use crate::mcp::McpState;
+use crate::mcp::tool_helpers::count_tokens_with_tokenizer;
+use crate::mcp::tools::parse_tokenizer_arg;
+use crate::protocol::send_response;
+use serde_json::Value;
 
 /// Handle `cbm_proxy` — forward to CBM, intercept raw response, compress it.
 ///
@@ -32,8 +32,9 @@ use crate::cbm::json_compress::compress_cbm_response;
 /// **Critical fix (RC-2):** NEVER returns raw CBM output. If compression
 /// fails, applies minimum compression (whitespace stripping + key
 /// shortening) before returning.
-pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
-    let bridge = match state.graph_bridge.as_mut() {
+pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
+    let mut bridge_guard = state.graph_bridge_lock();
+    let bridge = match &mut *bridge_guard {
         Some(b) => b,
         None => {
             send_response(&serde_json::json!({
@@ -47,10 +48,38 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
         }
     };
 
-    // Step 1: Extract the CBM tool name and its parameters
-    let cbm_tool = params["arguments"]["cbm_tool"].as_str().unwrap_or("graph_search");
+    // Step 1: Extract the CBM tool name and its parameters.
+    // IMPORTANT: `cbm_tool` is forwarded DIRECTLY to CBM, so it MUST use
+    // CBM's actual tool names, NOT Clean-CTX's wrapper names:
+    //   Clean-CTX tool   → CBM tool
+    //   graph_search     → search_graph
+    //   graph_query      → query_graph
+    //   graph_trace      → trace_path
+    //   get_architecture → get_architecture
+    // `get_symbol_importance` and `get_dead_code` are NOT CBM tools — they
+    // are implemented in Clean-CTX via query_graph Cypher, so they must
+    // NOT be passed as cbm_tool.
+    // Normalize Clean-CTX wrapper names to CBM's actual tool names so the
+    // proxy is resilient to either convention.
+    let raw_tool = params["arguments"]["cbm_tool"]
+        .as_str()
+        .unwrap_or("search_graph");
+    let cbm_tool = match raw_tool {
+        "graph_search" => "search_graph",
+        "graph_query" => "query_graph",
+        "graph_trace" => "trace_path",
+        other => other,
+    };
 
-    // Build the parameters object for CBM
+    // Build the parameters object for CBM.
+    // When the caller passes an explicit `parameters` object, it is forwarded
+    // as-is (with `project` merged in if missing) — the caller is responsible
+    // for using CBM-native parameter names.
+    // Otherwise, translate Clean-CTX shorthand args into CBM-native names:
+    //   - search_graph:  query → name_pattern
+    //   - query_graph:   query → query (same)
+    //   - trace_path:    from → function_name, to → direction
+    //   - get_architecture: project only
     let tool_params = match params["arguments"]["parameters"].as_object() {
         Some(obj) => {
             let mut merged = obj.clone();
@@ -62,19 +91,51 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
             Value::Object(merged)
         }
         None => {
-            // Handle non-object parameters (string query, etc.)
             let mut default = serde_json::Map::new();
-            if let Some(q) = params["arguments"]["query"].as_str() {
-                default.insert("query".into(), Value::String(q.to_string()));
+            match cbm_tool {
+                "search_graph" => {
+                    // CBM expects `name_pattern`; accept Clean-CTX `query` shorthand.
+                    let name_pattern = params["arguments"]["name_pattern"]
+                        .as_str()
+                        .or_else(|| params["arguments"]["query"].as_str())
+                        .unwrap_or("");
+                    if !name_pattern.is_empty() {
+                        default.insert(
+                            "name_pattern".into(),
+                            Value::String(name_pattern.to_string()),
+                        );
+                    }
+                }
+                "trace_path" => {
+                    // CBM expects `function_name` + `direction` (inbound|outbound|both).
+                    // Accept Clean-CTX `from`/`to` shorthand: from → function_name.
+                    let function_name = params["arguments"]["function_name"]
+                        .as_str()
+                        .or_else(|| params["arguments"]["from"].as_str())
+                        .unwrap_or("");
+                    if !function_name.is_empty() {
+                        default.insert(
+                            "function_name".into(),
+                            Value::String(function_name.to_string()),
+                        );
+                    }
+                    if let Some(dir) = params["arguments"]["direction"].as_str() {
+                        default.insert("direction".into(), Value::String(dir.to_string()));
+                    }
+                    if let Some(d) = params["arguments"]["depth"].as_u64() {
+                        default.insert("depth".into(), Value::Number(d.into()));
+                    }
+                }
+                _ => {
+                    // query_graph, get_architecture, detect_changes, index_repository:
+                    // `query` and `project` map directly to CBM names.
+                    if let Some(q) = params["arguments"]["query"].as_str() {
+                        default.insert("query".into(), Value::String(q.to_string()));
+                    }
+                }
             }
             if let Some(p) = params["arguments"]["project"].as_str() {
                 default.insert("project".into(), Value::String(p.to_string()));
-            }
-            if let Some(f) = params["arguments"]["from"].as_str() {
-                default.insert("from".into(), Value::String(f.to_string()));
-            }
-            if let Some(t) = params["arguments"]["to"].as_str() {
-                default.insert("to".into(), Value::String(t.to_string()));
             }
             Value::Object(default)
         }
@@ -82,7 +143,16 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
 
     let args = tool_params;
 
-    // Step 2: Forward to CBM via pipe — intercept the raw response text
+    // Step 2: Forward to CBM via pipe — intercept the raw response text.
+    //
+    // The indexing gate must resolve against the project actually being queried
+    // (never a stale active-project entry), and project-independent calls such
+    // as `list_projects` must NOT be gated at all.
+    if let Some(target_project) = resolve_proxy_target_project(bridge, params, &args) {
+        if !crate::cbm::handlers::ensure_indexed_or_error_for(id, bridge, &target_project) {
+            return;
+        }
+    }
     let raw_response = match bridge.proxy_call(cbm_tool, args) {
         Ok(text) => text,
         Err(e) => {
@@ -97,7 +167,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
     };
 
     // RM-1: Single status clone after CBM interaction
-    state.cbm_status = bridge.status().clone();
+    // state.cbm_status is Arc - cannot mutate
 
     // Step 3: Compress the intercepted response with JSON-aware compressor
     // RC-1 fix: JSON compressor handles key shortening, not tree-sitter
@@ -110,18 +180,13 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
         Some(compressed) => {
             // Use pluggable tokenizer for accurate counts (not byte-based estimate)
             let raw_tokens = count_tokens_with_tokenizer(&raw_response, tokenizer_ref);
-            let comp_tokens = count_tokens_with_tokenizer(&compressed.compressed_text, tokenizer_ref);
+            let comp_tokens =
+                count_tokens_with_tokenizer(&compressed.compressed_text, tokenizer_ref);
 
-            state.session_stats.record_compression(
-                &format!("cbm://{cbm_tool}"),
-                raw_tokens,
-                comp_tokens,
-                "low",
-                false,
-                "cbm_proxy",
-                None,
-                "cbm_filter",
-            );
+            // Record CBM pipe-level interception savings. This ACCUMULATES
+            // across calls (unlike per-file compression which overwrites),
+            // so the dashboard reflects total CBM output saved this session.
+            state.record_cbm_proxy(cbm_tool, raw_tokens, comp_tokens);
 
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
@@ -150,6 +215,10 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
             let raw_tokens = count_tokens_with_tokenizer(&raw_response, tokenizer_ref);
             let comp_tokens = count_tokens_with_tokenizer(&min_compressed, tokenizer_ref);
 
+            // Record minimum-compression savings too (fallback path previously
+            // skipped stats entirely).
+            state.record_cbm_proxy(cbm_tool, raw_tokens, comp_tokens);
+
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": {
@@ -171,6 +240,30 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &mut McpState) {
     }
 }
 
+/// Resolve the project a `cbm_proxy` call actually targets, or `None` for
+/// project-independent tools (e.g. `list_projects`).
+///
+/// Priority: CBM-native `parameters.project` (already merged into `tool_params`)
+/// → Clean-CTX `arguments.project` → `arguments.workspaceRoot` (a repo path).
+/// Every value is canonicalized to the authoritative CBM project slug so a
+/// proxy call can never gate on an unrelated/raw project name.
+pub(crate) fn resolve_proxy_target_project(
+    bridge: &crate::cbm::GraphBridge,
+    params: &Value,
+    tool_params: &Value,
+) -> Option<String> {
+    if let Some(p) = tool_params.get("project").and_then(|v| v.as_str()) {
+        return Some(bridge.resolve_project_id(p));
+    }
+    if let Some(p) = params["arguments"]["project"].as_str() {
+        return Some(bridge.resolve_project_id(p));
+    }
+    if let Some(root) = params["arguments"]["workspaceRoot"].as_str() {
+        return Some(bridge.resolve_project_id(root));
+    }
+    None
+}
+
 /// RC-2 fallback: minimum compression when JSON compressor fails.
 /// Strips all non-essential whitespace and shortens common JSON keys.
 pub(crate) fn apply_minimum_compression(raw: &str) -> String {
@@ -182,9 +275,8 @@ pub(crate) fn apply_minimum_compression(raw: &str) -> String {
                 raw.chars().filter(|c| !c.is_whitespace()).collect()
             });
         }
-        return serde_json::to_string(&val).unwrap_or_else(|_| {
-            raw.chars().filter(|c| !c.is_whitespace()).collect()
-        });
+        return serde_json::to_string(&val)
+            .unwrap_or_else(|_| raw.chars().filter(|c| !c.is_whitespace()).collect());
     }
 
     // Last resort: strip all whitespace

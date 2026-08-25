@@ -20,6 +20,7 @@
 // `extract_method_sig` etc. differently from `try_build_with` (the diff
 // path also handles `import.root` here, the compressor does not).
 
+use streaming_iterator::StreamingIterator;
 use tree_sitter::{Language, Parser as TSParser, Query, QueryCursor};
 
 use crate::compression::Fidelity;
@@ -62,17 +63,20 @@ where
     F: FnMut(&str, &str, Fidelity) -> Option<String>,
 {
     let mut parser = TSParser::new();
-    parser.set_language(language)?;
+    parser.set_language(&language)?;
+    tracing::debug!("[run_capture_pipeline] language set");
     let tree = parser.parse(source, None).ok_or("AST Generation Error")?;
+    tracing::debug!("[run_capture_pipeline] parsed, {} bytes", source.len());
     let source_bytes = source.as_bytes();
 
-    let query = Query::new(language, query_string)?;
+    let query = Query::new(&language, query_string)?;
+    tracing::debug!("[run_capture_pipeline] query compiled");
     let mut cursor = QueryCursor::new();
-    let matches = cursor.matches(&query, tree.root_node(), source_bytes);
+    let mut matches = cursor.matches(&query, tree.root_node(), source_bytes);
 
     let mut all_captures: Vec<CapEntry> = Vec::new();
-    for mat in matches {
-        for capture in mat.captures {
+    while let Some(mat) = matches.next() {
+        for capture in mat.captures.iter() {
             let capture_name = query.capture_names()[capture.index as usize].to_string();
             if let Ok(text_slice) = capture.node.utf8_text(source_bytes) {
                 let raw = text_slice.to_string();
@@ -92,6 +96,7 @@ where
     // in source order. This is the same `Vec::sort_by` both original
     // call sites performed.
     all_captures.sort_by_key(|a| a.start_byte);
+    tracing::debug!("[rcp] DONE — returning {} captures", all_captures.len());
     Ok(all_captures)
 }
 

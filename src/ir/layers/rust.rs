@@ -9,27 +9,36 @@
 //   - Trait implementations (impl Trait for Type)
 //   - Method visibility and safety flags (pub, unsafe, async)
 //   - Self kind (&self, &mut self, self, or associated function)
+//
+// R-43a: Execution semantics extraction:
+//   - async fn → SideEffect("async") + ExecutionContext("async")
+//   - unsafe block/fn → SideEffect("mutation")
+//   - references to fields → DataFlow("reads"/"writes", field_name)
+//   - match/loop/if/return patterns → ControlFlow
 
 use super::{LanguageLayer, LayerContext};
 use crate::compression::Fidelity;
-use crate::ir::opcodes::{CoreOp, FLAG_ASYNC, FLAG_EXPORT, FLAG_PRIVATE, FLAG_UNSAFE};
+use crate::ir::opcodes::{
+    CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTX_ASYNC, CoreOp, EFFECT_ASYNC, EFFECT_IO,
+    EFFECT_MUTATION, FLAG_ASYNC, FLAG_EXPORT, FLAG_PRIVATE, FLAG_UNSAFE,
+};
 
 /// Rust visibility enum
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RustVisibility {
-    Public,   // pub
-    Crate,    // pub(crate)
-    Super,    // pub(super)
-    Private,  // (default)
+    Public,  // pub
+    Crate,   // pub(crate)
+    Super,   // pub(super)
+    Private, // (default)
 }
 
 /// Self kind for methods
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SelfKind {
-    None,    // associated function (no self)
-    Ref,     // &self
-    RefMut,  // &mut self
-    Owned,   // self (by value)
+    None,   // associated function (no self)
+    Ref,    // &self
+    RefMut, // &mut self
+    Owned,  // self (by value)
 }
 
 /// Rust type kind
@@ -114,7 +123,7 @@ impl RustLayer {
 
             // Extract trait (after "impl<T>" or "impl")
             let after_impl = trait_part.strip_prefix("impl").unwrap_or(trait_part).trim();
-            
+
             // Strategy: skip all generic parameters <...> (which may be nested),
             // then take the next identifier as the trait name.
             let mut depth = 0i32;
@@ -132,19 +141,19 @@ impl RustLayer {
                     _ => {}
                 }
             }
-            
+
             // If depth > 0, we never closed all generics - just use the whole thing
             if depth > 0 {
                 past_generics = after_impl;
             }
-            
+
             // Now extract the trait name: it's the identifier (up to < or whitespace or end)
             let trait_name = past_generics
                 .split(|c: char| c == '<' || c.is_whitespace())
                 .next()
                 .unwrap_or(past_generics)
                 .trim();
-            
+
             if !trait_name.is_empty() {
                 traits.push(trait_name.to_string());
             }
@@ -166,6 +175,77 @@ impl RustLayer {
             flags.push(FLAG_EXPORT.to_string());
         }
         flags
+    }
+
+    /// R-43a: Extract execution semantics from method body text.
+    /// Returns (dataflow_ops, controlflow_ops, side_effect_op, context_op).
+    fn extract_execution_semantics(method_id: &str, body: &str) -> Vec<CoreOp> {
+        let mut ops = Vec::new();
+
+        // SideEffect: detect unsafe keyword
+        if body.contains("unsafe ") || body.contains("unsafe{") || body.contains("unsafe\n") {
+            ops.push(CoreOp::SideEffect(
+                method_id.to_string(),
+                EFFECT_MUTATION.to_string(),
+            ));
+        }
+
+        // SideEffect: detect I/O patterns (stdout, file operations, network)
+        if body.contains("std::io")
+            || body.contains("std::fs")
+            || body.contains("std::net")
+            || body.contains("println!")
+            || body.contains("eprintln!")
+            || body.contains("File::")
+            || body.contains("TcpStream")
+        {
+            ops.push(CoreOp::SideEffect(
+                method_id.to_string(),
+                EFFECT_IO.to_string(),
+            ));
+        }
+
+        // ControlFlow: detect match expressions
+        if body.contains("match ") && !body.trim_start().starts_with("//") {
+            ops.push(CoreOp::ControlFlow(
+                method_id.to_string(),
+                CTRL_MATCH.to_string(),
+                "match_expr".to_string(),
+            ));
+        }
+
+        // ControlFlow: detect loops
+        let has_loop = body.contains("loop ")
+            || body.contains("loop {")
+            || body.contains("while ")
+            || body.contains("for ");
+        if has_loop {
+            ops.push(CoreOp::ControlFlow(
+                method_id.to_string(),
+                CTRL_LOOP.to_string(),
+                "loop".to_string(),
+            ));
+        }
+
+        // ControlFlow: detect if/else
+        if body.contains("if ") && !body.trim_start().starts_with("//") {
+            ops.push(CoreOp::ControlFlow(
+                method_id.to_string(),
+                CTRL_IF.to_string(),
+                "if".to_string(),
+            ));
+        }
+
+        // ControlFlow: detect return
+        if body.contains("return ") || body.contains("\nreturn") || body.starts_with("return") {
+            ops.push(CoreOp::ControlFlow(
+                method_id.to_string(),
+                CTRL_RETURN.to_string(),
+                "return".to_string(),
+            ));
+        }
+
+        ops
     }
 
     /// Extract self kind from a Rust method signature.
@@ -272,9 +352,6 @@ impl LanguageLayer for RustLayer {
                     let mut flags = Self::extract_method_flags(raw_text);
 
                     // Wire P2: Use extract_visibility for precise visibility flags.
-                    // extract_method_flags only detects "pub " prefix. This also
-                    // handles pub(crate) and pub(super), and emits the appropriate
-                    // flag: EXPORT for pub, no flag for private.
                     let vis = Self::extract_visibility(raw_text);
                     match vis {
                         RustVisibility::Public => {
@@ -282,8 +359,6 @@ impl LanguageLayer for RustLayer {
                                 flags.push(FLAG_EXPORT.to_string());
                             }
                         }
-                        // pub(crate) and pub(super) are semantically "restricted public"
-                        // — still worth flagging as EXPORT so the LLM knows it's visible
                         RustVisibility::Crate | RustVisibility::Super => {
                             if !flags.contains(&FLAG_EXPORT.to_string()) {
                                 flags.push(FLAG_EXPORT.to_string());
@@ -297,14 +372,13 @@ impl LanguageLayer for RustLayer {
                     }
 
                     // Check for unsafe trait specifically
-                    if raw_text.contains("unsafe trait") && !flags.contains(&FLAG_UNSAFE.to_string()) {
+                    if raw_text.contains("unsafe trait")
+                        && !flags.contains(&FLAG_UNSAFE.to_string())
+                    {
                         flags.push(FLAG_UNSAFE.to_string());
                     }
 
                     // ── Phase B (P3): Wire extract_cfg ────────────────────
-                    // Scan backward from this capture's position in the source
-                    // to find #[cfg(...)] attributes. Emit them as class flags
-                    // so the LLM sees platform/feature gating.
                     if let Some(pos) = context.source.find(raw_text) {
                         if let Some(cfg_str) = Self::extract_cfg(&context.source, pos) {
                             let cfg_flag = format!("CFG({})", cfg_str);
@@ -315,8 +389,6 @@ impl LanguageLayer for RustLayer {
                     }
 
                     // ── Phase B (P4): Wire extract_generic_params ─────────
-                    // At Medium/High fidelity, preserve generic parameter info
-                    // so the LLM sees e.g. "<T, U>" on the class.
                     if context.fidelity != Fidelity::Low {
                         if let Some(generic_params) = Self::extract_generic_params(raw_text) {
                             let gp_flag = format!("GP{}", generic_params);
@@ -347,7 +419,8 @@ impl LanguageLayer for RustLayer {
 
                     // Emit class-level flags for unsafe impl
                     let mut flags = Self::extract_method_flags(raw_text);
-                    if raw_text.contains("unsafe impl") && !flags.contains(&FLAG_UNSAFE.to_string()) {
+                    if raw_text.contains("unsafe impl") && !flags.contains(&FLAG_UNSAFE.to_string())
+                    {
                         flags.push(FLAG_UNSAFE.to_string());
                     }
                     if !flags.is_empty() {
@@ -359,9 +432,28 @@ impl LanguageLayer for RustLayer {
                 // Extract method-level flags
                 let method_flags = Self::extract_method_flags(raw_text);
                 if let Some(method_id) = &context.current_method {
+                    let is_async = method_flags.contains(&FLAG_ASYNC.to_string());
                     if !method_flags.is_empty() {
                         ops.push(CoreOp::Flags(method_id.clone(), method_flags));
                     }
+
+                    // R-43a: Extract execution semantics from method body
+                    // The raw_text here is the method signature + body.
+                    // We detect async to emit SideEffect + ExecutionContext.
+                    if is_async {
+                        ops.push(CoreOp::SideEffect(
+                            method_id.clone(),
+                            EFFECT_ASYNC.to_string(),
+                        ));
+                        ops.push(CoreOp::ExecutionContext(
+                            method_id.clone(),
+                            CTX_ASYNC.to_string(),
+                        ));
+                    }
+
+                    // Extract additional execution semantics from the signature+body text
+                    let exec_ops = Self::extract_execution_semantics(method_id, raw_text);
+                    ops.extend(exec_ops);
                 }
             }
             // Rust mod declarations — structural, no IR ops needed

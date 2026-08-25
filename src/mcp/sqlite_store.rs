@@ -16,15 +16,33 @@
 //     for the retry/fallback pattern. The comment has been updated to reflect
 //     that the store is used in a multi-threaded context (retry with sleep).
 
-use std::path::Path;
-use rusqlite::{Connection, params};
 use crate::compression::Fidelity;
-use crate::mcp::context_store::{ContextStore, StoredContextMeta};
 use crate::ir::compiler::CompiledIR;
+use crate::mcp::context_store::{ContextStore, StoredContextMeta};
+use rusqlite::{Connection, params};
+use std::path::Path;
 
 /// SQLite-backed implementation of [`ContextStore`].
 pub struct SqliteStore {
     conn: Connection,
+}
+
+/// One row of the `contexts` table, summarized for the `list_sessions`
+/// tool (Non-CBM audit 2026-08-25 #7).
+#[derive(Debug, Clone)]
+pub struct PersistedContextSummary {
+    /// The persisted file path.
+    pub file_path: String,
+    /// Fidelity the context was compressed at ("low"/"medium"/"high").
+    pub fidelity: String,
+    /// Number of delta rows recorded for this context.
+    pub delta_count: i64,
+    /// Raw token count at save time (0 for pre-v2 rows).
+    pub raw_tokens: i64,
+    /// Compressed token count at save time (0 for pre-v2 rows).
+    pub compressed_tokens: i64,
+    /// Last-update timestamp as stored by SQLite (`datetime('now')`).
+    pub updated_at: String,
 }
 
 impl SqliteStore {
@@ -49,20 +67,26 @@ impl SqliteStore {
 
     /// Run schema migrations. Idempotent.
     fn migrate(&self) -> Result<(), Box<dyn std::error::Error>> {
-        self.conn.execute_batch("
+        self.conn.execute_batch(
+            "
             CREATE TABLE IF NOT EXISTS _schema_version (
                 version INTEGER PRIMARY KEY
             );
-        ")?;
+        ",
+        )?;
 
-        let current_version: i32 = self.conn
-            .query_row("SELECT COALESCE(MAX(version), 0) FROM _schema_version", [], |row| {
-                row.get(0)
-            })
+        let current_version: i32 = self
+            .conn
+            .query_row(
+                "SELECT COALESCE(MAX(version), 0) FROM _schema_version",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or(0);
 
         if current_version < 1 {
-            self.conn.execute_batch("
+            self.conn.execute_batch(
+                "
                 CREATE TABLE IF NOT EXISTS contexts (
                     id TEXT PRIMARY KEY,
                     file_path TEXT NOT NULL,
@@ -109,16 +133,19 @@ impl SqliteStore {
                 CREATE INDEX IF NOT EXISTS idx_symbols_context ON symbols(context_id);
 
                 INSERT INTO _schema_version (version) VALUES (1);
-            ")?;
+            ",
+            )?;
         }
 
         if current_version < 2 {
             // v2: Add token count columns so rebuild_stats() uses real data
-            self.conn.execute_batch("
+            self.conn.execute_batch(
+                "
                 ALTER TABLE contexts ADD COLUMN raw_tokens INTEGER NOT NULL DEFAULT 0;
                 ALTER TABLE contexts ADD COLUMN compressed_tokens INTEGER NOT NULL DEFAULT 0;
                 INSERT INTO _schema_version (version) VALUES (2);
-            ")?;
+            ",
+            )?;
         }
 
         Ok(())
@@ -168,7 +195,7 @@ impl SqliteStore {
 
         // 4. Build a ContextState and replay deltas
         let mut context_state = crate::ir::replay::ContextState::new();
-        context_state.load_ir(ir);
+        context_state.load_ir(ir, None);
 
         for delta_result in delta_rows {
             let (_seq, payload) = delta_result?;
@@ -177,9 +204,7 @@ impl SqliteStore {
         }
 
         // 5. Reconstruct CompiledIR from context state
-        let instructions = context_state.get_ir(file_path)
-            .cloned()
-            .unwrap_or_default();
+        let instructions = context_state.get_ir(file_path).cloned().unwrap_or_default();
         let version = context_state.file_version(file_path).unwrap_or(1);
 
         let instructions_ops: Vec<crate::ir::opcodes::CoreOp> = instructions
@@ -196,11 +221,61 @@ impl SqliteStore {
         Ok(Some((final_ir, version as u32)))
     }
 
+    /// Enumerate persisted contexts from the DB, most recently updated
+    /// first.
+    ///
+    /// Non-CBM audit 2026-08-25 #7: the persistence model has no session
+    /// concept (the `sessions` table is dead schema nothing writes), but
+    /// `contexts`/`deltas` hold real per-file state. This is what the
+    /// `list_sessions` tool now enumerates instead of a static status
+    /// string.
+    pub fn list_contexts(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<PersistedContextSummary>, Box<dyn std::error::Error>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT c.file_path, c.fidelity,
+                    COALESCE(c.raw_tokens, 0) as raw_tokens,
+                    COALESCE(c.compressed_tokens, 0) as compressed_tokens,
+                    c.updated_at,
+                    (SELECT COUNT(*) FROM deltas d WHERE d.context_id = c.id) as delta_count
+             FROM contexts c
+             ORDER BY c.updated_at DESC
+             LIMIT ?1",
+        )?;
+
+        let rows = stmt.query_map(params![limit as i64], |row| {
+            let fid: i32 = row.get(1)?;
+            let fidelity = match fid {
+                0 => "low",
+                1 => "medium",
+                2 => "high",
+                _ => "low",
+            };
+            Ok(PersistedContextSummary {
+                file_path: row.get(0)?,
+                fidelity: fidelity.to_string(),
+                raw_tokens: row.get(2)?,
+                compressed_tokens: row.get(3)?,
+                updated_at: row.get(4)?,
+                delta_count: row.get(5)?,
+            })
+        })?;
+
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     /// Rebuild SessionStats from DB (schema v2 — reads real token counts).
     ///
     /// Queries all contexts and their delta counts to reconstruct
     /// a SessionStats that reflects what's persisted.
-    pub fn rebuild_stats(&self) -> Result<crate::mcp::session_stats::SessionStats, Box<dyn std::error::Error>> {
+    pub fn rebuild_stats(
+        &self,
+    ) -> Result<crate::mcp::session_stats::SessionStats, Box<dyn std::error::Error>> {
         let mut stats = crate::mcp::session_stats::SessionStats::new();
 
         let mut stmt = self.conn.prepare(
@@ -208,7 +283,7 @@ impl SqliteStore {
                     COALESCE(c.raw_tokens, 0) as raw_tokens,
                     COALESCE(c.compressed_tokens, 0) as compressed_tokens,
                     (SELECT COUNT(*) FROM deltas d WHERE d.context_id = c.id) as delta_count
-             FROM contexts c"
+             FROM contexts c",
         )?;
 
         let rows = stmt.query_map([], |row| {
@@ -225,8 +300,16 @@ impl SqliteStore {
             let strategy = if dc > 0 { "delta" } else { "full" };
             // Use real token counts from the DB, falling back to estimates
             // for rows created before the v2 migration.
-            let raw = if raw_tokens > 0 { raw_tokens as usize } else { 0 };
-            let compressed = if compressed_tokens > 0 { compressed_tokens as usize } else { 0 };
+            let raw = if raw_tokens > 0 {
+                raw_tokens as usize
+            } else {
+                0
+            };
+            let compressed = if compressed_tokens > 0 {
+                compressed_tokens as usize
+            } else {
+                0
+            };
             let fidelity_str = match fid {
                 0 => "low",
                 1 => "medium",
@@ -234,7 +317,14 @@ impl SqliteStore {
                 _ => "low",
             };
             stats.record_compression(
-                &path, raw, compressed, fidelity_str, false, strategy, None, "ir_compression"
+                &path,
+                raw,
+                compressed,
+                fidelity_str,
+                false,
+                strategy,
+                None,
+                "ir_compression",
             );
         }
 
@@ -264,6 +354,16 @@ impl SqliteStore {
         let _ = self.conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
     }
 
+    /// Execute a raw SQL batch statement.
+    ///
+    /// Used internally by `BufferedStore` for foreign key toggling during
+    /// fallback reimport. Exposed as `pub(crate)` to avoid exposing the
+    /// underlying `Connection` directly.
+    pub(crate) fn execute_batch(&self, sql: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.conn.execute_batch(sql)?;
+        Ok(())
+    }
+
     /// Purge deltas older than the specified number of days.
     /// Returns the number of deltas deleted.
     pub fn purge_old_deltas(&self, days: u32) -> Result<usize, Box<dyn std::error::Error>> {
@@ -274,7 +374,7 @@ impl SqliteStore {
         Ok(affected)
     }
 
-/// Get delta count for a specific file (helper for purge handler).
+    /// Get delta count for a specific file (helper for purge handler).
     pub fn delta_count_for_file(&self, file_path: &str) -> usize {
         self.conn
             .query_row(
@@ -340,7 +440,7 @@ impl ContextStore for SqliteStore {
                     COALESCE(c.raw_tokens, 0) as raw_tokens,
                     COALESCE(c.compressed_tokens, 0) as compressed_tokens,
                     (SELECT COUNT(*) FROM deltas d WHERE d.context_id = c.id) as delta_count
-             FROM contexts c WHERE c.file_path = ?1 ORDER BY c.updated_at DESC LIMIT 1"
+             FROM contexts c WHERE c.file_path = ?1 ORDER BY c.updated_at DESC LIMIT 1",
         )?;
 
         let mut rows = stmt.query(params![file_path])?;
@@ -401,7 +501,8 @@ impl ContextStore for SqliteStore {
         edit_type: Option<&str>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // Get the next edit_sequence
-        let next_seq: i32 = self.conn
+        let next_seq: i32 = self
+            .conn
             .query_row(
                 "SELECT COALESCE(MAX(edit_sequence), 0) + 1 FROM deltas WHERE context_id = ?1",
                 params![context_id],
