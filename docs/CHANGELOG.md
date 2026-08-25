@@ -30,7 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Fresh-process/fresh-index live audit against a rebuilt CBM binary: all 9 audit probes green; self-contained multilingual fixture green through step 16 including cross-language resolution and primary-project health after project switches.
 - `cargo fmt --all -- --check` clean; `cargo clippy --all-targets -- -D warnings` zero warnings.
-- `cargo test --workspace --all-targets --all-features`: **2,481 passed / 0 failed / 5 ignored** (core library 2,141 + CLI binary 11 + proxy crate 329: lib 155, bin harness 155, audit-regression 18, e2e integration 1).
+- `cargo test --workspace --all-targets --all-features`: **2,497 passed / 0 failed / 5 ignored** (core library 2,157 + CLI binary 11 + proxy crate 329: lib 155, bin harness 155, audit-regression 18, e2e integration 1).
 
 ---
 

@@ -666,7 +666,7 @@ The binary is output as `clean-ctx.exe` (Windows) or `clean-ctx` (Linux/Mac).
 |--------|-------|
 | Build | ✅ `cargo check` clean |
 | Linting | ✅ `cargo clippy --all-targets -- -D warnings` — **0 warnings, 0 errors** |
-| Tests | ✅ **2,481 tests across all workspace targets (2,141 core library), all passing** - includes live-CBM semantic probes, a self-contained multilingual fixture suite, and 18 round-trip wire-format tests |
+| Tests | ✅ **2,497 tests across all workspace targets (2,157 core library), all passing** - includes live-CBM semantic probes, a self-contained multilingual fixture suite, and 18 round-trip wire-format tests |
 | Audit | ✅ FAANG-level audit — all 11 findings resolved (A-09 through A-15, F-19 through F-22); CBM audit — all findings resolved; Compiler-IR audit — all findings resolved; R-43a + R-43b FAANG audit — zero critical/high findings |
 | Languages | ✅ TypeScript, C#, Rust, Java with Angular/Spring Boot/.NET meta-layers, execution semantics across all 3 language layers |
 | IR Transport Protocol | ✅ Stateful instruction-level delta transport — compile once, send deltas thereafter |
