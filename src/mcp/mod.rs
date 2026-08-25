@@ -53,3 +53,9 @@ mod audit_fixes;
 #[cfg(test)]
 #[path = "../tests/mcp/e2e_server.rs"]
 mod e2e_server;
+
+// apply_edit black-box E2E (docs/plans/APPLY_EDIT_PLAN.md Phase 4). Same
+// spawn-the-binary model as `e2e_server`; `#[ignore]`d by default.
+#[cfg(test)]
+#[path = "../tests/mcp/apply_edit.rs"]
+mod apply_edit_tests;

@@ -13,6 +13,7 @@
 
 pub mod context;
 pub mod core;
+pub mod edit;
 pub mod persistence;
 pub mod registry;
 pub mod stats;

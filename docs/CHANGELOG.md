@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [Unreleased] - 2026-08-25 - `apply_edit` Write Path
+
+Clean-CTX-native single-unit editing per `docs/plans/APPLY_EDIT_PLAN.md`: an agent that already received byte-exact bodies via `provide_code_context(fidelity="edit"|"verbatim")` can now write through Clean-CTX itself instead of paying the host's full-file raw-read precondition on every edit. Capability and tool-selection guidance shipped together (RULE 1b + SYSTEM_PROMPT rules 3–4) so the tool actually gets routed through.
+
+### Added
+
+- **`apply_edit` MCP tool** (`src/mcp/tool_handlers/edit.rs`, schema + registry wiring): operations `replace_body` / `delete` (both requiring byte-exact `expectedOldText`) and `insert_after` / `insert_before` anchored to a named unit. Unit-granular optimistic concurrency — only the bytes being changed are verified, so two agents editing different units of one file no longer serialize. Hard pre-commit tree-sitter syntax gate (`has_error()`) rejects malformed splices before any byte hits disk. Minimal response (fileHash, version, per-op spans + byte deltas); `"verify": true` echoes new text back. Structured bounded mismatch payloads (`kind`, expected/actual snippets capped at 512 chars) on rejection — a rejection means the unit changed underneath the caller, never a silent overwrite. v1 policy: requires prior tracked state (`provide_code_context` first), refuses otherwise.
+- **Span-tracked `CoreOp::Body`** (`(method_id, verbatim_text, start_byte, end_byte)` with a both-or-neither pairing invariant exposed via `body_span()`): bodies are now splice-addressable. `pipeline.rs` gained `locate_method_body()` returning `(text, offset-within-capture)` — C# attribute-strip aware — and emission threads absolute spans (`capture.start_byte + offset .. capture.end_byte`). Dual-shape wire compatibility: span-less bodies keep the legacy 3-tuple, spanned bodies emit 5-tuples; `tuple_to_op` accepts exactly 3 or 5 (single gate covering named/tagged/positional/string-table decoders). Binary wire bumped to **v0x03** (has-span flag varint + two raw offset varints); v0x01/v0x02 streams still decode (pre-span bodies decode span-less and are `apply_edit`-ineligible until recompressed). Hierarchical format carries spans as optional `bs`/`be` on `MethodNode`.
+- **`src/edit/` pure write-path core**: `ops.rs` (serde-tagged operation model), `locate.rs` (`UnitTable` keyed on qualified name + structural fingerprint — containing class + ordered param types — with bare-name resolution only when unambiguous; span-less bodies excluded by design), `apply.rs` (expected-text verification, back-to-front splicing, disjointness validation, syntax gate). Deliberately free of `McpState`/I/O; the handler is a thin adapter.
+- **Deterministic unit ordering**: unit tables materialize in instruction order (a HashMap-iteration nondeterminism was caught by the ambiguity test — candidate listings in `Ambiguous` error payloads are now stable across runs).
+- **Tests** (`src/tests/edit/`, `src/tests/mcp/apply_edit.rs`, updates to opcodes/wire/binary_wire/hierarchical/round_trip/tool_handlers suites): wire round-trips both shapes + malformed-tuple rejection; legacy-version decode; fingerprint disambiguation of same-named methods; splice/delete/insert/mismatch/overlap unit coverage; in-process no-tracked-state refusal; black-box e2e over a persistent server session (provide → apply_edit → delta transport picks up the change; same-unit second edit rejected with structured mismatch; different-units independence) behind the existing `#[ignore]` e2e harness.
+- **`examples/apply_edit_comparison.rs`**: measures the actual WRITE-side token delta of `apply_edit` (operations JSON) vs the read→edit convention (full raw read per edit) across the 50-edit simulation categories — the write-side numbers the plan flagged as unmeasured.
+- **Guidance**: RULE 1b added to `docs/CLAUDE_INTEGRATION_RULES.md`; SYSTEM_PROMPT Edit-mode rules now steer single-unit edits to `apply_edit` (with host-tool fallback for signatures/imports/cross-file work).
+
+### Changed
+
+- **Concurrency deviation from plan**: the plan's "acquire the same RwLock" deadlocks today — `compile_file_ir_focused` internally takes an `ir_context` READ lock via `state.file_version()`, so a caller cannot hold that lock's WRITE guard across compilation. Commits serialize through a module-local mutex instead (same guarantee, no lock-order change). Documented in-handler and in the plan's new Implementation Notes.
+- **Relocation strategy**: the whole-file hash fast path is subsumed — every call relocates against a fresh Edit-fidelity compile of current bytes (strictly safer; costs one local parse, not client tokens). Session baseline refresh post-commit (ir_context `load_ir` + hash registry + source-cache invalidation + llm-text eviction) makes the next `provide_code_context` a delta.
+- **Open Question resolutions**: OQ2 — prior tracked state IS required (new files go through the host write tool); OQ3 — SQLite baseline persistence deliberately deferred to the next `provide_code_context` call (existing fire-and-forget pattern; avoids writing empty-baseline rows).
+
+### Verification
+
+- `cargo fmt --all -- --check` clean; `cargo clippy --all-targets --workspace -- -D warnings` zero warnings.
+- Full workspace suite green under `--all-features` (~2200 tests) including the new `edit::` (17) and black-box `apply_edit` suites; two pre-existing flaky live-CBM pipe tests confirmed environmental (orphaned subprocess) and green serially after cleanup.
+
+---
+
 ## [Unreleased] - 2026-08-25 - Non-CBM Tool Audit Fix Cycle
 
 Evidence-driven fix cycle over the 2026-08-25 non-CBM tool audit. Every fix was reproduced with a failing regression test before implementation.

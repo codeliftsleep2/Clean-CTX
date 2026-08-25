@@ -103,7 +103,8 @@ fn test_varint_small_values() {
     assert!(bytes.len() > 3, "binary output should have header");
     assert_eq!(bytes[0], 0xCC, "magic byte 1");
     assert_eq!(bytes[1], 0x02, "magic byte 2");
-    assert_eq!(bytes[2], 0x02, "version byte");
+    // apply_edit Phase 1: body spans bumped the wire version to 0x03.
+    assert_eq!(bytes[2], 0x03, "version byte");
 }
 
 // ── Round-trip Tests ───────────────────────────────────────────────

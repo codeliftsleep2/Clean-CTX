@@ -80,12 +80,22 @@ pub enum CoreOp {
     // ── Edit Mode: Verbatim Method Bodies ────────────────
     ///
     /// Body: ["BODY", method_id, verbatim_text]
+    ///   or:  ["BODY", method_id, verbatim_text, start_byte, end_byte]
     /// Carries the raw, byte-exact method body text from the source.
     /// Only emitted when `Fidelity::Edit` is active. The text is the
     /// verbatim source slice — no transformation, no compression.
     /// Used by the LLM renderer to emit bodies that are safe for
     /// `replace_in_file` SEARCH blocks.
-    Body(String, String),
+    ///
+    /// apply_edit plan Phase 1: when the span fields are `Some`, they hold
+    /// the absolute byte range `[start_byte, end_byte)` of the body slice
+    /// within the ORIGINAL source file that produced this IR, making the op
+    /// splice-addressable by the `apply_edit` write path. Both span fields
+    /// must be `Some` or both `None` (pairing invariant). Span-less bodies
+    /// arise from legacy wire tuples decoded by `tuple_to_op`; they remain
+    /// fully valid IR but are not eligible for span-based splicing until the
+    /// file is recompressed.
+    Body(String, String, Option<u64>, Option<u64>),
 
     // ── R-43a: Execution Semantics ──────────────────────
     ///
@@ -137,7 +147,9 @@ impl fmt::Display for CoreOp {
                 write!(f, "PAT {} {}", name, args.join(" "))
             }
             // Edit Mode: Verbatim Method Bodies
-            CoreOp::Body(mid, text) => {
+            // Spans are transport metadata for the write path; the rendered
+            // form stays byte-identical to the pre-span format.
+            CoreOp::Body(mid, text, ..) => {
                 write!(f, "BODY {} {}", mid, text)
             }
             // R-43a: Execution Semantics
@@ -225,7 +237,8 @@ pub fn arity(opcode: &str) -> Option<i32> {
         "TYPE" => Some(3),     // alias, original
         "PAT" => Some(-1),     // pattern_name, args...
         // Edit Mode: Verbatim Method Bodies
-        "BODY" => Some(3), // method_id, verbatim_text
+        // Dual shape: legacy 3-tuple when span-less, 5-tuple when spanned.
+        "BODY" => Some(-1), // method_id, text [, start_byte, end_byte]
         // R-43a: Execution Semantics
         "DATAFLOW" => Some(4), // method_id, direction, target
         "CTRL" => Some(4),     // method_id, kind, target
@@ -260,6 +273,19 @@ pub fn opcode_name(op: &CoreOp) -> &'static str {
         CoreOp::ControlFlow(..) => "CTRL",
         CoreOp::SideEffect(..) => "EFFECT",
         CoreOp::ExecutionContext(..) => "CTX",
+    }
+}
+
+impl CoreOp {
+    /// Returns the byte span `[start_byte, end_byte)` of a `Body` op when
+    /// both span fields are present (the pairing invariant makes partial
+    /// spans unrepresentable). `None` for span-less bodies decoded from
+    /// legacy wire tuples.
+    pub fn body_span(&self) -> Option<(u64, u64)> {
+        match self {
+            CoreOp::Body(_, _, Some(start), Some(end)) => Some((*start, *end)),
+            _ => None,
+        }
     }
 }
 

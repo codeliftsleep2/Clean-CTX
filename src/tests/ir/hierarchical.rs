@@ -666,6 +666,9 @@ fn test_body_round_trip() {
             CoreOp::Body(
                 "M1".to_string(),
                 "{\n  let x = 1;\n  println!(\"{}\", x);\n}".to_string(),
+                // apply_edit Phase 1: absolute byte span of the body slice.
+                Some(64),
+                Some(101),
             ),
         ],
     };
@@ -675,6 +678,9 @@ fn test_body_round_trip() {
         c1.methods[0].body.as_deref(),
         Some("{\n  let x = 1;\n  println!(\"{}\", x);\n}")
     );
+    // Phase 1: spans must fold into the MethodNode alongside the text.
+    assert_eq!(c1.methods[0].body_start, Some(64));
+    assert_eq!(c1.methods[0].body_end, Some(101));
 
     let restored = hierarchical_to_ir(&hir);
     assert_eq!(

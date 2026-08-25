@@ -9,7 +9,7 @@ fn body_method_ids(ir: &CompiledIR) -> HashSet<&str> {
     ir.instructions
         .iter()
         .filter_map(|op| {
-            if let CoreOp::Body(mid, _) = op {
+            if let CoreOp::Body(mid, ..) = op {
                 Some(mid.as_str())
             } else {
                 None

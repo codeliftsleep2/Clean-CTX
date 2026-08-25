@@ -112,6 +112,18 @@ pub struct MethodNode {
     #[serde(rename = "b", default, skip_serializing_if = "Option::is_none")]
     pub body: Option<String>,
 
+    /// apply_edit plan Phase 1: absolute byte offset of the body slice's
+    /// start within the source that produced this IR. Present iff `body`
+    /// is present AND the producing IR carried spans (legacy span-less
+    /// bodies decode without offsets).
+    #[serde(rename = "bs", default, skip_serializing_if = "Option::is_none")]
+    pub body_start: Option<u64>,
+
+    /// Absolute byte offset one past the end of the body slice. Present
+    /// iff `body_start` is present (pairing invariant).
+    #[serde(rename = "be", default, skip_serializing_if = "Option::is_none")]
+    pub body_end: Option<u64>,
+
     /// Control-flow metadata: [kind, target] tuples (R-43a).
     /// kind: "if" | "loop" | "match" | "try" | "await" | "return"
     #[serde(rename = "cf", default, skip_serializing_if = "Vec::is_empty")]
@@ -218,6 +230,8 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                         flags: None,
                         patterns: Vec::new(),
                         body: None,
+                        body_start: None,
+                        body_end: None,
                         control_flow: Vec::new(),
                         data_flow: Vec::new(),
                         side_effect: None,
@@ -238,6 +252,8 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                             flags: None,
                             patterns: Vec::new(),
                             body: None,
+                            body_start: None,
+                            body_end: None,
                             control_flow: Vec::new(),
                             data_flow: Vec::new(),
                             side_effect: None,
@@ -400,11 +416,15 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
             }
 
             // Edit Mode: verbatim method body
-            CoreOp::Body(mid, text) => {
+            CoreOp::Body(mid, text, start, end) => {
                 if let Some(c_idx) = current_class_idx {
                     for mi in 0..classes[c_idx].methods.len() {
                         if classes[c_idx].methods[mi].id == *mid {
                             classes[c_idx].methods[mi].body = Some(text.clone());
+                            // Span pairing invariant: producer guarantees
+                            // both-or-neither, so assignment preserves it.
+                            classes[c_idx].methods[mi].body_start = *start;
+                            classes[c_idx].methods[mi].body_end = *end;
                             current_method_idx = Some(mi);
                             break;
                         }
@@ -597,7 +617,12 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
 
             // Verbatim body
             if let Some(body) = &method.body {
-                instructions.push(CoreOp::Body(method.id.clone(), body.clone()));
+                instructions.push(CoreOp::Body(
+                    method.id.clone(),
+                    body.clone(),
+                    method.body_start,
+                    method.body_end,
+                ));
             }
 
             // Control-flow metadata

@@ -106,6 +106,15 @@ pub fn create_default_registry() -> HandlerRegistry {
         })
     );
 
+    // apply_edit write path (docs/plans/APPLY_EDIT_PLAN.md Phase 3)
+    register_tool!(
+        reg,
+        "apply_edit",
+        Box::new(|id, params, state| {
+            crate::mcp::tool_handlers::edit::handle_apply_edit(id, params, state);
+        })
+    );
+
     // Context history handler (src/mcp/tool_handlers/context/mod.rs)
     register_tool!(
         reg,

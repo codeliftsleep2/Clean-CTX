@@ -38,7 +38,13 @@ const MAGIC: [u8; 2] = [0xCC, 0x02];
 /// Binary wire format version:
 /// 0x01 = Original (long TYPE op names like "NG_COMPONENT_Foo")
 /// 0x02 = Abbreviated (@-prefixed TYPE ops like "@cmp")
-const VERSION: u8 = 0x02;
+/// 0x03 = Body spans (apply_edit plan Phase 1): OP_BODY gains a presence
+///        flag varint plus two raw byte-offset varints when a body span is
+///        present. All other opcodes are encoded identically to 0x02.
+const VERSION: u8 = 0x03;
+/// Version 0x02 (pre-span bodies) — still supported for decode; OP_BODY
+/// carries exactly two string-table operands and decodes span-less.
+const VERSION_PRE_SPAN: u8 = 0x02;
 /// Legacy version 0x01 (long TYPE op names) — still supported for decode.
 const VERSION_LEGACY: u8 = 0x01;
 
@@ -295,9 +301,24 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
                 }
             }
             // Edit Mode: Verbatim Method Bodies
-            CoreOp::Body(mid, text) => {
+            // v0x03+: [mid_idx, text_idx, has_span_flag, start?, end?].
+            // Spans are raw varints (not string-table entries) so repeated
+            // offsets don't pollute the table. Span-less bodies (legacy
+            // decoded state) write flag=0 and no offsets, keeping the
+            // encoding self-describing without a schema change elsewhere.
+            CoreOp::Body(mid, text, start, end) => {
                 encode_operand(&mut buf, mid);
                 encode_operand(&mut buf, text);
+                match (start, end) {
+                    (Some(s), Some(e)) => {
+                        write_varint(&mut buf, 1);
+                        write_varint(&mut buf, *s);
+                        write_varint(&mut buf, *e);
+                    }
+                    _ => {
+                        write_varint(&mut buf, 0);
+                    }
+                }
             }
             // R-43a: Execution Semantics
             CoreOp::DataFlow(mid, direction, target) => {
@@ -380,13 +401,15 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
     if data[0] != MAGIC[0] || data[1] != MAGIC[1] {
         return Err(BinaryDecodeError::InvalidMagic);
     }
-    if data[2] != VERSION && data[2] != VERSION_LEGACY {
+    if data[2] != VERSION && data[2] != VERSION_PRE_SPAN && data[2] != VERSION_LEGACY {
         return Err(BinaryDecodeError::UnsupportedVersion(data[2]));
     }
     let mut pos = 3;
 
     // 2. IR version (edit sequence number) — only in VERSION (0x02)
-    let ir_version = if data[2] == VERSION {
+    // Versions 0x02 and 0x03 carry the IR edit-sequence number; only
+    // VERSION_LEGACY (0x01) omits it.
+    let ir_version = if data[2] != VERSION_LEGACY {
         let (ver, consumed) = read_varint(&data[pos..])
             .ok_or_else(|| BinaryDecodeError::TruncatedData("IR version".into()))?;
         pos += consumed;
@@ -554,10 +577,34 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                     CoreOp::TypeAlias(String::new(), original)
                 }
                 // Edit Mode: Verbatim Method Bodies
+                // v0x03 streams append a has-span flag varint plus two raw
+                // byte-offset varints after the string-table operands;
+                // pre-span streams stop at the operands and decode
+                // span-less (apply_edit plan Phase 1 compat gate).
                 OP_BODY => {
                     let mid = read_operand(&data[pos..], &mut pos)?;
                     let text = read_operand(&data[pos..], &mut pos)?;
-                    CoreOp::Body(mid, text)
+                    if data[2] == VERSION {
+                        let (has_span, consumed) = read_varint(&data[pos..]).ok_or_else(|| {
+                            BinaryDecodeError::TruncatedData("BODY span flag".into())
+                        })?;
+                        pos += consumed;
+                        if has_span == 1 {
+                            let (start, consumed) = read_varint(&data[pos..]).ok_or_else(|| {
+                                BinaryDecodeError::TruncatedData("BODY start_byte".into())
+                            })?;
+                            pos += consumed;
+                            let (end, consumed) = read_varint(&data[pos..]).ok_or_else(|| {
+                                BinaryDecodeError::TruncatedData("BODY end_byte".into())
+                            })?;
+                            pos += consumed;
+                            CoreOp::Body(mid, text, Some(start), Some(end))
+                        } else {
+                            CoreOp::Body(mid, text, None, None)
+                        }
+                    } else {
+                        CoreOp::Body(mid, text, None, None)
+                    }
                 }
                 // R-43a: Execution Semantics
                 OP_DATAFLOW => {

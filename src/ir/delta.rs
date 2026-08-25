@@ -415,7 +415,7 @@ fn primary_key(op: &CoreOp) -> String {
             )
         }
         // Edit Mode: Verbatim Method Bodies
-        CoreOp::Body(mid, _) => format!("BODY:{}", mid),
+        CoreOp::Body(mid, ..) => format!("BODY:{}", mid),
         // R-43a: Execution Semantics
         CoreOp::DataFlow(mid, _, _) => format!("DATAFLOW:{}", mid),
         CoreOp::ControlFlow(mid, _, _) => format!("CTRL:{}", mid),
@@ -450,7 +450,7 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
             v
         }
         // Edit Mode: Verbatim Method Bodies
-        CoreOp::Body(mid, _) => vec!["BODY".into(), mid.clone()],
+        CoreOp::Body(mid, ..) => vec!["BODY".into(), mid.clone()],
         // R-43a: Execution Semantics
         CoreOp::DataFlow(mid, _, _) => vec!["DATAFLOW".into(), mid.clone()],
         CoreOp::ControlFlow(mid, _, _) => vec!["CTRL".into(), mid.clone()],

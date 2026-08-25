@@ -43,6 +43,8 @@ fn make_method(name: &str) -> MethodNode {
         flags: None,
         patterns: vec![],
         body: None,
+        body_start: None,
+        body_end: None,
         control_flow: vec![],
         data_flow: vec![],
         side_effect: None,

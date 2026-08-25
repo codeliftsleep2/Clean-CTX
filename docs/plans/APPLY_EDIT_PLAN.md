@@ -1,8 +1,8 @@
 # `apply_edit` — Clean-CTX-Native Write Path
 
-**Status:** 🧭 Proposed (not started)
+**Status:** ✅ Implemented (Phases 1–5 complete)
 **Created:** 2026-08-25
-**Depends on:** `docs/EDIT_MODE_PLAN.md` (Edit fidelity + `CoreOp::Body`) — assumed complete/landed
+**Depends on:** `docs/EDIT_MODE_PLAN.md` (Edit fidelity + `CoreOp::Body`) — complete/landed
 **Target Release:** TBD
 
 ---
@@ -170,8 +170,21 @@ Shipping `apply_edit` server-side doesn't automatically save anything — an age
 
 ---
 
+---
+
+## Implementation Notes (2026-08-25 — as built)
+
+- **Wire compatibility**: `CoreOp::Body` is now `(method_id, verbatim_text, Option<u64> start, Option<u64> end)` with a both-or-neither pairing invariant surfaced via `body_span()`. Span-less bodies serialize as the legacy 3-tuple; spanned bodies as 5-tuples; `tuple_to_op` accepts exactly 3 or 5 — the single compat gate covering named/tagged/positional/string-table decoders. Binary wire is **v0x03** (`[mid_idx, text_idx, has_span_flag, start?, end?]`, offsets as raw varints); 0x01/0x02 streams still decode, producing span-less bodies that are `apply_edit`-ineligible until recompressed.
+- **Emission**: `pipeline.rs::locate_method_body()` returns `(text, byte-offset-within-capture)` — C# attribute-strip aware via pointer arithmetic (stripping is prefix-only) — and the Edit-fidelity emission threads the absolute span `capture.start_byte + offset .. capture.end_byte`. The old text-only `extract_method_body` wrapper was removed as dead code.
+- **Concurrency deviation from Design §5**: "acquire that same write lock" self-deadlocks today because `compile_file_ir_focused` takes an `ir_context` READ lock internally (`state.file_version()`); a caller cannot hold that lock's WRITE guard across compilation. Commits serialize through a module-local mutex in `tool_handlers/edit.rs` instead — identical no-interleaving guarantee, no new lock-order interactions.
+- **Relocation**: every call relocates against a fresh Edit-fidelity compile of the CURRENT bytes, subsuming the whole-file-hash fast path (strictly safer; costs one local parse server-side, zero client tokens). Unit tables materialize in instruction order — a HashMap-iteration nondeterminism (randomized ambiguity-candidate listings) was caught by the adversarial test and fixed. Keys: qualified name + structural fingerprint; bare names only when unambiguous; span-less bodies excluded by construction.
+- **Session baseline refresh**: post-commit, the handler recompiles, `load_ir`s the result with the new hash, updates the registry hash, invalidates the source cache entry, and evicts the stale llm-text entry — so the next `provide_code_context` yields a delta (verified e2e).
+- **Dead-code note**: the unattached `src/tests/ir/compiler_methods.rs` references the removed wrapper. If that file is ever wired into a module tree, port its assertions to `locate_method_body`.
+
 ## Open Questions
 
 1. Does the client host's own permission/confirmation model apply uniformly to an MCP tool call that writes a file, the same way it does for a native write tool? Needs confirming per-host, not assumed.
 2. Should `apply_edit` be allowed to create a *new* file (no prior read), or strictly require a prior `provide_code_context` in the same session? Leaning toward the latter for v1 — it keeps the verification story simple (there is always a "last known state" to check against) and pushes new-file creation through the existing, already-correct write tool.
+   **✅ Resolved (v1):** prior tracked state IS required; `apply_edit` refuses with a structured `no_tracked_state` error otherwise.
 3. Should the persisted SQLite baseline (`docs/ARCHITECTURE_OVERVIEW.md`'s Persistence Layer) be updated synchronously on `apply_edit`, or left to the next `provide_code_context` call the way in-session state is? Persistence writes are already non-fatal/fire-and-forget elsewhere in the codebase; the same pattern likely applies here without a new design.
+   **✅ Resolved (v1):** deferred — the SQLite baseline refreshes on the next `provide_code_context` call; `apply_edit` writes nothing to persistence (avoids empty-baseline rows misrepresenting the session).

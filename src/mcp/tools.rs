@@ -175,6 +175,24 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             }
         }),
         serde_json::json!({
+            "name": "apply_edit",
+            "description": "Editor for controlled filesystem edits on the text file at the provided path. Provide `insert_line` to insert `new_text` at a specific line number. Otherwise, the tool replaces `old_text` with `new_text`, or creates the file with `new_text` if file does not exist. Preferred write path for SINGLE-UNIT edits (one method body / insertion anchored to one unit) once this session has seen byte-exact content via provide_code_context(fidelity=\"edit\"|\"verbatim\"): verified against Clean-CTX's tracked unit spans, gated by an in-memory tree-sitter parse before any byte hits disk. Multi-unit batches targeting different units are supported. Cross-file renames/signature changes still belong in the host's native edit tool.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filePath": { "type": "string", "description": "Absolute path to a previously-seen .ts, .cs, .rs, or .java file." },
+                    "operations": {
+                        "type": "array",
+                        "description": "Structural operations applied atomically (all-or-nothing). Each: {\"type\":\"replace_body\",\"target\":\"Class.method\",\"expectedOldText\":\"{...}\",\"newText\":\"{...}\"} | {\"type\":\"delete\",\"target\":..., \"expectedOldText\":...} | {\"type\":\"insert_after\",\"anchor\":\"Class.method\",\"unitText\":...} | {\"type\":\"insert_before\",...}. expectedOldText must byte-match the text this session last delivered for that unit.",
+                        "items": { "type": "object" }
+                    },
+                    "verify": { "type": "boolean", "description": "Optional. When true, echoes each replacement's new verbatim text back as a receipt. Default false." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                },
+                "required": ["filePath", "operations"]
+            }
+        }),
+        serde_json::json!({
             "name": "context_history",
             "description": "View compression history and savings for tracked files.",
             "inputSchema": {

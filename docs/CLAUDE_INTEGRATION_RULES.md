@@ -23,6 +23,31 @@ mcp__clean-ctx__provide_code_context(filePath: "src/services/UserService.ts", in
 
 ---
 
+## RULE 1b — Single-Unit Edits: Use `apply_edit`, NOT the Host Write Tool
+
+**For a SINGLE-UNIT edit** (replace one method body, insert one method after an anchor, delete one method) on a file you have already read at `fidelity: "edit"` or `fidelity: "verbatim"` **in this same session**, use `apply_edit` instead of the host's native write/edit tool.
+
+**NEVER use the host write tool immediately after `provide_code_context` when the edit targets a single structural unit.** The host tool forces a full raw re-read of the *entire* file (thousands of wasted tokens) purely to satisfy its own staleness precondition. `apply_edit` verifies only the bytes actually being changed — against the unit's current span — then runs an in-memory tree-sitter gate before any byte hits disk.
+
+```
+mcp__clean-ctx__apply_edit(filePath: "src/services/UserService.ts",
+  operations: [{
+    type: "replace_body",
+    target: "UserService.processOrder",       # qualified name "Class.method" (or "M3" / unambiguous bare name)
+    expectedOldText: "{ ...byte-exact current body from provide_code_context... }",
+    newText: "{ ...replacement body... }"
+  }])
+```
+
+**When NOT to use `apply_edit`** (still use the host write tool):
+- Cross-file edits, renames, or signature changes (effects at other call sites).
+- Brand-new files that were never read via `provide_code_context` (v1 policy: `apply_edit` requires prior tracked state).
+- Multi-unit edits that span whole classes or multiple unrelated regions in ways the operation shapes don't cover.
+
+`apply_edit` forms: `{type: "replace_body", target, expectedOldText, newText}`, `{type: "delete", target, expectedOldText}`, `{type: "insert_after", anchor, unitText}`, `{type: "insert_before", anchor, unitText}`. Add `"verify": true` to echo the new text back as a receipt. A rejected edit means the unit changed underneath you — re-read with `provide_code_context` and retry; never retry blindly.
+
+---
+
 ## RULE 2 — CBM Queries: Use `cbm_proxy`, NOT Direct Calls
 
 **NEVER call `search_graph`, `query_graph`, `trace_path`, or `get_architecture` directly.** They return raw, uncompressed responses that bypass compression.

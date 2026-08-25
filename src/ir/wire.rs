@@ -94,9 +94,22 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             v
         }
         // Edit Mode: Verbatim Method Bodies
-        CoreOp::Body(mid, text) => {
-            vec!["BODY".into(), mid.clone(), text.clone()]
-        }
+        // Span-less bodies keep the legacy 3-tuple shape so pre-span
+        // decoders can still read them; spanned bodies append both byte
+        // offsets as decimal strings (5-tuple). The pairing invariant on
+        // the op guarantees we never emit a 4-tuple.
+        CoreOp::Body(mid, text, start, end) => match (start, end) {
+            (Some(s), Some(e)) => {
+                vec![
+                    "BODY".into(),
+                    mid.clone(),
+                    text.clone(),
+                    s.to_string(),
+                    e.to_string(),
+                ]
+            }
+            _ => vec!["BODY".into(), mid.clone(), text.clone()],
+        },
         // R-43a: Execution Semantics
         CoreOp::DataFlow(mid, direction, target) => {
             vec![
@@ -248,13 +261,26 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
             }
         }
         // Edit Mode: Verbatim Method Bodies
-        "BODY" => {
-            if tuple.len() >= 3 {
-                Some(CoreOp::Body(tuple[1].clone(), tuple[2].clone()))
-            } else {
-                None
+        // Wire/compatibility gate (apply_edit plan Phase 1): legacy
+        // 3-element tuples decode span-less; new 5-element tuples carry
+        // [start_byte, end_byte] as decimal strings. Any other arity, or a
+        // non-numeric span field, is rejected as malformed. This single arm
+        // covers the named, tagged, positional, and string-table decoders,
+        // which all route through `tuple_to_op`.
+        "BODY" => match tuple.len() {
+            3 => Some(CoreOp::Body(tuple[1].clone(), tuple[2].clone(), None, None)),
+            5 => {
+                let start_byte = tuple[3].parse::<u64>().ok()?;
+                let end_byte = tuple[4].parse::<u64>().ok()?;
+                Some(CoreOp::Body(
+                    tuple[1].clone(),
+                    tuple[2].clone(),
+                    Some(start_byte),
+                    Some(end_byte),
+                ))
             }
-        }
+            _ => None,
+        },
         // R-43a: Execution Semantics
         "DATAFLOW" => {
             if tuple.len() >= 4 {

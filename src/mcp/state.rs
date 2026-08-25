@@ -519,6 +519,15 @@ impl McpState {
         g.file_version(path_alias)
     }
 
+    /// Drop the cached source snapshot for `path` so the next
+    /// `read_source` re-reads from disk (apply_edit Phase 3: called after
+    /// a successful commit so session reads observe the new bytes even
+    /// when mtime/size granularity hides the change).
+    pub fn invalidate_source_cache(&self, path: &str) {
+        let cache_key = Self::resolve_cache_key(path);
+        lock_or_recover!(self.source_cache.lock(), "source_cache").remove(&cache_key);
+    }
+
     /// Access CBM filter skip set for a file (thread-safe convenience method).
     pub fn get_skip_set(&self, file_path: &str) -> Option<HashSet<String>> {
         self.cbm_filter_lock().skip_sets.get(file_path).cloned()

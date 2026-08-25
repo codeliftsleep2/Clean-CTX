@@ -340,23 +340,45 @@ pub(crate) fn find_body_start_in(raw_method: &str) -> Option<usize> {
     None
 }
 
-/// Extract the verbatim method body from a raw method capture.
-pub(crate) fn extract_method_body(raw_method: &str) -> Option<String> {
+/// Extract the verbatim method body from a raw method capture *and* the
+/// byte offset at which that body slice begins within `raw_method`
+/// (apply_edit plan Phase 1).
+///
+/// The offset lets the IR compiler emit `CoreOp::Body` ops whose span
+/// fields address the exact source bytes the text came from:
+/// `absolute_start = capture.start_byte + offset`, and the slice always
+/// runs to the end of the capture, so `absolute_end = capture.end_byte`.
+///
+/// Block bodies are located within the attribute-stripped view; C#
+/// attribute stripping only removes a leading prefix, so pointer
+/// arithmetic maps the stripped-view index back onto the original bytes.
+/// Expression (`=>`) bodies are located directly on the raw capture,
+/// preserving the historical behavior of `extract_method_body`.
+pub(crate) fn locate_method_body(raw_method: &str) -> Option<(String, usize)> {
     let stripped = strip_csharp_attributes(raw_method);
+    // strip_csharp_attributes returns a subslice of its input (leading
+    // trim/strip only), so this pointer diff is the byte offset of the
+    // stripped view inside the original capture.
+    let stripped_offset = stripped.as_ptr() as usize - raw_method.as_ptr() as usize;
+
     if let Some(i) = find_body_start_in(stripped) {
         let line_start = stripped[..i].rfind('\n').map(|p| p + 1).unwrap_or(0);
         let prefix = &stripped[line_start..i];
         if prefix.trim().is_empty() {
-            return Some(stripped[line_start..].to_string());
+            return Some((
+                stripped[line_start..].to_string(),
+                stripped_offset + line_start,
+            ));
         }
-        return Some(stripped[i..].to_string());
+        return Some((stripped[i..].to_string(), stripped_offset + i));
     }
 
     if let Some(arrow_idx) = raw_method.rfind("=>") {
-        let expr = &raw_method[arrow_idx + 2..];
+        let expr_start = arrow_idx + "=>".len();
+        let expr = &raw_method[expr_start..];
         let trimmed = expr.trim();
         if !trimmed.is_empty() && trimmed != ";" {
-            return Some(expr.to_string());
+            return Some((expr.to_string(), expr_start));
         }
     }
 
@@ -566,10 +588,21 @@ impl IRPass for CoreIRPass {
                     if fidelity == Fidelity::Edit
                         && focus.as_ref().is_none_or(|f| f.contains(&method_name))
                     {
-                        if let Some(body) = extract_method_body(&cap.raw_text) {
-                            state
-                                .instructions
-                                .push(CoreOp::Body(method_id.clone(), body));
+                        if let Some((body, body_offset)) = locate_method_body(&cap.raw_text) {
+                            // apply_edit plan Phase 1: thread the absolute
+                            // byte span through the op so the apply_edit
+                            // write path can splice without re-locating the
+                            // unit. The body slice always runs to the end
+                            // of the capture's raw text, so the end offset
+                            // is the capture's own end_byte.
+                            let start_byte = cap.start_byte as u64 + body_offset as u64;
+                            let end_byte = cap.end_byte as u64;
+                            state.instructions.push(CoreOp::Body(
+                                method_id.clone(),
+                                body,
+                                Some(start_byte),
+                                Some(end_byte),
+                            ));
                         }
                     }
 

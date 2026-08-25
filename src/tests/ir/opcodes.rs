@@ -50,20 +50,88 @@ fn core_op_type_alias_display() {
 
 #[test]
 fn core_op_body_display() {
-    let op = CoreOp::Body("M1".into(), "{\n  return 42;\n}".into());
+    // Spans are transport metadata and must not leak into the rendered
+    // form (byte-identical to the pre-span format).
+    let op = CoreOp::Body(
+        "M1".into(),
+        "{\n  return 42;\n}".into(),
+        Some(120),
+        Some(138),
+    );
     assert_eq!(format!("{}", op), "BODY M1 {\n  return 42;\n}");
 }
 
 #[test]
 fn core_op_body_round_trips_through_wire() {
     use crate::ir::wire::{op_to_tuple, tuple_to_op};
-    let op = CoreOp::Body("M1".into(), "{\n  return 42;\n}".into());
+    // Legacy span-less shape keeps the historical 3-tuple wire layout.
+    let op = CoreOp::Body("M1".into(), "{\n  return 42;\n}".into(), None, None);
     let tuple = op_to_tuple(&op);
     assert_eq!(tuple[0], "BODY");
     assert_eq!(tuple[1], "M1");
     assert_eq!(tuple[2], "{\n  return 42;\n}");
+    assert_eq!(tuple.len(), 3, "span-less Body must stay a 3-tuple");
     let restored = tuple_to_op(&tuple).unwrap();
     assert_eq!(restored, op);
+}
+
+#[test]
+fn core_op_body_span_round_trips_through_wire() {
+    use crate::ir::wire::{op_to_tuple, tuple_to_op};
+    let op = CoreOp::Body(
+        "M7".into(),
+        "{\n  return 42;\n}".into(),
+        Some(1024),
+        Some(1048),
+    );
+    let tuple = op_to_tuple(&op);
+    assert_eq!(
+        tuple,
+        vec![
+            "BODY".to_string(),
+            "M7".to_string(),
+            "{\n  return 42;\n}".to_string(),
+            "1024".to_string(),
+            "1048".to_string(),
+        ],
+        "spanned Body serializes as a 5-tuple with decimal offsets"
+    );
+    let restored = tuple_to_op(&tuple).unwrap();
+    assert_eq!(restored, op);
+    assert_eq!(restored.body_span(), Some((1024, 1048)));
+}
+
+#[test]
+fn body_span_helper_enforces_pairing() {
+    // The pairing invariant: partial spans are unrepresentable through
+    // `body_span`, which only fires when both fields are present.
+    let none = CoreOp::Body("M1".into(), "{}".into(), None, None);
+    assert_eq!(none.body_span(), None);
+    let both = CoreOp::Body("M1".into(), "{}".into(), Some(0), Some(2));
+    assert_eq!(both.body_span(), Some((0, 2)));
+}
+
+#[test]
+fn wire_rejects_malformed_body_tuples() {
+    use crate::ir::wire::tuple_to_op;
+    // 4-tuple (partial span) must be rejected — never produced by
+    // `op_to_tuple`, never accepted on decode.
+    let four = vec![
+        "BODY".to_string(),
+        "M1".to_string(),
+        "{}".to_string(),
+        "10".to_string(),
+    ];
+    assert!(tuple_to_op(&four).is_none());
+    // Non-numeric span fields must be rejected.
+    let five_bad = vec![
+        "BODY".to_string(),
+        "M1".to_string(),
+        "{}".to_string(),
+        "abc".to_string(),
+        "20".to_string(),
+    ];
+    assert!(tuple_to_op(&five_bad).is_none());
 }
 
 #[test]
@@ -86,6 +154,9 @@ fn arity_table_variadic_opcodes() {
     assert_eq!(arity("FLAGS"), Some(-1));
     assert_eq!(arity("FLAGS_C"), Some(-1));
     assert_eq!(arity("INJECTS"), Some(-1));
+    // apply_edit Phase 1: BODY has a dual shape (legacy 3-tuple or
+    // spanned 5-tuple), so its arity is variadic.
+    assert_eq!(arity("BODY"), Some(-1));
 }
 
 #[test]
@@ -96,12 +167,14 @@ fn arity_table_fixed_opcodes() {
     assert_eq!(arity("SIG"), Some(5));
     assert_eq!(arity("RET"), Some(3));
     assert_eq!(arity("IMP"), Some(4));
-    assert_eq!(arity("BODY"), Some(3));
 }
 
 #[test]
 fn opcode_name_body() {
-    assert_eq!(opcode_name(&CoreOp::Body("M1".into(), "{}".into())), "BODY");
+    assert_eq!(
+        opcode_name(&CoreOp::Body("M1".into(), "{}".into(), None, None)),
+        "BODY"
+    );
 }
 
 #[test]

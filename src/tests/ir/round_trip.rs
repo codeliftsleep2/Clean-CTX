@@ -42,8 +42,13 @@ fn all_variants_ir() -> CompiledIR {
             CoreOp::Import("IM1".into(), "fs".into(), "readFile".into()),
             CoreOp::TypeAlias("T1".into(), "string".into()),
             CoreOp::Pattern("CTOR".into(), vec!["C1".into(), "M1".into(), "S1".into()]),
-            // Edit Mode: verbatim method body
-            CoreOp::Body("M1".into(), "{\n  let x = 1;\n  return x;\n}".into()),
+            // Edit Mode: verbatim method body (with apply_edit Phase 1 spans)
+            CoreOp::Body(
+                "M1".into(),
+                "{\n  let x = 1;\n  return x;\n}".into(),
+                Some(96),
+                Some(124),
+            ),
             // R-43a: 4 new execution semantics variants
             CoreOp::DataFlow("M1".into(), "reads".into(), "userRepo".into()),
             CoreOp::ControlFlow("M1".into(), "if".into(), "condition".into()),
@@ -489,6 +494,8 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
 }}",
                 rng() % 100
             ),
+            Some(rng() % 4096),
+            Some((rng() % 4096) + 128),
         ),
         _ => unreachable!(),
     }
