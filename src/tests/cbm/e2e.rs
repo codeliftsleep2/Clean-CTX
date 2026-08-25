@@ -858,7 +858,7 @@ fn e2e_cbm_multiroot_multilingual_integration() {
     }
     let state = shared_live_state();
 
-    eprintln!("\n═══ Step 1: get_cbm_status ═══");
+    // eprintln!("\n═══ Step 1: get_cbm_status ═══");
     crate::mcp::tools::dispatch_tools_call(
         &serde_json::json!(1),
         "get_cbm_status",
@@ -866,7 +866,7 @@ fn e2e_cbm_multiroot_multilingual_integration() {
         &state,
     );
 
-    eprintln!("\n═══ Step 2: graph_search ═══");
+    // eprintln!("\n═══ Step 2: graph_search ═══");
     crate::mcp::tools::dispatch_tools_call(
         &serde_json::json!(2),
         "graph_search",
@@ -874,7 +874,7 @@ fn e2e_cbm_multiroot_multilingual_integration() {
         &state,
     );
 
-    eprintln!("\n═══ Step 3: graph_query ═══");
+    // eprintln!("\n═══ Step 3: graph_query ═══");
     crate::mcp::tools::dispatch_tools_call(
         &serde_json::json!(3),
         "graph_query",
@@ -882,7 +882,7 @@ fn e2e_cbm_multiroot_multilingual_integration() {
         &state,
     );
 
-    eprintln!("\n═══ Step 4: graph_trace ═══");
+    // eprintln!("\n═══ Step 4: graph_trace ═══");
     crate::mcp::tools::dispatch_tools_call(
         &serde_json::json!(4),
         "graph_trace",
@@ -890,7 +890,7 @@ fn e2e_cbm_multiroot_multilingual_integration() {
         &state,
     );
 
-    eprintln!("\n═══ Step 5: get_architecture ═══");
+    // eprintln!("\n═══ Step 5: get_architecture ═══");
     crate::mcp::tools::dispatch_tools_call(
         &serde_json::json!(5),
         "get_architecture",
@@ -898,7 +898,7 @@ fn e2e_cbm_multiroot_multilingual_integration() {
         &state,
     );
 
-    eprintln!("\n═══ Step 6: cbm_proxy search_graph ═══");
+    // eprintln!("\n═══ Step 6: cbm_proxy search_graph ═══");
     crate::mcp::tools::dispatch_tools_call(
         &serde_json::json!(6),
         "cbm_proxy",
@@ -906,17 +906,18 @@ fn e2e_cbm_multiroot_multilingual_integration() {
         &state,
     );
 
-    eprintln!("\n═══ Step 7: resolve_cross_language_endpoint ═══");
+    // eprintln!("\n═══ Step 7: resolve_cross_language_endpoint ═══");
     {
         let mut guard = state.graph_bridge_lock();
         let bridge = guard.as_mut().expect("live bridge");
         for name in &["getAll", "GetAll", "Controller", "getUsers"] {
-            let result = bridge.resolve_cross_language_endpoint(name);
-            eprintln!("  resolve(\"{name}\") = {result:?}");
+            // Result intentionally exercised without logging (noise reduction);
+            // Step 15 asserts the fixture-project equivalents.
+            let _ = bridge.resolve_cross_language_endpoint(name);
         }
     }
 
-    eprintln!("\n═══ Step 8: cbm_proxy list_projects ═══");
+    // eprintln!("\n═══ Step 8: cbm_proxy list_projects ═══");
     crate::mcp::tools::dispatch_tools_call(
         &serde_json::json!(8),
         "cbm_proxy",
@@ -927,7 +928,7 @@ fn e2e_cbm_multiroot_multilingual_integration() {
     // ── Multilingual fixture (self-contained, machine-agnostic) ──
     // Generate a temporary polyglot project so every developer/CI machine
     // exercises the identical CBM wire path. No external repositories.
-    eprintln!("\n═══ Step 9: Create multilingual fixture project ═══");
+    // eprintln!("\n═══ Step 9: Create multilingual fixture project ═══");
     let fixture_root = std::env::temp_dir().join(format!("clean-ctx-audit-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&fixture_root);
     std::fs::create_dir_all(fixture_root.join("src")).expect("create fixture dir");
@@ -1047,7 +1048,7 @@ function createFixture(data) { return data; }
     fx_config.additional_roots.push(fixture_str.clone());
     let fx_state = crate::mcp::McpState::new(fx_config);
 
-    eprintln!("\n═══ Step 10: Wait for fixture indexing ═══");
+    // eprintln!("\n═══ Step 10: Wait for fixture indexing ═══");
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
     loop {
         let status = {
@@ -1056,7 +1057,7 @@ function createFixture(data) { return data; }
         };
         match status {
             Ok(crate::cbm::bridge::IndexingStatus::Ready) => {
-                eprintln!("  Fixture indexing Complete");
+                // eprintln!("  Fixture indexing Complete");
                 break;
             }
             Ok(crate::cbm::bridge::IndexingStatus::StillIndexing { .. }) => {
@@ -1074,12 +1075,12 @@ function createFixture(data) { return data; }
         let b = g.as_mut().expect("lf bridge");
         // Resolve the fixture project's canonical CBM slug via its path
         let s = b.resolve_project_id(&fixture_str);
-        eprintln!("  Fixture slug: {s}");
-        eprintln!("  primary slug: {}", b.project_str());
+        // eprintln!("  Fixture slug: {s}");
+        // eprintln!("  primary slug: {}", b.project_str());
         s
     };
 
-    eprintln!("\n═══ Step 11: Fixture architecture ═══");
+    // eprintln!("\n═══ Step 11: Fixture architecture ═══");
     {
         let mut g = fx_state.graph_bridge_lock();
         let b = g.as_mut().expect("lf bridge");
@@ -1089,21 +1090,21 @@ function createFixture(data) { return data; }
         let arch = b
             .get_architecture()
             .unwrap_or_else(|e| panic!("get_architecture must succeed on the fixture: {e}"));
-        eprintln!(
-            "  {} module(s), {} dep(s)",
-            arch.modules.len(),
-            arch.dependencies.len()
-        );
-        for m in &arch.modules {
-            eprintln!("    module: {} ({} nodes)", m.name, m.file_count);
-        }
-        for d in &arch.dependencies {
-            eprintln!("    dep: {} -> {} ({})", d.from, d.to, d.kind);
-        }
+        // eprintln!(
+        //     "  {} module(s), {} dep(s)",
+        //     arch.modules.len(),
+        //     arch.dependencies.len()
+        // );
+        // for m in &arch.modules {
+        //     eprintln!("    module: {} ({} nodes)", m.name, m.file_count);
+        // }
+        // for d in &arch.dependencies {
+        //     eprintln!("    dep: {} -> {} ({})", d.from, d.to, d.kind);
+        // }
         assert!(!arch.modules.is_empty(), "Fixture must have modules");
     }
 
-    eprintln!("\n═══ Step 12: Language-specific symbol discovery ═══");
+    // eprintln!("\n═══ Step 12: Language-specific symbol discovery ═══");
     {
         let mut g = fx_state.graph_bridge_lock();
         let b = g.as_mut().expect("fixture bridge");
@@ -1118,10 +1119,10 @@ function createFixture(data) { return data; }
             "fixture_styles.css", // CSS File node
         ] {
             let nodes = b.search(sym);
-            eprintln!("  search(\"{sym}\") = {} hits", nodes.len());
-            for n in nodes.iter().take(3) {
-                eprintln!("    - {} {} ({})", n.label, n.name, n.file);
-            }
+            // eprintln!("  search(\"{sym}\") = {} hits", nodes.len());
+            // for n in nodes.iter().take(3) {
+            //     eprintln!("    - {} {} ({})", n.label, n.name, n.file);
+            // }
             assert!(
                 !nodes.is_empty(),
                 "search(\"{sym}\") must find its fixture node"
@@ -1137,19 +1138,19 @@ function createFixture(data) { return data; }
                 .collect::<Vec<_>>()
         );
         // Informational: TS symbol parsing support varies by CBM build.
-        let ts = b.search("FixtureClientService");
-        eprintln!(
-            "  search(\"FixtureClientService\") [TS] = {} hits{}",
-            ts.len(),
-            if ts.is_empty() {
-                " (file-level only)"
-            } else {
-                ""
-            }
-        );
+        // let ts = b.search("FixtureClientService");
+        // eprintln!(
+        //     "  search(\"FixtureClientService\") [TS] = {} hits{}",
+        //     ts.len(),
+        //     if ts.is_empty() {
+        //         " (file-level only)"
+        //     } else {
+        //         ""
+        //     }
+        // );
     }
 
-    eprintln!("\n═══ Step 13: Method, Class and Function nodes ═══");
+    // eprintln!("\n═══ Step 13: Method, Class and Function nodes ═══");
     {
         let mut g = fx_state.graph_bridge_lock();
         let b = g.as_mut().expect("fixture bridge");
@@ -1160,7 +1161,7 @@ function createFixture(data) { return data; }
         let q1 = "MATCH (m:Method) RETURN m.name LIMIT 50".to_string();
         let qr1 = b.query_graph(&q1);
         let methods: Vec<&str> = qr1.nodes.iter().map(|n| n.name.as_str()).collect();
-        eprintln!("  Methods: {methods:?}");
+        // eprintln!("  Methods: {methods:?}");
         assert!(!qr1.nodes.is_empty(), "Fixture must have Method nodes");
         assert!(
             methods.contains(&"Get") && methods.contains(&"Create"),
@@ -1178,14 +1179,14 @@ function createFixture(data) { return data; }
         let q3 = "MATCH (f:Function) RETURN f.name LIMIT 30".to_string();
         let qr3 = b.query_graph(&q3);
         let fns: Vec<&str> = qr3.nodes.iter().map(|n| n.name.as_str()).collect();
-        eprintln!("  Functions: {fns:?}");
+        // eprintln!("  Functions: {fns:?}");
         assert!(
             fns.contains(&"fixture_value") || methods.contains(&"fixture_value"),
             "Rust fn fixture_value must appear as a Function/Method node, got fns={fns:?} methods={methods:?}"
         );
     }
 
-    eprintln!("\n═══ Step 14: Web-file nodes (JS/HTML/TS/CSS) ═══");
+    // eprintln!("\n═══ Step 14: Web-file nodes (JS/HTML/TS/CSS) ═══");
     {
         let mut g = fx_state.graph_bridge_lock();
         let b = g.as_mut().expect("fixture bridge");
@@ -1196,10 +1197,10 @@ function createFixture(data) { return data; }
                 "MATCH (n) WHERE n.file_path =~ '.*\\.{ext}$' RETURN n.name, n.file_path LIMIT 5"
             );
             let qr = b.query_graph(&q);
-            eprintln!("  {} nodes: {}", ext.to_uppercase(), qr.nodes.len());
-            for n in &qr.nodes {
-                eprintln!("    {} ({})", n.name, n.file);
-            }
+            // eprintln!("  {} nodes: {}", ext.to_uppercase(), qr.nodes.len());
+            // for n in &qr.nodes {
+            //     eprintln!("    {} ({})", n.name, n.file);
+            // }
             assert!(
                 !qr.nodes.is_empty(),
                 ".{ext} fixture must produce graph nodes"
@@ -1208,13 +1209,13 @@ function createFixture(data) { return data; }
         // Razor remains intentionally unsupported by CBM — no assertion.
     }
 
-    eprintln!("\n═══ Step 15: C# cross-language resolution ═══");
+    // eprintln!("\n═══ Step 15: C# cross-language resolution ═══");
     {
         let mut g = fx_state.graph_bridge_lock();
         let b = g.as_mut().expect("fixture bridge");
         for name in &["Get", "Create", "Update", "Delete"] {
             let result = b.resolve_cross_language_endpoint(name);
-            eprintln!("  resolve(\"{name}\") = {result:?}");
+            // eprintln!("  resolve(\"{name}\") = {result:?}");
             let endpoint =
                 result.unwrap_or_else(|| panic!("cross-language resolve(\"{name}\") must succeed"));
             assert!(
@@ -1224,14 +1225,14 @@ function createFixture(data) { return data; }
         }
     }
 
-    eprintln!("\n═══ Step 16: Primary bridge still healthy ═══");
+    // eprintln!("\n═══ Step 16: Primary bridge still healthy ═══");
     {
         let mut g = state.graph_bridge_lock();
         let b = g.as_mut().expect("live bridge");
         let c1 = b.search("GraphBridge").len();
-        eprintln!("  Primary search(GraphBridge) = {c1} hits");
+        // eprintln!("  Primary search(GraphBridge) = {c1} hits");
         assert!(c1 > 0, "Primary bridge must still be queryable");
     }
 
-    eprintln!("\n═══ Audit probe complete — all steps passed ═══\n");
+    // eprintln!("\n═══ Audit probe complete — all steps passed ═══\n");
 } // _cleanup drops here: removes the fixture dir even on panic

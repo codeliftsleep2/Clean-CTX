@@ -7,60 +7,64 @@ use crate::angular_meta::template::{
     TemplateShape, extract_template_shape, extract_template_shape_with_depth,
 };
 
+// NOISE REDUCTION (2026-08-25): AST-dump debug tests commented out — their
+// sole purpose was printing tree-sitter parse trees on every run. Uncomment
+// locally when debugging template parsing.
+//
 /// Debug: dump tree-sitter-html AST to understand node types.
-#[test]
-fn dump_html_ast() {
-    let html = r#"<div><span>Hello</span></div>"#;
-    let language = tree_sitter_html::LANGUAGE.into();
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&language).unwrap();
-    let tree = parser.parse(html.as_bytes(), None).unwrap();
-    let root = tree.root_node();
-    fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
-        let text = node.utf8_text(source.as_bytes()).unwrap_or("<error>");
-        let truncated = if text.len() > 40 { &text[..40] } else { text };
-        eprintln!(
-            "{}{:?} [named={}] \"{}\"",
-            " ".repeat(indent),
-            node.kind(),
-            node.is_named(),
-            truncated
-        );
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            print_node(child, source, indent + 2);
-        }
-    }
-    print_node(root, html, 0);
-}
-
+// #[test]
+// fn dump_html_ast() {
+//     let html = r#"<div><span>Hello</span></div>"#;
+//     let language = tree_sitter_html::LANGUAGE.into();
+//     let mut parser = tree_sitter::Parser::new();
+//     parser.set_language(&language).unwrap();
+//     let tree = parser.parse(html.as_bytes(), None).unwrap();
+//     let root = tree.root_node();
+//     fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
+//         let text = node.utf8_text(source.as_bytes()).unwrap_or("<error>");
+//         let truncated = if text.len() > 40 { &text[..40] } else { text };
+//         eprintln!(
+//             "{}{:?} [named={}] \"{}\"",
+//             " ".repeat(indent),
+//             node.kind(),
+//             node.is_named(),
+//             truncated
+//         );
+//         let mut cursor = node.walk();
+//         for child in node.children(&mut cursor) {
+//             print_node(child, source, indent + 2);
+//         }
+//     }
+//     print_node(root, html, 0);
+// }
+//
 /// Debug: dump AST for Angular template with bindings.
-#[test]
-fn dump_angular_template_ast() {
-    let html =
-        r#"<div *ngIf="show"><app-card [title]="name" (click)="handler()"></app-card></div>"#;
-    let language = tree_sitter_html::LANGUAGE.into();
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&language).unwrap();
-    let tree = parser.parse(html.as_bytes(), None).unwrap();
-    let root = tree.root_node();
-    fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
-        let text = node.utf8_text(source.as_bytes()).unwrap_or("<error>");
-        let truncated = if text.len() > 50 { &text[..50] } else { text };
-        eprintln!(
-            "{}{:?} [named={}] \"{}\"",
-            " ".repeat(indent),
-            node.kind(),
-            node.is_named(),
-            truncated
-        );
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            print_node(child, source, indent + 2);
-        }
-    }
-    print_node(root, html, 0);
-}
+// #[test]
+// fn dump_angular_template_ast() {
+//     let html =
+//         r#"<div *ngIf="show"><app-card [title]="name" (click)="handler()"></app-card></div>"#;
+//     let language = tree_sitter_html::LANGUAGE.into();
+//     let mut parser = tree_sitter::Parser::new();
+//     parser.set_language(&language).unwrap();
+//     let tree = parser.parse(html.as_bytes(), None).unwrap();
+//     let root = tree.root_node();
+//     fn print_node(node: tree_sitter::Node, source: &str, indent: usize) {
+//         let text = node.utf8_text(source.as_bytes()).unwrap_or("<error>");
+//         let truncated = if text.len() > 50 { &text[..50] } else { text };
+//         eprintln!(
+//             "{}{:?} [named={}] \"{}\"",
+//             " ".repeat(indent),
+//             node.kind(),
+//             node.is_named(),
+//             truncated
+//         );
+//         let mut cursor = node.walk();
+//         for child in node.children(&mut cursor) {
+//             print_node(child, source, indent + 2);
+//         }
+//     }
+//     print_node(root, html, 0);
+// }
 
 // ===== Legacy syntax tests (Tier 2) =====
 

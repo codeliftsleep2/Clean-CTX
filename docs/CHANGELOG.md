@@ -30,7 +30,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Fresh-process live probes green over synthetic fixture repos: typed CALLS projections surface edges end-to-end (endpoint cells exactly as projected — bare under `.name`, qualified under `.qualified_name`), wide scrambled 4-column projection maps middle columns into properties, aliased type() and numeric-triple projections stay node-shaped; verbatim raw-capture fixtures pin the column-shape conversion deterministically across all eight captured shapes.
 - `cargo fmt --all -- --check` clean; `cargo clippy --all-targets -- -D warnings` zero warnings.
-- `cargo test --workspace --all-targets --all-features`: **2,515 passed / 0 failed / 5 ignored** (core library 2,175 + CLI binary 11 + proxy crate 329: lib 155, bin harness 155, audit-regression 18, e2e integration 1), including `e2e_cbm_multiroot_multilingual_integration`.
+- `cargo test --workspace --all-targets --all-features`: **2,513 passed / 0 failed / 5 ignored** (core library 2,173 + CLI binary 11 + proxy crate 329: lib 155, bin harness 155, audit-regression 18, e2e integration 1), including `e2e_cbm_multiroot_multilingual_integration`.
+
+### Test-output noise reduction
+
+- Commented out per-run debug output in the test fixtures: the multilingual audit probe's Step 1–16 narration and result dumps (`src/tests/cbm/e2e.rs`), path-resolution dumps (`debug_bundler_paths`), AST-dump tests (`dump_html_ast`, `dump_angular_template_ast` — removed from the active count, −2), the P0-1 dispatcher progress line, and the `[TIMING]` compression line. Root cause of the largest flood fixed structurally: three `observability::tracing` tests raced to install a process-global DEBUG-level tracing subscriber for the whole suite; their env-mutating bodies are commented out with rationale. Skip/error-path diagnostics (e.g. "Skipping — CBM not installed") intentionally retained.
 
 ---
 

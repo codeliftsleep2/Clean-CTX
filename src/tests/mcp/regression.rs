@@ -895,7 +895,7 @@ fn regression_c1_workspace_tokenizer_created_once() {
     let state = crate::mcp::McpState::new(config);
 
     // TIMING: Measure compress_workspace_dir to isolate slow operations
-    let start = std::time::Instant::now();
+    // let start = std::time::Instant::now();
     let result = crate::mcp::workspace::compress_workspace_dir(
         &dir_path.to_string_lossy(),
         crate::compression::Fidelity::Low,
@@ -907,10 +907,10 @@ fn regression_c1_workspace_tokenizer_created_once() {
         "workspace compression should succeed: {:?}",
         result.err()
     );
-    eprintln!(
-        "[TIMING] compress_workspace_dir completed in {:?}",
-        start.elapsed()
-    );
+    // eprintln!(
+    //     "[TIMING] compress_workspace_dir completed in {:?}",
+    //     start.elapsed()
+    // );
     let workspace_result = result.unwrap();
 
     // Both files should be in the manifest

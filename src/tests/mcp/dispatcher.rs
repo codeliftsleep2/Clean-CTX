@@ -247,10 +247,10 @@ fn p0_1_regression_requests_execute_concurrently() {
 
     // Check how many handlers started
     let started_count = started.load(Ordering::SeqCst);
-    eprintln!(
-        "[clean-ctx] P0-1: started_count={} before barrier release",
-        started_count
-    );
+    // eprintln!(
+    //     "[clean-ctx] P0-1: started_count={} before barrier release",
+    //     started_count
+    // );
 
     // Release all waiting handlers
     all_started.store(true, Ordering::Release);
