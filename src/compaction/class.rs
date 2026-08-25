@@ -39,10 +39,15 @@ pub fn extract_class_name(text: &str) -> String {
     let rest = strip_modifiers(decl, MODIFIERS_CLASS);
     // Strip "class " / "interface " / "record " keyword (C# interfaces and
     // records are distinct AST nodes but share the same class-like shape).
+    // Non-CBM audit 2026-08-25 #1: also strip "enum " / "struct " so the
+    // diff snapshot builder can route C#/TS/Java enums and structs through
+    // this helper without the type keyword becoming the label.
     let rest = rest
         .strip_prefix("class ")
         .or_else(|| rest.strip_prefix("interface "))
         .or_else(|| rest.strip_prefix("record "))
+        .or_else(|| rest.strip_prefix("enum "))
+        .or_else(|| rest.strip_prefix("struct "))
         .unwrap_or(rest.as_str())
         .trim();
 
@@ -88,10 +93,14 @@ pub fn extract_class_meta(text: &str) -> String {
     let decl = stripped.lines().next().unwrap_or(stripped);
     let decl = decl.split('{').next().unwrap_or(decl).trim();
     let rest = strip_modifiers(decl, MODIFIERS_CLASS);
+    // Mirror `extract_class_name`'s keyword chain (incl. enum/struct, see
+    // Non-CBM audit 2026-08-25 #1) so both derive from the same decl text.
     let rest = rest
         .strip_prefix("class ")
         .or_else(|| rest.strip_prefix("interface "))
         .or_else(|| rest.strip_prefix("record "))
+        .or_else(|| rest.strip_prefix("enum "))
+        .or_else(|| rest.strip_prefix("struct "))
         .unwrap_or(rest.as_str())
         .trim();
 

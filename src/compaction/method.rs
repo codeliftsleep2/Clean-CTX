@@ -157,6 +157,7 @@ fn compact_method_low(sig: &str) -> String {
         Some((open, _)) => &s[..open],
         None => &s,
     };
+    let has_param_group = before_paren.len() != s.len() || s.contains('(');
     let tokens: Vec<&str> = before_paren.split_whitespace().collect();
     let name = if tokens.len() >= 2 && is_csharp_return_type(tokens[tokens.len() - 2]) {
         tokens
@@ -165,7 +166,25 @@ fn compact_method_low(sig: &str) -> String {
             .split('<')
             .next()
             .unwrap_or(tokens.last().unwrap())
+    } else if has_param_group && !tokens.is_empty() {
+        // Non-CBM audit 2026-08-25 #2: when the parameter list was located
+        // STRUCTURALLY, the identifier is simply the last whitespace token
+        // before it — regardless of naming convention and regardless of
+        // whether a named-tuple return type defeats the
+        // `is_csharp_return_type` heuristic (e.g.
+        // `Task<(A section, Guid requestId)> CreateRecordWithDefaults(...)`
+        // previously fell into the split-at-first-`<` fallback and yielded
+        // the whole type prefix `Task` / `internal static async Task` as
+        // the "name"). Splitting only the final token keeps generic names
+        // (`Foo<T>` → `Foo`) identical to the detected branch above.
+        tokens
+            .last()
+            .unwrap()
+            .split(['(', '<'])
+            .next()
+            .unwrap_or(tokens.last().unwrap())
     } else {
+        // No parameter list at all — keep the legacy split behavior.
         s.split(['(', '<']).next().unwrap_or(&s)
     };
 

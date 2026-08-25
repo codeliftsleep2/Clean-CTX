@@ -154,6 +154,17 @@ impl Decompressor {
 
         for line in compressed.lines() {
             let trimmed = line.trim();
+            // Non-CBM audit 2026-08-25 #8: `// ── ClassName ──` lines are
+            // STRUCTURAL class-boundary markers emitted by the IR LLM
+            // renderer, not disposable comments. Dropping them turned a
+            // multi-class skeleton into an unattributed flat field list —
+            // strictly less information than the compressed input had.
+            // Preserve them verbatim so round-trips keep class attribution.
+            if trimmed.starts_with("// ──") {
+                output.push_str(trimmed);
+                output.push('\n');
+                continue;
+            }
             // F-FULL-18: Skip ALL comment lines (starting with //) before
             // checking section starts. This prevents accidental section
             // detection on commented-out metadata like `// §PATHMAP`.

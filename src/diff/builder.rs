@@ -128,13 +128,13 @@ pub fn build_snapshot(
     // also fails with a compilation error, we return a valid empty
     // CapturedStructure instead of propagating the error.
     let mut last_ok_result: Option<CapturedStructure> = None;
-    for (_label, lang, query) in &candidates {
-        let result = match try_build_with(lang.clone(), query, source, fidelity) {
+    for (label, lang, query) in &candidates {
+        let result = match try_build_with(lang.clone(), query, source, fidelity, label) {
             Ok(snap) => snap,
             Err(e) => {
                 tracing::warn!(
                     "build_snapshot: parser {} failed, trying next: {}",
-                    _label,
+                    label,
                     e,
                 );
                 continue;
@@ -172,6 +172,7 @@ fn try_build_with(
     query_string: &str,
     source: &str,
     fidelity: Fidelity,
+    parser_label: &str,
 ) -> Result<CapturedStructure, Box<dyn std::error::Error>> {
     // Run the SHARED capture pipeline. The closure maps each
     // (capture_name, raw_text) pair to the normalised text the diff
@@ -188,9 +189,19 @@ fn try_build_with(
                 // C# interfaces and records are distinct AST nodes but
                 // share the same class-like shape. F-01 diff audit.
                 "interface.root" | "record.root" => Some(extract_class_name(raw)),
-                // Rust type declarations: struct, enum, trait, impl
+                // Type declarations. Non-CBM audit 2026-08-25 #1: Rust
+                // keeps its own extractor (`pub`/`pub(crate)` prefixes),
+                // but every OTHER language routes struct/enum through the
+                // shared class-name extractor — `extract_rust_struct_name`
+                // only strips Rust visibility, so C# `internal static
+                // class` became `internal` and `public enum Foo` became
+                // `public` (rendered as `~ class public` by diff_commits).
                 "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
-                    Some(extract_rust_struct_name(raw))
+                    if parser_label == "rust" {
+                        Some(extract_rust_struct_name(raw))
+                    } else {
+                        Some(extract_class_name(raw))
+                    }
                 }
                 // C# constructors and TS top-level functions are method-like.
                 "method.root" | "constructor.root" | "func.root" => {

@@ -175,6 +175,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### IDENT-001 One Physical File, One Stable Alias
+
+| Property | Value |
+|----------|-------|
+| **Intent** | All alias-keyed session state — IR context versions, text-delta baselines, LLM text cache, `§PATHMAP` output — must attribute every operation to ONE identity per physical file, regardless of which path spelling a caller supplies (Non-CBM audit 2026-08-25 #3: fragmented aliases silently split per-file state so one alias's cache never saw updates recorded under the other). |
+| **Invariant** | `PathDictionary::get_or_create_alias` maps different caller-supplied spellings of the same on-disk file (absolute path, workspace-root-joined relative form, redundant-segment form) to the SAME alias. Alias keys are canonicalized paths (Windows verbatim `\\?\` prefix stripped so stored keys stay readable); unresolvable paths fall back to the raw argument unchanged so synthetic strings neither collide nor panic. |
+| **Enforcement** | Canonicalize-or-fallback key normalization inside `PathDictionary::get_or_create_alias` itself — the single choke point all production call sites share (handler wrappers, `compress_text_body`, workspace passes), so no call site can reintroduce raw-string keys. Exact-string repeats fast-path without filesystem access. |
+| **Authority** | `src/dictionary/path.rs` (`normalize_alias_key`, `get_or_create_alias`), `src/tests/mcp/state.rs` (`alias_identity_absolute_and_redundant_segment_forms_converge`, `alias_identity_unresolvable_paths_fall_back_to_raw_key`) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
+
 ## Architectural Debt
 
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)

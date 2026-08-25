@@ -10,12 +10,51 @@ use std::collections::HashMap;
 pub struct PathDictionary {
     /// alias → path (e.g. "α1" → "/project/src/main.ts")
     forward: HashMap<String, String>,
-    /// path → alias (the reverse index for O(1) lookup)
+    /// path → alias (the reverse index for O(1) lookup).
+    ///
+    /// Keys are CANONICAL paths (see `normalize_alias_key`) so that
+    /// different caller-supplied spellings of the same physical file
+    /// converge onto one stable alias.
     reverse: HashMap<String, String>,
     /// bundle alias → component name (e.g. "Φ1" → "user-card.component")
     bundle_aliases: HashMap<String, String>,
     /// component name → bundle alias (reverse index for O(1) lookup)
     bundle_reverse: HashMap<String, String>,
+}
+
+/// Normalize a caller-supplied path to the canonical identity used for
+/// alias keys.
+///
+/// Non-CBM audit 2026-08-25 #3: handlers mix absolute paths and
+/// workspace-relative/joined spellings of the SAME file (`resolve_file_path_checked`
+/// deliberately returns the caller-shaped path), so keying on the raw
+/// argument fragmented identity — one file could hold two aliases
+/// (visible as duplicate `α` entries in `§PATHMAP`), silently splitting
+/// every alias-keyed state (IR context, text-delta baselines, LLM cache).
+///
+/// Resolution: `fs::canonicalize` when possible; on Windows the verbatim
+/// (`\\?\`) prefix is stripped so stored keys stay human-readable.
+/// Unresolvable paths (deleted files, synthetic strings used by tests)
+/// fall back to the raw argument unchanged.
+fn normalize_alias_key(path: &str) -> String {
+    match std::fs::canonicalize(path) {
+        Ok(canon) => {
+            let s = canon.to_string_lossy();
+            #[cfg(windows)]
+            {
+                if let Some(unc) = s.strip_prefix(r"\\?\UNC\") {
+                    format!(r"\\{unc}")
+                } else {
+                    s.strip_prefix(r"\\?\").unwrap_or(&s).to_string()
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                s.into_owned()
+            }
+        }
+        Err(_) => path.to_string(),
+    }
 }
 
 impl Default for PathDictionary {
@@ -35,12 +74,22 @@ impl PathDictionary {
     }
 
     pub fn get_or_create_alias(&mut self, absolute_path: String) -> String {
+        // Identity invariant: ONE physical file ⇒ ONE stable alias,
+        // regardless of the path form the caller supplies. Fast-path the
+        // exact-string hit first so repeat calls with identical arguments
+        // stay O(1) without touching the filesystem; otherwise resolve to
+        // the canonical key before consulting the map.
+        // Non-CBM audit 2026-08-25 #3.
         if let Some(alias) = self.reverse.get(&absolute_path).cloned() {
+            return alias;
+        }
+        let key = normalize_alias_key(&absolute_path);
+        if let Some(alias) = self.reverse.get(&key).cloned() {
             alias
         } else {
             let alias = format!("α{}", self.forward.len() + 1);
-            self.reverse.insert(absolute_path.clone(), alias.clone());
-            self.forward.insert(alias.clone(), absolute_path);
+            self.reverse.insert(key.clone(), alias.clone());
+            self.forward.insert(alias.clone(), key);
             alias
         }
     }

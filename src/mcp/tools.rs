@@ -122,7 +122,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "delta_text_context",
-            "description": "Text-level delta compression.",
+            "description": "Text-level (line-oriented) delta compression for supported source-code files only — same language registry as delta_code_context (.ts/.js/.tsx/.jsx/.cs/.rs/.java). Not for arbitrary text formats such as markdown/json/yaml.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -196,7 +196,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "list_sessions",
-            "description": "List all persistence sessions stored in the DB.",
+            "description": "List all persisted contexts stored in the DB — per-file rows with fidelity, token counts, delta count and last-update time.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         serde_json::json!({
@@ -648,3 +648,7 @@ pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, s
 #[cfg(test)]
 #[path = "../tests/mcp/tools.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/mcp/tool_contracts.rs"]
+mod tool_contracts_tests;

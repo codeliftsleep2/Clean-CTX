@@ -1122,3 +1122,78 @@ fn test_delta_without_prior_full_still_shows_na() {
         "delta with no prior full should show N/A"
     );
 }
+
+// ── Non-CBM Tool Audit 2026-08-25, finding #9 ────────────────────────
+//
+// A compression call can COST tokens (small file, unfocused edit
+// fidelity). The dashboard previously clamped that to 0.0%, hiding a real
+// regression. Negative savings must flow through the per-file entry, the
+// domain aggregate, the session total and the rendered dashboard.
+
+#[test]
+fn negative_savings_are_reported_not_clamped() {
+    let mut stats = SessionStats::new();
+    stats.record_compression(
+        "/test/regression.ts",
+        100,
+        150,
+        "edit",
+        false,
+        "full",
+        None,
+        "ir_compression",
+    );
+
+    let fs = stats.file_stats("/test/regression.ts").expect("file entry");
+    assert_eq!(fs.raw_tokens, 100);
+    assert_eq!(fs.compressed_tokens, 150);
+    assert!(
+        (fs.savings_pct + 50.0).abs() < 0.01,
+        "per-file savings must be -50.0, got {}",
+        fs.savings_pct
+    );
+
+    // Domain aggregate: single regressing file → negative domain pct.
+    let domains = stats.domain_breakdown();
+    let d = domains.get("ir_compression").expect("domain entry");
+    assert!(
+        (d.savings_pct + 50.0).abs() < 0.01,
+        "domain savings must be -50.0, got {}",
+        d.savings_pct
+    );
+
+    // Session total mirrors the same signed arithmetic.
+    let summary = stats.summary();
+    assert!(
+        (summary.total_savings_pct + 50.0).abs() < 0.01,
+        "total savings must be -50.0, got {}",
+        summary.total_savings_pct
+    );
+
+    // The rendered text dashboard shows the true negative figure.
+    let dashboard = render_dashboard_text(&stats);
+    assert!(
+        dashboard.contains("-50.0"),
+        "dashboard must display the negative percentage:\n{dashboard}"
+    );
+}
+
+#[test]
+fn positive_savings_rendering_unchanged() {
+    // Guard: the signed change must not disturb the normal case.
+    let mut stats = SessionStats::new();
+    stats.record_compression(
+        "/test/ok.ts",
+        1000,
+        250,
+        "low",
+        false,
+        "full",
+        None,
+        "ir_compression",
+    );
+    let fs = stats.file_stats("/test/ok.ts").expect("file entry");
+    assert!((fs.savings_pct - 75.0).abs() < 0.01);
+    let dashboard = render_dashboard_text(&stats);
+    assert!(dashboard.contains("75.0"));
+}

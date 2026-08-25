@@ -149,3 +149,53 @@ fn decompress_with_precomputed_opcodes_matches_expected() {
         result
     );
 }
+
+// ── Non-CBM Tool Audit 2026-08-25, finding #8 ────────────────────────
+//
+// Multi-class round-trip: `compress_code_context`'s IR renderer emits
+// `// ── ClassName ──` section markers between classes. The decompressor's
+// blanket "skip every // comment" rule destroyed those markers, turning a
+// multi-class skeleton into a flat field list with no class attribution —
+// strictly LESS information than the input had. Class-boundary markers
+// are STRUCTURAL content, not disposable comments, and must survive
+// decompression.
+
+#[test]
+fn multi_class_round_trip_preserves_class_boundaries() {
+    let input = concat!(
+        "// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias\n",
+        "// ── UserProfile ──\n",
+        "$c UserProfile;$b isInitialized;$s id\n",
+        "// ── SessionCache ──\n",
+        "$c SessionCache;$ctor();$a seed(payload: $s)\n",
+        "\n",
+        "§PATHMAP\n",
+        "  α1 = C:\\project\\SessionCache.cs"
+    );
+    let mut d = Decompressor::new();
+    let result = d.quick_decompress(input);
+
+    assert!(
+        result.contains("// ── UserProfile ──"),
+        "first class boundary was dropped on round-trip:\n{result}"
+    );
+    assert!(
+        result.contains("// ── SessionCache ──"),
+        "second class boundary was dropped on round-trip:\n{result}"
+    );
+    // Expansion still works around the preserved boundaries.
+    assert!(
+        result.contains("class UserProfile"),
+        "opcode expansion broke:\n{result}"
+    );
+}
+
+#[test]
+fn single_class_output_without_boundary_markers_is_unchanged() {
+    // Guard: inputs without `// ──` markers keep their established behavior.
+    let input = "// --- Compacted Layout (Low Fidelity): α1 ---\n$c SampleService;$ctor()\n\n§PATHMAP\n  α1 = C:\\project\\Service.ts";
+    let mut d = Decompressor::new();
+    let result = d.quick_decompress(input);
+    assert!(result.contains("class SampleService"));
+    assert!(result.contains("constructor()"));
+}

@@ -391,3 +391,64 @@ fn test_sqlite_multiple_files_independent() {
     assert!(!store.has_context("/test/a.ts"));
     assert!(store.has_context("/test/b.ts"));
 }
+
+// ── Non-CBM Tool Audit 2026-08-25, finding #7 ────────────────────────
+//
+// `list_sessions` must enumerate REAL persisted state. The persistence
+// model has no session concept (the `sessions` table is dead schema), so
+// the honest enumeration is the `contexts` table: one row per persisted
+// file context with fidelity, token counts and delta count.
+
+#[test]
+fn list_contexts_enumerates_saved_contexts() {
+    let mut store = in_memory_store();
+
+    store
+        .save_context(
+            "/test/alpha.ts",
+            Fidelity::Low,
+            "compressed-alpha",
+            None,
+            "hash-a",
+            1000,
+            250,
+        )
+        .expect("save alpha");
+    store
+        .save_context(
+            "/test/beta.rs",
+            Fidelity::High,
+            "compressed-beta",
+            None,
+            "hash-b",
+            2000,
+            500,
+        )
+        .expect("save beta");
+
+    let rows = store.list_contexts(100).expect("list_contexts");
+    assert_eq!(rows.len(), 2, "both persisted contexts listed");
+
+    let alpha = rows
+        .iter()
+        .find(|r| r.file_path == "/test/alpha.ts")
+        .unwrap();
+    assert_eq!(alpha.fidelity, "low");
+    assert_eq!(alpha.raw_tokens, 1000);
+    assert_eq!(alpha.compressed_tokens, 250);
+    assert_eq!(alpha.delta_count, 0);
+
+    let beta = rows
+        .iter()
+        .find(|r| r.file_path == "/test/beta.rs")
+        .unwrap();
+    assert_eq!(beta.fidelity, "high");
+    assert_eq!(beta.delta_count, 0);
+}
+
+#[test]
+fn list_contexts_empty_db_returns_empty_vec() {
+    let store = in_memory_store();
+    let rows = store.list_contexts(100).expect("list_contexts");
+    assert!(rows.is_empty());
+}

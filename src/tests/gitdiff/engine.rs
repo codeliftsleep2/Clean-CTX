@@ -815,3 +815,122 @@ fn gitdiff_workspace_component_html_added_emits_skeleton() {
         summary.manifest
     );
 }
+
+// ══════════════════════════════════════════════════════════════════
+// Non-CBM Tool Audit 2026-08-25, finding #1: changed-class labels
+//
+// Ground truth from the audit: an `internal static class` rendered as
+// `~ class internal` and a `public enum`-style declaration rendered as
+// `~ class public`. Access modifiers must never appear as class labels;
+// changed classes must carry their actual identifier.
+// ══════════════════════════════════════════════════════════════════
+
+/// Temp git repo mirroring the audited change shape: ONE changed file
+/// containing BOTH an unchanged public class and a changing
+/// `internal static class` with a tuple-returning async method (the audit
+/// observed `= class SampleRecordData (unchanged)` and
+/// `~ class internal` in the same per-file output).
+fn init_csharp_internal_class_repo() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().to_str().unwrap();
+
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .expect("git command");
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {:?}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+
+    let factory_v1 = concat!(
+        "using System.Threading.Tasks;\n",
+        "namespace MyApp.Tests.Support\n",
+        "{\n",
+        "    internal static class TestDataFactory\n",
+        "    {\n",
+        "        internal static async Task<(int First, int Second)> CreateRecordWithDefaults(int id)\n",
+        "        {\n",
+        "            return (1, id);\n",
+        "        }\n",
+        "    }\n",
+        "\n",
+        "    public class SampleRecordData\n",
+        "    {\n",
+        "        public int Id { get; set; }\n",
+        "    }\n",
+        "}\n"
+    );
+
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "test@example.com"]);
+    git(&["config", "user.name", "Test"]);
+
+    // Commit 1
+    std::fs::create_dir_all(dir.path().join("Support")).unwrap();
+    std::fs::write(dir.path().join("Support/TestDataFactory.cs"), factory_v1).unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "commit1"]);
+
+    // Commit 2: body-only change to the tuple-returning method; the
+    // sibling class in the same file is untouched.
+    let factory_v2 = factory_v1.replace("return (1, id);", "return (2, id);");
+    std::fs::write(dir.path().join("Support/TestDataFactory.cs"), factory_v2).unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "commit2"]);
+
+    dir
+}
+
+/// Regression: a changed `internal static class` must be labeled with its
+/// actual identifier, never with the access modifier (`~ class internal`)
+/// and never as a visibility token (`~ class public`).
+#[test]
+fn gitdiff_changed_internal_class_label_uses_identifier() {
+    let dir = init_csharp_internal_class_repo();
+    let root = dir.path().to_str().unwrap();
+
+    let summary = gitdiff_workspace(root, "HEAD~1", Some("HEAD"), Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+
+    assert!(
+        summary.manifest.contains("~ class TestDataFactory"),
+        "expected '~ class TestDataFactory', got:\n{}",
+        summary.manifest
+    );
+    assert!(
+        !summary.manifest.contains("~ class internal"),
+        "access modifier leaked into the class label:\n{}",
+        summary.manifest
+    );
+    assert!(
+        !summary.manifest.contains("~ class public"),
+        "visibility token leaked into the class label:\n{}",
+        summary.manifest
+    );
+}
+
+/// The unchanged-class branch must keep its existing correct rendering
+/// while the changed-class branch is fixed.
+#[test]
+fn gitdiff_unchanged_class_label_remains_correct() {
+    let dir = init_csharp_internal_class_repo();
+    let root = dir.path().to_str().unwrap();
+
+    let summary = gitdiff_workspace(root, "HEAD~1", Some("HEAD"), Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+
+    assert!(
+        summary
+            .manifest
+            .contains("= class SampleRecordData (unchanged)"),
+        "unchanged class rendering regressed:\n{}",
+        summary.manifest
+    );
+}

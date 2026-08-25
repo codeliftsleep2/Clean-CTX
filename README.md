@@ -236,7 +236,7 @@ For Spring Boot Java projects, Clean-CTX automatically detects framework annotat
 | `compress_workspace` | Entire directory → single compressed manifest |
 | `diff_code_context` | Source file → AST-level change-set (`+` / `-` / `~` / `=`) |
 | `delta_code_context` | IR-level delta compression — instruction-level deltas between compiled IR states |
-| `delta_text_context` | Text-level delta compression — line-level deltas between compressed body snapshots |
+| `delta_text_context` | Line-oriented deltas between snapshots of **supported source-code files only** (same language registry as `delta_code_context`) — not for arbitrary text formats |
 | `apply_delta` | Client-side state update — applies IR delta to in-session state machine |
 
 ### Persistence Layer (Built-in)
@@ -246,7 +246,7 @@ Compression contexts persist automatically across sessions using SQLite (enabled
 | Tool | Purpose |
 |------|---------|
 | `save_context` | Manual checkpoint to DB |
-| `list_sessions` | Show tracked files/sessions |
+| `list_sessions` | List persisted contexts from the DB (per-file rows with fidelity, token counts, delta count, last update) |
 | `replay_history` | Replay deltas from DB (crash recovery) |
 | `purge_old_deltas` | Trim old delta history |
 
@@ -260,7 +260,7 @@ Disable in `.clean-ctx.json` with: `"persistence": { "enabled": false }`
 ### Smart Caching
 
 - **Content-hash cache** — identical files compress instantly on repeat calls
-- **Baseline snapshots** — `diff_code_context` remembers the previous state, producing small deltas instead of full re-compressions
+- **Baseline snapshots** — `diff_code_context` remembers the previous state, producing small deltas instead of full re-compressions. Note: this baseline is **local to `diff_code_context`** (keyed by canonical path + fidelity in the session cache) — it is NOT seeded by `provide_code_context`/`compress_code_context`, so the first call on a file legitimately reports "No baseline snapshot for this file yet" and stores one for subsequent calls
 - **Raw-token count cache** — skip the BPE encode on cache hits (sub-millisecond responses)
 - **Workspace result cache** — `compress_workspace` caches the complete manifest keyed by file paths + mtimes + fidelity. Subsequent calls with no file changes return instantly (saves 5-15s per redundant call)
 

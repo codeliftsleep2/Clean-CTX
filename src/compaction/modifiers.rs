@@ -69,6 +69,11 @@ pub(crate) const MODIFIERS_FIELD: &[&str] = &[
 /// (`"export default "` must be tried before `"export "`); the
 /// `strip_modifiers` helper below picks the longest-matching prefix
 /// on each pass.
+///
+/// Non-CBM audit 2026-08-25 #1: `internal ` is an access modifier like
+/// `public`/`private`/`protected`; without it, `internal static class Foo`
+/// stopped stripping at once and `internal` became the extracted name
+/// (rendered by `diff_commits` as `~ class internal`).
 pub(crate) const MODIFIERS_CLASS: &[&str] = &[
     "export default ",
     "export ",
@@ -77,6 +82,7 @@ pub(crate) const MODIFIERS_CLASS: &[&str] = &[
     "public ",
     "private ",
     "protected ",
+    "internal ",
     "static ",
     "final ",
 ];

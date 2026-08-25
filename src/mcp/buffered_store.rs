@@ -676,6 +676,21 @@ impl BufferedStore {
             Ok(0)
         }
     }
+
+    /// Enumerate persisted contexts (Non-CBM audit 2026-08-25 #7).
+    /// Returns an empty list when persistence is disabled.
+    pub fn list_contexts(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crate::mcp::sqlite_store::PersistedContextSummary>, Box<dyn std::error::Error>>
+    {
+        self.flush();
+        if let Some(guard) = self.sqlite() {
+            guard.list_contexts(limit)
+        } else {
+            Ok(Vec::new())
+        }
+    }
 }
 
 #[cfg(all(test, feature = "rust"))]

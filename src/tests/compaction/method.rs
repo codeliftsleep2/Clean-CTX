@@ -167,3 +167,61 @@ fn medium_fidelity_multi_line_csharp_tuple_return() {
         out
     );
 }
+
+// ── Non-CBM Tool Audit 2026-08-25, finding #2 ────────────────────────
+//
+// `compress_workspace` at Low fidelity rendered a real-world C#
+// signature with an `internal` modifier and a named-tuple return type as
+// `internal static async Task(scope)` — the method identifier vanished.
+// Mechanism (traced): with a named tuple return type whose last element is
+// lowercase (`... requestId)>`), `is_csharp_return_type(tokens[len-2])`
+// returns false, so the name-first fallback split the WHOLE signature at
+// the first `<`, yielding the type prefix `internal static async Task` as
+// the "name".
+
+#[test]
+fn low_fidelity_named_tuple_return_type_keeps_method_name() {
+    let raw = concat!(
+        "internal static async Task<(Container section, Term term, UserAccount account, Guid requestId)> ",
+        "CreateRecordWithDefaults(IServiceProvider scope)\n",
+        "{\n    return await BuildAsync();\n}"
+    );
+    assert_eq!(
+        extract_method_sig(raw, Fidelity::Low),
+        "CreateRecordWithDefaults(scope)",
+        "low fidelity must retain the method identifier"
+    );
+}
+
+#[test]
+fn low_fidelity_unnamed_lowercase_tuple_tail_keeps_method_name() {
+    // Same failure class without any leading modifiers.
+    let raw = concat!(
+        "Task<(Container section, Term term)> LoadValidReferenceData(int id)\n",
+        "{\n    return default;\n}"
+    );
+    assert_eq!(
+        extract_method_sig(raw, Fidelity::Low),
+        "LoadValidReferenceData(id)"
+    );
+}
+
+#[test]
+fn compound_signature_medium_high_unchanged_by_low_fix() {
+    // Pins current non-Low output for the audited signature shape so the
+    // Low fix cannot leak into other fidelity tiers.
+    let sig = concat!(
+        "internal static async Task<(Container section, Term term)> ",
+        "CreateRecordWithDefaults(IServiceProvider scope)"
+    );
+    let raw = format!("{sig}\n{{\n}}\n");
+
+    // Medium keeps modifiers/async/return type; collapses ", " → ",".
+    assert_eq!(
+        extract_method_sig(&raw, Fidelity::Medium),
+        "internal static async Task<(Container section,Term term)> \
+         CreateRecordWithDefaults(IServiceProvider scope)"
+    );
+    // High keeps the full signature verbatim (before `{`).
+    assert_eq!(extract_method_sig(&raw, Fidelity::High), sig);
+}

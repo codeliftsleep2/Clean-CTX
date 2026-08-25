@@ -293,9 +293,13 @@ impl SessionStats {
                 (0.0, None)
             }
         } else {
+            // Non-CBM audit 2026-08-25 #9: do NOT clamp negative savings
+            // to zero. When compression produces MORE tokens than the raw
+            // input (small file / unfocused edit fidelity), the dashboard
+            // must show the true negative percentage instead of hiding it
+            // behind a misleading 0.0%.
             let sp = if raw_tokens > 0 {
-                let saved = raw_tokens.saturating_sub(compressed_tokens);
-                (saved as f64 / raw_tokens as f64) * 100.0
+                ((raw_tokens as f64 - compressed_tokens as f64) / raw_tokens as f64) * 100.0
             } else {
                 0.0
             };
@@ -373,11 +377,12 @@ impl SessionStats {
             domain_entry.total_raw_tokens += raw_tokens;
             domain_entry.total_compressed_tokens += compressed_tokens;
             if domain_entry.total_raw_tokens > 0 {
-                let saved = domain_entry
-                    .total_raw_tokens
-                    .saturating_sub(domain_entry.total_compressed_tokens);
-                domain_entry.savings_pct =
-                    (saved as f64 / domain_entry.total_raw_tokens as f64) * 100.0;
+                // Signed like the per-file entry above (audit #9): a
+                // domain's aggregate must be able to go negative when its
+                // files' expansions outweigh their savings.
+                let delta = domain_entry.total_raw_tokens as f64
+                    - domain_entry.total_compressed_tokens as f64;
+                domain_entry.savings_pct = (delta / domain_entry.total_raw_tokens as f64) * 100.0;
             }
         }
         // Increment file count only if this is a new file for this domain
@@ -716,7 +721,9 @@ impl SessionStats {
         let total_raw = self.total_raw_tokens;
         let total_compressed = self.total_compressed_tokens;
         let total_savings_pct = if total_raw > 0 {
-            ((total_raw.saturating_sub(total_compressed)) as f64 / total_raw as f64) * 100.0
+            // Signed (audit #9): session totals must be able to go
+            // negative when expansions outweigh savings across files.
+            ((total_raw as f64 - total_compressed as f64) / total_raw as f64) * 100.0
         } else {
             0.0
         };

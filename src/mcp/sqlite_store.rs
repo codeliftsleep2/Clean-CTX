@@ -27,6 +27,24 @@ pub struct SqliteStore {
     conn: Connection,
 }
 
+/// One row of the `contexts` table, summarized for the `list_sessions`
+/// tool (Non-CBM audit 2026-08-25 #7).
+#[derive(Debug, Clone)]
+pub struct PersistedContextSummary {
+    /// The persisted file path.
+    pub file_path: String,
+    /// Fidelity the context was compressed at ("low"/"medium"/"high").
+    pub fidelity: String,
+    /// Number of delta rows recorded for this context.
+    pub delta_count: i64,
+    /// Raw token count at save time (0 for pre-v2 rows).
+    pub raw_tokens: i64,
+    /// Compressed token count at save time (0 for pre-v2 rows).
+    pub compressed_tokens: i64,
+    /// Last-update timestamp as stored by SQLite (`datetime('now')`).
+    pub updated_at: String,
+}
+
 impl SqliteStore {
     /// Open (or create) the SQLite database at the given path.
     /// Automatically creates the parent directory if it doesn't exist.
@@ -201,6 +219,54 @@ impl SqliteStore {
         };
 
         Ok(Some((final_ir, version as u32)))
+    }
+
+    /// Enumerate persisted contexts from the DB, most recently updated
+    /// first.
+    ///
+    /// Non-CBM audit 2026-08-25 #7: the persistence model has no session
+    /// concept (the `sessions` table is dead schema nothing writes), but
+    /// `contexts`/`deltas` hold real per-file state. This is what the
+    /// `list_sessions` tool now enumerates instead of a static status
+    /// string.
+    pub fn list_contexts(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<PersistedContextSummary>, Box<dyn std::error::Error>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT c.file_path, c.fidelity,
+                    COALESCE(c.raw_tokens, 0) as raw_tokens,
+                    COALESCE(c.compressed_tokens, 0) as compressed_tokens,
+                    c.updated_at,
+                    (SELECT COUNT(*) FROM deltas d WHERE d.context_id = c.id) as delta_count
+             FROM contexts c
+             ORDER BY c.updated_at DESC
+             LIMIT ?1",
+        )?;
+
+        let rows = stmt.query_map(params![limit as i64], |row| {
+            let fid: i32 = row.get(1)?;
+            let fidelity = match fid {
+                0 => "low",
+                1 => "medium",
+                2 => "high",
+                _ => "low",
+            };
+            Ok(PersistedContextSummary {
+                file_path: row.get(0)?,
+                fidelity: fidelity.to_string(),
+                raw_tokens: row.get(2)?,
+                compressed_tokens: row.get(3)?,
+                updated_at: row.get(4)?,
+                delta_count: row.get(5)?,
+            })
+        })?;
+
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
     }
 
     /// Rebuild SessionStats from DB (schema v2 — reads real token counts).

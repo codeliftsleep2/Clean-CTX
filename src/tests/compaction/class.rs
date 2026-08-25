@@ -128,3 +128,49 @@ fn rust_extract_struct_name_where_clause() {
         "MyStruct<T>"
     );
 }
+
+// ── Non-CBM Tool Audit 2026-08-25, finding #1 ────────────────────────
+//
+// Ground-truth C# declaration shapes from the `diff_commits` audit. The
+// audit's hand-trace claimed these extract correctly, but `MODIFIERS_CLASS`
+// had no `internal ` entry, so `strip_modifiers` stopped immediately and
+// the first whitespace token became the "name":
+//   "internal static class TestDataFactory" → "internal"
+// which the diff renderer then emitted as `~ class internal`.
+// Also covers the enum/struct keyword strips used by the diff snapshot
+// builder.
+
+#[test]
+fn extract_class_name_strips_internal_modifier() {
+    assert_eq!(
+        extract_class_name("internal static class TestDataFactory"),
+        "TestDataFactory"
+    );
+}
+
+#[test]
+fn extract_class_name_strips_internal_on_interface() {
+    assert_eq!(
+        extract_class_name("internal interface IEntityRepository"),
+        "IEntityRepository"
+    );
+}
+
+#[test]
+fn extract_class_name_strips_enum_keyword() {
+    assert_eq!(
+        extract_class_name("public enum PriorityLevel"),
+        "PriorityLevel"
+    );
+    assert_eq!(
+        extract_class_name("internal enum StatusFlags"),
+        "StatusFlags"
+    );
+}
+
+#[test]
+fn extract_class_name_strips_struct_keyword() {
+    // C# structs are captured as `struct.root` and routed through this
+    // helper (non-Rust parsers only).
+    assert_eq!(extract_class_name("public struct Point"), "Point");
+}

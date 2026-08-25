@@ -63,3 +63,62 @@ fn state_accessor_mut_methods() {
     let _ir = state.ir_context_lock();
     let _td = &state.text_delta;
 }
+
+// ── Non-CBM Tool Audit 2026-08-25, finding #3 ────────────────────────
+//
+// Alias identity invariant: ONE physical file must map to ONE stable
+// alias regardless of the path form the caller supplies. Previously the
+// alias key was the raw caller string, so an absolute path and an
+// equivalent path containing a redundant segment produced two separate
+// aliases (visible as duplicate `α` entries in `§PATHMAP`) and silently
+// fragmented every alias-keyed state (IR context, text-delta baselines,
+// LLM text cache).
+
+#[test]
+fn alias_identity_absolute_and_redundant_segment_forms_converge() {
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("tempdir");
+    let dir = tmp.path().join("src");
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("main.rs");
+    std::fs::write(&file, "fn main() {}\n").unwrap();
+
+    let state = McpState::new(crate::tests::test_config());
+
+    // Form A: plain absolute path.
+    let abs_form = file.to_string_lossy().to_string();
+    // Form B: same physical file reached through a redundant segment.
+    let redundant_form = file
+        .with_file_name("placeholder")
+        .join("..")
+        .join("main.rs")
+        .to_string_lossy()
+        .to_string();
+    assert_ne!(
+        abs_form, redundant_form,
+        "fixture forms must differ as strings"
+    );
+
+    let alias_a = state.get_or_create_alias(abs_form);
+    let alias_b = state.get_or_create_alias(redundant_form);
+    assert_eq!(
+        alias_a, alias_b,
+        "one physical file must have one stable alias"
+    );
+}
+
+#[test]
+fn alias_identity_unresolvable_paths_fall_back_to_raw_key() {
+    // Documented fallback: when canonicalization is impossible (path does
+    // not exist), the raw string remains the key — distinct strings stay
+    // distinct aliases instead of colliding or panicking.
+    let state = McpState::new(crate::tests::test_config());
+    let a = state.get_or_create_alias("/nonexistent/alpha.rs".to_string());
+    let b = state.get_or_create_alias("/nonexistent/beta.rs".to_string());
+    assert_ne!(a, b);
+    assert_eq!(
+        a,
+        state.get_or_create_alias("/nonexistent/alpha.rs".to_string())
+    );
+}

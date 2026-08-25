@@ -29,26 +29,56 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
     }));
 }
 
-/// Handle `list_sessions` — lists delta counts from the SQLite DB.
+/// Handle `list_sessions` — enumerate persisted contexts stored in the DB.
+///
+/// Non-CBM audit 2026-08-25 #7: this tool previously returned a static
+/// `"Persistence DB active."` string while its name/description promised
+/// an enumeration. The persistence model has NO session concept (the
+/// `sessions` table is dead schema that nothing ever writes), so rather
+/// than inventing fake session data the tool lists what genuinely exists:
+/// one entry per persisted FILE CONTEXT — path, fidelity, token counts,
+/// delta count, last-update timestamp.
 pub(crate) fn handle_list_sessions(id: &Value, params: &Value, state: &McpState) {
     let _ = params;
     let guard = state.persistence_store_lock();
-    let has_persistence = guard.is_some() && guard.as_ref().and_then(|s| s.sqlite()).is_some();
-    drop(guard);
-    if has_persistence {
-        send_response(&serde_json::json!({
-            "jsonrpc": "2.0", "id": id,
-            "result": {
-                "content": [{ "type": "text", "text": "Persistence DB active." }]
+    let store = match *guard {
+        Some(ref store) => store,
+        None => {
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "result": { "content": [{ "type": "text", "text": "Persistence not enabled" }] }
+            }));
+            return;
+        }
+    };
+
+    match store.list_contexts(200) {
+        Ok(rows) => {
+            let mut text = format!("Persisted contexts: {}\n", rows.len());
+            if rows.is_empty() {
+                text.push_str("(none yet — compressed contexts appear here once saved)\n");
             }
-        }));
-    } else {
-        send_response(&serde_json::json!({
-            "jsonrpc": "2.0", "id": id,
-            "result": {
-                "content": [{ "type": "text", "text": "Persistence not enabled" }]
+            for row in &rows {
+                text.push_str(&format!(
+                    "  - {} [{}] deltas={} tokens={}→{} updated={}\n",
+                    row.file_path,
+                    row.fidelity,
+                    row.delta_count,
+                    row.raw_tokens,
+                    row.compressed_tokens,
+                    row.updated_at,
+                ));
             }
-        }));
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "result": { "content": [{ "type": "text", "text": text }] }
+            }));
+        }
+        Err(e) => {
+            send_response(
+                &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("List failed: {}", e) } }),
+            );
+        }
     }
 }
 
