@@ -221,6 +221,7 @@ fn core_ir_pass_populates_captures() {
         text: "Foo".into(),
         raw_text: "class Foo {}".into(),
         start_byte: 19,
+        end_byte: 19 + "class Foo {}".len(),
     };
     let source = "@Component()\nexport class Foo {}";
     let span = crate::meta_util::class_source_from_capture(source, &cap);

@@ -452,3 +452,64 @@ fn list_contexts_empty_db_returns_empty_vec() {
     let rows = store.list_contexts(100).expect("list_contexts");
     assert!(rows.is_empty());
 }
+
+/// CONTRACT PIN — persistence keys are caller-shaped strings.
+///
+/// Identity model across the stateful consumers (IDENT-001 and its
+/// extension): aliases, IR context, delta baselines, and SessionStats all
+/// key on CANONICAL file identity. The SQLite persistence layer is the
+/// DELIBERATE exception: `contexts.file_path` is stored and queried
+/// exactly as supplied by the caller. Converging path spellings is the
+/// caller boundary's job, because migrating durable rows to canonical
+/// keys would silently orphan every baseline persisted under a historical
+/// spelling (schema v3 candidate — deferred, see CHANGELOG).
+///
+/// This test pins that contract: the alternate spelling below resolves to
+/// the SAME physical file on disk, and the store intentionally reports no
+/// context for it.
+#[test]
+fn persistence_keys_are_caller_shaped_by_contract() {
+    let dir = tempfile::TempDir::new().expect("tempdir");
+    let real = dir.path().join("svc.ts");
+    std::fs::write(&real, "export class Svc {}\n").expect("write fixture");
+
+    // Make the alternate spelling genuinely resolvable to the same file.
+    let alt_dir = dir.path().join("_alt");
+    std::fs::create_dir(&alt_dir).expect("create _alt dir");
+    let alt_spelling = alt_dir.join("..").join("svc.ts");
+    assert_ne!(
+        real.to_string_lossy().to_string(),
+        alt_spelling.to_string_lossy().to_string(),
+        "fixture spellings must differ as strings"
+    );
+
+    let mut store = in_memory_store();
+    store
+        .save_context(
+            real.to_string_lossy().as_ref(),
+            Fidelity::Low,
+            "compressed",
+            None,
+            "hash-contract",
+            100,
+            25,
+        )
+        .expect("save under canonical spelling");
+
+    // The canonical spelling works.
+    assert!(store.has_context(real.to_string_lossy().as_ref()));
+    // The equivalent spelling of the SAME physical file is intentionally
+    // NOT recognized — pinned caller-shaped keying, not an accident.
+    assert!(
+        !store.has_context(alt_spelling.to_string_lossy().as_ref()),
+        "persistence must keep caller-shaped keys until a schema-v3 \
+         migration is explicitly approved"
+    );
+    assert!(
+        store
+            .load_latest(alt_spelling.to_string_lossy().as_ref())
+            .expect("load_latest")
+            .is_none(),
+        "load via an equivalent spelling must miss by contract"
+    );
+}

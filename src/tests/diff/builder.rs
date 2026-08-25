@@ -180,3 +180,125 @@ fn build_snapshot_rust_enum_behavior_unchanged() {
     let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot for Rust enum");
     assert_eq!(snap.classes[0].name, "Status");
 }
+
+// ── Nested-type ownership (diff_commits mislabeling) ──────────────────
+//
+// Every language query captures class/struct/enum/record declarations at
+// ANY nesting depth (the queries are unanchored), so a declaration made
+// INSIDE another declaration's body opens its own `CapturedClass` entry.
+// Because method attachment used `classes.last_mut()`, every enclosing-
+// declaration method captured AFTER a nested type was attributed to that
+// type — `diff_commits` rendered `~ class OrderStatus` for methods that
+// plainly belong to `OrderService`.
+//
+// Contract: a changed-member group must be owned by the declaration whose
+// source span CONTAINS the member. A nested declaration that closes before
+// the member starts must never own it. Nested types keep their own entries
+// with correct labels (finding #1 guarantees the identifier, this fixes
+// the ownership).
+
+#[test]
+fn build_snapshot_nested_enum_does_not_steal_enclosing_class_ownership() {
+    let src = r#"
+        namespace MyApp.Services
+        {
+            public class OrderService
+            {
+                public enum OrderStatus
+                {
+                    Pending,
+                    Shipped
+                }
+
+                public async Task ShipAsync(int id)
+                {
+                    await Task.CompletedTask;
+                }
+
+                public void Cancel(int id)
+                {
+                }
+            }
+        }
+    "#;
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot");
+    let names: Vec<&str> = snap.classes.iter().map(|c| c.name.as_str()).collect();
+    let service: Vec<_> = snap
+        .classes
+        .iter()
+        .filter(|c| c.name == "OrderService")
+        .collect();
+    assert_eq!(
+        service.len(),
+        1,
+        "exactly one OrderService entry expected, got: {names:?}"
+    );
+    let sigs: Vec<&str> = service[0].methods.iter().map(|m| m.sig.as_str()).collect();
+    assert!(
+        sigs.iter().any(|s| s.contains("ShipAsync")),
+        "ShipAsync must be owned by OrderService, got: {sigs:?}"
+    );
+    assert!(
+        sigs.iter().any(|s| s.contains("Cancel")),
+        "Cancel (declared after the nested enum closed) must be owned by \
+         OrderService, got: {sigs:?}"
+    );
+    let stolen: Vec<&str> = snap
+        .classes
+        .iter()
+        .filter(|c| c.name == "OrderStatus")
+        .flat_map(|c| c.methods.iter().map(|m| m.sig.as_str()))
+        .collect();
+    assert!(
+        stolen.is_empty(),
+        "nested enum must never own the enclosing class's methods, got: {stolen:?}"
+    );
+}
+
+#[test]
+fn build_snapshot_nested_class_ownership_follows_span_containment() {
+    // Same mechanism with a nested CLASS instead of an enum: the inner
+    // method belongs to Inner, the outer method (declared after Inner's
+    // body closes) belongs to Outer.
+    let src = r#"
+        namespace MyApp
+        {
+            public class Outer
+            {
+                public class Inner
+                {
+                    public void InnerMethod() { }
+                }
+
+                public void OuterMethod() { }
+            }
+        }
+    "#;
+    let snap = build_snapshot(src, Fidelity::Low).expect("build_snapshot");
+    let owner_of = |needle: &str| -> Option<&str> {
+        for c in &snap.classes {
+            if c.methods.iter().any(|m| m.sig.contains(needle)) {
+                return Some(&c.name);
+            }
+        }
+        None
+    };
+    assert_eq!(
+        owner_of("InnerMethod"),
+        Some("Inner"),
+        "inner method must stay with Inner, got: {:?}",
+        snap.classes
+            .iter()
+            .map(|c| (&c.name, &c.methods))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        owner_of("OuterMethod"),
+        Some("Outer"),
+        "outer method declared after Inner closed must belong to Outer, got: {:?}",
+        snap.classes
+            .iter()
+            .map(|c| (&c.name, &c.methods))
+            .collect::<Vec<_>>()
+    );
+}

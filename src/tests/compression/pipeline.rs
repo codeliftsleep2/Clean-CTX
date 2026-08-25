@@ -208,6 +208,7 @@ fn build_output_lines_edit_fidelity_emits_byte_exact_method() {
         text: method_text.to_string(),
         raw_text: method_text.to_string(),
         start_byte: 0,
+        end_byte: method_text.len(),
     };
     let built = build_output_lines(&[cap], "", Fidelity::Edit, None, None);
     assert_eq!(built.output_lines.len(), 1, "one method line expected");
@@ -226,6 +227,7 @@ fn build_output_lines_verbatim_fidelity_emits_byte_exact_method() {
         text: method_text.to_string(),
         raw_text: method_text.to_string(),
         start_byte: 0,
+        end_byte: method_text.len(),
     };
     let built = build_output_lines(&[cap], "", Fidelity::Verbatim, None, None);
     assert_eq!(built.output_lines.len(), 1, "one method line expected");
@@ -244,6 +246,7 @@ fn build_output_lines_high_fidelity_still_indents_signature() {
         text: sig.to_string(),
         raw_text: sig.to_string(),
         start_byte: 0,
+        end_byte: sig.len(),
     };
     let built = build_output_lines(&[cap], "", Fidelity::High, None, None);
     assert_eq!(built.output_lines.len(), 1);
@@ -400,6 +403,7 @@ fn should_skip_capture_edit_fidelity_matches_method_name() {
         text: method_text.to_string(),
         raw_text: method_text.to_string(),
         start_byte: 0,
+        end_byte: method_text.len(),
     };
     let mut skip = std::collections::HashSet::new();
     skip.insert("getUserById".to_string());
@@ -427,6 +431,7 @@ fn should_skip_capture_edit_fidelity_matches_field_name() {
         text: field_text.to_string(),
         raw_text: field_text.to_string(),
         start_byte: 0,
+        end_byte: field_text.len(),
     };
     let mut skip = std::collections::HashSet::new();
     skip.insert("userId".to_string());

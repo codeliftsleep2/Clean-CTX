@@ -167,6 +167,30 @@ pub fn build_snapshot(
     }))
 }
 
+/// Pop scopes whose source span ended at or before `at`, then return the
+/// `classes` index of the innermost declaration still containing `at`.
+fn current_owner(open_scopes: &mut Vec<(usize, usize)>, at: usize) -> Option<usize> {
+    while let Some((_, end)) = open_scopes.last() {
+        if *end <= at {
+            open_scopes.pop();
+        } else {
+            break;
+        }
+    }
+    open_scopes.last().map(|(idx, _)| *idx)
+}
+
+/// Legacy fallback target when no declaration is open: the most recently
+/// pushed class, mirroring the pre-span behavior for members that trail a
+/// closed declaration.
+fn last_class_index(classes: &[CapturedClass]) -> Option<usize> {
+    if classes.is_empty() {
+        None
+    } else {
+        Some(classes.len() - 1)
+    }
+}
+
 fn try_build_with(
     language: Option<tree_sitter::Language>,
     query_string: &str,
@@ -221,6 +245,16 @@ fn try_build_with(
     let mut orphan_methods: Vec<CapturedMethod> = Vec::new();
     let mut pending_fields: Vec<String> = Vec::new();
     let mut pending_markers: Vec<String> = Vec::new();
+    //
+    // Nested-type ownership: stack of currently-open declaration scopes
+    // as `(index into classes, end_byte of that declaration's span)`.
+    // Queries capture class/struct/enum/record declarations at ANY depth,
+    // so a nested type opens its own entry; a member must be attached to
+    // the INNERMOST declaration whose span still contains it — never to
+    // "whichever class was pushed last" (that attributed every method
+    // following a nested enum/class to the nested type, rendering
+    // `~ class <NestedType>` for the enclosing class's changes).
+    let mut open_scopes: Vec<(usize, usize)> = Vec::new();
 
     for cap in &all_captures {
         match cap.name.as_str() {
@@ -231,19 +265,27 @@ fn try_build_with(
             }
             "class.root" | "struct.root" | "enum.root" | "trait.root" | "impl.root"
             | "interface.root" | "record.root" => {
-                if let Some(last) = classes.last_mut() {
-                    if last.fields.is_empty() && !pending_fields.is_empty() {
-                        last.fields = std::mem::take(&mut pending_fields);
+                // Flush buffered fields into their owner BEFORE opening
+                // the new scope (same ownership rule as members below).
+                let flush_to =
+                    current_owner(&mut open_scopes, cap.start_byte).or(last_class_index(&classes));
+                match flush_to {
+                    Some(idx) => {
+                        let owner = &mut classes[idx];
+                        if owner.fields.is_empty() && !pending_fields.is_empty() {
+                            owner.fields = std::mem::take(&mut pending_fields);
+                        }
                     }
-                } else if !pending_fields.is_empty() {
-                    orphan_fields.append(&mut pending_fields);
+                    None => orphan_fields.append(&mut pending_fields),
                 }
+                let idx = classes.len();
                 classes.push(CapturedClass {
                     name: cap.text.clone(),
                     class_meta: extract_class_meta(&cap.raw_text),
                     fields: Vec::new(),
                     methods: Vec::new(),
                 });
+                open_scopes.push((idx, cap.end_byte));
                 pending_markers.clear();
             }
             "method.root" | "constructor.root" | "func.root" => {
@@ -252,14 +294,18 @@ fn try_build_with(
                     markers: std::mem::take(&mut pending_markers),
                     body: extract_method_body(&cap.raw_text),
                 };
-                if let Some(last) = classes.last_mut() {
-                    last.methods.push(method);
-                } else {
-                    // G2-2 audit: top-level functions (TS `function` /
-                    // `export function`, C# top-level statements) were
-                    // previously dropped when no class was open — a false
-                    // negative for files with only top-level functions.
-                    orphan_methods.push(method);
+                // Ownership: the enclosing declaration whose span contains
+                // this member — never a nested type that already closed.
+                // With no open scope, fall back to the legacy target so
+                // members trailing a closed declaration keep diffing as
+                // before; with no class at all, G2-2 keeps top-level
+                // functions (TS `function` / `export function`, C#
+                // top-level statements) alive as orphans instead of
+                // dropping them.
+                match current_owner(&mut open_scopes, cap.start_byte).or(last_class_index(&classes))
+                {
+                    Some(idx) => classes[idx].methods.push(method),
+                    None => orphan_methods.push(method),
                 }
             }
             "field.root" => {
@@ -281,12 +327,17 @@ fn try_build_with(
         }
     }
 
-    if let Some(last) = classes.last_mut() {
-        if last.fields.is_empty() && !pending_fields.is_empty() {
-            last.fields = pending_fields;
+    // Final field flush: whatever declaration is still open owns them;
+    // otherwise the legacy fallbacks apply.
+    let tail_owner = current_owner(&mut open_scopes, source.len()).or(last_class_index(&classes));
+    match tail_owner {
+        Some(idx) => {
+            let owner = &mut classes[idx];
+            if owner.fields.is_empty() && !pending_fields.is_empty() {
+                owner.fields = std::mem::take(&mut pending_fields);
+            }
         }
-    } else if !pending_fields.is_empty() {
-        orphan_fields.extend(pending_fields);
+        None => orphan_fields.extend(pending_fields),
     }
 
     Ok(CapturedStructure {
