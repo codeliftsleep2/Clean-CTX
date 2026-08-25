@@ -1,7 +1,7 @@
 # Clean-CTX — Developer Documentation
 
 > **Owner:** How-to-extend (languages/tools/opcodes/Φ markers) + opcode/marker vocabulary + build/test gates · **Status:** Living reference
-> **Version:** 0.3.0 · **Last updated:** 2026-08-07
+> **Version:** 0.4.0 · **Last updated:** 2026-08-24
 >
 > **Test count:** see `docs/CHANGELOG.md` for the current workspace test count.
 
