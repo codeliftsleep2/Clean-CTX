@@ -88,6 +88,56 @@ pub(crate) fn map_search_result(n: &Value) -> Option<GraphNode> {
     })
 }
 
+/// M-01 post-filter predicate: does `edge` touch the requested target?
+///
+/// Boundary normalization contract (2026-08-24 fix): CBM identifies symbols
+/// by their QUALIFIED names (`…src.cbm.bridge.GraphBridge.query_graph`)
+/// while the API accepts bare names (`query_graph`). A target therefore
+/// matches a canonical endpoint when
+///
+///   1. the endpoint EQUALS the target (caller passed the fully qualified
+///      form), or
+///   2. the endpoint's FINAL DOT SEGMENT equals the target (bare-name
+///      segment match — the dot is CBM's qualified-name separator,
+///      verified against live captures).
+///
+/// Nothing looser: a bare `to` name must RETAIN edges whose wire endpoints
+/// are qualified, but partial/multi-segment targets match nothing.
+/// `__file__` module pseudo-nodes are genuine relationships and are never
+/// filtered here.
+pub(crate) fn edge_touches_target(edge: &GraphEdge, target: &str) -> bool {
+    fn endpoint_matches(endpoint: &str, target: &str) -> bool {
+        if endpoint == target {
+            return true;
+        }
+        endpoint.rsplit('.').next() == Some(target)
+    }
+    endpoint_matches(&edge.from, target) || endpoint_matches(&edge.to, target)
+}
+
+/// Convert normalized wire edges into [`GraphEdge`]s, applying the M-01
+/// post-filter when a target is specified. Preserves CBM emission order.
+pub(crate) fn filter_trace_edges(
+    edges: &[Value],
+    filter_target: &Option<String>,
+) -> Vec<GraphEdge> {
+    edges
+        .iter()
+        .filter_map(|e| {
+            let ge = GraphEdge {
+                from: e["from"].as_str()?.to_string(),
+                to: e["to"].as_str()?.to_string(),
+                label: e["label"].as_str().unwrap_or("").into(),
+                properties: HashMap::new(),
+            };
+            match filter_target {
+                Some(target) if !edge_touches_target(&ge, target) => None,
+                _ => Some(ge),
+            }
+        })
+        .collect()
+}
+
 pub(crate) fn parse_architecture_response(arch: &Value) -> ArchitectureOverview {
     let modules = arch["packages"]
         .as_array()
@@ -1194,26 +1244,44 @@ impl GraphBridge {
         }
     }
 
-    /// Trace a call path between two symbols. If `to` is empty, traces all edges
-    /// from `from`. Otherwise post-filters to only include edges reaching `to`.
+    /// Trace a call path between two symbols. If `to` is empty, traces all
+    /// direct edges around `from`. Otherwise post-filters to only include
+    /// edges touching `to`.
     ///
-    /// M-01 fix: Previously ignored the `to` parameter — now properly filters
-    /// results to only include edges reaching the target symbol.
+    /// M-01 fix: previously ignored the `to` parameter — now properly filters
+    /// results to only include edges touching the target symbol.
+    ///
+    /// Direction determination (wire-shape fix, 2026-08-24): with both
+    /// endpoints supplied, OUTBOUND is attempted first — preserving pre-fix
+    /// behavior exactly for outbound-reachable pairs. Only when the outbound
+    /// attempt SUCCEEDS but yields no edge touching `to` do we fall back to
+    /// INBOUND once, making inbound-only relationships (callee ← caller)
+    /// discoverable. Errors are never swapped for the other direction: an
+    /// `Err` means CBM failed (F11 invariant), not "no data".
+    ///
+    /// Wire-shape note: the typed client path previously parsed a phantom
+    /// `edges` key and always collapsed to zero results; edges now come from
+    /// CBM's real `callers` / `callees` arrays via
+    /// `CbmClient::extract_trace_edges`.
     pub fn trace_path(&mut self, from: &str, to: &str) -> Vec<GraphEdge> {
         if from == to {
             // Trivially successful (no path needed) — clear stale error.
             self.set_last_error(None);
             return vec![];
         }
-        // Determine direction: if we have a target, trace outbound; otherwise both
-        let (direction, filter_target) = if to.is_empty() {
-            ("both", None)
+        let filter_target = if to.is_empty() {
+            None
         } else {
-            ("outbound", Some(to.to_string()))
+            Some(to.to_string())
+        };
+        // No target → single "both" sweep (pre-fix semantics preserved);
+        // target present → outbound-first with a single inbound fallback.
+        let (first_direction, allow_fallback) = match filter_target {
+            None => ("both", false),
+            Some(_) => ("outbound", true),
         };
         let key = format!("trace:{from}:{to}");
         let project = self.project_str();
-        let f = from.to_string();
         if self.check_cache(&key) {
             // Cache hit is a successful query — clear any stale error.
             let result = serde_json::from_value(
@@ -1228,31 +1296,36 @@ impl GraphBridge {
             self.set_last_error(None);
             return result;
         }
-        let result = self.query(move |c| c.trace_path(&f, direction, &project, Some(3)));
-        match result {
+
+        // Attempt 1: preferred direction.
+        let first = {
+            let f = from.to_string();
+            let project = project.clone();
+            self.query(move |c| c.trace_path(&f, first_direction, &project, Some(3)))
+        };
+        let outcome = match first {
+            Err(e) => Err(e),
             Ok(edges) => {
+                let ge = filter_trace_edges(&edges, &filter_target);
+                if !ge.is_empty() || !allow_fallback {
+                    Ok(ge)
+                } else {
+                    // Attempt 2 (single fallback): outbound succeeded but no
+                    // edge touches the target — the relationship may exist
+                    // ONLY inbound (the target calls `from`). Errors here are
+                    // propagated, never masked as empty data.
+                    let f = from.to_string();
+                    match self.query(move |c| c.trace_path(&f, "inbound", &project, Some(3))) {
+                        Ok(edges) => Ok(filter_trace_edges(&edges, &filter_target)),
+                        Err(e) => Err(e),
+                    }
+                }
+            }
+        };
+
+        match outcome {
+            Ok(ge) => {
                 self.set_last_error(None);
-                let ge: Vec<GraphEdge> = edges
-                    .iter()
-                    .filter_map(|e| {
-                        let ge = GraphEdge {
-                            from: e["from"].as_str()?.to_string(),
-                            to: e["to"].as_str()?.to_string(),
-                            label: e["label"].as_str().unwrap_or("").into(),
-                            properties: HashMap::new(),
-                        };
-                        // M-01: post-filter if target is specified
-                        if let Some(ref target) = filter_target {
-                            if ge.to == *target || ge.from == *target {
-                                Some(ge)
-                            } else {
-                                None
-                            }
-                        } else {
-                            Some(ge)
-                        }
-                    })
-                    .collect();
                 self.cache_insert(&key, &ge);
                 ge
             }

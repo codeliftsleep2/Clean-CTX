@@ -135,6 +135,94 @@ pub(crate) fn check_soft_error(tool_name: &str, result: &Value) -> Result<(), Cb
         message,
     })
 }
+// ── trace_path wire contract (CBM 0.8.1) ──────────────────────────────
+//
+// Verbatim live captures (fresh subprocess, 2026-08-24):
+//
+//   inbound  → {"function":"<fn>","direction":"inbound","callers":[…]}
+//   outbound → {"function":"<fn>","direction":"outbound","callees":[…]}
+//   both     → {"function":"<fn>","direction":"both",
+//               "callees":[…],"callers":[…]}   // both arrays coexist
+//
+// There is NO "edges" key — the former parser read a phantom one, so every
+// typed graph_trace silently collapsed to zero edges while the raw proxy
+// path worked. Relationships arrive as caller/callee ARRAYS whose entries
+// carry exactly `name`, `qualified_name`, and `hop` (a JSON number).
+// A missing array is a valid zero-result half (e.g. `callees: []`).
+//
+// Depth semantics (pinned by the depth-3 capture): entries are FLAT BFS
+// discoveries tagged only with their hop count — there is NO parent
+// linkage. A hop-1 entry is a direct call of the traced function; for a
+// hop-N (N ≥ 2) entry the immediate caller is not identifiable, so turning
+// it into an edge pair would invent relationships. Only hop-1 entries are
+// converted; deeper hops remain available through the raw cbm_proxy path.
+
+/// Endpoint identity of a caller/callee entry: `qualified_name`, falling
+/// back to the bare `name` — same normalization precedent as
+/// `map_search_result`. `None` when the entry carries neither key.
+fn trace_entry_endpoint(entry: &Value) -> Option<String> {
+    let name = entry.get("name").and_then(Value::as_str)?;
+    Some(
+        entry
+            .get("qualified_name")
+            .and_then(Value::as_str)
+            .unwrap_or(name)
+            .to_string(),
+    )
+}
+
+/// Only `hop: 1` entries describe DIRECT call relationships (see the
+/// depth-semantics note above); deeper hops are skipped rather than
+/// mis-attributed to an unidentifiable intermediate caller.
+fn trace_entry_is_direct(entry: &Value) -> bool {
+    entry.get("hop").and_then(Value::as_u64) == Some(1)
+}
+
+/// Normalize CBM 0.8.1's `trace_path` response into edge objects
+/// (`{"from","to","label"}`) consumable by `GraphBridge::trace_path`.
+///
+/// Direction semantics: every `callers[i]` calls `function_name`, and
+/// `function_name` calls every `callees[i]`. Edges are always oriented
+/// caller → callee regardless of which array produced them, so consumers
+/// see one consistent direction.
+///
+/// Pure function so tests can pin the exact wire shapes against verbatim
+/// captures (`src/tests/cbm/trace_wire.rs`).
+pub(crate) fn extract_trace_edges(inner: &Value, function_name: &str) -> Vec<Value> {
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    if let Some(callers) = inner.get("callers").and_then(Value::as_array) {
+        for entry in callers {
+            if trace_entry_is_direct(entry) {
+                if let Some(id) = trace_entry_endpoint(entry) {
+                    pairs.push((id, function_name.to_string()));
+                }
+            }
+        }
+    }
+    if let Some(callees) = inner.get("callees").and_then(Value::as_array) {
+        for entry in callees {
+            if trace_entry_is_direct(entry) {
+                if let Some(id) = trace_entry_endpoint(entry) {
+                    pairs.push((function_name.to_string(), id));
+                }
+            }
+        }
+    }
+    // Dedupe EXACT duplicate edges only, preserving first-seen CBM order.
+    // The same symbol may legitimately appear at several hops; repeated
+    // nodes are not relationships and are never merged away.
+    let mut edges: Vec<Value> = Vec::with_capacity(pairs.len());
+    for (from, to) in pairs {
+        let dup = edges.iter().any(|e| {
+            e["from"].as_str() == Some(from.as_str()) && e["to"].as_str() == Some(to.as_str())
+        });
+        if dup {
+            continue;
+        }
+        edges.push(serde_json::json!({"from": from, "to": to, "label": "calls"}));
+    }
+    edges
+}
 
 impl CbmClient {
     /// Launch the CBM subprocess.
@@ -566,6 +654,14 @@ impl CbmClient {
     /// Trace call paths in the CBM knowledge graph.
     ///
     /// CBM params: `function_name`, `direction` (inbound|outbound|both), `depth`, `project`
+    ///
+    /// Wire contract (2026-08-24): CBM answers with `callers` / `callees`
+    /// arrays — NOT an `edges` key. [`extract_trace_edges`] normalizes that
+    /// real shape into `{"from","to","label"}` objects. A missing function is
+    /// reported by CBM as a soft error (`result.isError` +
+    /// `"error":"function not found"`), which [`check_soft_error`] maps to
+    /// [`CbmError::ToolError`] before this parser runs — failure is never a
+    /// valid empty result (F11 invariant).
     pub fn trace_path(
         &mut self,
         function_name: &str,
@@ -579,7 +675,7 @@ impl CbmClient {
         }
         let r = self.call_tool("trace_path", args)?;
         let inner = self.parse_cbm_response(&r)?;
-        Ok(inner["edges"].as_array().cloned().unwrap_or_default())
+        Ok(extract_trace_edges(&inner, function_name))
     }
 
     /// Get architecture overview from CBM.
