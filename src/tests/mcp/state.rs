@@ -89,8 +89,16 @@ fn alias_identity_absolute_and_redundant_segment_forms_converge() {
     // Form A: plain absolute path.
     let abs_form = file.to_string_lossy().to_string();
     // Form B: same physical file reached through a redundant segment.
-    let redundant_form = file
-        .with_file_name("placeholder")
+    //
+    // The intermediate `placeholder` directory MUST actually exist:
+    // POSIX `realpath()` (what `fs::canonicalize` uses on Linux/macOS)
+    // resolves EVERY intermediate component and fails with ENOENT on
+    // phantom ones, while Windows path normalization collapses `..\`
+    // lexically. A real directory keeps the fixture cross-platform and
+    // matches the realistic caller shape (root-joined relative paths).
+    let placeholder_dir = dir.join("placeholder");
+    std::fs::create_dir_all(&placeholder_dir).unwrap();
+    let redundant_form = placeholder_dir
         .join("..")
         .join("main.rs")
         .to_string_lossy()
