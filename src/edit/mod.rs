@@ -32,3 +32,7 @@ mod locate_tests;
 #[cfg(test)]
 #[path = "../tests/edit/apply.rs"]
 mod apply_tests;
+
+#[cfg(test)]
+#[path = "../tests/edit/spans.rs"]
+mod spans_tests;

@@ -362,14 +362,14 @@ pub(crate) fn locate_method_body(raw_method: &str) -> Option<(String, usize)> {
     let stripped_offset = stripped.as_ptr() as usize - raw_method.as_ptr() as usize;
 
     if let Some(i) = find_body_start_in(stripped) {
-        let line_start = stripped[..i].rfind('\n').map(|p| p + 1).unwrap_or(0);
-        let prefix = &stripped[line_start..i];
-        if prefix.trim().is_empty() {
-            return Some((
-                stripped[line_start..].to_string(),
-                stripped_offset + line_start,
-            ));
-        }
+        // Body units are BRACE-DELIMITED: text and span start AT the
+        // opening `{`, never at the line start. The previous behavior
+        // backed up to the start of the line when `{` sat alone (Allman
+        // style / brace-on-next-line), embedding leading indentation in
+        // the tracked body — so every natural agent extraction (`{`
+        // through `}`) was rejected as a permanent byte-count mismatch.
+        // Regression: src/tests/edit/spans.rs
+        // `lf_csharp_allman_attributes_spans_address_exact_disk_bytes`.
         return Some((stripped[i..].to_string(), stripped_offset + i));
     }
 

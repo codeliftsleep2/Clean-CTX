@@ -20,6 +20,11 @@ Clean-CTX-native single-unit editing per `docs/plans/APPLY_EDIT_PLAN.md`: an age
 - **`examples/apply_edit_comparison.rs`**: measures the actual WRITE-side token delta of `apply_edit` (operations JSON) vs the read→edit convention (full raw read per edit) across the 50-edit simulation categories — the write-side numbers the plan flagged as unmeasured.
 - **Guidance**: RULE 1b added to `docs/CLAUDE_INTEGRATION_RULES.md`; SYSTEM_PROMPT Edit-mode rules now steer single-unit edits to `apply_edit` (with host-tool fallback for signatures/imports/cross-file work).
 
+### Fixed
+
+- **`replace_body` permanently rejected byte-exact body copies on Allman-style files** (reported on LF-only sources): `locate_method_body` backed up to the START OF THE LINE when `{` sat alone on its own line, embedding leading indentation in the tracked `CoreOp::Body` text/span. Any natural agent extraction (`{` through `}`) was then shorter by exactly that padding and failed the byte-exact comparison forever — identical across retries, LF/CRLF-independent, safety gate holding throughout. Fix at the single choke point (`src/ir/pipeline.rs`): body units are BRACE-DELIMITED — text and span start AT the opening brace; end remains the capture's closing `}`. Wire format unchanged; spans tighten. Regression: `src/tests/edit/spans.rs::lf_csharp_allman_attributes_spans_address_exact_disk_bytes` (RED pre-fix: expected 161 vs actual 165 = exactly the 4-space indent) plus an env-gated `probe_real_file` test for reconciling byte counts on real reported files.
+- Side-discovery during investigation (separate ticket, not fixed here): `McpState::read_source` Phase 3 uses `cache.entry(k).or_insert(...)`, so an existing cache entry is never updated after a file changes — every subsequent read takes the stale branch and re-reads from disk (caching/perf defect only; returned bytes are always fresh).
+
 ### Changed
 
 - **Concurrency deviation from plan**: the plan's "acquire the same RwLock" deadlocks today — `compile_file_ir_focused` internally takes an `ir_context` READ lock via `state.file_version()`, so a caller cannot hold that lock's WRITE guard across compilation. Commits serialize through a module-local mutex instead (same guarantee, no lock-order change). Documented in-handler and in the plan's new Implementation Notes.
@@ -29,7 +34,8 @@ Clean-CTX-native single-unit editing per `docs/plans/APPLY_EDIT_PLAN.md`: an age
 ### Verification
 
 - `cargo fmt --all -- --check` clean; `cargo clippy --all-targets --workspace -- -D warnings` zero warnings.
-- Full workspace suite green under `--all-features` (~2200 tests) including the new `edit::` (17) and black-box `apply_edit` suites; two pre-existing flaky live-CBM pipe tests confirmed environmental (orphaned subprocess) and green serially after cleanup.
+- Full workspace suite green under `--all-features`, including the new `src/tests/edit/` suites (apply/locate/ops plus the 6-test `edit::spans` span-invariant & boundary suite — 5 always-run + 1 env-gated probe) and the black-box `apply_edit` e2e suite; two pre-existing flaky live-CBM pipe tests confirmed environmental (orphaned subprocess) and green serially after cleanup.
+- Follow-up fix cycle (Allman body boundaries): RED reproduced first (`expected 161 bytes, actual 165 bytes` = exactly the 4-space indent), GREEN after the brace-delimited choke-point fix; focused `edit::spans` and full gate re-verified.
 
 ---
 
