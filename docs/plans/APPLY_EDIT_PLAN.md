@@ -188,3 +188,29 @@ Shipping `apply_edit` server-side doesn't automatically save anything — an age
    **✅ Resolved (v1):** prior tracked state IS required; `apply_edit` refuses with a structured `no_tracked_state` error otherwise.
 3. Should the persisted SQLite baseline (`docs/ARCHITECTURE_OVERVIEW.md`'s Persistence Layer) be updated synchronously on `apply_edit`, or left to the next `provide_code_context` call the way in-session state is? Persistence writes are already non-fatal/fire-and-forget elsewhere in the codebase; the same pattern likely applies here without a new design.
    **✅ Resolved (v1):** deferred — the SQLite baseline refreshes on the next `provide_code_context` call; `apply_edit` writes nothing to persistence (avoids empty-baseline rows misrepresenting the session).
+
+---
+
+## Known Issues (Post-Ship Verification — 2026-08-25)
+
+### BUG: `replace_body` rejects byte-exact `expectedOldText` on LF-encoded files — tracked span byte length does not match the real file's bytes
+
+**Repro (outcomes repo, `Outcomes.ApiCore.Tests/Populators/UserPopulator.cs`, method `CreateUser`, LF-only line endings — confirmed via `grep -c $'\r'` = 0 on the file):**
+
+1. `provide_code_context(filePath, fidelity="edit", intent="edit")` — renders the method body normally.
+2. `apply_edit` with a `replace_body` op targeting `UserPopulator.CreateUser`, `expectedOldText` hand-transcribed from that rendering (a trivial one-line-comment insertion as `newText`).
+3. Rejected: `unit changed since last seen (expected 1018 bytes, actual 1048)`.
+4. Assumed a transcription error, so re-derived `expectedOldText` **directly from the real file on disk**, independent of any Clean-CTX rendering: `sed -n '16,44p' UserPopulator.cs | wc -c` → **1021 bytes**, byte-for-byte verified (tabs, no trailing newline).
+5. Retried `apply_edit` with that byte-exact 1021-byte text. **Still rejected**, against the same `actual 1048`.
+6. Forced a fresh compile via `provide_code_context(fidelity="verbatim")` immediately before retrying (rules out a stale "last seen" cache) — no change.
+
+**Evidence 1048 isn't derived from any straightforward slice of the real file:**
+- Body only (lines 16–44): 1021 bytes
+- Signature + body (lines 15–44): 1167 bytes
+- Neither matches 1048.
+
+**Working hypothesis:** the body spans 29 lines → 28 internal newlines. `1021 (true LF byte count) + 28 (one extra byte per newline if internally counted as CRLF) = 1049` — within 1 byte of the reported `actual 1048`. This strongly suggests the tracked span's byte length (wherever `locate_method_body()`'s offset/length or `src/edit/apply.rs`'s expected-text length check is computed) is derived from a CRLF-normalized or otherwise line-ending-transformed representation of the body, while the real file on disk — and everything `provide_code_context` renders back to the caller — is LF-only. This repo's convention (and most non-Windows-authored source) is LF-only, so this would misfire on close to every multi-line `replace_body`/`delete` call against it. The exact +27/+28-byte source is **not yet confirmed** — this is a strong, evidence-backed hypothesis (off by 1 byte from a clean prediction), not a root-caused fix. Recommend live-audited tracing (per this project's usual practice: reproduce with a failing regression test — e.g. an LF-only multi-line fixture round-tripped through `provide_code_context(fidelity="edit")` → `apply_edit` — before patching) to pin the exact line in `pipeline.rs`/`src/edit/` doing the miscount.
+
+**Safety held:** both rejected attempts wrote nothing to disk (`git status`/`git diff` clean after each) — the mismatch gate correctly refused rather than silently overwriting, it's just comparing against a miscounted expectation.
+
+**Impact:** as shipped, `replace_body`/`delete` on a multi-line unit in an LF-encoded file will very likely reject byte-perfect `expectedOldText`, defeating v1's core promise for what is probably the majority of real-world source files.
