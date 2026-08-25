@@ -162,6 +162,17 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
 
+### CBM-WIRE-002 Verified CBM `query_graph` Wire Contract & Strict Positional Edge Extraction
+
+| Property | Value |
+|----------|-------|
+| **Intent** | The typed `graph_query` path must surface relationship data that CBM actually returns instead of collapsing it into duplicated column-0 nodes with a permanently empty edge list. |
+| **Invariant** | CBM answers `query_graph` with `{columns, rows, total}` where `columns` echo the projection expressions verbatim (`"a.name"`, `"type(r)"`), cells are JSON strings, undirected `-[r]-` patterns are supported, and one result set may mix every relationship type (DEFINES / DECORATES / USAGE / CALLS — captured live 2026-08-24). Conversion follows the STRICT POSITIONAL convention: exactly three cells per row, uniform across ALL rows ⇒ one `GraphEdge{from=row[0], label=row[1], to=row[2]}` per row, no synthesized nodes; EVERY other projection shape (0/1/2/4+ cells, mixed arities, empty) keeps the legacy column-0 node mapping with no edges. Deliberately excluded from this contract (separate findings): node deduplication, file-path population, endpoint normalization — duplicates pass through untouched; qualified/bare M-01 matching does NOT apply here because graph_query performs no target filtering. Cache compatibility: populated edges reuse the existing serialized `edges` key — no key versioning. |
+| **Enforcement** | Verbatim raw-row captures pin the conversion deterministically (directed CALLS bare names, undirected mixed types, qualified endpoints, two-column node-only control); synthetic policy pins cover non-triple arity fallback, uniform-arity requirement (one deviant row downgrades the whole set), empty results, and rider-out duplication pass-through. Two fresh-process `serial(cbm_live)` probes over the SYNTHETIC temp-dir fixture repo prove typed edges end-to-end (CALLS projections surface one edge per row with endpoint cells passed through exactly as projected — bare under `.name`, qualified under `.qualified_name` — and no invented nodes) plus preserved node-only behavior. Full finalization gate green (fmt clean; clippy `-D warnings` zero; workspace tests incl. live CBM probes + multilingual fixture). |
+| **Authority** | `src/cbm/bridge.rs` (`convert_query_rows`, `GraphBridge::query_graph`), `src/tests/cbm/query_wire.rs`, captures archived under `target/tmp/gq_raw_out.txt` + `gq_v6_out.txt` (session artifacts) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
 ---
 
 ## Architectural Debt

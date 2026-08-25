@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [Unreleased] - 2026-08-24 - Typed graph_query Edge Extraction
+
+### Fixed
+
+- **Typed `graph_query` reported "N node(s), 0 edge(s)" for every relationship-returning Cypher.** `GraphBridge::query_graph()` read only column 0 of each result row into nodes while its `edges` field was a literal empty vec — despite the doc comment claiming rows were interpreted "as either node or edge data". Live side-by-side on an indexed project: the same `MATCH (a)-[r:CALLS]->(b) RETURN a.name, type(r), b.name LIMIT 5` returned full CALLS rows through `cbm_proxy(query_graph)` while the typed path collapsed them into duplicated column-0 nodes. The client (`CbmClient::query_graph`) was always correct; the bridge now converts via pure `convert_query_rows()`. Defect previously documented as FAANG audit M-03 and CBM_API_AUDIT open question #4; never implemented until now.
+
+### Added
+
+- Strict positional wire convention (**invariant `CBM-WIRE-002`**, docs/ARCHITECTURAL_INVARIANTS.md): exactly-three-cell uniform row sets map `[from, relationship-type, to]` → `GraphEdge{from, to, label}`; every other projection shape (1/2/4+ columns, mixed arity, empty) keeps the legacy column-0 node mapping. Undirected `-[]-` projections supported and return all relationship types verbatim.
+- Regression suite `src/tests/cbm/query_wire.rs`: verbatim raw-capture fixtures (directed CALLS bare names, undirected mixed DEFINES/DECORATES/USAGE, qualified endpoints, node-only control) + policy pins (non-triple/mixed-arity fallback, empty results, duplicates pass through untouched) + two fresh-process `serial(cbm_live)` probes over a SYNTHETIC fixture repo (typed CALLS projection yields an edge with qualified wire endpoint and no invented nodes; node-only projections unchanged).
+
+### Changed
+
+- Relationship-shaped projections now report their edges INSTEAD of column-0 nodes (strict positional semantics); node-only projections are byte-for-byte unchanged. Node deduplication, file-path population, and endpoint normalization are deliberately NOT included — tracked as separate findings. No public API, cache-key, or compression changes; cached `cypher:*` entries remain deserializable (populated edges reuse the existing serialized `edges` key).
+
+---
+
 ## [0.4.0] - 2026-08-24 - CBM Graph-Intelligence & Trace-Wire Audits
 
 ### Fixed

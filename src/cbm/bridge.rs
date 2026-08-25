@@ -138,6 +138,59 @@ pub(crate) fn filter_trace_edges(
         .collect()
 }
 
+/// Convert CBM `{columns, rows}` query results into a [`QueryResult`] using
+/// the strict positional convention (wire contract CBM-WIRE-002, verified
+/// against verbatim live captures 2026-08-24):
+///
+/// - EXACTLY three cells per row, uniform across ALL rows, is interpreted as
+///   `[from, relationship-type, to]` and becomes one [`GraphEdge`] per row
+///   (`label` = the type cell). Nodes are deliberately NOT synthesized for
+///   this shape: a relationship-shaped projection IS its edges.
+/// - Every other projection shape (0/1/2/4+ cells, mixed arities, empty
+///   result) keeps the legacy mapping: one node per row from column 0,
+///   no edges.
+///
+/// Deliberately NOT done here (tracked as separate findings): node
+/// deduplication and file-path population — repeated nodes and empty
+/// `file` fields pass through exactly as before. Non-string cells become
+/// empty strings; rows are never skipped or reordered.
+pub(crate) fn convert_query_rows(rows: &[Vec<Value>]) -> QueryResult {
+    let uniform_triples = !rows.is_empty() && rows.iter().all(|row| row.len() == 3);
+    if uniform_triples {
+        let edges = rows
+            .iter()
+            .map(|row| GraphEdge {
+                from: row[0].as_str().unwrap_or_default().to_string(),
+                to: row[2].as_str().unwrap_or_default().to_string(),
+                label: row[1].as_str().unwrap_or_default().into(),
+                properties: HashMap::new(),
+            })
+            .collect();
+        return QueryResult {
+            nodes: vec![],
+            edges,
+        };
+    }
+    let nodes = rows
+        .iter()
+        .filter_map(|row| row.first())
+        .map(|first| {
+            let label = first.as_str().unwrap_or("");
+            GraphNode {
+                id: label.to_string(),
+                label: String::new(),
+                name: label.to_string(),
+                file: String::new(),
+                properties: HashMap::new(),
+            }
+        })
+        .collect();
+    QueryResult {
+        nodes,
+        edges: vec![],
+    }
+}
+
 pub(crate) fn parse_architecture_response(arch: &Value) -> ArchitectureOverview {
     let modules = arch["packages"]
         .as_array()
@@ -1164,24 +1217,14 @@ impl GraphBridge {
         match result {
             Ok(rows) => {
                 self.set_last_error(None);
-                // CBM Cypher returns {columns, rows} — rows are Vec<Vec<Value>>.
-                // We try to interpret each row as either node or edge data.
-                let mut nodes = vec![];
-                let edges = vec![];
-                for row in &rows {
-                    // First column is typically a name or label
-                    if let Some(first) = row.first() {
-                        let label = first.as_str().unwrap_or("");
-                        nodes.push(GraphNode {
-                            id: label.to_string(),
-                            label: String::new(),
-                            name: label.to_string(),
-                            file: String::new(),
-                            properties: HashMap::new(),
-                        });
-                    }
-                }
-                let r = QueryResult { nodes, edges };
+                // Wire contract (CBM-WIRE-002): strict positional conversion —
+                // see `convert_query_rows`. The previous implementation claimed
+                // to interpret rows "as either node or edge data" but only ever
+                // read column 0 into nodes while `edges` was a literal empty
+                // vec, so every relationship-shaped Cypher collapsed to
+                // "N node(s), 0 edge(s)" while the raw proxy path surfaced the
+                // very same rows intact.
+                let r = convert_query_rows(&rows);
                 self.cache_insert(&key, &r);
                 r
             }

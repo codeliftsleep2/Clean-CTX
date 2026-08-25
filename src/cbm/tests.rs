@@ -22,3 +22,9 @@ mod graph_intel;
 // fresh-process probes over a synthetic fixture repo.
 #[path = "../tests/cbm/trace_wire.rs"]
 mod trace_wire;
+
+// CBM 0.8.1 query_graph wire contract (typed graph_query edge extraction,
+// strict positional [from, type, to] convention), pinned by verbatim live
+// captures and fresh-process probes over a synthetic fixture repo.
+#[path = "../tests/cbm/query_wire.rs"]
+mod query_wire;

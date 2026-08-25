@@ -8,3 +8,4 @@ mod integration;
 mod e2e;
 mod graph_intel;
 mod trace_wire;
+mod query_wire;
