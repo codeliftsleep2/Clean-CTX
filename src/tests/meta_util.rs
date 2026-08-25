@@ -130,6 +130,8 @@ fn make_cap(name: &str, raw_text: &str, start_byte: usize) -> CapEntry {
         text: String::new(), // not used by class_source_from_capture
         raw_text: raw_text.to_string(),
         start_byte,
+        // Faithful span: raw_text is the captured node located at start_byte.
+        end_byte: start_byte + raw_text.len(),
     }
 }
 

@@ -45,6 +45,13 @@ pub struct CapEntry {
     pub raw_text: String,
     /// Byte offset of the start of the captured node in the source.
     pub start_byte: usize,
+    /// Byte offset one past the end of the captured node in the source.
+    ///
+    /// Orchestrators use this for span-containment tests: the diff
+    /// snapshot builder owns a member by the declaration whose
+    /// `[start_byte, end_byte)` window contains the member, so a nested
+    /// type that closed before the member starts can never steal it.
+    pub end_byte: usize,
 }
 
 // F-08 (FAANG audit): the closure previously received a hard-coded
@@ -86,6 +93,7 @@ where
                         text: processed,
                         raw_text: raw,
                         start_byte: capture.node.start_byte(),
+                        end_byte: capture.node.end_byte(),
                     });
                 }
             }

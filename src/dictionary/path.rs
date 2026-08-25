@@ -22,8 +22,8 @@ pub struct PathDictionary {
     bundle_reverse: HashMap<String, String>,
 }
 
-/// Normalize a caller-supplied path to the canonical identity used for
-/// alias keys.
+/// Normalize a caller-supplied path to THE canonical file identity used by
+/// every in-session stateful consumer.
 ///
 /// Non-CBM audit 2026-08-25 #3: handlers mix absolute paths and
 /// workspace-relative/joined spellings of the SAME file (`resolve_file_path_checked`
@@ -32,11 +32,17 @@ pub struct PathDictionary {
 /// (visible as duplicate `α` entries in `§PATHMAP`), silently splitting
 /// every alias-keyed state (IR context, text-delta baselines, LLM cache).
 ///
+/// IDENT-001 extension: `SessionStats` keys through this same helper so
+/// stats aggregate one physical file into one row. The SQLite persistence
+/// layer is the DELIBERATE exception (durable rows keep caller-shaped
+/// keys; migrating would orphan historical baselines — pinned by the
+/// `persistence_keys_are_caller_shaped_by_contract` test).
+///
 /// Resolution: `fs::canonicalize` when possible; on Windows the verbatim
 /// (`\\?\`) prefix is stripped so stored keys stay human-readable.
 /// Unresolvable paths (deleted files, synthetic strings used by tests)
 /// fall back to the raw argument unchanged.
-fn normalize_alias_key(path: &str) -> String {
+pub(crate) fn canonical_identity_key(path: &str) -> String {
     match std::fs::canonicalize(path) {
         Ok(canon) => {
             let s = canon.to_string_lossy();
@@ -83,7 +89,7 @@ impl PathDictionary {
         if let Some(alias) = self.reverse.get(&absolute_path).cloned() {
             return alias;
         }
-        let key = normalize_alias_key(&absolute_path);
+        let key = canonical_identity_key(&absolute_path);
         if let Some(alias) = self.reverse.get(&key).cloned() {
             alias
         } else {

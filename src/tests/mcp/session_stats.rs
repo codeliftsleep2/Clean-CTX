@@ -1197,3 +1197,79 @@ fn positive_savings_rendering_unchanged() {
     let dashboard = render_dashboard_text(&stats);
     assert!(dashboard.contains("75.0"));
 }
+
+// ── IDENT-001 extension: stats share canonical file identity ──────────
+//
+// `SessionStats::files` was keyed by the RAW path string passed to
+// `record_compression()`, so absolute / workspace-relative / redundant-
+// segment spellings of one physical file produced SEPARATE tracking
+// identities (double-counted totals, fragmented per-file rows). Stats
+// must aggregate through the same canonical identity as the alias
+// registry (IDENT-001). Unlike persistence, the stats map is session-
+// scoped RAM — there is no durable-row compatibility constraint.
+
+#[test]
+fn equivalent_path_spellings_share_one_stats_entry() {
+    // The fixture needs a REAL intermediate directory: POSIX realpath()
+    // resolves every component and fails on phantom ones (the CI lesson
+    // from the alias fixture), while Windows collapses "..\" lexically.
+    let dir = tempfile::TempDir::new().expect("tempdir");
+    let file = dir.path().join("widget.ts");
+    std::fs::write(&file, "export class Widget {}\n").expect("write fixture");
+    let sub = dir.path().join("sub");
+    std::fs::create_dir(&sub).expect("create sub dir");
+
+    let absolute = file.to_string_lossy().to_string();
+    let redundant = sub
+        .join("..")
+        .join("widget.ts")
+        .to_string_lossy()
+        .to_string();
+    assert_ne!(
+        absolute, redundant,
+        "fixture spellings must differ as strings"
+    );
+
+    let mut stats = SessionStats::new();
+    stats.record_compression(
+        &absolute,
+        1000,
+        250,
+        "low",
+        false,
+        "full",
+        None,
+        "ir_compression",
+    );
+    stats.record_compression(
+        &redundant,
+        900,
+        200,
+        "low",
+        false,
+        "full",
+        None,
+        "ir_compression",
+    );
+
+    assert_eq!(
+        stats.all_file_stats().len(),
+        1,
+        "one physical file must yield ONE stats entry, got: {:?}",
+        stats.all_file_stats().keys().collect::<Vec<_>>()
+    );
+    // Lookup through the OTHER spelling must find the same row.
+    let fs = stats
+        .file_stats(&redundant)
+        .expect("equivalent spelling must resolve to the tracked entry");
+    assert_eq!(
+        fs.raw_tokens, 900,
+        "second recording must overwrite, not duplicate"
+    );
+    assert_eq!(fs.compressed_tokens, 200);
+    // Totals must reflect one live file profile, not the sum of both calls.
+    assert_eq!(
+        stats.total_raw_tokens, 900,
+        "session totals must not double-count re-recorded spellings"
+    );
+}

@@ -186,6 +186,20 @@ impl SessionStats {
         domain: &str,
     ) {
         // Track domain — we need to know which domain this file was in before
+        // ── IDENT-001 extension: canonical stats identity ──────────────
+        // Key on the same canonical file identity as the alias registry so
+        // absolute / relative / redundant-segment spellings of ONE physical
+        // file aggregate into ONE per-file row instead of fragmenting
+        // totals. Exact-hit fast path keeps repeat calls filesystem-free;
+        // synthetic keys ("cbm://tool") and unresolvable paths fall back
+        // to the raw string unchanged.
+        let canonical;
+        let file_path = if self.files.contains_key(file_path) {
+            file_path
+        } else {
+            canonical = crate::dictionary::path::canonical_identity_key(file_path);
+            canonical.as_str()
+        };
         let prev_domain = self.files.get(file_path).map(|f| f.domain.clone());
 
         // Deduct previous per-file counters if this file was already tracked
@@ -701,8 +715,19 @@ impl SessionStats {
     }
 
     /// Get stats for a specific file, if tracked.
+    ///
+    /// Same identity resolution as [`SessionStats::record_compression`]:
+    /// an exact-key hit is O(1); otherwise the argument is resolved to the
+    /// canonical file identity before the lookup gives up, so callers may
+    /// query with any equivalent spelling of the path.
     pub fn file_stats(&self, file_path: &str) -> Option<&FileStats> {
-        self.files.get(file_path)
+        match self.files.get(file_path) {
+            Some(fs) => Some(fs),
+            None => {
+                let canonical = crate::dictionary::path::canonical_identity_key(file_path);
+                self.files.get(canonical.as_str())
+            }
+        }
     }
 
     /// Get stats for all tracked files.
