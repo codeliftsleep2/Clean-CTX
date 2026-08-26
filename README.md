@@ -110,7 +110,7 @@ Add to your MCP settings (see [IDE Configuration](#ide-configuration) below for 
 }
 ```
 
-Restart your editor. The tools `provide_code_context`, `compress_code_context`, `decompress_code_context`, `compress_workspace`, `diff_code_context`, `delta_code_context`, `apply_delta`, `context_stats`, `context_history`, `save_context`, `list_sessions`, `replay_history`, `purge_old_deltas`, and `restore_context` will be available.
+Restart your editor. The tools `provide_code_context`, `compress_code_context`, `diff_code_context`, `delta_code_context`, `apply_delta`, `context_stats`, `context_history`, `save_context`, `list_sessions`, `replay_history`, `purge_old_deltas`, and `restore_context` will be available.
 
 ---
 
@@ -201,23 +201,7 @@ Clean-CTX integrates with [codebase-memory-mcp](https://github.com/DeusData/code
 | `proxy.rs` | Pipe-level response interception and JSON-aware compression (~5,000 → ~1,100 tokens, ~78% savings) |
 | `json_compress.rs` | JSON-aware compressor: key shortening, envelope stripping, null field removal |
 
-### Spring Boot Meta-Layer
-
-For Spring Boot Java projects, Clean-CTX automatically detects framework annotations and enriches compressed output with structured `Φ` markers:
-
-| Marker | Meaning |
-|--------|---------|
-| `Φrest:` / `Φctrl:` | `@RestController` / `@Controller` with request mappings |
-| `Φsvc:` | `@Service` component |
-| `Φrepo:` | `@Repository` component |
-| `Φconf:` | `@Configuration` component |
-| `Φmap:` | `@RequestMapping` method mappings |
-| `Φaut:` | `@Autowired` field injection |
-| `Φval:` | `@Value` property injection |
-| `Φbean:` | `@Bean` method-level injection |
-| `Φprop:` | `@ConfigurationProperties` class |
-| `Φpropf:` | Properties file structural shape |
-| `Φgraph:` | Cross-file dependency graph (workspace mode) |
+Complete `Φ` marker vocabularies (Angular, Spring Boot, .NET) are documented in [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md) and the language-specific meta-layer docs.
 
 ### Three-Fidelity Compression
 
@@ -232,8 +216,6 @@ For Spring Boot Java projects, Clean-CTX automatically detects framework annotat
 | Tool | Purpose |
 |------|---------|
 | `compress_code_context` | Source file → compressed skeleton (text or IR with encoding selection) |
-| `decompress_code_context` | Compressed skeleton → human-readable format |
-| `compress_workspace` | Entire directory → single compressed manifest |
 | `diff_code_context` | Source file → AST-level change-set (`+` / `-` / `~` / `=`) |
 | `delta_code_context` | IR-level delta compression — instruction-level deltas between compiled IR states |
 | `apply_delta` | Client-side state update — applies IR delta to in-session state machine |
@@ -337,34 +319,6 @@ First call performs full compression; subsequent calls automatically use delta t
 // SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias
 // ── SampleService ──
 M doWork(payload:$s[]):$b
-```
-
-### Decompress back to readable format
-
-```json
-{
-  "name": "decompress_code_context",
-  "arguments": {
-    "compressedText": "$c SampleService;$ctor();processComplexData(payload: $s[]): $b;healthCheck(): $s"
-  }
-}
-```
-
-**Output:**
-```
-class SampleService;constructor();processComplexData(payload: string[]): boolean;healthCheck(): string
-```
-
-### Compress entire workspace
-
-```json
-{
-  "name": "compress_workspace",
-  "arguments": {
-    "directoryPath": "C:\\path\\to\\project",
-    "fidelity": "medium"
-  }
-}
 ```
 
 ### AST-level diff (track changes over time)
@@ -473,29 +427,7 @@ Every `provide_code_context` / `compress_code_context` / `restore_context` respo
 
 **High fidelity** adds `cf:` (control flow), `df:` (reads/writes), `se:` (side effect), `ec:` (execution context). **Edit fidelity appends each focused method's verbatim source body** — byte-exact. Types render exactly as captured.
 
-### Angular Meta-Layer Markers (Φ)
-
-| Marker | Meaning |
-|--------|---------|
-| `Φcmp:` | `@Component` — class name + selector, template URL, style URLs |
-| `Φsvc:` | `@Injectable` — class name + `providedIn` scope |
-| `Φmod:` | `@NgModule` — class name + declarations, imports, exports |
-| `Φdir:` | `@Directive` — class name + selector |
-| `Φpipe:` | `@Pipe` — class name + pipe name |
-| `Φin:` | `@Input` — field name + optional alias |
-| `Φout:` | `@Output` — field name + optional alias |
-| `Φmodel:` | `model()` signal — field name + optional alias (Angular 17.1+) |
-| `Φinjects:` | Constructor/DI injection — resolved types with file aliases |
-| `Φtpl:` | Template shape — tags, bindings, control flow blocks |
-| `Φtbind:` | Template binding — property/event/two-way binding expressions (`.component.html`) |
-| `Φtdir:` | Template directive — structural directives on a template element (`.component.html`) |
-| `Φtcmp:` | Template component — custom component element reference (`.component.html`) |
-| `Φp-<name>:` | PrimeNG component — e.g. `Φp-table:`, `Φp-card:` (`.component.html`) |
-| `Φsty:` | Style shape — class selectors, SCSS/CSS variables |
-| `ΦBUNDLE` | File-triplet bundle group (workspace manifest) |
-| `ΦMAP` | Workspace bundle alias map footer |
-| `Φgraph:` | Cross-file dependency graph edge |
-| `§ΦGRAPH` | Workspace dependency graph footer section |
+The full SCHEMA v2 notation reference (structure letters, behavior flags, meta-layer markers) is in [`docs/COMPILER_IR.md`](docs/COMPILER_IR.md).
 
 ---
 
