@@ -479,6 +479,8 @@ Every `provide_code_context` / `compress_code_context` / `restore_context` respo
 
 The tables below are produced **only** by `compress_workspace` manifests and `delta_text_context` baselines (decoded via `decompress_code_context`) — never by interactive responses. Fidelity-dependent: `⊕` at Medium/High; Low replaces them with `§` micro-codes (`§I`=⊕guard, `§L`=⊕loop, `§E`=⊕⇒, `§P`=$ctor) plus custom `$1…$N` symbols (§SYM footer).
 
+> **Phase A retirement (2026-08-25):** the interactive tools (`provide_code_context`, `compress_code_context`, `restore_context`) no longer fall back to this notation when IR compilation fails — they return a structured `ir_unavailable` JSON-RPC error instead. Legacy output now comes **only** from `compress_workspace` and `delta_text_context`; both are scheduled for migration in Phases B/C.
+
 ### Built-in Primitives (34 opcodes)
 
 | Opcode | Token | Opcode | Token | Opcode | Token |

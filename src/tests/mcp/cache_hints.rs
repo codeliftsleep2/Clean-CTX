@@ -304,20 +304,34 @@ fn test_cache_dashboard_json() {
     );
 }
 
-/// Verify that generate_vocabulary_text returns expected content.
+/// Verify that generate_vocabulary_text serves ONLY current vocabulary:
+/// SCHEMA v2 response symbols plus the live α / Φ systems — never the
+/// retired `$`-opcode / `⊕`-marker tables (Phase A retirement).
 #[test]
 fn test_generate_vocabulary_text() {
     let text = generate_vocabulary_text();
     assert!(
-        text.contains("Clean-CTX Opcode/Marker Vocabulary"),
-        "should have header"
+        text.contains("SCHEMA v2"),
+        "vocabulary prompt must teach the SCHEMA v2 legend"
     );
-    assert!(text.contains("$c   → class"), "should include $c opcode");
+    assert!(text.contains("Φcmp"), "Φ Angular markers remain current");
+    assert!(text.contains("α"), "path aliases remain current");
     assert!(
-        text.contains("Φcmp"),
-        "should include Angular component marker"
+        text.contains("fl:") || text.contains("fl:"),
+        "behavior-flag key should be documented"
     );
-    assert!(text.contains("⊕guard"), "should include guard marker");
+    for banned in [
+        "$c   → class",
+        "⊕guard",
+        "⊕Input",
+        "Opcode/Marker Vocabulary",
+        "compress_code_context and provide_code_context tools",
+    ] {
+        assert!(
+            !text.contains(banned),
+            "stale/retired vocabulary leaked into prompt: {banned}"
+        );
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════

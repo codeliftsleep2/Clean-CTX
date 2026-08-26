@@ -53,7 +53,22 @@ pub fn send_response(val: &serde_json::Value) {
     let _lock = lock_or_recover_protocol!(STDOUT_MUTEX.lock(), "stdout");
     let mut stdout = io::stdout().lock();
     if let Ok(payload) = serde_json::to_string(val) {
+        // Phase A retirement tests: record every outbound response so
+        // handler tests can assert on payload CONTENT (the handlers
+        // otherwise only write to stdout, which libtest cannot inspect).
+        // Test-only — release builds never allocate this sink.
+        #[cfg(test)]
+        {
+            if let Ok(mut q) = CAPTURED_RESPONSES.lock() {
+                q.push(val.clone());
+            }
+        }
         let _ = writeln!(stdout, "{}", payload);
         let _ = stdout.flush();
     }
 }
+
+/// Test-only response capture sink (Phase A retirement regression work).
+/// Pushed by [`send_response`] under `cfg(test)`; drained by handler tests.
+#[cfg(test)]
+pub(crate) static CAPTURED_RESPONSES: Mutex<Vec<serde_json::Value>> = Mutex::new(Vec::new());

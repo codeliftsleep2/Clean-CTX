@@ -28,3 +28,7 @@ pub use traits::BoxedHandlerFn;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/tool_handlers.rs"]
 pub(crate) mod tool_handlers_tests;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/phase_a_retirement.rs"]
+pub(crate) mod phase_a_retirement_tests;

@@ -258,68 +258,43 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             }
         })
     } else {
-        // Log the structured IR error before falling back (4.4 audit fix)
-        if let Err(ref e) = ir_result {
-            tracing::warn!(error = %e, path = %resolved_path, "IR compilation failed, falling back to legacy compression");
-        }
-        match crate::compression::pipeline::compress_file_with_source(
-            PathBuf::from(&resolved_path),
-            source_ref,
-            &mut state.dict_lock(),
-            &mut state.cache_write(),
-            effective_fidelity,
-            Some(&state.config),
-        ) {
-            Ok(mut compressed_text) => {
-                compressed_text.push_str(&state.format_dict_footer());
-                let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
-                let comp_tokens = count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
-                state.record_compression(
-                    &resolved_path,
-                    raw_tokens,
-                    comp_tokens,
-                    &format!("{:?}", effective_fidelity).to_lowercase(),
-                    false,
-                    "full",
-                    None,
-                    "ir_compression",
-                );
-
-                // Persist to DB
-                {
-                    if let Some(ref store) = *state.persistence_store_lock() {
-                        let mut hasher = Sha256::new();
-                        hasher.update(source_text.as_bytes());
-                        let source_hash = format!("{:x}", hasher.finalize());
-
-                        store.queue_save_context(
-                            &resolved_path,
-                            effective_fidelity,
-                            &compressed_text,
-                            &[],
-                            &source_hash,
-                            raw_tokens as u64,
-                            comp_tokens as u64,
-                        );
-                    }
+        // Phase A retirement (2026-08-25): the legacy `$`/`⊕`/`§`
+        // text-compression fallback has been REMOVED. When the primary IR
+        // compiler fails we return a structured `ir_unavailable` error
+        // instead of silently degrading the LLM-facing notation.
+        //
+        // (Removing this branch also eliminates a latent self-deadlock:
+        // the old body called `format_dict_footer()` — which locks the
+        // dictionary — while the `match` scrutinee temporaries still held
+        // `state.dict_lock()` / `state.cache_write()` for the legacy
+        // compressor call. The branch was unreachable before retirement,
+        // so the deadlock had never been observed.)
+        let reason = ir_result
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        tracing::warn!(
+            error = %reason,
+            path = %resolved_path,
+            "IR compilation failed; returning structured ir_unavailable error"
+        );
+        serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": {
+                "code": -32603,
+                "message": format!(
+                    "IR compilation unavailable for {}: {}. SCHEMA v2 output \
+                     cannot be produced for this input; retry with fidelity \
+                     \"verbatim\" or read the source directly.",
+                    resolved_path, reason
+                ),
+                "data": {
+                    "reason": "ir_unavailable",
+                    "path": resolved_path,
+                    "ir_compiler": reason,
                 }
-                state.flush_persistence();
-
-                serde_json::json!({
-                    "jsonrpc": "2.0", "id": id,
-                    "result": {
-                        "content": [{ "type": "text", "text": compressed_text }],
-                        "content_kind": content_kind, "byte_exact": byte_exact
-                    }
-                })
             }
-            Err(e) => {
-                serde_json::json!({
-                    "jsonrpc": "2.0", "id": id,
-                    "error": { "code": -32603, "message": e.to_string() }
-                })
-            }
-        }
+        })
     };
 
     // Inject baseline cache breakpoint into the response so the LLM
@@ -1144,73 +1119,35 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     "provide_code_context full complete"
                 );
             } else {
-                // Log the structured IR error before falling back (4.4 audit fix)
-                if let Err(ref e) = ir_result {
-                    tracing::warn!(error = %e, path = %resolved_path, "IR compilation failed in provide_code_context, falling back to legacy compression");
-                }
-                // Gap 6 fix: capture the CompileError so the response's
-                // `degradation.ir_compiler` signal tells the agent why this
-                // output is the legacy fallback (not IR-rendered).
-                let degraded_ir = ir_result
-                    .as_ref()
+                // Phase A retirement (2026-08-25): legacy `$`/`⊕`/`§`
+                // fallback removed (see compress_code_context site — its
+                // removal also eliminates a latent dict-lock self-deadlock).
+                let reason = ir_result
                     .err()
-                    .map(|e| serde_json::json!({ "ir_compiler": e.to_string() }));
-                let fallback_start = Instant::now();
-                match crate::compression::pipeline::compress_file_with_source(
-                    PathBuf::from(&resolved_path),
-                    Some(source),
-                    &mut state.dict_lock(),
-                    &mut state.cache_write(),
-                    effective_fidelity,
-                    Some(&state.config),
-                ) {
-                    Ok(mut compressed_text) => {
-                        compressed_text.push_str(&state.format_dict_footer());
-                        let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
-                        let comp_tokens =
-                            count_tokens_with_tokenizer(&compressed_text, tokenizer_ref);
-                        state.record_compression(
-                            &resolved_path,
-                            raw_tokens,
-                            comp_tokens,
-                            &format!("{:?}", effective_fidelity).to_lowercase(),
-                            is_angular,
-                            "full",
-                            None,
-                            "ir_compression",
-                        );
-                        let mut response = serde_json::json!({
-                            "jsonrpc": "2.0", "id": id, "result": {
-                                "content": [{ "type": "text", "text": compressed_text }],
-                                "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                                "decision_summary": decision.summary(),
-                                "content_kind": content_kind, "byte_exact": byte_exact,
-                                "degradation": degraded_ir
-                            }
-                        });
-                        // Fallback compression output is a stable full snapshot — inject baseline breakpoint.
-                        inject_baseline_breakpoint(&mut response, state, &compressed_text);
-                        send_response(&response);
-                        let fallback_ms = fallback_start.elapsed().as_millis() as u64;
-                        tracing::info!(
-                            heuristics_ms = heuristics_ms,
-                            compile_ms = compile_ms,
-                            fallback_ms = fallback_ms,
-                            raw_tokens = raw_tokens,
-                            comp_tokens = comp_tokens,
-                            savings_pct = if raw_tokens > 0 {
-                                ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0)
-                                    as u64
-                            } else {
-                                0
-                            },
-                            "provide_code_context fallback complete"
-                        );
+                    .map(|e| e.to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                tracing::warn!(
+                    error = %reason,
+                    path = %resolved_path,
+                    "IR compilation failed in provide_code_context; returning structured ir_unavailable error"
+                );
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0", "id": id,
+                    "error": {
+                        "code": -32603,
+                        "message": format!(
+                            "IR compilation unavailable for {}: {}. SCHEMA v2 output \
+                             cannot be produced for this input; retry with fidelity \
+                             \"verbatim\" or read the source directly.",
+                            resolved_path, reason
+                        ),
+                        "data": {
+                            "reason": "ir_unavailable",
+                            "path": resolved_path,
+                            "ir_compiler": reason,
+                        }
                     }
-                    Err(e) => send_response(
-                        &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } }),
-                    ),
-                }
+                }));
             }
         }
     }
@@ -1278,7 +1215,10 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
             return;
         }
     };
-    let source_text = source_arc.as_str();
+    // The read doubles as an existence check before IR compilation;
+    // the content itself is only consumed by the compiler via the
+    // shared source cache (Phase A removed the legacy text consumer).
+    let _source_text = source_arc.as_str();
 
     match compile_file_ir(&resolved_path, fidelity, state) {
         Ok((ir, _source_hash)) => {
@@ -1300,27 +1240,31 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
             send_response(&response);
         }
         Err(e) => {
-            // Log the structured IR error before falling back (4.4 audit fix)
-            tracing::warn!(error = %e, path = %resolved_path, "IR compilation failed in restore_context, falling back to legacy compression");
-            match crate::compression::pipeline::compress_file_with_source(
-                PathBuf::from(&resolved_path),
-                Some(source_text),
-                &mut state.dict_lock(),
-                &mut state.cache_write(),
-                fidelity,
-                Some(&state.config),
-            ) {
-                Ok(mut compressed_text) => {
-                    compressed_text.push_str(&state.format_dict_footer());
-                    let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": compressed_text }], "restored": true } });
-                    // Restored context is a stable full snapshot — inject baseline breakpoint.
-                    inject_baseline_breakpoint(&mut response, state, &compressed_text);
-                    send_response(&response);
+            // Phase A retirement (2026-08-25): legacy `$`/`⊕`/`§` fallback
+            // removed (see compress_code_context site).
+            let reason = e.to_string();
+            tracing::warn!(
+                error = %reason,
+                path = %resolved_path,
+                "IR compilation failed in restore_context; returning structured ir_unavailable error"
+            );
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "error": {
+                    "code": -32603,
+                    "message": format!(
+                        "IR compilation unavailable for {}: {}. SCHEMA v2 output \
+                         cannot be produced for this input; retry with fidelity \
+                         \"verbatim\" or read the source directly.",
+                        resolved_path, reason
+                    ),
+                    "data": {
+                        "reason": "ir_unavailable",
+                        "path": resolved_path,
+                        "ir_compiler": reason,
+                    }
                 }
-                Err(e) => send_response(
-                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": e.to_string() } }),
-                ),
-            }
+            }));
         }
     }
 }

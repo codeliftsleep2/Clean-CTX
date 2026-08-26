@@ -4,6 +4,14 @@
 // Extracted from tools.rs during the Phase 1 module split.
 
 use crate::compressor::Fidelity;
+
+/// Phase A retirement tests: cfg(test)-only injection slot. When
+/// `Some(reason)`, the next IR compilation fails with an injected error so
+/// the retired-legacy-fallback contract can be exercised end-to-end
+/// (natural `CompileError` paths are unreachable with valid grammars).
+#[cfg(test)]
+pub(crate) static TEST_INJECTED_IR_FAILURE: std::sync::Mutex<Option<String>> =
+    std::sync::Mutex::new(None);
 use crate::mcp::McpState;
 use std::path::PathBuf;
 
@@ -253,6 +261,21 @@ pub(super) fn compile_file_ir_focused(
     state: &McpState,
     focus: Option<&std::collections::HashSet<String>>,
 ) -> Result<(crate::ir::compiler::CompiledIR, String), crate::error::CleanCtxError> {
+    // Phase A retirement tests: cfg(test)-only fault injection. The
+    // natural CompileError paths (Capture/Layer) are unreachable with
+    // valid grammars, so the legacy-fallback branches cannot be exercised
+    // end-to-end without this hook. Release builds never compile it.
+    #[cfg(test)]
+    {
+        if let Ok(injected) = TEST_INJECTED_IR_FAILURE.lock() {
+            if let Some(reason) = injected.as_ref() {
+                return Err(crate::error::CleanCtxError::Ir(format!(
+                    "injected IR failure: {reason}"
+                )));
+            }
+        }
+    }
+
     use crate::ir::compiler::IRCompiler;
     use crate::ir::layers::csharp::CSharpLayer;
     use crate::ir::layers::java::JavaLayer;

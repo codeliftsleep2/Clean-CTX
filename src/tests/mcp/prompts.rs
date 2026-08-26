@@ -49,29 +49,24 @@ fn documents_high_and_edit_behaviors() {
 }
 
 #[test]
-fn retired_vocabulary_is_scoped_to_the_legacy_section() {
-    let primary = SYSTEM_PROMPT
-        .find("## Response Notation")
-        .expect("primary SCHEMA v2 section missing");
-    let legacy = SYSTEM_PROMPT
-        .find("## Legacy Notation")
-        .expect("scoped legacy section missing");
-    assert!(
-        primary < legacy,
-        "SCHEMA v2 must be taught BEFORE the legacy vocabulary"
-    );
-
-    // Retired tokens must still be documented for decoding legacy
-    // output, but ONLY inside the scoped legacy section.
-    for tok in ["$c ", "$ctor", "$nw", "$fr", "⊕guard", "⊕loop", "⊕⇒"] {
-        let pos = SYSTEM_PROMPT.find(tok).unwrap_or_else(|| {
-            panic!("legacy section must document retired token `{tok}`")
-        });
+fn retired_vocabulary_is_absent_from_the_prompt_entirely() {
+    // Phase A retirement: with the three IR fallbacks converted to
+    // structured `ir_unavailable` errors, no LLM-facing prompt teaches
+    // the retired `$`-primitive / `⊕`-marker / `§`-micro-code tables.
+    for tok in [
+        "## Legacy Notation",
+        "Primitive opcodes",
+        "$ctor",
+        "$nw",
+        "$fr",
+        "⊕",
+        "§I=",
+        "§SYM",
+    ] {
         assert!(
-            pos > legacy,
-            "retired token `{tok}` appears OUTSIDE the legacy section \
-             (at byte {pos}, legacy starts at {legacy}) — the prompt is \
-             teaching retired vocabulary as current"
+            !SYSTEM_PROMPT.contains(tok),
+            "SYSTEM_PROMPT still teaches retired notation fragment `{tok}` \
+             — the legacy fallback paths are gone; remove the stale table"
         );
     }
 }
