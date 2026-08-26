@@ -13,9 +13,7 @@ use crate::analytics::calculate_savings;
 
 /// F-18 (FAANG audit): maximum file size in bytes that `compress_file`
 /// will read into memory. Files larger than this return a clean error
-/// instead of risking an OOM. The streaming variant
-/// (`compress_file_streaming`) can be used as a fallback for larger
-/// files.
+/// instead of risking an OOM.
 const MAX_FILE_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
 
 /// P1-10: Unified token metadata computation for cache-hit paths.
@@ -87,8 +85,7 @@ pub struct BuildOutputResult {
 /// keyword-stripped structural signature stream with configurable fidelity.
 ///
 /// F-18: returns a [`CompressionError::FileTooLarge`] if the file exceeds
-/// [`MAX_FILE_BYTES`]. Use [`compress_file_streaming`](crate::compression::streaming::compress_file_streaming)
-/// for larger files.
+/// [`MAX_FILE_BYTES`].
 pub fn compress_file(
     file: PathBuf,
     dict: &mut PathDictionary,
@@ -535,6 +532,9 @@ pub fn build_output_lines(
 /// `enabled` flags and sub-layer settings (min_pipe_operators,
 /// include_dispatch_sites, etc.) are honored. When `None`, all meta-layers
 /// run with their defaults.
+/// Only used by the workspace compressor (retired in Phase C1);
+/// kept for test-only stats integration.
+#[allow(dead_code)]
 pub fn compress_source(
     source_code: &str,
     absolute_path: &str,

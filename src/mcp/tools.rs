@@ -4,11 +4,9 @@
 // v0.3.0: Registry-based dispatch for modular handlers, fallback to legacy.
 
 use crate::cbm;
-use crate::compressor::Fidelity;
-use crate::decompression::Decompressor;
+use crate::compression::Fidelity;
 use crate::mcp::McpState;
 use crate::mcp::cache_hints::{compute_workspace_breaker, inject_cache_breakpoints};
-use crate::mcp::workspace;
 use crate::protocol::send_response;
 use crate::tokenizer::{TokenizerKind, resolve_tokenizer_kind};
 use serde_json::Value;
@@ -68,30 +66,6 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]
-            }
-        }),
-        serde_json::json!({
-            "name": "decompress_code_context",
-            "description": "Expands a compressed structural skeleton back into human-readable format.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "compressedText": { "type": "string", "description": "Legacy-notation compressed output (e.g. a compress_workspace manifest baseline) to expand back into human-readable text. Interactive compress_code_context now returns compiled IR, not legacy text; this tool decodes the remaining legacy compress_workspace surface." }
-                },
-                "required": ["compressedText"]
-            }
-        }),
-        serde_json::json!({
-            "name": "compress_workspace",
-            "description": "Compresses all TypeScript, C#, and Rust files in a directory tree.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "directoryPath": { "type": "string", "description": "Absolute path to the project directory to scan." },
-                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, ~70-80%), 'high' (minimal compression, ~50-60%), 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: 'low'." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
-                },
-                "required": ["directoryPath"]
             }
         }),
         serde_json::json!({
@@ -365,8 +339,6 @@ pub fn setup_handler_registry_for_tests() {
 pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
     use std::collections::HashSet;
     let mut names = HashSet::new();
-    names.insert("decompress_code_context");
-    names.insert("compress_workspace");
     names.insert("diff_commits");
     names.insert("graph_search");
     names.insert("graph_query");
@@ -388,95 +360,7 @@ pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, s
     // (decompress, compress_workspace, and all CBM tools).
     // Each arm returns to prevent double-fire if a tool is also registered.
     match tool_name {
-        "decompress_code_context" => {
-            let compressed_text = params["arguments"]["compressedText"].as_str().unwrap_or("");
-            const MAX_DECOMPRESS_BYTES: usize = 4 * 1024 * 1024;
-            if compressed_text.len() > MAX_DECOMPRESS_BYTES {
-                send_response(&serde_json::json!({
-                    "jsonrpc": "2.0",
-                    "id": id,
-                    "error": { "code": -32603, "message": format!("compressedText too large: {} bytes (max {}).", compressed_text.len(), MAX_DECOMPRESS_BYTES) }
-                }));
-                return;
-            }
-            let mut decompressor = Decompressor::new();
-            let decompressed = decompressor.quick_decompress(compressed_text);
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": { "content": [{ "type": "text", "text": decompressed }] }
-            }));
-            return;
-        }
-        "compress_workspace" => {
-            let dir_path = params["arguments"]["directoryPath"].as_str().unwrap_or(".");
-            // XPIA mitigation: reject directory paths outside the trusted workspace root.
-            // Pass the caller-supplied workspaceRoot through so the boundary check
-            // honors it (multi-repo support) instead of pinning to CWD.
-            let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-            let dir_path = match super::tool_helpers::resolve_file_path_checked(
-                dir_path,
-                workspace_root,
-                &state.config.additional_roots,
-            ) {
-                Ok(p) => p,
-                Err(msg) => {
-                    send_response(&serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "error": { "code": -32602, "message": msg }
-                    }));
-                    return;
-                }
-            };
-            let fidelity = match parse_fidelity_arg(id, params, &state.config) {
-                Ok(f) => f,
-                Err(()) => return,
-            };
-            match workspace::compress_workspace_dir(&dir_path, fidelity, state) {
-                Ok(result) => {
-                    let mut response = serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "result": {
-                            "content": [{ "type": "text", "text": result.manifest }],
-                            "_meta": {
-                                "errors": result.errors.into_iter().map(|(p, e)| serde_json::json!({ "path": p, "error": e })).collect::<Vec<_>>(),
-                                "excluded": result.excluded.into_iter().map(|(p, patterns)| serde_json::json!({ "path": p, "matched_patterns": patterns })).collect::<Vec<_>>(),
-                                "warnings": result.warnings,
-                            }
-                        }
-                    });
-                    if state.config.cache.enabled {
-                        let ttl = state.config.cache.baseline_ttl.clone();
-                        let breaker =
-                            compute_workspace_breaker(std::slice::from_ref(&result.manifest));
-                        let tok_box = crate::tokenizer::create_tokenizer(
-                            crate::tokenizer::resolve_tokenizer_kind(
-                                None,
-                                Some(&state.config.tokenizer.to_string()),
-                            ),
-                        )
-                        .ok();
-                        let tok_ref: Option<&dyn crate::tokenizer::Tokenizer> = tok_box.as_deref();
-                        if let Some(result_obj) = response.get_mut("result") {
-                            inject_cache_breakpoints(
-                                result_obj, state, "baseline", &ttl, &breaker, tok_ref,
-                            );
-                        }
-                    }
-                    send_response(&response);
-                }
-                Err(e) => {
-                    send_response(&serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "error": { "code": -32603, "message": e.to_string() }
-                    }));
-                }
-            }
-            return;
-        }
+        // compress_workspace and decompress_code_context removed in Phase C1.
         "diff_commits" => {
             // Resolve the workspace root (XPIA mitigation). Defaults to CWD.
             // Pass the caller-supplied workspaceRoot through so the boundary

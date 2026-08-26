@@ -70,36 +70,6 @@ export class AnotherService {
     );
 }
 
-/// Test 3: Workspace + CBM Integration
-/// Full `compress_workspace` with CBM enabled should populate skip sets and reduce output.
-#[test]
-fn workspace_with_cbm_integration() {
-    let dir = tempfile::TempDir::new().unwrap();
-    let path = dir.path().join("workspace_file.ts");
-
-    let source = r#"
-export class WorkspaceService {
-    method(): void {}
-}
-"#;
-
-    let mut f = std::fs::File::create(&path).unwrap();
-    f.write_all(source.as_bytes()).unwrap();
-
-    let config = CleanCtxConfig::default();
-    let state = McpState::new(config);
-
-    // Test that workspace compression works
-    let result = crate::mcp::workspace::compress_workspace_dir(
-        dir.path().to_string_lossy().as_ref(),
-        Fidelity::Low,
-        &state,
-    );
-
-    // Should succeed (CBM may be disabled, but workspace should still work)
-    assert!(result.is_ok(), "Workspace compression should succeed");
-}
-
 /// Test 15: CBM Proxy Fallback
 /// When CBM returns unparseable JSON, `cbm_proxy` should apply minimum compression.
 #[test]

@@ -10,4 +10,3 @@ mod error_paths;
 mod mcp_e2e;
 mod persistence;
 mod text_vs_ir;
-mod workspace_perf;

@@ -520,7 +520,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
     let mut ir_ctx = state.ir_context_lock();
     match ir_ctx.apply(delta) {
         Ok(new_version) => {
-            let rendered = ir_ctx.render_pretty(&file, crate::compressor::Fidelity::Low);
+            let rendered = ir_ctx.render_pretty(&file, crate::compression::Fidelity::Low);
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": { "content": [{ "type": "text", "text": rendered.unwrap_or_default() }], "version": new_version }

@@ -16,7 +16,7 @@
 // low-importance symbols that should be EXCLUDED from compression
 // entirely. This replaces the post-compression enrichment pattern.
 
-use crate::compressor::Fidelity;
+use crate::compression::Fidelity;
 use std::collections::{HashMap, HashSet};
 
 /// A fidelity recommendation from the intelligence layer.

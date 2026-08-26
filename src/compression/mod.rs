@@ -1,7 +1,7 @@
 // src/compression/mod.rs
 //
-// Shared building blocks for the compression pipeline, plus the two
-// orchestrators (`compress_file` and `compress_file_streaming`).
+// Shared building blocks for the compression pipeline, plus the
+// orchestrator (`compress_file`).
 //
 // # Phase 2 foundations (shared single-source modules)
 //
@@ -19,7 +19,6 @@
 //   - `symbol_compression`: Low-fidelity opcode pass
 //   - `report`            : Final optimisation-report formatting
 //   - `pipeline`          : Non-streaming `compress_file` + shared helpers
-//   - `streaming`         : Streaming variant with progress callbacks
 
 pub(crate) mod capture_pipeline;
 pub(crate) mod graph_utils;
@@ -28,7 +27,6 @@ pub(crate) mod micro_opcodes;
 pub(crate) mod opcodes;
 pub(crate) mod pipeline;
 pub(crate) mod report;
-pub(crate) mod streaming;
 pub(crate) mod symbol_compression;
 // R-02: Type-aware compression — replaces configured type names with
 // short alias tokens (`UserId` → `$uid`) and emits a reversible `§TA`
@@ -37,20 +35,17 @@ pub(crate) mod symbol_compression;
 pub mod fidelity;
 pub mod language;
 pub(crate) mod type_aliases;
-pub(crate) mod workspace_symbols;
 
 // Re-export shared types for downstream callers.
 //
-// `Fidelity` is `pub` (not `pub(crate)`) because the historical
-// `crate::compressor::Fidelity` import path needs to remain public, and
-// downstream consumers (tests, the MCP server) use the same type.
+// `Fidelity` is `pub` (not `pub(crate)`) because MCP tool handlers
+// (tests, the MCP server) use the same type from `crate::compression::Fidelity`.
 pub(crate) use capture_pipeline::CapEntry;
 pub use fidelity::Fidelity;
 pub use language::{detect_language, language_for_extension, looks_like_csharp};
 // These are re-exported for convenience but the main consumers
-// (`pipeline.rs`, `streaming.rs`, consumers of `dictionary/`) import
+// (`pipeline.rs`, consumers of `dictionary/`) import
 // directly from the submodules.
 
-// Re-export the orchestrator entry points and the progress type.
+// Re-export the orchestrator entry point.
 pub use pipeline::compress_file;
-pub use streaming::{CompressionProgress, compress_file_streaming};

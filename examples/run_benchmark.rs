@@ -9,7 +9,7 @@
 use clean_ctx::analytics::{bpe, bpe_or_init};
 use clean_ctx::cache::LocalStateCache;
 use clean_ctx::compression::Fidelity;
-use clean_ctx::compressor::compress_file;
+use clean_ctx::compression::compress_file;
 use clean_ctx::dictionary::PathDictionary;
 use std::path::PathBuf;
 

@@ -475,9 +475,9 @@ pub fn build_configuration_properties_line(class_name: &str) -> String {
 ///
 /// Adding a new marker to the vocabulary only requires updating
 /// [`PhiLineKind`] — this function is generic and needs no edits.
-/// Called by `decompression::markers::expand_phi_in_line` when the
-/// `spring_boot` feature is enabled; always used by tests.
-#[cfg_attr(not(feature = "spring_boot"), allow(dead_code))]
+/// Called by `decompression::markers::expand_phi_in_line` (retired in Phase C1);
+/// kept for test-only round-trip validation.
+#[allow(dead_code)]
 pub fn expand_phi_in_line(line: &str) -> String {
     let mut s = line.to_string();
     for &kind in PhiLineKind::all_in_expand_order() {

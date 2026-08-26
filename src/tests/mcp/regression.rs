@@ -875,67 +875,6 @@ fn make_state(db_name: &str) -> (crate::mcp::McpState, TempDir) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// C-1 regression: workspace tokenizer created once, not per-file
-// ══════════════════════════════════════════════════════════════════
-
-#[test]
-fn regression_c1_workspace_tokenizer_created_once() {
-    // C-1 fix: tokenizer must be created once before the loop, not per-file.
-    // We verify this by checking that compress_workspace_dir completes
-    // without error and records stats for all files using the same tokenizer.
-    let tmp = TempDir::new().expect("failed to create temp dir");
-    let dir_path = tmp.path();
-
-    // Create two test files (use .rs to avoid tree-sitter TypeScript WASM deadlock on Windows)
-    std::fs::write(dir_path.join("a.rs"), "pub struct Foo { }").unwrap();
-    std::fs::write(dir_path.join("b.rs"), "pub struct Bar { }").unwrap();
-
-    let mut config = crate::tests::test_config();
-    config.persistence.enabled = false;
-    let state = crate::mcp::McpState::new(config);
-
-    // TIMING: Measure compress_workspace_dir to isolate slow operations
-    // let start = std::time::Instant::now();
-    let result = crate::mcp::workspace::compress_workspace_dir(
-        &dir_path.to_string_lossy(),
-        crate::compression::Fidelity::Low,
-        &state,
-    );
-
-    assert!(
-        result.is_ok(),
-        "workspace compression should succeed: {:?}",
-        result.err()
-    );
-    // eprintln!(
-    //     "[TIMING] compress_workspace_dir completed in {:?}",
-    //     start.elapsed()
-    // );
-    let workspace_result = result.unwrap();
-
-    // Both files should be in the manifest
-    let dir_str = dir_path.to_string_lossy();
-    assert!(
-        workspace_result.manifest.contains(&*dir_str),
-        "manifest should contain dir path, got: ...{}",
-        &workspace_result.manifest[..workspace_result.manifest.len().min(200)]
-    );
-
-    // Both files should have recorded stats (proving tokenizer was available)
-    let binding = state.session_stats_lock();
-    let summary = binding.summary();
-    // The global-symbols path may or may not record per-file stats depending
-    // on the compression path. The key assertion is that the manifest has
-    // content and the test completed without deadlocking.
-    assert!(
-        summary.total_files > 0 || workspace_result.manifest.len() > 100,
-        "should have either stats or manifest content, got {} files, manifest {} bytes",
-        summary.total_files,
-        workspace_result.manifest.len()
-    );
-}
-
-// ══════════════════════════════════════════════════════════════════
 // C-2 regression: context_history per-file shows session-level cache
 // ══════════════════════════════════════════════════════════════════
 

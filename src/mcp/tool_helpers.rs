@@ -3,7 +3,7 @@
 // Shared helper functions used by multiple tool handlers.
 // Extracted from tools.rs during the Phase 1 module split.
 
-use crate::compressor::Fidelity;
+use crate::compression::Fidelity;
 
 /// Phase A retirement tests: cfg(test)-only injection slot. When
 /// `Some(reason)`, the next IR compilation fails with an injected error so

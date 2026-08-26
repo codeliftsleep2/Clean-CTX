@@ -7,8 +7,5 @@
 
 pub(crate) mod path;
 pub(crate) mod symbol;
-pub(crate) mod workspace;
-
 pub use path::PathDictionary;
 pub use symbol::{SymbolDictionary, SymbolKind};
-pub use workspace::GlobalSymbolTable;

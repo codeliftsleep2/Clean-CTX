@@ -53,6 +53,9 @@ pub const PRIMITIVE_OPCODES: &[(&str, &str)] = &[
 ];
 
 /// Build a BTreeMap from opcode → token for fast lookup during expansion.
+/// Only used by the decompressor (retired in Phase C1); kept for
+/// test-only consistency validation.
+#[allow(dead_code)]
 pub(crate) fn builtin_opcode_map() -> std::collections::BTreeMap<&'static str, &'static str> {
     PRIMITIVE_OPCODES.iter().copied().collect()
 }

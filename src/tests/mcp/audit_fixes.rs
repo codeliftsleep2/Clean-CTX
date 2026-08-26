@@ -68,15 +68,15 @@ fn audit2_dispatch_returns_after_inline_arm() {
     // FAANG audit P1 #3: Each inline match arm must return so the
     // registry fallback does NOT fire. If a tool is only in the match
     // block and NOT in the registry, the registry should never trigger.
-    // We verify by calling decompress_code_context (only in match block)
+    // We verify by calling diff_commits (in match block but not registry)
     // and confirming it doesn't also hit the registry.
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params = serde_json::json!({
-        "arguments": { "compressedText": "// test" }
+        "arguments": { "fromRef": "HEAD~1", "workspaceRoot": "." }
     });
     // This should succeed without double-firing or panicking
-    crate::mcp::tools::dispatch_tools_call(&id, "decompress_code_context", &params, &state);
+    crate::mcp::tools::dispatch_tools_call(&id, "diff_commits", &params, &state);
     // If we get here, dispatch returned after the inline arm — no registry
     // double-fire occurred.
 }
@@ -192,22 +192,21 @@ fn audit6_ir_context_read_helper_works() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// AUDIT-7: Verify no dispatch double-fire for compress_workspace
+// AUDIT-7: Verify retired tools are not in registry
 // ══════════════════════════════════════════════════════════════════
 
 #[test]
-fn audit7_compress_workspace_not_in_registry() {
-    // compress_workspace is handled inline in the match block. If it were
-    // also in the registry (without a return), it would double-fire.
-    // Verify it's NOT in the registry.
+fn audit7_retired_tools_not_in_registry() {
+    // compress_workspace and decompress_code_context were retired in Phase C1.
+    // Verify they're NOT in the registry (they should fall through to "Tool not found").
     let registry = crate::mcp::tool_handlers::registry::create_default_registry();
     assert!(
         registry.get("compress_workspace").is_none(),
-        "AUDIT-7: compress_workspace should NOT be in registry (handled inline)"
+        "AUDIT-7: retired compress_workspace must not be in registry"
     );
     assert!(
         registry.get("decompress_code_context").is_none(),
-        "AUDIT-7: decompress_code_context should NOT be in registry"
+        "AUDIT-7: retired decompress_code_context must not be in registry"
     );
     // CBM tools should also NOT be in registry
     assert!(

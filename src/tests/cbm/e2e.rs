@@ -483,7 +483,7 @@ fn e2e_intelligence_layer_full_pipeline() {
     // Step 4: Apply recommendation
     let fidelity = apply_recommendation(&rec);
     if critical_score.combined_score > 0.8 {
-        assert_eq!(fidelity, Some(crate::compressor::Fidelity::High));
+        assert_eq!(fidelity, Some(crate::compression::Fidelity::High));
     }
 }
 

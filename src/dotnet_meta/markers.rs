@@ -584,10 +584,9 @@ pub fn build_metric_line(provider: &str) -> String {
 // ---------------------------------------------------------------------------
 
 /// Expand every recognised `Φ…` marker in a line back to its
-/// attribute form. Used by the decompressor.
-/// Called by `decompression::markers::expand_phi_in_line` when the
-/// `dotnet` feature is enabled; always used by tests.
-#[cfg_attr(not(feature = "dotnet"), allow(dead_code))]
+/// attribute form. Used by the decompressor (retired in Phase C1);
+/// kept for test-only round-trip validation.
+#[allow(dead_code)]
 pub fn expand_phi_in_line(line: &str) -> String {
     let mut s = line.to_string();
     for &kind in PhiLineKind::all_in_expand_order() {

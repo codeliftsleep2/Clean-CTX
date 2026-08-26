@@ -22,7 +22,6 @@
 pub mod analytics;
 pub mod cache;
 pub mod cbm;
-pub mod compressor;
 pub mod config;
 pub mod edit;
 pub mod intelligence;
@@ -34,7 +33,6 @@ pub mod queries;
 pub mod angular_meta;
 pub mod compaction;
 pub mod compression;
-pub mod decompression;
 pub mod dictionary;
 pub mod diff;
 pub mod dotnet_meta;

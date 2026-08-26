@@ -68,6 +68,9 @@ pub fn expand_marker(token: &str) -> Option<&'static str> {
 
 /// Expand every recognised marker in a line. Replaces non-overlapping
 /// matches; unknown tokens are left untouched.
+/// Only used by the decompressor (retired in Phase C1); kept for
+/// test-only round-trip validation.
+#[allow(dead_code)]
 pub fn expand_markers_in_line(line: &str) -> String {
     // We only operate on a small fixed set, so a per-marker replace is fine.
     let mut s = line.to_string();

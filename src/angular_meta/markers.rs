@@ -84,6 +84,7 @@ pub enum PhiLineKind {
 impl PhiLineKind {
     /// The `Φ` marker prefix for this kind (e.g. `"Φcmp:"`).
     /// For prefix-less tokens (`ΦBUNDLE`, `ΦMAP`) the colon is omitted.
+    #[allow(dead_code)]
     pub fn marker_prefix(self) -> &'static str {
         match self {
             Self::Component => "Φcmp:",
@@ -134,6 +135,7 @@ impl PhiLineKind {
     /// before shorter ones to prevent partial-match issues in string
     /// replacement (defensive — the current vocabulary has no overlaps,
     /// but this ordering is cheap insurance).
+    #[allow(dead_code)]
     pub fn all_in_expand_order() -> &'static [PhiLineKind] {
         &[
             Self::Injects,           // Φinjects:  (9 chars)
@@ -538,19 +540,9 @@ pub fn build_injects_line(types: &[String]) -> String {
 // ---------------------------------------------------------------------------
 
 /// Expand every recognised `Φ…` marker in a line back to its
-/// decorator form. Used by the decompressor.
-///
-/// This is the round-trip counterpart to the `build_*` helpers
-/// above. It is **deliberately conservative**: only the marker
-/// prefix is rewritten (`Φcmp:` → `@Component`); the trailing
-/// `key=value` attributes are left untouched because they are
-/// already human-readable in the compressed form.
-///
-/// Unknown `Φ` tokens (e.g. a future Phase marker) are passed
-/// through unchanged.
-///
-/// Adding a new marker to the vocabulary only requires updating
-/// [`PhiLineKind`] — this function is generic and needs no edits.
+/// decorator form. Used by the decompressor (retired in Phase C1);
+/// kept for test-only round-trip validation.
+#[allow(dead_code)]
 pub fn expand_phi_in_line(line: &str) -> String {
     let mut s = line.to_string();
     for &kind in PhiLineKind::all_in_expand_order() {

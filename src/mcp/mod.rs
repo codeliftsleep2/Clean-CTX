@@ -27,8 +27,6 @@ pub(crate) mod state;
 pub(crate) mod tool_handlers;
 pub(crate) mod tool_helpers;
 pub(crate) mod tools;
-pub(crate) mod workspace;
-pub(crate) mod workspace_util;
 
 pub use state::McpState;
 
