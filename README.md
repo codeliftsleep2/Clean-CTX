@@ -261,11 +261,10 @@ Disable in `.clean-ctx.json` with: `"persistence": { "enabled": false }`
 - **Content-hash cache** — identical files compress instantly on repeat calls
 - **Baseline snapshots** — `diff_code_context` remembers the previous state, producing small deltas instead of full re-compressions. Note: this baseline is **local to `diff_code_context`** (keyed by canonical path + fidelity in the session cache) — it is NOT seeded by `provide_code_context`/`compress_code_context`, so the first call on a file legitimately reports "No baseline snapshot for this file yet" and stores one for subsequent calls
 - **Raw-token count cache** — skip the BPE encode on cache hits (sub-millisecond responses)
-- **Workspace result cache** — `compress_workspace` caches the complete manifest keyed by file paths + mtimes + fidelity. Subsequent calls with no file changes return instantly (saves 5-15s per redundant call)
 
 ### Path Aliases
 
-Path aliases (`α1`, `α2`, …) are session-global — `compress_workspace` populates aliases that are immediately visible to subsequent `provide_code_context` calls, keeping the `§PATHMAP` footer stable across multiple tools. Aliases are pre-assigned deterministically before parallel compression to ensure `αN` numbering is stable across runs.
+Path aliases (`α1`, `α2`, …) are session-global — `provide_code_context` and `compress_code_context` populate aliases that are visible to all subsequent tools, keeping the `§PATHMAP` footer stable across multiple calls. Aliases are pre-assigned deterministically to ensure `αN` numbering is stable across runs.
 
 ### Multi-Platform Proxy
 
@@ -474,38 +473,6 @@ Every `provide_code_context` / `compress_code_context` / `restore_context` respo
 
 **High fidelity** adds `cf:` (control flow), `df:` (reads/writes), `se:` (side effect), `ec:` (execution context). **Edit fidelity appends each focused method's verbatim source body** — byte-exact. Types render exactly as captured.
 
-### Legacy notation — `$` opcodes & `⊕` markers (text-compressor pipeline only)
-
-The tables below are produced **only** by `compress_workspace` manifests baselines (decoded via `decompress_code_context`) — never by interactive responses. Fidelity-dependent: `⊕` at Medium/High; Low replaces them with `§` micro-codes (`§I`=⊕guard, `§L`=⊕loop, `§E`=⊕⇒, `§P`=$ctor) plus custom `$1…$N` symbols (§SYM footer).
-
-> **Phase A/B retirement (2026-08-25):** interactive tools no longer fall back to legacy notation (they return structured `ir_unavailable` errors), and the `delta_text_context` transport has been removed entirely. Legacy output now comes only from `compress_workspace` (Phase C candidate).
-
-### Built-in Primitives (34 opcodes)
-
-| Opcode | Token | Opcode | Token | Opcode | Token |
-|--------|-------|--------|-------|--------|-------|
-| `$c` | class | `$s` | string | `$b` | boolean |
-| `$n` | number | `$v` | void | `$a` | async |
-| `$e` | export | `$r` | return | `$t` | throw |
-| `$T` | true | `$F` | false | `$P` | Promise |
-| `$ctor` | constructor | `$fn` | function | `$E` | Error |
-| `$nw` | new | `$i` | if | `$fr` | for |
-| `$w` | while | `$h` | this | `$k` | const |
-| `$l` | let | `$pu` | public | `$pv` | private |
-| `$st` | static | `$x` | extends | `$m` | implements |
-| `$if` | interface | `$ty` | type | `$nl` | null |
-| `$ud` | undefined | `$fm` | from | `$im` | import |
-
-### Behavior markers (legacy Medium/High body text)
-
-| Marker | Meaning |
-|--------|---------|
-| `⊕guard` | Conditional branch (if statement) |
-| `⊕loop` | Iteration (for/while loop) |
-| `⊕⇒` | Return value follows |
-| `⊕!` | Throws error |
-| `⊕export` | Module export |
-
 ### Angular Meta-Layer Markers (Φ)
 
 | Marker | Meaning |
@@ -632,7 +599,6 @@ File: `settings.json` (Zed settings)
 
 The `cleanctx-notation` prompt provides system-level instructions to the AI explaining how to read and write Clean-CTX compressed notation. When loaded, the AI learns:
 - How to interpret the PRIMARY response notation (SCHEMA v2: `X/M/F/I/$` structure letters, `fl:` behavior flags, High-fidelity `cf:/df:/se:/ec:` metadata, verbatim bodies at Edit fidelity)
-- How to decode the LEGACY text-pipeline notation (`$c`, `$ctor`, `$s`, `⊕guard`, `⊕loop`) found only in `compress_workspace` output
 - How to interpret Angular and Spring Boot Meta-Layer markers
 - To respond in compressed form when appropriate
 - To never output raw opcode tables or metadata sections
