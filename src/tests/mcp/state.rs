@@ -54,6 +54,119 @@ fn read_source_nonexistent_file_returns_error() {
     assert!(result.is_err());
 }
 
+// ── read_source cache-refresh defect (side-discovery, 2026-08-24) ─────
+//
+// Mechanism: `McpState::read_source` Phase 3 used
+// `cache.entry(key).or_insert(entry)`. `or_insert` is a NO-OP when the
+// key is already occupied — which is exactly the stale-entry case it
+// needed to repair. Consequence after ANY external file write (host
+// editor save; only `apply_edit` calls `invalidate_source_cache`):
+//   read #1 populates the cache with v1 metadata/content;
+//   read #2 detects stale (mtime/size mismatch), re-reads v2 from disk,
+//           but Phase 3 leaves the v1 entry untouched;
+//   read #3..∞ repeat read #2 identically — a PERMANENT cache-miss
+//           (stat + full disk read + double lock acquisition) with the
+//           stale v1 `Arc<String>` pinned in memory forever.
+// Returned bytes were always fresh, so this was a caching/perf/memory
+// defect, never a correctness one. These tests pin the repaired
+// contract: Phase 3 must REFRESH an existing entry so the next read
+// converges back to a genuine cache HIT.
+
+#[test]
+fn read_source_returns_fresh_bytes_after_external_modification() {
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("tempdir");
+    let file = tmp.path().join("svc.rs");
+    let v1 = "pub struct ServiceA;\n";
+    std::fs::write(&file, v1).expect("write v1");
+
+    let state = McpState::new(crate::tests::test_config());
+
+    // Read #1 populates the cache with v1.
+    let r1 = state.read_source(file.to_str().unwrap()).unwrap();
+    assert_eq!(r1.as_str(), v1);
+
+    // EXTERNAL modification — deliberately NOT followed by
+    // invalidate_source_cache, matching the host-editor scenario.
+    let v2 = "pub struct ServiceAB;\npub struct ServiceCD;\n";
+    std::fs::write(&file, v2).expect("write v2");
+
+    // Correctness contract (already held pre-fix): fresh bytes.
+    let r2 = state.read_source(file.to_str().unwrap()).unwrap();
+    assert_eq!(r2.as_str(), v2);
+}
+
+#[test]
+fn read_source_third_read_is_served_from_the_refreshed_cache_entry() {
+    use std::sync::Arc;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("tempdir");
+    let file = tmp.path().join("svc.rs");
+    std::fs::write(&file, "pub struct ServiceA;\n").expect("write v1");
+
+    let state = McpState::new(crate::tests::test_config());
+    let _r1 = state.read_source(file.to_str().unwrap()).unwrap();
+
+    // External change without invalidation...
+    let v2 = "pub struct ServiceAB;\npub struct ServiceCD;\n";
+    std::fs::write(&file, v2).expect("write v2");
+    let r2 = state.read_source(file.to_str().unwrap()).unwrap();
+
+    // ...then a THIRD unchanged read must come from cache again.
+    // Pre-fix this allocated a brand-new Arc every time (permanent
+    // miss); post-fix the Phase-3 refresh makes this pointer-equal.
+    let r3 = state.read_source(file.to_str().unwrap()).unwrap();
+    assert!(
+        Arc::ptr_eq(&r2, &r3),
+        "read #3 must be served from the refreshed cache entry \
+         (pointer inequality means the cache never converged)"
+    );
+}
+
+#[test]
+fn read_source_phase3_updates_existing_entry_metadata_and_content() {
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("tempdir");
+    let file = tmp.path().join("svc.rs");
+    let v1 = "pub struct ServiceA;\n";
+    std::fs::write(&file, v1).expect("write v1");
+
+    let state = McpState::new(crate::tests::test_config());
+    let _r1 = state.read_source(file.to_str().unwrap()).unwrap();
+
+    let v2 = "pub struct ServiceAB;\npub struct ServiceCD;\n";
+    std::fs::write(&file, v2).expect("write v2");
+    let _r2 = state.read_source(file.to_str().unwrap()).unwrap();
+
+    // Direct mechanism proof (this module is a child module of
+    // state.rs, so the private map is inspectable): the stored entry
+    // must hold the CURRENT content/metadata, not the original
+    // snapshot. Pre-fix `or_insert` left v1 behind.
+    let key = McpState::resolve_cache_key(file.to_str().unwrap());
+    let expected_mtime = std::fs::metadata(&file).unwrap().modified().unwrap();
+    let cache = state.source_cache.lock().unwrap();
+    let entry = cache
+        .get(&key)
+        .expect("entry must exist after two successful reads");
+    assert_eq!(
+        entry.content.as_str(),
+        v2,
+        "cache must hold refreshed content, not the stale snapshot"
+    );
+    assert_eq!(
+        entry.size,
+        v2.len() as u64,
+        "cached size must match the current file"
+    );
+    assert_eq!(
+        entry.mtime, expected_mtime,
+        "cached mtime must match the current file"
+    );
+}
+
 #[test]
 fn state_accessor_mut_methods() {
     let state = McpState::new(crate::tests::test_config());

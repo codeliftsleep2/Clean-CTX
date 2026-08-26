@@ -680,12 +680,28 @@ impl McpState {
             path
         );
 
-        // P0-3: Insert or update cache entry with metadata
-        cache.entry(cache_key).or_insert(CacheEntry {
-            content: Arc::clone(&content),
-            mtime: current_mtime,
-            size: current_size,
-        });
+        // P0-3: Insert or REFRESH the cache entry with current metadata.
+        //
+        // Cache-refresh defect fix (2026-08-25): this previously used
+        // `cache.entry(cache_key).or_insert(...)`, which is a NO-OP
+        // whenever the key already exists — exactly the stale-entry case
+        // Phase 1 just detected. After any external file modification,
+        // the stale entry survived forever: every subsequent read took
+        // the STALE branch and re-read from disk (permanent cache-miss:
+        // stat + full I/O + double lock per read) while pinning the old
+        // content Arc in memory. Plain `insert` overwrites the entry so
+        // the next read converges back to a genuine cache HIT.
+        // Concurrency behavior is unchanged: the map is still mutated
+        // under the single brief Phase-3 lock; outstanding Arc clones
+        // held by other readers remain valid immutable snapshots.
+        cache.insert(
+            cache_key,
+            CacheEntry {
+                content: Arc::clone(&content),
+                mtime: current_mtime,
+                size: current_size,
+            },
+        );
 
         #[cfg(debug_assertions)]
         eprintln!(
