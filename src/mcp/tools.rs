@@ -121,19 +121,6 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             }
         }),
         serde_json::json!({
-            "name": "delta_text_context",
-            "description": "Text-level (line-oriented) delta compression for supported source-code files only — same language registry as delta_code_context (.ts/.js/.tsx/.jsx/.cs/.rs/.java). Not for arbitrary text formats such as markdown/json/yaml.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "filePath": { "type": "string" },
-                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
-                },
-                "required": ["filePath"]
-            }
-        }),
-        serde_json::json!({
             "name": "apply_delta",
             "description": "Applies an IR delta envelope to the in-session state machine.",
             "inputSchema": {

@@ -69,7 +69,6 @@ fn provide_code_context_cbm_skipped_when_intelligence_disabled() {
         None, // explicit_fidelity
         None, // explicit_intent
         &config,
-        &crate::compression::text_delta::TextDeltaComputer::new(),
         &crate::ir::replay::ContextState::new(),
         source,
         None, // path_alias
@@ -109,7 +108,6 @@ fn provide_code_context_cbm_informed_false_when_no_bridge() {
         None,
         None,
         &config,
-        &crate::compression::text_delta::TextDeltaComputer::new(),
         &crate::ir::replay::ContextState::new(),
         source,
         None,
@@ -140,7 +138,6 @@ fn provide_code_context_cbm_informed_false_on_explicit_fidelity() {
         Some("high"), // explicit_fidelity
         None,         // explicit_intent
         &config,
-        &crate::compression::text_delta::TextDeltaComputer::new(),
         &crate::ir::replay::ContextState::new(),
         source,
         None,

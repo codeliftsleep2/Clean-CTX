@@ -15,32 +15,6 @@ pub(crate) static TEST_INJECTED_IR_FAILURE: std::sync::Mutex<Option<String>> =
 use crate::mcp::McpState;
 use std::path::PathBuf;
 
-/// Compress a file and extract the body lines (without header) for
-/// delta comparison. Returns `(body_lines, full_output)`.
-///
-/// Thin MCP wrapper that reads source from state, then delegates to
-/// the pure [`crate::compression::pipeline::compress_text`] function.
-pub(super) fn compress_text_body(
-    file_path: &str,
-    fidelity: Fidelity,
-    state: &McpState,
-) -> Result<(Vec<String>, String), Box<dyn std::error::Error>> {
-    // Use source_cache via state.read_source() — Finding 1
-    let source_code_arc = state.read_source(file_path)?;
-    let source_code = source_code_arc.as_ref().clone();
-    let path_buf = std::path::PathBuf::from(file_path);
-    let extension = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
-    let path_alias = state.get_or_create_alias(file_path.to_string());
-
-    crate::compression::pipeline::compress_text(
-        &source_code,
-        extension,
-        fidelity,
-        &path_alias,
-        Some(&state.config.type_aliases),
-    )
-}
-
 /// Resolve a file path, handling relative paths with optional workspace root.
 pub(super) fn resolve_file_path(path: &str, workspace_root: Option<&str>) -> String {
     let path_obj = std::path::Path::new(path);

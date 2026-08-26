@@ -6,7 +6,7 @@
 // marker tables: the PRIMARY response notation (SCHEMA v2) must stay
 // taught first, High/Edit behaviors must stay documented, and the
 // retired text-compressor vocabulary must remain explicitly scoped to
-// the legacy section (compress_workspace / delta_text_context).
+// the legacy section (compress_workspace).
 
 use super::SYSTEM_PROMPT;
 

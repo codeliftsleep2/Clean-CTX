@@ -6,7 +6,7 @@
 pub(crate) const SYSTEM_PROMPT: &str = concat!(
     "# Clean-CTX Notation Guide\n\n",
     "# Clean-CTX Notation Guide\n\n",
-    "You are working with Clean-CTX structured code context. Responses use ONE LLM-facing notation: SCHEMA v2 (below). The separate workspace/text-delta outputs of `compress_workspace` and `delta_text_context` are legacy compressed text — decode those with `decompress_code_context` instead of by hand.\n\n",
+    "You are working with Clean-CTX structured code context. Responses use ONE LLM-facing notation: SCHEMA v2 (below). The separate workspace manifests of `compress_workspace` are legacy compressed text — decode those with `decompress_code_context` instead of by hand.\n\n",
     "## Response Notation (SCHEMA v2)\n\n",
     "Every provide_code_context / compress_code_context / restore_context response starts with this legend:\n\n",
     "`// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias`\n\n",

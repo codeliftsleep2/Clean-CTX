@@ -313,7 +313,6 @@ src/
 │   ├── report.rs                 # Output report formatting
 │   ├── pipeline.rs               # Non-streaming orchestrator
 │   ├── streaming.rs              # Streaming orchestrator (with progress callbacks)
-│   ├── text_delta.rs             # Phase IV: delta-aware text compression (line-level)
 │   ├── scope_defaults.rs         # Scope default application per fidelity
 │   ├── micro_opcodes.rs          # Micro-opcode expansion for ultra-compact output
 │   └── workspace_symbols.rs      # Global symbol table for workspace compression
@@ -421,7 +420,6 @@ Clean-CTX offers two delta transport mechanisms — text-level and IR-level. Bot
 
 | Pipeline | Granularity | CPU Savings vs Full ReCompress | Best For |
 |----------|-------------|:------------------------------:|----------|
-| Text-level (`delta_text_context`) | Line-level diffs of compressed body | ~70-90% | Rapid edit sessions with small changes |
 | IR-level (`delta_code_context`) | Instruction-level diffs of compiled IR | Field-patch encoding | Structured code analysis, workspace-aware refactoring |
 
 ### 50-Edit Session Results
@@ -528,7 +526,6 @@ Two delta pipelines serve different scenarios:
 
 | Pipeline | Granularity | Best For | Overhead |
 |----------|-------------|----------|----------|
-| Text-level (`delta_text_context`) | Line-level diffs of compressed body | Rapid edit sessions with small changes | ~70-90% savings vs full recompression |
 | IR-level (`delta_code_context`) | Instruction-level diffs of compiled IR | Structured code analysis, workspace-aware refactoring | Field-patch encoding for maximum compactness |
 
 The text-level pipeline is faster and simpler for quick edits. The IR pipeline preserves structural semantics and enables workspace-level cross-file analysis.

@@ -478,7 +478,6 @@ The state machine supports:
 |------|---------|-------------|
 | `compress_code_context` | `handle_compress_code_context` | IR-first compression with encoding selection |
 | `delta_code_context` | `handle_delta_code_context` | IR-level delta computation |
-| `delta_text_context` | `handle_delta_text_context` | Text-level delta (backward compat) |
 | `apply_delta` | `handle_apply_delta` | Client-side state update |
 | `provide_code_context` | `handle_provide_code_context` | Zero-touch entry point (auto-detect + delta) |
 | `restore_context` | `handle_restore_context` | Force full re-compression |

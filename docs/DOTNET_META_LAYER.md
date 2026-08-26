@@ -1,8 +1,8 @@
-# .NET / C# Meta-Layer
+﻿# .NET / C# Meta-Layer
 
-> **Owner:** .NET/C# Meta-Layer design (R-35, R-41/R-42) · **Status:** Living per-layer reference (shipped)
+> **Owner:** .NET/C# Meta-Layer design (R-35  R-41/R-42) · **Status:** Living per-layer reference (shipped)
 >
-> **Implementation:** Phase 1 (C# Core) complete with full ASP.NET Core, EF Core, SignalR, AutoMapper, and DI support. The .NET meta-layer is now integrated and available via the dotnet Cargo feature flag (enabled by default).
+> **Implementation:** Phase 1 (C# Core) complete with full ASP.NET Core  EF Core  SignalR  AutoMapper  and DI support. The .NET meta-layer is now integrated and available via the dotnet Cargo feature flag (enabled by default).
 > **Ship status:** see `docs/ROADMAP.md`. **Test counts / audit rounds:** see `docs/CHANGELOG.md`. This document does not duplicate them.
 
 ---
@@ -12,9 +12,9 @@
 | Question | Decision |
 |----------|----------|
 | Compiler approach | String-based extraction on tree-sitter C# captures (same strategy as Angular/Spring Boot). No re-parse of AST. |
-| Marker approach | `Φ`-prefixed markers, no new opcodes. Opcodes stay language-agnostic primitives. |
+| Marker approach | `Φ`-prefixed markers  no new opcodes. Opcodes stay language-agnostic primitives. |
 | Phasing | Three independently shippable phases. Stop after any phase for a useful Meta-Layer. |
-| Default state | On, opt-out via `.clean-ctx.json`. Non-.NET files pay zero overhead. |
+| Default state | On  opt-out via `.clean-ctx.json`. Non-.NET files pay zero overhead. |
 | Workspace scope | Tier 1 (per-file markers) works in both modes. Tiers 2 & 3 are workspace-only. |
 | New dependencies | None. Uses existing `tree-sitter-c-sharp` grammar (already in `Cargo.toml`). |
 | Feature flag | `dotnet` — depends on `csharp` feature. Registered in `LayerRegistry`. |
@@ -25,12 +25,12 @@
 
 | Prefix | Job | Examples |
 |--------|-----|---------|
-| `$xx` | Opcodes — language primitives | `$c` = class, `$ctor` = constructor, `$a` = async |
-| `⊕` | Behavior markers — control-flow annotations | `⊕guard`, `⊕loop`, `⊕⇒`, `⊕!` |
+| `$xx` | Opcodes — language primitives | `$c` = class  `$ctor` = constructor  `$a` = async |
+| `⊕` | Behavior markers — control-flow annotations | `⊕guard`  `⊕loop`  `⊕⇒`  `⊕!` |
 | `α / β / γ` | Path aliases — file references | `α7` = `/path/to/file.cs` |
-| `Φ` (new) | Framework-annotation markers | `Φctrl:`, `Φef:`, `Φhub:`, `Φmap:`, `Φsvc:`, `Φdi:` |
+| `Φ` (new) | Framework-annotation markers | `Φctrl:`  `Φef:`  `Φhub:`  `Φmap:`  `Φsvc:`  `Φdi:` |
 
-> **Notation scope:** `$xx` opcodes and `⊕` markers are emitted by the LEGACY text compressor (`compress_workspace` manifests, `delta_text_context`; `⊕` at Medium/High, `§` micro-codes at Low) and decoded by `decompress_code_context`. Interactive `provide_code_context` / `compress_code_context` responses use SCHEMA v2 notation instead (`X`/`M`/`F`/`I` structure letters, `fl:` flag codes, `@` meta annotations). The `Φ` framework vocabulary itself remains current for .NET meta output.
+> **Notation scope:** `$xx` opcodes and `⊕` markers are emitted by the LEGACY text compressor (`compress_workspace` manifests; `⊕` at Medium/High, `§` micro-codes at Low) and decoded by `decompress_code_context`. Interactive responses use SCHEMA v2 notation instead. The `Φ` framework vocabulary remains current.
 
 ---
 
@@ -42,7 +42,7 @@
 |--------|-----------|-------------|
 | `Φctrl:` | `[Controller]` / `[ApiController]` | Controller / route summary |
 | `Φapi:` | `[ApiController]` | ApiController details |
-| `Φaction:` | HTTP action | Verb, parameters, return type |
+| `Φaction:` | HTTP action | Verb  parameters  return type |
 | `Φmodel:` | Input/output models | Request/response DTOs |
 | `Φauth:` | `[Authorize]` | Authorization rules |
 
@@ -61,7 +61,7 @@
 | Marker | Expansion | Description |
 |--------|-----------|-------------|
 | `Φmap:` | `Profile` | Mapper profile |
-| `Φmapfrom:` | `CreateMap<TSrc, TDst>()` | CreateMap + mappings |
+| `Φmapfrom:` | `CreateMap<TSrc  TDst>()` | CreateMap + mappings |
 | `Φignore:` | `ForMember().Ignore()` | Ignored members |
 | `Φproj:` | `ProjectTo<T>()` | Projections |
 
@@ -104,22 +104,22 @@
 
 | Marker | Expansion | Description |
 |--------|-----------|-------------|
-| `Φidentity:` | `UserManager` / `SignInManager` | UserManager, SignInManager, IdentityUser |
-| `Φauth:` | `[Authorize]` | Authorization — policy-based, claims, roles |
+| `Φidentity:` | `UserManager` / `SignInManager` | UserManager  SignInManager  IdentityUser |
+| `Φauth:` | `[Authorize]` | Authorization — policy-based  claims  roles |
 | `Φjwt:` | JWT | JWT configuration / token generation |
 
 ### Caching
 
 | Marker | Expansion | Description |
 |--------|-----------|-------------|
-| `Φcache:` | `IMemoryCache` / `IDistributedCache` | Memory cache, distributed cache, `[ResponseCache]` |
+| `Φcache:` | `IMemoryCache` / `IDistributedCache` | Memory cache  distributed cache  `[ResponseCache]` |
 | `Φoutput:` | Output caching | Output caching middleware |
 
 ### Background Jobs
 
 | Marker | Expansion | Description |
 |--------|-----------|-------------|
-| `Φjob:` | `BackgroundJob` / `RecurringJob` | Hangfire background jobs, recurring jobs, attributes |
+| `Φjob:` | `BackgroundJob` / `RecurringJob` | Hangfire background jobs  recurring jobs  attributes |
 
 ### Logging / Telemetry
 
@@ -138,14 +138,14 @@
   Φaction:POST Create([FromBody] request)
 
 Φhub:NotificationHub
-  Φmethod:SendToUser(userId, message) → Clients.User
+  Φmethod:SendToUser(userId  message) → Clients.User
   Φclient:INotificationClient.Receive(...)
 
 Φef:AppDbContext
-  Φdbset:Users, Orders
-  Φentity:Order { Id, UserId (FK) }
+  Φdbset:Users  Orders
+  Φentity:Order { Id  UserId (FK) }
 
-Φdi:UserService → AddScoped<IUserService, UserService>
+Φdi:UserService → AddScoped<IUserService  UserService>
 Φdi:AppDbContext → AddDbContext<AppDbContext>(connectionString)
 ```
 
@@ -155,7 +155,7 @@
 
 ### Goal
 
-Deliver high-value compression for the primary .NET tech stack: ASP.NET Core, EF Core, SignalR, AutoMapper, and serialization. This phase alone gives the LLM controller routes, hub methods, DbContext shape, and DI registration context.
+Deliver high-value compression for the primary .NET tech stack: ASP.NET Core  EF Core  SignalR  AutoMapper  and serialization. This phase alone gives the LLM controller routes  hub methods  DbContext shape  and DI registration context.
 
 ### Scope
 
@@ -163,16 +163,16 @@ Deliver high-value compression for the primary .NET tech stack: ASP.NET Core, EF
 
 | Action | File | Purpose |
 |--------|------|---------|
-| Create | `src/dotnet_meta/mod.rs` | Public surface, `MetaBlock` struct, `run_meta_layer` entry point, `GraphCollector` |
-| Create | `src/dotnet_meta/detect.rs` | AST-based .NET file detection (ASP.NET attributes, `: Controller`, `: DbContext`, `: Hub<T>`, etc.) |
-| Create | `src/dotnet_meta/aspnet.rs` | Controller/Minimal API detection — `[ApiController]`, `[Route]`, `[HttpGet]`, method params, return types |
-| Create | `src/dotnet_meta/efcore.rs` | Entity Framework — `DbContext`, `DbSet<T>`, `[Key]`, `[ForeignKey]`, `[Table]`, Fluent API via `OnModelCreating` |
-| Create | `src/dotnet_meta/automapper.rs` | AutoMapper profiles — `CreateMap<TSrc, TDst>()`, `ForMember()`, `Ignore()`, `ProjectTo()` |
-| Create | `src/dotnet_meta/signalr.rs` | SignalR — `Hub<T>`, `[HubMethodName]`, strongly-typed `IClientProxy`, streaming `ChannelReader<T>`, groups, `IHubContext` injection |
-| Create | `src/dotnet_meta/serialization.rs` | `[JsonPropertyName]`, `[JsonIgnore]`, `[DataMember]`, `[IgnoreDataMember]`, `[JsonConverter]` |
-| Create | `src/dotnet_meta/general.rs` | `[Service]`, DI registration (`AddScoped`/`AddSingleton`/`AddTransient`/`AddDbContext`), validation attributes (`[Required]`, `[StringLength]`), exception filters |
-| Create | `src/dotnet_meta/markers.rs` | All Φ marker types — `PhiLineKind` enum, marker structs, `build_*` functions, `expand_phi_in_line` |
-| Create | `src/dotnet_meta/graph.rs` | DI graph — service → controller → EF context resolution, hub → client interface links |
+| Create | `src/dotnet_meta/mod.rs` | Public surface  `MetaBlock` struct  `run_meta_layer` entry point  `GraphCollector` |
+| Create | `src/dotnet_meta/detect.rs` | AST-based .NET file detection (ASP.NET attributes  `: Controller`  `: DbContext`  `: Hub<T>`  etc.) |
+| Create | `src/dotnet_meta/aspnet.rs` | Controller/Minimal API detection — `[ApiController]`  `[Route]`  `[HttpGet]`  method params  return types |
+| Create | `src/dotnet_meta/efcore.rs` | Entity Framework — `DbContext`  `DbSet<T>`  `[Key]`  `[ForeignKey]`  `[Table]`  Fluent API via `OnModelCreating` |
+| Create | `src/dotnet_meta/automapper.rs` | AutoMapper profiles — `CreateMap<TSrc  TDst>()`  `ForMember()`  `Ignore()`  `ProjectTo()` |
+| Create | `src/dotnet_meta/signalr.rs` | SignalR — `Hub<T>`  `[HubMethodName]`  strongly-typed `IClientProxy`  streaming `ChannelReader<T>`  groups  `IHubContext` injection |
+| Create | `src/dotnet_meta/serialization.rs` | `[JsonPropertyName]`  `[JsonIgnore]`  `[DataMember]`  `[IgnoreDataMember]`  `[JsonConverter]` |
+| Create | `src/dotnet_meta/general.rs` | `[Service]`  DI registration (`AddScoped`/`AddSingleton`/`AddTransient`/`AddDbContext`)  validation attributes (`[Required]`  `[StringLength]`)  exception filters |
+| Create | `src/dotnet_meta/markers.rs` | All Φ marker types — `PhiLineKind` enum  marker structs  `build_*` functions  `expand_phi_in_line` |
+| Create | `src/dotnet_meta/graph.rs` | DI graph — service → controller → EF context resolution  hub → client interface links |
 | Create | `src/dotnet_meta/graph_state.rs` | `DotnetGraphHandle` — McpState integration (mirrors `AngularGraphHandle`) |
 | Create | `src/dotnet_meta/footer.rs` | `§ΦMAP` workspace footer for .NET bundles |
 
@@ -206,7 +206,7 @@ Deliver high-value compression for the primary .NET tech stack: ASP.NET Core, EF
 | Create | `src/tests/dotnet_meta/markers.rs` | Φ marker round-trip tests |
 | Create | `src/tests/dotnet_meta/graph.rs` | Graph build + resolution tests |
 | Create | `src/tests/dotnet_meta/footer.rs` | Footer formatting tests |
-| Create | `src/test_files/dotnet/` | Test fixtures (Controllers, Hubs, DbContexts, Profiles) |
+| Create | `src/test_files/dotnet/` | Test fixtures (Controllers  Hubs  DbContexts  Profiles) |
 
 ### Completion Criteria — Phase 1
 
@@ -214,12 +214,12 @@ You will know Phase 1 is complete when **all** of the following are true:
 
 **Functional**
 - A `.cs` file with `[ApiController]` + `[Route("api/users")]` produces a `// --- Φ .NET Meta ---` block below the existing compacted class.
-- The block contains `Φctrl:`, `Φaction:`, `Φmodel:`, `Φauth:` lines as appropriate.
-- A `Hub<T>` file produces `Φhub:`, `Φmethod:`, `Φclient:`, `Φgroup:`, `Φstream:` lines.
-- A `DbContext` file produces `Φef:`, `Φdbset:`, `Φentity:`, `Φrel:`, `Φcfg:` lines.
-- An AutoMapper `Profile` produces `Φmap:`, `Φmapfrom:`, `Φignore:`, `Φproj:` lines.
-- DI registrations (`AddScoped`, `AddSingleton`, `AddTransient`, `AddDbContext`) produce `Φdi:` lines.
-- Validation attributes (`[Required]`, `[StringLength]`) produce `Φcommon:` lines.
+- The block contains `Φctrl:`  `Φaction:`  `Φmodel:`  `Φauth:` lines as appropriate.
+- A `Hub<T>` file produces `Φhub:`  `Φmethod:`  `Φclient:`  `Φgroup:`  `Φstream:` lines.
+- A `DbContext` file produces `Φef:`  `Φdbset:`  `Φentity:`  `Φrel:`  `Φcfg:` lines.
+- An AutoMapper `Profile` produces `Φmap:`  `Φmapfrom:`  `Φignore:`  `Φproj:` lines.
+- DI registrations (`AddScoped`  `AddSingleton`  `AddTransient`  `AddDbContext`) produce `Φdi:` lines.
+- Validation attributes (`[Required]`  `[StringLength]`) produce `Φcommon:` lines.
 
 **Non-regression**
 - A non-.NET `.cs` file produces **zero** Φ markers and **zero** newlines of overhead.
@@ -227,15 +227,15 @@ You will know Phase 1 is complete when **all** of the following are true:
 - `cargo clippy --all-targets -- -D warnings` is clean.
 
 **Round-trip**
-- `decompress_code_context` expands `Φctrl:` → `[Controller]`, `Φhub:` → `[Hub]`, etc.
+- `decompress_code_context` expands `Φctrl:` → `[Controller]`  `Φhub:` → `[Hub]`  etc.
 - The expanded output is human-readable and preserves all original class names.
 
 **Tests**
-- New unit tests: detector (positive + negative), extraction (each .NET subsystem), marker round-trip, graph build.
+- New unit tests: detector (positive + negative)  extraction (each .NET subsystem)  marker round-trip  graph build.
 - At least 12 new test files.
 - All tests pass.
 
-**Effort:** 5-7 days. **Risk:** Low-Medium (additive, no existing API changes, zero new deps).
+**Effort:** 5-7 days. **Risk:** Low-Medium (additive  no existing API changes  zero new deps).
 
 ---
 
@@ -249,14 +249,14 @@ You will know Phase 1 is complete when **all** of the following are true:
 
 ### Goal
 
-Polish the meta-layers for real-world pilot usage: cross-layer CBM integration, per-domain stats, pilot config preset, comprehensive test fixtures, and documentation.
+Polish the meta-layers for real-world pilot usage: cross-layer CBM integration  per-domain stats  pilot config preset  comprehensive test fixtures  and documentation.
 
 ### Scope
 
 | Action | File | Purpose |
 |--------|------|---------|
 | Create | `.clean-ctx-pilot.json` | Pilot config preset with optimal fidelity settings |
-| Modify | `src/mcp/tool_handlers/stats/mod.rs` | Per-domain `context_stats` breakdown (EF, SignalR, NgRx, etc.) |
+| Modify | `src/mcp/tool_handlers/stats/mod.rs` | Per-domain `context_stats` breakdown (EF  SignalR  NgRx  etc.) |
 | Modify | `src/cbm/bridge.rs` | Cross-layer CBM edges — backend C# controller ↔ frontend Angular service |
 | Create | `src/test_files/dotnet/pilot/` | Realistic multi-file .NET project fixture |
 | Create | `src/test_files/angular/pilot/` | Realistic multi-file Angular project fixture |
@@ -268,14 +268,14 @@ Polish the meta-layers for real-world pilot usage: cross-layer CBM integration, 
 **Pilot Config Preset (`.clean-ctx-pilot.json`):**
 ```json
 {
-  "fidelity": "medium",
+  "fidelity": "medium" 
   "meta_layers": {
-    "dotnet": { "enabled": true },
-    "angular": { "enabled": true },
+    "dotnet": { "enabled": true } 
+    "angular": { "enabled": true } 
     "spring_boot": { "enabled": false }
-  },
+  } 
   "resource_limits": {
-    "max_file_size": 10485760,
+    "max_file_size": 10485760 
     "max_workspace_files": 10000
   }
 }
@@ -289,24 +289,24 @@ Polish the meta-layers for real-world pilot usage: cross-layer CBM integration, 
 
 | Risk | Mitigation |
 |------|------------|
-| **Generic-heavy code** (AutoMapper, EF) | tree-sitter C# grammar handles generics `<T>`; string scanners look for `CreateMap<`, `DbSet<`, `Hub<` patterns |
-| **Partial classes & source generators** | tree-sitter can't resolve partial class merging; detect `partial class` and emit a `⊕partial` marker |
-| **SignalR streaming** | `ChannelReader<T>` return types on hub methods signal streaming; `IAsyncEnumerable<T>` is another pattern |
-| **Strongly-typed SignalR clients** | Detect `Hub<T>` where `T : class` is the client interface; extract method signatures from the interface |
-| **Version differences (.NET 6-9)** | Target the common subset (attributes stable since .NET 6); version-specific markers added later |
+| **Generic-heavy code** (AutoMapper  EF) | tree-sitter C# grammar handles generics `<T>` string scanners look for `CreateMap<`  `DbSet<`  `Hub<` patterns |
+| **Partial classes & source generators** | tree-sitter can't resolve partial class merging detect `partial class` and emit a `⊕partial` marker |
+| **SignalR streaming** | `ChannelReader<T>` return types on hub methods signal streaming `IAsyncEnumerable<T>` is another pattern |
+| **Strongly-typed SignalR clients** | Detect `Hub<T>` where `T : class` is the client interface extract method signatures from the interface |
+| **Version differences (.NET 6-9)** | Target the common subset (attributes stable since .NET 6) version-specific markers added later |
 | **Attribute vs Fluent patterns in EF** | Detect both `[Key]` attributes and `HasKey()` Fluent API calls in `OnModelCreating` |
-| **AutoMapper complex lambdas** | `ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.FullName))` — string-based fallback scanning |
+| **AutoMapper complex lambdas** | `ForMember(dest => dest.Name  opt => opt.MapFrom(src => src.FullName))` — string-based fallback scanning |
 | **Performance on large DbContexts/Hubs** | Limit extraction to top-N DbSets/methods per class (configurable via fidelity) |
 
 ---
 
 ## Must-Haves for Pilot Success
 
-- [ ] High-fidelity support for Controllers, DbContexts, Hubs, and NgRx stores
-- [ ] Clear, LLM-friendly Φ markers
+- [ ] High-fidelity support for Controllers  DbContexts  Hubs  and NgRx stores
+- [ ] Clear  LLM-friendly Φ markers
 - [ ] Cross-file / cross-language graph edges (via CBM)
 - [ ] Strong fallback behavior (string-based when AST fails)
-- [ ] Detailed `context_stats` per domain (EF, SignalR, NgRx, etc.)
+- [ ] Detailed `context_stats` per domain (EF  SignalR  NgRx  etc.)
 - [ ] Pilot-specific configuration & documentation with before/after examples
 
 ---

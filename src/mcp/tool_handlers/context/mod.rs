@@ -17,17 +17,18 @@ pub(crate) fn handle_context_history(id: &Value, params: &Value, state: &McpStat
 
     if let Some(fp) = file_path {
         let path_alias = state.get_or_create_alias(fp.to_string());
-        let version = state.text_delta_lock().file_version(&path_alias);
-        let has_ir = state.file_version(&path_alias).is_some();
+        let ir_version = state.file_version(&path_alias);
         let store_meta = state.context_store.load_latest(fp).ok().flatten();
 
         let mut lines = Vec::new();
         lines.push(format!("File: {}", fp));
-        lines.push(format!("  Text Delta Versions: {}", version));
         lines.push(format!(
             "  IR Baseline: {}",
-            if has_ir { "yes" } else { "no" }
+            if ir_version.is_some() { "yes" } else { "no" }
         ));
+        if let Some(v) = ir_version {
+            lines.push(format!("  IR Version: {}", v));
+        }
         lines.push(format!(
             "  Context Store: {}",
             if store_meta.is_some() { "yes" } else { "no" }

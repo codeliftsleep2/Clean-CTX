@@ -32,3 +32,7 @@ pub(crate) mod tool_handlers_tests;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/phase_a_retirement.rs"]
 pub(crate) mod phase_a_retirement_tests;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/phase_b_retirement.rs"]
+pub(crate) mod phase_b_retirement_tests;

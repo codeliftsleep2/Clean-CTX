@@ -128,48 +128,6 @@ fn audit3_restore_clears_persistence_db() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// AUDIT-4: delta_text_context stores baseline snapshot
-// ══════════════════════════════════════════════════════════════════
-
-#[test]
-fn audit4_delta_text_stores_baseline() {
-    // FAANG audit P1 #2: delta_text_context should actually store the baseline
-    // snapshot. On first call, has_baseline() should return false, then after
-    // the call it should return true.
-    let (state, _tmp) = make_state("audit4.db");
-
-    let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("main.rs");
-    let rs_path = rs_file.to_string_lossy().to_string();
-    let alias = state.get_or_create_alias(rs_path.clone());
-
-    // Before any delta_text call, has_baseline should be false
-    {
-        let td = state.text_delta_lock();
-        assert!(
-            !td.has_baseline(&alias),
-            "AUDIT-4: baseline should NOT exist before first call"
-        );
-    }
-
-    // Call delta_text_context (first call stores baseline)
-    let id = serde_json::json!(1);
-    let params = serde_json::json!({
-        "arguments": { "filePath": rs_path, "fidelity": "low" }
-    });
-    crate::mcp::tools::dispatch_tools_call(&id, "delta_text_context", &params, &state);
-
-    // After the call, has_baseline should be true
-    let td = state.text_delta_lock();
-    assert!(
-        td.has_baseline(&alias),
-        "AUDIT-4: baseline SHOULD exist after first delta_text_context call"
-    );
-    drop(td);
-}
-
-// ══════════════════════════════════════════════════════════════════
 // AUDIT-5: list_sessions returns result for disabled persistence
 // ══════════════════════════════════════════════════════════════════
 
@@ -382,7 +340,6 @@ fn audit11_helper_methods_compile() {
     drop(state.ir_context_lock());
     let _gb = state.graph_bridge_lock();
     let _ag = state.angular_graph_lock();
-    let _td = state.text_delta_lock();
     let _llm = state.llm_text_cache_lock();
     state.push_warning("test");
     let _drained = state.drain_warnings();

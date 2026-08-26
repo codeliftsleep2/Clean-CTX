@@ -86,13 +86,6 @@ pub fn create_default_registry() -> HandlerRegistry {
     );
     register_tool!(
         reg,
-        "delta_text_context",
-        Box::new(|id, params, state| {
-            crate::mcp::tool_handlers::core::handle_delta_text_context(id, params, state);
-        })
-    );
-    register_tool!(
-        reg,
         "apply_delta",
         Box::new(|id, params, state| {
             crate::mcp::tool_handlers::core::handle_apply_delta(id, params, state);

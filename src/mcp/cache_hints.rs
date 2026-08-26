@@ -301,8 +301,8 @@ pub fn generate_vocabulary_text() -> String {
         "Φcmp/Φdir/Φpipe/Φsvc/Φmod/Φin/Φout …  Angular meta-layer markers (current)",
         "Φctrl/Φef/Φhub/Φmap …  .NET meta-layer markers (current)",
         "",
-        "Note: compress_workspace manifests and delta_text_context emit a legacy",
-        "compressed-text format — decode via decompress_code_context.",
+        "Note: compress_workspace manifests emit a legacy compressed-text",
+        "format — decode via decompress_code_context.",
     ];
     lines.join("\n")
 }

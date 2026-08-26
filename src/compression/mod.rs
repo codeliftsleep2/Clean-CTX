@@ -31,7 +31,6 @@ pub(crate) mod report;
 pub(crate) mod scope_defaults;
 pub(crate) mod streaming;
 pub(crate) mod symbol_compression;
-pub(crate) mod text_delta;
 // R-02: Type-aware compression — replaces configured type names with
 // short alias tokens (`UserId` → `$uid`) and emits a reversible `§TA`
 // footer. Wired into `compress_file_with_source`, `compress_text`, and

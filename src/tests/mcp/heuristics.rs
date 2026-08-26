@@ -5,7 +5,6 @@
 // + regression tests for FAANG audit findings
 
 use crate::compression::Fidelity;
-use crate::compression::text_delta::TextDeltaComputer;
 use crate::config::CleanCtxConfig;
 use crate::ir::replay::ContextState;
 use crate::mcp::heuristics;
@@ -16,7 +15,6 @@ fn decide_ok(
     explicit_fidelity: Option<&str>,
     explicit_intent: Option<&str>,
     config: &CleanCtxConfig,
-    text_delta: &TextDeltaComputer,
     ir_ctx: &ContextState,
     source: &str,
     path_alias: Option<&str>,
@@ -27,7 +25,6 @@ fn decide_ok(
         explicit_fidelity,
         explicit_intent,
         config,
-        text_delta,
         ir_ctx,
         source,
         path_alias,
@@ -45,14 +42,12 @@ fn empty_source() -> &'static str {
 #[test]
 fn test_first_call_full_compress() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let decision = decide_ok(
         "/test/file.ts",
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         empty_source(),
         None,
@@ -62,20 +57,25 @@ fn test_first_call_full_compress() {
 }
 
 #[test]
-fn test_delta_after_baseline() {
+fn test_delta_after_ir_baseline() {
     let config = CleanCtxConfig::default();
-    let mut text_delta = TextDeltaComputer::new();
-    let ir_ctx = ContextState::new();
+    let mut ir_ctx = ContextState::new();
 
-    // Store a baseline first
-    text_delta.store_snapshot("alpha1", vec!["line1".to_string()]);
+    // Seed an IR baseline, as if a prior call compiled this file.
+    ir_ctx.load_ir(
+        crate::ir::compiler::CompiledIR {
+            file_id: "alpha1".to_string(),
+            instructions: vec![],
+            version: 1,
+        },
+        None,
+    );
 
     let decision = decide_ok(
         "alpha1",
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         empty_source(),
         Some("alpha1"),
@@ -97,11 +97,17 @@ fn test_delta_after_baseline() {
 #[test]
 fn test_explicit_fidelity_change_forces_full_compress() {
     let config = CleanCtxConfig::default();
-    let mut text_delta = TextDeltaComputer::new();
-    let ir_ctx = ContextState::new();
+    let mut ir_ctx = ContextState::new();
 
-    // Store a baseline first (as if a prior call compressed this file).
-    text_delta.store_snapshot("alpha1", vec!["line1".to_string()]);
+    // Seed an IR baseline, as if a prior call compressed this file.
+    ir_ctx.load_ir(
+        crate::ir::compiler::CompiledIR {
+            file_id: "alpha1".to_string(),
+            instructions: vec![],
+            version: 1,
+        },
+        None,
+    );
 
     // Explicit fidelity change → delta would be incompatible.
     let decision = decide_ok(
@@ -109,7 +115,6 @@ fn test_explicit_fidelity_change_forces_full_compress() {
         Some("edit"),
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         empty_source(),
         Some("alpha1"),
@@ -123,18 +128,23 @@ fn test_explicit_fidelity_change_forces_full_compress() {
 #[test]
 fn test_explicit_intent_change_forces_full_compress() {
     let config = CleanCtxConfig::default();
-    let mut text_delta = TextDeltaComputer::new();
-    let ir_ctx = ContextState::new();
+    let mut ir_ctx = ContextState::new();
 
-    // Store a baseline first (as if a baseline was compressed earlier).
-    text_delta.store_snapshot("alpha1", vec!["line1".to_string()]);
+    // Seed an IR baseline, as if a baseline was compressed earlier.
+    ir_ctx.load_ir(
+        crate::ir::compiler::CompiledIR {
+            file_id: "alpha1".to_string(),
+            instructions: vec![],
+            version: 1,
+        },
+        None,
+    );
 
     let decision = decide_ok(
         "alpha1",
         None,
         Some("edit"),
         &config,
-        &text_delta,
         &ir_ctx,
         empty_source(),
         Some("alpha1"),
@@ -148,14 +158,12 @@ fn test_explicit_intent_change_forces_full_compress() {
 #[test]
 fn test_intent_refactor_high_fidelity() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let decision = decide_ok(
         "/test/file.ts",
         None,
         Some("refactor"),
         &config,
-        &text_delta,
         &ir_ctx,
         empty_source(),
         None,
@@ -167,14 +175,12 @@ fn test_intent_refactor_high_fidelity() {
 #[test]
 fn test_intent_overview_low_fidelity() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let decision = decide_ok(
         "/test/file.ts",
         None,
         Some("overview"),
         &config,
-        &text_delta,
         &ir_ctx,
         empty_source(),
         None,
@@ -188,7 +194,6 @@ fn test_intent_overview_low_fidelity() {
 #[test]
 fn test_large_file_v2_complexity_medium() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let large_source: String = (0..500).map(|i| format!("line {}\n", i)).collect();
     let decision = decide_ok(
@@ -196,7 +201,6 @@ fn test_large_file_v2_complexity_medium() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         &large_source,
         None,
@@ -213,7 +217,6 @@ fn test_large_file_v2_complexity_medium() {
 #[test]
 fn test_small_file_v2_complexity_low() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let small_source: String = (0..150).map(|i| format!("line {}\n", i)).collect();
     let decision = decide_ok(
@@ -221,7 +224,6 @@ fn test_small_file_v2_complexity_low() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         &small_source,
         None,
@@ -239,7 +241,6 @@ fn test_small_file_v2_complexity_low() {
 #[test]
 fn test_angular_detection() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let angular_source = r#"
         import { Component } from '@angular/core';
@@ -251,7 +252,6 @@ fn test_angular_detection() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         angular_source,
         None,
@@ -263,14 +263,12 @@ fn test_angular_detection() {
 #[test]
 fn test_non_angular_not_detected() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let decision = decide_ok(
         "/test/file.ts",
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         "export class PlainClass {}",
         None,
@@ -282,14 +280,12 @@ fn test_non_angular_not_detected() {
 #[test]
 fn test_decision_summary_includes_details() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let decision = decide_ok(
         "/test/file.ts",
         None,
         Some("edit"),
         &config,
-        &text_delta,
         &ir_ctx,
         empty_source(),
         None,
@@ -313,7 +309,6 @@ fn test_decision_summary_includes_details() {
 #[test]
 fn test_v2_classify_test_file() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let test_source = "#[test]\nfn test_foo() { assert!(true); }";
     let decision = decide_ok(
@@ -321,7 +316,6 @@ fn test_v2_classify_test_file() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         test_source,
         None,
@@ -338,14 +332,12 @@ fn test_v2_classify_test_file() {
 #[test]
 fn test_v2_classify_test_path() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let decision = decide_ok(
         "/src/__tests__/utils.ts",
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         "export function add(a: number, b: number): number { return a + b; }",
         None,
@@ -362,14 +354,12 @@ fn test_v2_classify_test_path() {
 #[test]
 fn test_v2_classify_config_file() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let decision = decide_ok(
         "/project/src/config.rs",
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         "pub struct Config { pub db_path: String }",
         None,
@@ -387,14 +377,12 @@ fn test_v2_classify_config_file() {
 #[test]
 fn test_v2_m3_configure_not_config() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let decision = decide_ok(
         "/project/src/configure.rs",
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         "pub fn configure() {}",
         None,
@@ -411,7 +399,6 @@ fn test_v2_m3_configure_not_config() {
 #[test]
 fn test_v2_classify_model_file() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let model_source = r#"
 pub struct User { pub name: String, pub age: u32 }
@@ -424,7 +411,6 @@ pub trait Displayable { fn display(&self) -> String; }
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         model_source,
         None,
@@ -442,7 +428,6 @@ pub trait Displayable { fn display(&self) -> String; }
 #[test]
 fn test_v2_m1_impl_blocks_not_structs() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     // File with 1 struct and 5 impl blocks (method implementations)
     // Before M-1 fix: struct_count = 6 (1 struct + 5 impl) -> model classification
@@ -466,7 +451,6 @@ impl std::fmt::Display for User {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         source,
         None,
@@ -484,7 +468,6 @@ impl std::fmt::Display for User {
 #[test]
 fn test_v2_m2_test_helper_not_test_file() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let source = "fn test_connection() -> bool { true }\npub fn connect() { }";
     let decision = decide_ok(
@@ -492,7 +475,6 @@ fn test_v2_m2_test_helper_not_test_file() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         source,
         None,
@@ -510,7 +492,6 @@ fn test_v2_m2_test_helper_not_test_file() {
 #[test]
 fn test_v2_c1_stored_fidelity_reused() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let source = "pub fn do_stuff() { }";
     let decision = decide_ok(
@@ -518,7 +499,6 @@ fn test_v2_c1_stored_fidelity_reused() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         source,
         None,
@@ -535,7 +515,6 @@ fn test_v2_c1_stored_fidelity_reused() {
 #[test]
 fn test_v2_c1_explicit_overrides_stored() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let source = "pub fn do_stuff() { }";
     let decision = decide_ok(
@@ -543,7 +522,6 @@ fn test_v2_c1_explicit_overrides_stored() {
         Some("low"),
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         source,
         None,
@@ -561,7 +539,6 @@ fn test_v2_c1_explicit_overrides_stored() {
 fn test_v2_c1_disabled_ignores_stored() {
     let mut config = CleanCtxConfig::default();
     config.heuristics.session_aware_fidelity = false;
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let source = "pub fn do_stuff() { }";
     let decision = decide_ok(
@@ -569,7 +546,6 @@ fn test_v2_c1_disabled_ignores_stored() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         source,
         None,
@@ -590,7 +566,6 @@ fn test_v2_classify_service_file() {
     // Isolate the classifier's native Service→High mapping from the
     // auto-edit override (which is covered by its own tests).
     config.heuristics.auto_edit_mode = false;
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let mut source = String::new();
     for i in 0..16 {
@@ -607,7 +582,6 @@ fn test_v2_classify_service_file() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         &source,
         None,
@@ -627,7 +601,6 @@ fn test_v2_classify_implementation_file() {
     // Isolate the classifier's native Implementation→Medium mapping from
     // the auto-edit override (which is covered by its own tests).
     config.heuristics.auto_edit_mode = false;
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let impl_source = r#"
 use std::collections::HashMap;
@@ -646,7 +619,6 @@ pub fn list_users() -> Vec<User> {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         impl_source,
         None,
@@ -667,14 +639,12 @@ pub fn list_users() -> Vec<User> {
 #[test]
 fn test_v2_complexity_very_small_low() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let decision = decide_ok(
         "/project/src/lib.rs",
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         "pub fn add(a: i32, b: i32) -> i32 { a + b }",
         None,
@@ -690,7 +660,6 @@ fn test_v2_complexity_very_small_low() {
 #[test]
 fn test_v2_complexity_medium_imports() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let mut source = String::new();
     for i in 0..12 {
@@ -702,7 +671,6 @@ fn test_v2_complexity_medium_imports() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         &source,
         None,
@@ -721,7 +689,6 @@ fn test_v2_complexity_high() {
     // Isolate the complexity classifier's native High mapping from
     // the auto-edit override.
     config.heuristics.auto_edit_mode = false;
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let mut source = String::new();
     for i in 0..25 {
@@ -741,7 +708,6 @@ fn test_v2_complexity_high() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         &source,
         None,
@@ -757,7 +723,6 @@ fn test_v2_complexity_high() {
 #[test]
 fn test_v2_explicit_fidelity_overrides_classifier() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let mut source = String::new();
     for i in 0..20 {
@@ -771,7 +736,6 @@ fn test_v2_explicit_fidelity_overrides_classifier() {
         Some("low"),
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         &source,
         None,
@@ -788,7 +752,6 @@ fn test_v2_explicit_fidelity_overrides_classifier() {
 fn test_v2_auto_classify_disabled_v1_fallback() {
     let mut config = CleanCtxConfig::default();
     config.heuristics.auto_classify = false;
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let large_source: String = (0..500).map(|i| format!("line {}\n", i)).collect();
     let decision = decide_ok(
@@ -796,7 +759,6 @@ fn test_v2_auto_classify_disabled_v1_fallback() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         &large_source,
         None,
@@ -820,7 +782,6 @@ fn test_v2_classify_component_html_implementation() {
     // Isolate the classifier's native Implementation→Medium mapping from
     // the auto-edit override.
     config.heuristics.auto_edit_mode = false;
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let html = r#"<div class="container"><app-card [data]="cardData"></app-card></div>"#;
     let decision = decide_ok(
@@ -828,7 +789,6 @@ fn test_v2_classify_component_html_implementation() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         html,
         None,
@@ -845,7 +805,6 @@ fn test_v2_classify_component_html_implementation() {
 #[test]
 fn test_v2_component_html_edit_intent_high_fidelity() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let html = r#"<div><span>{{ name }}</span></div>"#;
     let decision = decide_ok(
@@ -853,7 +812,6 @@ fn test_v2_component_html_edit_intent_high_fidelity() {
         None,
         Some("edit"),
         &config,
-        &text_delta,
         &ir_ctx,
         html,
         None,
@@ -874,14 +832,12 @@ fn test_v2_component_html_edit_intent_high_fidelity() {
 #[test]
 fn test_invalid_explicit_fidelity_returns_error() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let result = heuristics::decide(
         "/project/src/service.ts",
         Some("full"), // invalid — not a recognized fidelity
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         "export class Foo {}",
         None,
@@ -901,14 +857,12 @@ fn test_invalid_explicit_fidelity_returns_error() {
 #[test]
 fn test_valid_explicit_fidelity_succeeds() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let result = heuristics::decide(
         "/project/src/service.ts",
         Some("edit"),
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         "export class Foo {}",
         None,
@@ -922,14 +876,12 @@ fn test_valid_explicit_fidelity_succeeds() {
 #[test]
 fn test_intent_edit_maps_to_edit_fidelity() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let decision = decide_ok(
         "/project/src/service.ts",
         None,
         Some("edit"),
         &config,
-        &text_delta,
         &ir_ctx,
         "export class Foo {}",
         None,
@@ -947,7 +899,6 @@ fn test_intent_edit_maps_to_edit_fidelity() {
 #[test]
 fn test_auto_edit_mode_service_file() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let mut source = String::new();
     for i in 0..16 {
@@ -964,7 +915,6 @@ fn test_auto_edit_mode_service_file() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         &source,
         None,
@@ -981,7 +931,6 @@ fn test_auto_edit_mode_service_file() {
 #[test]
 fn test_auto_edit_mode_implementation_file() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let impl_source = r#"
 use std::collections::HashMap;
@@ -996,7 +945,6 @@ pub fn get_user(id: u32) -> Option<User> {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         impl_source,
         None,
@@ -1014,7 +962,6 @@ pub fn get_user(id: u32) -> Option<User> {
 fn test_auto_edit_mode_disabled_keeps_high() {
     let mut config = CleanCtxConfig::default();
     config.heuristics.auto_edit_mode = false;
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let mut source = String::new();
     for i in 0..16 {
@@ -1031,7 +978,6 @@ fn test_auto_edit_mode_disabled_keeps_high() {
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         &source,
         None,
@@ -1049,7 +995,6 @@ fn test_auto_edit_mode_disabled_keeps_high() {
 fn test_auto_edit_mode_custom_classifications() {
     let mut config = CleanCtxConfig::default();
     config.heuristics.edit_auto_classifications = vec!["model".to_string()];
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let model_source = r#"
 pub struct User { pub name: String, pub age: u32 }
@@ -1061,7 +1006,6 @@ pub enum Status { Active, Inactive }
         None,
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         model_source,
         None,
@@ -1077,7 +1021,6 @@ pub enum Status { Active, Inactive }
 #[test]
 fn test_v2_component_html_explicit_fidelity_overrides() {
     let config = CleanCtxConfig::default();
-    let text_delta = TextDeltaComputer::new();
     let ir_ctx = ContextState::new();
     let html = r#"<div><span>{{ name }}</span></div>"#;
     let decision = decide_ok(
@@ -1085,7 +1028,6 @@ fn test_v2_component_html_explicit_fidelity_overrides() {
         Some("low"),
         None,
         &config,
-        &text_delta,
         &ir_ctx,
         html,
         None,

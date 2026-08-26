@@ -110,7 +110,7 @@ Add to your MCP settings (see [IDE Configuration](#ide-configuration) below for 
 }
 ```
 
-Restart your editor. The tools `provide_code_context`, `compress_code_context`, `decompress_code_context`, `compress_workspace`, `diff_code_context`, `delta_code_context`, `delta_text_context`, `apply_delta`, `context_stats`, `context_history`, `save_context`, `list_sessions`, `replay_history`, `purge_old_deltas`, and `restore_context` will be available.
+Restart your editor. The tools `provide_code_context`, `compress_code_context`, `decompress_code_context`, `compress_workspace`, `diff_code_context`, `delta_code_context`, `apply_delta`, `context_stats`, `context_history`, `save_context`, `list_sessions`, `replay_history`, `purge_old_deltas`, and `restore_context` will be available.
 
 ---
 
@@ -236,7 +236,6 @@ For Spring Boot Java projects, Clean-CTX automatically detects framework annotat
 | `compress_workspace` | Entire directory → single compressed manifest |
 | `diff_code_context` | Source file → AST-level change-set (`+` / `-` / `~` / `=`) |
 | `delta_code_context` | IR-level delta compression — instruction-level deltas between compiled IR states |
-| `delta_text_context` | Line-oriented deltas between snapshots of **supported source-code files only** (same language registry as `delta_code_context`) — not for arbitrary text formats |
 | `apply_delta` | Client-side state update — applies IR delta to in-session state machine |
 
 ### Persistence Layer (Built-in)
@@ -477,9 +476,9 @@ Every `provide_code_context` / `compress_code_context` / `restore_context` respo
 
 ### Legacy notation — `$` opcodes & `⊕` markers (text-compressor pipeline only)
 
-The tables below are produced **only** by `compress_workspace` manifests and `delta_text_context` baselines (decoded via `decompress_code_context`) — never by interactive responses. Fidelity-dependent: `⊕` at Medium/High; Low replaces them with `§` micro-codes (`§I`=⊕guard, `§L`=⊕loop, `§E`=⊕⇒, `§P`=$ctor) plus custom `$1…$N` symbols (§SYM footer).
+The tables below are produced **only** by `compress_workspace` manifests baselines (decoded via `decompress_code_context`) — never by interactive responses. Fidelity-dependent: `⊕` at Medium/High; Low replaces them with `§` micro-codes (`§I`=⊕guard, `§L`=⊕loop, `§E`=⊕⇒, `§P`=$ctor) plus custom `$1…$N` symbols (§SYM footer).
 
-> **Phase A retirement (2026-08-25):** the interactive tools (`provide_code_context`, `compress_code_context`, `restore_context`) no longer fall back to this notation when IR compilation fails — they return a structured `ir_unavailable` JSON-RPC error instead. Legacy output now comes **only** from `compress_workspace` and `delta_text_context`; both are scheduled for migration in Phases B/C.
+> **Phase A/B retirement (2026-08-25):** interactive tools no longer fall back to legacy notation (they return structured `ir_unavailable` errors), and the `delta_text_context` transport has been removed entirely. Legacy output now comes only from `compress_workspace` (Phase C candidate).
 
 ### Built-in Primitives (34 opcodes)
 
@@ -633,7 +632,7 @@ File: `settings.json` (Zed settings)
 
 The `cleanctx-notation` prompt provides system-level instructions to the AI explaining how to read and write Clean-CTX compressed notation. When loaded, the AI learns:
 - How to interpret the PRIMARY response notation (SCHEMA v2: `X/M/F/I/$` structure letters, `fl:` behavior flags, High-fidelity `cf:/df:/se:/ec:` metadata, verbatim bodies at Edit fidelity)
-- How to decode the LEGACY text-pipeline notation (`$c`, `$ctor`, `$s`, `⊕guard`, `⊕loop`) found only in `compress_workspace` / `delta_text_context` output
+- How to decode the LEGACY text-pipeline notation (`$c`, `$ctor`, `$s`, `⊕guard`, `⊕loop`) found only in `compress_workspace` output
 - How to interpret Angular and Spring Boot Meta-Layer markers
 - To respond in compressed form when appropriate
 - To never output raw opcode tables or metadata sections

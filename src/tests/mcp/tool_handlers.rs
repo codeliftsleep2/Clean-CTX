@@ -281,26 +281,6 @@ fn delta_code_context_cached_ir_path_does_not_panic() {
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
 }
 
-// REGRESSION: The "No changes" path in `delta_text_context` must not panic.
-#[test]
-fn delta_text_context_no_changes_path_does_not_panic() {
-    let state = crate::mcp::McpState::new(crate::tests::test_config());
-    let id = serde_json::json!(1);
-    let params =
-        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
-    dispatch_tools_call(&id, "delta_text_context", &params, &state);
-    dispatch_tools_call(&id, "delta_text_context", &params, &state);
-}
-
-#[test]
-fn handle_delta_text_context_no_baseline() {
-    let state = crate::mcp::McpState::new(crate::tests::test_config());
-    let id = json!(1);
-    let params = json!({ "arguments": { "filePath": "/nonexistent/file.ts", "fidelity": "low" } });
-    // Should not panic — stores text delta baseline, returns full output
-    dispatch_tools_call(&id, "delta_text_context", &params, &state);
-}
-
 #[test]
 fn handle_apply_delta_no_baseline() {
     let state = crate::mcp::McpState::new(crate::tests::test_config());
@@ -746,15 +726,6 @@ fn handle_delta_code_context_accepts_relative_path() {
     let params =
         serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
     dispatch_tools_call(&id, "delta_code_context", &params, &state);
-}
-
-#[test]
-fn handle_delta_text_context_accepts_relative_path() {
-    let state = crate::mcp::McpState::new(crate::tests::test_config());
-    let id = serde_json::json!(1);
-    let params =
-        serde_json::json!({ "arguments": { "filePath": "src/lib.rs", "fidelity": "low" } });
-    dispatch_tools_call(&id, "delta_text_context", &params, &state);
 }
 
 #[test]

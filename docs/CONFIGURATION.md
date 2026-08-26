@@ -396,7 +396,6 @@ into JSON-RPC responses. This is the **consumer contract** for LLM clients
 | `provide_code_context` (full) | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |
 | `provide_code_context` (delta) | `tail` | `rolling` | `tail_ttl` |
 | `delta_code_context` | `tail` | `rolling` | `tail_ttl` |
-| `delta_text_context` | `tail` | `rolling` | `tail_ttl` |
 | `apply_delta` | `tail` | `rolling` | `tail_ttl` |
 | `diff_code_context` | `tail` | `rolling` | `tail_ttl` |
 | `restore_context` | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |

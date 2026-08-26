@@ -22,7 +22,6 @@
 //   6. Config's `default_fidelity` → last resort.
 
 use crate::compression::Fidelity;
-use crate::compression::text_delta::TextDeltaComputer;
 use crate::config::CleanCtxConfig;
 use crate::ir::replay::ContextState;
 use std::path::Path;
@@ -507,7 +506,6 @@ pub fn decide(
     explicit_fidelity: Option<&str>,
     explicit_intent: Option<&str>,
     config: &CleanCtxConfig,
-    text_delta_state: &TextDeltaComputer,
     ir_context: &ContextState,
     source: &str,
     // The dict alias (e.g. "α1") for this file — used to look up
@@ -570,7 +568,6 @@ pub fn decide(
     // Determine strategy: check for baselines using the dict alias
     // (where they're actually stored), falling back to raw path.
     let check_key = path_alias.unwrap_or(file_path);
-    let has_delta_baseline = text_delta_state.has_baseline(check_key);
     let has_ir_baseline = ir_context.has_file(check_key);
 
     // Delta transport only makes sense when the prior baseline was
@@ -581,10 +578,7 @@ pub fn decide(
     // producing a bare summary line with no structured payload. Force a
     // full compress in that case so the response is always consumable.
     let explicit_fidelity_or_intent = explicit_fidelity.is_some() || explicit_intent.is_some();
-    let strategy = if config.auto_delta
-        && !explicit_fidelity_or_intent
-        && (has_delta_baseline || has_ir_baseline)
-    {
+    let strategy = if config.auto_delta && !explicit_fidelity_or_intent && has_ir_baseline {
         ContextStrategy::DeltaTransport
     } else {
         ContextStrategy::FullCompress

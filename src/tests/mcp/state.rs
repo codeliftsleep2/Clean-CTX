@@ -174,7 +174,6 @@ fn state_accessor_mut_methods() {
     let _dict = state.dict_lock().get_or_create_alias("test.rs".to_string());
     let _cache = state.cache_write();
     let _ir = state.ir_context_lock();
-    let _td = &state.text_delta;
 }
 
 // ── Non-CBM Tool Audit 2026-08-25, finding #3 ────────────────────────

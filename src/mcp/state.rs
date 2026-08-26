@@ -19,7 +19,6 @@
 
 use crate::angular_meta::graph_state::AngularGraphHandle;
 use crate::cache::LocalStateCache;
-use crate::compression::text_delta::TextDeltaComputer;
 use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
 use crate::dotnet_meta::graph_state::DotnetGraphHandle;
@@ -154,11 +153,6 @@ pub struct McpState {
     /// Enables delta-based state transport: load full IR on first
     /// compress, then apply deltas on subsequent edits.
     pub ir_context: RwLock<ContextState>,
-    /// Phase IV (Idea #12): Text-level delta compressor.
-    /// Stores compressed body snapshots per file and computes
-    /// line-level deltas for delta-based text transport.
-    /// Wrapped in Mutex for interior mutability (v0.2.0+).
-    pub text_delta: Mutex<TextDeltaComputer>,
     /// F-FULL-01/F-FULL-05: Shared file-content cache keyed by raw path.
     /// All I/O paths check this cache first, populating it on first read.
     /// Subsequent reads (from IR compiler, bundle_pass, graph_pass) are
@@ -295,7 +289,6 @@ impl McpState {
             dotnet_graph: Mutex::new(DotnetGraphHandle::new()),
             spring_graph: Mutex::new(SpringGraphHandle::new()),
             ir_context: RwLock::new(ContextState::new()),
-            text_delta: Mutex::new(TextDeltaComputer::new()),
             source_cache: Mutex::new(HashMap::new()),
             warnings: Mutex::new(Vec::new()),
             session_stats: Mutex::new(session_stats),
@@ -554,11 +547,6 @@ impl McpState {
     /// that the caller embeds in the response's `_warnings` field.
     pub fn drain_warnings(&self) -> Vec<String> {
         std::mem::take(&mut *lock_or_recover!(self.warnings.lock(), "warnings"))
-    }
-
-    /// Lock the text delta computer for mutation.
-    pub fn text_delta_lock(&self) -> std::sync::MutexGuard<'_, TextDeltaComputer> {
-        lock_or_recover!(self.text_delta.lock(), "text_delta")
     }
 
     /// Resolve a cache key for `source_cache`. On Windows, `canonicalize`

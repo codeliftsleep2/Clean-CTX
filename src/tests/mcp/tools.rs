@@ -70,7 +70,6 @@ fn schema_includes_workspace_root_on_path_resolving_tools() {
         "compress_code_context",
         "diff_code_context",
         "delta_code_context",
-        "delta_text_context",
         "restore_context",
         "provide_code_context",
         "compress_workspace",

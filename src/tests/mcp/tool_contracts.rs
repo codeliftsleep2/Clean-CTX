@@ -5,12 +5,12 @@
 // These tests encode the INTENDED contract of tools whose name/description
 // had drifted from their actual behavior, so the drift cannot silently
 // return:
-//   - `delta_text_context` operates ONLY on supported source-code files
-//     (same language registry as `delta_code_context`); the description
-//     must say so (audit finding #5).
 //   - `list_sessions` enumerates persisted CONTEXTS (the only real rows
 //     in the persistence model — there is no session concept); the
 //     description must not promise session objects (audit finding #6).
+//
+// (`delta_text_context` audit pin #5 was removed with the tool itself in
+// the Phase B legacy-transport retirement.)
 
 use crate::mcp::tools::tool_list;
 use serde_json::Value;
@@ -23,22 +23,6 @@ fn description_of(tool_name: &str) -> String {
         .as_str()
         .unwrap_or_default()
         .to_string()
-}
-
-/// Audit #5: the "text" in delta_text_context means a text-based diff
-/// STRATEGY for code files — the description must not imply arbitrary
-/// text formats work.
-#[test]
-fn delta_text_context_description_pins_code_only_contract() {
-    let desc = description_of("delta_text_context");
-    assert!(
-        desc.contains("source-code"),
-        "description must state source-code scope, got: {desc}"
-    );
-    assert!(
-        desc.to_lowercase().contains("not for arbitrary text"),
-        "description must warn against arbitrary text formats, got: {desc}"
-    );
 }
 
 /// Audit #6: list_sessions lists persisted CONTEXTS (no session concept

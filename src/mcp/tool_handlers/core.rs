@@ -16,7 +16,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use super::super::tool_helpers::{
-    compile_file_ir, compile_file_ir_focused, compress_text_body, count_tokens_with_tokenizer,
+    compile_file_ir, compile_file_ir_focused, count_tokens_with_tokenizer,
     diff_code_context_handler, inject_baseline_breakpoint, inject_tail_breakpoint,
     resolve_file_path_checked,
 };
@@ -493,92 +493,6 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     }
 }
 
-// ── Handler: delta_text_context ───────────────────────────────────
-
-pub(crate) fn handle_delta_text_context(id: &Value, params: &Value, state: &McpState) {
-    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
-    let workspace_root = params["arguments"]["workspaceRoot"].as_str();
-    let resolved_path = match resolve_file_path_checked(
-        file_path_str,
-        workspace_root,
-        &state.config.additional_roots,
-    ) {
-        Ok(p) => p,
-        Err(msg) => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": { "code": -32602, "message": msg }
-            }));
-            return;
-        }
-    };
-    let fidelity = match parse_fidelity_arg(id, params, &state.config) {
-        Ok(f) => f,
-        Err(()) => return,
-    };
-    match compress_text_body(&resolved_path, fidelity, state) {
-        Ok((body_lines, full_output)) => {
-            let alias = state.get_or_create_alias(resolved_path.clone());
-            let mut td = state.text_delta_lock();
-            if td.has_baseline(&alias) {
-                if let Some(delta) = td.compute_delta(&alias, &body_lines) {
-                    // Store updated baseline for next call
-                    td.store_snapshot(&alias, body_lines.clone());
-                    drop(td);
-                    let mut response = serde_json::json!({
-                        "jsonrpc": "2.0", "id": id,
-                        "result": {
-                            "content": [{ "type": "text", "text": delta.to_wire_format() }],
-                            "added": delta.adds.len(),
-                            "removed": delta.dels.len(),
-                            "modified": delta.mods.len(),
-                        }
-                    });
-                    // Delta output is rolling dynamic content — mark as tail (ephemeral).
-                    inject_tail_breakpoint(&mut response, state);
-                    send_response(&response);
-                } else {
-                    drop(td);
-                    let mut response = serde_json::json!({
-                        "jsonrpc": "2.0", "id": id,
-                        "result": {
-                            "content": [{ "type": "text", "text": "No changes since last call." }]
-                        }
-                    });
-                    // "No changes" is a stable response — inject baseline breakpoint
-                    // so the client can cache the unchanged output.
-                    if let Some(text) = response["result"]["content"][0]["text"].as_str() {
-                        let text_owned = text.to_string();
-                        inject_baseline_breakpoint(&mut response, state, &text_owned);
-                    }
-                    send_response(&response);
-                }
-            } else {
-                // Actually store the baseline snapshot on first call
-                td.store_snapshot(&alias, body_lines.clone());
-                drop(td);
-                let mut response = serde_json::json!({
-                    "jsonrpc": "2.0", "id": id,
-                    "result": {
-                        "content": [{ "type": "text", "text": format!("Baseline stored for {}.\nCall again after edits.\n\nFull output:\n{}", alias, full_output) }],
-                        "stored": true
-                    }
-                });
-                // Baseline stored — this is a stable snapshot, inject baseline breakpoint.
-                if let Some(text) = response["result"]["content"][0]["text"].as_str() {
-                    let text_owned = text.to_string();
-                    inject_baseline_breakpoint(&mut response, state, &text_owned);
-                }
-                send_response(&response);
-            }
-        }
-        Err(e) => send_response(&serde_json::json!({
-            "jsonrpc": "2.0", "id": id,
-            "error": { "code": -32603, "message": e.to_string() }
-        })),
-    }
-}
-
 // ── Handler: apply_delta ──────────────────────────────────────────
 
 pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
@@ -809,14 +723,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
 
     // Phase 1: Heuristics decision
     let heuristics_start = Instant::now();
-    let td_guard = state.text_delta_lock();
     let ir_read = state.ir_context_read();
     let decision = match crate::mcp::heuristics::decide(
         &resolved_path,
         explicit_fidelity,
         explicit_intent,
         &state.config,
-        &td_guard,
         &ir_read,
         source,
         Some(&alias),
@@ -831,7 +743,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             return;
         }
     };
-    drop(td_guard);
     drop(ir_read);
     let heuristics_ms = heuristics_start.elapsed().as_millis() as u64;
 
