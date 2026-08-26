@@ -497,22 +497,6 @@ Every `provide_code_context` / `compress_code_context` / `restore_context` respo
 | `Φgraph:` | Cross-file dependency graph edge |
 | `§ΦGRAPH` | Workspace dependency graph footer section |
 
-### Spring Boot Meta-Layer Markers (Φ)
-
-| Marker | Meaning |
-|--------|---------|
-| `Φrest:` | `@RestController` with request mappings |
-| `Φctrl:` | `@Controller` with request mappings |
-| `Φsvc:` | `@Service` component |
-| `Φrepo:` | `@Repository` component |
-| `Φconf:` | `@Configuration` component |
-| `Φmap:` | `@RequestMapping` / `@GetMapping` / etc. method mappings |
-| `Φaut:` | `@Autowired` field injection |
-| `Φval:` | `@Value` property injection |
-| `Φbean:` | `@Bean` method definition |
-| `Φprop:` | `@ConfigurationProperties` class |
-| `Φpropf:` | Properties file structural shape |
-
 ---
 
 ## IDE Configuration
