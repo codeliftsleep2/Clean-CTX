@@ -1,4 +1,4 @@
-﻿# Angular Meta-Layer — Design & Marker Vocabulary
+# Angular Meta-Layer — Design & Marker Vocabulary
 
 > **Owner:** Angular Meta-Layer design (Phases 1–4) · **Status:** Living per-layer reference (shipped)
 >

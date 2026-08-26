@@ -1,15 +1,15 @@
-﻿# Clean-CTX â€” Token Waste Reducer & Structured Transport Protocol
+# Clean-CTX - Token Waste Reducer & Structured Transport Protocol
 
-> **ðŸš€ Version 0.4.0** â€” A local-first, air-gapped MCP server that reduces LLM token waste through four independent mechanisms:
+> **Version 0.4.0** - A local-first, air-gapped MCP server that reduces LLM token waste through four independent mechanisms:
 
 | Mechanism | Savings | What it affects |
 |-----------|---------|-----------------|
-| **CBM symbol filtering** | 30â€“50% fewer tokens | Drops low-importance symbols before compression |
-| **Compression** (3 fidelities) | 75â€“97% vs raw source | Every `provide_code_context` / `compress_code_context` response |
-| **Tool output filtering** (26 filters) | 70â€“90% on tool results | Proxy-collapsed build/lint/test output |
+| **CBM symbol filtering** | 30-50% fewer tokens | Drops low-importance symbols before compression |
+| **Compression** (3 fidelities) | 75-97% vs raw source | Every `provide_code_context` / `compress_code_context` response |
+| **Tool output filtering** (26 filters) | 70-90% on tool results | Proxy-collapsed build/lint/test output |
 | **Prompt caching** (proxy) | ~90% API cost savings | Repeated turns via Anthropic/OpenAI/DeepSeek |
 
-**Delta transport** is a CPU-savings layer (up to 53% faster re-compiles) â€” it does **not** reduce LLM tokens. The LLM receives the same full compressed output either way.
+**Delta transport** is a CPU-savings layer (up to 53% faster re-compiles) - it does **not** reduce LLM tokens. The LLM receives the same full compressed output either way.
 
 Supports **TypeScript, C#, Rust, Java** with **Angular, Spring Boot, .NET** meta-layers, IR-level delta protocol, SCHEMA v2 response notation, and a multi-platform proxy with auto-cache + tool filters + secret scrubbing.
 
@@ -38,17 +38,18 @@ Clean-CTX uses Cargo **feature flags** to control which languages and meta-layer
 
 | Category | Feature | Implies | Includes | Build With | Default |
 |----------|---------|---------|----------|------------|---------|
-| **Language** | `typescript` | â€” | Base TypeScript/JavaScript grammar | `--features typescript` | âœ… |
-| **Language** | `csharp` | â€” | Base C# grammar | `--features csharp` | âœ… |
-| **Language** | `rust` | â€” | Base Rust grammar | `--features rust` | âŒ |
-| **Language** | `java` | â€” | Base Java grammar | `--features java` | âŒ |
-| **Meta-Layer** | `angular` | `typescript` | Components, Services, DI, Pipes, Directives, Modules, Input/Output, Template/Shape extraction, Style extraction, NgRx, RxJS, Signals, PrimeNG, Bundle graph | `--features angular` | âœ… |
-| **Meta-Layer** | `spring_boot` | `java` | RestController, Controller, Service, Repository, Configuration, RequestMapping, Autowired, Value, Bean, ConfigurationProperties, Cross-file graph | `--features spring_boot` | âŒ |
-| **Meta-Layer** | `dotnet` | `csharp` | ASP.NET Core (Controllers, Actions, Routes, Auth), EF Core (DbContext, DbSet, Entities), SignalR (Hubs, Clients, Streaming), AutoMapper (Profiles, Mappings), JSON Serialization, DI, Validation, Identity, Caching, Logging, Cross-file graph | `--features dotnet` | âœ… |
+| **Language** | `typescript` | - | Base TypeScript/JavaScript grammar | `--features typescript` | Yes |
+| **Language** | `csharp` | - | Base C# grammar | `--features csharp` | Yes |
+| **Language** | `rust` | - | Base Rust grammar | `--features rust` | No |
+| **Language** | `java` | - | Base Java grammar | `--features java` | No |
+| **Meta-Layer** | `angular` | `typescript` | Components, Services, DI, Pipes, Directives, Modules, Input/Output, Template/Shape extraction, Style extraction, NgRx, RxJS, Signals, PrimeNG, Bundle graph | `--features angular` | Yes |
+| **Meta-Layer** | `spring_boot` | `java` | RestController, Controller, Service, Repository, Configuration, RequestMapping, Autowired, Value, Bean, ConfigurationProperties, Cross-file graph | `--features spring_boot` | No |
+| **Meta-Layer** | `dotnet` | `csharp` | ASP.NET Core (Controllers, Actions, Routes, Auth), EF Core (DbContext, DbSet, Entities), SignalR (Hubs, Clients, Streaming), AutoMapper (Profiles, Mappings), JSON Serialization, DI, Validation, Identity, Caching, Logging, Cross-file graph | `--features dotnet` | Yes |
 
 **Build with only specific languages:**
+
 ```bash
-# Default (TypeScript + C# + Angular only)
+# Default build: TypeScript + Angular + C# + .NET
 cargo build --release
 
 # TypeScript + Angular only (no C#)
@@ -64,7 +65,7 @@ cargo build --release --no-default-features --features rust
 cargo build --release --features rust,java,spring_boot,dotnet
 ```
 
-Default features give you **TypeScript with Angular meta-layer, C#, and .NET enrichment** â€” the most common full-stack combination. Everything else is opt-in:
+Default features give you **TypeScript with Angular meta-layer, C#, and .NET enrichment** - the most common full-stack combination. Everything else is opt-in:
 
 ```bash
 # Add Rust, Java, and Spring Boot
@@ -89,7 +90,7 @@ Add to your MCP settings (see [IDE Configuration](#ide-configuration) below for 
 }
 ```
 
-Restart your editor. The tools `provide_code_context`, `compress_code_context`, `diff_code_context`, `delta_code_context`, `apply_delta`, `context_stats`, `context_history`, `save_context`, `list_sessions`, `replay_history`, `purge_old_deltas`, and `restore_context` will be available.
+Restart your editor. The tools `provide_code_context`, `compress_code_context`, `diff_code_context`, `diff_commits`, `delta_code_context`, `apply_delta`, `apply_edit`, `restore_context`, `context_stats`, `context_history`, `save_context`, `list_sessions`, `replay_history`, and `purge_old_deltas` will be available.
 
 ---
 
@@ -97,11 +98,11 @@ Restart your editor. The tools `provide_code_context`, `compress_code_context`, 
 
 ### Zero-Touch Workflow
 
-The **recommended entry point** is `provide_code_context` â€” a single tool that automatically handles compression, delta transport, Angular detection, fidelity selection, and CBM symbol filtering:
+The **recommended entry point** is `provide_code_context` - a single tool that automatically handles compression, delta transport, Angular detection, fidelity selection, and CBM symbol filtering:
 
 | Tool | Purpose |
 |------|---------|
-| `provide_code_context` | **Single entry point** â€” auto-detects file type, selects optimal fidelity, uses delta transport on subsequent calls, filters low-importance symbols via CBM |
+| `provide_code_context` | **Single entry point** - auto-detects file type, selects optimal fidelity, uses delta transport on subsequent calls, filters low-importance symbols via CBM |
 | `restore_context` | Force full re-compression, clearing all baselines and DB entries |
 | `context_history` | View compression history and delta savings for tracked files |
 | `context_stats` | Dashboard: token savings, compression stats, session metrics |
@@ -120,14 +121,14 @@ Clean-CTX integrates with [codebase-memory-mcp](https://github.com/DeusData/code
 | Feature | Description |
 |---------|-------------|
 | **Symbol Importance Filtering** | Symbols with importance score < 0.4 are dropped before compression runs, reducing token output by 30-50% for noisy files |
-| **Blast Radius** | Dependency graph tracing â€” knows which files are affected by a change |
+| **Blast Radius** | Dependency graph tracing - knows which files are affected by a change |
 | **Dead Code Detection** | Identifies orphaned classes, methods, and fields |
 | **Architecture Awareness** | Understands layering, module boundaries, and dependency direction |
 
 **How it works:**
 1. `provide_code_context` queries CBM for symbol importance scores via `get_symbol_importance(project)`
 2. `build_cbm_skip_set()` identifies symbols with score < 0.4 for the current file
-3. The compression pipeline checks `should_skip_capture()` for each class/method/field â€” low-importance symbols are dropped entirely
+3. The compression pipeline checks `should_skip_capture()` for each class/method/field - low-importance symbols are dropped entirely
 4. The IR compiler applies the same skip check before emitting `DefClass`/`DefMethod`/`DefField`
 5. Session stats record tokens removed under the `cbm_filter` domain
 
@@ -145,10 +146,12 @@ Clean-CTX integrates with [codebase-memory-mcp](https://github.com/DeusData/code
 
 | Tool | Purpose |
 |------|---------|
-| `compress_code_context` | Source file â†’ compressed skeleton (text or IR with encoding selection) |
-| `diff_code_context` | Source file â†’ AST-level change-set (`+` / `-` / `~` / `=`) |
-| `delta_code_context` | IR-level delta compression â€” instruction-level deltas between compiled IR states |
-| `apply_delta` | Client-side state update â€” applies IR delta to in-session state machine |
+| `compress_code_context` | Source file -> compressed skeleton (text or IR with encoding selection) |
+| `diff_code_context` | Source file -> AST-level change-set (`+` / `-` / `~` / `=`) |
+| `diff_commits` | Git ref-range diff -> per-file AST-level change-sets in one call |
+| `delta_code_context` | IR-level delta compression - instruction-level deltas between compiled IR states |
+| `apply_delta` | Client-side state update - applies an IR delta to the in-session state machine |
+| `apply_edit` | Structural edits on previously-seen files (replace_body / insert_after / ...) |
 
 ### Persistence Layer (Built-in)
 
@@ -162,21 +165,21 @@ Compression contexts persist automatically across sessions using SQLite (enabled
 | `purge_old_deltas` | Trim old delta history |
 
 Persistence uses a **three-tier reliability stack**:
-1. **Batched writes** â€” operations queue in memory and flush as single transactions
-2. **Retry with exponential backoff** â€” transient DB failures retry up to 3 times
-3. **JSON file fallback** â€” if all retries fail, data writes to `.clean-ctx/fallback/` and re-imports on next successful flush
+1. **Batched writes** - operations queue in memory and flush as single transactions
+2. **Retry with exponential backoff** - transient DB failures retry up to 3 times
+3. **JSON file fallback** - if all retries fail, data writes to `.clean-ctx/fallback/` and re-imports on next successful flush
 
 Disable in `.clean-ctx.json` with: `"persistence": { "enabled": false }`
 
 ### Smart Caching
 
-- **Content-hash cache** â€” identical files compress instantly on repeat calls
-- **Baseline snapshots** â€” `diff_code_context` remembers the previous state, producing small deltas instead of full re-compressions. Note: this baseline is **local to `diff_code_context`** (keyed by canonical path + fidelity in the session cache) â€” it is NOT seeded by `provide_code_context`/`compress_code_context`, so the first call on a file legitimately reports "No baseline snapshot for this file yet" and stores one for subsequent calls
-- **Raw-token count cache** â€” skip the BPE encode on cache hits (sub-millisecond responses)
+- **Content-hash cache** - identical files compress instantly on repeat calls
+- **Baseline snapshots** - `diff_code_context` remembers the previous state, producing small deltas instead of full re-compressions. Note: this baseline is **local to `diff_code_context`** (keyed by canonical path + fidelity in the session cache) - it is NOT seeded by `provide_code_context`/`compress_code_context`, so the first call on a file legitimately reports "No baseline snapshot for this file yet" and stores one for subsequent calls
+- **Raw-token count cache** - skip the BPE encode on cache hits (sub-millisecond responses)
 
 ### Path Aliases
 
-Path aliases (`Î±1`, `Î±2`, â€¦) are session-global â€” `provide_code_context` and `compress_code_context` populate aliases that are visible to all subsequent tools, keeping the `Â§PATHMAP` footer stable across multiple calls. Aliases are pre-assigned deterministically to ensure `Î±N` numbering is stable across runs.
+Path aliases (`α1`, `α2`, ...) are session-global: `provide_code_context` and `compress_code_context` populate aliases that are visible to all subsequent tools, keeping the `§PATHMAP` footer stable across multiple calls. Aliases are pre-assigned deterministically to ensure numbering is stable across runs.
 
 ### Multi-Platform Proxy
 
@@ -190,7 +193,7 @@ Works with Cline, Cursor, Aider, Continue.dev, and GitHub Copilot (BYOK). See [`
 
 ### Tool Output Filtering
 
-The proxy includes **26 built-in TOML filters** that compress verbose tool output by 70â€“90%:
+The proxy includes **26 built-in TOML filters** that compress verbose tool output by 70-90%:
 
 | Category | Filters |
 |----------|---------|
@@ -210,10 +213,10 @@ The proxy detects and redacts secrets (AWS keys, GitHub tokens, JWTs, PEM keys, 
 
 ### Security
 
-- **Zero network transport** â€” stdio-only via MCP, no HTTP/WS/RPC servers
-- **No external runtimes** â€” single statically linked binary
-- **No AI models** â€” fully deterministic, rule-based AST processing
-- **Minimal unsafe code** â€” only in test utilities for environment variable manipulation (required by Rust's stdlib)
+- **Zero network transport** - stdio-only via MCP, no HTTP/WS/RPC servers
+- **No external runtimes** - single statically linked binary
+- **No AI models** - fully deterministic, rule-based AST processing
+- **Minimal unsafe code** - only in test utilities for environment variable manipulation (required by Rust's stdlib)
 
 ---
 
@@ -246,8 +249,8 @@ First call performs full compression; subsequent calls automatically use delta t
 
 **Output (Phase 6 IR-first):**
 ```
-// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import â†’=scope fl:=flags cl:=class-flags P=pattern T=type-alias
-// â”€â”€ SampleService â”€â”€
+// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias
+// ── SampleService ──
 M doWork(payload:$s[]):$b
 ```
 
@@ -289,7 +292,7 @@ First call stores the current state as baseline. Subsequent calls return only th
 First call stores baseline IR; subsequent calls return only the structural delta:
 
 ```
-IR delta: v1 â†’ v2
+IR delta: v1 -> v2
 ```
 
 ### View compression dashboard
@@ -303,27 +306,27 @@ IR delta: v1 â†’ v2
 
 ---
 
-## ðŸ“Š Performance Benchmarks
+## Performance Benchmarks
 
 ### Token Compression
 
-Clean-CTX delivers **75â€“97% token waste reduction** on real-world files. See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for the full per-file breakdown across all three fidelity levels (Low/Medium/High) and aggregated savings across all test files.
+Clean-CTX delivers **75-97% token waste reduction** on real-world files. See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for the full per-file breakdown across all three fidelity levels (Low/Medium/High) and aggregated savings across all test files.
 
 Key highlights:
 - **Low fidelity**: Up to **97.5% savings** on large files (438 lines)
-- **Medium fidelity**: Up to **86.3% savings** â€” balanced detail with behavior markers
+- **Medium fidelity**: Up to **86.3% savings** - balanced detail with behavior markers
 - **High fidelity**: Up to **77.2% savings** with full type annotations preserved
 - **Aggregate** (3 test files): **96.1% worst-case reduction** at Low fidelity
 
 ### Delta Transport (50-Edit Session, CPU Savings Only)
 
-Delta transport does NOT reduce LLM token counts â€” it reduces local CPU/latency by avoiding full re-parsing on subsequent calls. Simulated 50 sequential edits on a ~440-line file:
+Delta transport does NOT reduce LLM token counts - it reduces local CPU/latency by avoiding full re-parsing on subsequent calls. Simulated 50 sequential edits on a ~440-line file:
 
 | Fidelity | Full ReComp (cumulative) | Delta (cumulative) | Delta vs ReComp |
 |----------|:-----------------------:|:------------------:|:----------------:|
 | **Low** | 7,823 tokens | 8,490 tokens | +8.5% overhead* |
-| **Medium** | 37,338 tokens | 18,287 tokens | **âˆ’51% cheaper** |
-| **High** | 48,556 tokens | 22,955 tokens | **âˆ’53% cheaper** |
+| **Medium** | 37,338 tokens | 18,287 tokens | **-51% cheaper** |
+| **High** | 48,556 tokens | 22,955 tokens | **-53% cheaper** |
 
 *\*At Low fidelity the compressed output is already tiny (~156 avg tokens), so delta's fixed envelope cost adds overhead. Delta is always within 0.3 percentage points of recompression at Low.*
 
@@ -333,29 +336,29 @@ See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for per-edit breakdowns, cachin
 
 ---
 
-## Response Notation (SCHEMA v2 â€” primary)
+## Response Notation (SCHEMA v2 - primary)
 
 Every `provide_code_context` / `compress_code_context` / `restore_context` response starts with this legend and uses the structural grammar below:
 
 ```
-// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import â†’=scope fl:=flags cl:=class-flags P=pattern T=type-alias
+// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias
 ```
 
 | Symbol | Meaning |
 |--------|---------|
-| `// â”€â”€ Name â”€â”€` | opens a class scope |
+| `// ── Name ──` | opens a class scope |
 | `cl:` | class-level flags |
 | `X <Parent>` | extends |
-| `I <Ifaceâ€¦>` | implements |
+| `I <Iface...>` | implements |
 | `F name:type` | field |
 | `M name(+N)` | method (`+N` = overload by param count) |
-| `â†’ p:name:type â€¦` / `â†’ type` | parameters / return type |
+| `→ p:name:type ...` / `→ type` | parameters / return type |
 | `fl:` | method flags: `IF LOOP RET THROW ASYNC GEN EXPORT STATIC PRIVATE PROTECTED ABSTRACT UNSAFE` |
 | `$ alias module [names]` | import |
 | `T alias = Type` | type alias |
-| `P NAME [args]` | structural pattern (CTOR, OBSERVABLE, GETTER, SETTERâ€¦) |
+| `P NAME [args]` | structural pattern (CTOR, OBSERVABLE, GETTER, SETTER...) |
 
-**High fidelity** adds `cf:` (control flow), `df:` (reads/writes), `se:` (side effect), `ec:` (execution context). **Edit fidelity appends each focused method's verbatim source body** â€” byte-exact. Types render exactly as captured.
+**High fidelity** adds `cf:` (control flow), `df:` (reads/writes), `se:` (side effect), `ec:` (execution context). **Edit fidelity appends each focused method's verbatim source body** - byte-exact. Types render exactly as captured.
 
 The full SCHEMA v2 notation reference (structure letters, behavior flags, meta-layer markers) is in [`docs/COMPILER_IR.md`](docs/COMPILER_IR.md).
 
@@ -388,57 +391,20 @@ Standard server block (Continue.dev adapts it to its array form):
 
 ---
 
-## Configuration
-
-Clean-CTX uses a two-tier configuration system with explicit precedence rules (tool argument > environment variable > config file > default). The complete configuration reference â€” including the full `.clean-ctx.json` schema, environment variables, resource limits, persistence, heuristics, meta-layers, intelligence layer, type aliases, cache, and proxy lifecycle â€” is documented in **[`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)**, which is the single source of truth for configuration.
-
-A minimal `.clean-ctx.json` example:
-
-```json
-{
-    "exclude_patterns": ["dist", "node_modules", "*.spec.ts"],
-    "default_fidelity": "medium",
-    "type_aliases": {
-        "UserId": "string",
-        "JsonObject": "Record<string, unknown>"
-    }
-}
-```
-
-See [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) for the full configuration reference.
-
----
-
-## Supported Languages
-
-| Language | Extension | Status |
-|----------|-----------|--------|
-| TypeScript | `.ts`, `.js` | âœ… Full support (Angular meta-layer) |
-| C# | `.cs` | âœ… Full support |
-| Rust | `.rs` | âœ… Full support (structs, enums, traits, impls, generics, derives, cfg, unsafe) |
-| Java | `.java` | âœ… Full support (classes, interfaces, records, enums, Spring Boot meta-layer) |
-
-Angular framework detection is automatic for TypeScript files containing `@Component`, `@Injectable`, `@NgModule`, `@Directive`, or `@Pipe` decorators. Spring Boot detection is automatic for Java files containing `@RestController`, `@Service`, `@Repository`, `@Configuration`, or `@RequestMapping` annotations.
-
-Complete `Φ` marker vocabularies are documented in [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md) and the language-specific meta-layer docs.
-
----
-
 ## Project Status
 
-| Metric | Value |
-|--------|-------|
-| Build | ✅ `cargo check` clean |
-| Linting | ✅ `cargo clippy --all-targets -- -D warnings` — **0 warnings, 0 errors** |
-| Tests | ✅ **All tests passing** — includes live-CBM semantic probes, a self-contained multilingual fixture suite, 18 round-trip wire-format tests, and the `edit::spans` span-invariant/EOL-transport suite |
-| Audit | ✅ FAANG-level audits resolved (A-09—A-15, F-19—F-22); CBM audit resolved; Compiler-IR audit resolved; R-43a + R-43b — zero critical/high findings |
-| Languages | ✅ TypeScript, C#, Rust, Java with Angular/Spring Boot/.NET meta-layers |
-| Transport | ✅ Stateful IR delta transport — compile once, send deltas thereafter |
-| Pass Architecture | ✅ Composable IRPass pipeline (Core → Language → Meta → Exec* → Graph* → Inference* → Validation), IR validator (E001—E010), query engine, semantic delta intents (*optional passes) |
-| CBM Integration | ✅ Filter-first — symbol importance scores drop low-importance symbols before compression; typed-error graph queries |
-| Persistence | ✅ SQLite cross-session persistence with three-tier reliability |
-| Proxy | ✅ Multi-platform proxy (Anthropic/OpenAI/Generic) with auto-cache + tool filters |
-| Filters | ✅ 26 built-in TOML filters — cargo, npm, eslint, docker, go, and more |
+| Metric | Status |
+|--------|--------|
+| Build | OK: `cargo check` clean |
+| Linting | OK: `cargo clippy --all-targets -- -D warnings` - **0 warnings, 0 errors** |
+| Tests | OK: **All tests passing** - includes live-CBM semantic probes and a self-contained multilingual fixture suite |
+| Languages | OK: TypeScript, C#, Rust, Java with Angular/Spring Boot/.NET meta-layers |
+| Transport | OK: Stateful IR delta transport - compile once, send deltas thereafter |
+| Pass Architecture | OK: Composable IRPass pipeline (Core -> Language -> Meta -> Exec* -> Graph* -> Inference* -> Validation), IR validator (E001-E010), query engine, semantic delta intents (*optional passes) |
+| CBM Integration | OK: Filter-first - symbol importance scores drop low-importance symbols before compression; typed-error graph queries |
+| Persistence | OK: SQLite cross-session persistence with three-tier reliability |
+| Proxy | OK: Multi-platform proxy (Anthropic/OpenAI/Generic) with auto-cache + tool filters |
+| Filters | OK: 26 built-in TOML filters - cargo, npm, eslint, docker, go, and more |
 
 Unsafe code is test-only (environment-variable manipulation).
 
@@ -450,12 +416,12 @@ Unsafe code is test-only (environment-variable manipulation).
 |----------|----------|---------|
 | [`README.md`](README.md) | **Users** | Installation, usage, opcode reference |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contributors | Overview, process, quick links to detailed docs |
-| [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Users | **Configuration source of truth** â€” `.clean-ctx.json` schema, env vars, precedence, resource limits, persistence, heuristics, meta-layers, cache, proxy lifecycle |
+| [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Users | **Configuration source of truth** - `.clean-ctx.json` schema, env vars, precedence, resource limits, persistence, heuristics, meta-layers, cache, proxy lifecycle |
 | [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md) | Architects | System design, module structure, pipeline stages, design decisions |
 | [`docs/DEVELOPER_DOCUMENTATION.md`](docs/DEVELOPER_DOCUMENTATION.md) | Contributors | Building, testing, adding languages/tools/opcodes, code quality gates |
 | [`docs/COMPILER_IR.md`](docs/COMPILER_IR.md) | Architects | Compiler IR protocol, delta state transport, wire format, phase implementation |
 | [`docs/ANGULAR_META_LAYER.md`](docs/ANGULAR_META_LAYER.md) | Developers | Angular Meta-Layer design, marker vocabulary, template extraction, graph |
-| [`docs/ANGULAR_ECOSYSTEM_DEEPENING.md`](docs/ANGULAR_ECOSYSTEM_DEEPENING.md) | Developers | Angular Ecosystem Deepening â€” RxJS/NgRx/Signals/Routing meta-layers, cross-layer graph |
+| [`docs/ANGULAR_ECOSYSTEM_DEEPENING.md`](docs/ANGULAR_ECOSYSTEM_DEEPENING.md) | Developers | Angular Ecosystem Deepening - RxJS/NgRx/Signals/Routing meta-layers, cross-layer graph |
 | [`docs/DOTNET_META_LAYER.md`](docs/DOTNET_META_LAYER.md) | Developers | .NET/C# Meta-Layer design, marker vocabulary, ASP.NET/EF Core/SignalR |
 | [`docs/EDIT_TYPE.md`](docs/EDIT_TYPE.md) | Developers | Edit categorization vocabulary for delta transport annotation |
 | [`docs/DIFF_COMMITS_GUIDE.md`](docs/DIFF_COMMITS_GUIDE.md) | Users | `diff_commits` tool usage, ref validation, security posture |
@@ -470,7 +436,4 @@ Unsafe code is test-only (environment-variable manipulation).
 
 ## License
 
-[CC0-1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) â€” Dedicated to the public domain.
-
-
-
+[CC0-1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) - Dedicated to the public domain.

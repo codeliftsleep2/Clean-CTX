@@ -1,4 +1,4 @@
-﻿# .NET / C# Meta-Layer
+# .NET / C# Meta-Layer
 
 > **Owner:** .NET/C# Meta-Layer design (R-35  R-41/R-42) · **Status:** Living per-layer reference (shipped)
 >

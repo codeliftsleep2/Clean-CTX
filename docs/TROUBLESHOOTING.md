@@ -1,4 +1,4 @@
-﻿# Clean-CTX — Troubleshooting Guide
+# Clean-CTX — Troubleshooting Guide
 
 > **Owner:** Problem-solving + error codes + diagnostic commands · **Status:** Living reference
 
