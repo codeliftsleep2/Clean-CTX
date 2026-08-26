@@ -183,8 +183,7 @@ fn state_accessor_mut_methods() {
 // alias key was the raw caller string, so an absolute path and an
 // equivalent path containing a redundant segment produced two separate
 // aliases (visible as duplicate `α` entries in `§PATHMAP`) and silently
-// fragmented every alias-keyed state (IR context, text-delta baselines,
-// LLM text cache).
+// fragmented every alias-keyed state (IR context, LLM text cache).
 
 #[test]
 fn alias_identity_absolute_and_redundant_segment_forms_converge() {

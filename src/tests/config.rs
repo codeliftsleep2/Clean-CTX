@@ -9,6 +9,28 @@ fn test_default_config() {
     assert!(config.type_aliases.is_empty());
 }
 
+/// C0 regression (Phase C0 dead-path retirement): `test_config()` must
+/// disable persistence as well as CBM.
+///
+/// Before Phase C0 the helper only disabled CBM while its doc comment
+/// claimed both were disabled. Every handler test built on
+/// `McpState::new(test_config())` therefore silently opened the repo's real
+/// `.clean-ctx/persistence.db` — cross-test pollution via
+/// `rebuild_stats()`, WAL contention between parallel test threads, and
+/// writes leaking into the developer's live database. Tests that genuinely
+/// need persistence opt in explicitly with their own temp `db_path`
+/// (`buffered_store.rs`, `regression.rs`, `audit_fixes.rs`,
+/// `tool_contracts.rs`) and are unaffected by this default.
+#[test]
+fn test_config_disables_cbm_and_persistence_by_default() {
+    let config = crate::tests::test_config();
+    assert!(!config.cbm.enabled, "test_config must disable CBM");
+    assert!(
+        !config.persistence.enabled,
+        "test_config must disable persistence"
+    );
+}
+
 // ── Angular Ecosystem Deepening sub-layer configs (Phase 6) ───────
 
 #[test]

@@ -1,4 +1,3 @@
-use super::super::walker::LineKind;
 use super::*;
 
 #[test]
@@ -9,19 +8,6 @@ fn test_decompress_low() {
     assert!(result.contains("class SampleService"));
     assert!(result.contains("constructor()"));
     assert!(result.contains("boolean isInitialized"));
-}
-
-#[test]
-fn test_line_classification() {
-    assert_eq!(classify_line_kind(""), LineKind::Blank);
-    assert_eq!(classify_line_kind("   "), LineKind::Blank);
-    assert_eq!(classify_line_kind("// --- header"), LineKind::Header);
-    assert_eq!(classify_line_kind("§PATHMAP"), LineKind::SectionStart);
-    assert_eq!(classify_line_kind("hello world"), LineKind::Body);
-}
-
-fn classify_line_kind(line: &str) -> LineKind {
-    super::super::walker::classify(line)
 }
 
 // ---------- word_boundary_replace (F-06) ----------

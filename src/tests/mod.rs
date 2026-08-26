@@ -12,11 +12,16 @@
 ///
 /// Most unit tests do not need CBM or persistence. Using a default config
 /// would launch a CBM subprocess on every `McpState::new()` call, costing
-/// ~500ms+ per test and wasting CI resources. This helper provides a fast,
-/// isolated default for tests that don't require live CBM.
+/// ~500ms+ per test and wasting CI resources. Furthermore, with persistence
+/// enabled each handler test would open the repo's real
+/// `.clean-ctx/persistence.db` — cross-test pollution via `rebuild_stats()`
+/// and writes leaking into the developer's live database (Phase C0 fix).
+/// This helper provides a fast, isolated default for tests that don't
+/// require live CBM or persistence.
 pub fn test_config() -> crate::config::CleanCtxConfig {
     let mut c = crate::config::CleanCtxConfig::default();
     c.cbm.enabled = false;
+    c.persistence.enabled = false;
     c
 }
 

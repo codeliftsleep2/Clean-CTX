@@ -287,7 +287,6 @@ pub enum CoreOp {
 pub enum CompileError {
     Capture(String),      // tree-sitter pipeline failure
     Layer(String),         // Language/Meta/Pattern layer error
-    NoCaptures,            // source produced no captures (not fatal)
 }
 ```
 

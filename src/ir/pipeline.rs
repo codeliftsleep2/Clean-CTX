@@ -250,23 +250,15 @@ impl PassContext {
     }
 
     /// Emit import IR from a raw import line.
+    ///
+    /// The IR capture closure passes the raw source line for
+    /// `import.root`/`package.root` captures (it does not run
+    /// `compact_import`), so imports arrive as source text with a literal
+    /// ` from ` separator, never as legacy `$im … .$fm …` text. The
+    /// vestigial `$im…$fm` decode/strip branch was removed in Phase C0 as
+    /// unreachable — nothing produces that form.
     fn emit_import_ir(&mut self, raw: &str) {
         let trimmed = raw.trim();
-
-        if let Some(rest) = trimmed.strip_prefix("$im ") {
-            if let Some(fm_pos) = rest.find(".$fm") {
-                let named = rest[..fm_pos].trim().to_string();
-                let module = rest[fm_pos + 4..].trim().to_string();
-                let alias = self.next_id("IM");
-                self.instructions.push(CoreOp::Import(alias, module, named));
-                return;
-            }
-            let named = rest.trim().to_string();
-            let alias = self.next_id("IM");
-            self.instructions
-                .push(CoreOp::Import(alias, String::new(), named));
-            return;
-        }
 
         if let Some(from_pos) = trimmed.find(" from ") {
             let named_part = trimmed[..from_pos].trim();

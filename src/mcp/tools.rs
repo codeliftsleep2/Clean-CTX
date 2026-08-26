@@ -76,7 +76,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "compressedText": { "type": "string", "description": "The compressed output from compress_code_context to expand." }
+                    "compressedText": { "type": "string", "description": "Legacy-notation compressed output (e.g. a compress_workspace manifest baseline) to expand back into human-readable text. Interactive compress_code_context now returns compiled IR, not legacy text; this tool decodes the remaining legacy compress_workspace surface." }
                 },
                 "required": ["compressedText"]
             }

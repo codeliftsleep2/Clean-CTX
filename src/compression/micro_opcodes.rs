@@ -24,8 +24,10 @@
 //    `apply_micro_opcodes` replaces structural patterns with §-prefixed codes.
 // 2. The output is tokenized by the LLM. The § prefix ensures each micro-opcode
 //    is a distinct token (§C, §P are single tokens in BPE).
-// 3. The client decompressor expands micro-opcodes back to the original format
-//    via `expand_micro_opcodes`.
+// 3. The client decompressor expands §-micro-opcodes back to the original
+//    format via the `Decompressor` in `crate::decompression` (the standalone
+//    `expand_micro_opcodes` inverse was removed in Phase C0 as unreachable —
+//    no production caller constructs its textual inverse).
 //
 // ## Savings
 //
@@ -70,64 +72,6 @@ pub fn apply_micro_opcodes(body: &str, fidelity: Fidelity) -> String {
     for &(_opcode, pattern, replacement) in MICRO_OPCODE_TABLE {
         result = result.replace(pattern, replacement);
     }
-    result
-}
-
-/// Expand micro-opcodes back to their original form.
-///
-/// Used by the decompression side to restore the original structural format.
-/// The expansion is order-independent since each micro-opcode maps to a
-/// unique original pattern with no overlap.
-#[allow(dead_code)]
-pub fn expand_micro_opcodes(body: &str) -> String {
-    let mut result = body.to_string();
-
-    // Expand §E → ⊕⇒ (before §C to avoid any overlap)
-    result = result.replace("§E", "⊕⇒");
-    // Expand §L → ⊕loop
-    result = result.replace("§L", "⊕loop");
-    // Expand §I → ⊕guard
-    result = result.replace("§I", "⊕guard");
-    // Expand §P → $ctor (before §C to avoid any overlap)
-    result = result.replace("§P", "$ctor");
-
-    // §C is ambiguous (used for both { and }). The expansion strategy:
-    // - First §C after a word character → opening brace
-    // - Second §C → closing brace
-    // This works because class entries follow the pattern:
-    //   ClassName§C field1;field2§C  or  §C ClassName§C
-    // In the stream, §C alternates between opening and closing.
-    result = expand_class_markers(&result);
-
-    result
-}
-
-/// Expand §C markers by alternating between `{` and `}`.
-///
-/// In the compressed format, §C appears in pairs:
-///   `§C ClassName§C field1;field2§C` → `ClassName{field1;field2}`
-///   or for classes without fields:
-///   `§C ClassName§C` → `ClassName{}`
-///
-/// The alternation strategy: odd-numbered §C → `{`, even-numbered → `}`.
-#[allow(dead_code)]
-fn expand_class_markers(body: &str) -> String {
-    let mut result = String::with_capacity(body.len());
-    let mut class_marker_count: usize = 0;
-
-    for part in body.split("§C") {
-        if !result.is_empty() {
-            // Odd count → opening brace, even count → closing brace
-            class_marker_count += 1;
-            if class_marker_count % 2 == 1 {
-                result.push('{');
-            } else {
-                result.push('}');
-            }
-        }
-        result.push_str(part);
-    }
-
     result
 }
 

@@ -49,18 +49,13 @@ pub enum CompileError {
     Capture(String),
     /// A language / meta / pattern layer raised an error.
     Layer(String),
-    /// Source produced no `class.root` / `method.root` captures.
-    /// Not necessarily fatal — the call site may treat it as an
-    /// empty (but valid) compile result.
-    NoCaptures,
 }
 
 impl std::fmt::Display for CompileError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CompileError::Capture(msg) => write!(f, "capture pipeline error: {}", msg),
-            CompileError::Layer(msg) => write!(f, "layer error: {}", msg),
-            CompileError::NoCaptures => write!(f, "source produced no captures"),
+            CompileError::Capture(msg) => write!(f, "capture pipeline error: {msg}"),
+            CompileError::Layer(msg) => write!(f, "layer error: {msg}"),
         }
     }
 }
@@ -112,7 +107,7 @@ impl IRCompiler {
     /// exclude low-importance symbols.
     ///
     /// Returns a typed `CompileError` (F-30) — callers can pattern-match
-    /// on `CompileError::Capture`, `Layer`, or `NoCaptures`. The
+    /// on `CompileError::Capture` or `Layer`. The
     /// `mcp::tools` boundary converts to `Box<dyn Error>` via `?` if needed.
     pub fn compile(
         &mut self,

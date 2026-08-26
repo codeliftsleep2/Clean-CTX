@@ -313,7 +313,6 @@ src/
 │   ├── report.rs                 # Output report formatting
 │   ├── pipeline.rs               # Non-streaming orchestrator
 │   ├── streaming.rs              # Streaming orchestrator (with progress callbacks)
-│   ├── scope_defaults.rs         # Scope default application per fidelity
 │   ├── micro_opcodes.rs          # Micro-opcode expansion for ultra-compact output
 │   └── workspace_symbols.rs      # Global symbol table for workspace compression
 │
@@ -386,7 +385,6 @@ src/
 │   ├── mod.rs
 │   ├── path.rs                   # PathDictionary (α/β/γ aliases)
 │   ├── symbol.rs                 # SymbolDictionary (opcode↔token mappings)
-│   ├── huffman.rs                # HuffmanSymbolDictionary (frequency-based encoding)
 │   └── workspace.rs              # GlobalSymbolTable (workspace-level symbol sharing)
 │
 ├── cache.rs                      # LocalStateCache (hash registry + baseline snapshots)
@@ -610,7 +608,7 @@ Agent → cbm_proxy tool
   → Clean-CTX forwards to CBM via stdin pipe
   → CBM responds with ~5000-token structural seed
   → Clean-CTX intercepts raw stdout at pipe level
-  → Compresses through compress_file_with_source() → ~1100 tokens
+  → Compresses through cbm::json_compress::compress_cbm_response() → ~1100 tokens
   → Returns compressed result to agent
 ```
 

@@ -246,7 +246,12 @@ pub fn proxy_call(&mut self, tool_name: &str, args: Value) -> Result<String, Cbm
 2. Build the JSON-RPC parameters for CBM
 3. Call `GraphBridge::proxy_call()` which delegates to `CbmClient::call_tool_raw()`
 4. Receive the **raw response text** from CBM's stdout
-5. Run the intercepted text through Clean-CTX's `compress_file_with_source()` pipeline
+5. Run the intercepted text through Clean-CTX's JSON-aware compressor
+   (`cbm::json_compress::compress_cbm_response`). NOTE: the original plan used
+   `compress_file_with_source()` for this step; the RC-1 fix replaced it with
+   the JSON compressor because the tree-sitter pipeline produces zero captures
+   on JSON input. This plan documents the original design, not the current
+   implementation — see `src/cbm/proxy.rs`.
 6. Return the compressed result (~1100 tokens) with metadata about savings
 
 **MCP tool signature:**

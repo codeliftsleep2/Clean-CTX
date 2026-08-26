@@ -619,32 +619,6 @@ fn micro_opcode_table_includes_new_markers() {
     assert!(replacements.contains(&"§E"), "Should have §E replacement");
 }
 
-#[test]
-fn micro_opcode_apply_expand_roundtrip_with_new_markers() {
-    use crate::compression::micro_opcodes::{apply_micro_opcodes, expand_micro_opcodes};
-    let original = "Foo{field1};⊕guard check() ⊕loop iterate() ⊕⇒result ⊕!err";
-    let compressed = apply_micro_opcodes(original, Fidelity::Low);
-    let expanded = expand_micro_opcodes(&compressed);
-    assert_eq!(
-        expanded, original,
-        "Round-trip must preserve original content"
-    );
-    // Verify compression replaces markers
-    assert!(
-        compressed.contains("§I"),
-        "⊕guard should be compressed to §I"
-    );
-    assert!(
-        compressed.contains("§L"),
-        "⊕loop should be compressed to §L"
-    );
-    assert!(compressed.contains("§E"), "⊕⇒ should be compressed to §E");
-    assert!(
-        compressed.contains("§C"),
-        "{{ and }} should be compressed to §C"
-    );
-}
-
 // ── Regression: relative path resolution ─────────────────────────
 // FAANG audit follow-up: ensure all handlers resolve relative paths
 // via resolve_file_path() instead of using bare PathBuf::from().
