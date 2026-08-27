@@ -35,4 +35,3 @@ mod integration;
 #[cfg(test)]
 #[path = "encoding.rs"]
 mod encoding;
-

@@ -125,7 +125,7 @@ foreach ($rel in $tracked) {
     $lines = $text -split "`r?`n"
     for ($i = 0; $i -lt $lines.Count; $i++) {
         foreach ($sigEntry in $Signatures) {
-            $idx = $lines[$i].IndexOf($sigEntry.Sig)
+            $idx = $lines[$i].IndexOf($sigEntry.Sig, [System.StringComparison]::Ordinal)
             if ($idx -lt 0) { continue }
             if (-not $allowed) {
                 $mojiCount++
@@ -148,7 +148,7 @@ if ($violations.Count -gt 0) {
         @($violations | Where-Object { $_ -like 'READ-FAIL*' }).Count)
     Write-Host ''
     Write-Host 'A MOJIBAKE hit means text crossed an encoding boundary incorrectly.'
-    Write-Host 'Do NOT blind-replace characters. See .clinerules/encoding.md:'
+    Write-Host 'Do NOT blind-replace characters. See docs/ENCODING_POLICY.md:'
     Write-Host 'identify the boundary (shell pipe? editor default? writer?), fix the'
     Write-Host 'boundary, then restore the intended characters. Quoting signatures in'
     Write-Host 'documentation requires an entry in $MojibakeAllowedPaths with justification.'
