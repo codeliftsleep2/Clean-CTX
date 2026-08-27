@@ -64,6 +64,40 @@ export function selectEligibleAccounts(registry, modelId, env) {
   }));
 }
 
+// ===== 2b. Tier builder (ClinePass first, then free accounts) =====
+
+export function buildAccountTiers(registry, modelId, env) {
+  const passModel = modelId || "cline-pass/deepseek-v4-flash";
+  const freeProvider = process.env.CLINE_FREE_PROVIDER || "cline";
+  const freeModel = process.env.CLINE_FREE_MODEL || "deepseek/deepseek-v4-flash";
+  const tiers = [];
+
+  const byId = (a, b) => (a.priority || 100) - (b.priority || 100) || a.id.localeCompare(b.id);
+  const hasKey = (a) => { const s = env[a.secretName]; return s && typeof s === "string" && s.trim().length > 0; };
+
+  const passAccounts = registry.accounts.filter(a => a.enabled !== false && a.clinePass && hasKey(a)).sort(byId);
+  if (passAccounts.length > 0) {
+    tiers.push({
+      name: "cline-pass",
+      accounts: passAccounts.map(a => ({ account: a, apiKey: (env[a.secretName] || "").trim() })),
+      providerId: "cline-pass",
+      modelId: passModel,
+    });
+  }
+
+  const freeAccounts = registry.accounts.filter(a => a.enabled !== false && !a.clinePass && hasKey(a)).sort(byId);
+  if (freeAccounts.length > 0) {
+    tiers.push({
+      name: "free",
+      accounts: freeAccounts.map(a => ({ account: a, apiKey: (env[a.secretName] || "").trim() })),
+      providerId: freeProvider,
+      modelId: freeModel,
+    });
+  }
+
+  return tiers;
+}
+
 // ===== 3. Identity verification =====
 
 export async function verifyAccount(apiKey, account, options = {}) {
@@ -114,7 +148,7 @@ export function isAccountSpecificFailure(error) {
   return false;
 }
 
-// ===== 6. Rollover orchestration =====
+// ===== 6. Rollover orchestration (account level) =====
 
 export function createRolloverRunner(eligibleAccounts, sessionFn, identityOpts, entitlementOpts, rolloverOpts) {
   return async (...apiKeys) => {
@@ -146,5 +180,53 @@ export function createRolloverRunner(eligibleAccounts, sessionFn, identityOpts, 
       }
     }
     throw new Error(`All eligible accounts exhausted (${failures.length} attempted).\n${failures.map((f) => `  ${f.id}: ${f.reason}`).join("\n")}`);
+  };
+}
+
+// ===== 7. Tiered mid-task failover orchestration =====
+
+export function createTieredFailoverRunner(tiers, sessionFactory, identityOpts, entitlementOpts) {
+  if (!tiers || tiers.length === 0) throw new Error("No account tiers available");
+  return async () => {
+    const attempted = new Set();
+    const failures = [];
+    let attemptCount = 0;
+
+    for (const tier of tiers) {
+      for (const { account, apiKey } of tier.accounts) {
+        if (attempted.has(account.id)) continue;
+        attempted.add(account.id);
+        attemptCount++;
+
+        const key = apiKey;
+        if (!key) { console.log(`[agent] Account ${account.id} skipped: key unavailable`); failures.push({ id: account.id, reason: "key unavailable", tier: tier.name }); continue; }
+
+        console.log(`[agent] Cline account attempt ${attemptCount}: ${account.id} (tier: ${tier.name})`);
+        const idv = await verifyAccount(key, account, identityOpts || {});
+        if (!idv.verified) { console.log(`[agent] ${account.id} identity: ${idv.reason}`); failures.push({ id: account.id, reason: idv.reason, tier: tier.name }); continue; }
+        console.log(`[agent] ${account.id} identity=verified`);
+        const ent = await verifyEntitlement(key, account, entitlementOpts || {});
+        if (!ent.hasEntitlement) { console.log(`[agent] ${account.id} entitlement: ${ent.reason}`); failures.push({ id: account.id, reason: ent.reason, tier: tier.name }); continue; }
+        if (!ent.skipped) console.log(`[agent] ${account.id} clinepass=verified`);
+
+        try {
+          const sessionFn = sessionFactory(account, key, tier);
+          return await sessionFn();
+        } catch (err) {
+          const isSpecific = isAccountSpecificFailure(err);
+          const msg = err?.message ?? String(err);
+          if (isSpecific) {
+            console.log(`[agent] ${account.id} failed (account-specific): ${msg}`);
+            failures.push({ id: account.id, reason: msg, tier: tier.name });
+          } else {
+            console.log(`[agent] ${account.id} failed (infrastructure): ${msg}`);
+            throw err;
+          }
+        }
+      }
+    }
+
+    const aggMsg = `All accounts exhausted (${failures.length} attempted across ${tiers.length} tier(s)).\n${failures.map(f => `  ${f.id} (${f.tier}): ${f.reason}`).join("\n")}`;
+    throw new Error(aggMsg);
   };
 }

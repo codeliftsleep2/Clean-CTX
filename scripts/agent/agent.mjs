@@ -76,18 +76,23 @@ async function runAgentSession({ mode, taskPrompt, workspace }) {
   const systemPrompt = buildSystemPrompt(mode, policyText);
   setMode(mode);
 
-  // Try account selector (multi-account registry path with verification + rollover)
   const selector = await loadAccountSelector(workspace, modelId);
   if (selector) {
-    log(`Using account selector with ${selector.eligibleAccounts.length} eligible account(s)`);
+    const tiers = buildAccountTiers(selector.registry, modelId, process.env);
+    if (tiers.length > 0) {
+      const result = await runWithTieredContinuation(
+        tiers, systemPrompt, workspace, maxIterations, ClineCore, taskPrompt, providerId, modelId,
+      );
+      return result;
+    }
+    log(`No tiers built; using flat rollover with ${selector.eligibleAccounts.length} eligible account(s)`);
     const runner = createRolloverRunner(
       selector.eligibleAccounts,
       async (account, cred) => {
         log(`Session starting with account ${account.id}`);
         return runClineCore(cred, providerId, modelId, systemPrompt, workspace, maxIterations, ClineCore, taskPrompt);
       },
-      {}, // identityOpts
-      {}, // entitlementOpts
+      {}, {},
     );
     const result = await runner();
     return extractSessionResult(ClineCore, result);
@@ -107,7 +112,7 @@ async function runAgentSession({ mode, taskPrompt, workspace }) {
 
 async function loadAccountSelector(workspace, modelId) {
   try {
-    const { loadRegistry, selectEligibleAccounts, createRolloverRunner } = await import("./account-selector.mjs");
+    const { loadRegistry, selectEligibleAccounts, createRolloverRunner, buildAccountTiers, createTieredFailoverRunner } = await import("./account-selector.mjs");
     const registryPath = path.join(workspace, "scripts", "agent", "accounts.json");
     const registry = loadRegistry(registryPath);
     const eligibleAccounts = selectEligibleAccounts(registry, modelId, process.env);
@@ -115,7 +120,7 @@ async function loadAccountSelector(workspace, modelId) {
       log("Account registry has no eligible accounts; falling back to legacy path");
       return null;
     }
-    return { eligibleAccounts, createRolloverRunner };
+    return { eligibleAccounts, createRolloverRunner, registry, buildAccountTiers, createTieredFailoverRunner };
   } catch (err) {
     log(`Account selector unavailable: ${err.message}; falling back to legacy CLINE_AGENT_API_KEY path`);
     return null;
@@ -161,6 +166,130 @@ async function runClineCore(apiKey, providerId, modelId, systemPrompt, workspace
 
 function extractSessionResult(ClineCore, result) {
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Tiered continuation runner (mid-task failover with same-session restoration)
+// Uses restore() to preserve sessionId and accumulated messages across
+// account rollover — the programmatic equivalent of Cline's Retry button.
+// ---------------------------------------------------------------------------
+
+async function runWithTieredContinuation(tiers, systemPrompt, workspace, maxIterations, ClineCore, taskPrompt, defaultProviderId, defaultModelId) {
+  const { isAccountSpecificFailure } = await import("./account-selector.mjs");
+  const cline = await ClineCore.create({
+    clientName: "clean-ctx-issue-agent",
+    capabilities: { requestToolApproval },
+  });
+  try {
+    let sessionId = null;
+    const attemptedIds = new Set();
+
+    for (const tier of tiers) {
+      for (const { account, apiKey } of tier.accounts) {
+        if (attemptedIds.has(account.id)) continue;
+        attemptedIds.add(account.id);
+
+        const key = apiKey;
+        if (!key) { log(`Account ${account.id} skipped: key unavailable`); continue; }
+
+        const effectiveProvider = tier.name === "free" ? tier.providerId : defaultProviderId;
+        const effectiveModel = tier.name === "free" ? tier.modelId : defaultModelId;
+
+        log(`Cline account attempt: ${account.id} (tier: ${tier.name}, model: ${effectiveModel})`);
+
+        if (sessionId) {
+          // Continuation path: use restore() to rebuild from the persisted session's
+          // messages and start a new run under the new credentials. The sessionId
+          // is unchanged; the conversation history survives the credential swap.
+          log(`Restoring session ${sessionId} with account ${account.id}`);
+          try {
+            const session = await cline.restore({
+              sessionId,
+              checkpointRunCount: 0,
+              cwd: workspace,
+              restore: { messages: true, workspace: false },
+              start: {
+                prompt: taskPrompt,
+                config: {
+                  providerId: effectiveProvider,
+                  modelId: effectiveModel,
+                  apiKey: key,
+                  systemPrompt,
+                  cwd: workspace,
+                  workspaceRoot: workspace,
+                  mode: "act",
+                  enableTools: true,
+                  enableSpawnAgent: false,
+                  enableAgentTeams: false,
+                  maxIterations,
+                },
+              },
+            });
+            sessionId = session.sessionId || sessionId;
+            const startResult = session.startResult;
+            if (startResult) {
+              const text = startResult?.result?.text ?? startResult?.result?.outputText ?? JSON.stringify(startResult?.result ?? {});
+              let usage = null;
+              try { usage = await cline.getAccumulatedUsage(sessionId); } catch { /* optional */ }
+              return { text: String(text), usage, sessionId };
+            }
+          } catch (err) {
+            const msg = err?.message ?? String(err);
+            if (isAccountSpecificFailure(err)) {
+              log(`Account ${account.id} failed (account-specific): ${msg}`);
+              continue;
+            }
+            log(`Account ${account.id} failed (infrastructure): ${msg}`);
+            throw err;
+          }
+        } else {
+          // First attempt: start fresh, capture sessionId for later continuation
+          log(`Starting fresh session with account ${account.id}`);
+          try {
+            const session = await cline.start({
+              prompt: taskPrompt,
+              config: {
+                providerId: effectiveProvider,
+                modelId: effectiveModel,
+                apiKey: key,
+                systemPrompt,
+                cwd: workspace,
+                workspaceRoot: workspace,
+                mode: "act",
+                enableTools: true,
+                enableSpawnAgent: false,
+                enableAgentTeams: false,
+                maxIterations,
+              },
+            });
+            sessionId = session?.sessionId;
+            const text = session?.result?.text ?? session?.result?.outputText ?? JSON.stringify(session?.result ?? {});
+            let usage = null;
+            try { usage = await cline.getAccumulatedUsage(sessionId); } catch { /* optional */ }
+            return { text: String(text), usage, sessionId };
+          } catch (err) {
+            const msg = err?.message ?? String(err);
+            if (isAccountSpecificFailure(err)) {
+              log(`Account ${account.id} failed (account-specific): ${msg}`);
+              if (!sessionId) {
+              // First attempt failed before session was created;
+              // next account starts fresh (no session to restore).
+            }
+              continue;
+            }
+            log(`Account ${account.id} failed (infrastructure): ${msg}`);
+            throw err;
+          }
+        }
+      }
+    }
+
+    const msg = `All accounts exhausted (${attemptedIds.size} attempted).`;
+    log(msg);
+    throw new Error(msg);
+  } finally {
+    try { await cline.dispose("run-complete"); } catch { /* best effort */ }
+  }
 }
 
 // ---------------------------------------------------------------------------

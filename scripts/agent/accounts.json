@@ -13,6 +13,30 @@
       "preferredModels": [
         "cline-pass/deepseek-v4-flash"
       ]
+    },
+    {
+      "id": "cline-pass-02",
+      "secretName": "CLINE_ACCOUNT_02_API_KEY",
+      "enabled": true,
+      "priority": 20,
+      "clinePass": true,
+      "preferredModels": []
+    },
+    {
+      "id": "cline-free-01",
+      "secretName": "CLINE_ACCOUNT_03_API_KEY",
+      "enabled": true,
+      "priority": 30,
+      "clinePass": false,
+      "preferredModels": []
+    },
+    {
+      "id": "cline-free-02",
+      "secretName": "CLINE_ACCOUNT_04_API_KEY",
+      "enabled": true,
+      "priority": 40,
+      "clinePass": false,
+      "preferredModels": []
     }
   ]
 }

@@ -345,6 +345,8 @@ test("registry: account-selector.mjs is loadable", async () => {
   assert.equal(typeof mod.verifyEntitlement, "function");
   assert.equal(typeof mod.isAccountSpecificFailure, "function");
   assert.equal(typeof mod.createRolloverRunner, "function");
+  assert.equal(typeof mod.buildAccountTiers, "function");
+  assert.equal(typeof mod.createTieredFailoverRunner, "function");
 });
 
 test("config: legacy CLINE_API_KEY compatibility remains in agent.mjs", () => {
@@ -356,7 +358,7 @@ test("config: legacy CLINE_API_KEY compatibility remains in agent.mjs", () => {
 test("config: account selector references in agent.mjs", () => {
   const src = readFileSync(new URL("./agent.mjs", import.meta.url), "utf8");
   assert.ok(src.includes("loadAccountSelector"), "agent.mjs must have loadAccountSelector");
-  assert.ok(src.includes("createRolloverRunner"), "agent.mjs must use createRolloverRunner");
+  assert.ok(src.includes("createTieredFailoverRunner"), "agent.mjs must use createTieredFailoverRunner");
 });
 
 // ---------------------------------------------------------------------------
