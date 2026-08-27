@@ -25,6 +25,8 @@ jobs:
         run: cargo check --all-targets
       - name: cargo clippy
         run: cargo clippy --all-targets -- -D warnings
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
       - name: tree-sitter version consistency check
         shell: pwsh
         run: ./scripts/check-tree-sitter-versions.ps1
