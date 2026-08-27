@@ -3,6 +3,7 @@
 // Class-level extraction and formatting helpers.
 // Extended to support Rust structs, enums, and traits.
 
+use crate::compaction::method::find_method_params;
 use crate::compaction::modifiers::{
     MODIFIERS_CLASS, MODIFIERS_STRUCT_RS, strip_csharp_attributes, strip_modifiers,
 };
@@ -50,6 +51,13 @@ pub fn extract_class_name(text: &str) -> String {
         .or_else(|| rest.strip_prefix("struct "))
         .unwrap_or(rest.as_str())
         .trim();
+
+    // A C# primary-constructor parameter list (`record Example(string Value)`)
+    // is part of the declaration header, never part of the class identity —
+    // without this strip the whitespace tokenizer produced labels like
+    // `Example(string` (regression test
+    // `gitdiff_interpolation_does_not_bleed_into_signature_line`).
+    let rest = strip_trailing_param_list(rest);
 
     // Split on whitespace: first token is "Name<T>" or "Name"
     let name_token = rest.split_whitespace().next().unwrap_or(rest);
@@ -104,6 +112,10 @@ pub fn extract_class_meta(text: &str) -> String {
         .unwrap_or(rest.as_str())
         .trim();
 
+    // Mirror `extract_class_name`'s primary-constructor strip so both derive
+    // from the same decl text (see `strip_trailing_param_list`).
+    let rest = strip_trailing_param_list(rest);
+
     // Find the `:` that separates the class name from the base list.
     // C# uses `: Base, IFoo`; TS uses `extends Base implements IFoo`.
     let mut meta = String::new();
@@ -136,6 +148,37 @@ pub fn extract_class_meta(text: &str) -> String {
         meta.push_str(&implements.join(","));
     }
     meta
+}
+
+/// Strip a trailing C# primary-constructor parameter list from a
+/// class-like declaration remainder.
+///
+/// Input is a declaration header after modifier/type-keyword removal:
+///   "Example(string Value)"            → "Example"
+///   "Range(int lo, int hi)"            → "Range"      (Java records)
+///   "FooService : BaseService, IFoo"    → unchanged     (no parens)
+///
+/// A class/interface/record header may contain a depth-0 paren group only
+/// as its primary-constructor parameter list; that group describes the
+/// declared NAME, never identity or base metadata. The group is located
+/// with the existing LAST-depth-0-group locator `find_method_params`
+/// (shared with method-signature extraction — no second parser).
+///
+/// Guard: a group is peeled only when it CLOSES OUT the remainder (empty
+/// tail or a lone `;`). A group followed by more text (`: Base(args)`,
+/// `where T : Fn(u32)`) is left untouched, so base lists and constraint
+/// clauses keep their legacy rendering; for such headers behavior is
+/// byte-identical to before this helper existed.
+fn strip_trailing_param_list(rest: &str) -> &str {
+    let mut cur = rest.trim();
+    while let Some((open, close)) = find_method_params(cur) {
+        let tail = cur[close + 1..].trim();
+        if !(tail.is_empty() || tail == ";") {
+            break;
+        }
+        cur = cur[..open].trim();
+    }
+    cur
 }
 
 /// Format a class entry line, embedding any accumulated field signatures.

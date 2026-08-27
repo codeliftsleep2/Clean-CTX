@@ -174,3 +174,29 @@ fn extract_class_name_strips_struct_keyword() {
     // helper (non-Rust parsers only).
     assert_eq!(extract_class_name("public struct Point"), "Point");
 }
+
+// ── Primary-constructor parameter list regression (gitdiff audit) ────
+//
+// A C#/Java primary-constructor parameter list belongs to the declaration
+// header, never to the type identity: without the trailing-param peel the
+// whitespace tokenizer produced corrupted labels like `Example(string`.
+
+#[test]
+fn extract_class_name_strips_primary_constructor_params() {
+    assert_eq!(
+        extract_class_name("public sealed record Example(string Value)"),
+        "Example"
+    );
+}
+
+/// Generic primary-constructor + inheritance: the parameter list must be
+/// peeled even though a `: Base` base list FOLLOWS it. Per the F-04
+/// contract pinned above (`UserController : ControllerBase`), the C#
+/// base list belongs in `class_meta`, not in the class name —
+/// hence "Foo" + ":Base" rather than a merged "Foo:Base".
+#[test]
+fn extract_class_name_generic_primary_ctor_with_base_list() {
+    let decl = "class Foo<T>(int x) : Base";
+    assert_eq!(extract_class_name(decl), "Foo");
+    assert_eq!(extract_class_meta(decl), ":Base");
+}

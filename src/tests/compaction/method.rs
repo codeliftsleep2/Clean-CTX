@@ -225,3 +225,54 @@ fn compound_signature_medium_high_unchanged_by_low_fix() {
     // High keeps the full signature verbatim (before `{`).
     assert_eq!(extract_method_sig(&raw, Fidelity::High), sig);
 }
+
+// ── Expression-bodied member regression (gitdiff RED→GREEN audit) ────
+//
+// An expression-bodied member (`M() => expr;`) has NO body brace, so the
+// first `{` in the raw capture belongs to something else — typically an
+// interpolated-string hole. The signature span must therefore ALSO end at
+// the first depth-0 `=>` outside string/char literals; otherwise the `=>`
+// and body/literal fragments bleed onto the rendered diff signature line
+// (see `gitdiff_interpolation_does_not_bleed_into_signature_line`).
+
+#[test]
+fn medium_fidelity_expression_bodied_stops_at_arrow() {
+    let raw = "public string Display() => $\"Value: {Value}\";";
+    let out = extract_method_sig(raw, Fidelity::Medium);
+    assert_eq!(out, "Display()", "got: {}", out);
+    assert!(
+        !out.contains("=>"),
+        "expression body leaked onto the signature: {}",
+        out
+    );
+    assert!(
+        !out.contains("Value"),
+        "interpolation fragment leaked onto the signature: {}",
+        out
+    );
+}
+
+/// Control: a normal brace-bodied member must keep taking the legacy
+/// first-`{` path byte-for-byte, even when its body contains the same
+/// interpolated string — body content never reaches the signature.
+#[test]
+fn medium_fidelity_brace_bodied_control_unaffected() {
+    let raw = concat!(
+        "public void Write(string value)\n",
+        "{\n",
+        "    Console.WriteLine($\"Value: {value}\");\n",
+        "}\n"
+    );
+    let out = extract_method_sig(raw, Fidelity::Medium);
+    assert_eq!(out, "Write(string value)", "got: {}", out);
+    assert!(
+        !out.contains("=>"),
+        "body leaked onto the signature: {}",
+        out
+    );
+    assert!(
+        !out.contains("$\"Value") && !out.contains("{value}"),
+        "interpolation fragment leaked onto the signature: {}",
+        out
+    );
+}

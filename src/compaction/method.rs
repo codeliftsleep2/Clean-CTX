@@ -27,7 +27,26 @@ pub fn extract_method_sig(text: &str, fidelity: Fidelity) -> String {
     //       DataRow data,
     //       string extra)
     // F-03 diff audit.
-    let sig = stripped.split('{').next().unwrap_or(stripped).trim();
+    //
+    // Expression-bodied members (`M() => expr;`) have NO body brace, so
+    // for them the first `{` in the raw text belongs to something else —
+    // typically a `{hole}` inside an interpolated string. That made the
+    // header stop mid-literal and bled `=>` / string fragments onto the
+    // signature line (see regression test
+    // `gitdiff_interpolation_does_not_bleed_into_signature_line`).
+    // A depth-0 `=>` outside string/char literals therefore ends the
+    // signature too, alongside the first `{`.
+    let brace_end = stripped.find('{');
+    let arrow_end = find_depth_zero_arrow(stripped);
+    let sig_end = match (brace_end, arrow_end) {
+        (Some(b), Some(a)) => Some(b.min(a)),
+        (b, a) => b.or(a),
+    };
+    let sig = match sig_end {
+        Some(end) => &stripped[..end],
+        None => stripped,
+    };
+    let sig = sig.trim();
 
     match fidelity {
         Fidelity::Low => compact_method_low(sig),
@@ -38,6 +57,57 @@ pub fn extract_method_sig(text: &str, fidelity: Fidelity) -> String {
         Fidelity::Edit | Fidelity::Verbatim => text.to_string(),
         Fidelity::High => sig.to_string(),
     }
+}
+
+/// Find the byte offset of the first `=>` at paren/bracket depth 0 that
+/// lies OUTSIDE string and character literals, or `None`.
+///
+/// An expression-bodied member (`M() => expr;`) has no body brace, so
+/// `=>` is an explicit end-of-signature boundary. The depth-0 constraint
+/// keeps `=>` inside the parameter list (TS callback types such as
+/// `(cb: (x) => void)`) from terminating the header. Literals are
+/// skipped so a default value containing an arrow
+/// (`void M(string s = "a => b")`) does not truncate the signature.
+///
+/// Conservative by construction: an unmatched quote consumes to EOF and
+/// a missed arrow merely restores the legacy first-`{` behavior; the
+/// function can never manufacture a spurious boundary from commented or
+/// quoted text.
+fn find_depth_zero_arrow(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut depth: i32 = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'"' | b'\'' => {
+                i = skip_quoted_literal(bytes, i);
+                continue;
+            }
+            b'(' | b'[' => depth += 1,
+            b')' | b']' => depth -= 1,
+            b'=' if depth == 0 && i + 1 < bytes.len() && bytes[i + 1] == b'>' => return Some(i),
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Advance past a quoted literal beginning at `open`, returning the index
+/// just past its closing quote. Backslash escapes are honored; verbatim
+/// (`@"..."`) and raw-literal quote-doubling degenerate to scanning for
+/// the next unescaped closer, which can only cause a MISSED `=>` boundary
+/// (never a spurious one — see `find_depth_zero_arrow`).
+fn skip_quoted_literal(bytes: &[u8], open: usize) -> usize {
+    let mut i = open + 1;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' => i += 2,
+            ch if ch == bytes[open] => return i + 1,
+            _ => i += 1,
+        }
+    }
+    bytes.len()
 }
 
 /// Find the byte range of a method's parameter list — the LAST balanced

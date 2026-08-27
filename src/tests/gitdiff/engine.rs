@@ -934,3 +934,83 @@ fn gitdiff_unchanged_class_label_remains_correct() {
         summary.manifest
     );
 }
+
+// ══════════════════════════════════════════════════════════════════
+// RED regression: an interpolated string must never bleed into a member's
+// signature / the diff signature line.
+//
+// The original bug report used a brace-bodied constructor
+// (`public Example(string value) { Console.WriteLine($"Value: {value}"); }`).
+// That exact shape parses cleanly on the current snapshot (the body `{`
+// precedes the interpolation `{`, so `split('{').next()` still stops at
+// the body brace). The defect reproduces with the adjusted fixture below,
+// where the interpolated parameter name surfaces in an expression-bodied
+// member — a C# record whose primary constructor parameter `Value` is
+// interpolated inside an expression-bodied member of the record symbol.
+// (See the discussion in the task: the fixture must be adjusted to trigger
+// the real, existing defect.)
+#[test]
+fn gitdiff_interpolation_does_not_bleed_into_signature_line() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().to_str().unwrap();
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .expect("git command");
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {:?}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "test@example.com"]);
+    git(&["config", "user.name", "Test"]);
+
+    // Commit 1: the record with only its primary constructor.
+    let v1 = "public sealed record Example(string Value);\n";
+    std::fs::write(dir.path().join("Example.cs"), v1).unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "commit1"]);
+
+    // Commit 2: add an expression-bodied member whose body interpolates
+    // the primary-constructor parameter name, `Value`.
+    let v2 = concat!(
+        "public sealed record Example(string Value)\n",
+        "{\n",
+        "    public string Display() => $\"Value: {Value}\";\n",
+        "}\n"
+    );
+    std::fs::write(dir.path().join("Example.cs"), v2).unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "commit2"]);
+
+    let summary = gitdiff_workspace(root, "HEAD~1", Some("HEAD"), Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+    let manifest = &summary.manifest;
+
+    // Guard against a false NEGATIVE: the added member must surface at all.
+    assert!(
+        manifest.contains("Display"),
+        "added member 'Display' must appear in the diff:\n{manifest}"
+    );
+
+    // VIOLATED by the current implementation: the `=>` expression-body
+    // leaks onto the signature / diff line.
+    assert!(
+        !manifest.contains("=>"),
+        "expression body leaked onto a signature/diff line:\n{manifest}"
+    );
+
+    // VIOLATED by the current implementation: the string-interpolation
+    // fragment `$"Value:` bleeds into the rendered signature line.
+    assert!(
+        !manifest.contains("$\"Value:"),
+        "interpolated-string fragment bled into the signature line:\n{manifest}"
+    );
+}
