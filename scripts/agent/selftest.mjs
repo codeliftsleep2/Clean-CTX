@@ -29,6 +29,7 @@ import {
   deleteRemoteBranch,
   createPr,
 } from "./gitops.mjs";
+import { readFileSync } from "node:fs";
 
 let passed = 0;
 function test(name, fn) {
@@ -293,6 +294,18 @@ test("gitops: refuses to operate on non-agent refs", () => {
   throws(() => ensureBranch("main"), "non-agent branch");
   throws(() => deleteRemoteBranch("o", "r", "main"), "non-agent branch");
   throws(() => createPr("o", "r", 1, "main", "main", "t", "b"), "non-agent branch");
+});
+
+// ---------------------------------------------------------------------------
+// Provider/model defaults (contract with cline-pass provider)
+// ---------------------------------------------------------------------------
+
+test("config: default provider/model follow cline-pass convention", () => {
+  const src = readFileSync(new URL("./agent.mjs", import.meta.url), "utf8");
+  for (const line of src.split(/\r?\n/)) {
+    if (/^\s+const providerId\s*=/.test(line)) assert.ok(line.includes('"cline-pass"'), "default provider must be cline-pass");
+    if (/^\s+const modelId\s*=/.test(line)) assert.ok(line.includes('"cline-pass/deepseek-v4-flash"'), "default model must be cline-pass/deepseek-v4-flash");
+  }
 });
 
 // ---------------------------------------------------------------------------
