@@ -161,8 +161,9 @@ pub fn extract_class_meta(text: &str) -> String {
 /// A class/interface/record header may contain a depth-0 paren group only
 /// as its primary-constructor parameter list; that group describes the
 /// declared NAME, never identity or base metadata. The group is located
-/// with the existing LAST-depth-0-group locator `find_method_params`
-/// (shared with method-signature extraction — no second parser).
+/// with the shared name-anchored locator `find_method_params` (first
+/// depth-0 group anchored to the declared name — shared with
+/// method-signature extraction, no second parser).
 ///
 /// Guard: a group is peeled only when it CLOSES OUT the remainder (empty
 /// tail or a lone `;`). A group followed by more text (`: Base(args)`,

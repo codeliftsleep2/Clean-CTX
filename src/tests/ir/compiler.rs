@@ -92,6 +92,84 @@ fn compile_sample_file_id_matches() {
     assert_eq!(ir.file_id, "test_sample");
 }
 
+/// A base-initializer constructor must compile with its DECLARED identity:
+/// `parse_method_sig` must anchor the parameter group to the method name —
+/// the `: base(...)` call site is neither the method name nor a return
+/// type. The LAST-group locator named the IR method `base` and fed the
+/// initializer's argument list through as the constructor's parameters.
+#[test]
+fn compile_base_initializer_ctor_keeps_constructor_identity() {
+    use crate::ir::opcodes::TYPE_VOID;
+
+    let source = concat!(
+        "using System;\n",
+        "public class Greeter : Base\n",
+        "{\n",
+        "    public Greeter(string prefix)\n",
+        "        : base(prefix)\n",
+        "    {\n",
+        "        Initialize(prefix);\n",
+        "    }\n",
+        "}\n"
+    );
+    let (language, query) = detect_language(source);
+    let mut compiler = IRCompiler::new();
+    let ir = compiler
+        .compile(
+            source,
+            "base_init_ctor",
+            language,
+            query,
+            Fidelity::Low,
+            None,
+        )
+        .expect("compilation should succeed");
+
+    let method_names: Vec<&str> = ir
+        .instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::DefMethod(_, _, name) => Some(name.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        method_names.contains(&"Greeter"),
+        "constructor must be named Greeter, got {method_names:?}"
+    );
+    assert!(
+        !method_names.contains(&"base"),
+        "initializer call site must not become a method name, got {method_names:?}"
+    );
+
+    // CoreOp::Param(method_id, param_id, type, name)
+    let param_names: Vec<&str> = ir
+        .instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::Param(_, _, _, name) => Some(name.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        param_names.contains(&"string prefix"),
+        "the constructor's own parameter group must reach the Param ops, got {param_names:?}"
+    );
+
+    let return_types: Vec<&str> = ir
+        .instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::Return(_, ty) => Some(ty.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        return_types.iter().all(|t| *t == TYPE_VOID),
+        "a constructor has no return type, got {return_types:?}"
+    );
+}
+
 #[test]
 fn compile_sample_has_def_class() {
     let ir = compile_sample();

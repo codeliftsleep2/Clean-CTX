@@ -40,6 +40,30 @@ fn extract_class_name_strips_generic_parameters() {
     assert_eq!(extract_class_name("class Foo<T>"), "Foo");
 }
 
+// ── Primary-constructor peel guard vs base calls ─────────────────────
+
+/// The peel guard's documented promise: a group followed by more text
+/// (`: Base(args)`) is left untouched — the base-call group is a call
+/// site, never the primary-constructor list. The LAST-group locator
+/// defeated this guard by selecting the base call's own parens (empty
+/// tail) and peeling them.
+#[test]
+fn strip_trailing_param_list_leaves_base_call_untouched() {
+    assert_eq!(
+        strip_trailing_param_list("Example(string Value) : Base(Value)"),
+        "Example(string Value) : Base(Value)"
+    );
+    assert_eq!(
+        strip_trailing_param_list("Example(string Value) : Base(Value);"),
+        "Example(string Value) : Base(Value);"
+    );
+    // A genuine primary-constructor list still peels (control).
+    assert_eq!(
+        strip_trailing_param_list("Example(string Value)"),
+        "Example"
+    );
+}
+
 // ── C# attribute handling ─────────────────────────────────────────
 
 #[test]

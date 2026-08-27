@@ -362,7 +362,7 @@ fn extract_method_body(raw: &str) -> Option<String> {
     // Only consider the signature portion (everything before the first
     // `{`). Parens in the method BODY (e.g. `api.get(id)` call
     // arguments) would otherwise be found by `find_method_params` as the
-    // "last" depth-0 group, producing a wrong body fingerprint. F-03 diff
+    // parameter-group match, producing a wrong body fingerprint. F-03 diff
     // audit: the previous implementation used `raw.find('(')` which found
     // the FIRST `(`, breaking body extraction for methods with tuple
     // return types. Scanning only the signature part solves both.

@@ -293,6 +293,23 @@ fn csharp_return_type_first_method_key() {
     assert_eq!(method_key("getUser(id:string):Promise<User>"), "getUser");
 }
 
+/// A base-initializer constructor must key on its declared name. The
+/// LAST-group locator picked the initializer's own parens, so every
+/// `: base(...)` / `: this(...)` constructor grouped under the key
+/// `base` — distinct constructors merged into one diff entry.
+#[test]
+fn method_key_base_initializer_uses_constructor_name() {
+    use crate::diff::keys::method_key;
+    assert_eq!(
+        method_key("Greeter(string prefix) : base(prefix)"),
+        "Greeter"
+    );
+    assert_eq!(
+        method_key("Greeter(string prefix) : this(prefix)"),
+        "Greeter"
+    );
+}
+
 /// G3-5: TS/Java name-first signatures with leading declarator keywords
 /// (`export function`, `async function`) must key on the actual method
 /// name, not the first token. Previously `method_key` took the FIRST

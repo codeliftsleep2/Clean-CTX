@@ -35,7 +35,7 @@ use super::program_graph::{GraphBuilder, ProgramGraph};
 use super::symbol_table::SymbolKind;
 use super::validator::{DefaultValidator, IRValidator};
 use crate::cbm::bridge::GraphBridge;
-use crate::compaction::method::find_method_params;
+use crate::compaction::method::{find_method_params, strip_base_initializer_clause};
 use crate::compaction::modifiers::{MODIFIERS_LOW, strip_csharp_attributes, strip_modifiers};
 use crate::compaction::{
     extract_class_name, extract_field, extract_method_sig, extract_rust_struct_name,
@@ -165,6 +165,11 @@ impl PassContext {
     /// Parse a method signature string into a `MethodSig`.
     fn parse_method_sig(&self, sig: &str) -> MethodSig {
         let sig = sig.trim();
+        // C# constructor initializers (`: base(...)` / `: this(...)`) are
+        // call sites, never signature content: drop the clause so the name,
+        // params, and return type derive from the bare declaration — a
+        // base/this call must not become a synthesized "return type".
+        let sig = strip_base_initializer_clause(sig);
 
         let (name, params_str, return_type) = if let Some((ps, pe)) = find_method_params(sig) {
             let raw_name = sig[..ps].trim();

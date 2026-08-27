@@ -162,45 +162,147 @@ fn find_depth_zero_brace(text: &str) -> Option<usize> {
     None
 }
 
-/// Find the byte range of a method's parameter list — the LAST balanced
-/// paren group at depth 0.
+/// Find the byte range of a method's parameter list — the FIRST balanced
+/// paren group at depth 0 that is ANCHORED TO THE DECLARED NAME: its opening
+/// `(` is immediately preceded (after whitespace) by `>` (a generic-type
+/// close) or by the end of an identifier that is neither the `base` nor
+/// `this` constructor-initializer keyword.
 ///
 /// C# tuple return types like
 ///   `Task<(Dictionary<string, Guid> Exact, Dictionary<string, Guid> IgnoreCase)> GetOrgUnitDlc(int id)`
-/// open a top-level `(` for the tuple. Taking the FIRST such group would
-/// mis-tokenize the tuple as the parameter list and the method name as
-/// `Task<` (silently breaking `focusMethods` matching). The method's own
-/// parameter list is the LAST depth-0 group — its closing `)` is followed
-/// by end-of-signature or a `:` return annotation.
+/// open a top-level `(` for the tuple, but that group is preceded by `<`,
+/// so it is skipped and the method's own group is selected. Constructor
+/// initializers (`Greeter(string prefix) : base(prefix)`) are call sites that
+/// FOLLOW the parameter list; the name anchor selects the declaration's own
+/// group ahead of them. The scan skips string/char literals so a default
+/// value such as `void M(string s = "a (", int n)` cannot break it.
 ///
-/// Returns `Some((start, end))` byte indices of the `(` and matching `)`,
-/// or `None` when there is no balanced paren group (or the parens are
+/// Returns `Some((start, end))` byte indices of the `(` and matching `)`, or
+/// `None` when no name-anchored balanced group exists (or the parens are
 /// unbalanced — defensive).
 pub(crate) fn find_method_params(sig: &str) -> Option<(usize, usize)> {
+    let bytes = sig.as_bytes();
     let mut depth = 0i32;
-    let mut start = None;
-    let mut end = None;
-    for (i, ch) in sig.char_indices() {
-        match ch {
-            '(' => {
+    let mut start: Option<usize> = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'"' | b'\'' => {
+                i = skip_quoted_literal(bytes, i);
+                continue;
+            }
+            b'(' => {
                 if depth == 0 {
-                    start = Some(i);
+                    start = if is_name_anchored(sig, i) {
+                        Some(i)
+                    } else {
+                        None
+                    };
                 }
                 depth += 1;
             }
-            ')' => {
-                depth -= 1;
+            b'[' => depth += 1,
+            b')' | b']' => {
+                depth = (depth - 1).max(0);
                 if depth == 0 {
-                    end = Some(i);
+                    if let Some(s) = start {
+                        if s < i {
+                            return Some((s, i));
+                        }
+                    }
+                    start = None;
                 }
             }
             _ => {}
         }
+        i += 1;
     }
-    match (start, end) {
-        (Some(s), Some(e)) if s < e => Some((s, e)),
-        _ => None,
+    None
+}
+
+/// Whether the `(` at byte `at` is immediately preceded (after whitespace) by
+/// `>` (a generic-type close) or by the end of an identifier token other than
+/// the `base`/`this` constructor-initializer keywords.
+fn is_name_anchored(sig: &str, at: usize) -> bool {
+    let bytes = sig.as_bytes();
+    let mut p = at;
+    while p > 0 && bytes[p - 1].is_ascii_whitespace() {
+        p -= 1;
     }
+    if p == 0 {
+        return false;
+    }
+    let prev = bytes[p - 1];
+    if prev == b'>' {
+        return true;
+    }
+    if !(prev.is_ascii_alphanumeric() || prev == b'_') {
+        return false;
+    }
+    // Back up to the start of the identifier token ending at `prev`.
+    let tok_end = p - 1;
+    let mut tok_start = tok_end;
+    while tok_start > 0
+        && (bytes[tok_start - 1].is_ascii_alphanumeric() || bytes[tok_start - 1] == b'_')
+    {
+        tok_start -= 1;
+    }
+    let ident = &sig[tok_start..=tok_end];
+    ident != "base" && ident != "this"
+}
+
+/// Drop a trailing C# constructor initializer clause (`: base(...)` /
+/// `: this(...)`) from a method-header slice, returning the shorter subslice.
+///
+/// An initializer clause is a CALL SITE, not signature content: it must never
+/// render as a return-type annotation (`M(...):base(...)`) nor feed the
+/// parameter/name scan. The boundary `:` is accepted only at structural
+/// depth 0 outside string/char literals, so an interpolated-argument clause
+/// (`: base($"msg: {p}")`) cannot mask it.
+pub(crate) fn strip_base_initializer_clause(sig: &str) -> &str {
+    if sig.is_empty() {
+        return sig;
+    }
+    let bytes = sig.as_bytes();
+    let mut depth = 0i32;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'"' | b'\'' => {
+                i = skip_quoted_literal(bytes, i);
+                continue;
+            }
+            b'(' | b'[' => depth += 1,
+            b')' | b']' => {
+                depth = (depth - 1).max(0);
+            }
+            b':' if depth == 0 => {
+                let rest = sig[i + 1..].trim_start();
+                let ident_end = rest
+                    .char_indices()
+                    .find_map(|(idx, c)| {
+                        if c.is_alphanumeric() || c == '_' {
+                            None
+                        } else {
+                            Some(idx)
+                        }
+                    })
+                    .unwrap_or(rest.len());
+                let ident = &rest[..ident_end];
+                if (ident == "base" || ident == "this")
+                    && rest[ident_end..].trim_start().starts_with('(')
+                {
+                    // The clause ran from this `:` to end-of-header; the
+                    // whitespace between the parameter list and the `:` is
+                    // not signature content either.
+                    return sig[..i].trim_end();
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    sig
 }
 
 /// Detect whether a token is a C# return type (as opposed to a TS/Java
@@ -272,9 +374,9 @@ fn compact_method_low(sig: &str) -> String {
     // s is now "name(params...): ReturnType" or "name<T>(params): ReturnType"
     // or C# "ActionResult<UserDto> GetAll(params)".
     // Extract name: for C# return-type-first, take the last whitespace
-    // token before the method's own `(` (the LAST balanced depth-0 group,
-    // so a C# tuple return type is not mis-tokenized); otherwise take up
-    // to the first `(` or `<`.
+    // token before the method's own `(` (the name-anchored first depth-0
+    // group from `find_method_params`, so a C# tuple return type is not
+    // mis-tokenized); otherwise take up to the first `(` or `<`.
     let before_paren = match find_method_params(&s) {
         Some((open, _)) => &s[..open],
         None => &s,
@@ -325,20 +427,25 @@ fn compact_method_low(sig: &str) -> String {
 ///   → "GetAll(id:int)"
 fn compact_method_medium(sig: &str) -> String {
     // F-16: use the shared `strip_modifiers` helper.
-    let s = strip_modifiers(sig, MODIFIERS_MEDIUM);
+    let stripped = strip_modifiers(sig, MODIFIERS_MEDIUM);
+    // A C# constructor initializer clause (`: base(...)`/`: this(...)`) is a
+    // call site, not signature content: dropping it first keeps the clause
+    // from collapsing onto the label as a fake return-type annotation.
+    let s = strip_base_initializer_clause(&stripped);
 
     // Detect C# return-type-first and normalize to name-first.
-    // Use the method's own `(` (LAST balanced depth-0 group) so a C#
-    // tuple return type is not mis-tokenized as the parameter list.
-    let before_paren = match find_method_params(&s) {
+    // Use the method's own `(` (`find_method_params` — the name-anchored
+    // first depth-0 group) so a C# tuple return type is not mis-tokenized
+    // as the parameter list.
+    let before_paren = match find_method_params(s) {
         Some((open, _)) => &s[..open],
-        None => &s,
+        None => s,
     };
     let tokens: Vec<&str> = before_paren.split_whitespace().collect();
     if tokens.len() >= 2 && is_csharp_return_type(tokens[tokens.len() - 2]) {
         // C#: "ActionResult<UserDto> GetAll(id:int)" → "GetAll(id:int)"
         let name = tokens.last().unwrap();
-        let (params, ret) = split_params_ret(&s);
+        let (params, ret) = split_params_ret(s);
         let mut out = format!("{}({})", name, params);
         if !ret.is_empty() {
             out.push(':');
@@ -358,8 +465,9 @@ fn compact_method_medium(sig: &str) -> String {
 /// Extract bare parameter names from a method signature string.
 /// Handles optional markers (`?`), rest params (`...`), and ignores defaults.
 fn extract_param_names(sig: &str) -> Vec<String> {
-    // Use the method's own `(` (LAST balanced depth-0 group) so a C#
-    // tuple return type is not mis-tokenized as the parameter list.
+    // Use the method's own `(` (`find_method_params` — the name-anchored
+    // first depth-0 group) so a C# tuple return type is not mis-tokenized
+    // as the parameter list.
     let Some((open, close)) = find_method_params(sig) else {
         return Vec::new();
     };

@@ -130,6 +130,69 @@ fn find_method_params_unbalanced_returns_none() {
     assert!(find_method_params("foo((bar").is_none());
 }
 
+// ── Name-anchored parameter-group selection (base-initializer audit) ──
+//
+// The method's own parameter list is the depth-0 group anchored to the
+// DECLARED NAME — not the last depth-0 group. A constructor initializer
+// (`: base(...)` / `: this(...)`) is a call site, not a parameter list;
+// its parens must never be selected as the parameter group.
+
+#[test]
+fn find_method_params_selects_name_anchored_group_over_base_initializer() {
+    let sig = "Greeter(string prefix) : base(prefix)";
+    let (open, close) = find_method_params(sig).expect("should find params");
+    assert_eq!(
+        &sig[open..=close],
+        "(string prefix)",
+        "base-initializer call site must not be selected as the parameter group"
+    );
+}
+
+#[test]
+fn find_method_params_selects_name_anchored_group_over_this_initializer() {
+    let sig = "Greeter(string prefix) : this(prefix)";
+    let (open, close) = find_method_params(sig).expect("should find params");
+    assert_eq!(
+        &sig[open..=close],
+        "(string prefix)",
+        "this-initializer call site must not be selected as the parameter group"
+    );
+}
+
+/// Parens inside quoted literals must not break the group scan: a default
+/// value whose string literal contains an unbalanced `(` must not defeat
+/// the enclosing parameter group (today the scan returns None and every
+/// consumer falls back to legacy tokenization).
+#[test]
+fn find_method_params_literal_parens_do_not_break_group() {
+    let sig = "void M(string s = \"a (\", int n)";
+    let (open, close) = find_method_params(sig).expect("should find params");
+    assert_eq!(&sig[open..=close], "(string s = \"a (\", int n)");
+}
+
+/// Control (passes before and after the fix): a generic method's parameter
+/// list is anchored AFTER the generic argument list — the preceding
+/// non-whitespace character is `>`.
+#[test]
+fn find_method_params_generic_method_anchored_after_generic_close() {
+    let sig = "public static T M<T>(T x)";
+    let (open, close) = find_method_params(sig).expect("should find params");
+    assert_eq!(&sig[open..=close], "(T x)");
+}
+
+/// A `new()` generic-constraint group can never be the parameter list —
+/// the real parameter group always precedes it in the declaration.
+#[test]
+fn find_method_params_constraint_new_group_never_selected() {
+    let sig = "void M(int id) where T : new()";
+    let (open, close) = find_method_params(sig).expect("should find params");
+    assert_eq!(
+        &sig[open..=close],
+        "(int id)",
+        "constraint group must not be selected as the parameter list"
+    );
+}
+
 // ── Multi-line C# signatures (F-03 diff audit) ────────────────────
 
 /// Regression: multi-line C# signatures (parameter list spanning multiple
@@ -309,15 +372,55 @@ fn high_fidelity_base_initializer_interpolation_keeps_full_header() {
         "header must extend past the interpolated initializer holes to the true body brace"
     );
 
-    // MEDIUM: no mid-literal truncation — both interpolation holes must
-    // survive extraction into the compacted label.
+    // MEDIUM (revised by the base-initializer label fix): the initializer
+    // clause is call-site metadata, not signature — the compacted label is
+    // the bare declaration. (ff2a29a pinned hole survival because the
+    // truncation bug destroyed the initializer outright; the label tier
+    // now drops the clause entirely, while High keeps the byte-exact
+    // header above.)
     let medium = extract_method_sig(raw, Fidelity::Medium);
-    assert!(
-        medium.contains("{value}"),
-        "value hole lost to mid-literal truncation (medium): {medium}"
+    assert_eq!(
+        medium, "ExampleException(string value,object context)",
+        "medium label must be the bare declaration without the initializer clause: {medium}"
     );
-    assert!(
-        medium.contains("{context}"),
-        "context hole lost to mid-literal truncation (medium): {medium}"
+}
+
+// ── Base-initializer compaction (Low/Medium label tiers) ─────────────
+
+/// Low fidelity must identify the constructor by its DECLARED name. The
+/// LAST-group locator picked the initializer's own parens, so the label
+/// became `base(prefix)` — the method's identity was destroyed.
+#[test]
+fn low_fidelity_base_initializer_keeps_constructor_name() {
+    let raw = concat!(
+        "public Greeter(string prefix)\n",
+        "        : base(prefix)\n",
+        "    {\n",
+        "        Initialize(prefix);\n",
+        "    }\n"
+    );
+    assert_eq!(
+        extract_method_sig(raw, Fidelity::Low),
+        "Greeter(prefix)",
+        "constructor label must carry the declared name, not the initializer call site"
+    );
+}
+
+/// Medium fidelity keeps types but drops the initializer clause — the
+/// `: base(...)` tail must not render onto the label where it reads as a
+/// return annotation.
+#[test]
+fn medium_fidelity_base_initializer_drops_initializer_clause() {
+    let raw = concat!(
+        "public Greeter(string prefix)\n",
+        "        : base(prefix)\n",
+        "    {\n",
+        "        Initialize(prefix);\n",
+        "    }\n"
+    );
+    assert_eq!(
+        extract_method_sig(raw, Fidelity::Medium),
+        "Greeter(string prefix)",
+        "medium label must not render the initializer clause"
     );
 }

@@ -1082,16 +1082,23 @@ fn gitdiff_ctor_base_initializer_interpolation_not_truncated() {
         "added constructor must appear in the diff:\n{manifest}"
     );
 
-    // VIOLATED by the current implementation: extraction truncates at the
-    // FIRST `{` — the interpolation hole INSIDE the initializer literal —
-    // so neither hole survives onto any diff/signature line.
+    // Revised by the base-initializer label fix: the Medium-tier member
+    // label is the bare declaration — the initializer clause is call-site
+    // metadata and no longer renders onto the label. (ff2a29a asserted
+    // hole survival because the truncation bug destroyed the initializer
+    // outright; the label tier now drops the clause instead, while High
+    // keeps the byte-exact header.)
     assert!(
-        manifest.contains("{value}"),
-        "interpolation hole {{value}} truncated out of the signature line:\n{manifest}"
+        manifest.contains("ExampleException(string value,object context)"),
+        "constructor label must be the bare declaration:\n{manifest}"
     );
     assert!(
-        manifest.contains("{context}"),
-        "interpolation hole {{context}} truncated out of the signature line:\n{manifest}"
+        !manifest.contains("{value}"),
+        "interpolation hole {{value}} must not render onto any diff/signature line:\n{manifest}"
+    );
+    assert!(
+        !manifest.contains("{context}"),
+        "interpolation hole {{context}} must not render onto any diff/signature line:\n{manifest}"
     );
 
     // Body statements belong to the body, never to a signature/label line.

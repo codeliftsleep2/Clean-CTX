@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.4.6] - 2026-08-27 - Constructor Initializer Mis-Tokenized as Parameter Group
+
+### Fixed
+
+- **A C# constructor initializer clause was mis-selected as the parameter group.** `find_method_params` returned the LAST balanced depth-0 paren group, so for `Greeter(string prefix) : base(prefix)` — and every `: base(...)` / `: this(...)` constructor — the initializer's OWN parentheses won the selection: Low rendered the constructor as `base(prefix)`, Medium welded the clause onto the label as a fake return-type annotation after space-collapse (`Greeter(string prefix):base(prefix)`), `method_key` grouped every base-initializing constructor under `base` (distinct overloads merged into one diff entry), the IR compiler named the constructor `base` and fed the initializer argument through as a parameter, the diff body fingerprint keyed off the initializer's own parens (initializer-only edits were invisible to the differ), and the class primary-constructor peel guard peeled a base call's `(Value)` because its own tail was "empty". The parameter list is now the FIRST balanced depth-0 paren group ANCHORED TO THE DECLARED NAME — its opening `(` immediately preceded (after whitespace) by `>` (a generic-type close) or by an identifier that is neither `base` nor `this` — scanned literal-aware via the shared `skip_quoted_literal` so a default value like `void M(string s = "a (", int n)` cannot break it (`src/compaction/method.rs`). New shared `strip_base_initializer_clause` drops the `: base(...)` / `: this(...)` call-site clause from the header before Medium compaction and before `parse_method_sig` name/params/return-type derivation (`src/compaction/method.rs`, `src/ir/pipeline.rs`).
+
+- **Behavior preservation.** Tuple-return signatures still select the method's own group (the tuple's top-level `(` is preceded by `<` and skipped); every non-constructor signature is byte-identical; High-fidelity output remains byte-exact including the full initializer clause.
+
+- **Deliberate Medium-tier revision.** The ff2a29a Medium expectation was revised by design: the compacted label now DROPS the initializer clause (call-site metadata, not a return annotation) instead of carrying the interpolation holes, while High keeps the byte-exact header. The ff2a29a truncation fix itself is untouched.
+
+### Tests
+
+- Name-anchored selection RED→GREEN: base-initializer (`Greeter(string prefix) : base(prefix)` → `(string prefix)`), this-initializer, literal-paren default value (`void M(string s = "a (", int n)` → full group), generic-`>` anchor (control), generic-`new()` constraint exclusion, and the existing tuple-return test unchanged.
+- Tier and consumer regressions RED→GREEN: Low label `Greeter(prefix)`, Medium label `Greeter(string prefix)`, `method_key("Greeter(string prefix) : base(prefix)")` → `Greeter`, IR identity (constructor compiles named `Greeter` with `string prefix` parameter and void return), class peel guard leaves `Example(string Value) : Base(Value)` untouched, and the body-fingerprint test fails on initializer-only edits.
+- Revised ff2a29a pair: unit `high_fidelity_base_initializer_interpolation_keeps_full_header` (High byte-exact including the clause; Medium = bare declaration) and e2e `gitdiff_ctor_base_initializer_interpolation_not_truncated` (bare label `ExampleException(string value,object context)`; `{value}`/`{context}` absent; body statements absent).
+
+### Verification
+
+- compaction 95 passed; diff 80 passed (2 feature-ignored); gitdiff 42 passed; ir::compiler 20 passed; ir::pipeline 12 passed; `cargo test encoding` 6 passed; `cargo fmt --all -- --check` clean; `cargo clippy --all-targets -- -D warnings` (default and `--features rust`) 0 warnings; UTF-8 guard PASS (473 files, strict UTF-8, 0 BOMs, 0 mojibake).
+
+---
+
 ## [0.4.5] - 2026-08-27 - Constructor Base-Initializer Signature Truncation
 
 ### Fixed
@@ -862,6 +884,7 @@ Evidence-driven fix cycle over the 2026-08-25 non-CBM tool audit. Every fix was 
 - Cargo.toml: `license`, `rust-version`, `[lib]`, `[[bin]]` added
 - tree-sitter crates pinned to exact versions with `// SAFETY:` comments
 - `#![allow(dead_code)]` and shim modules removed from `lib.rs`
+| 0.4.6 | 2026-08-27 | **Constructor Initializer Mis-Tokenized as Parameter Group.** `find_method_params` selects the FIRST name-anchored balanced depth-0 paren group (preceded by `>` or an identifier other than `base`/`this`, scanned literal-aware) — `: base(...)`/`: this(...)` call sites are no longer chosen as the parameter list: Low/Medium labels, diff grouping, IR constructor identity, initializer-sensitive body fingerprints, and the class primary-constructor peel guard all corrected; new `strip_base_initializer_clause` wired into Medium compaction and `parse_method_sig`; tuple-return behavior and High byte-exact output preserved; the ff2a29a Medium tier deliberately drops the clause while High keeps it byte-exact — compaction 95, diff 80, gitdiff 42, ir 32 passed, 0 clippy warnings |
 
 ### Deferred
 - **F-19** — Streaming workspace walk (replaced collect-then-sort with `walkdir`)

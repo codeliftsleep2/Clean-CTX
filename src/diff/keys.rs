@@ -45,8 +45,9 @@ pub(crate) fn group_strings_by_key(
 /// (`+ method bool bool Resolve(...)`) and incorrect grouping of
 /// methods that share a return type. F-02 diff audit.
 pub(crate) fn method_key(sig: &str) -> String {
-    // Use the method's own `(` (LAST balanced depth-0 group) so a C#
-    // tuple return type is not mis-tokenized as the parameter list.
+    // Use the method's own `(` (`find_method_params` — the name-anchored
+    // first depth-0 group) so a C# tuple return type is not mis-tokenized
+    // as the parameter list.
     let before_paren = match find_method_params(sig) {
         Some((open, _)) => &sig[..open],
         None => sig,

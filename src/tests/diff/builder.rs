@@ -20,6 +20,28 @@ fn build_snapshot_handles_empty_source() {
     assert!(snap.imports.is_empty());
 }
 
+// ── Base-initializer sensitivity (body fingerprint) ──────────────────
+
+/// The fingerprint covers everything after the method's OWN parameter
+/// list. A base-initializer clause is behavior — it runs before the body —
+/// so an initializer-only edit must change the fingerprint even when the
+/// body text is identical. The LAST-group locator keyed the fingerprint
+/// off the initializer's own parens, hiding initializer-only edits.
+#[test]
+fn method_body_fingerprint_is_initializer_sensitive() {
+    let body = "{\n    Initialize(prefix);\n}";
+    let a = format!("public Greeter(string prefix) : base(prefix)\n{body}");
+    let b = format!("public Greeter(string prefix) : base(prefix + 1)\n{body}");
+    let c = "public Greeter(string prefix) : base(prefix)\n{\n    Initialize(prefix);\n    Validate();\n}";
+
+    let fa = extract_method_body(&a).expect("fingerprint");
+    let fb = extract_method_body(&b).expect("fingerprint");
+    let fc = extract_method_body(c).expect("fingerprint");
+
+    assert_ne!(fa, fb, "initializer-only edit must change the fingerprint");
+    assert_ne!(fa, fc, "body-only edit must change the fingerprint");
+}
+
 #[test]
 fn build_snapshot_falls_back_to_other_language() {
     let src = r#"
