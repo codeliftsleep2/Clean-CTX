@@ -71,8 +71,8 @@ async function runAgentSession({ mode, taskPrompt, workspace }) {
   const { ClineCore } = await import("@cline/sdk");
   const apiKey = process.env.CLINE_AGENT_API_KEY ?? "";
   if (!apiKey) fatal("CLINE_AGENT_API_KEY is not set; cannot start a model session.");
-  const providerId = process.env.CLINE_AGENT_PROVIDER ?? "anthropic";
-  const modelId = process.env.CLINE_AGENT_MODEL ?? "claude-sonnet-4-6";
+  const providerId = process.env.CLINE_AGENT_PROVIDER ?? "cline-pass";
+  const modelId = process.env.CLINE_AGENT_MODEL ?? "cline-pass/claude-sonnet-4-6";
   const maxIterations = Number(process.env.CLINE_AGENT_MAX_ITERS ?? 100);
   const policyText = readPortablePolicy(path.join(workspace, "AGENTS.md"));
   const systemPrompt = buildSystemPrompt(mode, policyText);
