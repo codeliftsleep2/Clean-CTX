@@ -33,19 +33,17 @@ fn phase_b_fixture() -> (tempfile::TempDir, String, String) {
 
 #[test]
 fn phase_b_delta_text_context_is_no_longer_a_registered_tool() {
+    let _serial = crate::protocol::handler_response_serial();
     let (_dir, path, root) = phase_b_fixture();
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(91);
     let params =
         json!({ "arguments": { "filePath": path, "fidelity": "medium", "workspaceRoot": root } });
-    crate::protocol::CAPTURED_RESPONSES.lock().unwrap().clear();
+    crate::protocol::captured_responses().clear();
 
     dispatch_tools_call(&id, "delta_text_context", &params, &state);
-    let resp = crate::protocol::CAPTURED_RESPONSES
-        .lock()
-        .unwrap()
-        .pop()
-        .unwrap();
+    let resp = crate::protocol::captured_responses().pop();
+    let resp = resp.unwrap();
 
     let err = resp
         .get("error")
@@ -97,6 +95,7 @@ fn phase_b_registered_schemas_carry_no_sd_marker() {
 
 #[test]
 fn phase_b_ir_native_delta_flow_end_to_end_still_works() {
+    let _serial = crate::protocol::handler_response_serial();
     let (_dir, path, root) = phase_b_fixture();
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(92);
@@ -104,13 +103,10 @@ fn phase_b_ir_native_delta_flow_end_to_end_still_works() {
     // Step 1: full compression populates the IR context (version 1).
     let compress_params =
         json!({ "arguments": { "filePath": path, "fidelity": "medium", "workspaceRoot": root } });
-    crate::protocol::CAPTURED_RESPONSES.lock().unwrap().clear();
+    crate::protocol::captured_responses().clear();
     dispatch_tools_call(&id, "compress_code_context", &compress_params, &state);
-    let compressed = crate::protocol::CAPTURED_RESPONSES
-        .lock()
-        .unwrap()
-        .pop()
-        .unwrap();
+    let compressed = crate::protocol::captured_responses().pop();
+    let compressed = compressed.unwrap();
     assert!(
         compressed.get("error").is_none(),
         "baseline compression failed: {compressed}"
@@ -130,13 +126,10 @@ fn phase_b_ir_native_delta_flow_end_to_end_still_works() {
             "currentVersion": 1,
         }
     });
-    crate::protocol::CAPTURED_RESPONSES.lock().unwrap().clear();
+    crate::protocol::captured_responses().clear();
     dispatch_tools_call(&id, "apply_delta", &delta_params, &state);
-    let applied = crate::protocol::CAPTURED_RESPONSES
-        .lock()
-        .unwrap()
-        .pop()
-        .unwrap();
+    let applied = crate::protocol::captured_responses().pop();
+    let applied = applied.unwrap();
 
     assert!(
         applied.get("error").is_none(),

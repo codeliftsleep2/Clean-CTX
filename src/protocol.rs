@@ -72,3 +72,48 @@ pub fn send_response(val: &serde_json::Value) {
 /// Pushed by [`send_response`] under `cfg(test)`; drained by handler tests.
 #[cfg(test)]
 pub(crate) static CAPTURED_RESPONSES: Mutex<Vec<serde_json::Value>> = Mutex::new(Vec::new());
+
+/// Poison-tolerant guard for [`CAPTURED_RESPONSES`].
+///
+/// A test that fails while draining the sink must never cascade into
+/// `PoisonError` storms across sibling handler tests (observed 2026-08-27
+/// under full-suite parallelism: one empty-pop panic held the guard,
+/// poisoned the sink, and failed three unrelated tests). The producer in
+/// [`send_response`] already tolerates poison (`if let Ok`); consumers
+/// get the same courtesy here.
+///
+/// Gated to the `rust` feature to mirror its consumers: the only drainers
+/// (`phase_a_retirement_tests`, `phase_b_retirement_tests`) compile under
+/// `#[cfg(all(test, feature = "rust"))]` — a bare `cfg(test)` gate would
+/// leave these items dead (and warn) in default-feature test builds.
+#[cfg(all(test, feature = "rust"))]
+pub(crate) fn captured_responses() -> std::sync::MutexGuard<'static, Vec<serde_json::Value>> {
+    match CAPTURED_RESPONSES.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+/// Serializes every test that dispatches tool calls and drains
+/// [`CAPTURED_RESPONSES`].
+///
+/// The sink is process-global; concurrent `clear()` → dispatch → `pop()`
+/// sequences from sibling tests race (a sibling's `clear()` erases an
+/// in-flight response, or another test steals it via its own `pop()`),
+/// which surfaced as a spurious "handler must have sent exactly one
+/// response" panic followed by a `PoisonError` cascade. Phase A originally
+/// serialized only its own file; Phase B joined the contract late with no
+/// gate at all — both now share this single lock.
+///
+/// Feature-gated to mirror its consumers (see `captured_responses`).
+#[cfg(all(test, feature = "rust"))]
+pub(crate) static HANDLER_RESPONSE_SERIAL: Mutex<()> = Mutex::new(());
+
+/// Poison-tolerant guard for [`HANDLER_RESPONSE_SERIAL`] — see its docs.
+#[cfg(all(test, feature = "rust"))]
+pub(crate) fn handler_response_serial() -> std::sync::MutexGuard<'static, ()> {
+    match HANDLER_RESPONSE_SERIAL.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}

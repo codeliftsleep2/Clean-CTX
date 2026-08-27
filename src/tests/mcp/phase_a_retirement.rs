@@ -14,19 +14,9 @@
 
 use crate::mcp::tools::dispatch_tools_call;
 use serde_json::json;
-use std::sync::{Mutex, MutexGuard};
 
-/// Serializes every test here so the global injection flag can never
-/// leak into a concurrently running sibling test.
-static PHASE_A_SERIAL: Mutex<()> = Mutex::new(());
-
-fn phase_a_serial() -> MutexGuard<'static, ()> {
-    // Poison-tolerant: a sibling panic must not cascade into this suite.
-    match PHASE_A_SERIAL.lock() {
-        Ok(g) => g,
-        Err(poisoned) => poisoned.into_inner(),
-    }
-}
+// Test serialization moved to `protocol::HANDLER_RESPONSE_SERIAL`
+// (shared with the Phase B suite — one gate for the one shared sink).
 
 const TS_FIXTURE: &str = "export class Greeter {\n    private prefix: string;\n    constructor(prefix: string) {\n        this.prefix = prefix;\n    }\n    greet(name: string): string {\n        return this.prefix + ', ' + name;\n    }\n}\n";
 
@@ -52,23 +42,26 @@ fn phase_a_temp_fixture() -> PhaseAFixture {
 }
 
 fn phase_a_set_injection(reason: Option<&str>) {
-    let mut slot = crate::mcp::tool_helpers::TEST_INJECTED_IR_FAILURE
-        .lock()
-        .unwrap();
+    // Poison-tolerant: a sibling panic must not cascade into this suite.
+    let mut slot = match crate::mcp::tool_helpers::TEST_INJECTED_IR_FAILURE.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     *slot = reason.map(str::to_string);
 }
 
 fn phase_a_take_response() -> serde_json::Value {
-    crate::protocol::CAPTURED_RESPONSES
-        .lock()
-        .unwrap()
-        .pop()
-        .expect("handler must have sent exactly one response")
+    // Pop under the guard, THEN assert — an assertion failure here must
+    // never panic while holding the sink's lock (that is exactly how one
+    // genuine failure once poisoned `CAPTURED_RESPONSES` and cascaded
+    // into PoisonError storms across sibling tests).
+    let resp = crate::protocol::captured_responses().pop();
+    resp.expect("handler must have sent exactly one response")
 }
 
 #[test]
 fn phase_a_fallbacks_return_structured_ir_unavailable_not_legacy_text() {
-    let _serial = phase_a_serial();
+    let _serial = crate::protocol::handler_response_serial();
     let fx = phase_a_temp_fixture();
     let id = json!(77);
 
@@ -82,7 +75,7 @@ fn phase_a_fallbacks_return_structured_ir_unavailable_not_legacy_text() {
     for (tool, params) in cases {
         let state = crate::mcp::McpState::new(crate::tests::test_config());
         phase_a_set_injection(Some("unit-test"));
-        crate::protocol::CAPTURED_RESPONSES.lock().unwrap().clear();
+        crate::protocol::captured_responses().clear();
 
         dispatch_tools_call(&id, tool, &params, &state);
         let resp = phase_a_take_response();
@@ -132,7 +125,7 @@ fn phase_a_fallbacks_return_structured_ir_unavailable_not_legacy_text() {
 
 #[test]
 fn phase_a_success_paths_still_render_schema_v2() {
-    let _serial = phase_a_serial();
+    let _serial = crate::protocol::handler_response_serial();
     let fx = phase_a_temp_fixture();
     let id = json!(78);
 
@@ -146,7 +139,7 @@ fn phase_a_success_paths_still_render_schema_v2() {
     for (tool, params) in cases {
         let state = crate::mcp::McpState::new(crate::tests::test_config());
         phase_a_set_injection(None);
-        crate::protocol::CAPTURED_RESPONSES.lock().unwrap().clear();
+        crate::protocol::captured_responses().clear();
 
         dispatch_tools_call(&id, tool, &params, &state);
         let resp = phase_a_take_response();
