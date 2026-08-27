@@ -14,8 +14,23 @@ export function loadRegistry(filePath) {
   if (!parsed || typeof parsed !== "object") throw new Error("Registry must be a JSON object");
   if (!Array.isArray(parsed.accounts)) throw new Error("Registry must have an 'accounts' array");
   for (const [i, acct] of parsed.accounts.entries()) {
-    if (!acct.id || typeof acct.id !== "string") throw new Error(`Account ${i}: missing 'id'`);
-    if (!acct.secretName || typeof acct.secretName !== "string") throw new Error(`Account ${i}: missing 'secretName'`);
+    if (!acct.id || typeof acct.id !== "string") throw new Error(`Account ${i}: missing or invalid 'id'`);
+    if (!acct.secretName || typeof acct.secretName !== "string") throw new Error(`Account ${i}: missing or invalid 'secretName'`);
+    if (!/^CLINE_ACCOUNT_\d+_API_KEY$/.test(acct.secretName)) {
+      throw new Error(`Account ${i} ("${acct.id}"): secretName '${acct.secretName}' must match CLINE_ACCOUNT_N_API_KEY format`);
+    }
+  }
+  // Reject duplicate account IDs
+  const ids = new Set();
+  for (const acct of parsed.accounts) {
+    if (ids.has(acct.id)) throw new Error(`Duplicate account ID: ${acct.id}`);
+    ids.add(acct.id);
+  }
+  // Reject duplicate secretName values
+  const secrets = new Set();
+  for (const acct of parsed.accounts) {
+    if (secrets.has(acct.secretName)) throw new Error(`Duplicate secretName: ${acct.secretName} (both accounts would use the same credential)`);
+    secrets.add(acct.secretName);
   }
   return parsed;
 }

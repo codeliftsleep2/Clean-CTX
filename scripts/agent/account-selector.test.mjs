@@ -5,8 +5,8 @@ import{fileURLToPath}from "node:url";
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const T=[];let p=0,f=0;
 function test(n,fn){T.push([n,fn]);}
-function regStr(ov){return JSON.stringify({accounts:[{id:"cp-01",secretName:"S1",enabled:true,priority:10,clinePass:true,preferredModels:["cline-pass/deepseek-v4-flash"]},{id:"cp-02",secretName:"S2",enabled:true,priority:20,clinePass:true,preferredModels:[]},{id:"ub-01",secretName:"S3",enabled:true,priority:30,clinePass:false,preferredModels:[]}],...ov});}
-function env(e){return{S1:"k1",S2:"k2",S3:"k3",...e};}
+function regStr(ov){return JSON.stringify({accounts:[{id:"cp-01",secretName:"CLINE_ACCOUNT_01_API_KEY",enabled:true,priority:10,clinePass:true,preferredModels:["cline-pass/deepseek-v4-flash"]},{id:"cp-02",secretName:"CLINE_ACCOUNT_02_API_KEY",enabled:true,priority:20,clinePass:true,preferredModels:[]},{id:"ub-01",secretName:"CLINE_ACCOUNT_03_API_KEY",enabled:true,priority:30,clinePass:false,preferredModels:[]}],...ov});}
+function env(e){return{CLINE_ACCOUNT_01_API_KEY:"k1",CLINE_ACCOUNT_02_API_KEY:"k2",CLINE_ACCOUNT_03_API_KEY:"k3",...e};}
 function mF(s,b){const t=typeof b==="string"?b:JSON.stringify(b);return async()=>({ok:s>=200&&s<300,status:s,json:async()=>b,text:async()=>t,headers:{get:()=>null}});}
 test("reg:valid JSON",async()=>{const{loadRegistry}=await import("./account-selector.mjs");const d=path.join(__dirname,".scratch");const f=path.join(d,"r.json");try{mkdirSync(d,{recursive:true})}catch{}writeFileSync(f,regStr(),"utf8");const r=loadRegistry(f);assert.equal(r.accounts.length,3);try{unlinkSync(f);unlinkSync(d)}catch{}});
 test("reg:missing file",async()=>{const{loadRegistry}=await import("./account-selector.mjs");assert.throws(()=>loadRegistry("/nonexistent.json"),/not found/)});
@@ -34,7 +34,7 @@ main();
 test("sel:ClinePass filters",async()=>{const{selectEligibleAccounts}=await import("./account-selector.mjs");const cs=selectEligibleAccounts(JSON.parse(regStr()),"cline-pass/deepseek-v4-flash",env());assert.equal(cs.length,2);assert.ok(cs.every(c=>c.account.clinePass))});
 test("sel:non-Pass allows all",async()=>{const{selectEligibleAccounts}=await import("./account-selector.mjs");assert.equal(selectEligibleAccounts(JSON.parse(regStr()),"m/m",env()).length,3)});
 test("sel:disabled excluded",async()=>{const{selectEligibleAccounts}=await import("./account-selector.mjs");const reg=JSON.parse(regStr());reg.accounts[0].enabled=false;assert.equal(selectEligibleAccounts(reg,"cline-pass/deepseek-v4-flash",env()).length,1)});
-test("sel:missing secret skipped",async()=>{const{selectEligibleAccounts}=await import("./account-selector.mjs");assert.equal(selectEligibleAccounts(JSON.parse(regStr()),"cline-pass/deepseek-v4-flash",env({S2:undefined})).length,1)});
+test("sel:missing secret skipped",async()=>{const{selectEligibleAccounts}=await import("./account-selector.mjs");assert.equal(selectEligibleAccounts(JSON.parse(regStr()),"cline-pass/deepseek-v4-flash",env({CLINE_ACCOUNT_02_API_KEY:undefined})).length,1)});
 test("sel:preferred model",async()=>{const{selectEligibleAccounts}=await import("./account-selector.mjs");const reg=JSON.parse(regStr());reg.accounts[0].preferredModels=[];reg.accounts[1].preferredModels=["cline-pass/deepseek-v4-flash"];reg.accounts[0].priority=20;reg.accounts[1].priority=10;assert.equal(selectEligibleAccounts(reg,"cline-pass/deepseek-v4-flash",env())[0].account.id,"cp-02")});
 test("sel:deterministic",async()=>{const{selectEligibleAccounts}=await import("./account-selector.mjs");const reg=JSON.parse(regStr());reg.accounts.forEach(a=>{a.preferredModels=[];a.priority=10});const a=selectEligibleAccounts(reg,"cline-pass/deepseek-v4-flash",env());const b=selectEligibleAccounts(reg,"cline-pass/deepseek-v4-flash",env());assert.deepEqual(a.map(x=>x.account.id),b.map(x=>x.account.id))});
 

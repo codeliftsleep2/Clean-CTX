@@ -10,7 +10,8 @@
   "scripts": {
     "agent": "node scripts/agent/agent.mjs",
     "selftest": "node scripts/agent/selftest.mjs",
-    "test-account-selector": "node scripts/agent/account-selector.test.mjs"
+    "test-account-selector": "node scripts/agent/account-selector.test.mjs",
+    "test-account-mapping": "node scripts/agent/account-selector.mapping.test.mjs"
   },
   "dependencies": {
     "@cline/sdk": "^0.0.81"
