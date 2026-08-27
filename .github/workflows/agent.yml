@@ -65,6 +65,11 @@ jobs:
       # Pinned to immutable commit SHAs (supply-chain hardening), matching the
       # convention in ci.yml.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch || github.ref_name || 'main' }}
+          # Explicit ref is required for issue_comment events: github.sha can
+          # point to a phantom SHA that doesn't exist as a commit on any ref,
+          # causing the checkout to get stale content.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '22'
