@@ -35,33 +35,26 @@ export function ghNoBody(method, path) {
 
 export function issueComments(owner, repo, issue) {
   const out = run(
-    `gh api "repos/${owner}/${repo}/issues/${issue}/comments" --paginate ` +
-      // Double-quoted (not single-quoted): execSync uses cmd.exe on Windows,
-      // where single quotes are literal characters and would split this jq
-      // expression into multiple positional args. Double quotes are honored
-      // identically by cmd.exe and /bin/sh.
-      `--jq ".[] | {id, body, login: .user.login, at: .created_at}"`,
+    `gh api "repos/${owner}/${repo}/issues/${issue}/comments?per_page=100" ` +
+    `--jq ".[] | {id, body, login: .user.login, at: .created_at}"`,
   );
-  try {
-    return JSON.parse(out);
-  } catch {
-    // gh --jq emits one JSON object per line under this shape.
-    return out
-      .trim()
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .map((l) => JSON.parse(l));
-  }
+  return parseLineJson(out);
+}
+
+// Parses JSON-lines output (a common gh --jq shape) robustly, skipping any
+// malformed lines instead of propagating parse failures.
+function parseLineJson(raw) {
+  const lines = String(raw ?? "").trim().split(/\r?\n/).filter(Boolean);
+  if (!lines.length) return [];
+  const result = [];
+  for (const l of lines) { try { result.push(JSON.parse(l)); } catch {/*skip*/} }
+  return result;
 }
 
 export function issueInfo(owner, repo, issue) {
-  // Double-quoted jq (see issueComments) so this works under cmd.exe and sh.
   const out = run(`gh api "repos/${owner}/${repo}/issues/${issue}" --jq "{title, body, state, number}"`);
-  try {
-    return JSON.parse(out);
-  } catch {
-    return { title: `issue ${issue}`, body: "", state: "open", number: Number(issue) };
-  }
+  const obj = parseLineJson(out);
+  return obj[0] ?? { title: `issue ${issue}`, body: "", state: "open", number: Number(issue) };
 }
 
 export function postComment(owner, repo, issue, body) {
