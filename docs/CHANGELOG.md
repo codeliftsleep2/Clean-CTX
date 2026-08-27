@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.4.5] - 2026-08-27 - Constructor Base-Initializer Signature Truncation
+
+### Fixed
+
+- **Interpolation hole inside a constructor base-initializer terminated the signature.** A brace-bodied C# constructor whose base-initializer argument is an interpolated string (`: base($"Unexpected value: {value}, context: {context}")`) truncated at the FIRST `{` anywhere in the capture — the interpolation hole INSIDE the literal — rendering the diff member as `method value: …:base($"Unexpected value:` with both holes and the initializer tail destroyed while raw `git diff` was correct. The body-brace boundary now shares `find_depth_zero_arrow`'s literal-aware contract: new sibling `find_depth_zero_brace` skips string/char literals via the existing `skip_quoted_literal` and tracks paren/bracket depth, so only a structural-depth-0 `{` OUTSIDE quoted/interpolated literals ends the signature (`src/compaction/method.rs`). Renderer/differ untouched; no fixture special-casing; the expression-bodied min-boundary fix and normal brace-bodied legacy extraction are byte-identical.
+
+### Tests
+
+- Focused unit regression `high_fidelity_base_initializer_interpolation_keeps_full_header` (`src/tests/compaction/method.rs`): the High-fidelity signature span ends at the true body brace with the full initializer intact; the Medium-tier compacted label retains both interpolation holes.
+- End-to-end regression `gitdiff_ctor_base_initializer_interpolation_not_truncated` (`src/tests/gitdiff/engine.rs`): established failing against the unfixed tree (manifest dropped `{value}`/`{context}` and mis-shaped the member marker), promoted GREEN with assertions unchanged; constructor body statements asserted absent from every signature line.
+- Harness hardening (same build): `CAPTURED_RESPONSES` consumers are now poison-tolerant via `protocol::captured_responses()` and drain pop-first-then-assert, so a genuine test failure can no longer poison the shared sink while holding its guard; and both Phase A/B retirement suites gate their dispatching tests on one shared `protocol::HANDLER_RESPONSE_SERIAL` (Phase B previously had no serialization at all, and Phase A's gate covered only its own file) — eliminating the empty-pop → `PoisonError` cascade observed under full-suite parallelism, where one test's clear/dispatch/pop raced a sibling's and three unrelated tests died on a poisoned lock.
+
+### Verification
+
+- compaction 87 passed; diff 62 passed (2 feature-ignored); gitdiff 41 passed; `cargo fmt --all -- --check` clean (two EOF-newline fixes applied via the formatter); UTF-8 guard PASS (473 files, strict UTF-8, 0 BOMs, 0 mojibake); `cargo test encoding` 6 passed; `cargo clippy --all-targets -- -D warnings` 0 warnings.
+
+---
+
 ## [0.4.4] - 2026-08-27 - git_diff Signature-Bleed Fixes
 
 ### Fixed
@@ -865,6 +883,7 @@ This project follows [Semantic Versioning](https://semver.org/). Major version z
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.4.5 | 2026-08-27 | **Constructor Base-Initializer Signature Truncation.** `find_depth_zero_brace` (sibling of `find_depth_zero_arrow`, reusing `skip_quoted_literal`) locates the body brace only at structural depth 0 outside quoted/interpolated literals — interpolation holes in `: base($"Unexpected value: {value}")` no longer truncate constructor signatures onto diff labels; RED→GREEN e2e regression kept assertion-exact — focused compaction/diff/gitdiff suites 190 passed, 0 clippy warnings |
 | 0.4.4 | 2026-08-27 | **git_diff Signature-Bleed Fixes.** Expression-bodied members no longer leak `=>`/interpolation fragments onto change-set signatures (`find_depth_zero_arrow`+`skip_quoted_literal` min-boundary slicing); C# primary-constructor parameter lists no longer corrupt class labels (`strip_trailing_param_list` peels the trailing balanced group via existing `find_method_params`); RED→GREEN end-to-end regression kept assertion-exact — focused compaction/diff/gitdiff suites 143 passed, 0 clippy warnings on changed targets |
 | 0.4.3 | 2026-08-25 | **Clean-CTX-native `apply_edit` Write Path.** Single-unit byte-exact editing (replace_body/delete/insert_after/insert_before) with unit-granular optimistic concurrency; EOL-preserving expected-text verification; `read_source` permanently-self-defeating cache entry fixed (stale `Arc<String>` pinned forever after external writes); Phase A legacy notation retired from interactive surfaces (structured `ir_unavailable` errors); Phase B `delta_text_context`/`§Δ` transport removed entirely |
 | 0.4.2 | 2026-08-25 | **Non-CBM Tool Audit Fix Cycle.** Access-modifier class-label corruption + nested-declaration method attribution fixed in diff_commits; compound-signature identifier recovery at Low fidelity; canonical path identity unifies alias registry & SessionStats; decompression preserves class-boundary markers; `list_sessions` enumerates persisted file contexts; `context_stats` signs true negative savings — every fix RED-first |

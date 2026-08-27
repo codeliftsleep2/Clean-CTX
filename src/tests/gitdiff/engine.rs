@@ -1014,3 +1014,93 @@ fn gitdiff_interpolation_does_not_bleed_into_signature_line() {
         "interpolated-string fragment bled into the signature line:\n{manifest}"
     );
 }
+
+// ══════════════════════════════════════════════════════════════════
+// RED regression (ff2a29a): a brace-bodied constructor whose
+// base-initializer argument is an INTERPOLATED string must not have its
+// signature truncated at the interpolation hole inside
+// `: base($"Unexpected value: {value}, ...")`. The literal-unaware
+// `stripped.find('{')` in `extract_method_sig` stopped mid-literal, so
+// every interpolation hole plus the initializer tail vanished from the
+// rendered member label in the diff manifest.
+#[test]
+fn gitdiff_ctor_base_initializer_interpolation_not_truncated() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().to_str().unwrap();
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .expect("git command");
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {:?}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "test@example.com"]);
+    git(&["config", "user.name", "Test"]);
+
+    // Commit 1: the class shell with no members.
+    let v1 = "public class ExampleException : Exception\n{\n}\n";
+    std::fs::write(dir.path().join("ExampleException.cs"), v1).unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "commit1"]);
+
+    // Commit 2: add the ff2a29a repro shape — a constructor whose
+    // base-initializer argument interpolates both parameters.
+    let v2 = concat!(
+        "public class ExampleException : Exception\n",
+        "{\n",
+        "    public ExampleException(string value, object context)\n",
+        "        : base($\"Unexpected value: {value}, context: {context}\")\n",
+        "    {\n",
+        "        Value = value;\n",
+        "        Context = context;\n",
+        "    }\n",
+        "\n",
+        "    public string Value { get; }\n",
+        "    public object Context { get; }\n",
+        "}\n"
+    );
+    std::fs::write(dir.path().join("ExampleException.cs"), v2).unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "commit2"]);
+
+    let summary = gitdiff_workspace(root, "HEAD~1", Some("HEAD"), Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+    let manifest = &summary.manifest;
+
+    // Guard against a false NEGATIVE: the added constructor must surface.
+    assert!(
+        manifest.contains("ExampleException("),
+        "added constructor must appear in the diff:\n{manifest}"
+    );
+
+    // VIOLATED by the current implementation: extraction truncates at the
+    // FIRST `{` — the interpolation hole INSIDE the initializer literal —
+    // so neither hole survives onto any diff/signature line.
+    assert!(
+        manifest.contains("{value}"),
+        "interpolation hole {{value}} truncated out of the signature line:\n{manifest}"
+    );
+    assert!(
+        manifest.contains("{context}"),
+        "interpolation hole {{context}} truncated out of the signature line:\n{manifest}"
+    );
+
+    // Body statements belong to the body, never to a signature/label line.
+    assert!(
+        !manifest.contains("Value = value;"),
+        "constructor body leaked onto a signature/diff line:\n{manifest}"
+    );
+    assert!(
+        !manifest.contains("Context = context;"),
+        "constructor body leaked onto a signature/diff line:\n{manifest}"
+    );
+}

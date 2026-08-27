@@ -276,3 +276,48 @@ fn medium_fidelity_brace_bodied_control_unaffected() {
         out
     );
 }
+// ── Constructor base-initializer interpolation (issue ff2a29a) ──────
+
+/// Regression (ff2a29a): a brace-bodied constructor whose
+/// base-initializer argument is an INTERPOLATED string must have its
+/// signature span end at the TRUE body `{`. The legacy literal-unaware
+/// `stripped.find('{')` matched an interpolation HOLE inside
+/// `: base($"Unexpected value: {value}, ...")`, truncating the header
+/// mid-literal — High rendered a dangling unterminated
+/// `$"Unexpected value:` fragment and every tier lost the remainder of
+/// the initializer, corrupting the rendered diff label.
+#[test]
+fn high_fidelity_base_initializer_interpolation_keeps_full_header() {
+    let raw = concat!(
+        "public ExampleException(string value, object context)\n",
+        "        : base($\"Unexpected value: {value}, context: {context}\")\n",
+        "    {\n",
+        "        Value = value;\n",
+        "        Context = context;\n",
+        "    }\n"
+    );
+
+    // HIGH: byte-exact header span INCLUDING the base-initializer,
+    // terminating at the real body brace.
+    let expected_sig = concat!(
+        "public ExampleException(string value, object context)\n",
+        "        : base($\"Unexpected value: {value}, context: {context}\")"
+    );
+    assert_eq!(
+        extract_method_sig(raw, Fidelity::High),
+        expected_sig,
+        "header must extend past the interpolated initializer holes to the true body brace"
+    );
+
+    // MEDIUM: no mid-literal truncation — both interpolation holes must
+    // survive extraction into the compacted label.
+    let medium = extract_method_sig(raw, Fidelity::Medium);
+    assert!(
+        medium.contains("{value}"),
+        "value hole lost to mid-literal truncation (medium): {medium}"
+    );
+    assert!(
+        medium.contains("{context}"),
+        "context hole lost to mid-literal truncation (medium): {medium}"
+    );
+}

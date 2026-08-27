@@ -19,7 +19,7 @@ pub fn extract_method_sig(text: &str, fidelity: Fidelity) -> String {
     // `[HttpGet("{id}")]`); strip them so the signature line is the
     // actual method declaration, not the attribute.
     let stripped = strip_csharp_attributes(text);
-    // Take everything before the first `{` (the body start). This
+    // Take everything before the SIGNATURE/BODY boundary brace. This
     // handles multi-line C# signatures where the parameter list spans
     // multiple lines — the previous implementation only took the first
     // line, producing unbalanced-paren garbage for signatures like:
@@ -35,8 +35,22 @@ pub fn extract_method_sig(text: &str, fidelity: Fidelity) -> String {
     // signature line (see regression test
     // `gitdiff_interpolation_does_not_bleed_into_signature_line`).
     // A depth-0 `=>` outside string/char literals therefore ends the
-    // signature too, alongside the first `{`.
-    let brace_end = stripped.find('{');
+    // signature too, alongside the body brace.
+    //
+    // ff2a29a audit: the SAME literal-unaware trap applies to the brace
+    // boundary itself. A brace-bodied C# constructor whose
+    // base-initializer argument is an INTERPOLATED string
+    // (`: base($"Unexpected value: {value}, …")`) opens its real body
+    // `{` only AFTER the initializer clause; a bare `find('{')` stopped
+    // at the interpolation HOLE inside the literal, truncating the
+    // header mid-string (regression tests
+    // `high_fidelity_base_initializer_interpolation_keeps_full_header`
+    // and `gitdiff_ctor_base_initializer_interpolation_not_truncated`).
+    // The boundary brace is therefore located with the shared
+    // literal-aware scanning contract (`skip_quoted_literal` +
+    // paren/bracket depth tracking): only a structural-depth-0 `{`
+    // OUTSIDE quoted/interpolated literals may end the signature.
+    let brace_end = find_depth_zero_brace(stripped);
     let arrow_end = find_depth_zero_arrow(stripped);
     let sig_end = match (brace_end, arrow_end) {
         (Some(b), Some(a)) => Some(b.min(a)),
@@ -108,6 +122,44 @@ fn skip_quoted_literal(bytes: &[u8], open: usize) -> usize {
         }
     }
     bytes.len()
+}
+
+/// Find the byte offset of the first `{` at paren/bracket depth 0 that
+/// lies OUTSIDE string and character literals, or `None`.
+///
+/// This is the SIGNATURE/BODY boundary for brace-bodied declarations. A
+/// bare `find('{')` would instead stop at the first `{` anywhere in the
+/// text — which for a constructor whose base-initializer argument is an
+/// interpolated string is an interpolation HOLE inside the literal
+/// (`: base($"msg: {param}")`, ff2a29a audit), truncating the extracted
+/// signature mid-literal.
+///
+/// Shares the conservative-by-construction contract of
+/// `find_depth_zero_arrow`: `skip_quoted_literal` makes interpolation
+/// hole braces invisible, and a degenerate/unmatched quote merely defers
+/// to the arrow bound — the function can never manufacture a spurious
+/// boundary from commented or quoted text. Depth tracking additionally
+/// keeps braces nested inside the parameter list or an initializer
+/// argument (`M(opts = { a: 1 })`) out of play until true structural
+/// depth 0 is restored.
+fn find_depth_zero_brace(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut depth: i32 = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'"' | b'\'' => {
+                i = skip_quoted_literal(bytes, i);
+                continue;
+            }
+            b'(' | b'[' => depth += 1,
+            b')' | b']' => depth -= 1,
+            b'{' if depth == 0 => return Some(i),
+            _ => {}
+        }
+        i += 1;
+    }
+    None
 }
 
 /// Find the byte range of a method's parameter list — the LAST balanced
