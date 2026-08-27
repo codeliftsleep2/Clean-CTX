@@ -95,6 +95,7 @@ async function runAgentSession({ mode, taskPrompt, workspace }) {
         mode: "act",
         enableTools: true,
         enable_spawn: false,
+        enable_teams: false,
         maxIterations,
       },
       toolPolicies: toolPolicies(),
