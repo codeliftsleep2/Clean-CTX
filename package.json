@@ -1,0 +1,17 @@
+{
+  "name": "clean-ctx-agent",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GitHub Issue -> Cline Agent -> PR runner (@cline/sdk).",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "agent": "node scripts/agent/agent.mjs",
+    "selftest": "node scripts/agent/selftest.mjs"
+  },
+  "dependencies": {
+    "@cline/sdk": "^0.0.81"
+  }
+}

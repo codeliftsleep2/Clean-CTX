@@ -42,3 +42,7 @@ src/tests/cbm/fixtures/
 
 # Personal audit probe paths (machine-specific)
 .clean-ctx/audit-paths.toml
+# Cline agent runner (scripts/agent/*) - npm + local scratch
+node_modules/
+scripts/agent/.scratch/
+*.agent-tmp.tmp
