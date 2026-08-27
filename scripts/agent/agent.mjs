@@ -69,8 +69,6 @@ function ghostCommand(body) {
 
 async function runAgentSession({ mode, taskPrompt, workspace }) {
   const { ClineCore } = await import("@cline/sdk");
-  const apiKey = process.env.CLINE_AGENT_API_KEY ?? "";
-  if (!apiKey) fatal("CLINE_AGENT_API_KEY is not set; cannot start a model session.");
   const providerId = process.env.CLINE_AGENT_PROVIDER ?? "cline-pass";
   const modelId = process.env.CLINE_AGENT_MODEL ?? "cline-pass/deepseek-v4-flash";
   const maxIterations = Number(process.env.CLINE_AGENT_MAX_ITERS ?? 100);
@@ -78,6 +76,57 @@ async function runAgentSession({ mode, taskPrompt, workspace }) {
   const systemPrompt = buildSystemPrompt(mode, policyText);
   setMode(mode);
 
+  // Try account selector (multi-account registry path with verification + rollover)
+  const selector = await loadAccountSelector(workspace, modelId);
+  if (selector) {
+    log(`Using account selector with ${selector.eligibleAccounts.length} eligible account(s)`);
+    const runner = createRolloverRunner(
+      selector.eligibleAccounts,
+      async (account, cred) => {
+        log(`Session starting with account ${account.id}`);
+        return runClineCore(cred, providerId, modelId, systemPrompt, workspace, maxIterations, ClineCore, taskPrompt);
+      },
+      {}, // identityOpts
+      {}, // entitlementOpts
+    );
+    const result = await runner();
+    return extractSessionResult(ClineCore, result);
+  }
+
+  // Legacy single-key path
+  const apiKey = process.env.CLINE_AGENT_API_KEY ?? "";
+  if (!apiKey) fatal("CLINE_AGENT_API_KEY is not set; cannot start a model session.");
+  log("Using legacy CLINE_AGENT_API_KEY path");
+  const result = await runClineCore(apiKey, providerId, modelId, systemPrompt, workspace, maxIterations, ClineCore, taskPrompt);
+  return extractSessionResult(ClineCore, result);
+}
+
+// ---------------------------------------------------------------------------
+// Account selector helper (multi-account registry path)
+// ---------------------------------------------------------------------------
+
+async function loadAccountSelector(workspace, modelId) {
+  try {
+    const { loadRegistry, selectEligibleAccounts, createRolloverRunner } = await import("./account-selector.mjs");
+    const registryPath = path.join(workspace, "scripts", "agent", "accounts.json");
+    const registry = loadRegistry(registryPath);
+    const eligibleAccounts = selectEligibleAccounts(registry, modelId, process.env);
+    if (eligibleAccounts.length === 0) {
+      log("Account registry has no eligible accounts; falling back to legacy path");
+      return null;
+    }
+    return { eligibleAccounts, createRolloverRunner };
+  } catch (err) {
+    log(`Account selector unavailable: ${err.message}; falling back to legacy CLINE_AGENT_API_KEY path`);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Common ClineCore session runner (used by both paths)
+// ---------------------------------------------------------------------------
+
+async function runClineCore(apiKey, providerId, modelId, systemPrompt, workspace, maxIterations, ClineCore, taskPrompt) {
   const cline = await ClineCore.create({
     clientName: "clean-ctx-issue-agent",
     capabilities: { requestToolApproval },
@@ -108,6 +157,10 @@ async function runAgentSession({ mode, taskPrompt, workspace }) {
   } finally {
     try { await cline.dispose("run-complete"); } catch { /* best effort */ }
   }
+}
+
+function extractSessionResult(ClineCore, result) {
+  return result;
 }
 
 // ---------------------------------------------------------------------------

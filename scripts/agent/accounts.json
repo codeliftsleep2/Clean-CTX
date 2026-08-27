@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "description": "Cline account registry (metadata only; no secrets). API keys live in GitHub Secrets.",
+  "defaultProvider": "cline-pass",
+  "defaultModel": "cline-pass/deepseek-v4-flash",
+  "accounts": [
+    {
+      "id": "cline-pass-01",
+      "secretName": "CLINE_ACCOUNT_01_API_KEY",
+      "enabled": true,
+      "priority": 10,
+      "clinePass": true,
+      "preferredModels": [
+        "cline-pass/deepseek-v4-flash"
+      ]
+    }
+  ]
+}

@@ -307,6 +307,57 @@ test("config: default provider/model follow cline-pass convention", () => {
     if (/^\s+const modelId\s*=/.test(line)) assert.ok(line.includes('"cline-pass/deepseek-v4-flash"'), "default model must be cline-pass/deepseek-v4-flash");
   }
 });
+// ---------------------------------------------------------------------------
+// Account registry contract (multi-account support)
+// ---------------------------------------------------------------------------
+
+test("registry: accounts.json exists and parses", () => {
+  const regPath = new URL("./accounts.json", import.meta.url);
+  const raw = readFileSync(regPath, "utf8");
+  const parsed = JSON.parse(raw);
+  assert.ok(Array.isArray(parsed.accounts), "accounts.json must have accounts array");
+  assert.ok(parsed.accounts.length > 0, "accounts.json must have at least one account");
+});
+
+test("registry: no raw API key values in tracked registry file", () => {
+  const regContent = readFileSync(new URL("./accounts.json", import.meta.url), "utf8");
+  // Only check for actual API key patterns (sk-...), not the env var names (CLINE_ACCOUNT_...)
+  const suspicious = ["\"sk-", "bearer", "api_key\": "];
+  for (const pattern of suspicious) {
+    assert.ok(!regContent.toLowerCase().includes(pattern), `accounts.json must not contain '${pattern}'`);
+  }
+});
+
+test("registry: secretName values reference env vars, not secrets themselves", () => {
+  const raw = readFileSync(new URL("./accounts.json", import.meta.url), "utf8");
+  const parsed = JSON.parse(raw);
+  for (const acct of parsed.accounts) {
+    assert.ok(acct.secretName, `Account ${acct.id} must have secretName`);
+    assert.ok(acct.secretName.startsWith("CLINE_ACCOUNT_"), `secretName ${acct.secretName} must start with CLINE_ACCOUNT_`);
+  }
+});
+
+test("registry: account-selector.mjs is loadable", async () => {
+  const mod = await import("./account-selector.mjs");
+  assert.equal(typeof mod.loadRegistry, "function");
+  assert.equal(typeof mod.selectEligibleAccounts, "function");
+  assert.equal(typeof mod.verifyAccount, "function");
+  assert.equal(typeof mod.verifyEntitlement, "function");
+  assert.equal(typeof mod.isAccountSpecificFailure, "function");
+  assert.equal(typeof mod.createRolloverRunner, "function");
+});
+
+test("config: legacy CLINE_API_KEY compatibility remains in agent.mjs", () => {
+  const src = readFileSync(new URL("./agent.mjs", import.meta.url), "utf8");
+  assert.ok(src.includes("CLINE_AGENT_API_KEY"), "agent.mjs must reference CLINE_AGENT_API_KEY");
+  assert.ok(src.includes("CLINE_API_KEY") || src.includes("CLINE_AGENT_API_KEY"), "legacy key compatibility check");
+});
+
+test("config: account selector references in agent.mjs", () => {
+  const src = readFileSync(new URL("./agent.mjs", import.meta.url), "utf8");
+  assert.ok(src.includes("loadAccountSelector"), "agent.mjs must have loadAccountSelector");
+  assert.ok(src.includes("createRolloverRunner"), "agent.mjs must use createRolloverRunner");
+});
 
 // ---------------------------------------------------------------------------
 

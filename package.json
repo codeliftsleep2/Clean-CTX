@@ -9,7 +9,8 @@
   },
   "scripts": {
     "agent": "node scripts/agent/agent.mjs",
-    "selftest": "node scripts/agent/selftest.mjs"
+    "selftest": "node scripts/agent/selftest.mjs",
+    "test-account-selector": "node scripts/agent/account-selector.test.mjs"
   },
   "dependencies": {
     "@cline/sdk": "^0.0.81"
