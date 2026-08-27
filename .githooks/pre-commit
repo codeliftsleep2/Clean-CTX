@@ -1,0 +1,39 @@
+#!/bin/sh
+# .githooks/pre-commit
+#
+# Automatic UTF-8 / mojibake pre-commit guard.
+#
+# The SINGLE source of truth for encoding detection is
+# scripts/check-utf8.ps1. This hook only invokes it and translates its exit
+# status:
+#   guard PASS (exit 0) -> commit proceeds
+#   guard FAIL (exit 1) -> commit is aborted
+#
+# Do NOT add any encoding-detection logic here. Keep this file small and
+# boring. scripts/install-git-hooks.ps1 wires this directory up via
+# `git config core.hooksPath .githooks` (run it once per clone).
+
+# Resolve the repository root from wherever git invokes this hook.
+hook_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(cd "$hook_dir/.." && pwd)
+cd "$repo_root"
+
+# Choose a PowerShell host. Prefer pwsh (PowerShell 7+); fall back to the
+# OS-built-in powershell (Windows PowerShell 5.1). The guard is written with
+# .NET APIs (never the utf8NoBOM parameter), so it is correct under either
+# host; see .clinerules/encoding.md section 3.
+host_exe=""
+if command -v pwsh >/dev/null 2>&1; then
+  host_exe="pwsh"
+elif command -v powershell >/dev/null 2>&1; then
+  host_exe="powershell"
+else
+  echo "pre-commit[utf8]: no PowerShell host (pwsh/powershell) found; cannot run encoding guard." >&2
+  exit 1
+fi
+
+# Run the guard. Its exit code is the hook's exit code; any non-zero code
+# makes git abort the commit (git treats a non-zero pre-commit exit as failure).
+"$host_exe" -NoProfile -ExecutionPolicy Bypass -File scripts/check-utf8.ps1
+status=$?
+exit "$status"

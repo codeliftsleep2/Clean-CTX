@@ -35,6 +35,9 @@
 git clone https://github.com/codeliftsleep2/Clean-CTX.git
 cd Clean-CTX
 
+# Enable the automatic UTF-8 pre-commit guard (idempotent; run once per clone)
+powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
+
 # Build (debug) with all default features
 cargo build
 
@@ -917,3 +920,17 @@ Every pull request must pass these checks:
 
 ```bash
 cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo audit --ignore RUSTSEC-2025-0009
+```
+
+> **Encoding guard is automatic in CI and locally.** `scripts/check-utf8.ps1`
+> runs in CI on every push/PR. Locally, enable the versioned pre-commit hook once
+> per clone:
+>
+> ```bash
+> powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
+> ```
+>
+> This sets `core.hooksPath = .githooks`; the `.githooks/pre-commit` hook then
+> invokes `scripts/check-utf8.ps1` automatically on every commit and aborts the
+> commit if the encoding guard fails. See `CONTRIBUTING.md → Automatic UTF-8
+> pre-commit guard` for details.

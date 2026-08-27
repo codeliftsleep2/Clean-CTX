@@ -1,4 +1,4 @@
-﻿// src/test_files/typescript/MultiClassFixture.ts
+// src/test_files/typescript/MultiClassFixture.ts
 //
 // Multi-class TypeScript regression fixture.
 //

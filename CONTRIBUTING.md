@@ -26,6 +26,10 @@ Thank you for your interest in contributing! Clean-CTX is an open-source project
 git clone https://github.com/codeliftsleep2/Clean-CTX.git
 cd Clean-CTX
 
+# Enable the automatic UTF-8 pre-commit guard (idempotent; run once per clone).
+# This wires core.hooksPath to the versioned .githooks/ directory.
+powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
+
 # Build
 cargo build
 
@@ -49,16 +53,58 @@ Every pull request **must** pass these checks. The full checklist is in [`PULL_R
 3. **`cargo test --workspace --all-targets --all-features`** — all 2,513 workspace tests pass
 4. **`cargo audit`** — no known security vulnerabilities
 5. **`scripts/check-tree-sitter-versions.ps1`** — all tree-sitter crates share the same `tree-sitter-language` ABI version
-6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
-7. **No `let _ = ...` dead-code suppression** — remove the unused variable instead
-8. **No `#![allow(...)]` annotations** without a `// SAFETY:` or `// Phase N:` comment
+6. **`scripts/check-utf8.ps1`** — all tracked text files are valid BOM-less UTF-8 with no mojibake signatures ([policy & rationale](docs/ENCODING_POLICY.md))
+7. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
+8. **No `let _ = ...` dead-code suppression** — remove the unused variable instead
+9. **No `#![allow(...)]` annotations** without a `// SAFETY:` or `// Phase N:` comment
 
 ---
 
 ## Pre-commit Checklist
 
 ```bash
-cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo audit --ignore RUSTSEC-2025-0009 && pwsh -ExecutionPolicy Bypass ./scripts/check-tree-sitter-versions.ps1
+cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo audit --ignore RUSTSEC-2025-0009 && pwsh -ExecutionPolicy Bypass ./scripts/check-tree-sitter-versions.ps1 && pwsh -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
+```
+
+Note that running the manual commands here is belt-and-braces: after running
+the installer below, the UTF-8 guard is also enforced **automatically** at
+commit time, so you do not need to remember to run `check-utf8.ps1` by hand.
+
+## Automatic UTF-8 pre-commit guard
+
+The repository protects its encoding invariant automatically. The mechanism is:
+
+1. **Run the installer once after cloning** (it is idempotent — safe to re-run):
+
+   ```bash
+   powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
+   ```
+
+2. The installer sets `git config core.hooksPath .githooks` (clone-local), pointing
+   Git at the repository's **versioned** hooks directory — it does **not** install
+   anything into your private `.git/hooks/`.
+
+3. The `.githooks/pre-commit` hook runs on every commit. It simply invokes
+   `scripts/check-utf8.ps1` (the single, authoritative encoding guard — the hook
+   contains **no** duplicate detection logic) and:
+
+   - **aborts** the commit if the guard fails (invalid UTF-8, a BOM, or a
+     mojibake signature), and
+   - **allows** the commit when the guard passes.
+
+4. CI independently runs the same `scripts/check-utf8.ps1` on every push/PR, so
+   the guard is enforced both locally (automatic) and remotely (automatic).
+
+5. You can always run the guard manually too:
+
+   ```bash
+   pwsh -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
+   ```
+
+To switch the automatic guard back off:
+
+```bash
+git config --unset core.hooksPath
 ```
 
 ---

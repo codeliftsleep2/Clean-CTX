@@ -28,6 +28,9 @@ jobs:
       - name: tree-sitter version consistency check
         shell: pwsh
         run: ./scripts/check-tree-sitter-versions.ps1
+      - name: UTF-8 / mojibake guard
+        shell: pwsh
+        run: ./scripts/check-utf8.ps1
       - name: cargo test
         run: cargo test --workspace --all-targets --all-features
       - name: cargo audit

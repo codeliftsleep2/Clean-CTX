@@ -28,3 +28,11 @@ pub fn test_config() -> crate::config::CleanCtxConfig {
 // Integration tests for cross-module interactions
 #[cfg(test)]
 mod integration;
+
+// Encoding invariant guard: strict UTF-8 validation, mojibake signature scan,
+// and the Unicode canary fixture. Authoritative rule: .clinerules/encoding.md
+// (rationale: docs/ENCODING_POLICY.md).
+#[cfg(test)]
+#[path = "encoding.rs"]
+mod encoding;
+

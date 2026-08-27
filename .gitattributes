@@ -1,0 +1,13 @@
+# Normalize text file handling. See docs/ENCODING_POLICY.md.
+* text=auto
+
+# The Unicode canary fixture is byte-compared by src/tests/encoding.rs and
+# MUST always be checked out with LF endings only (no CR bytes).
+src/test_files/unicode_canary.txt text eol=lf
+
+# PowerShell scripts: CRLF on all platforms.
+*.ps1 text eol=crlf
+
+# Versioned Git hooks are POSIX shell scripts and MUST stay LF (a CR would
+# break the shebang when git runs the hook).
+.githooks/* text eol=lf

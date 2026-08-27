@@ -36,6 +36,7 @@ Closes #(issue-number)
   - Error/invalid-input test(s)
   - Edge case test(s) (empty input, Unicode, boundaries)
 - [ ] `cargo audit` shows no known security vulnerabilities
+- [ ] `scripts/check-utf8.ps1` passes — text files remain valid UTF-8, no mojibake introduced ([policy & rationale](docs/ENCODING_POLICY.md))
 - [ ] No new `#![allow(...)]` annotations without a `// SAFETY:` or `// Phase N:` comment
 - [ ] No new `.unwrap()` calls without a `// SAFETY:` comment explaining why it cannot fail
 - [ ] No `let _ = ...` dead-code suppression — unused variables are removed
