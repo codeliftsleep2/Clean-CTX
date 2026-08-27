@@ -74,6 +74,8 @@ replace suspicious characters, and never assume non-ASCII means corruption.
 ## Suggested pre-commit usage
 
 ```powershell
-pwsh -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
+powershell -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1  # local Windows (PS 5.1)
+# On Linux/macOS or CI (PowerShell 7+ / `shell: pwsh` in ci.yml):
+# pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
 cargo test encoding
 ```

@@ -6,7 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [Unreleased] - 2026-08-25 - `apply_edit` Write Path
+## [0.4.4] - 2026-08-27 - git_diff Signature-Bleed Fixes
+
+### Fixed
+
+- **Signature bleed from expression-bodied members in `git_diff` output.** Diffing a file whose expression-bodied member interpolates a primary-constructor parameter name (`public string Display() => $"Value: {Value}";` under `record Example(string Value)`) emitted corrupted change-set lines — the method name duplicated with `=>` and interpolated-string fragments welded onto the signature (`method Display Display():=> $"Value:`), plus a corrupted `~ class Example(string` label — while raw `git diff` was correct. Root cause: `extract_method_sig` treated the first `{` as end-of-header; expression-bodied members have none, so the interpolation hole became the boundary, truncating mid-literal. The signature span now ends at min(first `{`, first depth-0 `=>` outside string/char literals) via new `find_depth_zero_arrow` + `skip_quoted_literal` helpers (`src/compaction/method.rs`); paren depth keeps TS callback-typed parameters intact and unmatched quotes fail safe to the legacy behavior. Byte-identical output whenever no arrow exists.
+- **C# primary-constructor parameter lists leaked into class labels.** After modifier/keyword stripping, whitespace tokenization turned `Example(string Value)` into the label `Example(string`, surfacing corrupted `~ class …` rows for every record or class with a primary constructor. New `strip_trailing_param_list` peels a trailing balanced `(…)` group using the EXISTING last-depth-0 locator `find_method_params` — activated only when the group closes out the declaration (empty tail or lone `;`), leaving `: Base(args)` and `where` clauses untouched — wired into both `extract_class_name` and `extract_class_meta` so name and base metadata derive from identical declaration text (`src/compaction/class.rs`).
+
+Renderer/differ untouched; no fixture special-casing; no output deduplication.
+
+### Tests
+
+- RED→GREEN end-to-end regression `gitdiff_interpolation_does_not_bleed_into_signature_line` (`src/tests/gitdiff/engine.rs`): established failing against the unfixed tree (asserts the added member surfaces yet no `=>` or `$"Value:` fragment reaches any diff/signature line), promoted GREEN by these fixes with assertions unchanged.
+- Unit-level regressions: `extract_method_sig("public string Display() => $\"Value: {Value}\";", Medium)` returns `Display()` with a brace-bodied control proving preserved legacy extraction; `extract_class_name("public sealed record Example(string Value)")` yields `Example`, and `class Foo<T>(int x) : Base` yields `Foo` with `:Base` carried in `class_meta` (`src/tests/compaction/method.rs`, `src/tests/compaction/class.rs`).
+
+### Verification
+
+- `cargo fmt --all -- --check` clean; `cargo clippy --all-targets -- -D warnings` clean for all changed targets (two pre-existing lints remain in unrelated `src/tests/encoding.rs`); compaction suite 86 passed; focused `compaction:: diff:: gitdiff::` suites 143 passed including the end-to-end regression; UTF-8 guard PASS (473 files, strict UTF-8, 0 BOMs, 0 mojibake).
+
+---
+
+## [0.4.3] - 2026-08-25 - `apply_edit` Write Path
 
 Clean-CTX-native single-unit editing per `docs/plans/APPLY_EDIT_PLAN.md`: an agent that already received byte-exact bodies via `provide_code_context(fidelity="edit"|"verbatim")` can now write through Clean-CTX itself instead of paying the host's full-file raw-read precondition on every edit. Capability and tool-selection guidance shipped together (RULE 1b + SYSTEM_PROMPT rules 3–4) so the tool actually gets routed through.
 
@@ -56,7 +76,7 @@ Clean-CTX-native single-unit editing per `docs/plans/APPLY_EDIT_PLAN.md`: an age
 
 ---
 
-## [Unreleased] - 2026-08-25 - Non-CBM Tool Audit Fix Cycle
+## [0.4.2] - 2026-08-25 - Non-CBM Tool Audit Fix Cycle
 
 Evidence-driven fix cycle over the 2026-08-25 non-CBM tool audit. Every fix was reproduced with a failing regression test before implementation.
 
@@ -87,7 +107,7 @@ Evidence-driven fix cycle over the 2026-08-25 non-CBM tool audit. Every fix was 
 
 ---
 
-## [Unreleased] - 2026-08-24 - Typed graph_query Edge Extraction
+## [0.4.1] - 2026-08-24 - Typed graph_query Edge Extraction
 
 ### Fixed
 
@@ -845,7 +865,12 @@ This project follows [Semantic Versioning](https://semver.org/). Major version z
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.4.4 | 2026-08-27 | **git_diff Signature-Bleed Fixes.** Expression-bodied members no longer leak `=>`/interpolation fragments onto change-set signatures (`find_depth_zero_arrow`+`skip_quoted_literal` min-boundary slicing); C# primary-constructor parameter lists no longer corrupt class labels (`strip_trailing_param_list` peels the trailing balanced group via existing `find_method_params`); RED→GREEN end-to-end regression kept assertion-exact — focused compaction/diff/gitdiff suites 143 passed, 0 clippy warnings on changed targets |
+| 0.4.3 | 2026-08-25 | **Clean-CTX-native `apply_edit` Write Path.** Single-unit byte-exact editing (replace_body/delete/insert_after/insert_before) with unit-granular optimistic concurrency; EOL-preserving expected-text verification; `read_source` permanently-self-defeating cache entry fixed (stale `Arc<String>` pinned forever after external writes); Phase A legacy notation retired from interactive surfaces (structured `ir_unavailable` errors); Phase B `delta_text_context`/`§Δ` transport removed entirely |
+| 0.4.2 | 2026-08-25 | **Non-CBM Tool Audit Fix Cycle.** Access-modifier class-label corruption + nested-declaration method attribution fixed in diff_commits; compound-signature identifier recovery at Low fidelity; canonical path identity unifies alias registry & SessionStats; decompression preserves class-boundary markers; `list_sessions` enumerates persisted file contexts; `context_stats` signs true negative savings — every fix RED-first |
+| 0.4.1 | 2026-08-24 | **Typed graph_query Edge Extraction.** Relationship-shaped Cypher projections convert into edges instead of duplicated column-0 nodes; column-shape wire convention invariant `CBM-WIRE-002` + 18-test `query_wire.rs` suite + fresh-process live probes; CI decompression-proptest flake root-caused to a false property — corrected contract verified green at 5,000 cases |
 | 0.4.0 | 2026-08-24 | **CBM Graph-Intelligence & Trace-Wire Audits.** Blast-radius CALLS-edge fail-open fixed; Result-propagating intel APIs (`Ok(empty)` vs `Err(ToolError)`); dual-label dead code; dead DATAFLOW path removed; typed `graph_trace` parses the real callers/callees wire contract (phantom `edges` key eliminated); inbound-fallback direction determination; M-01 qualified/bare boundary normalization — invariant `CBM-WIRE-001`, 16-test `trace_wire.rs` suite, 2,497 tests, 0 clippy warnings |
+| 0.3.1 | 2026-08-23 | **C-22 Canonical Source-Span Contract & Multi-Class Fix.** Class source spans derived from capture identity rather than `DefClass.name` (`class_source_from_capture()` trilingual decorator scan); marker cross-contamination eliminated in multi-class Spring Boot/Angular/.NET fixtures (9 isolation tests) |
 | 0.3.0 | 2026-08-12 | **Angular Ecosystem Deepening (R-23/R-24/R-25).** RxJS/NgRx/Signals/Routing meta-layers, cross-layer NgRx graph edges, Round-7→Round-11 FAANG audit hardening — 2,263 tests, 0 clippy warnings |
 | 0.3.0 | 2026-08-07 | **Angular HTML Template Compression (R-44).** Fidelity-gated `.component.html` compression, PrimeNG markers, GitDiff integration, `angular_template` dashboard domain — 2,141 tests, 0 clippy warnings |
 | 0.3.0 | 2026-08-04 | **IR Evolution (R-43a + R-43b).** Execution semantics, program graph, inference layer, pass pipeline, validation, query, semantic delta intent |

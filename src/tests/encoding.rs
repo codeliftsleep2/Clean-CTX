@@ -126,13 +126,16 @@ fn collect_text_files() -> Vec<PathBuf> {
 
 /// True when no known mojibake signature appears anywhere in `content`.
 /// The signatures mirror scripts/check-utf8.ps1; update both together.
+///
+/// Clippy 1.96 (`manual_find`): expressed with `Iterator::find` instead of a
+/// hand-written scan loop. `.copied()` lifts the `&str` items out of the
+/// constant table so the returned reference keeps its `'static` lifetime;
+/// semantics unchanged (first matching signature wins, `None` otherwise).
 fn contains_mojibake(content: &str) -> Option<&'static str> {
-    for sig in MOJIBAKE_SIGNATURES {
-        if content.contains(sig) {
-            return Some(sig);
-        }
-    }
-    None
+    MOJIBAKE_SIGNATURES
+        .iter()
+        .copied()
+        .find(|sig| content.contains(*sig))
 }
 
 /// Files permitted to contain mojibake SIGNATURES because they quote historic
@@ -182,7 +185,7 @@ fn unicode_canary_is_byte_identical_through_git() {
 fn all_repo_text_files_are_strict_utf8_without_mojibake() {
     for path in collect_text_files() {
         let bytes = fs::read(&path).unwrap_or_else(|e| panic!("unreadable {:?}: {e}", path));
-        let rel = path.strip_prefix(&repo_root()).unwrap();
+        let rel = path.strip_prefix(repo_root()).unwrap();
         let rel_s = rel.to_string_lossy().replace('\\', "/");
 
         let decoded = match strict_utf8(&bytes) {
