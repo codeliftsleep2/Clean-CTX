@@ -197,36 +197,25 @@ fn gitdiff_workspace_working_tree_diff() {
 }
 
 #[test]
-fn gitdiff_workspace_working_tree_added_file_read_from_disk() {
+fn gitdiff_workspace_working_tree_untracked_file_appears_as_added() {
     let dir = init_repo();
     let root = dir.path().to_str().unwrap();
 
-    // Uncommitted new file (does not exist in HEAD). `git add -N` (intent
-    // to add) makes git report it as `A` in the working-tree diff without
-    // creating a commit — exercising the `to == None` disk-read path.
+    // Uncommitted new file — no git add, no intent-to-add. The new
+    // untracked discovery path (`git ls-files --others --exclude-standard`)
+    // should find it and treat it as FileChange::Added.
     std::fs::write(
         dir.path().join("brand_new.ts"),
         "class BrandNew { init() {} }\n",
     )
     .unwrap();
-    let out = std::process::Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["add", "-N", "brand_new.ts"])
-        .output()
-        .expect("git add -N");
-    assert!(
-        out.status.success(),
-        "git add -N failed: {:?}",
-        String::from_utf8_lossy(&out.stderr)
-    );
 
     let summary = gitdiff_workspace(root, "HEAD", None, Fidelity::Medium, None, None)
         .expect("gitdiff_workspace");
 
-    assert_eq!(summary.file_count, 1, "1 uncommitted added file");
+    assert_eq!(summary.file_count, 1, "1 untracked added file");
     assert_eq!(summary.counts, (1, 0, 0, 0), "1 added, 0 skipped");
-    assert_eq!(summary.skipped, 0, "added file must not be skipped");
+    assert_eq!(summary.skipped, 0, "untracked file must not be skipped");
     assert!(
         summary.manifest.contains("brand_new.ts (+1 -0 ~0)"),
         "expected added brand_new.ts entry, got:\n{}",
@@ -306,6 +295,128 @@ fn gitdiff_workspace_invalid_ref_rejected() {
     assert!(
         err.to_string().contains("invalid git ref"),
         "expected ref validation error, got: {err}"
+    );
+}
+
+#[test]
+fn gitdiff_workspace_untracked_ts_file_appears_in_manifest() {
+    let dir = init_repo();
+    let root = dir.path().to_str().unwrap();
+
+    // Create an untracked TypeScript file (compressible) in the working tree.
+    std::fs::write(
+        dir.path().join("untracked_util.ts"),
+        "class StringHelper {\n  static trim(input: string): string {\n    return input.trim();\n  }\n}\n",
+    )
+    .unwrap();
+
+    let summary = gitdiff_workspace(root, "HEAD", None, Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+
+    assert!(
+        summary.manifest.contains("untracked_util.ts"),
+        "untracked file must appear in manifest:\n{}",
+        summary.manifest
+    );
+    assert!(
+        summary.manifest.contains("+ class StringHelper"),
+        "untracked compressible file must produce AST skeleton:\n{}",
+        summary.manifest
+    );
+    assert_eq!(summary.counts.0, 1, "untracked file must count as added");
+}
+
+#[test]
+fn gitdiff_workspace_untracked_non_compressible_falls_back_to_line_delta() {
+    let dir = init_repo();
+    let root = dir.path().to_str().unwrap();
+
+    // Untracked non-compressible file.
+    std::fs::write(dir.path().join("data.json"), "[\"a\", \"b\"]\n").unwrap();
+
+    let summary = gitdiff_workspace(root, "HEAD", None, Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+
+    assert!(
+        summary.manifest.contains("data.json"),
+        "untracked non-compressible file must appear in manifest:\n{}",
+        summary.manifest
+    );
+    // Non-compressible → line-count delta from 0 lines.
+    assert!(
+        summary.manifest.contains("+1 lines (0 → 1)"),
+        "expected line-count fallback, got:\n{}",
+        summary.manifest
+    );
+}
+
+#[test]
+fn gitdiff_workspace_ignored_untracked_file_excluded() {
+    let dir = init_repo();
+    let root = dir.path().to_str().unwrap();
+
+    // Write a .gitignore and create both ignored and non-ignored files.
+    std::fs::write(dir.path().join(".gitignore"), "*.log\n").unwrap();
+    std::fs::write(dir.path().join("trace.log"), "ignored\n").unwrap();
+    std::fs::write(dir.path().join("lib.rs"), "pub fn helper() -> i32 { 42 }\n").unwrap();
+
+    let summary = gitdiff_workspace(root, "HEAD", None, Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+
+    // Ignored file must not appear.
+    assert!(
+        !summary.manifest.contains("trace.log"),
+        "ignored file (trace.log) must NOT appear in manifest:\n{}",
+        summary.manifest
+    );
+    // Non-ignored untracked files must appear.
+    assert!(
+        summary.manifest.contains(".gitignore"),
+        ".gitignore itself must appear in manifest"
+    );
+    assert!(
+        summary.manifest.contains("lib.rs"),
+        "non-ignored file (lib.rs) must appear in manifest"
+    );
+}
+
+#[test]
+fn gitdiff_workspace_untracked_plus_tracked_mixed() {
+    let dir = init_repo();
+    let root = dir.path().to_str().unwrap();
+
+    // Modify a tracked file AND add an untracked file.
+    std::fs::write(
+        dir.path().join("src/app.ts"),
+        "class UserService {\n  getUser(id: string): Promise<User> {\n    return api.get(id);\n  }\n}\n",
+    )
+    .unwrap();
+    // Restore to the commit-1 shape (remove the added method from commit 2).
+    // Now we diff HEAD (commit 2) against working tree, so saveUser should be
+    // removed (deleted marker), and the untracked file should appear as added.
+    std::fs::write(
+        dir.path().join("new_util.ts"),
+        "class NewUtil { run() {} }\n",
+    )
+    .unwrap();
+
+    let summary = gitdiff_workspace(root, "HEAD", None, Fidelity::Medium, None, None)
+        .expect("gitdiff_workspace");
+
+    // Must report the tracked modified file and the untracked added file.
+    assert!(
+        summary.manifest.contains("new_util.ts"),
+        "untracked file must appear in manifest:\n{}",
+        summary.manifest
+    );
+    assert!(
+        summary.manifest.contains("src/app.ts"),
+        "tracked modified file must appear"
+    );
+    // file_count must include both.
+    assert_eq!(
+        summary.file_count, 2,
+        "expected 2 changes: 1 tracked modified + 1 untracked added"
     );
 }
 

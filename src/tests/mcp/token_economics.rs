@@ -46,7 +46,7 @@ fn different_languages_have_different_thresholds() {
     for ext in &["ts", "cs", "rs", "java"] {
         let t = compression_threshold(Fidelity::Edit, ext);
         assert!(t > 0);
-        assert!(t >= 400 && t <= 700, "Threshold {} out of range", t);
+        assert!((400..=700).contains(&t), "Threshold {} out of range", t);
     }
 }
 

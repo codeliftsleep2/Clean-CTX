@@ -8,7 +8,7 @@
 
 `diff_commits` answers: **"What changed in this PR / between these two commits?"**
 
-It runs `git diff --name-status --find-renames` to enumerate every changed file between two refs, then for each file produces a **compact structural delta** instead of the full file content:
+When both `fromRef` and `toRef` are provided, it runs `git diff --name-status --find-renames` to enumerate every changed file between two refs, then for each file produces a **compact structural delta** instead of the full file content. When `toRef` is omitted (working-tree diff), it additionally discovers non-ignored untracked files via `git ls-files --others --exclude-standard` so that brand-new files appear alongside tracked modifications.
 
 | Change type | What the output shows |
 |---|---|
@@ -145,7 +145,7 @@ A skipped file is counted in `skipped` **only** — it is never double-counted i
 - **Non-compressible files** (html/css/json/md) fall back to a **line-count delta** rather than a structural diff — still compact, but less semantic detail.
 - **Added files** emit a skeleton (imports + class names), not the full new content — so if the LLM needs the *body* of a brand-new file, follow up with `compress_code_context`.
 - It's a **summary tool** — for deep work on a specific file, use `compress_code_context` or `provide_code_context` on that file.
-- Only **tracked** files appear in the diff. Untracked files must be `git add -N` (intent-to-add) first to show up in a working-tree diff.
+- `diff_commits` with `to` omitted (working-tree diff) includes tracked changes plus **non-ignored untracked files**. Ignored files remain excluded. Untracked files do not need to be staged or intent-to-added.
 
 ---
 

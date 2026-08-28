@@ -50,6 +50,12 @@ impl FileChange {
 /// the output into a sorted `Vec<FileChange>`. The `to` ref may be
 /// `None` to diff against the working tree (uncommitted changes).
 ///
+/// When `to == None`, additionally discovers untracked non-ignored files
+/// via `git ls-files --others --exclude-standard` and treats them as
+/// `FileChange::Added`. This makes working-tree diffs include files that
+/// exist on disk but have never been staged, while respecting `.gitignore`,
+/// `.git/info/exclude`, and global gitignore rules.
+///
 /// Output format of `git diff --name-status`:
 ///   - `A\tpath`          → Added
 ///   - `M\tpath`          → Modified
@@ -66,6 +72,7 @@ pub fn collect_changed_files(
         crate::gitdiff::refs::validate_ref(t)?;
     }
 
+    // ── Tracked changes via git diff ──
     let mut args: Vec<String> = vec![
         "diff".to_string(),
         "--name-status".to_string(),
@@ -109,6 +116,42 @@ pub fn collect_changed_files(
             }
             // Unknown status — skip (defensive; git only emits A/M/D/R/C/T/U/X).
             _ => {}
+        }
+    }
+
+    // ── Untracked non-ignored files (working-tree diff only) ──
+    // `git diff` does not enumerate untracked files. When diffing against
+    // the working tree, discover them via `git ls-files --others
+    // --exclude-standard`, which respects .gitignore, .git/info/exclude,
+    // and global gitignore rules. Each untracked file is treated as
+    // FileChange::Added — semantically a newly added file in the working
+    // tree — and enters the existing pipeline unchanged.
+    if to.is_none() {
+        let ls_output = super::runner::run_git(
+            root,
+            &[
+                "ls-files",
+                "--others",
+                "--exclude-standard",
+                "--end-of-options",
+            ],
+        )?;
+
+        // Build a set of paths already discovered by `git diff` to avoid
+        // duplicating files that happen to be reported by both commands
+        // (defensive; `git diff` should never report untracked files).
+        let existing_paths: std::collections::HashSet<String> = changes
+            .iter()
+            .map(|c| c.current_path().to_string())
+            .collect();
+
+        for line in ls_output.lines() {
+            let path = line.trim_end();
+            if path.is_empty() || existing_paths.contains(path) {
+                continue;
+            }
+            validate_git_path(path)?;
+            changes.push(FileChange::Added(path.to_string()));
         }
     }
 

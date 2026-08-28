@@ -10,13 +10,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **`diff_commits` working-tree diff now includes non-ignored untracked files.** When `toRef` is omitted, `collect_changed_files()` additionally runs `git ls-files --others --exclude-standard` and treats discovered paths as `FileChange::Added`, entering the existing diff pipeline unchanged. Ignored files remain excluded. No index mutation, no staging, no `git add -N` required. (`src/gitdiff/workspace.rs`)
+
 ### Changed
 
 ### Fixed
 
+- Fixed pre-existing `clippy::manual_range_contains` warning in `src/tests/mcp/token_economics.rs`.
+
 ### Tests
 
+- **Workspace-level untracked-file tests:** Discovery in working-tree diff, exclusion from commit-to-commit diff, coexistence with tracked modifications, .gitignore exclusion, no-tracked-changes edge case.
+- **Engine-level untracked-file tests:** Untracked `.ts` file produces AST skeleton in manifest; untracked non-compressible file falls back to line-count delta; ignored files excluded from manifest; mixed tracked + untracked changes counted correctly.
+- Replaced the old `git add -N` dependency test (`gitdiff_workspace_working_tree_added_file_read_from_disk`) with a no-staging untracked variant.
+
 ### Documentation
+
+- Removed the `git add -N` limitation from `docs/DIFF_COMMITS_GUIDE.md`.
+- Documented the new untracked-file behavior in `docs/DIFF_COMMITS_GUIDE.md`.
 
 ### Verification
 
