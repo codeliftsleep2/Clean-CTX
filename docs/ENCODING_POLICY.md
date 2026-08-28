@@ -71,26 +71,6 @@ identify the boundary, recover intended text from git history or known intent,
 fix the boundary (not just the bytes), re-run both guards. Never silently
 replace suspicious characters, and never assume non-ASCII means corruption.
 
-### Automated repair tool
-
-A deterministic repair script lives at `scripts/fix-encoding.py`:
-
-```powershell
-python scripts/fix-encoding.py <file1> [file2 file3 ...]
-```
-
-It repairs:
-- UTF-8 BOM (byte order mark) stripping
-- CP1252/Latin-1 double-encoding mojibake (em-dashes, smart quotes, etc.)
-- Incomplete/corrupted multi-character sequences
-
-After repair it automatically runs `scripts/check-utf8.ps1` to verify.
-The repair sequences exactly mirror the signatures defined in `check-utf8.ps1`,
-so repair and detection are always in sync.
-
-**Do NOT use this tool as a substitute for fixing the boundary that caused the
-corruption** — it recovers the text but does not prevent the root cause from
-recurring.
 
 ## Root-cause analysis of the 2026-08-28 incident
 
@@ -134,24 +114,22 @@ recurring.
 
 | Measure | Status |
 |---------|--------|
-| `scripts/fix-encoding.py` added to repository (reusable, argument-driven) | ✅ DONE |
-| `scripts/check-utf8.ps1` remains the authoritative detection guard | ✅ EXISTING |
-| Pre-commit hook must NOT be bypassed for encoding issues | 🔧 See `.clinerules/encoding.md` |
+| `scripts/check-utf8.ps1` remains the authoritative detection guard | ✅ Existing |
+| Pre-commit hook must NOT be bypassed for encoding issues | 🔧 See `.clinerules/encoding.md` §7 |
 | Agent rule: after ANY file write, verify encoding before committing | 🔧 Added to `.clinerules/encoding.md` §5 |
-| Bypass detection: `--no-verify` should only be used for encoding-clean reasons | 🔧 Added to engineering rules |
+| `--no-verify` is FORBIDDEN when encoding guard flags any file | 🔧 Added to `.clinerules/encoding.md` §5 |
 
 ### How to verify this never recurs
 
-When an agent writes file content with the `editor` tool:
+When an agent modifies files:
 
-1. **Before committing**, verify no BOM was introduced:
+1. **Run the encoding guard** before committing:
    ```
-   python -c "with open('path.rs','rb') as f: d=f.read(); print('BOM:', d[:3]==b'\\xef\\xbb\\xbf')"
+   powershell -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
    ```
-2. **Run the encoding guard** — if it fails, run the fix script first:
-   ```
-   python scripts/fix-encoding.py <affected-files>
-   ```
+2. **If the guard fails**, recover following §7 of `.clinerules/encoding.md`:
+   `git checkout -- <file>` from known-good history, then fix the tool boundary
+   that caused the corruption.
 3. **Commit only after the guard passes**
-4. **Never use `--no-verify`** unless the cause is documented and unrelated
-   to encoding
+4. **Never use `--no-verify`** to bypass the encoding guard. A bypass is a
+   project policy violation regardless of justification.
