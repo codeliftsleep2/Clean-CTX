@@ -50,11 +50,11 @@ mcp__clean-ctx__apply_edit(filePath: "src/services/UserService.ts",
 
 ## RULE 2 — CBM Queries: Use `cbm_proxy`, NOT Direct Calls
 
-**NEVER call `search_graph`, `query_graph`, `trace_path`, or `get_architecture` directly.** They return raw, uncompressed responses that bypass compression.
+**NEVER call `search_graph`, `query_graph`, `trace_path`, `get_architecture`, `list_projects`, or `index_repository` directly.** They return raw, uncompressed responses that bypass compression.
 
 **ALWAYS use `cbm_proxy`** — it intercepts the response at the pipe level and compresses it before it reaches you.
 
-**`cbm_tool` must be a REAL CBM tool name:** `search_graph`, `query_graph`, `trace_path`, `get_architecture`. `get_symbol_importance` and `get_dead_code` are NOT CBM tools — they are implemented internally via `query_graph` Cypher, so never pass them as `cbm_tool`.
+**`cbm_tool` must be a REAL CBM tool name:** `search_graph`, `query_graph`, `trace_path`, `get_architecture`, `list_projects`, `index_repository`. `get_symbol_importance` and `get_dead_code` are NOT CBM tools — they are implemented internally via `query_graph` Cypher, so never pass them as `cbm_tool`.
 
 | FORBIDDEN direct call | Use `cbm_proxy` with |
 |-----------------------|----------------------|
@@ -62,6 +62,8 @@ mcp__clean-ctx__apply_edit(filePath: "src/services/UserService.ts",
 | `query_graph` | `cbm_tool: "query_graph"`, `query` |
 | `trace_path` | `cbm_tool: "trace_path"`, `function_name`, `direction` |
 | `get_architecture` | `cbm_tool: "get_architecture"`, `project` |
+| `list_projects` | `cbm_tool: "list_projects"`, `parameters: {}` |
+| `index_repository` | `cbm_tool: "index_repository"`, `parameters: { repo_path, mode? }` |
 
 **Only direct CBM call allowed:** `get_cbm_status` (tiny status object).
 
@@ -85,6 +87,12 @@ mcp__clean-ctx__cbm_proxy(cbm_tool: "trace_path", parameters: { function_name: "
 | Non-code file | `Read` |
 | CBM graph query | `cbm_proxy` |
 | CBM availability | `get_cbm_status` |
+| CBM project list | `cbm_proxy` with `cbm_tool: "list_projects"` |
+| CBM reindex | `cbm_proxy` with `cbm_tool: "index_repository"` (only needed for external edits) |
 | Token savings | `context_stats` |
+
+**After `apply_edit`:** Automatic synchronous CBM `fast` reindex runs when CBM is available — no manual `index_repository` needed.
+
+**After external edits** (host write tool, shell, git operation): Clean-CTX cannot observe the mutation. Use `cbm_proxy(cbm_tool: "index_repository", parameters: { repo_path, mode: "fast" })` explicitly if graph freshness is required.
 
 **Before completing any task, verify:** every code file used `provide_code_context`, every CBM query used `cbm_proxy`, and `Read` was only used for non-code files or after `provide_code_context` failed.

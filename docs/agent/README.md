@@ -38,4 +38,4 @@ architectural facts and is NOT duplicated here.
 | `architecture.md` | Architectural audit checklist, invariant hierarchy, test-file convention | ending a multi-step architectural task |
 | `incremental-migration.md` | Incremental architectural migration procedure | performing a designated migration |
 | `releases.md` | Gated release, changelog & versioning accounting | a behavior-affecting build ships |
-| `tooling.md` | MCP / code-context tool usage | choosing how to read/understand code |
+| `tooling.md` | Comprehensive MCP/code-context tool selection, workflow, and antipatterns guide | choosing how to read, understand, edit, or verify code |

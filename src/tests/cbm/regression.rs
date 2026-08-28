@@ -3,6 +3,11 @@
 // Regression tests for CBM audit fixes.
 // Tests pure functions: is_retryable, check_cache behavior,
 // json_compress utilities, and enrichment compression savings.
+//
+// CBM-EDIT-001: Post-Edit Graph Consistency invariant tests
+// are also in this file (reindex_for_file tests below).
+
+#![allow(unnameable_test_items)]
 
 use serde_json::json;
 
@@ -1147,4 +1152,98 @@ fn fixture_defines_method_count_matches_method_node_count() {
         .and_then(|e| e["count"].as_u64())
         .unwrap_or(0);
     assert_eq!(ecount, mcount);
+}
+// ── reindex_for_file tests ────────────────────────────────────
+//
+// CBM-EDIT-001 Post-Edit Graph Consistency: after a successful
+// mutation returns, subsequent CBM graph queries observe the
+// filesystem state produced by that mutation.
+
+#[test]
+fn reindex_for_file_fails_gracefully_when_cbm_unavailable() {
+    use crate::cbm::GraphBridge;
+    use crate::cbm::config::{CbmConfig, CbmStatus};
+    use std::path::Path;
+
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge = GraphBridge::try_create(&config, Path::new("."));
+    bridge.status = CbmStatus::Unavailable;
+
+    let result = bridge.reindex_for_file(Path::new("src/main.rs"), "fast");
+    assert!(
+        result.is_err(),
+        "reindex_for_file must fail when CBM unavailable"
+    );
+let err = result.unwrap_err();
+    match err {
+        crate::cbm::client::CbmError::LaunchError(msg) => {
+            assert!(
+                msg.contains("not available"),
+                "error message should indicate unavailability: {msg}"
+            );
+        }
+        other => panic!("expected LaunchError, got: {other:?}"),
+    }
+}
+
+#[test]
+fn reindex_for_file_resolves_to_extra_root_via_try_create_with_roots() {
+    use crate::cbm::GraphBridge;
+    use crate::cbm::config::CbmConfig;
+
+    let primary = make_temp_root("reidx_primary");
+    let extra = make_temp_root("reidx_extra");
+    std::fs::write(extra.join("src").join("main.rs"), b"fn main() {}").unwrap_or_default();
+
+    let config = CbmConfig { enabled: false, ..Default::default() };
+    let mut bridge = GraphBridge::try_create_with_roots(&config, &primary, &[extra.clone()]);
+    prime_available(&mut bridge);
+
+    let file_in_extra = extra.join("src").join("main.rs");
+    let result = bridge.reindex_for_file(&file_in_extra, "fast");
+    assert!(result.is_err(), "reindex_for_file must fail with no client");
+    match &result {
+        Err(crate::cbm::client::CbmError::LaunchError(msg)) => {
+            assert!(msg.contains("not available"), "unexpected error: {msg}");
+        }
+        other => panic!("expected LaunchError, got: {other:?}"),
+    }
+    let _ = std::fs::remove_dir_all(&primary);
+    let _ = std::fs::remove_dir_all(&extra);
+}
+#[test]
+fn reindex_for_file_fallback_to_active_root_for_unmapped_file() {
+    use crate::cbm::GraphBridge;
+    use crate::cbm::config::CbmConfig;
+
+    let root = make_temp_root("reidx_root");
+    let config = CbmConfig { enabled: false, ..Default::default() };
+    let mut bridge = GraphBridge::try_create(&config, &root);
+    prime_available(&mut bridge);
+    let outside = std::env::temp_dir().join(format!("reindex_outside_{}", std::process::id()));
+    let result = bridge.reindex_for_file(&outside, "fast");
+    assert!(result.is_err(), "should reach client via fallback root");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn reindex_for_file_invalidate_cache_clears_memory_entries() {
+    use crate::cbm::GraphBridge;
+    use crate::cbm::config::CbmConfig;
+    use std::time::{Duration, Instant};
+
+    let config = CbmConfig { enabled: false, ..Default::default() };
+    let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
+    bridge.status = crate::cbm::config::CbmStatus::Available;
+    let data = crate::cbm::bridge::CachedGraphData {
+        data: serde_json::json!([["A", "B"]]),
+        expires_at: Instant::now() + Duration::from_secs(300),
+    };
+    bridge.cache.insert("call_edges".to_string(), data);
+    assert_eq!(bridge.cache.len(), 1, "cache should have 1 entry before invalidation");
+    bridge.invalidate_cache();
+    assert_eq!(bridge.cache.len(), 0, "cache should be empty after invalidation");
 }

@@ -200,9 +200,21 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .update_and_verify(&resolved_path, &new_hash);
     drop(_commit_guard);
     state.llm_text_cache_lock().remove(&alias);
+// ── Automatic CBM reindex (post-edit graph consistency) ──────────
+    if let Some(ref mut bridge) = *state.graph_bridge_lock() {
+        if bridge.is_available() {
+            match bridge.reindex_for_file(std::path::Path::new(&resolved_path), "fast") {
+                Ok(()) => { /* graph is fresh */ }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Post-edit CBM reindex failed; graph may be stale");
+                }
+            }
+        }
+    }
 
     // ── Minimal response (plan step 6) ───────────────────────────────
     let mut ops_report: Vec<Value> = report
+
         .operations
         .iter()
         .map(|o| {

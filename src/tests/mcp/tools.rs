@@ -246,6 +246,8 @@ fn p3_21_tool_names_match_tool_list_and_registry() {
         set.insert("get_architecture".to_string());
         set.insert("get_cbm_status".to_string());
         set.insert("cbm_proxy".to_string());
+        set.insert("list_projects".to_string());
+        set.insert("index_repository".to_string());
         set
     };
 

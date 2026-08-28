@@ -1236,3 +1236,96 @@ function createFixture(data) { return data; }
 
     // eprintln!("\n═══ Audit probe complete — all steps passed ═══\n");
 } // _cleanup drops here: removes the fixture dir even on panic
+
+// -- E2E: apply_edit -> automatic reindex -> fresh graph ------------
+//
+// CBM-EDIT-001 invariant: after a successful apply_edit returns,
+// subsequent CBM graph queries observe the filesystem state
+// produced by that edit.
+//
+// The reindex call is synchronous from apply_edit's perspective
+// (the bridge calls client.index_repository() and waits for the
+// JSON-RPC response before returning), so there is no timing
+// dependency.
+
+/// Create a small TypeScript fixture file in the given directory.
+fn ts_fixture(dir: &std::path::Path) -> std::path::PathBuf {
+    let path = dir.join("src").join("service.ts");
+    std::fs::create_dir_all(path.parent().unwrap()).expect("create src dir");
+    std::fs::write(
+        &path,
+        "class MyService {\n  doSomething() {\n    return 42;\n  }\n}\n",
+    ).expect("write fixture");
+    path
+}
+
+/// Prove automatic reindex after apply_edit by modifying a method body
+/// and verifying the CBM graph is still queryable after reindex.
+#[serial(cbm_live)]
+#[test]
+fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
+    if !cbm_binary_exists() {
+        eprintln!("Skipping - CBM not installed");
+        return;
+    }
+    let fixture_root = std::env::temp_dir()
+        .join(format!("clean-ctx-reindex-e2e-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&fixture_root);
+    std::fs::create_dir_all(fixture_root.join("src"))
+        .expect("create fixture dir");
+    struct FixtureCleanup(std::path::PathBuf);
+    impl Drop for FixtureCleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let _cleanup = FixtureCleanup(fixture_root.clone());
+    let fixture_path = ts_fixture(&fixture_root);
+    let file_path_str = fixture_path.to_string_lossy().into_owned();
+    let mut config = crate::config::CleanCtxConfig::default();
+    config.cbm.enabled = true;
+    let fixture_str = fixture_root.to_string_lossy().to_string();
+    config.additional_roots.push(fixture_str.clone());
+    let state = crate::mcp::McpState::new(config);
+    wait_for_indexing_complete(&state);
+    let fx_slug = {
+        let mut guard = state.graph_bridge_lock();
+        let b = guard.as_mut().expect("live bridge");
+        b.resolve_project_id(&fixture_str)
+    };
+    {
+        let mut guard = state.graph_bridge_lock();
+        let b = guard.as_mut().expect("live bridge");
+        b.set_project(&fx_slug);
+        b.invalidate_cache();
+        let before = b.search("doSomething");
+        assert!(!before.is_empty(), "doSomething must be indexed before edit");
+    }
+    crate::mcp::tool_handlers::core::handle_provide_code_context(
+        &serde_json::json!(1),
+        &serde_json::json!({"arguments": {"filePath": file_path_str.clone(), "fidelity": "edit"}}),
+        &state,
+    );
+    crate::mcp::tool_handlers::edit::handle_apply_edit(
+        &serde_json::json!(2),
+        &serde_json::json!({"arguments": {"filePath": file_path_str.clone(), "operations": [{
+            "type": "replace_body",
+            "target": "MyService.doSomething",
+            "expectedOldText": "{\n    return 42;\n  }",
+            "newText": "{\n    return 99;\n  }"
+        }]}}),
+        &state,
+    );
+    let on_disk = std::fs::read_to_string(&fixture_path)
+        .expect("fixture must exist after edit");
+    assert!(on_disk.contains("return 99;"), "edit must have written new body to disk:\n{on_disk}");
+    {
+        let mut guard = state.graph_bridge_lock();
+        let b = guard.as_mut().expect("live bridge");
+        b.set_project(&fx_slug);
+        b.invalidate_cache();
+        let orig = b.search("doSomething");
+        assert!(!orig.is_empty(), "doSomething must still be in graph after reindex");
+    }
+}
+

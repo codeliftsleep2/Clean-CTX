@@ -1,7 +1,7 @@
-// src/cbm/config.rs
+﻿// src/cbm/config.rs
 //
 // CBM (codebase-memory-mcp) integration configuration.
-// Entirely self-contained — CleanCtxConfig references this via a single `cbm` field.
+// Entirely self-contained â€” CleanCtxConfig references this via a single `cbm` field.
 
 use serde::{Deserialize, Serialize};
 
@@ -132,3 +132,6 @@ impl CbmStatus {
         }
     }
 }
+
+
+

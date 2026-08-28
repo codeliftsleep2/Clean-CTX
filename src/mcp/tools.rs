@@ -516,6 +516,43 @@ pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, s
             crate::cbm::proxy::handle_cbm_proxy(id, params, state);
             return;
         }
+        "list_projects" => {
+            // Route through cbm_proxy with no parameters
+            crate::cbm::proxy::handle_cbm_proxy(
+                id,
+                &serde_json::json!({"arguments": {
+                    "cbm_tool": "list_projects",
+                    "parameters": {}
+                }}),
+                state,
+            );
+            return;
+        }
+        "index_repository" => {
+            // Route through cbm_proxy with the caller's parameters
+            let args = &params["arguments"];
+            let repo_path = args["repo_path"].as_str().unwrap_or("");
+            if repo_path.is_empty() {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0", "id": id,
+                    "error": { "code": -32602, "message": "Missing required: repo_path" }
+                }));
+                return;
+            }
+            let mode = args["mode"].as_str().unwrap_or("fast");
+            crate::cbm::proxy::handle_cbm_proxy(
+                id,
+                &serde_json::json!({"arguments": {
+                    "cbm_tool": "index_repository",
+                    "parameters": {
+                        "repo_path": repo_path,
+                        "mode": mode
+                    }
+                }}),
+                state,
+            );
+            return;
+        }
         // Unknown — fall through to registry
         _ => {}
     }

@@ -61,15 +61,37 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                 "properties": {}
             }
         }),
-        // ── Phase 2: Pipe-Level Interception Proxy ───────────────────
+        // ── Project discovery ─────────────────────────────────────
         serde_json::json!({
-            "name": "cbm_proxy",
-            "description": "**Primary CBM integration point.** Forwards a query to CBM, intercepts the raw ~5000-token structural response at the pipe level, compresses it down to ~1100 tokens, and returns the compressed result. `cbm_tool` must be a real CBM tool name: 'search_graph', 'query_graph', 'trace_path', or 'get_architecture'. Use this instead of calling CBM directly. Only available when codebase-memory-mcp is installed.",
+            "name": "list_projects",
+            "description": "List all CBM-indexed projects. Returns each project's CBM identity, path, and status. Project-independent — no project parameter required. Use this to discover the authoritative CBM project slug when needed.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {}
+            }
+        }),
+        // ── Repository indexing ────────────────────────────────────
+        serde_json::json!({
+            "name": "index_repository",
+            "description": "Trigger CBM to index (or reindex) a repository. After a successful apply_edit, Clean-CTX automatically performs a synchronous fast reindex — manual index_repository is normally not needed. Use this explicitly when external edits (host write tool, shell, git operation) have modified the repository outside Clean-CTX. fast mode is appropriate for normal post-edit refreshes; full mode is available for explicit rebuild/recovery scenarios. This operation updates CBM's graph/index; it does not modify the repository's files or Git state.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "cbm_tool": { "type": "string", "description": "CBM tool to call (must be a real CBM tool): 'search_graph', 'query_graph', 'trace_path', 'get_architecture'. Default: 'search_graph'. NOTE: get_symbol_importance/get_dead_code are implemented internally via query_graph and are NOT CBM tools." },
-                    "parameters": { "type": "object", "description": "Parameters to pass to CBM using CBM-native names. search_graph: { 'name_pattern': string, 'project': string }. query_graph: { 'query': string, 'project': string }. trace_path: { 'function_name': string, 'direction': string (inbound|outbound|both), 'depth': int, 'project': string }. get_architecture: { 'project': string }." },
+                    "repo_path": { "type": "string", "description": "Path to the repository to index." },
+                    "mode": { "type": "string", "description": "Indexing mode: 'fast' (normal refresh, default) or 'full' (rebuild/recovery)." }
+                },
+                "required": ["repo_path"]
+            }
+        }),
+        // ── Phase 2: Pipe-Level Interception Proxy ───────────────────
+        serde_json::json!({
+            "name": "cbm_proxy",
+            "description": "**Primary CBM integration point.** Forwards a query to CBM, intercepts the raw ~5000-token structural response at the pipe level, compresses it down to ~1100 tokens, and returns the compressed result. `cbm_tool` must be a real CBM tool name: 'search_graph', 'query_graph', 'trace_path', 'get_architecture', 'list_projects', or 'index_repository'. Use this instead of calling CBM directly. Only available when codebase-memory-mcp is installed.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "cbm_tool": { "type": "string", "description": "CBM tool to call (must be a real CBM tool): 'search_graph', 'query_graph', 'trace_path', 'get_architecture', 'list_projects', 'index_repository'. Default: 'search_graph'. NOTE: get_symbol_importance/get_dead_code are implemented internally via query_graph and are NOT CBM tools." },
+                    "parameters": { "type": "object", "description": "Parameters to pass to CBM using CBM-native names. search_graph: { 'name_pattern': string, 'project': string }. query_graph: { 'query': string, 'project': string }. trace_path: { 'function_name': string, 'direction': string (inbound|outbound|both), 'depth': int, 'project': string }. get_architecture: { 'project': string }. list_projects: {} (no parameters required). index_repository: { 'repo_path': string (required), 'mode': string ('fast' | 'full', default 'fast') }." },
                     "query": { "type": "string", "description": "Shorthand: query text passed to CBM (mapped to name_pattern for search_graph, query for query_graph)." },
                     "project": { "type": "string", "description": "Shorthand: CBM project name (used when parameters is not set)." }
                 },

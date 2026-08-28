@@ -1,7 +1,7 @@
 # Clean-CTX — Architecture Overview
 
 > **Owner:** System + module architecture · **Status:** Living reference
-> **Version:** 0.4.0
+> **Version:** 0.4.7
 > **Last updated:** 2026-08-07 (R-44 complete: Angular HTML template compression, PrimeNG markers, GitDiff integration)
 >
 > **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
@@ -666,7 +666,27 @@ Normative details: **CBM-ID-001** in `docs/ARCHITECTURAL_INVARIANTS.md`.
 
 ### Graph Intelligence API & Error Semantics
 
-Five bridge queries power the intelligence features - `get_symbol_importance_mut()`, `get_blast_radius()`, `get_dead_code()`, `get_call_edges()`, `get_architecture()` - and all five return `Result<_, CbmError>`:
+The `GraphBridge` provides two categories of queries:
+
+**Agent-facing CBM operations** (callable through `cbm_proxy` with the corresponding `cbm_tool` value):
+
+| Operation | CBM Tool | Description |
+|-----------|----------|-------------|
+| Architecture | `get_architecture` | Project module/component overview |
+| Graph search | `search_graph` | Search by name/pattern |
+| Cypher query | `query_graph` | Execute Cypher-like queries |
+| Trace path | `trace_path` | Trace call/dependency paths |
+| List projects | `list_projects` | Discover CBM-indexed projects |
+| Index repository | `index_repository` | Trigger reindexing |
+
+**Internal bridge helpers** (not MCP tools — they exist only on the `GraphBridge` struct and are used internally by the intelligence layer):
+
+- `get_symbol_importance_mut()` — per-symbol importance scores computed from in-degree
+- `get_blast_radius()` — depth-1 caller-file set for a symbol
+- `get_dead_code()` — function/method nodes with no callers and not entry points
+- `get_call_edges()` — all CALLS relationships in the project
+
+All five of the original intelligence queries (`get_symbol_importance_mut()`, `get_blast_radius()`, `get_dead_code()`, `get_call_edges()`, `get_architecture()`) return `Result<_, CbmError>`:
 
 - **`Ok(empty)` means a valid query with zero results** (e.g. a symbol with no callers). It is never used as a stand-in for failure.
 - **`Err` means CBM failed** - transport fault, timeout, open circuit, or a tool error reported by CBM itself. Callers must never treat `Err` as "no data".
