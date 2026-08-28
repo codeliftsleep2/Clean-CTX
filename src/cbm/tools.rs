@@ -12,7 +12,8 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "query": { "type": "string", "description": "Search query (symbol name, pattern, or natural language)." },
+                    "name_pattern": { "type": "string", "description": "CBM-native search query (symbol name, pattern, or regex)." },
+                    "query": { "type": "string", "description": "Clean-CTX shorthand search query (symbol name, pattern, or natural language). Accepted alongside name_pattern." },
                     "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root." }
                 },
                 "required": ["query"]

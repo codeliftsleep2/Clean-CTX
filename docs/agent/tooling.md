@@ -298,6 +298,18 @@ The structured tools apply Clean-CTX-specific transformations (query wrapping, p
 and return cached results. Responses are NOT compressed — prefer `cbm_proxy` when token
 efficiency matters.
 
+**Project state:** `graph_search`, `graph_query`, `graph_trace`, and `get_architecture`
+change the bridge's active project when a `project` argument is supplied. A subsequent
+wrapper call without an explicit `project` uses the last-set active project. `cbm_proxy`
+does **not** mutate the bridge's active project — its project resolution is scoped to the
+individual proxy call.
+
+**Freshness:** The structured tools return TTL-cached results from the bridge (the
+cache TTL is configurable). `cbm_proxy` bypasses the bridge cache and fetches fresh data
+from CBM before compression. The wrapper and proxy paths therefore have intentionally
+different freshness semantics — prefer wrappers for repeated queries where staleness
+is acceptable, and the proxy when fresh data is required.
+
 ### Other Prohibited Values
 
 Do **not** pass `get_symbol_importance` or `get_dead_code` as `cbm_tool`.
