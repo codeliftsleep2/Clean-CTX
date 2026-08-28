@@ -823,7 +823,27 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         };
         te_threshold = threshold;
         if !prediction {
-            // Compression predicted unfavorable -- return raw source.
+            // Compression predicted unfavorable -- but Edit fidelity still
+            // requires tracked IR state so that apply_edit can resolve unit
+            // byte ranges. Compile IR and load state, then return raw source
+            // without entering the expensive compression/rendering pipeline.
+            // IR compilation is cheap (~1ms for small files) compared to the
+            // full render pipeline that would otherwise be needed.
+            match compile_file_ir_focused(
+                &resolved_path,
+                crate::compression::Fidelity::Edit,
+                state,
+                focus_methods.as_ref(),
+            ) {
+                Ok((compiled, _)) => {
+                    state.ir_context_lock().load_ir(compiled, None);
+                }
+                Err(e) => {
+                    send_response(&to_jsonrpc_error(id, &e));
+                    return;
+                }
+            }
+
             state.record_compression(
                 &resolved_path,
                 raw_tokens,

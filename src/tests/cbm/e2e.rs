@@ -1342,12 +1342,18 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
         );
     }
 
-    // First graph search must trigger lazy reindex and return fresh results.
+    // First graph search: explicitly ensure freshness (as the production
+    // MCP handler does via ensure_indexed_or_error), then search.
     {
         let mut guard = state.graph_bridge_lock();
         let b = guard.as_mut().expect("live bridge");
         b.set_project(&fx_slug);
         b.invalidate_cache();
+        let idx_status = b.ensure_indexed();
+        match idx_status {
+            Ok(crate::cbm::bridge::IndexingStatus::Ready) => {}
+            _ => panic!("ensure_indexed must return Ready after lazy reindex: {idx_status:?}"),
+        }
         let result = b.search("doSomething");
         assert!(
             !result.is_empty(),
@@ -1370,13 +1376,19 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
         );
     }
 
-    // Second graph search should NOT trigger another reindex (project is clean).
-    // The result should still be valid.
+    // Second graph search: explicitly ensure freshness, then search.
+    // The project is already clean (ensure_indexed in the first block
+    // advanced indexed_generation), so ensure_indexed is a fast no-op.
     {
         let mut guard = state.graph_bridge_lock();
         let b = guard.as_mut().expect("live bridge");
         b.set_project(&fx_slug);
         b.invalidate_cache();
+        let idx_status = b.ensure_indexed();
+        match idx_status {
+            Ok(crate::cbm::bridge::IndexingStatus::Ready) => {}
+            _ => panic!("ensure_indexed must return Ready on clean project: {idx_status:?}"),
+        }
         let result = b.search("doSomething");
         assert!(
             !result.is_empty(),

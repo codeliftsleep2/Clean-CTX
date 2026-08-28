@@ -104,6 +104,51 @@ fn tool_list_advertises_apply_edit() {
     );
 }
 
+/// Regression: small Edit files must survive the token-economics gate with
+/// tracked IR state so that apply_edit works after raw_passthrough.
+#[test]
+fn apply_edit_works_after_raw_passthrough_on_small_file() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let root_str = dir.path().to_string_lossy().into_owned();
+    let path = dir.path().join("tiny.ts");
+    // 52 bytes -- well below the .ts Edit threshold of ~544 tokens.
+    std::fs::write(&path, "class T {\n  m() {\n    return 1;\n  }\n}\n").unwrap();
+    let mut config = crate::tests::test_config();
+    config.additional_roots.push(root_str);
+    let state = crate::mcp::McpState::new(config);
+    let file_path = path.to_string_lossy().into_owned();
+
+    // Step 1: provide_code_context at Edit fidelity.
+    crate::mcp::tool_handlers::core::handle_provide_code_context(
+        &json!(1),
+        &json!({ "arguments": { "filePath": file_path.clone(), "fidelity": "edit" } }),
+        &state,
+    );
+
+    // Step 2: apply_edit must succeed (IR state was established despite
+    // raw_passthrough). Prior to the fix, this would fail with
+    // "no prior tracked state".
+    crate::mcp::tool_handlers::edit::handle_apply_edit(
+        &json!(2),
+        &json!({
+            "arguments": {
+                "filePath": file_path,
+                "operations": [{
+                    "type": "replace_body",
+                    "target": "T.m",
+                    "expectedOldText": "{\n    return 1;\n  }",
+                    "newText": "{\n    return 2;\n  }"
+                }]
+            }
+        }),
+        &state,
+    );
+    let on_disk = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        on_disk.contains("return 2;"),
+        "edit after raw_passthrough must have written new body to disk:\n{on_disk}"
+    );
+}
 /// apply_edit requires a prior provide and refuses to act on state-less
 /// files (policy from Open Question 2). In-process (no spawn): the file on
 /// disk must remain untouched.
