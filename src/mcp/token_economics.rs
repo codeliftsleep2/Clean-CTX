@@ -116,16 +116,11 @@ fn params_for_edit(extension: &str) -> EconomicsParams {
 }
 
 /// Compute the raw token threshold at or below which compression is
-/// predicted unfavorable. Public for testing.
+/// predicted unfavorable. Public for testing and observability.
 ///
-/// # Dead-code note
-///
-/// This function is only used by test code (in `src/tests/mcp/token_economics.rs`)
-/// to pin calibration values. It must remain `pub(crate)` and structurally
-/// necessary — the tests verify that the estimator's boundary behavior matches
-/// the declared calibration, which acts as a regression guard when parameters
-/// are adjusted.
-#[allow(dead_code)]
+/// This function was originally dead-code (test-only). It is now also
+/// called from the production path to record the threshold in the tracing
+/// span for calibration observability.
 pub(crate) fn compression_threshold(fidelity: Fidelity, extension: &str) -> usize {
     if matches!(fidelity, Fidelity::Low | Fidelity::Medium | Fidelity::High) {
         return 0;

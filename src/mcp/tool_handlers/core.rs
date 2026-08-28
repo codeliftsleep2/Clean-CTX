@@ -798,17 +798,31 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     //
     // Structural fidelities (Low, Medium, High) are skipped by the gate because
     // they strip method bodies entirely and always produce substantial savings.
+    //
+    // Observability: lift prediction and threshold out for the tracing span below
+    // so we can correlate predictions with actual outcomes.
+    let mut te_prediction: &str = "bypass";
+    let mut te_threshold: usize = 0;
     if effective_fidelity == crate::compression::Fidelity::Edit {
         let extension = std::path::Path::new(&resolved_path)
             .extension()
             .and_then(|e| e.to_str())
             .unwrap_or("");
         let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
-        if !crate::mcp::token_economics::should_attempt_compression(
+        let prediction = crate::mcp::token_economics::should_attempt_compression(
             raw_tokens,
             effective_fidelity,
             extension,
-        ) {
+        );
+        let threshold =
+            crate::mcp::token_economics::compression_threshold(effective_fidelity, extension);
+        te_prediction = if prediction {
+            "favorable"
+        } else {
+            "unfavorable"
+        };
+        te_threshold = threshold;
+        if !prediction {
             // Compression predicted unfavorable -- return raw source.
             state.record_compression(
                 &resolved_path,
@@ -844,6 +858,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         strategy = %format!("{:?}", strategy),
         cbm_status = %state.cbm_status.summary(),
         is_angular = %is_angular,
+        prediction = %te_prediction,
+        threshold = %te_threshold,
     )
     .entered();
 

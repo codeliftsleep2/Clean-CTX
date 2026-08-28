@@ -50,6 +50,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - `src/cbm/tools.rs` `index_repository` description updated to reflect lazy freshness. (`src/cbm/tools.rs`)
 
+### Observability
+
+- **Token-economics gate now emits tracing fields.** The existing `provide_code_context` tracing span (`tracing::info_span!`) now captures `prediction` (`"favorable"`, `"unfavorable"`, or `"bypass"`) and `threshold` (the biased token count used for the decision). Structural fidelities (Low, Medium, High) and Verbatim log `"bypass"` / `0`. This allows correlation of predictions with actual compression outcomes using structured log output, supporting future calibration of per-language `fixed_overhead` and `expected_savings_ratio` values from real-world usage data. No gate behavior, calibration, or response contract was changed. (`src/mcp/tool_handlers/core.rs`, `src/mcp/token_economics.rs`)
+
 ### Verification
 
 - CBM regression: 77 passed, 0 failed (11 new freshness tests + 66 existing).
