@@ -24,6 +24,7 @@ mod server;
 pub(crate) mod session_stats;
 pub(crate) mod sqlite_store;
 pub(crate) mod state;
+pub(crate) mod token_economics;
 pub(crate) mod tool_handlers;
 pub(crate) mod tool_helpers;
 pub(crate) mod tools;

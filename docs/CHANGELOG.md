@@ -6,7 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [Unreleased] - Per-Project Lazy CBM Graph Freshness
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Fixed
+
+### Tests
+
+### Documentation
+
+### Verification
+
+---
+
+## [0.4.8] - 2026-08-28 - Per-Project Lazy CBM Graph Freshness & Token-Economics Gate
+
+### Added
+
+- **Cheap token-economics gate before IR compression.** A new preflight check (`src/mcp/token_economics.rs`) predicts whether compression at verbatim-body-preserving fidelities (Edit, Verbatim) will produce a net token savings. If not, compression is skipped entirely and the raw file is returned through the existing response contract with `content_kind: "raw_passthrough"`. The estimator uses a single BPE token-count pass — no AST parse, no IR compile, no render. Calibration is per-language via a simple parameter table (fixed_overhead + expected_savings_ratio) with a 15% conservative bias toward compression. Structural fidelities (Low, Medium, High) are not gated — they always attempt compression. (`src/mcp/token_economics.rs`, `src/mcp/tool_handlers/core.rs`)
 
 ### Changed
 
@@ -19,16 +39,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Tests
 
 - 11 regression tests for freshness behavior: dirty tracking, generation invariants, multi-project isolation, failure survival, and mock-level `apply_edit` marking. (`src/tests/cbm/regression.rs`)
+
 - Updated E2E test `e2e_apply_edit_triggers_reindex_and_graph_is_fresh`: now verifies the full lazy contract — dirty after `apply_edit`, fresh after first graph query, clean after second. (`src/tests/cbm/e2e.rs`)
+
+- **13 token-economics regression tests:** below-threshold skip, above-threshold compress, conservative bias near boundary, structural-fidelity bypass, per-language calibration, unknown-extension defaults, leading-dot normalization, zero-token edge case, verbatim pass-through, all-languages structural bypass, and structural-threshold-is-zero invariant. (`src/tests/mcp/token_economics.rs`)
 
 ### Documentation
 
 - `docs/agent/tooling.md` updated: "Lazy CBM Graph Freshness after `apply_edit`" section replaces "Automatic Reindex". `apply_edit` tool table description updated. (`docs/agent/tooling.md`)
+
 - `src/cbm/tools.rs` `index_repository` description updated to reflect lazy freshness. (`src/cbm/tools.rs`)
 
 ### Verification
 
 - CBM regression: 77 passed, 0 failed (11 new freshness tests + 66 existing).
+- Token-economics: 13/13 passed, 0 failed.
 - `cargo clippy --all-targets -- -D warnings` zero warnings.
 - `cargo fmt --all` clean.
 - Encoding guard: 498 text files valid UTF-8 without BOM.

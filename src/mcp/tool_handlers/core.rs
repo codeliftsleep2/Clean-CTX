@@ -790,6 +790,52 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         return;
     }
 
+    // -- Token-economics gate --
+    // Before entering the expensive compression pipeline (IR compilation + render),
+    // cheaply predict whether compression at verbatim-body-preserving fidelities
+    // will produce a net token savings. If not, skip compression and return the
+    // raw file through the existing response contract.
+    //
+    // Structural fidelities (Low, Medium, High) are skipped by the gate because
+    // they strip method bodies entirely and always produce substantial savings.
+    if effective_fidelity == crate::compression::Fidelity::Edit {
+        let extension = std::path::Path::new(&resolved_path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
+        let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
+        if !crate::mcp::token_economics::should_attempt_compression(
+            raw_tokens,
+            effective_fidelity,
+            extension,
+        ) {
+            // Compression predicted unfavorable -- return raw source.
+            state.record_compression(
+                &resolved_path,
+                raw_tokens,
+                raw_tokens,
+                "edit",
+                is_angular,
+                "full",
+                None,
+                "raw_passthrough",
+            );
+            let mut response = serde_json::json!({
+                "jsonrpc": "2.0", "id": id, "result": {
+                    "content": [{ "type": "text", "text": source }],
+                    "strategy": "full", "fidelity": "edit",
+                    "decision_summary": decision.summary(),
+                    "content_kind": "raw_passthrough",
+                    "byte_exact": ["document"],
+                    "degradation": null
+                }
+            });
+            inject_baseline_breakpoint(&mut response, state, source);
+            send_response(&response);
+            return;
+        }
+    }
+
     // A-04: Create tracing span for this call
     let _span = tracing::info_span!(
         "provide_code_context",
