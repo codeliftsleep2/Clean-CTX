@@ -141,7 +141,10 @@ fn contains_mojibake(content: &str) -> Option<&'static str> {
 /// Files permitted to contain mojibake SIGNATURES because they quote historic
 /// corruption (forensic records). Must stay in sync with the allowlist in
 /// scripts/check-utf8.ps1. Keep reasons beside each entry.
-const MOJIBAKE_ALLOWED_PATHS: &[&str] = &["docs/CHANGELOG.md"]; // historical bug-fix record quoting corrupted sequences
+const MOJIBAKE_ALLOWED_PATHS: &[&str] = &[
+    "docs/CHANGELOG.md",
+    "docs/ENCODING_POLICY.md", // root-cause analysis section intentionally quotes mojibake patterns as teaching example
+];
 
 #[test]
 fn unicode_canary_survives_file_round_trip() {
@@ -217,7 +220,7 @@ fn encoding_gates_stay_in_sync_with_each_other() {
     // contract at the boundary most likely to drift.
     assert_eq!(
         MOJIBAKE_ALLOWED_PATHS,
-        &["docs/CHANGELOG.md"],
+        &["docs/CHANGELOG.md", "docs/ENCODING_POLICY.md"],
         "Rust-side allowlist drifted; update scripts/check-utf8.ps1 $MojibakeAllowedPaths together"
     );
 }

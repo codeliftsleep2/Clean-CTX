@@ -79,6 +79,7 @@ $Signatures = @(
 # corruption is forbidden; every addition must be reviewed like code.
 $MojibakeAllowedPaths = @{
     'docs/CHANGELOG.md' = 'Historical bug-fix record quoting mojibake sequences'
+    'docs/ENCODING_POLICY.md' = 'Root-cause analysis section intentionally quotes actual mojibake byte sequences as a documented teaching example (part of the forensic record)'
 }
 
 # --- Scan --------------------------------------------------------------------
