@@ -1199,7 +1199,7 @@ fn reindex_for_file_resolves_to_extra_root_via_try_create_with_roots() {
     std::fs::write(extra.join("src").join("main.rs"), b"fn main() {}").unwrap_or_default();
 
     let config = CbmConfig { enabled: false, ..Default::default() };
-    let mut bridge = GraphBridge::try_create_with_roots(&config, &primary, &[extra.clone()]);
+    let mut bridge = GraphBridge::try_create_with_roots(&config, &primary, std::slice::from_ref(&extra));
     prime_available(&mut bridge);
 
     let file_in_extra = extra.join("src").join("main.rs");

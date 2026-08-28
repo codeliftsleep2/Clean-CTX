@@ -1,6 +1,6 @@
-﻿// src/cbm/bridge.rs
+// src/cbm/bridge.rs
 //
-// Graph Bridge â€” translates CBM graph data into Clean-CTX concepts.
+// Graph Bridge — translates CBM graph data into Clean-CTX concepts.
 // Entirely self-contained with its own types and caching.
 
 use std::collections::HashMap;
@@ -69,11 +69,11 @@ pub struct ArchitectureDependency {
 ///   (cross-package call edges; `kind` is always `"calls"`).
 ///
 /// Key sets vary between projects/modes (small graphs omit `boundaries`,
-/// large ones may omit `entry_points`) â€” missing keys deserialize to
+/// large ones may omit `entry_points`) — missing keys deserialize to
 /// empty vecs rather than erroring.
 /// Map one CBM 0.8.1 `search_graph` result object onto [`GraphNode`].
 ///
-/// CBM emits `qualified_name` / `file_path` â€” there is **no `id`** and **no
+/// CBM emits `qualified_name` / `file_path` — there is **no `id`** and **no
 /// `file`** key (verified against live captures). The previous mapping
 /// required `n["id"]`, so `filter_map`'s `?` silently dropped EVERY result
 /// and wrapper searches were always empty regardless of the pattern.
@@ -91,14 +91,14 @@ pub(crate) fn map_search_result(n: &Value) -> Option<GraphNode> {
 /// M-01 post-filter predicate: does `edge` touch the requested target?
 ///
 /// Boundary normalization contract (2026-08-24 fix): CBM identifies symbols
-/// by their QUALIFIED names (`â€¦src.cbm.bridge.GraphBridge.query_graph`)
+/// by their QUALIFIED names (`...src.cbm.bridge.GraphBridge.query_graph`)
 /// while the API accepts bare names (`query_graph`). A target therefore
 /// matches a canonical endpoint when
 ///
 ///   1. the endpoint EQUALS the target (caller passed the fully qualified
 ///      form), or
 ///   2. the endpoint's FINAL DOT SEGMENT equals the target (bare-name
-///      segment match â€” the dot is CBM's qualified-name separator,
+///      segment match — the dot is CBM's qualified-name separator,
 ///      verified against live captures).
 ///
 /// Nothing looser: a bare `to` name must RETAIN edges whose wire endpoints
@@ -145,20 +145,20 @@ pub(crate) fn filter_trace_edges(
 /// - A projection is relationship-shaped IFF it contains exactly ONE column
 ///   echoing a literal `type(...)` expression (whitespace-tolerant:
 ///   `"type( r )"` matches; aliased `type(r) AS kind` echoes as `"kind"`
-///   and is intentionally UNDETECTABLE â€” CBM erases the marker).
+///   and is intentionally UNDETECTABLE — CBM erases the marker).
 /// - Relationship-shaped projections become one [`GraphEdge`] per row:
 ///   endpoints are the FIRST and LAST non-type projected columns, the type
 ///   cell becomes `label`, and every other projected column maps into
 ///   `properties` keyed by its echoed column text with the actual projected
 ///   value preserved. Scrambled 5/6/N-column orders work purely from the
-///   column metadata â€” arity and position are never consulted.
+///   column metadata — arity and position are never consulted.
 /// - No unaliased `type(...)` column â‡’ node fallback REGARDLESS of column
 ///   count. Arbitrary uniform triples (e.g. `[name, in_degree, out_degree]`)
-///   must NEVER fabricate edges â€” the previous arity rule produced a fake
+///   must NEVER fabricate edges — the previous arity rule produced a fake
 ///   edge labelled `"10"` for exactly that shape.
 ///
 /// Deliberately NOT done here (tracked as separate findings): node
-/// deduplication and file-path population â€” repeated nodes and empty
+/// deduplication and file-path population — repeated nodes and empty
 /// `file` fields pass through exactly as before. Endpoint/label cells are
 /// extracted as strings (non-strings become empty); property cells keep
 /// their projected JSON value verbatim. Rows are never skipped or reordered.
@@ -220,7 +220,7 @@ pub(crate) fn convert_query_rows(columns: &[String], rows: &[Vec<Value>]) -> Que
 ///
 /// Matches a literal `type(...)` expression case-insensitively with inner
 /// whitespace tolerated (CBM echoes `"type( r )"` verbatim). Returns `Some`
-/// only when EXACTLY ONE such column exists â€” zero means node-shaped, and
+/// only when EXACTLY ONE such column exists — zero means node-shaped, and
 /// more than one means the projection's semantics are ambiguous, so we
 /// refuse to guess. An `AS` alias replaces the whole expression in the echo
 /// (`type(r) AS rel_kind` â‡’ `"rel_kind"`), which by design makes aliased
@@ -321,7 +321,7 @@ pub(crate) struct CachedGraphData {
 
 /// Tracks the state of project indexing for the CBM graph bridge.
 ///
-/// P1-9: Indexing is now non-blocking â€” `ensure_indexed()` returns
+/// P1-9: Indexing is now non-blocking — `ensure_indexed()` returns
 /// immediately with `StillIndexing` if indexing is in progress, and
 /// a background thread handles the actual pipe I/O.
 #[derive(Debug, Clone)]
@@ -386,7 +386,7 @@ pub struct GraphBridge {
     ///
     /// These methods historically returned empty/default results on failure
     /// (e.g. "indexing in progress"), which made the graph tools report
-    /// "0 nodes, 0 edges" â€” a confidently wrong answer. The handlers now
+    /// "0 nodes, 0 edges" — a confidently wrong answer. The handlers now
     /// check this after each call via `take_last_error()` and surface the
     /// error to the agent instead of the empty result.
     ///
@@ -412,7 +412,7 @@ impl GraphBridge {
     /// Create a `GraphBridge` for a primary root plus additional roots.
     ///
     /// The authoritative CBM project identity for every root is the canonical
-    /// slug CBM derives from the repository path (`cbm_project_slug`) â€” the
+    /// slug CBM derives from the repository path (`cbm_project_slug`) — the
     /// directory basename is never treated as a CBM project ID. Each configured
     /// root is registered in `project_ids`/`project_paths` and, when CBM is
     /// available, begins indexing asynchronously at construction.
@@ -571,7 +571,7 @@ impl GraphBridge {
     ///   - A real CBM client is available AND status is Available, OR
     ///   - The cache has pre-seeded entries (mock/test mode) AND status is Available
     ///
-    /// P0-2: Previously required `self.client.is_some()` which broke the mock â€”
+    /// P0-2: Previously required `self.client.is_some()` which broke the mock —
     /// tests using `new_mock()` pre-seed the cache but set client to None.
     /// Now `is_available()` also returns true when cached data exists, allowing
     /// mocks to serve pre-seeded data without a real CBM binary.
@@ -634,7 +634,7 @@ impl GraphBridge {
         let client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
         let _result = match client_guard.as_ref() {
             Some(_c) => {
-                // We need mut access â€” drop guard, reacquire as mut
+                // We need mut access — drop guard, reacquire as mut
                 drop(client_guard);
                 let mut cg = self.client.lock().unwrap_or_else(|p| p.into_inner());
                 let client = cg.as_mut().unwrap();
@@ -905,7 +905,7 @@ impl GraphBridge {
             if let Some(slug) = self.project_ids.get(&canon) {
                 return slug.clone();
             }
-            // Unknown path: derive its canonical slug WITHOUT registering it â€”
+            // Unknown path: derive its canonical slug WITHOUT registering it —
             // this method is identity-resolution only (and takes `&self` so the
             // proxy can call it). Registration happens in `set_workspace_root`.
             return cbm_project_slug(&canon);
@@ -945,7 +945,7 @@ impl GraphBridge {
     /// being queried. Semantics:
     ///   - The active project delegates to `ensure_indexed()`.
     ///   - A project that is NOT tracked (unknown slug) passes through as
-    ///     `Ready` â€” CBM returns its authoritative error if the project doesn't
+    ///     `Ready` — CBM returns its authoritative error if the project doesn't
     ///     exist, so an unrelated/unknown project can never dead-end in
     ///     `StillIndexing{0}` forever.
     ///   - A tracked root reports its own per-project state (`Complete`â†’`Ready`,
@@ -1002,7 +1002,7 @@ impl GraphBridge {
     ///   - the `project` argument on every CBM tool call,
     ///   - the `indexing_state` key for readiness gating.
     ///     (The disk graph-cache partitions by the canonical root *path*,
-    ///     `self.project_root` â€” a 1:1 equivalent of this slug per repo.)
+    ///     `self.project_root` — a 1:1 equivalent of this slug per repo.)
     pub(crate) fn project_str(&self) -> String {
         self.project
             .clone()
@@ -1012,7 +1012,7 @@ impl GraphBridge {
     /// Per-symbol importance scores derived from CBM caller counts.
     ///
     /// Errors (CBM unavailable / failed / rejected the query) propagate as
-    /// [`CbmError::Err`] â€” an `Ok(map)` is always a valid, complete result.
+    /// [`CbmError::Err`] — an `Ok(map)` is always a valid, complete result.
     pub fn get_symbol_importance_mut(
         &mut self,
     ) -> Result<HashMap<String, SymbolImportance>, CbmError> {
@@ -1054,7 +1054,7 @@ impl GraphBridge {
     /// regex, which CBM treated literally and returned zero matches.
     ///
     /// AUDIT FIX (F1): the WHERE clause previously referenced an undeclared
-    /// variable (`m.name`) â€” live CBM fail-opens on invalid WHERE clauses and
+    /// variable (`m.name`) — live CBM fail-opens on invalid WHERE clauses and
     /// returned EVERY CALLS edge in the project as the "blast radius".
     ///
     /// `_depth` is accepted for API compatibility; CBM's single-hop CALLS
@@ -1095,7 +1095,7 @@ impl GraphBridge {
     /// that are not entry points.
     ///
     /// AUDIT FIX (F3): only `(f:Function)` was scanned, so dead class
-    /// methods â€” the majority of TS/C#/Java symbols â€” were invisible.
+    /// methods — the majority of TS/C#/Java symbols — were invisible.
     /// CBM 0.8.1's Cypher dialect has no verified UNION support here, so
     /// both labels are queried separately and merged (functions first).
     ///
@@ -1184,13 +1184,13 @@ impl GraphBridge {
     // The former `get_dataflow_edges()` queried edge type `DATAFLOW`,
     // which does not exist in CBM 0.8.1's schema (edge types: USAGE,
     // DEFINES, CALLS, DECORATES, DEFINES_METHOD, TESTS, WRITES,
-    // CONFIGURES, IMPORTS â€” verified via get_graph_schema on a live
+    // CONFIGURES, IMPORTS — verified via get_graph_schema on a live
     // index). It therefore always returned an empty result and was
     // removed rather than left as a silently-dead query path.
     //
     // Why USAGE/WRITES are NOT substitutes:
     //   - `USAGE` is reference tracking (`callee` property), not value
-    //     flow â€” it has no read/write direction.
+    //     flow — it has no read/write direction.
     //   - `WRITES` records field assignments only (e.g.
     //     `bridge.rs â†’ disk_cache`); there is no READS counterpart, so
     //     read-side dataflow can never be reconstructed from it.
@@ -1224,7 +1224,7 @@ impl GraphBridge {
         let project = self.project_str();
         let arch = self.query(move |c| c.get_architecture(&project))?;
         // CBM 0.8.1 emits packages/boundaries (not modules/
-        // dependencies) â€” map through the verified wire-schema
+        // dependencies) — map through the verified wire-schema
         // parser instead of reading keys that never exist.
         let ov = parse_architecture_response(&arch);
         self.cache_insert(&key, &ov);
@@ -1232,21 +1232,21 @@ impl GraphBridge {
     }
 
     /// Resolve a cross-language endpoint for a method name (Angular
-    /// Ecosystem Deepening â€” NgRx effect â†’ .NET controller endpoint).
+    /// Ecosystem Deepening — NgRx effect â†’ .NET controller endpoint).
     ///
     /// Returns `None` when CBM is unavailable or no candidate matches.
     /// Uses the existing `query_graph` Cypher path with TTL in-memory +
-    /// disk caching â€” **no new tool**.
+    /// disk caching — **no new tool**.
     ///
     /// Returns the best-match as `"{ClassName}.{MethodName}"` (e.g.
     /// `"UserController.GetAll"`); empty/no-match â†’ `None`.
     ///
     /// The Cypher now joins the declaring `Class` node so the returned
-    /// endpoint is **Controller-qualified** â€” the LLM can trace
+    /// endpoint is **Controller-qualified** — the LLM can trace
     /// `Î¦effect:loadUsers$ â†’ UserController.GetAll` as a single semantic
     /// chain, not just a bare method name.
     pub fn resolve_cross_language_endpoint(&mut self, method_name: &str) -> Option<String> {
-        // Graceful skip when CBM is unavailable â€” no error, no graph line.
+        // Graceful skip when CBM is unavailable — no error, no graph line.
         if !self.is_available() {
             return None;
         }
@@ -1268,7 +1268,7 @@ impl GraphBridge {
         // CBM 0.8.1 uses DEFINES_METHOD edges between Class and Method
         // result is `"{Class}.{Method}"`. Prefer Controller classes.
         // We call the client directly (via `self.query`) to get the raw
-        // `{columns, rows}` â€” the generic `query_graph` flattens rows to
+        // `{columns, rows}` — the generic `query_graph` flattens rows to
         // the first column, discarding the Controller class. We match on
         // the exact method name (case-sensitive) so we never return an
         // arbitrary fuzzy match.
@@ -1312,7 +1312,7 @@ impl GraphBridge {
         let project = self.project_str();
         let q = cypher.to_string();
         if self.check_cache(&key) {
-            // Cache hit is a successful query â€” clear any stale error.
+            // Cache hit is a successful query — clear any stale error.
             let result = serde_json::from_value(
                 self.cache
                     .get(&key)
@@ -1332,7 +1332,7 @@ impl GraphBridge {
         match result {
             Ok(table) => {
                 self.set_last_error(None);
-                // Wire contract (CBM-WIRE-002): column-shape conversion â€”
+                // Wire contract (CBM-WIRE-002): column-shape conversion —
                 // see `convert_query_rows`. The projection's echoed columns
                 // decide the interpretation; row arity is never consulted
                 // and arbitrary uniform triples are NEVER fabricated into
@@ -1360,7 +1360,7 @@ impl GraphBridge {
         let project = self.project_str();
         let q = query.to_string();
         if self.check_cache(&key) {
-            // Cache hit is a successful query â€” clear any stale error.
+            // Cache hit is a successful query — clear any stale error.
             let result = serde_json::from_value(
                 self.cache
                     .get(&key)
@@ -1408,11 +1408,11 @@ impl GraphBridge {
     /// direct edges around `from`. Otherwise post-filters to only include
     /// edges touching `to`.
     ///
-    /// M-01 fix: previously ignored the `to` parameter â€” now properly filters
+    /// M-01 fix: previously ignored the `to` parameter — now properly filters
     /// results to only include edges touching the target symbol.
     ///
     /// Direction determination (wire-shape fix, 2026-08-24): with both
-    /// endpoints supplied, OUTBOUND is attempted first â€” preserving pre-fix
+    /// endpoints supplied, OUTBOUND is attempted first — preserving pre-fix
     /// behavior exactly for outbound-reachable pairs. Only when the outbound
     /// attempt SUCCEEDS but yields no edge touching `to` do we fall back to
     /// INBOUND once, making inbound-only relationships (callee â† caller)
@@ -1425,7 +1425,7 @@ impl GraphBridge {
     /// `CbmClient::extract_trace_edges`.
     pub fn trace_path(&mut self, from: &str, to: &str) -> Vec<GraphEdge> {
         if from == to {
-            // Trivially successful (no path needed) â€” clear stale error.
+            // Trivially successful (no path needed) — clear stale error.
             self.set_last_error(None);
             return vec![];
         }
@@ -1443,7 +1443,7 @@ impl GraphBridge {
         let key = format!("trace:{from}:{to}");
         let project = self.project_str();
         if self.check_cache(&key) {
-            // Cache hit is a successful query â€” clear any stale error.
+            // Cache hit is a successful query — clear any stale error.
             let result = serde_json::from_value(
                 self.cache
                     .get(&key)
@@ -1471,7 +1471,7 @@ impl GraphBridge {
                     Ok(ge)
                 } else {
                     // Attempt 2 (single fallback): outbound succeeded but no
-                    // edge touches the target â€” the relationship may exist
+                    // edge touches the target — the relationship may exist
                     // ONLY inbound (the target calls `from`). Errors here are
                     // propagated, never masked as empty data.
                     let f = from.to_string();
@@ -1513,7 +1513,7 @@ impl GraphBridge {
         }
     }
 
-    /// Alias for `invalidate_cache` â€” clears memory and the current project's
+    /// Alias for `invalidate_cache` — clears memory and the current project's
     /// disk partition (disk coherence).
     pub fn clear_cache(&mut self) {
         self.invalidate_cache();
@@ -1522,7 +1522,7 @@ impl GraphBridge {
     /// Detect whether the CBM graph has changed since the last call.
     /// Returns the new graph version if changed, or `None` if CBM is unavailable.
     ///
-    /// Cache invalidation is the caller's responsibility â€” when a new version
+    /// Cache invalidation is the caller's responsibility — when a new version
     /// is detected, the cache should be invalidated and the version updated.
     pub fn detect_changes(&mut self) -> Result<Option<String>, CbmError> {
         let client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
@@ -1599,7 +1599,7 @@ impl GraphBridge {
         };
         // Log recovery transitions
         if matches!(previous, CbmStatus::Degraded(_)) && self.status.is_available() {
-            eprintln!("[clean-ctx-cbm] Recovered â€” circuit breaker reset, CBM available again");
+            eprintln!("[clean-ctx-cbm] Recovered — circuit breaker reset, CBM available again");
         }
     }
 
@@ -1608,7 +1608,7 @@ impl GraphBridge {
     /// Disk key scope: `{project_name}:{key}` so the effective disk
     /// partition is `(project_root, project_name)`. This prevents a
     /// cross-project data leak when `set_project("repo-b")` is called
-    /// while `project_root` is still pinned to repo-a â€” repo-b queries
+    /// while `project_root` is still pinned to repo-a — repo-b queries
     /// would otherwise hydrate repo-a's cached results.
     fn disk_key(&self, key: &str) -> String {
         format!("{}:{key}", self.project_str())
@@ -1626,13 +1626,13 @@ impl GraphBridge {
             if cached.value().expires_at > Instant::now() {
                 return true;
             }
-            // Expired â€” clone key then drop guard before remove (avoids borrow conflict)
+            // Expired — clone key then drop guard before remove (avoids borrow conflict)
             let owned_key = key.to_string();
             drop(cached);
             self.cache.remove(&owned_key);
         }
 
-        // Memory miss â€” try disk cache (lazy hydration on first touch).
+        // Memory miss — try disk cache (lazy hydration on first touch).
         if let Some(ref disk) = self.disk_cache {
             let project_root = self.project_root.to_string_lossy().into_owned();
             let disk_key = self.disk_key(key);
@@ -1723,7 +1723,7 @@ pub(crate) fn cbm_project_slug(canonical_root: &Path) -> String {
             out.push('-');
             last_dash = true;
         } else if out.is_empty() {
-            // Leading separator â€” skip without emitting a dash.
+            // Leading separator — skip without emitting a dash.
             last_dash = true;
         }
     }
@@ -1760,14 +1760,14 @@ fn resolve_cbm_binary(config: &CbmConfig) -> Option<PathBuf> {
         if p.exists() && p.is_file() {
             return Some(p);
         }
-        // Config path doesn't exist â€” fall through to PATH
+        // Config path doesn't exist — fall through to PATH
         eprintln!(
             "[clean-ctx-cbm] Config binary_path '{}' not found, trying PATH...",
             path
         );
     }
 
-    // 2. PATH search â€” try all candidate names (e.g. .exe, .cmd on Windows)
+    // 2. PATH search — try all candidate names (e.g. .exe, .cmd on Windows)
     let names = cbm_binary_names();
     if let Ok(path_var) = std::env::var("PATH") {
         for dir in std::env::split_paths(&path_var) {
@@ -1780,7 +1780,7 @@ fn resolve_cbm_binary(config: &CbmConfig) -> Option<PathBuf> {
         }
     }
 
-    // 3. Common install locations â€” try all candidate names per directory
+    // 3. Common install locations — try all candidate names per directory
     common_install_locations(&names)
 }
 
@@ -1840,7 +1840,7 @@ fn install_dirs() -> Vec<PathBuf> {
 }
 
 fn common_install_locations(names: &[String]) -> Option<PathBuf> {
-    // Try each directory Ã— each candidate name
+    // Try each directory × each candidate name
     for dir in &install_dirs() {
         for name in names {
             let candidate = dir.join(name);
@@ -1854,7 +1854,7 @@ fn common_install_locations(names: &[String]) -> Option<PathBuf> {
 
 /// Return a list of all candidate binary paths that `resolve_cbm_binary` checks.
 ///
-/// This is used by `get_cbm_status` for diagnostics â€” when CBM is unavailable,
+/// This is used by `get_cbm_status` for diagnostics — when CBM is unavailable,
 /// the response includes this list so the user can see exactly what was searched
 /// and identify why detection failed (e.g. binary installed in an unlisted dir).
 pub fn checked_paths() -> Vec<String> {
@@ -1906,7 +1906,7 @@ pub mod test_helpers {
 
     /// Create a mock GraphBridge with canned symbol importance data.
     ///
-    /// P0-2: Fixed â€” the mock now sets `status: CbmStatus::Available` and
+    /// P0-2: Fixed — the mock now sets `status: CbmStatus::Available` and
     /// overrides `is_available()` behavior by pre-seeding the cache.
     /// The mock has no real CBM client, so `query()` will return Err.
     ///
@@ -1953,7 +1953,7 @@ pub mod test_helpers {
     /// is `NotStarted` (a state that only exists transiently before the
     /// construction-time `start_indexing()` thread flips it to `InProgress`).
     ///
-    /// K-1: Used to prove `ensure_indexed()` is **report-only** â€” it must NOT
+    /// K-1: Used to prove `ensure_indexed()` is **report-only** — it must NOT
     /// transition `NotStarted` â†’ `InProgress` (i.e. it must not spawn an
     /// indexing thread). The old behavior spawned on `NotStarted`.
     pub fn new_available_not_started() -> GraphBridge {

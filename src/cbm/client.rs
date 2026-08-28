@@ -1,7 +1,7 @@
-﻿// src/cbm/client.rs
+// src/cbm/client.rs
 //
 // JSON-RPC 2.0 subprocess client for codebase-memory-mcp.
-// Self-contained â€” no knowledge of Clean-CTX internals.
+// Self-contained — no knowledge of Clean-CTX internals.
 
 use serde_json::Value;
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -56,7 +56,7 @@ pub const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 /// row matrix.
 ///
 /// CBM-WIRE-002 (verified live 2026-08-24): `columns` echo the RETURN
-/// expressions verbatim â€” including whitespace (`"type( r )"`), but with
+/// expressions verbatim — including whitespace (`"type( r )"`), but with
 /// any `AS` alias REPLACING the expression entirely (`type(r) AS rel_kind`
 /// echoes as `"rel_kind"`, erasing the semantic marker). Callers that
 /// interpret projection shapes must consume this struct, never rows alone.
@@ -97,15 +97,15 @@ pub struct CbmClient {
 /// Determines whether a CBM error is transient and should be retried.
 ///
 /// Retryable errors:
-/// - `ConnectionLost` â€” transient pipe failure, CBM may recover
-/// - `Timeout` â€” CBM was busy, retry may succeed
-/// - `RpcError` with code -32603 (Internal error) â€” transient server issue
+/// - `ConnectionLost` — transient pipe failure, CBM may recover
+/// - `Timeout` — CBM was busy, retry may succeed
+/// - `RpcError` with code -32603 (Internal error) — transient server issue
 ///
 /// Non-retryable errors:
-/// - `LaunchError` â€” binary missing, retry won't help
-/// - `ParseError` â€” malformed response, retry won't help
-/// - `ToolError` â€” CBM rejected the request semantically, retry won't help
-/// - `RpcError` with code -32601 (Method not found) â€” programming error
+/// - `LaunchError` — binary missing, retry won't help
+/// - `ParseError` — malformed response, retry won't help
+/// - `ToolError` — CBM rejected the request semantically, retry won't help
+/// - `RpcError` with code -32601 (Method not found) — programming error
 pub(crate) fn is_retryable(error: &CbmError) -> bool {
     matches!(
         error,
@@ -151,30 +151,30 @@ pub(crate) fn check_soft_error(tool_name: &str, result: &Value) -> Result<(), Cb
         message,
     })
 }
-// â”€â”€ trace_path wire contract (CBM 0.8.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── trace_path wire contract (CBM 0.8.1) ──────────────────────────────
 //
 // Verbatim live captures (fresh subprocess, 2026-08-24):
 //
-//   inbound  â†’ {"function":"<fn>","direction":"inbound","callers":[â€¦]}
-//   outbound â†’ {"function":"<fn>","direction":"outbound","callees":[â€¦]}
-//   both     â†’ {"function":"<fn>","direction":"both",
-//               "callees":[â€¦],"callers":[â€¦]}   // both arrays coexist
+//   inbound  → {"function":"<fn>","direction":"inbound","callers":[…]}
+//   outbound → {"function":"<fn>","direction":"outbound","callees":[…]}
+//   both     → {"function":"<fn>","direction":"both",
+//               "callees":[…],"callers":[…]}   // both arrays coexist
 //
-// There is NO "edges" key â€” the former parser read a phantom one, so every
+// There is NO "edges" key — the former parser read a phantom one, so every
 // typed graph_trace silently collapsed to zero edges while the raw proxy
 // path worked. Relationships arrive as caller/callee ARRAYS whose entries
 // carry exactly `name`, `qualified_name`, and `hop` (a JSON number).
 // A missing array is a valid zero-result half (e.g. `callees: []`).
 //
 // Depth semantics (pinned by the depth-3 capture): entries are FLAT BFS
-// discoveries tagged only with their hop count â€” there is NO parent
+// discoveries tagged only with their hop count — there is NO parent
 // linkage. A hop-1 entry is a direct call of the traced function; for a
-// hop-N (N â‰¥ 2) entry the immediate caller is not identifiable, so turning
+// hop-N (N ≥ 2) entry the immediate caller is not identifiable, so turning
 // it into an edge pair would invent relationships. Only hop-1 entries are
 // converted; deeper hops remain available through the raw cbm_proxy path.
 
 /// Endpoint identity of a caller/callee entry: `qualified_name`, falling
-/// back to the bare `name` â€” same normalization precedent as
+/// back to the bare `name` — same normalization precedent as
 /// `map_search_result`. `None` when the entry carries neither key.
 fn trace_entry_endpoint(entry: &Value) -> Option<String> {
     let name = entry.get("name").and_then(Value::as_str)?;
@@ -199,7 +199,7 @@ fn trace_entry_is_direct(entry: &Value) -> bool {
 ///
 /// Direction semantics: every `callers[i]` calls `function_name`, and
 /// `function_name` calls every `callees[i]`. Edges are always oriented
-/// caller â†’ callee regardless of which array produced them, so consumers
+/// caller → callee regardless of which array produced them, so consumers
 /// see one consistent direction.
 ///
 /// Pure function so tests can pin the exact wire shapes against verbatim
@@ -245,7 +245,7 @@ impl CbmClient {
     ///
     /// **Stderr handling:** A background reader thread drains CBM's stderr
     /// into a log file. Without this, if CBM writes enough diagnostic output
-    /// (~64KB), the pipe buffer fills and CBM blocks â€” causing a deadlock
+    /// (~64KB), the pipe buffer fills and CBM blocks — causing a deadlock
     /// since we only read stdout. (H-1 regression guard).
     pub fn try_launch(
         binary_path: &Path,
@@ -301,13 +301,13 @@ impl CbmClient {
                     let mut line = String::new();
                     match reader.read_line(&mut line) {
                         Ok(0) => {
-                            // EOF â€” child exited.
+                            // EOF — child exited.
                             let _ = stdout_tx.send(Err("CBM exited".to_string()));
                             break;
                         }
                         Ok(_) => {
                             if stdout_tx.send(Ok(line)).is_err() {
-                                break; // Main thread dropped the receiver â€” stop reading.
+                                break; // Main thread dropped the receiver — stop reading.
                             }
                         }
                         Err(e) => {
@@ -339,7 +339,7 @@ impl CbmClient {
         &self.status
     }
 
-    // â”€â”€ Circuit breaker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Circuit breaker ─────────────────────────────────────────
 
     /// Check if the circuit is open (too many recent failures).
     /// Returns true if the circuit allows the call, false if it's tripped.
@@ -350,21 +350,21 @@ impl CbmClient {
         if self.consecutive_failures < self.max_consecutive_failures {
             return true;
         }
-        // Circuit is open â€” check if cooldown has elapsed
+        // Circuit is open — check if cooldown has elapsed
         if let Some(since) = self.degraded_since {
             if since.elapsed() >= Duration::from_secs(self.circuit_cooldown_secs) {
-                // Cooldown elapsed â€” reset to half-open, allow one try
+                // Cooldown elapsed — reset to half-open, allow one try
                 self.consecutive_failures = 0;
                 self.degraded_since = None;
                 self.status = CbmStatus::Available;
-                eprintln!("[clean-ctx-cbm] Circuit cooldown elapsed, trying againâ€¦");
+                eprintln!("[clean-ctx-cbm] Circuit cooldown elapsed, trying again…");
                 return true;
             }
         }
         false
     }
 
-    /// Record a successful query â€” resets the failure counter.
+    /// Record a successful query — resets the failure counter.
     pub(crate) fn record_success(&mut self) {
         self.consecutive_failures = 0;
         self.degraded_since = None;
@@ -374,7 +374,7 @@ impl CbmClient {
         }
     }
 
-    /// Record a transient failure â€” increments the counter, degrades if threshold reached.
+    /// Record a transient failure — increments the counter, degrades if threshold reached.
     pub(crate) fn record_failure(&mut self) {
         self.consecutive_failures += 1;
         if self.consecutive_failures >= self.max_consecutive_failures {
@@ -415,7 +415,7 @@ impl CbmClient {
         let mut backoff = Duration::from_millis(100);
 
         loop {
-            // Value::clone() is cheap â€” a few ref-count bumps for JSON strings/arrays
+            // Value::clone() is cheap — a few ref-count bumps for JSON strings/arrays
             match self.call_tool_raw_inner(tool_name, args.clone()) {
                 Ok(result) => {
                     self.record_success();
@@ -435,7 +435,7 @@ impl CbmClient {
         }
     }
 
-    /// Inner implementation of call_tool_raw â€” the actual pipe-level I/O.
+    /// Inner implementation of call_tool_raw — the actual pipe-level I/O.
     fn call_tool_raw_inner(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError> {
         let id = self.request_id.fetch_add(1, Ordering::SeqCst);
         let request = serde_json::json!({
@@ -478,7 +478,7 @@ impl CbmClient {
                         )));
                     }
                     if serde_json::from_str::<Value>(buf.trim()).is_ok() {
-                        // Valid complete JSON â€” return the raw intercepted text
+                        // Valid complete JSON — return the raw intercepted text
                         return Ok(buf);
                     }
                 }
@@ -502,7 +502,7 @@ impl CbmClient {
 
     /// Send a JSON-RPC 2.0 request and read the parsed response.
     ///
-    /// For **pipe-level interception** use `call_tool_raw` instead â€”
+    /// For **pipe-level interception** use `call_tool_raw` instead —
     /// it returns the raw text that gets compressed.
     ///
     /// Retries transient errors (timeout, connection lost, internal error)
@@ -536,7 +536,7 @@ impl CbmClient {
         }
     }
 
-    /// Inner implementation of call_tool â€” the actual JSON-RPC call.
+    /// Inner implementation of call_tool — the actual JSON-RPC call.
     fn call_tool_inner(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
         let id = self.request_id.fetch_add(1, Ordering::SeqCst);
         let request = serde_json::json!({
@@ -596,7 +596,7 @@ impl CbmClient {
                         check_soft_error(tool_name, &result)?;
                         return Ok(result);
                     }
-                    // Not yet complete JSON â€” continue reading lines
+                    // Not yet complete JSON — continue reading lines
                 }
                 Ok(Err(msg)) => {
                     self.status = CbmStatus::Degraded("exited".into());
@@ -616,7 +616,7 @@ impl CbmClient {
         }
     }
 
-    // â”€â”€ Response parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Response parsing ───────────────────────────────────────
 
     /// CBM wraps all tool responses in MCP content array format.
     /// The actual data is a JSON string inside `result.content[0].text`.
@@ -633,7 +633,7 @@ impl CbmClient {
             .map_err(|e| CbmError::ParseError(format!("inner JSON parse: {e}")))
     }
 
-    // â”€â”€ Typed wrappers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Typed wrappers ──────────────────────────────────────────
 
     /// Search the CBM knowledge graph by name pattern and optional label filter.
     ///
@@ -641,7 +641,7 @@ impl CbmClient {
     /// Build the `search_graph` tool arguments.
     ///
     /// Pure helper so tests can pin the exact request shape sent to CBM.
-    /// `label` is optional â€” omitting it searches across all node labels
+    /// `label` is optional — omitting it searches across all node labels
     /// (Class, Method, Function, Enum, ...).
     pub(crate) fn build_search_graph_args(
         name_pattern: &str,
@@ -672,11 +672,11 @@ impl CbmClient {
     /// CBM params: `function_name`, `direction` (inbound|outbound|both), `depth`, `project`
     ///
     /// Wire contract (2026-08-24): CBM answers with `callers` / `callees`
-    /// arrays â€” NOT an `edges` key. [`extract_trace_edges`] normalizes that
+    /// arrays — NOT an `edges` key. [`extract_trace_edges`] normalizes that
     /// real shape into `{"from","to","label"}` objects. A missing function is
     /// reported by CBM as a soft error (`result.isError` +
     /// `"error":"function not found"`), which [`check_soft_error`] maps to
-    /// [`CbmError::ToolError`] before this parser runs â€” failure is never a
+    /// [`CbmError::ToolError`] before this parser runs — failure is never a
     /// valid empty result (F11 invariant).
     pub fn trace_path(
         &mut self,
@@ -697,7 +697,7 @@ impl CbmClient {
     /// Get architecture overview from CBM.
     pub fn get_architecture(&mut self, project: &str) -> Result<Value, CbmError> {
         let r = self.call_tool("get_architecture", serde_json::json!({"project": project}))?;
-        // get_architecture may or may not wrap in content array â€” try both
+        // get_architecture may or may not wrap in content array — try both
         if r.get("content").is_some() {
             self.parse_cbm_response(&r)
         } else {
@@ -707,7 +707,7 @@ impl CbmClient {
 
     /// Execute a Cypher-like query against the CBM knowledge graph.
     ///
-    /// Returns the full wire table as [`QueryRows`] â€” both `columns` and
+    /// Returns the full wire table as [`QueryRows`] — both `columns` and
     /// `rows`. CBM wraps results in `{columns, rows, total}`; the echoed
     /// `columns` carry the semantic projection (e.g. a verbatim `type(r)`
     /// marker) and MUST NOT be discarded by callers that interpret shapes.
