@@ -31,7 +31,10 @@ audience. This document governs agent decision-making.
 
 ### 1.2 Clean-CTX Context/Read Tools
 
-All accept `workspaceRoot` to anchor relative paths.
+All accept `workspaceRoot` to anchor relative paths. **Always pass `workspaceRoot`
+explicitly** — auto-detection may be wrong in hosted environments (e.g. VS Code).
+The `file` field from `graph_search` is a relative path; pair it with `workspaceRoot`
+as `filePath`.
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
