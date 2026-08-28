@@ -74,10 +74,10 @@ All accept `workspaceRoot` to anchor relative paths.
 | `get_cbm_status` | — | — | **ONLY direct CBM call permitted.** Returns `available`, `degraded`, or `unavailable`. |
 | `list_projects` | — | — | **AVAILABLE** — list CBM-indexed projects. Project-independent, no project parameter required. |
 | `index_repository` | `repo_path` | `mode` | **AVAILABLE** — trigger CBM to index/reindex a repository. `mode`: `"fast"` (normal refresh, default) or `"full"` (rebuild/recovery). |
-| `graph_search` | `query` | `project` | **FORBIDDEN** — use `cbm_proxy` instead. |
-| `graph_query` | `query` | `project` | **FORBIDDEN** — use `cbm_proxy` instead. |
-| `graph_trace` | `from`, `to` | `project` | **FORBIDDEN** — use `cbm_proxy` instead. |
-| `get_architecture` | — | `project` | **FORBIDDEN** — use `cbm_proxy` instead. |
+| `graph_search` | `query` | `project` | **STRUCTURED** — returns typed results (cached). Prefer `cbm_proxy` for token efficiency. |
+| `graph_query` | `query` | `project` | **STRUCTURED** — returns typed `{nodes, edges}` (cached). Prefer `cbm_proxy` for token efficiency. |
+| `graph_trace` | `from`, `to` | `project` | **STRUCTURED** — returns typed `{edges}` (cached). Prefer `cbm_proxy` for token efficiency. |
+| `get_architecture` | — | `project` | **STRUCTURED** — returns typed `{modules, dependencies}` (cached). Prefer `cbm_proxy` for token efficiency. |
 
 ### 1.7 Workspace Tools
 
@@ -282,21 +282,21 @@ graph query
 
 Edits performed outside Clean-CTX are not automatically observed; use `index_repository` when graph freshness is required after an external edit.
 
-### Forbidden Direct Calls
+### Direct Call Comparison
 
-### Forbidden Direct Calls
+`cbm_proxy` is the preferred tool for token-efficient CBM access. The following tools exist for
+cases where structured/typed responses are preferred over compressed text:
 
-**Never** call these tools directly:
+- `graph_search` — typed `{nodes, count}` (cached, uncompressed)
+- `graph_query` — typed `{nodes, edges, count}` (cached, uncompressed)
+- `graph_trace` — typed `{edges, count}` (cached, uncompressed)
+- `get_architecture` — typed `{modules, dependencies}` (cached, uncompressed)
+- `list_projects` — routes through `cbm_proxy` internally
+- `index_repository` — routes through `cbm_proxy` internally
 
-- `graph_search`
-- `graph_query`
-- `graph_trace`
-- `get_architecture`
-- `list_projects`
-- `index_repository`
-
-They return raw, uncompressed CBM responses. Always route through
-`cbm_proxy`.
+The structured tools apply Clean-CTX-specific transformations (query wrapping, path resolution)
+and return cached results. Responses are NOT compressed — prefer `cbm_proxy` when token
+efficiency matters.
 
 ### Other Prohibited Values
 
@@ -453,10 +453,12 @@ without these benefits.
 At `low`/`medium`/`high` / non-edit fidelities, `focusMethods` is silently
 ignored. You will receive skeleton-only output but no error.
 
-### ❌ Do Not call raw CBM graph tools directly
+### ❌ Prefer `cbm_proxy` over structured wrappers for token efficiency
 
 `graph_search`, `graph_query`, `graph_trace`, and `get_architecture` return
-raw, uncompressed CBM responses. Always use `cbm_proxy`.
+structured/typed Clean-CTX responses rather than compressed text. Prefer `cbm_proxy`
+when minimizing token usage is important, and use the structured wrappers when
+programmatic access to typed data (nodes, edges, architecture overview) is needed.
 
 ### ❌ Do Not use `apply_edit` for changes it cannot safely represent
 

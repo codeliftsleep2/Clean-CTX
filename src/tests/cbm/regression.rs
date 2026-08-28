@@ -1380,3 +1380,65 @@ fn cbm_proxy_compatibility_aliases_are_normalized_before_whitelist() {
         "graph_trace is an alias, not a CBM-native name — whitelist rejects it alone"
     );
 }
+
+// ── Proxy project-not-found error enhancement ──────────────────
+
+#[test]
+fn enhance_project_not_found_injects_list_projects_hint() {
+    let raw = r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Project 'does-not-exist' not found"}}"#;
+    let enhanced = crate::cbm::proxy::enhance_project_not_found_error(raw);
+    let parsed: serde_json::Value = serde_json::from_str(&enhanced).unwrap();
+    let msg = parsed["error"]["message"].as_str().unwrap();
+    assert!(
+        msg.contains("list_projects"),
+        "should contain list_projects hint, got: {msg}"
+    );
+    assert!(
+        msg.contains("does-not-exist"),
+        "should preserve the project name, got: {msg}"
+    );
+}
+
+#[test]
+fn enhance_project_not_found_handles_unknown_project_variant() {
+    let raw =
+        r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Unknown project: foo"}}"#;
+    let enhanced = crate::cbm::proxy::enhance_project_not_found_error(raw);
+    let parsed: serde_json::Value = serde_json::from_str(&enhanced).unwrap();
+    let msg = parsed["error"]["message"].as_str().unwrap();
+    assert!(
+        msg.contains("list_projects"),
+        "should contain list_projects hint for 'Unknown project:', got: {msg}"
+    );
+}
+
+#[test]
+fn enhance_project_not_found_ignores_non_project_errors() {
+    let raw =
+        r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"Internal server error"}}"#;
+    let enhanced = crate::cbm::proxy::enhance_project_not_found_error(raw);
+    let parsed: serde_json::Value = serde_json::from_str(&enhanced).unwrap();
+    let msg = parsed["error"]["message"].as_str().unwrap();
+    assert_eq!(
+        msg, "Internal server error",
+        "non-project errors must not be enhanced"
+    );
+    assert!(
+        !msg.contains("list_projects"),
+        "non-project errors must not get the hint"
+    );
+}
+
+#[test]
+fn enhance_project_not_found_ignores_success_response() {
+    let raw = r#"{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"ok"}]}}"#;
+    let enhanced = crate::cbm::proxy::enhance_project_not_found_error(raw);
+    assert_eq!(enhanced, raw, "success responses must not be altered");
+}
+
+#[test]
+fn enhance_project_not_found_preserves_unparseable_text() {
+    let raw = "this is not valid json at all";
+    let enhanced = crate::cbm::proxy::enhance_project_not_found_error(raw);
+    assert_eq!(enhanced, raw, "unparseable text must be returned as-is");
+}

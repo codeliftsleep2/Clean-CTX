@@ -55,6 +55,53 @@ pub(crate) fn reject_disallowed_cbm_tool(tool: &str) -> Option<String> {
     ))
 }
 
+/// Detect project-not-found errors in a raw JSON-RPC CBM response and
+/// enhance the error message with a recovery hint.
+///
+/// CBM returns JSON-RPC error responses (valid JSON with an `error` key)
+/// through the pipe-level proxy as `Ok(raw_text)` — not as `Err`. This
+/// function intercepts the raw text before compression, checks for a
+/// project-related error signature, and replaces the message with an
+/// enhanced version that directs the agent to use `list_projects`.
+///
+/// Detection is intentionally conservative: the `error.message` must
+/// mention "project" AND one of the known-not-found keywords. This avoids
+/// adding the hint to unrelated CBM errors.
+///
+/// If the response is not a JSON-RPC error, or the error is not project-
+/// related, the original text is returned unchanged.
+pub(crate) fn enhance_project_not_found_error(raw: &str) -> String {
+    let val: Value = match serde_json::from_str(raw.trim()) {
+        Ok(v) => v,
+        Err(_) => return raw.to_string(),
+    };
+    let error = match val.get("error") {
+        Some(e) => e,
+        None => return raw.to_string(),
+    };
+    let msg = match error["message"].as_str() {
+        Some(m) => m,
+        None => return raw.to_string(),
+    };
+    let lower = msg.to_lowercase();
+    let is_project_error = lower.contains("project")
+        && (lower.contains("not found")
+            || lower.contains("does not exist")
+            || lower.contains("unknown")
+            || lower.contains("invalid"));
+    if !is_project_error {
+        return raw.to_string();
+    }
+    // Enhance the error message with a recovery hint.
+    let hint = format!(
+        "{}. Use list_projects to discover available projects and retry with a valid project name.",
+        msg.trim_end_matches('.')
+    );
+    let mut enhanced = val;
+    enhanced["error"]["message"] = Value::String(hint);
+    serde_json::to_string(&enhanced).unwrap_or_else(|_| raw.to_string())
+}
+
 /// Handle `cbm_proxy` — forward to CBM, intercept raw response, compress it.
 ///
 /// The proxy accepts any CBM tool call, forwards it, catches CBM's
@@ -201,7 +248,13 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
         }
     }
     let raw_response = match bridge.proxy_call(cbm_tool, args) {
-        Ok(text) => text,
+        Ok(text) => {
+            // Intercept before compression: check for project-not-found CBM
+            // errors and enhance them with a recovery hint. CBM-level errors
+            // arrive as Ok(raw_json) because the pipe I/O succeeded — the
+            // error is in the JSON content, not the transport status.
+            enhance_project_not_found_error(&text)
+        }
         Err(e) => {
             // RM-2: Log compression errors for diagnostics
             state.push_warning(format!("CBM proxy call failed: {e}"));
