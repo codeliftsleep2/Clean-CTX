@@ -14,7 +14,7 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                 "properties": {
                     "name_pattern": { "type": "string", "description": "CBM-native search query (symbol name, pattern, or regex)." },
                     "query": { "type": "string", "description": "Clean-CTX shorthand search query (symbol name, pattern, or natural language). Accepted alongside name_pattern." },
-                    "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root." }
+                    "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root. Supplying a project changes the bridge's active project for subsequent structured-wrapper calls that omit a project." }
                 },
                 "required": ["query"]
             }
@@ -26,7 +26,7 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "query": { "type": "string", "description": "Cypher-like query (e.g., 'MATCH (c:Class)-[:CALLS]->(m:Method)')." },
-                    "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root." }
+                    "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root. Supplying a project changes the bridge's active project for subsequent structured-wrapper calls that omit a project." }
                 },
                 "required": ["query"]
             }
@@ -39,7 +39,7 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                 "properties": {
                     "from": { "type": "string", "description": "Source symbol name." },
                     "to": { "type": "string", "description": "Target symbol name." },
-                    "project": { "type": "string", "description": "Optional CBM project name." }
+                    "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root. Supplying a project changes the bridge's active project for subsequent structured-wrapper calls that omit a project." }
                 },
                 "required": ["from", "to"]
             }
@@ -50,7 +50,7 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "project": { "type": "string", "description": "Optional CBM project name." }
+                    "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root. Supplying a project changes the bridge's active project for subsequent structured-wrapper calls that omit a project." }
                 }
             }
         }),
@@ -94,7 +94,7 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                     "cbm_tool": { "type": "string", "description": "CBM tool to call (must be a real CBM tool): 'search_graph', 'query_graph', 'trace_path', 'get_architecture', 'list_projects', 'index_repository'. Default: 'search_graph'. NOTE: get_symbol_importance/get_dead_code are implemented internally via query_graph and are NOT CBM tools." },
                     "parameters": { "type": "object", "description": "Parameters to pass to CBM using CBM-native names. search_graph: { 'name_pattern': string, 'project': string }. query_graph: { 'query': string, 'project': string }. trace_path: { 'function_name': string, 'direction': string (inbound|outbound|both), 'depth': int, 'project': string }. get_architecture: { 'project': string }. list_projects: {} (no parameters required). index_repository: { 'repo_path': string (required), 'mode': string ('fast' | 'full', default 'fast') }." },
                     "query": { "type": "string", "description": "Shorthand: query text passed to CBM (mapped to name_pattern for search_graph, query for query_graph)." },
-                    "project": { "type": "string", "description": "Shorthand: CBM project name (used when parameters is not set)." }
+                    "project": { "type": "string", "description": "Shorthand: CBM project name (used when parameters is not set). Project resolution is scoped to this proxy call and does not change the bridge's active project." }
                 },
                 "required": []
             }

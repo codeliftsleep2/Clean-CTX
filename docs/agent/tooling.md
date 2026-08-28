@@ -310,6 +310,91 @@ from CBM before compression. The wrapper and proxy paths therefore have intentio
 different freshness semantics — prefer wrappers for repeated queries where staleness
 is acceptable, and the proxy when fresh data is required.
 
+### Clean-CTX-First Repository Discovery
+
+Use Clean-CTX as the primary repository and code-intelligence layer. Do not
+guess repository paths, namespaces, or structural conventions when Clean-CTX
+can answer the question.
+
+#### Tool selection
+
+| Need | Preferred operation |
+|------|--------------------|
+| Find a symbol, file, class, method, or concept | `graph_search` or `cbm_proxy(cbm_tool: "search_graph")` |
+| Explore structural / graph relationships | `graph_query` or `cbm_proxy(cbm_tool: "query_graph")` |
+| Trace a dependency or call path | `graph_trace` or `cbm_proxy(cbm_tool: "trace_path")` |
+| Understand repository / module architecture | `get_architecture` or `cbm_proxy(cbm_tool: "get_architecture")` |
+| Discover available CBM projects | `cbm_proxy(cbm_tool: "list_projects")` |
+| Trigger repository reindexing | `cbm_proxy(cbm_tool: "index_repository")` |
+| Read a code file for context | `provide_code_context` |
+| Filesystem read / write / edit | Host tool (`run_commands`, native editor, etc.) |
+
+#### Path discipline
+
+- **Never invent a path.** Do not guess a file's location from its namespace,
+  module name, or symbol name. Use `graph_search` or `cbm_proxy(cbm_tool:
+  "search_graph")` to discover the actual location.
+- **Do not turn a CBM project name into a filesystem path.** The mapping from
+  repository path to CBM project slug is derived and is not reversible from
+  the slug alone.
+- **Do not turn a filesystem path into a CBM project name** unless the tool
+  explicitly handles that resolution (e.g. `index_repository` accepts
+  `repo_path`).
+- **When Clean-CTX returns a path, use it.** Do not replace or reconstruct
+  the returned path.
+- **When uncertain, discover.** Use Clean-CTX to discover paths and symbols
+  rather than guessing.
+
+**Bad — guessing paths:**
+```text
+> The class is probably under src/services/UserService.ts, so I will open that.
+```
+
+**Good — discovering with Clean-CTX:**
+```text
+> mcp__clean-ctx__graph_search(query: "UserService")
+> → found at src/services/UserService.ts
+> Now use provide_code_context on the discovered path.
+```
+
+#### Project semantics
+
+The structured wrapper tools (`graph_search`, `graph_query`, `graph_trace`,
+`get_architecture`) maintain a **sticky active project** on the bridge:
+
+- When you supply a `project` parameter, that project becomes the active
+  project for subsequent structured-wrapper calls that omit a project.
+- If you work across multiple projects, explicitly supply `project` on each
+  wrapper call rather than relying on inherited state.
+
+The `cbm_proxy` tool does **not** change the active project:
+
+- A project supplied to `cbm_proxy` is resolved only for that proxy
+  invocation.
+- The next `graph_search()` or `graph_query()` call will still target
+  whatever project was active before the proxy call.
+
+These semantics are documented in each tool's MCP schema (`project` parameter
+description).
+
+#### Recommended workflow
+
+1. **Discover** — Determine which repository or project the task concerns.
+   Use `cbm_proxy(cbm_tool: "list_projects")` or `get_architecture()` to
+   understand the workspace.
+2. **Locate** — Use `graph_search` to find symbols, files, or classes
+   rather than guessing paths.
+3. **Analyze** — Use `graph_query`, `graph_trace`, or `get_architecture`
+   for structural and relationship discovery.
+4. **Read** — Use `provide_code_context` on the discovered file path.
+5. **Edit** — Use the appropriate edit tool: `apply_edit` for single-unit
+   edits; the host write tool for broader changes.
+6. **Verify** — Compile, test, and confirm correctness.
+
+Filesystem operations are still appropriate when the task genuinely requires
+them (create, delete, list, move files) or when Clean-CTX cannot answer the
+question.
+
 ### Other Prohibited Values
 
 Do **not** pass `get_symbol_importance` or `get_dead_code` as `cbm_tool`.
