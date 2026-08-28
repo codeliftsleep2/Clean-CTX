@@ -181,7 +181,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         state.ir_context_lock().load_ir(ir.clone(), None);
         let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
         let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
-        let footer = state.format_dict_footer();
+        let footer = state.format_dict_footer_for_aliases(&[&ir.file_id]);
         let llm_text_with_footer = format!(
             "{}\n// ── {} ({}) ──\n{}",
             llm_text.trim(),
@@ -980,7 +980,9 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         llm_text.trim(),
                         compiled.file_id,
                         resolved_path,
-                        state.format_dict_footer().trim()
+                        state
+                            .format_dict_footer_for_aliases(&[&compiled.file_id])
+                            .trim()
                     );
                     let render_ms = render_start.elapsed().as_millis() as u64;
                     raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
@@ -1066,7 +1068,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     llm_text.trim(),
                     ir.file_id,
                     resolved_path,
-                    state.format_dict_footer().trim()
+                    state.format_dict_footer_for_aliases(&[&ir.file_id]).trim()
                 );
                 state
                     .llm_text_cache_lock()
@@ -1222,7 +1224,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
                 llm_text.trim(),
                 ir.file_id,
                 resolved_path,
-                state.format_dict_footer().trim()
+                state.format_dict_footer_for_aliases(&[&ir.file_id]).trim()
             );
             state
                 .llm_text_cache_lock()

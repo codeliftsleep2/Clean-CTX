@@ -100,10 +100,40 @@ impl PathDictionary {
         }
     }
 
+    /// Format the full session-global PATHMAP as a footer.
+    ///
+    /// Serializes **every** alias in the session dictionary. Used by tests
+    /// and workspace-level compression. For single-file responses prefer
+    /// [`format_footer_for_aliases`] which emits only the aliases actually
+    /// referenced by that response.
     pub fn format_footer(&self) -> String {
         let mut footer = String::from("\n§PATHMAP\n");
         for (alias, real_path) in &self.forward {
             footer.push_str(&format!("  {} = {}\n", alias, real_path));
+        }
+        footer
+    }
+
+    /// Format a request-scoped PATHMAP containing only the listed aliases.
+    ///
+    /// Produces the same `§PATHMAP` header and line format as [`format_footer`],
+    /// but only includes aliases that exist in `required_aliases`. Aliases that
+    /// have not been registered yet are silently omitted (they will not be
+    /// referenced by the response anyway).
+    ///
+    /// This is the correct method for single-file responses like
+    /// `provide_code_context`, `compress_code_context`, and `restore_context`,
+    /// where the rendered output never references other files' aliases.
+    ///
+    /// For workspace manifests and other multi-file outputs that legitimately
+    /// reference many aliases, use [`format_footer`] or pass the complete
+    /// set of referenced aliases.
+    pub fn format_footer_for_aliases(&self, required_aliases: &[&str]) -> String {
+        let mut footer = String::from("\n§PATHMAP\n");
+        for alias in required_aliases {
+            if let Some(real_path) = self.forward.get(*alias) {
+                footer.push_str(&format!("  {} = {}\n", alias, real_path));
+            }
         }
         footer
     }
@@ -133,3 +163,7 @@ impl PathDictionary {
         self.bundle_reverse.get(component_name).map(|s| s.as_str())
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/dictionary/path.rs"]
+mod tests;

@@ -474,6 +474,12 @@ impl McpState {
         self.dict_lock().format_footer()
     }
 
+    /// Format a request-scoped PATHMAP containing only the listed aliases
+    /// (thread-safe convenience method).
+    pub fn format_dict_footer_for_aliases(&self, required_aliases: &[&str]) -> String {
+        self.dict_lock().format_footer_for_aliases(required_aliases)
+    }
+
     #[allow(clippy::too_many_arguments)]
     /// Record compression stats (thread-safe convenience method).
     pub fn record_compression(

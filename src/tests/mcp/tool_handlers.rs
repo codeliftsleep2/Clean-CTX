@@ -889,6 +889,85 @@ fn provide_code_context_verbatim_fidelity_does_not_panic() {
     dispatch_tools_call(&id, "provide_code_context", &params, &state);
 }
 
+// ── PATHMAP footer scoping tests ───────────────────────────────────
+// Verifies that format_dict_footer_for_aliases produces a request-scoped
+// PATHMAP containing only the aliases needed by each individual response.
+
+#[test]
+fn pathmap_footer_contains_only_requested_alias() {
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+
+    let alias_a = state.get_or_create_alias("/workspace/file_a.ts".to_string());
+    let alias_b = state.get_or_create_alias("/workspace/file_b.ts".to_string());
+
+    // Footer for file A should only contain A's alias.
+    let footer_a = state.format_dict_footer_for_aliases(&[&alias_a]);
+    assert!(footer_a.contains("§PATHMAP"), "footer must have header");
+    assert!(
+        footer_a.contains(&alias_a),
+        "footer for A must contain {alias_a}"
+    );
+    assert!(
+        !footer_a.contains(&alias_b),
+        "footer for A must NOT contain file_b alias {alias_b}"
+    );
+
+    // Footer for file B should only contain B's alias.
+    let footer_b = state.format_dict_footer_for_aliases(&[&alias_b]);
+    assert!(
+        footer_b.contains(&alias_b),
+        "footer for B must contain {alias_b}"
+    );
+    assert!(
+        !footer_b.contains(&alias_a),
+        "footer for B must NOT contain file_a alias {alias_a}"
+    );
+}
+
+#[test]
+fn pathmap_footer_does_not_grow_with_unrelated_files() {
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+
+    // Simulate sequential requests.
+    let alias_a = state.get_or_create_alias("/project/src/a.ts".to_string());
+    let _alias_b = state.get_or_create_alias("/project/src/b.ts".to_string());
+    let _alias_c = state.get_or_create_alias("/project/src/c.ts".to_string());
+    let _alias_d = state.get_or_create_alias("/project/src/d.ts".to_string());
+
+    // Footer for a later request for file A should be the same size as if A alone existed.
+    let footer_a = state.format_dict_footer_for_aliases(&[&alias_a]);
+    let line_count_a = footer_a.lines().filter(|l| l.contains('=')).count();
+    assert_eq!(
+        line_count_a, 1,
+        "scoped footer for A must have exactly 1 alias line, got {line_count_a}: {footer_a:?}"
+    );
+}
+
+#[test]
+fn full_pathmap_footer_retains_all_aliases() {
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+
+    let alias_a = state.get_or_create_alias("/project/src/a.ts".to_string());
+    let alias_b = state.get_or_create_alias("/project/src/b.ts".to_string());
+
+    // The full format_footer must contain all aliases.
+    let full = state.format_dict_footer();
+    assert!(
+        full.contains(&alias_a),
+        "full footer must contain {alias_a}"
+    );
+    assert!(
+        full.contains(&alias_b),
+        "full footer must contain {alias_b}"
+    );
+
+    let line_count = full.lines().filter(|l| l.contains('=')).count();
+    assert_eq!(
+        line_count, 2,
+        "full footer must have exactly 2 alias lines, got {line_count}"
+    );
+}
+
 /// Verbatim short-circuit in `handle_compress_code_context` must not panic.
 #[test]
 fn compress_code_context_verbatim_fidelity_does_not_panic() {
