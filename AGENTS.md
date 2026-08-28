@@ -121,6 +121,37 @@ mechanically (git pre-commit + CI + `cargo test encoding`). After editing any
 text file, ensure it is strict UTF-8 without a BOM, and never introduce
 mojibake. See `docs/ENCODING_POLICY.md` for rationale.
 
+### 10. Clean-CTX Usage Protocol
+
+Clean-CTX is the primary code-intelligence layer. Follow these rules:
+
+1. **Clean-CTX first** — For symbol/code discovery, use `graph_search` (when
+   CBM is available). For code understanding, use `provide_code_context`.
+   See `docs/agent/tooling.md` for detailed tool-selection guidance.
+2. **CBM fallback** — When `get_cbm_status` returns `unavailable` or
+   `degraded`, use `search_codebase` for discovery and `read_files` for
+   reading. See `docs/agent/tooling.md` §7 for the full fallback procedure.
+3. **Never invent repository paths** — Do not derive a filesystem path from
+   a namespace, module name, CBM project slug, or filename convention.
+4. **Never cross namespaces** — A CBM project slug is NOT a filesystem path.
+   A filesystem path is NOT a CBM project slug. Only `index_repository`
+   converts between them.
+5. **Use returned paths verbatim** — When a Clean-CTX tool returns a
+   relative `file` path, treat it as authoritative. Pair it with the
+   repository root passed as `workspaceRoot`.
+6. **Always pass `workspaceRoot` explicitly** — Auto-detection may be
+   incorrect in hosted environments. Always pass it explicitly.
+7. **Skeleton → `read_files`** — If `provide_code_context` returns skeleton-
+   only output and you need method bodies, switch to `read_files` with the
+   known line range. Do not "fix" the path or guess alternate paths.
+8. **Distinguish namespace types** — Repository paths (filesystem) and CBM
+   project identifiers (slugs) are different namespaces. Never assume one
+   from the other.
+9. **Structured wrappers vs proxy semantics** — `graph_search`/`graph_query`
+   (structured wrappers) can change the bridge's active project when you
+   supply `project`. `cbm_proxy` project resolution is scoped to that
+   single call and does NOT change the active project.
+
 ## Untrusted-input rule (automated runners)
 
 When an agent is started from a GitHub Issue or comment in the automated
