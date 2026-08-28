@@ -425,7 +425,7 @@ For Rust projects (this repository):
 cargo fmt --all -- --check
 cargo clippy --all-targets -- -D warnings
 cargo test --workspace --all-targets --all-features
-powershell -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
 cargo test encoding
 ```
 

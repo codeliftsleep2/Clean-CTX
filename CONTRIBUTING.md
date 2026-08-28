@@ -28,7 +28,7 @@ cd Clean-CTX
 
 # Enable the automatic UTF-8 pre-commit guard (idempotent; run once per clone).
 # This wires core.hooksPath to the versioned .githooks/ directory.
-powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
+pwsh -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
 
 # Build
 cargo build
@@ -77,7 +77,7 @@ The repository protects its encoding invariant automatically. The mechanism is:
 1. **Run the installer once after cloning** (it is idempotent — safe to re-run):
 
    ```bash
-   powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
+   pwsh -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
    ```
 
 2. The installer sets `git config core.hooksPath .githooks` (clone-local), pointing

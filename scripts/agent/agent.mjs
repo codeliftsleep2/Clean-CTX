@@ -321,8 +321,7 @@ function verifyCommand(cmd, cwd) {
 // The complete Final Verification Gate, exactly as defined in
 // docs/agent/verification.md. A single failure aborts before any push.
 async function runFinalVerificationGate(cwd) {
-  const isWin = process.platform === "win32";
-  const utf8 = isWin ? "powershell" : "pwsh";
+  const utf8 = "pwsh";  // PowerShell 7.6.5+ (consistent across all platforms; Windows PowerShell 5.1 lacks utf8NoBOM)
   verifyCommand(["cargo", "fmt", "--all", "--", "--check"], cwd);
   verifyCommand(["cargo", "clippy", "--all-targets", "--", "-D", "warnings"], cwd);
   verifyCommand([utf8, "-NoProfile", "-ExecutionPolicy", "Bypass", "./scripts/check-utf8.ps1"], cwd);

@@ -125,7 +125,7 @@ When an agent modifies files:
 
 1. **Run the encoding guard** before committing:
    ```
-   powershell -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
+   pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
    ```
 2. **If the guard fails**, recover following §7 of `.clinerules/encoding.md`:
    `git checkout -- <file>` from known-good history, then fix the tool boundary

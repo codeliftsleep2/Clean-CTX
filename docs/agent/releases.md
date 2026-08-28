@@ -46,7 +46,7 @@ allowlist in both guards (`scripts/check-utf8.ps1` and `src/tests/encoding.rs`).
 After editing the changelog, pass the encoding gates:
 
 ```bash
-powershell -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
 cargo test encoding
 ```
 

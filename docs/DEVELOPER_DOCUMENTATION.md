@@ -36,7 +36,7 @@ git clone https://github.com/codeliftsleep2/Clean-CTX.git
 cd Clean-CTX
 
 # Enable the automatic UTF-8 pre-commit guard (idempotent; run once per clone)
-powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
+pwsh -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
 
 # Build (debug) with all default features
 cargo build
@@ -927,7 +927,7 @@ cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo 
 > per clone:
 >
 > ```bash
-> powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
+> pwsh -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
 > ```
 >
 > This sets `core.hooksPath = .githooks`; the `.githooks/pre-commit` hook then
