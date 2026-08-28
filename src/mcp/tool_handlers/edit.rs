@@ -200,7 +200,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .update_and_verify(&resolved_path, &new_hash);
     drop(_commit_guard);
     state.llm_text_cache_lock().remove(&alias);
-// ── Automatic CBM reindex (post-edit graph consistency) ──────────
+    // ── Automatic CBM reindex (post-edit graph consistency) ──────────
     if let Some(ref mut bridge) = *state.graph_bridge_lock() {
         if bridge.is_available() {
             match bridge.reindex_for_file(std::path::Path::new(&resolved_path), "fast") {
@@ -214,7 +214,6 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
 
     // ── Minimal response (plan step 6) ───────────────────────────────
     let mut ops_report: Vec<Value> = report
-
         .operations
         .iter()
         .map(|o| {

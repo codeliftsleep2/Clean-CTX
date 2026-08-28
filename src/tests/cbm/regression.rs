@@ -1177,7 +1177,7 @@ fn reindex_for_file_fails_gracefully_when_cbm_unavailable() {
         result.is_err(),
         "reindex_for_file must fail when CBM unavailable"
     );
-let err = result.unwrap_err();
+    let err = result.unwrap_err();
     match err {
         crate::cbm::client::CbmError::LaunchError(msg) => {
             assert!(
@@ -1198,8 +1198,12 @@ fn reindex_for_file_resolves_to_extra_root_via_try_create_with_roots() {
     let extra = make_temp_root("reidx_extra");
     std::fs::write(extra.join("src").join("main.rs"), b"fn main() {}").unwrap_or_default();
 
-    let config = CbmConfig { enabled: false, ..Default::default() };
-    let mut bridge = GraphBridge::try_create_with_roots(&config, &primary, std::slice::from_ref(&extra));
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge =
+        GraphBridge::try_create_with_roots(&config, &primary, std::slice::from_ref(&extra));
     prime_available(&mut bridge);
 
     let file_in_extra = extra.join("src").join("main.rs");
@@ -1220,7 +1224,10 @@ fn reindex_for_file_fallback_to_active_root_for_unmapped_file() {
     use crate::cbm::config::CbmConfig;
 
     let root = make_temp_root("reidx_root");
-    let config = CbmConfig { enabled: false, ..Default::default() };
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
     let mut bridge = GraphBridge::try_create(&config, &root);
     prime_available(&mut bridge);
     let outside = std::env::temp_dir().join(format!("reindex_outside_{}", std::process::id()));
@@ -1235,7 +1242,10 @@ fn reindex_for_file_invalidate_cache_clears_memory_entries() {
     use crate::cbm::config::CbmConfig;
     use std::time::{Duration, Instant};
 
-    let config = CbmConfig { enabled: false, ..Default::default() };
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
     let mut bridge = GraphBridge::try_create(&config, std::path::Path::new("."));
     bridge.status = crate::cbm::config::CbmStatus::Available;
     let data = crate::cbm::bridge::CachedGraphData {
@@ -1243,7 +1253,130 @@ fn reindex_for_file_invalidate_cache_clears_memory_entries() {
         expires_at: Instant::now() + Duration::from_secs(300),
     };
     bridge.cache.insert("call_edges".to_string(), data);
-    assert_eq!(bridge.cache.len(), 1, "cache should have 1 entry before invalidation");
+    assert_eq!(
+        bridge.cache.len(),
+        1,
+        "cache should have 1 entry before invalidation"
+    );
     bridge.invalidate_cache();
-    assert_eq!(bridge.cache.len(), 0, "cache should be empty after invalidation");
+    assert_eq!(
+        bridge.cache.len(),
+        0,
+        "cache should be empty after invalidation"
+    );
+}
+
+// ── Proxy whitelist validation ──────────────────────────────────
+
+#[test]
+fn cbm_proxy_whitelist_accepts_all_six_operations() {
+    let ops = [
+        "search_graph",
+        "query_graph",
+        "trace_path",
+        "get_architecture",
+        "list_projects",
+        "index_repository",
+    ];
+    for op in &ops {
+        assert!(
+            crate::cbm::proxy::reject_disallowed_cbm_tool(op).is_none(),
+            "expected '{op}' to be accepted by the proxy whitelist"
+        );
+    }
+}
+
+#[test]
+fn cbm_proxy_whitelist_rejects_unknown_operation() {
+    let err = crate::cbm::proxy::reject_disallowed_cbm_tool("unknown_tool");
+    assert!(err.is_some(), "expected 'unknown_tool' to be rejected");
+    let msg = err.unwrap();
+    assert!(
+        msg.contains("Unsupported CBM operation"),
+        "error should mention unsupported operation, got: {msg}"
+    );
+    assert!(
+        msg.contains("get_symbol_importance"),
+        "error should mention internal helpers, got: {msg}"
+    );
+}
+
+#[test]
+fn cbm_proxy_whitelist_rejects_get_symbol_importance() {
+    // get_symbol_importance is implemented internally via query_graph Cypher
+    // and is NOT a CBM proxy tool — it must be rejected.
+    let err = crate::cbm::proxy::reject_disallowed_cbm_tool("get_symbol_importance");
+    assert!(
+        err.is_some(),
+        "get_symbol_importance must be rejected by the proxy whitelist"
+    );
+}
+
+#[test]
+fn cbm_proxy_whitelist_rejects_get_dead_code() {
+    // get_dead_code is implemented internally via query_graph Cypher
+    // and is NOT a CBM proxy tool — it must be rejected.
+    let err = crate::cbm::proxy::reject_disallowed_cbm_tool("get_dead_code");
+    assert!(
+        err.is_some(),
+        "get_dead_code must be rejected by the proxy whitelist"
+    );
+}
+
+#[test]
+fn cbm_proxy_whitelist_rejects_get_blast_radius() {
+    // get_blast_radius is an internal bridge helper, not a CBM tool.
+    let err = crate::cbm::proxy::reject_disallowed_cbm_tool("get_blast_radius");
+    assert!(
+        err.is_some(),
+        "get_blast_radius must be rejected by the proxy whitelist"
+    );
+}
+
+#[test]
+fn cbm_proxy_whitelist_rejects_detect_changes() {
+    // detect_changes is an internal bridge operation, not a CBM tool.
+    let err = crate::cbm::proxy::reject_disallowed_cbm_tool("detect_changes");
+    assert!(
+        err.is_some(),
+        "detect_changes must be rejected by the proxy whitelist"
+    );
+}
+
+#[test]
+fn cbm_proxy_whitelist_rejects_get_call_edges() {
+    // get_call_edges is an internal bridge helper, not a CBM tool.
+    let err = crate::cbm::proxy::reject_disallowed_cbm_tool("get_call_edges");
+    assert!(
+        err.is_some(),
+        "get_call_edges must be rejected by the proxy whitelist"
+    );
+}
+
+#[test]
+fn cbm_proxy_compatibility_aliases_are_normalized_before_whitelist() {
+    // The proxy normalizes graph_search → search_graph, etc. BEFORE the
+    // whitelist check, so the normalized values always pass. This test
+    // confirms that the aliases are NOT in the whitelist themselves but
+    // are handled by the normalization step in handle_cbm_proxy.
+    //
+    // The whitelist only contains CBM-native names. The alias normalization
+    // happens before the whitelist check, so these are rejected by the
+    // whitelist function alone — but the full handle_cbm_proxy flow
+    // normalizes them first.
+    let err = crate::cbm::proxy::reject_disallowed_cbm_tool("graph_search");
+    assert!(
+        err.is_some(),
+        "graph_search is an alias, not a CBM-native name — whitelist rejects it alone"
+    );
+    let err = crate::cbm::proxy::reject_disallowed_cbm_tool("graph_query");
+    assert!(
+        err.is_some(),
+        "graph_query is an alias, not a CBM-native name — whitelist rejects it alone"
+    );
+    let err = crate::cbm::proxy::reject_disallowed_cbm_tool("graph_trace");
+    assert!(
+        err.is_some(),
+        "graph_trace is an alias, not a CBM-native name — whitelist rejects it alone"
+    );
 }

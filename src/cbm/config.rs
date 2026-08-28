@@ -132,6 +132,3 @@ impl CbmStatus {
         }
     }
 }
-
-
-

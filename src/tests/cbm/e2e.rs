@@ -1255,7 +1255,8 @@ fn ts_fixture(dir: &std::path::Path) -> std::path::PathBuf {
     std::fs::write(
         &path,
         "class MyService {\n  doSomething() {\n    return 42;\n  }\n}\n",
-    ).expect("write fixture");
+    )
+    .expect("write fixture");
     path
 }
 
@@ -1268,11 +1269,10 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
         eprintln!("Skipping - CBM not installed");
         return;
     }
-    let fixture_root = std::env::temp_dir()
-        .join(format!("clean-ctx-reindex-e2e-{}", std::process::id()));
+    let fixture_root =
+        std::env::temp_dir().join(format!("clean-ctx-reindex-e2e-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&fixture_root);
-    std::fs::create_dir_all(fixture_root.join("src"))
-        .expect("create fixture dir");
+    std::fs::create_dir_all(fixture_root.join("src")).expect("create fixture dir");
     struct FixtureCleanup(std::path::PathBuf);
     impl Drop for FixtureCleanup {
         fn drop(&mut self) {
@@ -1299,7 +1299,10 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
         b.set_project(&fx_slug);
         b.invalidate_cache();
         let before = b.search("doSomething");
-        assert!(!before.is_empty(), "doSomething must be indexed before edit");
+        assert!(
+            !before.is_empty(),
+            "doSomething must be indexed before edit"
+        );
     }
     crate::mcp::tool_handlers::core::handle_provide_code_context(
         &serde_json::json!(1),
@@ -1316,16 +1319,20 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
         }]}}),
         &state,
     );
-    let on_disk = std::fs::read_to_string(&fixture_path)
-        .expect("fixture must exist after edit");
-    assert!(on_disk.contains("return 99;"), "edit must have written new body to disk:\n{on_disk}");
+    let on_disk = std::fs::read_to_string(&fixture_path).expect("fixture must exist after edit");
+    assert!(
+        on_disk.contains("return 99;"),
+        "edit must have written new body to disk:\n{on_disk}"
+    );
     {
         let mut guard = state.graph_bridge_lock();
         let b = guard.as_mut().expect("live bridge");
         b.set_project(&fx_slug);
         b.invalidate_cache();
         let orig = b.search("doSomething");
-        assert!(!orig.is_empty(), "doSomething must still be in graph after reindex");
+        assert!(
+            !orig.is_empty(),
+            "doSomething must still be in graph after reindex"
+        );
     }
 }
-

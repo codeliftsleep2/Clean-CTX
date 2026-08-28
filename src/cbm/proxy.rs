@@ -18,6 +18,42 @@ use crate::mcp::tool_helpers::count_tokens_with_tokenizer;
 use crate::mcp::tools::parse_tokenizer_arg;
 use crate::protocol::send_response;
 use serde_json::Value;
+use std::collections::HashSet;
+
+/// The exact set of agent-facing CBM operations that `cbm_proxy` accepts.
+///
+/// These are CBM's native tool names. The proxy also accepts Clean-CTX
+/// compatibility aliases (`graph_search`, `graph_query`, `graph_trace`),
+/// which are normalized to their CBM equivalents before this check.
+///
+/// Internal helpers (`get_symbol_importance`, `get_dead_code`, etc.) are
+/// NOT CBM tools and MUST be rejected here.
+const CBM_ALLOWED_TOOLS: &[&str] = &[
+    "search_graph",
+    "query_graph",
+    "trace_path",
+    "get_architecture",
+    "list_projects",
+    "index_repository",
+];
+
+/// Reject a `cbm_tool` value that is not in the documented whitelist.
+///
+/// Returns `Some(error_message)` if the tool is disallowed, or `None` if it
+/// is a known agent-facing CBM operation. This is factored out for direct
+/// unit testing independent of the MCP response pipeline.
+pub(crate) fn reject_disallowed_cbm_tool(tool: &str) -> Option<String> {
+    let allowed: HashSet<&str> = CBM_ALLOWED_TOOLS.iter().copied().collect();
+    if allowed.contains(tool) {
+        return None;
+    }
+    Some(format!(
+        "Unsupported CBM operation: '{tool}'. Supported operations: {}. \
+         Note: get_symbol_importance, get_dead_code, and other \
+         Clean-CTX internal helpers are not CBM proxy tools.",
+        CBM_ALLOWED_TOOLS.join(", "),
+    ))
+}
 
 /// Handle `cbm_proxy` — forward to CBM, intercept raw response, compress it.
 ///
@@ -70,6 +106,17 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
         "graph_trace" => "trace_path",
         other => other,
     };
+
+    // Whitelist validation: only the 6 documented agent-facing CBM operations
+    // are permitted through the proxy. Reject unknown/internal tool names with
+    // a clear structured error before any dispatch.
+    if let Some(error_msg) = reject_disallowed_cbm_tool(cbm_tool) {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": { "code": -32602, "message": error_msg }
+        }));
+        return;
+    }
 
     // Build the parameters object for CBM.
     // When the caller passes an explicit `parameters` object, it is forwarded
