@@ -346,6 +346,23 @@ pub enum IndexingStatus {
     StillIndexing { elapsed_secs: u64 },
 }
 
+/// Per-project freshness state for lazy CBM graph reindexing.
+///
+/// Tracks whether filesystem edits have occurred since the last successful
+/// reindex. Independent of `IndexingState` (which tracks startup/construction
+/// indexing lifecycle).
+///
+/// A project is "stale" (needs reindexing before the next graph query) when
+/// `dirty_generation > indexed_generation`.
+#[derive(Debug, Clone)]
+pub(crate) struct ProjectFreshness {
+    /// Monotonically increasing counter. Incremented on every dirty mark.
+    pub(crate) dirty_generation: u64,
+
+    /// Value of `dirty_generation` represented by the last successful reindex.
+    pub(crate) indexed_generation: u64,
+}
+
 /// Graph bridge with TTL caching and graceful degradation.
 pub struct GraphBridge {
     /// CBM subprocess client, wrapped in Arc<Mutex<>> so the background
@@ -376,6 +393,10 @@ pub struct GraphBridge {
     /// `cbm_project_slug`), NOT from the directory basename. This map holds
     /// the primary root plus every configured additional root, so queries,
     /// readiness checks, and proxy calls always use the same CBM identity.
+    /// Per-project freshness tracking for lazy graph reindexing.
+    /// Keyed by CBM project slug.
+    /// Independent of `indexing_state` — orthogonal concern.
+    pub(crate) freshness: Arc<Mutex<HashMap<String, ProjectFreshness>>>,
     pub(crate) project_ids: HashMap<PathBuf, String>,
     /// Inverse of `project_ids`: CBM project ID â†’ canonical repository root.
     /// Used to resolve the `repo_path` when (re)indexing a specific project.
@@ -491,6 +512,7 @@ impl GraphBridge {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(HashMap::new())),
+            freshness: Arc::new(Mutex::new(HashMap::new())),
             last_error: None,
         };
 
@@ -649,6 +671,126 @@ impl GraphBridge {
         Ok(())
     }
 
+    /// Resolve the CBM project slug and repo root for a given file path.
+    ///
+    /// long and checks down from: the longest matching configured project root
+    /// (canonicalized). Falls back to the active project if the file path
+    /// doesn't match any known root.
+    ///
+    /// Returns `(project_slug, repo_root)`.
+    fn resolve_project_for_file(&self, file_path: &Path) -> (String, PathBuf) {
+        let file_canon = file_path
+            .canonicalize()
+            .unwrap_or_else(|_| file_path.to_path_buf());
+        let repo_root = self
+            .project_ids
+            .keys()
+            .filter(|root| file_canon.starts_with(*root))
+            .max_by_key(|root| root.as_os_str().len())
+            .cloned()
+            .unwrap_or_else(|| self.project_root.clone());
+
+        let project = self
+            .project_ids
+            .get(&repo_root)
+            .cloned()
+            .unwrap_or_else(|| self.project_str());
+
+        (project, repo_root)
+    }
+
+    /// Mark the CBM project containing `file_path` as dirty.
+    ///
+    /// **Concurrency invariant:** This method must be called while holding
+    /// `graph_bridge_lock()`. Because the lock provides mutual exclusion, an
+    /// edit cannot mark a project dirty while a query's lazy reindex is in
+    /// progress.
+    ///
+    /// `dirty_generation` is incremented on each call, enabling the lazy
+    /// reindex on the next graph query. Multiple edits coalesce into a single
+    /// lazy refresh because the indexed generation is only advanced after
+    /// a successful reindex.
+    pub fn mark_project_dirty(&mut self, file_path: &Path) {
+        let (project, _repo_root) = self.resolve_project_for_file(file_path);
+
+        let mut freshness_map = self.freshness.lock().unwrap_or_else(|p| p.into_inner());
+
+        let entry = freshness_map.entry(project).or_insert(ProjectFreshness {
+            dirty_generation: 0,
+            indexed_generation: 0,
+        });
+        entry.dirty_generation += 1;
+    }
+
+    /// Check whether a project is dirty (needs reindexing before graph query).
+    ///
+    /// A project is dirty when:
+    ///   - a freshness entry exists AND
+    ///   - `dirty_generation > indexed_generation`
+    ///
+    /// No entry means the project is treated as clean (no edits have occurred).
+    pub(crate) fn is_project_dirty(&self, project: &str) -> bool {
+        let freshness_map = self.freshness.lock().unwrap_or_else(|p| p.into_inner());
+
+        match freshness_map.get(project) {
+            Some(entry) => entry.dirty_generation > entry.indexed_generation,
+            None => false,
+        }
+    }
+
+    /// Perform a synchronous lazy reindex of the active project.
+    ///
+    /// **Concurrency invariant:** This method is called while `graph_bridge_lock()`
+    /// is held. The `client.lock()` provides serialization for the CBM call.
+    ///
+    /// On success, sets `indexed_generation = dirty_generation` (the generation
+    /// that was current at the time the lock was acquired). Because no edit can
+    /// acquire `graph_bridge_lock()` concurrently, the generation cannot change
+    /// during the reindex — the snapshot is exact.
+    ///
+    /// On failure, the project remains dirty (indexed_generation is NOT advanced).
+    pub(crate) fn reindex_active_project(&mut self, mode: &str) -> Result<(), CbmError> {
+        let project = self.project_str();
+        let repo_path = self.project_root.to_string_lossy().to_string();
+
+        // Capture the dirty_generation before the CBM call.
+        let dirty_gen = {
+            let freshness_map = self.freshness.lock().unwrap_or_else(|p| p.into_inner());
+            freshness_map
+                .get(&project)
+                .map(|e| e.dirty_generation)
+                .unwrap_or(0)
+        };
+
+        eprintln!("[clean-ctx-cbm] Lazy reindex: {project} (repo: {repo_path}, mode: {mode})");
+
+        // Acquire client lock and call index_repository.
+        let mut cg = self.client.lock().unwrap_or_else(|p| p.into_inner());
+        let client = match cg.as_mut() {
+            Some(c) => c,
+            None => return Err(CbmError::LaunchError("CBM not available".into())),
+        };
+        client.call_tool(
+            "index_repository",
+            serde_json::json!({"repo_path": repo_path, "mode": mode}),
+        )?;
+        drop(cg);
+
+        // On success, advance indexed_generation to the captured dirty_generation.
+        {
+            let mut freshness_map = self.freshness.lock().unwrap_or_else(|p| p.into_inner());
+            if let Some(entry) = freshness_map.get_mut(&project) {
+                entry.indexed_generation = dirty_gen;
+            }
+        }
+
+        // Invalidate in-memory graph cache so pre-edit entries are not served.
+        self.invalidate_cache();
+
+        eprintln!("[clean-ctx-cbm] Lazy reindex complete for: {project}");
+        Ok(())
+    }
+
     /// Reindex the CBM project containing `file_path`.
     ///
     /// Resolves which configured project root `file_path` belongs to (longest
@@ -668,25 +810,9 @@ impl GraphBridge {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
 
-        // Resolve the repo root for the edited file: longest matching
-        // configured root (canonicalized). Fall back to active project root.
-        let file_canon = file_path
-            .canonicalize()
-            .unwrap_or_else(|_| file_path.to_path_buf());
-        let repo_root = self
-            .project_ids
-            .keys()
-            .filter(|root| file_canon.starts_with(*root))
-            .max_by_key(|root| root.as_os_str().len())
-            .cloned()
-            .unwrap_or_else(|| self.project_root.clone());
-
+        // Resolve the repo root for the edited file using the extracted helper.
+        let (project, repo_root) = self.resolve_project_for_file(file_path);
         let repo_path = repo_root.to_string_lossy().to_string();
-        let project = self
-            .project_ids
-            .get(&repo_root)
-            .cloned()
-            .unwrap_or_else(|| self.project_str());
 
         eprintln!(
             "[clean-ctx-cbm] Reindexing project: {project} (repo: {repo_path}, mode: {mode})"
@@ -851,6 +977,17 @@ impl GraphBridge {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
         let project = self.project_str();
+
+        // ── Lazy freshness gate ──────────────────────────────────────
+        // If the project is dirty (filesystem edits occurred since the last
+        // successful reindex), perform a synchronous reindex before checking
+        // the background indexing state. This ensures the graph query sees
+        // the post-edit state without requiring an explicit index_repository.
+        if self.is_project_dirty(&project) {
+            self.reindex_active_project("fast")?;
+        }
+        // ── Existing IndexingState logic ─────────────────────────────
+
         let mut states = self
             .indexing_state
             .lock()
@@ -957,7 +1094,54 @@ impl GraphBridge {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
         if self.project.as_deref() != Some(project) {
-            // Not the active project. Unknown/untracked projects pass through.
+            // Not the active project. Check freshness before proceeding.
+            // ── Lazy freshness gate (non-active project) ───────────────
+            if self.is_project_dirty(project) {
+                // Reindex the specific target project.
+                if let Some(repo_root) = self.project_paths.get(project) {
+                    let repo_path = repo_root.to_string_lossy().to_string();
+
+                    // Capture dirty_generation before the CBM call.
+                    let dirty_gen = {
+                        let freshness_map =
+                            self.freshness.lock().unwrap_or_else(|p| p.into_inner());
+                        freshness_map
+                            .get(project)
+                            .map(|e| e.dirty_generation)
+                            .unwrap_or(0)
+                    };
+
+                    eprintln!(
+                        "[clean-ctx-cbm] Lazy reindex (non-active): {project} (repo: {repo_path})"
+                    );
+
+                    let mut cg = self.client.lock().unwrap_or_else(|p| p.into_inner());
+                    let client = match cg.as_mut() {
+                        Some(c) => c,
+                        None => return Err(CbmError::LaunchError("CBM not available".into())),
+                    };
+                    client.call_tool(
+                        "index_repository",
+                        serde_json::json!({"repo_path": repo_path, "mode": "fast"}),
+                    )?;
+                    drop(cg);
+
+                    // On success, advance indexed_generation.
+                    {
+                        let mut freshness_map =
+                            self.freshness.lock().unwrap_or_else(|p| p.into_inner());
+                        if let Some(entry) = freshness_map.get_mut(project) {
+                            entry.indexed_generation = dirty_gen;
+                        }
+                    }
+
+                    self.invalidate_cache();
+
+                    eprintln!("[clean-ctx-cbm] Lazy reindex complete for: {project}");
+                }
+            }
+
+            // Unknown/untracked projects pass through.
             if !self.project_paths.contains_key(project) {
                 return Ok(IndexingStatus::Ready);
             }
@@ -1926,6 +2110,7 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(states)),
+            freshness: Arc::new(Mutex::new(HashMap::new())),
             project_ids: HashMap::new(),
             project_paths: HashMap::new(),
             last_error: None,
@@ -1967,6 +2152,7 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(HashMap::new())),
+            freshness: Arc::new(Mutex::new(HashMap::new())),
             project_ids: HashMap::new(),
             project_paths: HashMap::new(),
             last_error: None,
@@ -2005,6 +2191,7 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(states)),
+            freshness: Arc::new(Mutex::new(HashMap::new())),
             project_ids: HashMap::new(),
             project_paths: HashMap::new(),
             last_error: None,

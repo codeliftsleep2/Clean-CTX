@@ -57,7 +57,7 @@ as `filePath`.
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
-| `apply_edit` | `filePath`, `operations` | `verify` | Tree-sitter-gated single-unit edit. Operations: `replace_body`, `delete`, `insert_after`, `insert_before`. **Requires prior `provide_code_context` at edit/verbatim fidelity in the same session.** After a successful edit, Clean-CTX automatically performs a synchronous CBM `fast` reindex when CBM is available — the agent does not need to call `index_repository` manually. |
+| `apply_edit` | `filePath`, `operations` | `verify` | Tree-sitter-gated single-unit edit. Operations: `replace_body`, `delete`, `insert_after`, `insert_before`. **Requires prior `provide_code_context` at edit/verbatim fidelity in the same session.** After a successful edit, Clean-CTX marks the affected CBM project dirty but does NOT synchronously reindex — the next graph query automatically refreshes the project before executing. The agent does not need to call `index_repository` after `apply_edit`. |
 | `apply_delta` | `delta`, `currentVersion` | — | Apply an IR delta envelope to the in-session state machine. Low-level; typically not called directly by agents. |
 ### 1.5 Admin/Persistence Tools
 
@@ -250,28 +250,46 @@ Passed as `cbm_tool` parameter inside `cbm_proxy`:
 
 | Mode | Use Case |
 |------|----------|
-| `fast` | Normal post-edit refresh — default for `apply_edit`'s automatic reindex |
+| `fast` | Normal post-edit refresh — used by the lazy freshness gate before graph queries |
 | `full` | Explicit rebuild/recovery when a complete reindex is needed |
 
-### Automatic Reindex after `apply_edit`
+### Lazy CBM Graph Freshness after `apply_edit`
 
-`apply_edit` now automatically performs a synchronous CBM `fast` reindex when CBM is available:
+`apply_edit` now uses **per-project lazy freshness** instead of synchronous reindexing:
 
 ```text
 apply_edit
     ↓
 filesystem mutation succeeds
     ↓
-automatic synchronous CBM fast reindex
+session IR refreshed
     ↓
-apply_edit returns
+affected CBM project marked DIRTY (no CBM call)
     ↓
-graph query can be performed
+apply_edit returns immediately
+
+next graph query (graph_search / graph_query / graph_trace / get_architecture / cbm_proxy)
+    ↓
+detects project is DIRTY
+    ↓
+synchronous CBM fast reindex
+    ↓
+project marked FRESH
+    ↓
+graph query executes against up-to-date graph
 ```
 
-Therefore, an agent normally does **not** need to manually call `index_repository` after a successful Clean-CTX `apply_edit`.
+Therefore, an agent normally does **not** need to manually call `index_repository` after a successful Clean-CTX `apply_edit`. The next graph operation automatically refreshes the affected project before executing.
 
-However:
+Key properties:
+
+* **Lazy:** The reindex only happens when a graph query actually executes, not on every edit.
+* **Per-project:** Each CBM project tracks its own freshness independently. Editing project A does not invalidate project B's graph.
+* **Coalescing:** Multiple rapid edits to the same project trigger only one reindex (on the next graph query).
+* **Transparent:** The agent sees fresh graph results without any explicit indexing step.
+* **Non-blocking for edits:** `apply_edit` returns immediately after marking the project dirty — no CBM call on the write path.
+
+However for external edits:
 
 ```text
 external edit

@@ -322,7 +322,10 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
 /// map wasn't populated yet). The handler now only *reads* the current
 /// indexing state via `bridge.indexing_state()`.
 pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
-    let (status, details, version, indexing_info) = match state.graph_bridge_lock().as_mut() {
+    let (status, details, version, indexing_info, freshness_info) = match state
+        .graph_bridge_lock()
+        .as_mut()
+    {
         Some(bridge) => {
             // Refresh the live circuit-breaker status (no indexing trigger).
             bridge.update_status();
@@ -398,14 +401,36 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
                 }
             };
             let v = bridge.graph_version().to_string();
-            (s, d, v, idx_info)
+
+            // ── Freshness information (read-only, no indexing trigger) ──
+            let freshness_info = {
+                let f_map = bridge.freshness.lock().unwrap_or_else(|p| p.into_inner());
+                let mut projects = serde_json::Map::new();
+                for (slug, entry) in f_map.iter() {
+                    projects.insert(
+                        slug.clone(),
+                        serde_json::json!({
+                            "dirty_generation": entry.dirty_generation,
+                            "indexed_generation": entry.indexed_generation,
+                            "is_stale": entry.dirty_generation > entry.indexed_generation,
+                        }),
+                    );
+                }
+                if projects.is_empty() {
+                    None
+                } else {
+                    Some(serde_json::json!({ "projects": projects }))
+                }
+            };
+
+            (s, d, v, idx_info, freshness_info)
         }
         None => {
             let d = match &state.cbm_status {
                 crate::cbm::CbmStatus::Available => "CBM configured but not connected.".into(),
                 _ => "CBM not available.".into(),
             };
-            (state.cbm_status.clone(), d, String::new(), None)
+            (state.cbm_status.clone(), d, String::new(), None, None)
         }
     };
 
@@ -426,6 +451,9 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
     });
     if let Some(idx) = indexing_info {
         response["result"]["indexing"] = idx;
+    }
+    if let Some(fresh) = freshness_info {
+        response["result"]["freshness"] = fresh;
     }
     if let Some(paths) = checked_paths {
         response["result"]["checked_paths"] = serde_json::json!(paths);

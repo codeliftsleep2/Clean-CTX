@@ -1324,15 +1324,77 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
         on_disk.contains("return 99;"),
         "edit must have written new body to disk:\n{on_disk}"
     );
+
+    // ── Verify lazy freshness contract ──────────────────────────────
+    // After apply_edit, the project must be dirty (no synchronous reindex).
+    {
+        let mut guard = state.graph_bridge_lock();
+        let b = guard.as_mut().expect("live bridge");
+        let f_map = b.freshness.lock().unwrap_or_else(|p| p.into_inner());
+        let entry = f_map
+            .get(&fx_slug)
+            .expect("project must have freshness entry");
+        assert!(
+            entry.dirty_generation > entry.indexed_generation,
+            "project must be dirty after apply_edit (dirty={}, indexed={})",
+            entry.dirty_generation,
+            entry.indexed_generation,
+        );
+    }
+
+    // First graph search must trigger lazy reindex and return fresh results.
     {
         let mut guard = state.graph_bridge_lock();
         let b = guard.as_mut().expect("live bridge");
         b.set_project(&fx_slug);
         b.invalidate_cache();
-        let orig = b.search("doSomething");
+        let result = b.search("doSomething");
         assert!(
-            !orig.is_empty(),
-            "doSomething must still be in graph after reindex"
+            !result.is_empty(),
+            "doSomething must be in graph after lazy reindex"
+        );
+    }
+
+    // After the search, the project must be clean (indexed = dirty).
+    {
+        let mut guard = state.graph_bridge_lock();
+        let b = guard.as_mut().expect("live bridge");
+        let f_map = b.freshness.lock().unwrap_or_else(|p| p.into_inner());
+        let entry = f_map
+            .get(&fx_slug)
+            .expect("project must have freshness entry");
+        assert_eq!(
+            entry.dirty_generation, entry.indexed_generation,
+            "project must be clean after lazy reindex (dirty={}, indexed={})",
+            entry.dirty_generation, entry.indexed_generation,
+        );
+    }
+
+    // Second graph search should NOT trigger another reindex (project is clean).
+    // The result should still be valid.
+    {
+        let mut guard = state.graph_bridge_lock();
+        let b = guard.as_mut().expect("live bridge");
+        b.set_project(&fx_slug);
+        b.invalidate_cache();
+        let result = b.search("doSomething");
+        assert!(
+            !result.is_empty(),
+            "doSomething must still be in graph on second search"
+        );
+    }
+
+    // After the second search, the project must still be clean.
+    {
+        let mut guard = state.graph_bridge_lock();
+        let b = guard.as_mut().expect("live bridge");
+        let f_map = b.freshness.lock().unwrap_or_else(|p| p.into_inner());
+        let entry = f_map
+            .get(&fx_slug)
+            .expect("project must have freshness entry");
+        assert_eq!(
+            entry.dirty_generation, entry.indexed_generation,
+            "project must remain clean after second search",
         );
     }
 }

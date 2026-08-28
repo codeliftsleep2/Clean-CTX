@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [Unreleased] - Per-Project Lazy CBM Graph Freshness
+
+### Changed
+
+- **CBM graph freshness is now lazy and per-project.** `apply_edit` no longer performs a synchronous CBM `index_repository` on the write path. Instead, it marks the affected project dirty. The next graph query (`graph_search`, `graph_query`, `graph_trace`, `get_architecture`, `cbm_proxy`) automatically triggers a synchronous fast reindex before executing. Multiple edits to the same project coalesce into a single reindex. Freshness is tracked independently per CBM project slug — editing project A does not affect project B's graph. (`src/cbm/bridge.rs`, `src/mcp/tool_handlers/edit.rs`)
+
+- **`get_cbm_status` now reports project freshness information.** The response includes a `freshness` field with per-project `dirty_generation`, `indexed_generation`, and `is_stale` status. This endpoint remains read-only and does not trigger indexing. (`src/cbm/handlers.rs`)
+
+- **`ProjectFreshness` struct added.** Per-project state tracking `dirty_generation` and `indexed_generation`, independent of `IndexingState`. (`src/cbm/bridge.rs`)
+
+### Tests
+
+- 11 regression tests for freshness behavior: dirty tracking, generation invariants, multi-project isolation, failure survival, and mock-level `apply_edit` marking. (`src/tests/cbm/regression.rs`)
+- Updated E2E test `e2e_apply_edit_triggers_reindex_and_graph_is_fresh`: now verifies the full lazy contract — dirty after `apply_edit`, fresh after first graph query, clean after second. (`src/tests/cbm/e2e.rs`)
+
+### Documentation
+
+- `docs/agent/tooling.md` updated: "Lazy CBM Graph Freshness after `apply_edit`" section replaces "Automatic Reindex". `apply_edit` tool table description updated. (`docs/agent/tooling.md`)
+- `src/cbm/tools.rs` `index_repository` description updated to reflect lazy freshness. (`src/cbm/tools.rs`)
+
+### Verification
+
+- CBM regression: 77 passed, 0 failed (11 new freshness tests + 66 existing).
+- `cargo clippy --all-targets -- -D warnings` zero warnings.
+- `cargo fmt --all` clean.
+- Encoding guard: 498 text files valid UTF-8 without BOM.
+
+---
+
 ## [0.4.7] - 2026-08-28 - Automatic CBM Reindex after apply_edit & Schema Documentation
 
 ### Added

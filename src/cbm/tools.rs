@@ -74,7 +74,7 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
         // ── Repository indexing ────────────────────────────────────
         serde_json::json!({
             "name": "index_repository",
-            "description": "Trigger CBM to index (or reindex) a repository. After a successful apply_edit, Clean-CTX automatically performs a synchronous fast reindex — manual index_repository is normally not needed. Use this explicitly when external edits (host write tool, shell, git operation) have modified the repository outside Clean-CTX. fast mode is appropriate for normal post-edit refreshes; full mode is available for explicit rebuild/recovery scenarios. This operation updates CBM's graph/index; it does not modify the repository's files or Git state.",
+            "description": "Trigger CBM to index (or reindex) a repository. After a successful apply_edit, Clean-CTX uses lazy per-project freshness — the next graph query automatically triggers a synchronous fast reindex before executing. Manual index_repository is normally not needed for Clean-CTX-managed edits. Use this explicitly when external edits (host write tool, shell, git operation) have modified the repository outside Clean-CTX. fast mode is appropriate for normal post-edit refreshes; full mode is available for explicit rebuild/recovery scenarios. This operation updates CBM's graph/index; it does not modify the repository's files or Git state.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
