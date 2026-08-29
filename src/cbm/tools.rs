@@ -17,6 +17,29 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                     "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root. Supplying a project changes the bridge's active project for subsequent structured-wrapper calls that omit a project." }
                 },
                 "required": ["query"]
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "nodes": {
+                        "type": "array",
+                        "description": "Matching graph nodes from the CBM knowledge graph.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "string", "description": "Unique qualified symbol identifier." },
+                                "label": { "type": "string", "description": "Node type label (e.g., Class, Method, Function)." },
+                                "name": { "type": "string", "description": "Symbol name." },
+                                "file": { "type": "string", "description": "File path relative to the project root." },
+                                "properties": { "type": "object", "description": "Additional node properties." }
+                            },
+                            "required": ["id", "label", "name", "file"]
+                        }
+                    },
+                    "count": { "type": "integer", "description": "Number of matching nodes." },
+                    "cbm_status": { "type": "string", "description": "CBM current status (available, degraded, unavailable)." }
+                },
+                "required": ["nodes", "count", "cbm_status"]
             }
         }),
         serde_json::json!({

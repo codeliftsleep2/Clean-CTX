@@ -167,18 +167,42 @@ pub fn handle_graph_search(id: &Value, params: &Value, state: &McpState) {
             "jsonrpc": "2.0", "id": id,
             "result": {
                 "content": [{ "type": "text", "text": format!("CBM search failed: {err}") }],
-                "error": err.to_string(),
-                "cbm_status": status.summary()
+                "isError": true,
+                "structuredContent": {
+                    "error": err.to_string(),
+                    "cbm_status": status.summary()
+                }
             }
         }));
         return;
     }
+    // Build a human-readable content summary with node details.
+    // This is the MINIMUM that every MCP client forwards to the model.
+    let content_text = if nodes.is_empty() {
+        format!("Found 0 symbol(s). Try a different query.")
+    } else {
+        let node_lines: Vec<String> = nodes
+            .iter()
+            .map(|n| {
+                let label_str = if n.label.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({})", n.label)
+                };
+                format!("  - {}{} @ {}", n.name, label_str, n.file)
+            })
+            .collect();
+        format!("Found {} symbol(s):\n{}", nodes.len(), node_lines.join("\n"))
+    };
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
-            "content": [{ "type": "text", "text": format!("Found {} symbol(s).", nodes.len()) }],
-            "nodes": nodes, "count": nodes.len(),
-            "cbm_status": status.summary()
+            "content": [{ "type": "text", "text": content_text }],
+            "structuredContent": {
+                "nodes": nodes,
+                "count": nodes.len(),
+                "cbm_status": status.summary()
+            }
         }
     }));
 }

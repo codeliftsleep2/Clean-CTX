@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.5.0] - 2026-08-28
+
+### Changed
+
+- **Canonical MCP structured-output architecture — `graph_search` reference implementation.**
+  Tool responses now use the MCP 2025-11-25 `structuredContent` channel instead of
+  ad-hoc `result` fields. `graph_search` is the golden path: `content` carries a
+  human-readable node summary while `structuredContent` carries the typed `{nodes,
+  count, cbm_status}` payload. An `outputSchema` is declared in `tools/list` for the
+  first time. Error responses use `isError: true` + `structuredContent` instead of
+  ad-hoc `error` fields. New wire-level contract tests validate the `CallToolResult`
+  shape and would have caught the previous invisible-data problem.
+  (`src/cbm/handlers.rs`, `src/cbm/tools.rs`, `src/tests/cbm/handlers.rs`)
+
+### Tests
+
+- **Contract conformance tests for `graph_search`:** Three new handler-level tests
+  validate the MCP `CallToolResult` contract — success shape (`structuredContent`
+  with `nodes`/`count`/`cbm_status`, no ad-hoc fields), error shape (`isError: true`
+  with error details in `structuredContent`), and CBM-unavailable handler path
+  through `CAPTURED_RESPONSES`.
+
+---
+
 ## [Unreleased]
 
 ### Added
