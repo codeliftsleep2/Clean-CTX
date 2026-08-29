@@ -48,6 +48,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   payloads are preserved unchanged. (`src/cbm/handlers.rs`,
   `src/mcp/tool_handlers/core.rs`, `src/mcp/tool_handlers/persistence/mod.rs`)
 
+- **MCP-layer dispatch/error-path unification (D1/D2/D5).** Architectural cleanup of
+  the MCP handler layer consolidating three previously-duplicated mechanisms:
+  - **D1 — JSON-RPC error-envelope unification.** Added a shared `jsonrpc_error(...)`
+    builder primitive; eliminated inline JSON-RPC error-envelope construction
+    throughout the MCP handler layer (`edit`, `persistence`, `core`, `error.rs`
+    `to_jsonrpc_error`, and the newly migrated `gitdiff` handler). Existing error
+    codes, messages, IDs, and `data` payloads are preserved exactly.
+  - **D5 — parameter-extraction unification.** Added shared `arg_str` /
+    `arg_str_or_empty` helpers and migrated the duplicated
+    `params.arguments["filePath"]` / `["workspaceRoot"]` extraction sites across
+    `core`, `context`, `persistence`, and `stats`.
+  - **D2 — registry dispatch unification.** Moved `diff_commits` and
+    `index_repository` out of the inline dispatch path in `tools.rs` into the
+    canonical tool registry: `diff_commits` gained a dedicated `gitdiff.rs` handler
+    module and `index_repository` moved into `cbm/handlers.rs`. Dispatch behavior
+    and existing contracts are preserved exactly.
+  (`src/mcp/tool_helpers.rs`, `src/error.rs`, `src/mcp/tools.rs`,
+  `src/mcp/tool_handlers/*`, `src/cbm/handlers.rs`)
+
 ### Tests
 
 - **Contract conformance tests for `graph_search`:** Three new handler-level tests
@@ -86,6 +105,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Full workspace `cargo test --workspace --all-targets --all-features` — 2238
   passed / 0 failed / 8 ignored (the known environmental CBM pipe flake did not
   occur this run).
+- Post-cleanup: `cargo check --lib`, `cargo fmt --all -- --check`, and the
+  targeted `phase3_contract` suite (8/8) passed after the final MCP-layer
+  cleanup.
+- Release-binary black-box MCP sweep: every registered tool exercised against the
+  freshly rebuilt binary via the MCP JSON-RPC interface, including deliberate
+  error paths (missing/invalid arguments, invalid git refs, un-gated edits), with
+  raw-wire verification of the 0.5.0 response contracts (`content` /
+  `structuredContent` / `_meta` / JSON-RPC error envelope) and `id` preservation.
+  Working tree clean afterward.
 
 ---
 
