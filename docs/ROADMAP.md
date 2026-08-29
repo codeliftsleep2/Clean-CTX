@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-08-24 (CBM graph-intelligence audits ✅ — graph-intel live-probe pass + typed graph_trace wire-contract fix, both recorded in Completed below)
+**Last updated:** 2026-08-29 (roadmap: added deferred R-46 — MCP envelope migration for `compress_code_context`/`delta_code_context`; CBM graph-intelligence audits ✅ — graph-intel live-probe pass + typed graph_trace wire-contract fix, both recorded in Completed below)
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -145,6 +145,7 @@ Items explicitly deferred — not forgotten, not prioritized.
 | **R-14** | LLM-aware prompt optimization | Covered more systematically by R-29 Intelligence Layer (PageRank + adaptive fidelity) |
 | **Idea #5** | RLE Delta Batching (ULTRA_COMPACT_PLAN) | Lower priority; deferred in original plan; revisit if delta envelope size becomes a bottleneck |
 | **A-02** | Migrate to `walkdir` | Absorbed into F-19 scope (completed). |
+| **R-46** | Complete MCP envelope migration for `compress_code_context` and `delta_code_context` | **Target 0.6.0 (deferred/planned).** These two tools still emit legacy ad-hoc result-level fields under the canonical MCP envelope contract (`compress_code_context`: `ir`, `pretty`, `v`, `file`, `content_kind`, `byte_exact`; `delta_code_context`: `version`, `instruction_count`, `cached`) — an incomplete Phase-3 response-metadata migration. Planned: move machine-readable payloads (`ir`, `pretty`) into `structuredContent`; move metadata (`v`, `file`, `content_kind`, `byte_exact`, `version`, `instruction_count`, `cached`) into `_meta`; preserve the human/LLM-facing `content`; cover both tools together (do not migrate one without the other); update the existing contract assertions that reference `result.file`; add strict `assert_valid_mcp_envelope` coverage for both tools so every response producer is covered. **Wire-contract change, not an internal refactor:** 0.5.0 consumers pin `result.file` (tests) and the client consumes the existing `ir`/`pretty` structure — so this needs a minor version bump to 0.6.0, client/MCP-wrapper coordination, and explicit release-note documentation. **Do not backport into 0.5.0.** Evidence: identified during post-release reconnaissance of the freshly rebuilt 0.5.0 binary; predates and is independent of the D1/D2/D5 cleanup. Non-goals: no generic server-side envelope normalizer; no changes to `diff_commits`, `diff_code_context`, or already-conforming producers; no combining with D3/D4/D6/D7; no CBM transport changes. |
 
 ---
 
