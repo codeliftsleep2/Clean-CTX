@@ -52,6 +52,42 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                     "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root. Supplying a project changes the bridge's active project for subsequent structured-wrapper calls that omit a project." }
                 },
                 "required": ["query"]
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "nodes": {
+                        "type": "array",
+                        "description": "Matching graph nodes from the CBM knowledge graph.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "string", "description": "Unique qualified symbol identifier." },
+                                "label": { "type": "string", "description": "Node type label (e.g., Class, Method, Function)." },
+                                "name": { "type": "string", "description": "Symbol name." },
+                                "file": { "type": "string", "description": "File path relative to the project root." },
+                                "properties": { "type": "object", "description": "Additional node properties." }
+                            },
+                            "required": ["id", "label", "name", "file"]
+                        }
+                    },
+                    "edges": {
+                        "type": "array",
+                        "description": "Edges connecting the matched nodes.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from": { "type": "string", "description": "Source node ID." },
+                                "to": { "type": "string", "description": "Target node ID." },
+                                "label": { "type": "string", "description": "Edge type label." },
+                                "properties": { "type": "object", "description": "Additional edge properties." }
+                            },
+                            "required": ["from", "to", "label"]
+                        }
+                    },
+                    "cbm_status": { "type": "string", "description": "CBM current status (available, degraded, unavailable)." }
+                },
+                "required": ["nodes", "edges", "cbm_status"]
             }
         }),
         serde_json::json!({
@@ -65,6 +101,28 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                     "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root. Supplying a project changes the bridge's active project for subsequent structured-wrapper calls that omit a project." }
                 },
                 "required": ["from", "to"]
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "edges": {
+                        "type": "array",
+                        "description": "Edges along the trace path.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from": { "type": "string", "description": "Source node ID." },
+                                "to": { "type": "string", "description": "Target node ID." },
+                                "label": { "type": "string", "description": "Edge type label." },
+                                "properties": { "type": "object", "description": "Additional edge properties." }
+                            },
+                            "required": ["from", "to", "label"]
+                        }
+                    },
+                    "count": { "type": "integer", "description": "Number of edges in the trace path." },
+                    "cbm_status": { "type": "string", "description": "CBM current status (available, degraded, unavailable)." }
+                },
+                "required": ["edges", "count", "cbm_status"]
             }
         }),
         serde_json::json!({
@@ -75,6 +133,39 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                 "properties": {
                     "project": { "type": "string", "description": "Optional CBM project name. Defaults to workspace root. Supplying a project changes the bridge's active project for subsequent structured-wrapper calls that omit a project." }
                 }
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "modules": {
+                        "type": "array",
+                        "description": "Project modules/packages.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": { "type": "string", "description": "Module name." },
+                                "path": { "type": "string", "description": "Filesystem path." },
+                                "file_count": { "type": "integer", "description": "Number of files in the module." }
+                            },
+                            "required": ["name", "path", "file_count"]
+                        }
+                    },
+                    "dependencies": {
+                        "type": "array",
+                        "description": "Cross-module dependencies.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from": { "type": "string", "description": "Source module name." },
+                                "to": { "type": "string", "description": "Target module name." },
+                                "kind": { "type": "string", "description": "Dependency kind (e.g., 'calls')." }
+                            },
+                            "required": ["from", "to", "kind"]
+                        }
+                    },
+                    "cbm_status": { "type": "string", "description": "CBM current status (available, degraded, unavailable)." }
+                },
+                "required": ["modules", "dependencies", "cbm_status"]
             }
         }),
         serde_json::json!({

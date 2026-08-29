@@ -238,8 +238,11 @@ pub fn handle_graph_query(id: &Value, params: &Value, state: &McpState) {
             "jsonrpc": "2.0", "id": id,
             "result": {
                 "content": [{ "type": "text", "text": format!("CBM query failed: {err}") }],
-                "error": err.to_string(),
-                "cbm_status": status.summary()
+                "isError": true,
+                "structuredContent": {
+                    "error": err.to_string(),
+                    "cbm_status": status.summary()
+                }
             }
         }));
         return;
@@ -248,8 +251,10 @@ pub fn handle_graph_query(id: &Value, params: &Value, state: &McpState) {
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": format!("{} node(s), {} edge(s).", result.nodes.len(), result.edges.len()) }],
-            "nodes": result.nodes, "edges": result.edges,
-            "cbm_status": status.summary()
+            "structuredContent": {
+                "nodes": result.nodes, "edges": result.edges,
+                "cbm_status": status.summary()
+            }
         }
     }));
 }
@@ -282,8 +287,11 @@ pub fn handle_graph_trace(id: &Value, params: &Value, state: &McpState) {
             "jsonrpc": "2.0", "id": id,
             "result": {
                 "content": [{ "type": "text", "text": format!("CBM trace failed: {err}") }],
-                "error": err.to_string(),
-                "cbm_status": status.summary()
+                "isError": true,
+                "structuredContent": {
+                    "error": err.to_string(),
+                    "cbm_status": status.summary()
+                }
             }
         }));
         return;
@@ -292,8 +300,10 @@ pub fn handle_graph_trace(id: &Value, params: &Value, state: &McpState) {
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": format!("'{from}' → '{to}': {} edge(s).", edges.len()) }],
-            "edges": edges, "count": edges.len(),
-            "cbm_status": status.summary()
+            "structuredContent": {
+                "edges": edges, "count": edges.len(),
+                "cbm_status": status.summary()
+            }
         }
     }));
 }
@@ -319,8 +329,10 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": format!("{} module(s), {} deps.", arch.modules.len(), arch.dependencies.len()) }],
-                    "modules": arch.modules, "dependencies": arch.dependencies,
-                    "cbm_status": status.summary()
+                    "structuredContent": {
+                        "modules": arch.modules, "dependencies": arch.dependencies,
+                        "cbm_status": status.summary()
+                    }
                 }
             }));
         }
@@ -329,8 +341,11 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": format!("CBM architecture query failed: {err}") }],
-                    "error": err.to_string(),
-                    "cbm_status": status.summary()
+                    "isError": true,
+                    "structuredContent": {
+                        "error": err.to_string(),
+                        "cbm_status": status.summary()
+                    }
                 }
             }));
         }
