@@ -136,7 +136,9 @@ A skipped file is counted in `skipped` **only** — it is never double-counted i
 | `diff_code_context` | 1 file | In-session AST delta (baseline → current) |
 | `delta_code_context` | 1 file | IR-level delta for edit sessions |
 | **`diff_commits`** | **whole workspace** | **"What changed in this PR?" — multi-file git-ref diff** |
-| `compress_workspace` | whole workspace | Full skeletons of all files (not just changes) |
+| `provide_code_context` or `cbm_proxy(cbm_tool: "search_graph")` | whole workspace | Broad structural overviews and symbol discovery (see `docs/agent/tooling.md`) |
+
+**Note:** `compress_workspace` is not an agent-invocable MCP tool. Use `cbm_proxy(cbm_tool: "search_graph")` for workspace-level symbol discovery or `provide_code_context` for structural file skeletons.
 
 **Rule of thumb:** If you're asking "what changed between two commits/branches?", reach for `diff_commits` first. If you need the full content of a specific file that appeared in the diff, follow up with `compress_code_context` on that file.
 

@@ -450,16 +450,17 @@ Use it when:
 - Investigating whether a regression was introduced by recent changes.
 - Getting a workspace-level summary without reading every file.
 
-### Comparison: `diff_commits` vs `compress_workspace`
+### Comparison: `diff_commits` vs workspace-level tools
+
+`compress_workspace` is an internal implementation detail — it is **not** an agent-invocable MCP tool. For broad structural overviews, use `cbm_proxy(cbm_tool: "search_graph")` for symbol discovery or `provide_code_context` on specific files for structural skeletons.
 
 | Tool | Scope | Output | Best For |
 |------|-------|--------|----------|
 | `diff_commits` | Git ref comparison | Per-file AST change-set (additions, deletions, modifications) | Understanding what changed |
-| `compress_workspace` | Directory tree | Full structural skeletons of all files (legacy manifest) | Broad structural overview of the entire codebase |
+| `cbm_proxy(cbm_tool: "search_graph")` | Whole workspace | Graph-aware search results (symbols, files) | Broad symbol/structural discovery |
 
-**Do not use `compress_workspace` as a substitute for Git diff analysis.**
-If you need to understand changes, use `diff_commits`. If you need the full
-structure of all files regardless of change status, use `compress_workspace`.
+**Do not use `cbm_proxy` as a substitute for Git diff analysis.**
+If you need to understand changes, use `diff_commits`. If you need broad structural discovery, use `cbm_proxy(cbm_tool: "search_graph")` or `provide_code_context` on specific files.
 
 ### Workflow
 
@@ -594,10 +595,13 @@ syntax. It does **not** confirm type correctness or behavioral correctness.
 `diff_commits` provides a token-efficient AST-level summary of what
 changed between Git refs. Manually reading every file is wasteful.
 
-### ❌ Do Not use `compress_workspace` as a Git diff substitute
+### ❌ Do Not attempt to invoke internal-only tools
 
-Use `diff_commits` for change analysis, `compress_workspace` for broad
-codebase structural overview.
+`compress_workspace` is an internal implementation — it is **not** an
+agent-invocable MCP tool and is not registered in `tools/list`.
+Do not attempt to call it. Use `diff_commits` for change analysis,
+`cbm_proxy(cbm_tool: "search_graph")` for broad symbol discovery, or
+`provide_code_context` for structural file overviews.
 
 ### ❌ Do Not bypass Clean-CTX for supported source languages without a reason
 
