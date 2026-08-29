@@ -179,7 +179,7 @@ pub fn handle_graph_search(id: &Value, params: &Value, state: &McpState) {
     // Build a human-readable content summary with node details.
     // This is the MINIMUM that every MCP client forwards to the model.
     let content_text = if nodes.is_empty() {
-        format!("Found 0 symbol(s). Try a different query.")
+        "Found 0 symbol(s). Try a different query.".to_string()
     } else {
         let node_lines: Vec<String> = nodes
             .iter()
@@ -192,7 +192,11 @@ pub fn handle_graph_search(id: &Value, params: &Value, state: &McpState) {
                 format!("  - {}{} @ {}", n.name, label_str, n.file)
             })
             .collect();
-        format!("Found {} symbol(s):\n{}", nodes.len(), node_lines.join("\n"))
+        format!(
+            "Found {} symbol(s):\n{}",
+            nodes.len(),
+            node_lines.join("\n")
+        )
     };
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
