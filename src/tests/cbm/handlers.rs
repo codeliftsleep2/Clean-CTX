@@ -4,11 +4,13 @@
 // Tests validate the MCP CallToolResult contract: content + structuredContent,
 // and that no ad-hoc fields leak onto the result object.
 //
-// These tests use the CAPTURED_RESPONSES sink to intercept responses
-// that handlers write via send_response().
-
-use serde_json::Value;
-
+// These tests use the protocol::CAPTURED_RESPONSES sink to intercept
+// responses that handlers write via send_response().  All consumers of that
+// sink must hold protocol::HANDLER_RESPONSE_SERIAL to prevent parallel-test
+// races — see src/cbm/tests.rs for the feature gate rationale.
+//
+// This module compiles only under cfg(all(test, feature = "rust")) —
+// see the #[cfg] gate in src/cbm/tests.rs.
 // ── graph_search structured-content contract ────────────────────────
 //
 // MCP 2025-11-25 spec demands tool results use:
@@ -19,45 +21,28 @@ use serde_json::Value;
 //
 // NO ad-hoc fields (nodes, count, cbm_status, etc.) as result siblings.
 
-/// Helper: clear the CAPTURED_RESPONSES sink before a handler call.
-fn clear_captured() {
-    if let Ok(mut q) = crate::protocol::CAPTURED_RESPONSES.lock() {
-        q.clear();
-    }
-}
-
-/// Helper: pop exactly one captured response and validate it has a result field.
-fn take_response() -> Value {
-    let mut guard = crate::protocol::CAPTURED_RESPONSES
-        .lock()
-        .expect("CAPTURED_RESPONSES lock");
-    assert_eq!(guard.len(), 1, "handler must send exactly one response");
-    guard.pop().expect("one response")
-}
-
 /// graph_search error path: CBM unavailable → handler must use isError + structuredContent.
 #[test]
 fn graph_search_returns_is_error_when_cbm_unavailable() {
-    clear_captured();
+    // Serialize access to the shared CAPTURED_RESPONSES sink with the
+    // Phase A/B retirement suites (must hold HANDLER_RESPONSE_SERIAL).
+    let _serial = crate::protocol::handler_response_serial();
 
-    let config = crate::config::CleanCtxConfig {
-        cbm: crate::cbm::CbmConfig {
-            enabled: false,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    let state = crate::mcp::McpState::new(config);
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     crate::mcp::tools::setup_handler_registry_for_tests();
+
+    crate::protocol::captured_responses().clear();
 
     crate::mcp::tools::dispatch_tools_call(
         &serde_json::json!(1),
         "graph_search",
-        &serde_json::json!({"arguments": {"query": "GraphBridge"}}),
+        &serde_json::json!( {"arguments": {"query": "GraphBridge"}}),
         &state,
     );
 
-    let response = take_response();
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("handler must have sent exactly one response");
 
     // Must be a JSON-RPC error (no bridge = unavailable)
     assert!(

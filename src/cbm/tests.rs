@@ -23,6 +23,12 @@ mod graph_intel;
 #[path = "../tests/cbm/trace_wire.rs"]
 mod trace_wire;
 // CBM handler MCP contract tests (structuredContent, outputSchema conformance).
+// Gated behind `feature = "rust"` because these tests share the global
+// protocol::CAPTURED_RESPONSES sink with the Phase A/B retirement suites
+// (which are also gated behind `feature = "rust"`), and all consumers of
+// that sink must hold protocol::HANDLER_RESPONSE_SERIAL to prevent
+// parallel-test races on the shared response queue.
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/cbm/handlers.rs"]
 mod handlers;
 
