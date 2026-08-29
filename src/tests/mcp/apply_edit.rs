@@ -102,6 +102,32 @@ fn tool_list_advertises_apply_edit() {
         entry["inputSchema"]["properties"]["verify"]["type"],
         "boolean"
     );
+
+    // outputSchema must describe structuredContent.operations.
+    let os = entry
+        .get("outputSchema")
+        .expect("apply_edit must declare outputSchema");
+    assert_eq!(os["type"], "object");
+    assert_eq!(os["required"][0], "operations");
+    let items = &os["properties"]["operations"]["items"];
+    assert_eq!(items["type"], "object");
+    assert_eq!(
+        items["required"],
+        json!(["kind", "target", "startByte", "endByte", "byteDelta"])
+    );
+    // newText is optional — must NOT appear in required.
+    assert!(
+        !items["required"]
+            .as_array()
+            .unwrap_or(&vec![])
+            .contains(&json!("newText")),
+        "newText must be optional"
+    );
+    // kind is a closed enum.
+    assert_eq!(
+        items["properties"]["kind"]["enum"],
+        json!(["replace_body", "insert_after", "insert_before", "delete"])
+    );
 }
 
 /// Regression: small Edit files must survive the token-economics gate with
@@ -229,12 +255,17 @@ fn e2e_apply_edit_round_trip_then_delta() {
     );
     assert!(app.get("error").is_none(), "apply_edit failed: {app:?}");
     let result = &app["result"];
-    assert_eq!(result["applied"], 1);
-    assert!(!result["fileHash"].as_str().unwrap_or("").is_empty());
-    assert_eq!(result["syntaxGated"], true);
+    assert_eq!(result["_meta"]["applied"], 1);
+    assert!(
+        !result["_meta"]["fileHash"]
+            .as_str()
+            .unwrap_or("")
+            .is_empty()
+    );
+    assert_eq!(result["_meta"]["syntaxGated"], true);
     // verify:true echoes the new body as a receipt.
     assert!(
-        result["operations"][0]["newText"]
+        result["structuredContent"]["operations"][0]["newText"]
             .as_str()
             .unwrap_or("")
             .contains("toLowerCase")
@@ -348,4 +379,304 @@ fn e2e_apply_edit_different_units_both_succeed() {
     let on_disk = std::fs::read_to_string(&path).unwrap();
     assert!(on_disk.contains("toUpperCase"));
     assert!(on_disk.contains("return 42;"));
+}
+
+// ── Phase 2 structured-output contract tests ───────────────────────
+
+/// Constructed-JSON contract: the success envelope must carry operations in
+/// structuredContent, metadata in _meta, and no ad-hoc result-level fields.
+#[test]
+fn apply_edit_success_response_has_correct_mcp_shape() {
+    use crate::tests::{assert_structured_content_has, assert_valid_mcp_envelope};
+
+    let response = serde_json::json!({
+        "jsonrpc": "2.0", "id": 1,
+        "result": {
+            "content": [{ "type": "text", "text": "applied 1 operation(s) to /path/file.ts (v3)" }],
+            "structuredContent": {
+                "operations": [{
+                    "kind": "replace_body",
+                    "target": "UserService.processOrder",
+                    "startByte": 41,
+                    "endByte": 77,
+                    "byteDelta": 12,
+                    "newText": "{ return 1; }"
+                }]
+            },
+            "_meta": {
+                "filePath": "/path/file.ts",
+                "fileHash": "e414e1bd",
+                "version": 3,
+                "applied": 1,
+                "syntaxGated": true
+            }
+        }
+    });
+
+    let result = response["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent object");
+    assert_structured_content_has(sc, &["operations"]);
+
+    let op = &sc["operations"][0];
+    assert_eq!(op["kind"], "replace_body");
+    assert_eq!(op["target"], "UserService.processOrder");
+    assert_eq!(op["startByte"], 41);
+    assert_eq!(op["endByte"], 77);
+    assert_eq!(op["byteDelta"], 12);
+
+    let meta = result["_meta"].as_object().expect("_meta object");
+    assert!(meta.contains_key("filePath"));
+    assert!(meta.contains_key("fileHash"));
+    assert!(meta.contains_key("version"));
+    assert!(meta.contains_key("applied"));
+    assert!(meta.contains_key("syntaxGated"));
+
+    // No ad-hoc result-level fields.
+    assert!(
+        !result.contains_key("operations"),
+        "result.operations must not exist"
+    );
+    assert!(
+        !result.contains_key("filePath"),
+        "result.filePath must not exist"
+    );
+    assert!(
+        !result.contains_key("fileHash"),
+        "result.fileHash must not exist"
+    );
+    assert!(
+        !result.contains_key("version"),
+        "result.version must not exist"
+    );
+    assert!(
+        !result.contains_key("applied"),
+        "result.applied must not exist"
+    );
+    assert!(
+        !result.contains_key("syntaxGated"),
+        "result.syntaxGated must not exist"
+    );
+
+    let text = result["content"][0]["text"].as_str().expect("content text");
+    assert!(
+        text.contains("applied"),
+        "content should describe the operation"
+    );
+}
+
+/// Live in-process dispatch: the real handler must emit the canonical envelope
+/// (content + structuredContent.operations + _meta, nothing ad-hoc).
+#[cfg(all(test, feature = "rust"))]
+#[test]
+fn apply_edit_live_dispatch_emits_canonical_envelope() {
+    use crate::tests::{assert_structured_content_has, assert_valid_mcp_envelope};
+
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("svc.ts");
+    std::fs::write(
+        &path,
+        "export class UserService {\n  processOrder(order: string) {\n    return order.trim();\n  }\n}\n",
+    )
+    .unwrap();
+
+    let mut config = crate::tests::test_config();
+    let root_str = dir.path().to_string_lossy().into_owned();
+    config.additional_roots.push(root_str);
+    let state = crate::mcp::McpState::new(config);
+    let file_path = path.to_string_lossy().into_owned();
+
+    // Establish tracked state.
+    crate::mcp::tool_handlers::core::handle_provide_code_context(
+        &json!(1),
+        &json!({ "arguments": { "filePath": file_path.clone(), "fidelity": "edit" } }),
+        &state,
+    );
+
+    // Serialize access to the shared CAPTURED_RESPONSES sink.
+    let _serial = crate::protocol::handler_response_serial();
+    crate::protocol::captured_responses().clear();
+
+    crate::mcp::tool_handlers::edit::handle_apply_edit(
+        &json!(2),
+        &json!({
+            "arguments": {
+                "filePath": file_path,
+                "verify": true,
+                "operations": [{
+                    "type": "replace_body",
+                    "target": "UserService.processOrder",
+                    "expectedOldText": "{\n    return order.trim();\n  }",
+                    "newText": "{\n    return order.trim().toLowerCase();\n  }"
+                }]
+            }
+        }),
+        &state,
+    );
+
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("handler must have sent exactly one response");
+    let result = response["result"].as_object().expect("result object");
+
+    assert_valid_mcp_envelope(result);
+
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent object");
+    assert_structured_content_has(sc, &["operations"]);
+    assert_eq!(sc["operations"].as_array().unwrap().len(), 1);
+
+    let op = &sc["operations"][0];
+    assert_eq!(op["kind"], "replace_body");
+    assert_eq!(op["target"], "UserService.processOrder");
+    assert!(op["startByte"].is_number());
+    assert!(op["endByte"].is_number());
+    assert!(op["byteDelta"].is_number());
+    // verify:true → newText present.
+    assert!(op["newText"].as_str().unwrap_or("").contains("toLowerCase"));
+
+    let meta = result["_meta"].as_object().expect("_meta object");
+    assert!(meta.contains_key("filePath"));
+    assert!(meta.contains_key("fileHash"));
+    assert!(meta.contains_key("version"));
+    assert_eq!(meta["applied"], 1);
+    assert_eq!(meta["syntaxGated"], true);
+
+    // No ad-hoc result-level fields.
+    assert!(!result.contains_key("operations"));
+    assert!(!result.contains_key("filePath"));
+    assert!(!result.contains_key("fileHash"));
+    assert!(!result.contains_key("version"));
+    assert!(!result.contains_key("applied"));
+    assert!(!result.contains_key("syntaxGated"));
+}
+
+/// Error-path regression: the existing JSON-RPC error shape must survive the
+/// migration unchanged (-32602 + structured error.data.kind).
+#[cfg(all(test, feature = "rust"))]
+#[test]
+fn apply_edit_error_path_unchanged_after_migration() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("err.ts");
+    std::fs::write(
+        &path,
+        "export class G {\n  run() {\n    return 1;\n  }\n}\n",
+    )
+    .unwrap();
+
+    let mut config = crate::tests::test_config();
+    let root_str = dir.path().to_string_lossy().into_owned();
+    config.additional_roots.push(root_str);
+    let state = crate::mcp::McpState::new(config);
+    let file_path = path.to_string_lossy().into_owned();
+
+    // Establish tracked state.
+    crate::mcp::tool_handlers::core::handle_provide_code_context(
+        &json!(1),
+        &json!({ "arguments": { "filePath": file_path.clone(), "fidelity": "edit" } }),
+        &state,
+    );
+
+    let _serial = crate::protocol::handler_response_serial();
+    crate::protocol::captured_responses().clear();
+
+    // Stale expectedOldText → unit_mismatch rejection.
+    crate::mcp::tool_handlers::edit::handle_apply_edit(
+        &json!(2),
+        &json!({
+            "arguments": {
+                "filePath": file_path,
+                "operations": [{
+                    "type": "replace_body",
+                    "target": "G.run",
+                    "expectedOldText": "{ wrong text }",
+                    "newText": "{ return 2; }"
+                }]
+            }
+        }),
+        &state,
+    );
+
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("handler must have sent exactly one response");
+
+    // JSON-RPC error (NOT result.isError).
+    assert!(
+        response.get("error").is_some(),
+        "error path must produce JSON-RPC error, got: {response}"
+    );
+    let err = &response["error"];
+    assert_eq!(err["code"], -32602);
+    assert!(err["data"]["kind"].is_string());
+    assert_eq!(err["data"]["kind"], "unit_mismatch");
+    // No result envelope at all on error.
+    assert!(response.get("result").is_none());
+}
+
+/// newText must be absent when verify=false (receipt not requested).
+#[cfg(all(test, feature = "rust"))]
+#[test]
+fn apply_edit_newtext_absent_when_verify_false() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("novf.ts");
+    std::fs::write(
+        &path,
+        "export class UserService {\n  processOrder(order: string) {\n    return order.trim();\n  }\n}\n",
+    )
+    .unwrap();
+
+    let mut config = crate::tests::test_config();
+    let root_str = dir.path().to_string_lossy().into_owned();
+    config.additional_roots.push(root_str);
+    let state = crate::mcp::McpState::new(config);
+    let file_path = path.to_string_lossy().into_owned();
+
+    crate::mcp::tool_handlers::core::handle_provide_code_context(
+        &json!(1),
+        &json!({ "arguments": { "filePath": file_path.clone(), "fidelity": "edit" } }),
+        &state,
+    );
+
+    let _serial = crate::protocol::handler_response_serial();
+    crate::protocol::captured_responses().clear();
+
+    crate::mcp::tool_handlers::edit::handle_apply_edit(
+        &json!(2),
+        &json!({
+            "arguments": {
+                "filePath": file_path,
+                "verify": false,
+                "operations": [{
+                    "type": "replace_body",
+                    "target": "UserService.processOrder",
+                    "expectedOldText": "{\n    return order.trim();\n  }",
+                    "newText": "{\n    return order.trim().toLowerCase();\n  }"
+                }]
+            }
+        }),
+        &state,
+    );
+
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("handler must have sent exactly one response");
+    let result = response["result"].as_object().expect("result object");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent object");
+    let op = &sc["operations"][0];
+
+    // newText must NOT be present when verify=false.
+    assert!(
+        op.get("newText").is_none(),
+        "newText must be absent when verify=false, got: {op}"
+    );
+    // The operation record is still well-formed.
+    assert_eq!(op["kind"], "replace_body");
+    assert!(op["byteDelta"].is_number());
 }

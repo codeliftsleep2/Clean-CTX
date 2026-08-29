@@ -246,12 +246,16 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id, "result": {
             "content": [{ "type": "text", "text": summary }],
-            "filePath": resolved_path,
-            "fileHash": new_hash,
-            "version": version,
-            "applied": report.operations.len(),
-            "operations": ops_report,
-            "syntaxGated": true,
+            "structuredContent": {
+                "operations": ops_report,
+            },
+            "_meta": {
+                "filePath": resolved_path,
+                "fileHash": new_hash,
+                "version": version,
+                "applied": report.operations.len(),
+                "syntaxGated": true,
+            }
         }
     }));
 }

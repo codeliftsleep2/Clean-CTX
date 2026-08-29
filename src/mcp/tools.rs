@@ -151,6 +151,49 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath", "operations"]
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "operations": {
+                        "type": "array",
+                        "description": "Per-operation outcomes in request order, measured against the NEW file. All operations apply atomically; this list equals the requested batch on success.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "kind": {
+                                    "type": "string",
+                                    "enum": ["replace_body", "insert_after", "insert_before", "delete"],
+                                    "description": "Applied operation type."
+                                },
+                                "target": {
+                                    "type": "string",
+                                    "description": "Targeted unit name (replace_body/delete) or anchor unit (insert_after/insert_before)."
+                                },
+                                "startByte": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "description": "Absolute start byte affected in the NEW file (insertions: insertion point)."
+                                },
+                                "endByte": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "description": "Absolute end byte affected in the NEW file (insertions: same as startByte)."
+                                },
+                                "byteDelta": {
+                                    "type": "integer",
+                                    "description": "Signed size change contributed by this operation (new minus old; negative for deletes)."
+                                },
+                                "newText": {
+                                    "type": "string",
+                                    "description": "Verbatim new text receipt. Present only when verify=true and the operation carries new text (replace_body, insert_after, insert_before); never for delete."
+                                }
+                            },
+                            "required": ["kind", "target", "startByte", "endByte", "byteDelta"]
+                        }
+                    }
+                },
+                "required": ["operations"]
             }
         }),
         serde_json::json!({
