@@ -115,8 +115,7 @@ fn send_indexing_gate(
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": msg }],
-                    "still_indexing": true,
-                    "elapsed_secs": elapsed_secs,
+                    "_meta": { "still_indexing": true, "elapsed_secs": elapsed_secs },
                 }
             }));
             false
@@ -488,18 +487,20 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": details }],
-            "cbm_status": status.summary(),
-            "graph_version": version,
+            "_meta": {
+                "cbm_status": status.summary(),
+                "graph_version": version,
+            }
         }
     });
     if let Some(idx) = indexing_info {
-        response["result"]["indexing"] = idx;
+        response["result"]["_meta"]["indexing"] = idx;
     }
     if let Some(fresh) = freshness_info {
-        response["result"]["freshness"] = fresh;
+        response["result"]["_meta"]["freshness"] = fresh;
     }
     if let Some(paths) = checked_paths {
-        response["result"]["checked_paths"] = serde_json::json!(paths);
+        response["result"]["_meta"]["checked_paths"] = serde_json::json!(paths);
     }
     send_response(&response);
 }

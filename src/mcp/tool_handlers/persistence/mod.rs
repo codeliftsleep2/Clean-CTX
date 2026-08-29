@@ -22,9 +22,8 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
-            "ok": true,
-            "saved": saved_count,
-            "message": format!("Saved {} context(s) to persistence DB.", saved_count)
+            "content": [{ "type": "text", "text": format!("Saved {} context(s) to persistence DB.", saved_count) }],
+            "_meta": { "ok": true, "saved": saved_count }
         }
     }));
 }
@@ -105,7 +104,7 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
                     "jsonrpc": "2.0", "id": id,
                     "result": {
                         "content": [{ "type": "text", "text": format!("Replayed {} to v{} ({} instructions)", file_path, version, ir.instructions.len()) }],
-                        "file": file_path, "version": version, "instruction_count": ir.instructions.len()
+                        "_meta": { "file": file_path, "version": version, "instruction_count": ir.instructions.len() }
                     }
                 }));
             }
@@ -140,7 +139,7 @@ pub(crate) fn handle_purge_old_deltas(id: &Value, params: &Value, state: &McpSta
             Ok(n) => {
                 drop(guard);
                 send_response(
-                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "ok": true, "purged": n, "message": format!("Purged {} delta(s) older than {} days.", n, days) } }),
+                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Purged {} delta(s) older than {} days.", n, days) }], "_meta": { "ok": true, "purged": n } } }),
                 );
             }
             Err(e) => {

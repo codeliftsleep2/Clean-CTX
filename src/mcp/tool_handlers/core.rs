@@ -523,7 +523,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             let rendered = ir_ctx.render_pretty(&file, crate::compression::Fidelity::Low);
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
-                "result": { "content": [{ "type": "text", "text": rendered.unwrap_or_default() }], "version": new_version }
+                "result": { "content": [{ "type": "text", "text": rendered.unwrap_or_default() }], "_meta": { "version": new_version } }
             });
             // Applied delta output is rolling dynamic content — mark as tail (ephemeral).
             inject_tail_breakpoint(&mut response, state);
@@ -648,10 +648,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id, "result": {
                     "content": [{ "type": "text", "text": source }],
-                    "strategy": "full", "fidelity": "verbatim",
-                    "is_angular": true, "template_compressed": false,
-                    "content_kind": "verbatim_document", "byte_exact": ["document"],
-                    "degradation": null
+                    "_meta": {
+                        "strategy": "full", "fidelity": "verbatim",
+                        "is_angular": true, "template_compressed": false,
+                        "content_kind": "verbatim_document", "byte_exact": ["document"],
+                        "degradation": null
+                    }
                 }
             });
             inject_baseline_breakpoint(&mut response, state, source);
@@ -707,10 +709,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         let mut response = serde_json::json!({
             "jsonrpc": "2.0", "id": id, "result": {
                 "content": [{ "type": "text", "text": body }],
-                "strategy": "full", "fidelity": format!("{:?}", fidelity).to_lowercase(),
-                "is_angular": true, "template_compressed": true,
-                "content_kind": content_kind, "byte_exact": byte_exact,
-                "degradation": null
+                "_meta": {
+                    "strategy": "full", "fidelity": format!("{:?}", fidelity).to_lowercase(),
+                    "is_angular": true, "template_compressed": true,
+                    "content_kind": content_kind, "byte_exact": byte_exact,
+                    "degradation": null
+                }
             }
         });
         inject_baseline_breakpoint(&mut response, state, &body);
@@ -779,10 +783,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         let mut response = serde_json::json!({
             "jsonrpc": "2.0", "id": id, "result": {
                 "content": [{ "type": "text", "text": full }],
-                "strategy": "full", "fidelity": "verbatim",
-                "decision_summary": decision.summary(),
-                "content_kind": "verbatim_document", "byte_exact": ["document"],
-                "degradation": null, "verbatim": true
+                "_meta": {
+                    "strategy": "full", "fidelity": "verbatim",
+                    "decision_summary": decision.summary(),
+                    "content_kind": "verbatim_document", "byte_exact": ["document"],
+                    "degradation": null, "verbatim": true
+                }
             }
         });
         inject_baseline_breakpoint(&mut response, state, &full);
@@ -857,11 +863,13 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id, "result": {
                     "content": [{ "type": "text", "text": source }],
-                    "strategy": "full", "fidelity": "edit",
-                    "decision_summary": decision.summary(),
-                    "content_kind": "raw_passthrough",
-                    "byte_exact": ["document"],
-                    "degradation": null
+                    "_meta": {
+                        "strategy": "full", "fidelity": "edit",
+                        "decision_summary": decision.summary(),
+                        "content_kind": "raw_passthrough",
+                        "byte_exact": ["document"],
+                        "degradation": null
+                    }
                 }
             });
             inject_baseline_breakpoint(&mut response, state, source);
@@ -944,11 +952,13 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     let mut response = serde_json::json!({
                         "jsonrpc": "2.0", "id": id, "result": {
                             "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): +{} ~{} -{} ops", compiled.file_id, d.from, d.to, d.ops.adds.len(), d.ops.mods.len(), d.ops.dels.len()) }],
-                            "delta": wire_delta, "from_version": d.from, "to_version": d.to,
-                            "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                            "decision_summary": decision.summary(),
-                            "content_kind": content_kind, "byte_exact": byte_exact,
-                            "degradation": null
+                            "_meta": {
+                                "delta": wire_delta, "from_version": d.from, "to_version": d.to,
+                                "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
+                                "decision_summary": decision.summary(),
+                                "content_kind": content_kind, "byte_exact": byte_exact,
+                                "degradation": null
+                            }
                         }
                     });
                     // Delta output is rolling dynamic content — mark as tail (ephemeral).
@@ -999,11 +1009,14 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     );
                     let mut response = serde_json::json!({
                         "jsonrpc": "2.0", "id": id, "result": {
-                            "content": [{ "type": "text", "text": full }], "version": compiled.version,
-                            "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                            "decision_summary": decision.summary(),
-                            "content_kind": content_kind, "byte_exact": byte_exact,
-                            "degradation": null
+                            "content": [{ "type": "text", "text": full }],
+                            "_meta": {
+                                "version": compiled.version,
+                                "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
+                                "decision_summary": decision.summary(),
+                                "content_kind": content_kind, "byte_exact": byte_exact,
+                                "degradation": null
+                            }
                         }
                     });
                     // Inject baseline cache breakpoint for the stable full-compression output.
@@ -1088,11 +1101,14 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 );
                 let mut response = serde_json::json!({
                     "jsonrpc": "2.0", "id": id, "result": {
-                        "content": [{ "type": "text", "text": full }], "version": ir.version,
-                        "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                        "is_angular": is_angular, "decision_summary": decision.summary(),
-                        "content_kind": content_kind, "byte_exact": byte_exact,
-                        "degradation": null
+                        "content": [{ "type": "text", "text": full }],
+                        "_meta": {
+                            "version": ir.version,
+                            "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
+                            "is_angular": is_angular, "decision_summary": decision.summary(),
+                            "content_kind": content_kind, "byte_exact": byte_exact,
+                            "degradation": null
+                        }
                     }
                 });
                 // Inject baseline cache breakpoint for the stable full-compression output.
@@ -1229,7 +1245,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
             state
                 .llm_text_cache_lock()
                 .insert(ir.file_id.clone(), full.clone());
-            let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": full }], "version": ir.version, "restored": true } });
+            let mut response = serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": full }], "_meta": { "version": ir.version, "restored": true } } });
             // Restored context is a stable full snapshot — inject baseline breakpoint.
             inject_baseline_breakpoint(&mut response, state, &full);
             send_response(&response);
