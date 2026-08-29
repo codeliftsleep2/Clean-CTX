@@ -66,10 +66,10 @@ fn audit1_compress_persists_to_db() {
 #[test]
 fn audit2_dispatch_returns_after_inline_arm() {
     // FAANG audit P1 #3: Each inline match arm must return so the
-    // registry fallback does NOT fire. If a tool is only in the match
-    // block and NOT in the registry, the registry should never trigger.
-    // We verify by calling diff_commits (in match block but not registry)
-    // and confirming it doesn't also hit the registry.
+    // registry fallback does NOT double-fire. diff_commits was originally
+    // inline-only; after the D2 registry migration it is a registry handler,
+    // so this now exercises the registry dispatch path end-to-end and
+    // confirms dispatch completes without double-firing or panicking.
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params = serde_json::json!({
@@ -77,8 +77,7 @@ fn audit2_dispatch_returns_after_inline_arm() {
     });
     // This should succeed without double-firing or panicking
     crate::mcp::tools::dispatch_tools_call(&id, "diff_commits", &params, &state);
-    // If we get here, dispatch returned after the inline arm — no registry
-    // double-fire occurred.
+    // If we get here, dispatch completed cleanly — no double-fire or panic.
 }
 
 // ══════════════════════════════════════════════════════════════════

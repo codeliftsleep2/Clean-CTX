@@ -239,7 +239,6 @@ fn p3_21_tool_names_match_tool_list_and_registry() {
     let inline_names: std::collections::HashSet<String> = {
         let mut set = std::collections::HashSet::new();
         // Inline tools from dispatch_tools_call() in tools.rs
-        set.insert("diff_commits".to_string());
         set.insert("graph_search".to_string());
         set.insert("graph_query".to_string());
         set.insert("graph_trace".to_string());
@@ -247,7 +246,6 @@ fn p3_21_tool_names_match_tool_list_and_registry() {
         set.insert("get_cbm_status".to_string());
         set.insert("cbm_proxy".to_string());
         set.insert("list_projects".to_string());
-        set.insert("index_repository".to_string());
         set
     };
 

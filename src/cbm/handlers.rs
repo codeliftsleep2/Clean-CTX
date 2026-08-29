@@ -504,3 +504,33 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
     }
     send_response(&response);
 }
+
+/// Handle the `index_repository` MCP tool.
+///
+/// D2 migration: moved verbatim from the inline dispatch arm in
+/// `src/mcp/tools.rs` into the canonical registry handler path. Parameter
+/// validation (`repo_path` required, `mode` defaults to `"fast"`) and the
+/// routing through `cbm_proxy` are preserved exactly.
+pub fn handle_index_repository(id: &Value, params: &Value, state: &McpState) {
+    // Route through cbm_proxy with the caller's parameters
+    let repo_path = crate::mcp::tool_helpers::arg_str_or_empty(params, "repo_path");
+    if repo_path.is_empty() {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": { "code": -32602, "message": "Missing required: repo_path" }
+        }));
+        return;
+    }
+    let mode = crate::mcp::tool_helpers::arg_str(params, "mode").unwrap_or("fast");
+    crate::cbm::proxy::handle_cbm_proxy(
+        id,
+        &serde_json::json!({"arguments": {
+            "cbm_tool": "index_repository",
+            "parameters": {
+                "repo_path": repo_path,
+                "mode": mode
+            }
+        }}),
+        state,
+    );
+}

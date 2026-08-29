@@ -156,5 +156,25 @@ pub fn create_default_registry() -> HandlerRegistry {
         })
     );
 
+    // diff_commits handler (src/mcp/tool_handlers/gitdiff.rs) — D2 migration
+    // from the inline dispatch arm in src/mcp/tools.rs.
+    register_tool!(
+        reg,
+        "diff_commits",
+        Box::new(|id, params, state| {
+            crate::mcp::tool_handlers::gitdiff::handle_diff_commits(id, params, state);
+        })
+    );
+
+    // index_repository (src/cbm/handlers.rs) — D2 migration from the inline
+    // dispatch arm in src/mcp/tools.rs.
+    register_tool!(
+        reg,
+        "index_repository",
+        Box::new(|id, params, state| {
+            crate::cbm::handlers::handle_index_repository(id, params, state);
+        })
+    );
+
     reg
 }

@@ -6,6 +6,7 @@
 // Submodules:
 //   core/        — Compression, IR, delta, provide, restore handlers
 //   context/     — Context history queries
+//   gitdiff.rs   — diff_commits (multi-file git-ref diff) handler
 //   persistence/ — SQLite/BufferedStore CRUD tools
 //   stats/       — Dashboard rendering
 //   traits.rs    — ToolHandlerDef trait (v0.3.0 placeholder)
@@ -14,6 +15,7 @@
 pub mod context;
 pub mod core;
 pub mod edit;
+pub mod gitdiff;
 pub mod persistence;
 pub mod registry;
 pub mod stats;
