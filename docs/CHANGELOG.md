@@ -20,6 +20,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   shape and would have caught the previous invisible-data problem.
   (`src/cbm/handlers.rs`, `src/cbm/tools.rs`, `src/tests/cbm/handlers.rs`)
 
+### Changed
+
+- **CBM graph tools to `structuredContent` — `graph_query`, `graph_trace`, `get_architecture`.**
+  Following the `graph_search` golden path, the remaining structured CBM handlers now use
+  the canonical response envelope. Primary payload and `cbm_status` moved into
+  `structuredContent` (`{nodes, edges}` for `graph_query`; `{edges, count}` for
+  `graph_trace`; `{modules, dependencies}` for `get_architecture`); all ad-hoc
+  result-level fields removed; error paths use `isError: true` + `structuredContent.error`.
+  Each tool now declares an `outputSchema` in `tools/list`. (`src/cbm/handlers.rs`,
+  `src/cbm/tools.rs`)
+
+- **`apply_edit` to `structuredContent` + `_meta`.** Success response is now
+  `content` + `structuredContent.operations` + `_meta{filePath, fileHash, version,
+  applied, syntaxGated}`. An `outputSchema` declares the operation contract (`kind`
+  enum over `replace_body`/`insert_after`/`insert_before`/`delete`; required
+  `kind`/`target`/`startByte`/`endByte`/`byteDelta`; optional `newText`). Errors
+  remain JSON-RPC with structured `error.data`. (`src/mcp/tool_handlers/edit.rs`,
+  `src/mcp/tools.rs`)
+
+- **Response metadata to `_meta` across the remaining tools.** `get_cbm_status`,
+  `still_indexing` (shared indexing gate, cross-cutting to every gated CBM query),
+  `save_context`, `purge_old_deltas`, `replay_history`, `restore_context`,
+  `apply_delta`, and all seven `provide_code_context` response sites moved ad-hoc
+  result-level fields into `_meta`. `save_context` and `purge_old_deltas` gained the
+  previously-missing `content` field. Existing JSON-RPC error paths and `error.data`
+  payloads are preserved unchanged. (`src/cbm/handlers.rs`,
+  `src/mcp/tool_handlers/core.rs`, `src/mcp/tool_handlers/persistence/mod.rs`)
+
 ### Tests
 
 - **Contract conformance tests for `graph_search`:** Three new handler-level tests
@@ -28,24 +56,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   with error details in `structuredContent`), and CBM-unavailable handler path
   through `CAPTURED_RESPONSES`.
 
----
+- **Phase 1 CBM contract tests (`src/tests/cbm/handlers.rs`):** success/error shape
+  and live-dispatch tests for `graph_query`, `graph_trace`, `get_architecture`, plus
+  a `tools/list` `outputSchema`↔`structuredContent` consistency test, using shared
+  envelope/structured-content helpers.
 
-## [Unreleased]
+- **Phase 2 `apply_edit` tests (`src/tests/mcp/apply_edit.rs`):** success-envelope
+  shape, `outputSchema` consistency, live in-process dispatch via
+  `CAPTURED_RESPONSES`, `newText` present/absent by `verify`, and an error-path pin
+  proving the JSON-RPC `unit_mismatch` contract is unchanged.
 
-### Added
+- **Phase 3 contract suite (`src/tests/mcp/phase3_contract.rs`):** envelope
+  conformance, `_meta` placement, meaningful content, and error-path stability for
+  all eight migrated tools — no `structuredContent`/`outputSchema` introduced.
 
+- **Phase 4 helper consolidation:** duplicated private CBM envelope helpers removed
+  in favor of the shared `crate::tests` versions (`assert_valid_mcp_envelope`,
+  `assert_structured_content_has`); the CBM-specific `assert_error_structured_content`
+  stays local.
 
-### Changed
+### Verification
 
-
-### Fixed
-
-
-### Tests
-
-
-### Documentation
-
+- Focused suites: `cbm::tests::handlers` 13/13; `mcp::apply_edit` 7 passed / 3
+  ignored; `phase3_contract` 8/8; phase_a + phase_b + tool_handlers 81/0; default
+  `cargo test --lib` 1932 passed / 0 failed.
+- `cargo clippy --all-targets --all-features -- -D warnings` — zero warnings.
+- `cargo fmt --all -- --check` — clean.
+- `scripts/check-utf8.ps1` — 503 text files valid UTF-8, 0 BOMs, 0 mojibake.
+- Full workspace `cargo test --workspace --all-targets --all-features` — 2238
+  passed / 0 failed / 8 ignored (the known environmental CBM pipe flake did not
+  occur this run).
 
 ---
 
@@ -1059,6 +1099,7 @@ Evidence-driven fix cycle over the 2026-08-25 non-CBM tool audit. Every fix was 
 - Cargo.toml: `license`, `rust-version`, `[lib]`, `[[bin]]` added
 - tree-sitter crates pinned to exact versions with `// SAFETY:` comments
 - `#![allow(dead_code)]` and shim modules removed from `lib.rs`
+| 0.5.0 | 2026-08-28 | **MCP Structured-Output Migration.** Canonical `content` + `structuredContent` + `_meta` response envelope across MCP tools; `graph_search` reference plus `graph_query`/`graph_trace`/`get_architecture`/`apply_edit` gain `structuredContent` + `outputSchema`; remaining eight tools' ad-hoc metadata moved to `_meta` (`save_context`/`purge_old_deltas` gained `content`); JSON-RPC error paths preserved unchanged; shared `crate::tests` envelope helpers consolidate Phase 1–4 coverage |
 | 0.4.6 | 2026-08-27 | **Constructor Initializer Mis-Tokenized as Parameter Group.** `find_method_params` selects the FIRST name-anchored balanced depth-0 paren group (preceded by `>` or an identifier other than `base`/`this`, scanned literal-aware) — `: base(...)`/`: this(...)` call sites are no longer chosen as the parameter list: Low/Medium labels, diff grouping, IR constructor identity, initializer-sensitive body fingerprints, and the class primary-constructor peel guard all corrected; new `strip_base_initializer_clause` wired into Medium compaction and `parse_method_sig`; tuple-return behavior and High byte-exact output preserved; the ff2a29a Medium tier deliberately drops the clause while High keeps it byte-exact — compaction 95, diff 80, gitdiff 42, ir 32 passed, 0 clippy warnings |
 
 ### Deferred
