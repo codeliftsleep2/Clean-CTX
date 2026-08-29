@@ -190,6 +190,45 @@ pub(crate) fn count_tokens_with_tokenizer(
         None => estimate_tokens(text),
     }
 }
+/// Shared JSON-RPC 2.0 error-envelope builder (D1 dispatch/error-path
+/// unification).
+///
+/// Constructs the complete error response object:
+///
+/// ```text
+/// { "jsonrpc": "2.0", "id": <id>, "error": { "code", "message", "data"? } }
+/// ```
+///
+/// `data` is added to the error object only when `Some` — its presence or
+/// absence is externally observable, so callers migrating to this builder
+/// must preserve exactly what they previously sent. The builder does not
+/// transmit; pair the returned value with `crate::protocol::send_response`.
+pub(crate) fn jsonrpc_error(
+    id: impl Into<serde_json::Value>,
+    code: i64,
+    message: impl Into<String>,
+    data: Option<serde_json::Value>,
+) -> serde_json::Value {
+    let mut error = serde_json::json!({ "code": code, "message": message.into() });
+    if let Some(data) = data {
+        error["data"] = data;
+    }
+    serde_json::json!({ "jsonrpc": "2.0", "id": id.into(), "error": error })
+}
+
+/// Extract an optional string argument from `params.arguments` (D5 shared
+/// parameter-extraction primitive).
+pub(crate) fn arg_str<'a>(params: &'a serde_json::Value, key: &str) -> Option<&'a str> {
+    params["arguments"][key].as_str()
+}
+
+/// Extract a string argument from `params.arguments`, defaulting to `""`
+/// (D5 shared parameter-extraction primitive). Callers that treat empty as
+/// "missing" perform their own guard so their exact error envelope is
+/// preserved at the call site.
+pub(crate) fn arg_str_or_empty<'a>(params: &'a serde_json::Value, key: &str) -> &'a str {
+    params["arguments"][key].as_str().unwrap_or("")
+}
 
 /// Compile a file to IR, detecting language and running the full
 /// 4-layer compilation pipeline.

@@ -175,17 +175,12 @@ impl From<crate::ir::compiler::CompileError> for CleanCtxError {
 /// Convert a `CleanCtxError` into a JSON-RPC error response Value.
 /// Convenience for MCP tool handlers.
 pub fn to_jsonrpc_error(id: &serde_json::Value, error: &CleanCtxError) -> serde_json::Value {
-    serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "error": {
-            "code": error.status_code(),
-            "message": error.to_string(),
-            "data": {
-                "retryable": error.is_retryable(),
-            }
-        }
-    })
+    crate::mcp::tool_helpers::jsonrpc_error(
+        id.clone(),
+        error.status_code(),
+        error.to_string(),
+        Some(serde_json::json!({ "retryable": error.is_retryable() })),
+    )
 }
 
 #[cfg(test)]

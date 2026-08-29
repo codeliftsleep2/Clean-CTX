@@ -13,7 +13,7 @@ use serde_json::Value;
 /// Handle `context_history` — shows per-file versioning, delta history,
 /// and cache efficiency metrics. With no file path, shows all tracked files.
 pub(crate) fn handle_context_history(id: &Value, params: &Value, state: &McpState) {
-    let file_path = params["arguments"]["filePath"].as_str();
+    let file_path = crate::mcp::tool_helpers::arg_str(params, "filePath");
 
     if let Some(fp) = file_path {
         let path_alias = state.get_or_create_alias(fp.to_string());

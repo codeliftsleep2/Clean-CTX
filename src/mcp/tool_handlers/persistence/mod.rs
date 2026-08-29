@@ -9,7 +9,7 @@ use serde_json::Value;
 
 /// Handle `save_context` — persists current in-memory context to the DB.
 pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) {
-    let _file_path = params["arguments"]["filePath"].as_str();
+    let _file_path = crate::mcp::tool_helpers::arg_str(params, "filePath");
     let mut saved_count = 0;
 
     let mut store_guard = state.persistence_store_lock();
@@ -74,24 +74,30 @@ pub(crate) fn handle_list_sessions(id: &Value, params: &Value, state: &McpState)
             }));
         }
         Err(e) => {
-            send_response(
-                &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("List failed: {}", e) } }),
-            );
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                format!("List failed: {}", e),
+                None,
+            ));
         }
     }
 }
 
 /// Handle `replay_history` — loads and replays delta history from DB.
 pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState) {
-    let file_path = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let file_path = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
     let target_seq = params["arguments"]["targetSequence"]
         .as_i64()
         .map(|v| v as u32);
 
     if file_path.is_empty() {
-        send_response(
-            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }),
-        );
+        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+            id.clone(),
+            -32602,
+            "Missing required parameter: filePath",
+            None,
+        ));
         return;
     }
 
@@ -110,22 +116,31 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
             }
             Ok(None) => {
                 drop(guard);
-                send_response(
-                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("No context found for: {}", file_path) } }),
-                );
+                send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                    id.clone(),
+                    -32603,
+                    format!("No context found for: {}", file_path),
+                    None,
+                ));
             }
             Err(e) => {
                 drop(guard);
-                send_response(
-                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Replay failed: {}", e) } }),
-                );
+                send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                    id.clone(),
+                    -32603,
+                    format!("Replay failed: {}", e),
+                    None,
+                ));
             }
         }
     } else {
         drop(guard);
-        send_response(
-            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": "Persistence DB not enabled." } }),
-        );
+        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+            id.clone(),
+            -32603,
+            "Persistence DB not enabled.",
+            None,
+        ));
     }
 }
 
@@ -144,15 +159,21 @@ pub(crate) fn handle_purge_old_deltas(id: &Value, params: &Value, state: &McpSta
             }
             Err(e) => {
                 drop(guard);
-                send_response(
-                    &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Purge failed: {}", e) } }),
-                );
+                send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                    id.clone(),
+                    -32603,
+                    format!("Purge failed: {}", e),
+                    None,
+                ));
             }
         }
     } else {
         drop(guard);
-        send_response(
-            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": "Persistence DB not enabled." } }),
-        );
+        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+            id.clone(),
+            -32603,
+            "Persistence DB not enabled.",
+            None,
+        ));
     }
 }

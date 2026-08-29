@@ -52,7 +52,7 @@ pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState)
         merged.sync_cache_metrics(&metrics);
     }
 
-    let file_path = params["arguments"]["filePath"].as_str();
+    let file_path = crate::mcp::tool_helpers::arg_str(params, "filePath");
     let format = params["arguments"]["format"].as_str().unwrap_or("text");
 
     if let Some(fp) = file_path {

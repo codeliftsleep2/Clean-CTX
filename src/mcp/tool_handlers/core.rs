@@ -87,9 +87,9 @@ pub(crate) fn contract_fields_focused(
 /// P3-2: Main handler for compress_code_context tool.
 /// Orchestrates validation, compilation, and response building.
 pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &McpState) {
-    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let file_path_str = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
     let encoding = params["arguments"]["encoding"].as_str().unwrap_or("named");
-    let workspace_root = params["arguments"]["workspaceRoot"].as_str();
+    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
     let resolved_path = match resolve_file_path_checked(
         file_path_str,
         workspace_root,
@@ -97,10 +97,12 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
     ) {
         Ok(p) => p,
         Err(msg) => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": { "code": -32602, "message": msg }
-            }));
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32602,
+                msg,
+                None,
+            ));
             return;
         }
     };
@@ -310,8 +312,8 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
 // ── Handler: diff_code_context ────────────────────────────────────
 
 pub(crate) fn handle_diff_code_context(id: &Value, params: &Value, state: &McpState) {
-    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
-    let workspace_root = params["arguments"]["workspaceRoot"].as_str();
+    let file_path_str = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
+    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
     let resolved_path = match resolve_file_path_checked(
         file_path_str,
         workspace_root,
@@ -319,10 +321,12 @@ pub(crate) fn handle_diff_code_context(id: &Value, params: &Value, state: &McpSt
     ) {
         Ok(p) => p,
         Err(msg) => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": { "code": -32602, "message": msg }
-            }));
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32602,
+                msg,
+                None,
+            ));
             return;
         }
     };
@@ -365,8 +369,8 @@ pub(crate) fn handle_diff_code_context(id: &Value, params: &Value, state: &McpSt
 // ── Handler: delta_code_context ───────────────────────────────────
 
 pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpState) {
-    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
-    let workspace_root = params["arguments"]["workspaceRoot"].as_str();
+    let file_path_str = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
+    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
     let resolved_path = match resolve_file_path_checked(
         file_path_str,
         workspace_root,
@@ -374,10 +378,12 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     ) {
         Ok(p) => p,
         Err(msg) => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": { "code": -32602, "message": msg }
-            }));
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32602,
+                msg,
+                None,
+            ));
             return;
         }
     };
@@ -502,17 +508,26 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
     let delta: IRDelta = match serde_json::from_value(delta_value.clone()) {
         Ok(d) => d,
         Err(e) => {
-            send_response(
-                &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": format!("Invalid delta: {}", e) } }),
-            );
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32602,
+                format!("Invalid delta: {}", e),
+                None,
+            ));
             return;
         }
     };
 
     if current_version != Some(delta.from as i64) {
-        send_response(
-            &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": format!("Version mismatch: client has v{:?}, delta expects from v{}", current_version, delta.from) } }),
-        );
+        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+            id.clone(),
+            -32602,
+            format!(
+                "Version mismatch: client has v{:?}, delta expects from v{}",
+                current_version, delta.from
+            ),
+            None,
+        ));
         return;
     }
 
@@ -553,7 +568,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 .collect()
         });
 
-    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let file_path_str = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
     if file_path_str.is_empty() {
         send_response(
             &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }),
@@ -561,7 +576,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         return;
     }
 
-    let workspace_root = params["arguments"]["workspaceRoot"].as_str();
+    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
     let resolved_path = match resolve_file_path_checked(
         file_path_str,
         workspace_root,
@@ -569,10 +584,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     ) {
         Ok(p) => p,
         Err(msg) => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": { "code": -32602, "message": msg }
-            }));
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32602,
+                msg,
+                None,
+            ));
             return;
         }
     };
@@ -1167,14 +1184,14 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
 // ── Handler: restore_context ───────────────────────────────────────
 
 pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpState) {
-    let file_path_str = params["arguments"]["filePath"].as_str().unwrap_or("");
+    let file_path_str = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
     if file_path_str.is_empty() {
         send_response(
             &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": "Missing required parameter: filePath" } }),
         );
         return;
     }
-    let workspace_root = params["arguments"]["workspaceRoot"].as_str();
+    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
     let resolved_path = match resolve_file_path_checked(
         file_path_str,
         workspace_root,
@@ -1182,10 +1199,12 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     ) {
         Ok(p) => p,
         Err(msg) => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": { "code": -32602, "message": msg }
-            }));
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32602,
+                msg,
+                None,
+            ));
             return;
         }
     };

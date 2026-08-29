@@ -48,13 +48,12 @@ fn commit_lock() -> &'static Mutex<()> {
 }
 
 fn err_response(id: &Value, code: i64, message: String, data: Option<Value>) {
-    let mut error = serde_json::json!({ "code": code, "message": message });
-    if let Some(d) = data {
-        error["data"] = d;
-    }
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id, "error": error
-    }));
+    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+        id.clone(),
+        code,
+        message,
+        data,
+    ));
 }
 
 pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
