@@ -22,6 +22,8 @@
 // NO ad-hoc fields (nodes, count, cbm_status, etc.) as result siblings.
 
 /// graph_search error path: CBM unavailable → handler must use isError + structuredContent.
+use crate::tests::{assert_structured_content_has, assert_valid_mcp_envelope};
+
 #[test]
 fn graph_search_returns_is_error_when_cbm_unavailable() {
     // Serialize access to the shared CAPTURED_RESPONSES sink with the
@@ -337,40 +339,6 @@ fn graph_search_error_response_has_correct_mcp_shape() {
         );
     }
 }
-/// Helper: validate the MCP CallToolResult envelope (no ad-hoc fields).
-fn assert_valid_mcp_envelope(result: &serde_json::Map<String, serde_json::Value>) {
-    let allowed = ["content", "structuredContent", "isError", "_meta"];
-    for key in result.keys() {
-        assert!(
-            allowed.contains(&key.as_str()),
-            "unexpected result-level field: {key} — must use structuredContent or _meta"
-        );
-    }
-    assert!(
-        result.contains_key("content"),
-        "result must contain content, got keys: {:?}",
-        result.keys().collect::<Vec<_>>()
-    );
-    assert!(
-        result["content"].as_array().is_some_and(|a| !a.is_empty()),
-        "content must be a non-empty array"
-    );
-}
-
-/// Helper: validate that structuredContent contains the expected keys.
-fn assert_structured_content_has(
-    sc: &serde_json::Map<String, serde_json::Value>,
-    required_keys: &[&str],
-) {
-    for key in required_keys {
-        assert!(
-            sc.contains_key(*key),
-            "structuredContent should contain '{key}', got keys: {:?}",
-            sc.keys().collect::<Vec<_>>()
-        );
-    }
-}
-
 /// Helper: validate that error structuredContent follows the MCP pattern.
 fn assert_error_structured_content(sc: &serde_json::Map<String, serde_json::Value>) {
     assert!(
