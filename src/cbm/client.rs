@@ -390,6 +390,89 @@ impl CbmClient {
         }
     }
 
+    /// Send a JSON-RPC 2.0 request to CBM and read the raw response text.
+    ///
+    /// This is the **single shared transport pipeline** — both
+    /// [`call_tool_inner`] and [`call_tool_raw_inner`] delegate here.
+    ///
+    /// Handles:
+    /// - Request ID allocation
+    /// - JSON-RPC envelope construction and serialization
+    /// - stdin write + flush
+    /// - Response line accumulation via the background reader channel
+    /// - Timeout detection (kills the child on timeout)
+    /// - Pipe death / disconnected-channel detection
+    /// - Oversized-response enforcement
+    /// - Degraded-status updates on transport errors
+    ///
+    /// Returns the complete raw JSON-RPC response text on success.
+    /// Callers that need the parsed `result` field should call
+    /// [`call_tool_inner`]; callers that need the raw intercepted text
+    /// should call [`call_tool_raw_inner`].
+    fn send_and_receive_raw(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError> {
+        let id = self.request_id.fetch_add(1, Ordering::SeqCst);
+        let request = serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "method": "tools/call",
+            "params": { "name": tool_name, "arguments": args }
+        });
+        let req_line =
+            serde_json::to_string(&request).map_err(|e| CbmError::ParseError(e.to_string()))?;
+        writeln!(self.stdin, "{req_line}").map_err(|e| {
+            self.status = CbmStatus::Degraded(format!("write: {e}"));
+            CbmError::ConnectionLost(e.to_string())
+        })?;
+        self.stdin.flush().map_err(|e| {
+            self.status = CbmStatus::Degraded(format!("flush: {e}"));
+            CbmError::ConnectionLost(e.to_string())
+        })?;
+
+        // C-2 fix: accumulate lines until we have complete JSON, honouring the
+        // deadline on every receive call.
+        let mut buf = String::new();
+        let deadline = std::time::Instant::now() + self.timeout;
+        loop {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() {
+                let _ = self.child.kill();
+                let _ = self.child.try_wait();
+                self.status = CbmStatus::Degraded("timeout".into());
+                return Err(CbmError::Timeout(self.timeout));
+            }
+            match self.stdout_rx.recv_timeout(remaining) {
+                Ok(Ok(line)) => {
+                    buf.push_str(&line);
+                    if buf.len() > MAX_RESPONSE_BYTES {
+                        self.status = CbmStatus::Degraded("oversized".into());
+                        return Err(CbmError::ConnectionLost(format!(
+                            "response >{}B",
+                            MAX_RESPONSE_BYTES
+                        )));
+                    }
+                    if serde_json::from_str::<Value>(buf.trim()).is_ok() {
+                        // Valid complete JSON — return the raw text.
+                        // The caller (call_tool_inner or call_tool_raw_inner)
+                        // is responsible for further semantic checks.
+                        return Ok(buf);
+                    }
+                }
+                Ok(Err(msg)) => {
+                    self.status = CbmStatus::Degraded("exited".into());
+                    return Err(CbmError::ConnectionLost(msg));
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    let _ = self.child.kill();
+                    let _ = self.child.try_wait();
+                    self.status = CbmStatus::Degraded("timeout".into());
+                    return Err(CbmError::Timeout(self.timeout));
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    self.status = CbmStatus::Degraded("exited".into());
+                    return Err(CbmError::ConnectionLost("CBM exited".into()));
+                }
+            }
+        }
+    }
     /// Send a JSON-RPC 2.0 request and read the raw response text.
     ///
     /// **Pipe-level interception:** This returns the **raw text** that CBM
@@ -435,69 +518,11 @@ impl CbmClient {
         }
     }
 
-    /// Inner implementation of call_tool_raw — the actual pipe-level I/O.
+    /// Inner implementation of call_tool_raw — delegates to the shared
+    /// transport pipeline [`send_and_receive_raw`] and returns the raw
+    /// response text.
     fn call_tool_raw_inner(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError> {
-        let id = self.request_id.fetch_add(1, Ordering::SeqCst);
-        let request = serde_json::json!({
-            "jsonrpc": "2.0", "id": id,
-            "method": "tools/call",
-            "params": { "name": tool_name, "arguments": args }
-        });
-        let req_line =
-            serde_json::to_string(&request).map_err(|e| CbmError::ParseError(e.to_string()))?;
-        writeln!(self.stdin, "{req_line}").map_err(|e| {
-            self.status = CbmStatus::Degraded(format!("write: {e}"));
-            CbmError::ConnectionLost(e.to_string())
-        })?;
-        self.stdin.flush().map_err(|e| {
-            self.status = CbmStatus::Degraded(format!("flush: {e}"));
-            CbmError::ConnectionLost(e.to_string())
-        })?;
-
-        // C-2 fix: accumulate lines until we have complete JSON, honouring the
-        // deadline on every receive call. `recv_timeout` returns immediately
-        // when the deadline has passed instead of blocking in `read_line`.
-        let mut buf = String::new();
-        let deadline = std::time::Instant::now() + self.timeout;
-        loop {
-            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-            if remaining.is_zero() {
-                let _ = self.child.kill();
-                let _ = self.child.try_wait();
-                self.status = CbmStatus::Degraded("timeout".into());
-                return Err(CbmError::Timeout(self.timeout));
-            }
-            match self.stdout_rx.recv_timeout(remaining) {
-                Ok(Ok(line)) => {
-                    buf.push_str(&line);
-                    if buf.len() > MAX_RESPONSE_BYTES {
-                        self.status = CbmStatus::Degraded("oversized".into());
-                        return Err(CbmError::ConnectionLost(format!(
-                            "response >{}B",
-                            MAX_RESPONSE_BYTES
-                        )));
-                    }
-                    if serde_json::from_str::<Value>(buf.trim()).is_ok() {
-                        // Valid complete JSON — return the raw intercepted text
-                        return Ok(buf);
-                    }
-                }
-                Ok(Err(msg)) => {
-                    self.status = CbmStatus::Degraded("exited".into());
-                    return Err(CbmError::ConnectionLost(msg));
-                }
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    let _ = self.child.kill();
-                    let _ = self.child.try_wait();
-                    self.status = CbmStatus::Degraded("timeout".into());
-                    return Err(CbmError::Timeout(self.timeout));
-                }
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                    self.status = CbmStatus::Degraded("exited".into());
-                    return Err(CbmError::ConnectionLost("CBM exited".into()));
-                }
-            }
-        }
+        self.send_and_receive_raw(tool_name, args)
     }
 
     /// Send a JSON-RPC 2.0 request and read the parsed response.
@@ -536,84 +561,30 @@ impl CbmClient {
         }
     }
 
-    /// Inner implementation of call_tool — the actual JSON-RPC call.
+    /// Inner implementation of call_tool — delegates to the shared
+    /// transport pipeline [`send_and_receive_raw`], then parses and
+    /// verifies the response. Returns the parsed `result` field.
     fn call_tool_inner(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
-        let id = self.request_id.fetch_add(1, Ordering::SeqCst);
-        let request = serde_json::json!({
-            "jsonrpc": "2.0", "id": id,
-            "method": "tools/call",
-            "params": { "name": tool_name, "arguments": args }
-        });
-        let req_line =
-            serde_json::to_string(&request).map_err(|e| CbmError::ParseError(e.to_string()))?;
-        writeln!(self.stdin, "{req_line}").map_err(|e| {
-            self.status = CbmStatus::Degraded(format!("write: {e}"));
-            CbmError::ConnectionLost(e.to_string())
-        })?;
-        self.stdin.flush().map_err(|e| {
-            self.status = CbmStatus::Degraded(format!("flush: {e}"));
-            CbmError::ConnectionLost(e.to_string())
-        })?;
-
-        // C-2 fix: accumulate lines until we have complete JSON, honouring the
-        // deadline on every receive call.
-        let mut buf = String::new();
-        let deadline = std::time::Instant::now() + self.timeout;
-        loop {
-            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-            if remaining.is_zero() {
-                let _ = self.child.kill();
-                let _ = self.child.try_wait();
-                self.status = CbmStatus::Degraded("timeout".into());
-                return Err(CbmError::Timeout(self.timeout));
-            }
-            match self.stdout_rx.recv_timeout(remaining) {
-                Ok(Ok(line)) => {
-                    buf.push_str(&line);
-                    if buf.len() > MAX_RESPONSE_BYTES {
-                        self.status = CbmStatus::Degraded("oversized".into());
-                        return Err(CbmError::ConnectionLost(format!(
-                            "response >{}B",
-                            MAX_RESPONSE_BYTES
-                        )));
-                    }
-                    if let Ok(resp) = serde_json::from_str::<Value>(buf.trim()) {
-                        if let Some(error) = resp.get("error") {
-                            return Err(CbmError::RpcError {
-                                code: error["code"].as_i64().unwrap_or(-1),
-                                message: error["message"].as_str().unwrap_or("unknown").into(),
-                            });
-                        }
-                        // Soft-error gate: CBM signals tool failures inside a
-                        // SUCCESSFUL JSON-RPC result via `result.isError` +
-                        // an error payload in `content[0].text`. Map them onto
-                        // CbmError so callers never conflate "failed" with
-                        // "valid query, zero results".
-                        let result = resp
-                            .get("result")
-                            .cloned()
-                            .ok_or_else(|| CbmError::ParseError("missing result".into()))?;
-                        check_soft_error(tool_name, &result)?;
-                        return Ok(result);
-                    }
-                    // Not yet complete JSON — continue reading lines
-                }
-                Ok(Err(msg)) => {
-                    self.status = CbmStatus::Degraded("exited".into());
-                    return Err(CbmError::ConnectionLost(msg));
-                }
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    let _ = self.child.kill();
-                    let _ = self.child.try_wait();
-                    self.status = CbmStatus::Degraded("timeout".into());
-                    return Err(CbmError::Timeout(self.timeout));
-                }
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                    self.status = CbmStatus::Degraded("exited".into());
-                    return Err(CbmError::ConnectionLost("CBM exited".into()));
-                }
-            }
+        let buf = self.send_and_receive_raw(tool_name, args)?;
+        let resp: Value = serde_json::from_str(buf.trim())
+            .map_err(|e| CbmError::ParseError(e.to_string()))?;
+        if let Some(error) = resp.get("error") {
+            return Err(CbmError::RpcError {
+                code: error["code"].as_i64().unwrap_or(-1),
+                message: error["message"].as_str().unwrap_or("unknown").into(),
+            });
         }
+        // Soft-error gate: CBM signals tool failures inside a
+        // SUCCESSFUL JSON-RPC result via `result.isError` +
+        // an error payload in `content[0].text`. Map them onto
+        // CbmError so callers never conflate "failed" with
+        // "valid query, zero results".
+        let result = resp
+            .get("result")
+            .cloned()
+            .ok_or_else(|| CbmError::ParseError("missing result".into()))?;
+        check_soft_error(tool_name, &result)?;
+        Ok(result)
     }
 
     // ── Response parsing ───────────────────────────────────────
