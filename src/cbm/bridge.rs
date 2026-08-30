@@ -274,11 +274,7 @@ fn single_type_column(columns: &[String]) -> Option<usize> {
         })
         .map(|(i, _)| i)
         .collect();
-    if hits.len() == 1 {
-        Some(hits[0])
-    } else {
-        None
-    }
+    if hits.len() == 1 { Some(hits[0]) } else { None }
 }
 
 /// Locate a node-property projection column (e.g. `file_path` or `label`) in

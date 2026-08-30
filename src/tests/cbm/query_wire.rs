@@ -45,7 +45,7 @@
 
 use serial_test::serial;
 
-use crate::cbm::bridge::{convert_query_rows, GraphBridge};
+use crate::cbm::bridge::{GraphBridge, convert_query_rows};
 use crate::cbm::config::CbmConfig;
 
 // ── Verbatim raw row captures (fresh subprocess, 2026-08-24) ─────────
@@ -318,7 +318,7 @@ fn node_projection_preserves_extra_properties_and_known_label() {
 #[test]
 fn query_cache_key_namespace_bumps_stale_cypher_entries() {
     use crate::cbm::bridge::test_helpers::new_mock_empty;
-    use crate::cbm::bridge::{CachedGraphData, GraphNode, QueryResult, QUERY_CACHE_KEY_NAMESPACE};
+    use crate::cbm::bridge::{CachedGraphData, GraphNode, QUERY_CACHE_KEY_NAMESPACE, QueryResult};
     use std::collections::HashMap;
 
     let mut bridge = new_mock_empty();

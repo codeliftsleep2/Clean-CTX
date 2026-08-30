@@ -421,7 +421,7 @@ fn graph_query_success_response_has_correct_mcp_shape() {
 #[test]
 fn graph_query_dispatch_surfaces_projected_file_path() {
     use crate::cbm::bridge::test_helpers::new_mock_empty;
-    use crate::cbm::bridge::{convert_query_rows, CachedGraphData, QUERY_CACHE_KEY_NAMESPACE};
+    use crate::cbm::bridge::{CachedGraphData, QUERY_CACHE_KEY_NAMESPACE, convert_query_rows};
 
     let _serial = crate::protocol::handler_response_serial();
 
