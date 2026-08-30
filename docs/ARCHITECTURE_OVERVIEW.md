@@ -1,8 +1,8 @@
 # Clean-CTX — Architecture Overview
 
 > **Owner:** System + module architecture · **Status:** Living reference
-> **Version:** 0.4.7
-> **Last updated:** 2026-08-07 (R-44 complete: Angular HTML template compression, PrimeNG markers, GitDiff integration)
+> **Version:** 0.5.2
+> **Last updated:** 2026-08-30 (0.4.8–0.5.2: structuredContent MCP envelope, CBM transport unification, graph_query fidelity)
 >
 > **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
 

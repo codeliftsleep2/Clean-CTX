@@ -327,9 +327,11 @@ Renderer/differ untouched; no fixture special-casing; no output deduplication.
 
 ---
 
-## [0.4.3] - 2026-08-25 - `apply_edit` Write Path
+## [0.4.3] - 2026-08-25 - `apply_edit` Write Path + Phase C1/C2 Legacy Retirements
 
-Clean-CTX-native single-unit editing per `docs/plans/APPLY_EDIT_PLAN.md`: an agent that already received byte-exact bodies via `provide_code_context(fidelity="edit"|"verbatim")` can now write through Clean-CTX itself instead of paying the host's full-file raw-read precondition on every edit. Capability and tool-selection guidance shipped together (RULE 1b + SYSTEM_PROMPT rules 3–4) so the tool actually gets routed through.
+Clean-CTX-native single-unit editing per `docs/plans/APPLY_EDIT_PLAN.md`: an agent that already received byte-exact bodies via `provide_code_context(fidelity="edit"|"verbatim")` can now write through Clean-CTX itself instead of paying the host's full-file raw-read precondition on every edit. Capability and tool-selection guidance shipped together (RULE 1b + SYSTEM_PROMPT rules 3-4) so the tool actually gets routed through.
+
+**Phase C1/C2 (2026-08-26)** - `compress_workspace` and `decompress_code_context` retired entirely as MCP tools. Net -4748 lines across 39 files: inline dispatch arms, tool-list registration, handler functions, and all legacy-workspace-compression machinery removed. Remaining code references retagged as dead/stale (`#[allow(dead_code)]` with test-only notes). The Phase A changelog entry below stated "Remaining legacy emitters until Phases B/C: `compress_workspace`, `delta_text_context`" - Phase B removed `delta_text_context`; Phase C1/C2 completed the retirement by removing `compress_workspace` and `decompress_code_context`. The only remaining legacy-notation emitters are internal-only test helpers.
 
 ### Added
 

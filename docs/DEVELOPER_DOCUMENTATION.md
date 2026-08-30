@@ -1,7 +1,7 @@
 # Clean-CTX — Developer Documentation
 
 > **Owner:** How-to-extend (languages/tools/opcodes/Φ markers) + opcode/marker vocabulary + build/test gates · **Status:** Living reference
-> **Version:** 0.4.0 · **Last updated:** 2026-08-24
+> **Version:** 0.5.2 · **Last updated:** 2026-08-30
 >
 > **Test count:** see `docs/CHANGELOG.md` for the current workspace test count.
 
@@ -910,7 +910,7 @@ Every pull request must pass these checks:
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test --workspace --all-targets --all-features`** — all 2,513 workspace tests pass (2,173 core library)
+3. **`cargo test --workspace --all-targets --all-features`** — all 2,522 workspace tests pass (2,182 core library)
 4. **`cargo audit`** — no known security vulnerabilities
 5. **No new `#![allow(...)]`** annotations without a `// SAFETY:` or `// Phase N:` comment
 6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail

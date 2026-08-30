@@ -1,6 +1,6 @@
 # Clean-CTX - Token Waste Reducer & Structured Transport Protocol
 
-> **Version 0.4.0** - A local-first, air-gapped MCP server that reduces LLM token waste through four independent mechanisms:
+> **Version 0.5.2** - A local-first, air-gapped MCP server that reduces LLM token waste through four independent mechanisms:
 
 | Mechanism | Savings | What it affects |
 |-----------|---------|-----------------|
