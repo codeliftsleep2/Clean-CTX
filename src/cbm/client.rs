@@ -566,8 +566,8 @@ impl CbmClient {
     /// verifies the response. Returns the parsed `result` field.
     fn call_tool_inner(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
         let buf = self.send_and_receive_raw(tool_name, args)?;
-        let resp: Value = serde_json::from_str(buf.trim())
-            .map_err(|e| CbmError::ParseError(e.to_string()))?;
+        let resp: Value =
+            serde_json::from_str(buf.trim()).map_err(|e| CbmError::ParseError(e.to_string()))?;
         if let Some(error) = resp.get("error") {
             return Err(CbmError::RpcError {
                 code: error["code"].as_i64().unwrap_or(-1),
