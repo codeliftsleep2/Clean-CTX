@@ -436,7 +436,7 @@ fn graph_query_dispatch_surfaces_projected_file_path() {
         "sanity: conversion feeds the cache"
     );
 
-    let mut bridge = new_mock_empty();
+    let bridge = new_mock_empty();
     bridge.cache.insert(
         format!(
             "{QUERY_CACHE_KEY_NAMESPACE}:MATCH (f:Function) RETURN f.name, f.file_path LIMIT 5"
