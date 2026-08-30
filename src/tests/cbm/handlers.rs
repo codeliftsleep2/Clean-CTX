@@ -392,6 +392,11 @@ fn graph_query_success_response_has_correct_mcp_shape() {
     assert_structured_content_has(sc, &["nodes", "edges", "cbm_status"]);
 
     assert_eq!(sc["nodes"][0]["name"], "MyClass");
+    assert_eq!(
+        sc["nodes"][0]["file"], "src/my_class.ts",
+        "structuredContent.nodes[*].file must carry the projected file path"
+    );
+    assert_eq!(sc["nodes"][0]["label"], "Class");
     assert_eq!(sc["edges"][0]["from"], "node1");
     assert_eq!(sc["cbm_status"], "available");
 
@@ -406,6 +411,82 @@ fn graph_query_success_response_has_correct_mcp_shape() {
     assert!(
         text.contains("1 node(s)"),
         "content should mention node count"
+    );
+}
+
+/// graph_query pipeline regression (0.5.1): dispatches the real handler over a
+/// mock bridge pre-seeded with the conversion of the verbatim
+/// `RETURN f.name, f.file_path` capture, proving `structuredContent.nodes[*].file`
+/// carries the projected path instead of `""`.
+#[test]
+fn graph_query_dispatch_surfaces_projected_file_path() {
+    use crate::cbm::bridge::test_helpers::new_mock_empty;
+    use crate::cbm::bridge::{convert_query_rows, CachedGraphData, QUERY_CACHE_KEY_NAMESPACE};
+
+    let _serial = crate::protocol::handler_response_serial();
+
+    let columns = vec![String::from("f.name"), String::from("f.file_path")];
+    let rows = vec![vec![
+        serde_json::json!("cbm_binary_exists"),
+        serde_json::json!("src/tests/cbm/e2e.rs"),
+    ]];
+    let converted = convert_query_rows(&columns, &rows);
+    assert_eq!(
+        converted.nodes[0].file, "src/tests/cbm/e2e.rs",
+        "sanity: conversion feeds the cache"
+    );
+
+    let mut bridge = new_mock_empty();
+    bridge.cache.insert(
+        format!(
+            "{QUERY_CACHE_KEY_NAMESPACE}:MATCH (f:Function) RETURN f.name, f.file_path LIMIT 5"
+        ),
+        CachedGraphData {
+            data: serde_json::to_value(&converted).expect("serialize"),
+            expires_at: std::time::Instant::now() + std::time::Duration::from_secs(600),
+        },
+    );
+
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    {
+        let mut guard = state.graph_bridge_lock();
+        *guard = Some(bridge);
+    }
+    crate::mcp::tools::setup_handler_registry_for_tests();
+    crate::protocol::captured_responses().clear();
+
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(1),
+        "graph_query",
+        &serde_json::json!({"arguments": {
+            "query": "MATCH (f:Function) RETURN f.name, f.file_path LIMIT 5"
+        }}),
+        &state,
+    );
+
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("handler must have sent exactly one response");
+    assert!(
+        response.get("error").is_none(),
+        "query must succeed: {response}"
+    );
+
+    let result = response["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent object");
+    assert_structured_content_has(sc, &["nodes", "edges", "cbm_status"]);
+    assert_eq!(
+        sc["nodes"][0]["file"], "src/tests/cbm/e2e.rs",
+        "structuredContent.nodes[0].file must be the projected file_path, not ''"
+    );
+    assert_eq!(sc["nodes"][0]["name"], "cbm_binary_exists");
+    assert_eq!(
+        sc["nodes"][0]["label"], "",
+        "no label projection -> legacy empty label"
     );
 }
 

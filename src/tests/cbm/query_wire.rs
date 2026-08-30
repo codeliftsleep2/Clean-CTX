@@ -45,7 +45,7 @@
 
 use serial_test::serial;
 
-use crate::cbm::bridge::{GraphBridge, convert_query_rows};
+use crate::cbm::bridge::{convert_query_rows, GraphBridge};
 use crate::cbm::config::CbmConfig;
 
 // ── Verbatim raw row captures (fresh subprocess, 2026-08-24) ─────────
@@ -239,6 +239,141 @@ fn node_only_shape_keeps_legacy_mapping() {
     assert_eq!(
         qr.nodes[0].id, "cbm_binary_exists",
         "column 0 maps to id+name"
+    );
+    // 0.5.1 data-fidelity fix: the projected `f.file_path` cell (present in
+    // the verbatim raw capture) populates `GraphNode.file` instead of being
+    // silently discarded.
+    assert_eq!(
+        qr.nodes[0].file, "src/tests/cbm/e2e.rs",
+        "projected f.file_path must populate GraphNode.file"
+    );
+    assert!(
+        qr.nodes[0].label.is_empty(),
+        "no label projection -> legacy empty label"
+    );
+    assert!(
+        qr.nodes[0].properties.is_empty(),
+        "consumed columns do not leak into properties"
+    );
+}
+
+// ── 0.5.1 data-fidelity pins ───────────────────────────────────────
+//
+// Node-shaped projections previously read only column 0 and hard-coded
+// GraphNode `file`/`label` to empty strings. The verbatim raw captures below
+// prove CBM *does* return `f.file_path` (and any extra projected columns);
+// the conversion must now surface them instead of discarding them.
+
+/// Node-only projection with a recognized `label` column and an extra scalar.
+/// CBM echoes these verbatim exactly like the `f.name, f.file_path` control.
+const GQ_NODE_FULL_COLS: &[&str] = &["f.name", "f.label", "f.file_path", "f.in_degree"];
+const GQ_NODE_FULL_ROWS: &str = r#"[
+ ["cbm_binary_exists","Function","src/tests/cbm/e2e.rs","10"],
+ ["shared_live_state","Function","src/tests/cbm/e2e.rs","6"]
+]"#;
+
+/// 0.5.1 data-fidelity fix: additional node projections are preserved. A
+/// clearly-recognizable `label` column populates `GraphNode.label`, and every
+/// non-consumed column lands in `GraphNode.properties` keyed by the echoed
+/// column text (mirroring the relationship-shaped property rule).
+#[test]
+fn node_projection_preserves_extra_properties_and_known_label() {
+    let qr = convert_query_rows(&cols(GQ_NODE_FULL_COLS), &rows_of(GQ_NODE_FULL_ROWS));
+
+    assert!(
+        qr.edges.is_empty(),
+        "no type(...) column must produce no edges"
+    );
+    assert_eq!(qr.nodes.len(), 2);
+    assert_eq!(qr.nodes[0].name, "cbm_binary_exists");
+    assert_eq!(qr.nodes[0].id, "cbm_binary_exists");
+    assert_eq!(
+        qr.nodes[0].label, "Function",
+        "label projection populates label"
+    );
+    assert_eq!(
+        qr.nodes[0].file, "src/tests/cbm/e2e.rs",
+        "file_path projection populates file"
+    );
+    assert_eq!(
+        qr.nodes[0]
+            .properties
+            .get("f.in_degree")
+            .and_then(serde_json::Value::as_str),
+        Some("10"),
+        "non-consumed projected columns are preserved verbatim in properties"
+    );
+    for consumed in ["f.name", "f.label", "f.file_path"] {
+        assert!(
+            !qr.nodes[0].properties.contains_key(consumed),
+            "{consumed} is consumed by GraphNode fields, not a property"
+        );
+    }
+}
+
+/// 0.5.1 cache-namespace bump: `query_graph` keys move from `cypher:` to
+/// `cypher2:` so results cached before the node-mapping fix (with always-empty
+/// `file` cells) can never survive the upgrade. A pre-0.5.1 `cypher:` entry
+/// must be treated as a miss even when a newer `cypher2:` entry is present.
+#[test]
+fn query_cache_key_namespace_bumps_stale_cypher_entries() {
+    use crate::cbm::bridge::test_helpers::new_mock_empty;
+    use crate::cbm::bridge::{CachedGraphData, GraphNode, QueryResult, QUERY_CACHE_KEY_NAMESPACE};
+    use std::collections::HashMap;
+
+    let mut bridge = new_mock_empty();
+    let cypher = "MATCH (f:Function) RETURN f.name, f.file_path LIMIT 5";
+    let expires_at = std::time::Instant::now() + std::time::Duration::from_secs(3600);
+
+    let stale: QueryResult = QueryResult {
+        nodes: vec![GraphNode {
+            id: "stale-id".into(),
+            label: String::new(),
+            name: "stale-name".into(),
+            file: String::new(),
+            properties: HashMap::new(),
+        }],
+        edges: vec![],
+    };
+    let fresh: QueryResult = QueryResult {
+        nodes: vec![GraphNode {
+            id: "cbm_binary_exists".into(),
+            label: String::new(),
+            name: "cbm_binary_exists".into(),
+            file: "src/tests/cbm/e2e.rs".into(),
+            properties: HashMap::new(),
+        }],
+        edges: vec![],
+    };
+
+    // Pre-0.5.1 entry under the old namespace — must be treated as a miss.
+    bridge.cache.insert(
+        format!("cypher:{cypher}"),
+        CachedGraphData {
+            data: serde_json::to_value(&stale).expect("serialize stale"),
+            expires_at,
+        },
+    );
+    // 0.5.1 entry under the new namespace — must win.
+    bridge.cache.insert(
+        format!("{QUERY_CACHE_KEY_NAMESPACE}:{cypher}"),
+        CachedGraphData {
+            data: serde_json::to_value(&fresh).expect("serialize fresh"),
+            expires_at,
+        },
+    );
+
+    let r = bridge.query_graph(cypher);
+
+    assert_eq!(QUERY_CACHE_KEY_NAMESPACE, "cypher2", "namespace bump pin");
+    assert_eq!(r.nodes.len(), 1, "exactly one entry may win");
+    assert_eq!(
+        r.nodes[0].file, "src/tests/cbm/e2e.rs",
+        "fresh 0.5.1-namespace entry is served"
+    );
+    assert!(
+        r.nodes[0].name != "stale-name",
+        "pre-0.5.1 cypher: entry must NOT be reused"
     );
 }
 

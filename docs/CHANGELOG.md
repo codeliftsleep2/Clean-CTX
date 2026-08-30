@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.5.1] - 2026-08-29
+
+### Fixed
+
+- **`graph_query` node-result data fidelity — projected `file_path` no longer erased.** `GraphBridge::convert_query_rows()` read only column 0 on node-shaped Cypher projections (`RETURN f.name, f.file_path`) and built `GraphNode { id, name, label: "", file: "", properties: {} }`, silently discarding the `f.file_path` cell CBM was returning. The 0.5.0 structured-output migration made the defect visible (empty `structuredContent.nodes[*].file`) against an `outputSchema` that already requires `file`. Node-shaped projections now resolve from the echoed column metadata exactly like the relationship-shaped path: column 0 keeps its legacy `id`/`name` role, a `file_path` projection populates `GraphNode.file`, a clearly recognizable `label` projection populates `GraphNode.label` (legacy empty default otherwise), and every other projected column is preserved in `GraphNode.properties` keyed by the echoed column text with its projected JSON value verbatim. The relationship/edge-shaped conversion path is unchanged. **Bug/conformance fix only — no MCP response schema change.** (`src/cbm/bridge.rs`, `src/tests/cbm/query_wire.rs`, `src/tests/cbm/handlers.rs`)
+
+### Cache
+
+- **Query-cache namespace bumped `cypher:` -> `cypher2:`** so results cached before this fix (always-empty `file` cells) can never be served after upgrade. SQLite schema unchanged; pre-0.5.1 `cypher:` rows remain in the database untouched (never read, never migrated). (`src/cbm/bridge.rs`)
+
 ## [0.5.0] - 2026-08-28
 
 ### Changed
@@ -1127,6 +1137,7 @@ Evidence-driven fix cycle over the 2026-08-25 non-CBM tool audit. Every fix was 
 - Cargo.toml: `license`, `rust-version`, `[lib]`, `[[bin]]` added
 - tree-sitter crates pinned to exact versions with `// SAFETY:` comments
 - `#![allow(dead_code)]` and shim modules removed from `lib.rs`
+| 0.5.1 | 2026-08-29 | **graph_query node-result data fidelity.** Node-shaped Cypher projections (`RETURN f.name, f.file_path`) no longer collapse to column-0-only nodes with hard-coded empty `file`/`label` and dropped columns: `file_path` populates `GraphNode.file`, a recognized `label` column populates `GraphNode.label`, and extra projected columns are preserved in `GraphNode.properties`; the query-cache namespace was bumped `cypher:` -> `cypher2:` to invalidate pre-fix entries. 0.5.0 conformance fix — no MCP schema change |
 | 0.5.0 | 2026-08-28 | **MCP Structured-Output Migration.** Canonical `content` + `structuredContent` + `_meta` response envelope across MCP tools; `graph_search` reference plus `graph_query`/`graph_trace`/`get_architecture`/`apply_edit` gain `structuredContent` + `outputSchema`; remaining eight tools' ad-hoc metadata moved to `_meta` (`save_context`/`purge_old_deltas` gained `content`); JSON-RPC error paths preserved unchanged; shared `crate::tests` envelope helpers consolidate Phase 1–4 coverage |
 | 0.4.6 | 2026-08-27 | **Constructor Initializer Mis-Tokenized as Parameter Group.** `find_method_params` selects the FIRST name-anchored balanced depth-0 paren group (preceded by `>` or an identifier other than `base`/`this`, scanned literal-aware) — `: base(...)`/`: this(...)` call sites are no longer chosen as the parameter list: Low/Medium labels, diff grouping, IR constructor identity, initializer-sensitive body fingerprints, and the class primary-constructor peel guard all corrected; new `strip_base_initializer_clause` wired into Medium compaction and `parse_method_sig`; tuple-return behavior and High byte-exact output preserved; the ff2a29a Medium tier deliberately drops the clause while High keeps it byte-exact — compaction 95, diff 80, gitdiff 42, ir 32 passed, 0 clippy warnings |
 

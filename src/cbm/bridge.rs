@@ -157,11 +157,19 @@ pub(crate) fn filter_trace_edges(
 ///   must NEVER fabricate edges — the previous arity rule produced a fake
 ///   edge labelled `"10"` for exactly that shape.
 ///
+/// Node-shaped projections resolve from the echoed column metadata exactly
+/// like the relationship-shaped path: column 0 keeps its legacy `id`/`name`
+/// role, a `file_path` projection populates `GraphNode.file`, a clearly
+/// recognizable `label` projection populates `GraphNode.label` (the legacy
+/// empty default applies when no convincing `label` column exists), and every
+/// other projected column is preserved in `GraphNode.properties` keyed by the
+/// echoed column text with its projected JSON value verbatim. 0.5.1 fix: the
+/// `f.file_path` value CBM actually returns is no longer silently discarded.
 /// Deliberately NOT done here (tracked as separate findings): node
-/// deduplication and file-path population — repeated nodes and empty
-/// `file` fields pass through exactly as before. Endpoint/label cells are
+/// deduplication and endpoint normalization. Endpoint/label cells are
 /// extracted as strings (non-strings become empty); property cells keep
-/// their projected JSON value verbatim. Rows are never skipped or reordered.
+/// their projected JSON value verbatim. Rows are never skipped or reordered
+/// (rows without a first cell keep the legacy blanket skip).
 pub(crate) fn convert_query_rows(columns: &[String], rows: &[Vec<Value>]) -> QueryResult {
     if columns.len() >= 3 {
         if let Some(type_idx) = single_type_column(columns) {
@@ -196,17 +204,47 @@ pub(crate) fn convert_query_rows(columns: &[String], rows: &[Vec<Value>]) -> Que
             }
         }
     }
+    // ── Node-shaped projection fallback ─────────────────────────────
+    // Column 0 keeps its legacy `id`/`name` role. The echoed columns now
+    // additionally drive `file`/`label` population and property preservation
+    // so projected node data CBM actually returned (e.g. `f.file_path`) is no
+    // longer silently discarded. Relationship-shaped projections returned
+    // above; unaliased `type(...)` handling is untouched.
+    let file_idx = find_projection_column(columns, "file_path");
+    let label_idx = find_projection_column(columns, "label");
     let nodes = rows
         .iter()
-        .filter_map(|row| row.first())
-        .map(|first| {
-            let label = first.as_str().unwrap_or("");
+        .enumerate()
+        .filter_map(|(row_idx, row)| row.first().map(|first| (row_idx, row, first)))
+        .map(|(_row_idx, row, first)| {
+            let name = first.as_str().unwrap_or("");
+            let file = file_idx
+                .and_then(|idx| row.get(idx))
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            let label = label_idx
+                .and_then(|idx| row.get(idx))
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            let mut properties = HashMap::new();
+            for (idx, column) in columns.iter().enumerate() {
+                if idx == 0 || Some(idx) == file_idx || Some(idx) == label_idx {
+                    continue;
+                }
+                if let Some(value) = row.get(idx) {
+                    // Preserve the projected JSON value verbatim (mirrors the
+                    // relationship-shaped property rule above).
+                    properties.insert(column.clone(), value.clone());
+                }
+            }
             GraphNode {
-                id: label.to_string(),
-                label: String::new(),
-                name: label.to_string(),
-                file: String::new(),
-                properties: HashMap::new(),
+                id: name.to_string(),
+                label,
+                name: name.to_string(),
+                file,
+                properties,
             }
         })
         .collect();
@@ -236,8 +274,56 @@ fn single_type_column(columns: &[String]) -> Option<usize> {
         })
         .map(|(i, _)| i)
         .collect();
-    if hits.len() == 1 { Some(hits[0]) } else { None }
+    if hits.len() == 1 {
+        Some(hits[0])
+    } else {
+        None
+    }
 }
+
+/// Locate a node-property projection column (e.g. `file_path` or `label`) in
+/// an echoed `query_graph` column list.
+///
+/// CBM echoes RETURN expressions verbatim (a `f.file_path` projection echoes
+/// as `"f.file_path"`), mirroring the `type(...)` echo handled by
+/// [`single_type_column`]. A property `P` is identified by a column whose
+/// whitespace-stripped text is exactly `P` or ends with `.P`. Only a SINGLE
+/// conclusive match maps; zero matches keep the legacy empty default, and
+/// several matches would be ambiguous (which node's value?) so we refuse to
+/// guess. An `AS` alias replaces the whole expression in the echo
+/// (`f.file_path AS path` echoes as `"path"`), so aliased properties are
+/// intentionally undetectable — exactly like the aliased `type()` pin.
+/// Column 0 is unconditionally the legacy `id`/`name` identity column and is
+/// never repurposed as a property.
+fn find_projection_column(columns: &[String], property: &str) -> Option<usize> {
+    let hits: Vec<usize> = columns
+        .iter()
+        .enumerate()
+        .filter(|(idx, column)| {
+            if *idx == 0 {
+                return false;
+            }
+            let flat: String = column.chars().filter(|c| !c.is_whitespace()).collect();
+            flat == property
+                || flat
+                    .strip_suffix(property)
+                    .is_some_and(|prefix| prefix.ends_with('.'))
+        })
+        .map(|(idx, _)| idx)
+        .collect();
+    match hits.as_slice() {
+        [idx] => Some(*idx),
+        _ => None,
+    }
+}
+
+/// Cache-key namespace for `query_graph` results.
+///
+/// Bumped `cypher:` -> `cypher2:` in 0.5.1 so results cached before the
+/// node-mapping fix (whose `file` cells were always empty) can never be
+/// served again. The SQLite schema is unchanged; pre-0.5.1 `cypher:` rows
+/// stay in the database untouched (never read, never migrated).
+pub(crate) const QUERY_CACHE_KEY_NAMESPACE: &str = "cypher2";
 
 pub(crate) fn parse_architecture_response(arch: &Value) -> ArchitectureOverview {
     let modules = arch["packages"]
@@ -1492,7 +1578,7 @@ impl GraphBridge {
     }
 
     pub fn query_graph(&mut self, cypher: &str) -> QueryResult {
-        let key = format!("cypher:{cypher}");
+        let key = format!("{QUERY_CACHE_KEY_NAMESPACE}:{cypher}");
         let project = self.project_str();
         let q = cypher.to_string();
         if self.check_cache(&key) {
