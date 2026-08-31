@@ -115,6 +115,10 @@ pub enum SemanticRelation {
     CallsService,
     /// A component/effect has a store reference.
     HasStore,
+    /// An action triggers a reducer state transition.
+    TriggersReducer,
+    /// An effect produces/dispatches a success/failure action.
+    ProducesAction,
     // ---- .NET ----
     /// A controller exposes an action method.
     ControllerAction,

@@ -205,10 +205,29 @@ impl MetaLayer for AngularMetaLayer {
         // 1. Decorator-based edges from class captures
         let is_angular = crate::angular_meta::detect::is_angular_file(source);
         if is_angular {
+            // Build a name→entity_type map from all class captures to support
+            // precise DeclaresInModule/ExportsFromModule entity types.
+            let mut decl_types: std::collections::HashMap<String, &'static str> =
+                std::collections::HashMap::new();
+            for raw_class in class_captures {
+                if let Some((class_name, kind, _, _, _)) =
+                    crate::angular_meta::decorators::extract_graph_entries(raw_class)
+                {
+                    let entity_type = match kind {
+                        crate::angular_meta::decorators::ClassKind::Component => "Component",
+                        crate::angular_meta::decorators::ClassKind::Service => "Service",
+                        crate::angular_meta::decorators::ClassKind::Directive => "Directive",
+                        crate::angular_meta::decorators::ClassKind::Pipe => "Pipe",
+                        crate::angular_meta::decorators::ClassKind::Module => "Module",
+                    };
+                    decl_types.insert(class_name, entity_type);
+                }
+            }
+
             for raw_class in class_captures {
                 // extract_graph_entries gives structured class metadata
-                // (kind, selector, injects) — no re-parsing of the source.
-                if let Some((class_name, kind, selector, injects, _pipe_name)) =
+                // (kind, selector, injects, pipe_name) — no re-parsing of the source.
+                if let Some((class_name, kind, selector, injects, pipe_name)) =
                     crate::angular_meta::decorators::extract_graph_entries(raw_class)
                 {
                     edges.extend(crate::angular_meta::semantic::class_to_semantic_edges(
@@ -216,8 +235,10 @@ impl MetaLayer for AngularMetaLayer {
                         kind,
                         selector.as_deref(),
                         &injects,
+                        pipe_name.as_deref(),
                         raw_class,
                         fidelity,
+                        &decl_types,
                     ));
                 }
             }

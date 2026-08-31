@@ -19,7 +19,6 @@
 // The string walker is O(L) where L is the length of the class
 // capture, which is bounded by the class body length.
 
-use crate::angular_meta::graph::ClassKind;
 use crate::angular_meta::markers::{
     ComponentFields, build_component_line, build_directive_line, build_injects_line,
     build_input_line, build_model_line, build_module_line, build_output_line, build_pipe_line,
@@ -28,6 +27,16 @@ use crate::angular_meta::markers::{
 use crate::compression::Fidelity;
 use crate::meta_util::{consume_call_expression, split_top_level};
 
+/// The kind of Angular class that can be extracted from decorators.
+/// Used as a private extraction helper — not a shared architectural type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ClassKind {
+    Component,
+    Service,
+    Directive,
+    Pipe,
+    Module,
+}
 /// Result of [`extract_decorators`]: the Φ marker lines plus any
 /// inline template content that should be fed through the HTML
 /// template extractor.
@@ -301,23 +310,23 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                 scan += 1;
             }
             if scan < len {
-                let (func_name, open_paren) = if scan + 5 < len && &bytes[scan..scan + 6] == b"input("
-                {
-                    ("input", scan + 5)
-                } else if scan + 5 < len && &bytes[scan..scan + 6] == b"model(" {
-                    ("model", scan + 5)
-                } else if scan + 6 < len && &bytes[scan..scan + 7] == b"output(" {
-                    ("output", scan + 6)
-                } else if scan + 5 < len
-                    && &bytes[scan..scan + 6] == b"inject"
-                    && scan + 6 < len
-                    && bytes[scan + 6] == b'('
-                {
-                    ("inject", scan + 6)
-                } else {
-                    i += 1;
-                    continue;
-                };
+                let (func_name, open_paren) =
+                    if scan + 5 < len && &bytes[scan..scan + 6] == b"input(" {
+                        ("input", scan + 5)
+                    } else if scan + 5 < len && &bytes[scan..scan + 6] == b"model(" {
+                        ("model", scan + 5)
+                    } else if scan + 6 < len && &bytes[scan..scan + 7] == b"output(" {
+                        ("output", scan + 6)
+                    } else if scan + 5 < len
+                        && &bytes[scan..scan + 6] == b"inject"
+                        && scan + 6 < len
+                        && bytes[scan + 6] == b'('
+                    {
+                        ("inject", scan + 6)
+                    } else {
+                        i += 1;
+                        continue;
+                    };
 
                 let kind = match func_name {
                     "input" => SignalKind::Input,
@@ -888,7 +897,7 @@ fn unquote(s: &str) -> &str {
 /// cross-file dependency graph (Phase 3, Tier 3).
 ///
 /// Returns `(class_name, kind, selector, injects, pipe_name)` for
-/// the class, suitable for pushing into a `GraphCollector`.
+/// the class, suitable for feeding into the semantic edge model.
 // F-ANG-12: use `?` since the enclosing function returns `Option`.
 // F-ANG-13: substitute `?` for missing class names at the call site.
 // (Same as `extract_decorators`; the `let-else` → `?` swap is

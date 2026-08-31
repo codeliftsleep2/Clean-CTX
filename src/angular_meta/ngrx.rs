@@ -120,6 +120,53 @@ impl PhiMarker for NgRxKind {
         }
     }
 }
+// ---------------------------------------------------------------------------
+// NgRxEdgeKind — legacy graph edge kind, kept for backward compatibility
+// with to_graph_edges(). Superseded by SemanticRelation for phases 4+.
+// ---------------------------------------------------------------------------
+
+/// The kind of an NgRx cross-layer graph edge (Phase 5 of the Angular
+/// Ecosystem Deepening). These wire NgRx store artifacts — actions,
+/// reducers, effects, selectors, and components — into the DI graph so
+/// the LLM can trace `dispatch(loadUsers)` → `loadUsers$ effect` →
+/// `UserService.getUsers()` → `.NET UserController.GetAll()` as a single
+/// semantic chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NgRxEdgeKind {
+    /// `Φaction:loadUsers` → `Φreducer:users` (via `on(loadUsers)` handler).
+    ActionReducer,
+    /// `Φaction:loadUsers` → `Φeffect:loadUsers$` (via `ofType(loadUsers)`).
+    ActionEffect,
+    /// `Φeffect:loadUsers$` → `UserService@α3` (via `switchMap(() => svc.getAll())`).
+    EffectService,
+    /// `Φeffect:loadUsers$` → `Φaction:loadUsersSuccess` (via `map(...)`).
+    EffectAction,
+    /// `UserComponent@α7` → `Φngrx:UserFeature` (via `Store<AppState>` DI).
+    ComponentStore,
+    /// `UserComponent@α7` → `Φselector:selectAllUsers` (via `store.select(...)`).
+    ComponentSelector,
+    /// `Φeffect:loadUsers$` → `UserController.GetAll@α12` (CBM cross-language).
+    EffectEndpoint,
+}
+
+impl NgRxEdgeKind {
+    /// The `Φ` marker prefix for this edge kind.
+    pub fn marker_prefix(self) -> &'static str {
+        match self {
+            Self::ActionReducer => "Φact→red:",
+            Self::ActionEffect => "Φact→eff:",
+            Self::EffectService => "Φeff→svc:",
+            Self::EffectAction => "Φeff→act:",
+            Self::ComponentStore => "Φcmp→store:",
+            Self::ComponentSelector => "Φcmp→sel:",
+            Self::EffectEndpoint => "Φeff→endpoint:",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Data structures
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Data structures
@@ -232,14 +279,10 @@ impl NgRxShape {
     /// of the Angular Ecosystem Deepening).
     ///
     /// Returns `(from, to, kind)` triples where `kind` is the
-    /// [`NgRxEdgeKind`](crate::angular_meta::graph::NgRxEdgeKind)
-    /// marker prefix. The caller (workspace graph pass) resolves
-    /// service names to file aliases and feeds these into the
-    /// `AngularGraphBuilder`.
-    pub fn to_graph_edges(
-        &self,
-    ) -> Vec<(String, String, crate::angular_meta::graph::NgRxEdgeKind)> {
-        use crate::angular_meta::graph::NgRxEdgeKind;
+    /// [`NgRxEdgeKind`](crate::angular_meta::ngrx::NgRxEdgeKind)
+    /// marker prefix. The caller feeds these into the legacy graph.
+    pub fn to_graph_edges(&self) -> Vec<(String, String, crate::angular_meta::ngrx::NgRxEdgeKind)> {
+        use crate::angular_meta::ngrx::NgRxEdgeKind;
         let mut edges = Vec::new();
 
         // Action → Reducer (via `on(action)` handlers).
@@ -347,14 +390,29 @@ impl NgRxShape {
     /// Produces:
     /// - Effect → `HandlesAction` → Action (one per `ofType` source action)
     /// - Effect → `CallsService` → ServiceMethod (from `switchMap` body)
-    /// - DispatchSite → `Dispatches` → Action
-    /// - SelectSite → `Selects` → Selector
+    /// - Action → `TriggersReducer` → Reducer (from `on(action)` handlers)
+    /// - Effect → `ProducesAction` → Action (from `map(successAction)`)
+    /// - Component → `HasStore` → Store (from `Store<T>` DI)
+    /// - Component → `Dispatches` → Action (via `this.store.dispatch(...)`)
+    /// - Component → `Selects` → Selector (via `this.store.select(...)`)
     pub fn to_ngrx_semantic_edges(&self) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
         use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
         let mut edges: Vec<SemanticEdge> = Vec::new();
 
-        // Effect → HandlesAction → Action
+        // Action → TriggersReducer → Reducer (via `on(action)` handlers).
+        if let Some(reducer) = &self.reducer {
+            for transition in &reducer.transitions {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::TriggersReducer,
+                    subject: EntityRef::new("ngrx", "Action", &transition.action_name),
+                    object: EntityRef::new("ngrx", "Reducer", &reducer.name),
+                    layer: "ngrx",
+                });
+            }
+        }
+
+        // Effect → HandlesAction → Action (via `ofType(action)`).
         for effect in &self.effects {
             let sources: Vec<&str> = if !effect.source_actions.is_empty() {
                 effect.source_actions.iter().map(|s| s.as_str()).collect()
@@ -379,35 +437,57 @@ impl NgRxShape {
                     layer: "ngrx",
                 });
             }
+
+            // Effect → ProducesAction → Action (via `map(successAction)`).
+            if let Some(success) = &effect.success_action {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::ProducesAction,
+                    subject: EntityRef::new("ngrx", "Effect", &effect.name),
+                    object: EntityRef::new("ngrx", "Action", success),
+                    layer: "ngrx",
+                });
+            }
         }
 
-        // DispatchSite → Dispatches → Action
+        // Component → HasStore → Store (via `Store<T>` DI).
+        if let Some(ref component) = self.component_name {
+            for store_type in &self.store_injections {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::HasStore,
+                    subject: EntityRef::new("angular", "Component", component),
+                    object: EntityRef::new("ngrx", "Store", store_type),
+                    layer: "ngrx",
+                });
+            }
+        }
+
+        // Component → Dispatches → Action (via `this.store.dispatch(...)`).
+        // Uses the actual component class as the subject when available.
         for site in &self.dispatch_sites {
+            let subject = if let Some(ref component) = self.component_name {
+                EntityRef::new("angular", "Component", component)
+            } else {
+                EntityRef::new("angular", "DispatchSite", "store")
+            };
             edges.push(SemanticEdge {
                 relation: SemanticRelation::Dispatches,
-                subject: EntityRef::new(
-                    "angular",
-                    "DispatchSite",
-                    self.component_name
-                        .clone()
-                        .unwrap_or_else(|| "store".to_string()),
-                ),
+                subject,
                 object: EntityRef::new("ngrx", "Action", &site.action_name),
                 layer: "ngrx",
             });
         }
 
-        // SelectSite → Selects → Selector
+        // Component → Selects → Selector (via `this.store.select(...)`).
+        // Uses the actual component class as the subject when available.
         for site in &self.select_sites {
+            let subject = if let Some(ref component) = self.component_name {
+                EntityRef::new("angular", "Component", component)
+            } else {
+                EntityRef::new("angular", "SelectSite", "store")
+            };
             edges.push(SemanticEdge {
                 relation: SemanticRelation::Selects,
-                subject: EntityRef::new(
-                    "angular",
-                    "SelectSite",
-                    self.component_name
-                        .clone()
-                        .unwrap_or_else(|| "store".to_string()),
-                ),
+                subject,
                 object: EntityRef::new("ngrx", "Selector", &site.selector_name),
                 layer: "ngrx",
             });

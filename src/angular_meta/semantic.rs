@@ -9,7 +9,7 @@
 // Phase 1 contract: this module reuses existing extraction helpers and does
 // NOT duplicate parsing logic. It is a projection adapter, not a new parser.
 
-use crate::angular_meta::graph::ClassKind;
+use crate::angular_meta::decorators::ClassKind;
 use crate::compression::Fidelity;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
@@ -18,13 +18,20 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 /// and NgModule declarations.
 ///
 /// Called once per class capture in `extract_semantic_edges()`.
+///
+/// `pipe_name` is the Angular pipe name (e.g. "uppercase"), used for
+/// Pipe entities. `declaration_types` maps class names to entity types
+/// for NgModule declarations (enables precision in DeclaresInModule edges).
+#[allow(clippy::too_many_arguments)]
 pub fn class_to_semantic_edges(
     class_name: &str,
     kind: ClassKind,
     selector: Option<&str>,
     injects: &[String],
+    pipe_name: Option<&str>,
     raw_class: &str,
     fidelity: Fidelity,
+    declaration_types: &std::collections::HashMap<String, &'static str>,
 ) -> Vec<SemanticEdge> {
     let mut edges: Vec<SemanticEdge> = Vec::new();
 
@@ -37,6 +44,18 @@ pub fn class_to_semantic_edges(
     };
 
     let subject = EntityRef::new("angular", entity_type, class_name);
+
+    // Pipe → HasPipeName → pipe-name-string
+    if kind == ClassKind::Pipe {
+        if let Some(pn) = pipe_name {
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: subject.clone(),
+                object: EntityRef::new("angular", "PipeName", pn),
+                layer: "angular",
+            });
+        }
+    }
 
     // Component → HasSelector → selector-string
     if kind == ClassKind::Component {
@@ -63,14 +82,19 @@ pub fn class_to_semantic_edges(
     }
 
     // Module → DeclaresInModule → Component/Directive/Pipe for each declaration
+    // Uses the declaration_types map for precise entity type.
     if kind == ClassKind::Module {
-        let (declarations, imports, _exports) =
+        let (declarations, imports, exports) =
             crate::angular_meta::decorators::extract_module_declarations(raw_class);
         for decl in &declarations {
+            let decl_type = declaration_types
+                .get(decl.as_str())
+                .copied()
+                .unwrap_or("Component");
             edges.push(SemanticEdge {
                 relation: SemanticRelation::DeclaresInModule,
                 subject: subject.clone(),
-                object: EntityRef::new("angular", "Component", decl),
+                object: EntityRef::new("angular", decl_type, decl),
                 layer: "angular",
             });
         }
@@ -80,6 +104,19 @@ pub fn class_to_semantic_edges(
                 relation: SemanticRelation::ImportsModule,
                 subject: subject.clone(),
                 object: EntityRef::new("angular", "Module", imp),
+                layer: "angular",
+            });
+        }
+        // Module → ExportsFromModule → Component/Directive/Pipe for each export
+        for exp in &exports {
+            let exp_type = declaration_types
+                .get(exp.as_str())
+                .copied()
+                .unwrap_or("Component");
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::ExportsFromModule,
+                subject: subject.clone(),
+                object: EntityRef::new("angular", exp_type, exp),
                 layer: "angular",
             });
         }

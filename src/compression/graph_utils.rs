@@ -71,6 +71,7 @@ where
 ///
 /// # Complexity
 /// O(V + E) time, O(V) space
+#[allow(dead_code)]
 pub fn find_cycles<F, L>(node_count: usize, adjacency_fn: F, node_label_fn: L) -> Vec<Vec<String>>
 where
     F: Fn(usize) -> Vec<usize>,

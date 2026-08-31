@@ -304,6 +304,7 @@ impl PhiLineKind {
     }
 
     /// Returns the token string (without trailing `:`) for a given kind.
+    #[allow(dead_code)]
     pub fn token(self) -> &'static str {
         match self {
             Self::Controller => "Φctrl",

@@ -17,11 +17,9 @@
 // use `Mutex`/`RwLock` internally, so `&mut` is never required.
 // is single-threaded by design) and the config is shared immutably.
 
-use crate::angular_meta::graph_state::AngularGraphHandle;
 use crate::cache::LocalStateCache;
 use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
-use crate::dotnet_meta::graph_state::DotnetGraphHandle;
 use crate::ir::replay::ContextState;
 use crate::layers::LayerRegistry;
 use crate::mcp::buffered_store::BufferedStore;
@@ -29,7 +27,6 @@ use crate::mcp::cache_hints::CacheMetrics;
 use crate::mcp::context_store::InMemoryContextStore;
 use crate::mcp::session_stats::SessionStats;
 use crate::mcp::sqlite_store::SqliteStore;
-use crate::spring_meta::graph_state::SpringGraphHandle;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::{Mutex, RwLock};
@@ -137,18 +134,6 @@ pub struct McpState {
     /// Treated as immutable for the session — the operator must
     /// restart the server to pick up edits.
     pub config: CleanCtxConfig,
-    /// Angular cross-file dependency graph (Phase 3, Tier 3).
-    /// Built once per `compress_workspace` call; `None` when no
-    /// workspace has been compressed yet.
-    pub angular_graph: Mutex<AngularGraphHandle>,
-    /// .NET cross-file dependency graph (Phase 3, Tier 3).
-    /// Built once per `compress_workspace` call; `None` when no
-    /// workspace has been compressed yet.
-    pub dotnet_graph: Mutex<DotnetGraphHandle>,
-    /// Spring Boot cross-file dependency graph (Phase 3, Tier 3).
-    /// Built once per `compress_workspace` call; `None` when no
-    /// workspace has been compressed yet.
-    pub spring_graph: Mutex<SpringGraphHandle>,
     /// Compiler IR context state — tracks all files and their IR state.
     /// Enables delta-based state transport: load full IR on first
     /// compress, then apply deltas on subsequent edits.
@@ -285,9 +270,6 @@ impl McpState {
             dict: Mutex::new(PathDictionary::new()),
             cache: RwLock::new(LocalStateCache::new()),
             config,
-            angular_graph: Mutex::new(AngularGraphHandle::new()),
-            dotnet_graph: Mutex::new(DotnetGraphHandle::new()),
-            spring_graph: Mutex::new(SpringGraphHandle::new()),
             ir_context: RwLock::new(ContextState::new()),
             source_cache: Mutex::new(HashMap::new()),
             warnings: Mutex::new(Vec::new()),
@@ -422,21 +404,6 @@ impl McpState {
     /// Lock the graph bridge for mutation.
     pub fn graph_bridge_lock(&self) -> std::sync::MutexGuard<'_, Option<crate::cbm::GraphBridge>> {
         lock_or_recover!(self.graph_bridge.lock(), "graph_bridge")
-    }
-
-    /// Lock the angular graph for mutation.
-    pub fn angular_graph_lock(&self) -> std::sync::MutexGuard<'_, AngularGraphHandle> {
-        lock_or_recover!(self.angular_graph.lock(), "angular_graph")
-    }
-
-    /// Lock the .NET graph for mutation.
-    pub fn dotnet_graph_lock(&self) -> std::sync::MutexGuard<'_, DotnetGraphHandle> {
-        lock_or_recover!(self.dotnet_graph.lock(), "dotnet_graph")
-    }
-
-    /// Lock the Spring graph for mutation.
-    pub fn spring_graph_lock(&self) -> std::sync::MutexGuard<'_, SpringGraphHandle> {
-        lock_or_recover!(self.spring_graph.lock(), "spring_graph")
     }
 
     /// Lock the persistence store for writing.

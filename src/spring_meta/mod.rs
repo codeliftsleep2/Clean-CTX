@@ -22,11 +22,7 @@
 // - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
 
 pub(crate) mod annotations;
-pub mod bundler;
 pub(crate) mod detect;
-pub mod footer;
-pub mod graph;
-pub mod graph_state;
 pub(crate) mod markers;
 pub mod properties;
 pub mod semantic;

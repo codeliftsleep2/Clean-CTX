@@ -20,12 +20,8 @@
 // - `footer`     : `§ΦMAP` workspace footer formatter
 // - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
 
-pub mod bundler;
 pub(crate) mod decorators;
 pub(crate) mod detect;
-pub mod footer;
-pub mod graph;
-pub mod graph_state;
 pub(crate) mod markers;
 pub mod ngrx;
 pub mod phi;
