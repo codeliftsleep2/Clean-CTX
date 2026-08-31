@@ -29,6 +29,7 @@ pub mod graph;
 pub mod graph_state;
 pub(crate) mod markers;
 pub mod properties;
+pub mod semantic;
 
 use crate::compression::Fidelity;
 
@@ -128,3 +129,7 @@ pub fn run_meta_layer(
 #[cfg(all(test, feature = "spring_boot"))]
 #[path = "../tests/spring_meta/mod.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "spring_boot"))]
+#[path = "../tests/spring_meta/semantic.rs"]
+mod semantic_tests;

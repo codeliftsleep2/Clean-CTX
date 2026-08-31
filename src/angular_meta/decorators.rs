@@ -301,15 +301,15 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                 scan += 1;
             }
             if scan < len {
-                let (func_name, open_paren) = if scan + 5 < len && &body[scan..scan + 6] == "input("
+                let (func_name, open_paren) = if scan + 5 < len && &bytes[scan..scan + 6] == b"input("
                 {
                     ("input", scan + 5)
-                } else if scan + 5 < len && &body[scan..scan + 6] == "model(" {
+                } else if scan + 5 < len && &bytes[scan..scan + 6] == b"model(" {
                     ("model", scan + 5)
-                } else if scan + 6 < len && &body[scan..scan + 7] == "output(" {
+                } else if scan + 6 < len && &bytes[scan..scan + 7] == b"output(" {
                     ("output", scan + 6)
                 } else if scan + 5 < len
-                    && &body[scan..scan + 6] == "inject"
+                    && &bytes[scan..scan + 6] == b"inject"
                     && scan + 6 < len
                     && bytes[scan + 6] == b'('
                 {

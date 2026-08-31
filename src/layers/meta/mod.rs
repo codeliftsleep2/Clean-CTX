@@ -340,6 +340,22 @@ impl MetaLayer for SpringBootMetaLayer {
             dotnet_block: None,
         })
     }
+
+    fn extract_semantic_edges(
+        &self,
+        source: &str,
+        class_captures: &[String],
+        fidelity: Fidelity,
+        _config: Option<&CleanCtxConfig>,
+    ) -> Vec<SemanticEdge> {
+        let mut edges = Vec::new();
+        for raw_class in class_captures {
+            edges.extend(crate::spring_meta::semantic::extract_spring_semantic_edges(
+                raw_class, fidelity,
+            ));
+        }
+        edges
+    }
 }
 
 #[cfg(not(feature = "spring_boot"))]

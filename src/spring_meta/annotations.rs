@@ -227,7 +227,7 @@ pub fn extract_annotations(raw_class: &str, fidelity: Fidelity) -> Option<Annota
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AnnotationKind {
+pub(crate) enum AnnotationKind {
     RestController,
     Controller,
     Service,
@@ -246,7 +246,7 @@ enum AnnotationKind {
     Other,
 }
 
-fn collect_annotations(head: &str) -> Vec<Annotation> {
+pub(crate) fn collect_annotations(head: &str) -> Vec<Annotation> {
     let mut annotations: Vec<Annotation> = Vec::new();
     let bytes = head.as_bytes();
     let len = bytes.len();
@@ -295,11 +295,11 @@ fn collect_annotations(head: &str) -> Vec<Annotation> {
 }
 
 #[derive(Debug, Clone)]
-struct Annotation {
+pub(crate) struct Annotation {
     #[allow(dead_code)]
-    name: String,
-    arg: String,
-    kind: AnnotationKind,
+    pub(crate) name: String,
+    pub(crate) arg: String,
+    pub(crate) kind: AnnotationKind,
 }
 
 fn classify_annotation(name: &str) -> AnnotationKind {
@@ -334,7 +334,7 @@ fn annotation_kind_to_http_method(kind: AnnotationKind) -> String {
     }
 }
 
-fn parse_request_mappings(arg: &str) -> Vec<RequestMappingMapping> {
+pub(crate) fn parse_request_mappings(arg: &str) -> Vec<RequestMappingMapping> {
     let mut mappings = Vec::new();
     let trimmed = arg.trim();
 
@@ -406,7 +406,7 @@ fn parse_mapping_paths(arg: &str) -> Vec<String> {
     paths
 }
 
-fn collect_method_annotations(body: &str) -> Vec<(String, AnnotationKind, String)> {
+pub(crate) fn collect_method_annotations(body: &str) -> Vec<(String, AnnotationKind, String)> {
     let mut out: Vec<(String, AnnotationKind, String)> = Vec::new();
     let bytes = body.as_bytes();
     let len = bytes.len();
@@ -509,7 +509,7 @@ fn collect_method_annotations(body: &str) -> Vec<(String, AnnotationKind, String
     out
 }
 
-fn collect_field_annotations(body: &str) -> Vec<(String, AnnotationKind)> {
+pub(crate) fn collect_field_annotations(body: &str) -> Vec<(String, AnnotationKind)> {
     let mut out: Vec<(String, AnnotationKind)> = Vec::new();
     let bytes = body.as_bytes();
     let len = bytes.len();
@@ -572,7 +572,7 @@ fn collect_field_annotations(body: &str) -> Vec<(String, AnnotationKind)> {
 // returning `i-open_paren` and slicing to end of text — silent EOF
 // behaviour).
 
-fn find_class_head_end(raw: &str) -> Option<usize> {
+pub(crate) fn find_class_head_end(raw: &str) -> Option<usize> {
     if let Some(pos) = raw.find("class ") {
         return Some(pos);
     }
@@ -597,7 +597,7 @@ fn find_class_head_end(raw: &str) -> Option<usize> {
 /// The brace-depth + string-literal scan delegates to the shared
 /// `meta_util::find_first_top_level` primitive (Round-8 structural audit)
 /// — no hand-rolled scanner remains in this file.
-fn find_class_body_open(raw: &str) -> Option<usize> {
+pub(crate) fn find_class_body_open(raw: &str) -> Option<usize> {
     const TYPE_KW: &[(&str, usize)] = &[
         ("class ", 6),
         ("interface ", 10),
@@ -613,7 +613,7 @@ fn find_class_body_open(raw: &str) -> Option<usize> {
     None
 }
 
-fn extract_class_name(raw: &str) -> Option<String> {
+pub(crate) fn extract_class_name(raw: &str) -> Option<String> {
     if let Some(class_pos) = raw.find("class ") {
         let after = &raw[class_pos + 6..];
         let trimmed = after.trim_start();

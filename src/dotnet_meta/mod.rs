@@ -32,6 +32,7 @@ pub mod general;
 pub mod graph;
 pub mod graph_state;
 pub(crate) mod markers;
+pub mod semantic;
 pub mod serialization;
 pub mod signalr;
 
@@ -148,6 +149,10 @@ pub fn run_meta_layer(
 #[path = "../tests/dotnet_meta/mod.rs"]
 mod tests;
 
+#[cfg(all(test, feature = "dotnet"))]
+#[path = "../tests/dotnet_meta/semantic.rs"]
+mod semantic_tests;
+
 // ── Meta-Layer Integration ────────────────────────────────────────────
 
 #[cfg(feature = "dotnet")]
@@ -202,6 +207,29 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             spring_block: None,
             dotnet_block: Some(block),
         })
+    }
+
+    fn extract_semantic_edges(
+        &self,
+        _source: &str,
+        class_captures: &[String],
+        fidelity: crate::compression::Fidelity,
+        _config: Option<&crate::config::CleanCtxConfig>,
+    ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
+        use crate::layers::meta::semantic::SemanticEdge;
+        let mut edges: Vec<SemanticEdge> = Vec::new();
+
+        // Run per-class extraction following the same pattern as run_meta_layer
+        for raw_class in class_captures {
+            let class_name = crate::dotnet_meta::semantic::extract_class_name_from_class(raw_class);
+            if let Some(name) = class_name {
+                edges.extend(crate::dotnet_meta::semantic::extract_dotnet_semantic_edges(
+                    raw_class, &name, fidelity,
+                ));
+            }
+        }
+
+        edges
     }
 }
 
