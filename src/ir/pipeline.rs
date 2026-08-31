@@ -89,6 +89,9 @@ pub struct PassContext {
     /// Source code and metadata
     pub source: String,
     pub file_id: String,
+    /// Durable canonical file identity (for EntityRef.file provenance).
+    /// Set by compile_inner; distinct from file_id (which is αN alias).
+    pub canonical_path: Option<String>,
     pub fidelity: Fidelity,
     /// Monotonic instruction ID counter.
     pub id_counter: u64,
@@ -125,6 +128,7 @@ impl PassContext {
             semantic_edges: Vec::new(),
             source,
             file_id,
+            canonical_path: None,
             fidelity,
             id_counter: 0,
             language_layers: Vec::new(),
@@ -824,13 +828,20 @@ impl IRPass for MetaLayerPass {
             state.fidelity,
             None,
         );
-        let file_id = state.file_id.clone();
+        // Attach durable canonical path (or fall back to αN file_id) as
+        // file provenance on every semantic edge. The canonical path is
+        // the authoritative file identity for the WorkspaceIndex; αN is
+        // session-local and presentation-only (File Identity Correction).
+        let file_provenance = state
+            .canonical_path
+            .clone()
+            .unwrap_or_else(|| state.file_id.clone());
         for edge in &mut semantic_edges {
             if edge.subject.file.is_none() {
-                edge.subject.file = Some(file_id.clone());
+                edge.subject.file = Some(file_provenance.clone());
             }
             if edge.object.file.is_none() {
-                edge.object.file = Some(file_id.clone());
+                edge.object.file = Some(file_provenance.clone());
             }
         }
         state.semantic_edges.extend(semantic_edges);

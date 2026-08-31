@@ -313,6 +313,12 @@ pub(super) fn compile_file_ir_focused(
     // display, but the alias key itself uses the raw path.
     let path_alias = state.get_or_create_alias(file_path.to_string());
 
+    // File Identity Correction: compute the durable canonical identity
+    // for EntityRef.file provenance. This is the authoritative file
+    // identity for semantic edges and the WorkspaceIndex, distinct from
+    // the session-local αN alias.
+    let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
+
     // NF-02: Determine the next version based on the previous context state
     let prev_version = state.file_version(&path_alias).unwrap_or(0);
 
@@ -370,6 +376,7 @@ pub(super) fn compile_file_ir_focused(
     let mut compiled = compiler.compile_focused(
         source,
         &path_alias,
+        Some(&canonical_path),
         language,
         query_string,
         fidelity,

@@ -121,6 +121,7 @@ impl IRCompiler {
         self.compile_inner(
             source,
             file_id,
+            None,
             language,
             query_string,
             fidelity,
@@ -149,6 +150,7 @@ impl IRCompiler {
         &mut self,
         source: &str,
         file_id: &str,
+        canonical_path: Option<&str>,
         language: tree_sitter::Language,
         query_string: &str,
         fidelity: Fidelity,
@@ -158,6 +160,7 @@ impl IRCompiler {
         self.compile_inner(
             source,
             file_id,
+            canonical_path,
             language,
             query_string,
             fidelity,
@@ -191,6 +194,7 @@ impl IRCompiler {
         &mut self,
         source: &str,
         file_id: &str,
+        canonical_path: Option<&str>,
         language: tree_sitter::Language,
         query_string: &str,
         fidelity: Fidelity,
@@ -199,6 +203,7 @@ impl IRCompiler {
     ) -> Result<CompiledIR, CompileError> {
         // Construct PassContext with per-compilation state
         let mut ctx = PassContext::new(source.to_string(), file_id.to_string(), fidelity);
+        ctx.canonical_path = canonical_path.map(|p| p.to_string());
         ctx.language = Some(language);
         ctx.query_string = query_string.to_string();
         ctx.skip_set = skip_set.cloned();

@@ -52,6 +52,7 @@ fn compile_edit_focused(focus: Option<&HashSet<String>>) -> CompiledIR {
         .compile_focused(
             source,
             "test_edit_focused",
+            None,
             language,
             query,
             Fidelity::Edit,
@@ -423,6 +424,7 @@ fn compile_focused_non_edit_fidelity_ignores_focus() {
         .compile_focused(
             source,
             "test_high_focused",
+            None,
             language,
             query,
             Fidelity::High,
