@@ -91,6 +91,9 @@ pub struct WorkspaceIndex {
     edge_set: HashSet<EdgeKey>,
     /// File → entity keys in that file (for provenance tracking).
     file_map: HashMap<String, Vec<EntityKey>>,
+    /// Entity name → entity keys (for name-based lookup across domains/types).
+    /// Populated alongside the entities map during registration.
+    name_index: HashMap<String, Vec<EntityKey>>,
     /// Total edge count before dedup (for diagnostic purposes).
     total_edges_inserted: usize,
     /// Active edge count after dedup.
@@ -105,6 +108,7 @@ impl WorkspaceIndex {
             reverse: HashMap::new(),
             edge_set: HashSet::new(),
             file_map: HashMap::new(),
+            name_index: HashMap::new(),
             total_edges_inserted: 0,
             edge_count: 0,
         }
@@ -179,6 +183,12 @@ impl WorkspaceIndex {
         entity: EntityRef,
         file_entity_keys: &mut Vec<EntityKey>,
     ) {
+        // Only push unique entity keys into the name index to avoid
+        // repeated lookups for the same (name, identity) pair.
+        let name_entries = self.name_index.entry(entity.name.clone()).or_default();
+        if !name_entries.contains(key) {
+            name_entries.push(key.clone());
+        }
         self.entities.entry(key.clone()).or_default().push(entity);
         file_entity_keys.push(key.clone());
     }
@@ -291,6 +301,97 @@ impl WorkspaceIndex {
     /// Check if the index is empty.
     pub fn is_empty(&self) -> bool {
         self.edge_count == 0
+    }
+
+    // ── Phase 4b queries ─────────────────────────────────────────────
+
+    /// Find all entity occurrences with the given name across all domains
+    /// and entity types.
+    ///
+    /// This is a name-based lookup (not identity-based). Multiple identical
+    /// entity identities at different file locations all match.
+    ///
+    /// Returns an empty vec when no entity with that name exists.
+    pub fn find_entities_by_name(&self, name: &str) -> Vec<&EntityRef> {
+        let keys = match self.name_index.get(name) {
+            Some(k) => k,
+            None => return Vec::new(),
+        };
+        let mut results: Vec<&EntityRef> = Vec::new();
+        for key in keys {
+            if let Some(occurrences) = self.entities.get(key) {
+                results.extend(occurrences.iter());
+            }
+        }
+        results
+    }
+
+    /// Resolve an injection reference target by bare type name.
+    ///
+    /// Returns all entity occurrences that are referenced as injection
+    /// targets by an `Injects` or `Autowired` edge whose object has the
+    /// requested type/name.
+    ///
+    /// Semantics: the returned EntityRef.file indicates the extraction
+    /// provenance (the file where the injection reference occurred), NOT
+    /// necessarily the definition file of the injected target.
+    ///
+    /// Preserves ambiguity: if the same target name is referenced from
+    /// multiple files, all occurrences are returned.
+    pub fn resolve_inject_type(&self, type_name: &str) -> Vec<&EntityRef> {
+        let keys = match self.name_index.get(type_name) {
+            Some(k) => k,
+            None => return Vec::new(),
+        };
+        let mut results: Vec<&EntityRef> = Vec::new();
+        for key in keys {
+            // Only include entities that are the target of an Injects or
+            // Autowired edge (incoming edge on the object side).
+            if let Some(incoming) = self.reverse.get(key) {
+                let is_inject_target = incoming.iter().any(|e| {
+                    matches!(
+                        e.relation,
+                        SemanticRelation::Injects | SemanticRelation::Autowired
+                    )
+                });
+                if is_inject_target {
+                    if let Some(occurrences) = self.entities.get(key) {
+                        results.extend(occurrences.iter());
+                    }
+                }
+            }
+        }
+        results
+    }
+
+    /// Resolve a CSS selector string to component/directive entity
+    /// occurrences that expose that selector.
+    ///
+    /// Algorithm: selector → `[selector]` marker entity → incoming
+    /// `HasSelector` edges → subject entity occurrences.
+    ///
+    /// Returns all matching entity occurrences. Preserves ambiguity and
+    /// insertion order.
+    pub fn resolve_selector(&self, selector: &str) -> Vec<&EntityRef> {
+        let marker_name = format!("[{}]", selector);
+        let marker_keys = match self.name_index.get(&marker_name) {
+            Some(k) => k,
+            None => return Vec::new(),
+        };
+        let mut results: Vec<&EntityRef> = Vec::new();
+        for marker_key in marker_keys {
+            if let Some(incoming) = self.reverse.get(marker_key) {
+                for edge in incoming {
+                    if edge.relation == SemanticRelation::HasSelector {
+                        let subj_key = entity_key(&edge.subject);
+                        if let Some(occurrences) = self.entities.get(&subj_key) {
+                            results.extend(occurrences.iter());
+                        }
+                    }
+                }
+            }
+        }
+        results
     }
 }
 

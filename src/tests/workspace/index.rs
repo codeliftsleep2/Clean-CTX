@@ -303,3 +303,235 @@ fn counters_reflect_insertion_and_dedup() {
     assert_eq!(idx.total_edges_inserted(), 6);
     assert_eq!(idx.edge_count(), 4);
 }
+// ── Phase 4b: Name-based Lookup ───────────────────────────────────────
+
+#[test]
+fn find_entities_by_name_empty_when_not_found() {
+    let idx = WorkspaceIndex::new();
+    assert!(idx.find_entities_by_name("NonExistent").is_empty());
+}
+
+#[test]
+fn find_entities_by_name_returns_across_domains_and_types() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "app.ts",
+        vec![inject_edge("UserComponent", "UserService", Some("app.ts"))],
+    );
+    idx.add_edges("app.ts", vec![route_edge("/users", "UsersComponent")]);
+
+    let found = idx.find_entities_by_name("UserComponent");
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].domain, "angular");
+    assert_eq!(found[0].entity_type, "Component");
+}
+
+#[test]
+fn find_entities_by_name_retains_ambiguity() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.ts",
+        vec![inject_edge("UserComponent", "UserService", Some("a.ts"))],
+    );
+    idx.add_edges(
+        "b.ts",
+        vec![inject_edge("AdminComponent", "UserService", Some("b.ts"))],
+    );
+
+    // UserService has same name but comes from two different entity identities
+    // (both are ("angular", "Service", "UserService") so same identity, but
+    // two occurrences at different files).
+    let found = idx.find_entities_by_name("UserService");
+    assert_eq!(found.len(), 2, "both occurrences must be found");
+}
+
+// ── Phase 4b: resolve_inject_type ────────────────────────────────────
+
+#[test]
+fn resolve_inject_type_empty_when_not_found() {
+    let idx = WorkspaceIndex::new();
+    assert!(idx.resolve_inject_type("NonExistent").is_empty());
+}
+
+#[test]
+fn resolve_inject_type_returns_injection_targets() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "app.ts",
+        vec![inject_edge("UserComponent", "UserService", Some("app.ts"))],
+    );
+
+    let targets = idx.resolve_inject_type("UserService");
+    assert_eq!(targets.len(), 1);
+    assert_eq!(targets[0].name, "UserService");
+    assert_eq!(targets[0].entity_type, "Service");
+    assert_eq!(targets[0].file.as_deref(), Some("app.ts"));
+}
+
+#[test]
+fn resolve_inject_type_ignores_non_injected_names() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "app.ts",
+        vec![
+            inject_edge("UserComponent", "UserService", Some("app.ts")),
+            route_edge("/home", "HomeComponent"),
+        ],
+    );
+
+    // "HomeComponent" appears as an object of a RouteMapsTo edge, NOT Injects.
+    let targets = idx.resolve_inject_type("HomeComponent");
+    assert!(targets.is_empty(), "non-injected entities must be excluded");
+}
+
+#[test]
+fn resolve_inject_type_returns_multiple_occurrences() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.ts",
+        vec![inject_edge("ComponentA", "SharedService", Some("a.ts"))],
+    );
+    idx.add_edges(
+        "b.ts",
+        vec![inject_edge("ComponentB", "SharedService", Some("b.ts"))],
+    );
+
+    let targets = idx.resolve_inject_type("SharedService");
+    assert_eq!(targets.len(), 2, "both injection reference occurrences");
+}
+#[test]
+fn resolve_inject_type_accepts_spring_autowired() {
+    let mut idx = WorkspaceIndex::new();
+    let autowired_edge = SemanticEdge {
+        relation: SemanticRelation::Autowired,
+        subject: EntityRef::new("spring", "Controller", "UserController"),
+        object: EntityRef {
+            domain: "spring",
+            entity_type: "Service",
+            name: "UserService".to_string(),
+            file: Some("UserController.java".to_string()),
+        },
+        layer: "spring",
+    };
+    idx.add_edges("UserController.java", vec![autowired_edge]);
+
+    let targets = idx.resolve_inject_type("UserService");
+    assert_eq!(targets.len(), 1);
+    assert_eq!(targets[0].domain, "spring");
+    assert_eq!(targets[0].file.as_deref(), Some("UserController.java"));
+}
+
+#[test]
+fn resolve_inject_type_angular_component_has_no_reverse_inject() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "app.ts",
+        vec![inject_edge("UserComponent", "UserService", Some("app.ts"))],
+    );
+
+    // "UserComponent" is the SUBJECT of Injects, not the object.
+    let targets = idx.resolve_inject_type("UserComponent");
+    assert!(
+        targets.is_empty(),
+        "subjects of injection edges are not injection targets"
+    );
+}
+
+// ── Phase 4b: resolve_selector ───────────────────────────────────────
+
+#[test]
+fn resolve_selector_empty_when_not_found() {
+    let idx = WorkspaceIndex::new();
+    assert!(idx.resolve_selector("app-not-found").is_empty());
+}
+
+#[test]
+fn resolve_selector_returns_component_with_matching_selector() {
+    let mut idx = WorkspaceIndex::new();
+
+    let edge = SemanticEdge {
+        relation: SemanticRelation::HasSelector,
+        subject: EntityRef::new("angular", "Component", "UserCardComponent"),
+        object: EntityRef::new("angular", "Component", "[app-user-card]"),
+        layer: "angular",
+    };
+    idx.add_edges("user-card.ts", vec![edge]);
+
+    let results = idx.resolve_selector("app-user-card");
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].name, "UserCardComponent");
+    assert_eq!(results[0].entity_type, "Component");
+}
+
+#[test]
+fn resolve_selector_unknown_selector_returns_empty() {
+    let mut idx = WorkspaceIndex::new();
+
+    let edge = SemanticEdge {
+        relation: SemanticRelation::RouteMapsTo,
+        subject: EntityRef::new("angular", "Route", "/home"),
+        object: EntityRef::new("angular", "Component", "HomeComponent"),
+        layer: "angular",
+    };
+    idx.add_edges("routes.ts", vec![edge]);
+
+    let results = idx.resolve_selector("home-selector");
+    assert!(results.is_empty(), "RouteMapsTo must not match HasSelector");
+}
+
+#[test]
+fn resolve_selector_file_provenance_preserved() {
+    let mut idx = WorkspaceIndex::new();
+
+    let edge = SemanticEdge {
+        relation: SemanticRelation::HasSelector,
+        subject: EntityRef {
+            domain: "angular",
+            entity_type: "Component",
+            name: "HeaderComponent".to_string(),
+            file: Some("header.component.ts".to_string()),
+        },
+        object: EntityRef {
+            domain: "angular",
+            entity_type: "Component",
+            name: "[app-header]".to_string(),
+            file: None,
+        },
+        layer: "angular",
+    };
+    idx.add_edges("header.component.ts", vec![edge]);
+
+    let results = idx.resolve_selector("app-header");
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].file.as_deref(), Some("header.component.ts"));
+}
+
+// ── Phase 4b: Phase 4a regression ───────────────────────────────────
+
+#[test]
+fn phase_4a_empty_index_constructs_unchanged() {
+    let idx = WorkspaceIndex::new();
+    assert!(idx.is_empty());
+    assert_eq!(idx.edge_count(), 0);
+    assert_eq!(idx.entity_identity_count(), 0);
+    assert_eq!(idx.entity_occurrence_count(), 0);
+    assert_eq!(idx.file_count(), 0);
+}
+
+#[test]
+fn phase_4a_identity_queries_unchanged() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "app.ts",
+        vec![inject_edge("UserComponent", "UserService", Some("app.ts"))],
+    );
+
+    let by_id = idx.entities_by_identity("angular", "Component", "UserComponent");
+    assert_eq!(by_id.len(), 1);
+
+    let forward = idx.forward_edges_by_identity("angular", "Component", "UserComponent");
+    assert_eq!(forward.len(), 1);
+
+    let reverse = idx.reverse_edges_by_identity("angular", "Service", "UserService");
+    assert_eq!(reverse.len(), 1);
+}
