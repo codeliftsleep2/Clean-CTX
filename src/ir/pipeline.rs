@@ -42,6 +42,7 @@ use crate::compaction::{
 };
 use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::{CapEntry, run_capture_pipeline};
+use crate::layers::meta::semantic::SemanticEdge;
 
 /// Error type for pass execution.
 #[derive(Debug, Clone)]
@@ -82,6 +83,9 @@ pub struct PassContext {
     pub program_graph: Option<ProgramGraph>,
     /// Inference layer (built in Pass 6)
     pub inference_layer: Option<InferenceLayer>,
+    /// Meta-layer semantic edges accumulated by Pass 3 (MetaLayerPass) and
+    /// consumed by the inference layer (Pass 8; semantic plan Phase 2).
+    pub semantic_edges: Vec<SemanticEdge>,
     /// Source code and metadata
     pub source: String,
     pub file_id: String,
@@ -118,6 +122,7 @@ impl PassContext {
             layer_context: LayerContext::new(&source, fidelity),
             program_graph: None,
             inference_layer: None,
+            semantic_edges: Vec::new(),
             source,
             file_id,
             fidelity,
@@ -808,6 +813,28 @@ impl IRPass for MetaLayerPass {
                 }
             }
         }
+
+        // Phase 2: collect semantic edges from applicable meta-layers and
+        // attach the per-file identity anchor. Edges flow:
+        //   MetaLayerPass PRODUCES -> state.semantic_edges (temporary carrier)
+        //   InferenceLayerPass CONSUMES -> InferenceLayer.semantic_edges (permanent)
+        let mut semantic_edges = crate::layers::LayerRegistry::global().collect_semantic_edges(
+            &state.source,
+            &class_captures,
+            state.fidelity,
+            None,
+        );
+        let file_id = state.file_id.clone();
+        for edge in &mut semantic_edges {
+            if edge.subject.file.is_none() {
+                edge.subject.file = Some(file_id.clone());
+            }
+            if edge.object.file.is_none() {
+                edge.object.file = Some(file_id.clone());
+            }
+        }
+        state.semantic_edges.extend(semantic_edges);
+
         Ok(())
     }
 }
@@ -960,6 +987,15 @@ impl IRPass for InferenceLayerPass {
                 );
             }
         }
+
+        // Phase 2: drain semantic edges accumulated by MetaLayerPass (Pass 3)
+        // into the InferenceLayer. Edges flow:
+        //   MetaLayerPass PRODUCES -> state.semantic_edges (temporary carrier)
+        //   InferenceLayerPass CONSUMES -> InferenceLayer.semantic_edges (permanent)
+        for edge in state.semantic_edges.drain(..) {
+            layer.add_semantic_edge(edge);
+        }
+
         state.inference_layer = Some(layer);
         Ok(())
     }

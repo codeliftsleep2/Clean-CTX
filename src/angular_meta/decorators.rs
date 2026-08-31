@@ -251,7 +251,7 @@ struct Decorator {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DecoratorKind {
+pub(crate) enum DecoratorKind {
     Component,
     Injectable,
     NgModule,
@@ -585,7 +585,7 @@ fn parse_provided_in(arg: &str) -> Option<String> {
     None
 }
 
-fn parse_module_fields(arg: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
+pub(crate) fn parse_module_fields(arg: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
     let mut trimmed = arg.trim().to_string();
     if trimmed.starts_with('{') && trimmed.ends_with('}') {
         trimmed = trimmed[1..trimmed.len() - 1].trim().to_string();
@@ -658,7 +658,77 @@ fn parse_first_string_arg(arg: &str) -> Option<String> {
     Some(unquoted.to_string())
 }
 
-fn extract_constructor_injects(raw_class: &str) -> Option<Vec<String>> {
+/// Extract input/output field names from a class capture for semantic edge
+/// construction.
+///
+/// Reuses the same field-decorator scanning logic as `extract_decorators`
+/// but returns structured data instead of Φ markers. Returns
+/// `Vec<(is_input: bool, field_name: String)>`.
+pub(crate) fn extract_io_fields(raw_class: &str, fidelity: Fidelity) -> Vec<(bool, String)> {
+    let _head_end = match find_class_head_end(raw_class) {
+        Some(e) => e,
+        None => return Vec::new(),
+    };
+    let class_body_start = match find_class_body_open(raw_class) {
+        Some(s) => s,
+        None => return Vec::new(),
+    };
+    let body_end = match crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
+    {
+        Some(e) => e,
+        None => return Vec::new(),
+    };
+    let body = &raw_class[class_body_start..];
+    let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
+
+    let mut fields: Vec<(bool, String)> = Vec::new();
+
+    // Collect @Input/@Output field decorators
+    for (kind, _alias, field_name) in collect_field_decorators(body_inner) {
+        match kind {
+            DecoratorKind::Input => fields.push((true, field_name)),
+            DecoratorKind::Output => fields.push((false, field_name)),
+            _ => {}
+        }
+    }
+
+    // Collect signal-based fields (input(), output() calls) at High fidelity
+    if fidelity == Fidelity::High {
+        for sf in collect_signal_fields(body_inner) {
+            match sf.kind {
+                SignalKind::Input => fields.push((true, sf.name)),
+                SignalKind::Output => fields.push((false, sf.name)),
+                _ => {}
+            }
+        }
+    }
+
+    fields
+}
+
+/// Extract NgModule declarations/imports/exports from a class capture,
+/// reusing the same parser as `extract_decorators`. Returns
+/// `(declarations, imports, exports)`.
+pub(crate) fn extract_module_declarations(
+    raw_class: &str,
+) -> (Vec<String>, Vec<String>, Vec<String>) {
+    let head_end = match find_class_head_end(raw_class) {
+        Some(e) => e,
+        None => return (Vec::new(), Vec::new(), Vec::new()),
+    };
+    let head = &raw_class[..head_end];
+    let decorators = collect_decorators(head);
+
+    for dec in &decorators {
+        if dec.kind == DecoratorKind::NgModule {
+            return parse_module_fields(&dec.arg);
+        }
+    }
+
+    (Vec::new(), Vec::new(), Vec::new())
+}
+
+pub(crate) fn extract_constructor_injects(raw_class: &str) -> Option<Vec<String>> {
     let body_start = raw_class.find('{')?;
     let body = &raw_class[body_start..];
 
@@ -727,7 +797,7 @@ fn is_word_byte(c: u8) -> bool {
 /// Walk the class body and collect all `@Input(...)` /
 /// `@Output(...)` decorator occurrences, pairing each decorator
 /// with the field declaration line that follows it.
-fn collect_field_decorators(body: &str) -> Vec<(DecoratorKind, Option<String>, String)> {
+pub(crate) fn collect_field_decorators(body: &str) -> Vec<(DecoratorKind, Option<String>, String)> {
     let mut out: Vec<(DecoratorKind, Option<String>, String)> = Vec::new();
     let bytes = body.as_bytes();
     let len = bytes.len();

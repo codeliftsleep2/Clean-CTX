@@ -9,6 +9,7 @@
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::layers::language::LanguageLayer;
+use crate::layers::meta::semantic::SemanticEdge;
 use crate::layers::meta::{MetaLayer, MetaLayerOutput};
 use std::sync::OnceLock;
 
@@ -145,6 +146,33 @@ impl LayerRegistry {
         results
     }
 
+    /// Collect semantic edges from all applicable meta-layers (phase 0).
+    ///
+    /// Mirrors `run_meta_layers_pipeline` dispatch: each layer checks
+    /// `is_applicable` and, if true, calls `extract_semantic_edges`. Edges
+    /// are NOT deduplicated here -- deduplication happens at the workspace
+    /// index boundary (semantic plan U2).
+    pub fn collect_semantic_edges(
+        &self,
+        source: &str,
+        class_captures: &[String],
+        fidelity: Fidelity,
+        config: Option<&CleanCtxConfig>,
+    ) -> Vec<SemanticEdge> {
+        let mut edges = Vec::new();
+        for layer in &self.meta_layers {
+            if layer.is_applicable(source, std::path::Path::new(""), config) {
+                edges.extend(layer.extract_semantic_edges(
+                    source,
+                    class_captures,
+                    fidelity,
+                    config,
+                ));
+            }
+        }
+        edges
+    }
+
     /// Check if a specific meta-layer is enabled.
     pub fn has_meta_layer(&self, name: &str) -> bool {
         self.meta_layers.iter().any(|l| l.name() == name)
@@ -160,3 +188,7 @@ impl LayerRegistry {
         self.meta_layers.iter().map(|l| l.name()).collect()
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/layers/registry.rs"]
+mod tests;

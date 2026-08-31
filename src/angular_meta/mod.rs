@@ -31,6 +31,7 @@ pub mod ngrx;
 pub mod phi;
 pub mod routing;
 pub mod rx;
+pub mod semantic;
 pub mod signals;
 pub mod style;
 pub mod template;
@@ -352,3 +353,7 @@ pub fn run_meta_layer_with_config(
 #[cfg(all(test, feature = "angular"))]
 #[path = "../tests/angular_meta/mod.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../tests/angular_meta/semantic.rs"]
+mod semantic_tests;

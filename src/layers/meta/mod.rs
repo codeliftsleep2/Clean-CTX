@@ -17,8 +17,11 @@
 // in this file for historical reasons. New meta-layers should NOT follow
 // this pattern.
 
+pub mod semantic;
+
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
+use crate::layers::meta::semantic::SemanticEdge;
 use std::path::Path;
 
 /// Structured output of a single meta-layer pass.
@@ -87,6 +90,24 @@ pub trait MetaLayer: Send + Sync {
         fidelity: Fidelity,
         config: Option<&CleanCtxConfig>,
     ) -> Option<MetaLayerOutput>;
+
+    /// Extract structured semantic edges for the given source file.
+    ///
+    /// Returns an empty vector by default -- meta-layers are NOT required
+    /// to produce semantic edges. Semantic edges are structural facts
+    /// (implicit confidence 1.0) discovered by the same per-framework
+    /// helpers that produce the Phi markers; `enrich()` output is
+    /// unchanged. No plugin feeds these yet (Phase 1+); the default keeps
+    /// every existing layer behavior-identical.
+    fn extract_semantic_edges(
+        &self,
+        _source: &str,
+        _class_captures: &[String],
+        _fidelity: Fidelity,
+        _config: Option<&CleanCtxConfig>,
+    ) -> Vec<SemanticEdge> {
+        Vec::new()
+    }
 }
 
 // ── Angular Meta-Layer ────────────────────────────────────────────────
@@ -169,6 +190,65 @@ impl MetaLayer for AngularMetaLayer {
             spring_block: None,
             dotnet_block: None,
         })
+    }
+
+    fn extract_semantic_edges(
+        &self,
+        source: &str,
+        class_captures: &[String],
+        fidelity: Fidelity,
+        config: Option<&CleanCtxConfig>,
+    ) -> Vec<SemanticEdge> {
+        let meta_config = config.and_then(|c| c.meta_layers.get("angular"));
+        let mut edges: Vec<SemanticEdge> = Vec::new();
+
+        // 1. Decorator-based edges from class captures
+        let is_angular = crate::angular_meta::detect::is_angular_file(source);
+        if is_angular {
+            for raw_class in class_captures {
+                // extract_graph_entries gives structured class metadata
+                // (kind, selector, injects) — no re-parsing of the source.
+                if let Some((class_name, kind, selector, injects, _pipe_name)) =
+                    crate::angular_meta::decorators::extract_graph_entries(raw_class)
+                {
+                    edges.extend(crate::angular_meta::semantic::class_to_semantic_edges(
+                        &class_name,
+                        kind,
+                        selector.as_deref(),
+                        &injects,
+                        raw_class,
+                        fidelity,
+                    ));
+                }
+            }
+        }
+
+        // 2. NgRx semantic edges — the shape extraction already parses the
+        //    file for NgRx artifacts; reuse its structured output.
+        let ngrx_enabled = meta_config.map(|c| c.ngrx.enabled).unwrap_or(true);
+        if ngrx_enabled {
+            if let Some(shape) = crate::angular_meta::ngrx::extract_ngrx_shape(source, fidelity) {
+                edges.extend(shape.to_ngrx_semantic_edges());
+            }
+        }
+
+        // 3. Routing semantic edges — same reuse of existing shape extraction.
+        let routing_enabled = meta_config.map(|c| c.routing.enabled).unwrap_or(true);
+        if routing_enabled {
+            if let Some(shape) = crate::angular_meta::routing::extract_route_shape(source, fidelity)
+            {
+                edges.extend(shape.to_semantic_edges());
+            }
+        }
+
+        // 4. RxJS: observables and subjects describe data-flow wiring, not
+        //    cross-entity semantic relationships. The NgRx effect extraction
+        //    already covers the action→effect→service pipeline, which is the
+        //    primary semantic chain. RxJS entries are retained as structural
+        //    metadata (Φ markers); semantic-edge projection of observables
+        //    is deferred to Phase 4 (WorkspaceIndex) if needed.
+
+        edges
     }
 }
 

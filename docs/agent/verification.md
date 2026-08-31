@@ -25,6 +25,12 @@ For ordinary tasks, the gate above is run once, for the changed targets where
 possible, before declaring the task complete. Prefer targeted suites for fast
 iteration, then run the complete gate at the end.
 
+**Windows performance note:** `cargo test` recompiles even on no-change runs.
+On this machine the compile step can exceed the agent's 30-second command
+timeout. After the test binary is built, prefer direct invocation (see
+`.clinerules/engineering.md` §7b for the exact PowerShell incantation). Use
+`cargo test` only when a rebuild is actually required.
+
 ## Migration-finalization verification
 
 For an explicitly designated **incremental architectural migration**, do NOT

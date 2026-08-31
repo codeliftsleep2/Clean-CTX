@@ -335,6 +335,87 @@ impl NgRxShape {
         edges
     }
 
+    /// Convert this NgRx shape into structured semantic edges
+    /// (Phase 1 of the Semantic Relationship Model).
+    ///
+    /// Parallel to [`to_graph_edges`](Self::to_graph_edges): the legacy
+    /// graph API renders flat `(from, to, kind)` triples for the DI graph,
+    /// while this method produces `SemanticEdge` objects with typed
+    /// relations for the IR InferenceLayer. Reuses the same structured data
+    /// fields — no re-parsing of source text.
+    ///
+    /// Produces:
+    /// - Effect → `HandlesAction` → Action (one per `ofType` source action)
+    /// - Effect → `CallsService` → ServiceMethod (from `switchMap` body)
+    /// - DispatchSite → `Dispatches` → Action
+    /// - SelectSite → `Selects` → Selector
+    pub fn to_ngrx_semantic_edges(&self) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
+        use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+
+        let mut edges: Vec<SemanticEdge> = Vec::new();
+
+        // Effect → HandlesAction → Action
+        for effect in &self.effects {
+            let sources: Vec<&str> = if !effect.source_actions.is_empty() {
+                effect.source_actions.iter().map(|s| s.as_str()).collect()
+            } else {
+                effect.source_action.iter().map(|s| s.as_str()).collect()
+            };
+            for source in sources {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::HandlesAction,
+                    subject: EntityRef::new("ngrx", "Effect", &effect.name),
+                    object: EntityRef::new("ngrx", "Action", source),
+                    layer: "ngrx",
+                });
+            }
+
+            // Effect → CallsService → ServiceMethod
+            if let Some(service) = &effect.service_call {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::CallsService,
+                    subject: EntityRef::new("ngrx", "Effect", &effect.name),
+                    object: EntityRef::new("ngrx", "ServiceMethod", service),
+                    layer: "ngrx",
+                });
+            }
+        }
+
+        // DispatchSite → Dispatches → Action
+        for site in &self.dispatch_sites {
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Dispatches,
+                subject: EntityRef::new(
+                    "angular",
+                    "DispatchSite",
+                    self.component_name
+                        .clone()
+                        .unwrap_or_else(|| "store".to_string()),
+                ),
+                object: EntityRef::new("ngrx", "Action", &site.action_name),
+                layer: "ngrx",
+            });
+        }
+
+        // SelectSite → Selects → Selector
+        for site in &self.select_sites {
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Selects,
+                subject: EntityRef::new(
+                    "angular",
+                    "SelectSite",
+                    self.component_name
+                        .clone()
+                        .unwrap_or_else(|| "store".to_string()),
+                ),
+                object: EntityRef::new("ngrx", "Selector", &site.selector_name),
+                layer: "ngrx",
+            });
+        }
+
+        edges
+    }
+
     /// Render the full `Φ NgRx Meta` block at the given fidelity.
     pub fn render(&self, fidelity: Fidelity) -> String {
         self.render_with_config(fidelity, None)

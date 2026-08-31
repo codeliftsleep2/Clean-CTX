@@ -19,6 +19,7 @@
 use std::collections::HashMap;
 
 use crate::cbm::bridge::GraphBridge;
+use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
 
 /// The Inference Layer holds all non-deterministic, derived, or estimated
 /// data about the IR. This layer is NEVER serialized into the core IR wire
@@ -27,8 +28,24 @@ use crate::cbm::bridge::GraphBridge;
 pub struct InferenceLayer {
     /// Inferred edges with confidence scores
     pub inferred_edges: Vec<InferenceEdge>,
+    /// Meta-layer semantic edges (structural facts, implicit confidence 1.0)
+    pub semantic_edges: Vec<SemanticEdge>,
     /// Per-symbol annotations (importance, dead code, blast radius)
     pub annotations: HashMap<String, Vec<InferenceAnnotation>>,
+}
+
+/// All edges (inferred + semantic) touching a single entity.
+///
+/// Returned by [`InferenceLayer::all_edges_for`]. The two lists are kept
+/// separate because the edge kinds are intentionally distinct: inferred
+/// edges are confidence-scored derivations, semantic edges are structural
+/// meta-layer facts (implicit confidence 1.0).
+#[derive(Debug, Clone)]
+pub struct EdgeSet<'a> {
+    /// CBM/structural/derived edges (explicit confidence + source).
+    pub inferred: Vec<&'a InferenceEdge>,
+    /// Meta-layer structural facts (implicit confidence 1.0).
+    pub semantic: Vec<&'a SemanticEdge>,
 }
 
 /// An inferred edge between two symbols.
@@ -98,6 +115,40 @@ impl InferenceLayer {
     /// Add an annotation for a symbol.
     pub fn add_annotation(&mut self, symbol: String, annotation: InferenceAnnotation) {
         self.annotations.entry(symbol).or_default().push(annotation);
+    }
+
+    /// Add a semantic edge (meta-layer structural fact, confidence 1.0).
+    pub fn add_semantic_edge(&mut self, edge: SemanticEdge) {
+        self.semantic_edges.push(edge);
+    }
+
+    /// Get all semantic edges (references into the layer's store).
+    pub fn semantic_edges(&self) -> Vec<&SemanticEdge> {
+        self.semantic_edges.iter().collect()
+    }
+
+    /// Get semantic edges whose subject or object equals the given entity
+    /// IDENTITY. Entity identity is (domain, entity_type, name) -- `file`
+    /// is excluded, so a query built with a different file id still matches
+    /// (plan U1/U2).
+    pub fn semantic_edges_for(&self, entity: &EntityRef) -> Vec<&SemanticEdge> {
+        self.semantic_edges
+            .iter()
+            .filter(|e| e.subject == *entity || e.object == *entity)
+            .collect()
+    }
+
+    /// All edges touching an entity: inferred (CBM/structural, matched by
+    /// symbol ID) plus semantic (meta-layer facts, matched by identity).
+    pub fn all_edges_for(&self, entity: &EntityRef) -> EdgeSet<'_> {
+        EdgeSet {
+            inferred: self
+                .inferred_edges
+                .iter()
+                .filter(|e| e.from == entity.name || e.to == entity.name)
+                .collect(),
+            semantic: self.semantic_edges_for(entity),
+        }
     }
 
     /// Get all edges with confidence above a threshold.

@@ -9,6 +9,7 @@ use crate::cbm::bridge::{DeadCodeEntry, SymbolImportance};
 use crate::ir::inference_layer::{
     InferenceAnnotation, InferenceEdge, InferenceEdgeType, InferenceLayer, InferenceSource,
 };
+use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
 // ── Basic Functionality ─────────────────────────────────────────────
 
@@ -831,4 +832,70 @@ fn test_enrich_from_cbm_does_not_duplicate_existing_edges() {
         .collect();
     assert_eq!(structural.len(), 1);
     assert_eq!(cbm.len(), 1);
+}
+
+// ── Semantic Edges (Meta-Layer Facts) ─────────────────────────────────
+
+#[test]
+fn test_semantic_edges_default_empty() {
+    let layer = InferenceLayer::new();
+    assert!(layer.semantic_edges.is_empty());
+    assert!(layer.semantic_edges().is_empty());
+}
+
+#[test]
+fn test_add_semantic_edge() {
+    let mut layer = InferenceLayer::new();
+    layer.add_semantic_edge(SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Component", "UserComponent"),
+        object: EntityRef::new("angular", "Service", "UserService"),
+        layer: "angular",
+    });
+    assert_eq!(layer.semantic_edges.len(), 1);
+    assert_eq!(layer.semantic_edges().len(), 1);
+}
+
+#[test]
+fn test_semantic_edges_for_matches_identity_ignores_file() {
+    let mut layer = InferenceLayer::new();
+    layer.add_semantic_edge(SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Component", "UserComponent")
+            .with_file("a.ts".to_string()),
+        object: EntityRef::new("angular", "Service", "UserService"),
+        layer: "angular",
+    });
+
+    // Query built with a DIFFERENT file id but the same identity -> match.
+    let query =
+        EntityRef::new("angular", "Component", "UserComponent").with_file("b.ts".to_string());
+    assert_eq!(layer.semantic_edges_for(&query).len(), 1);
+
+    // Different name -> no match.
+    let other = EntityRef::new("angular", "Component", "AdminComponent");
+    assert!(layer.semantic_edges_for(&other).is_empty());
+}
+
+#[test]
+fn test_all_edges_for_returns_both_kinds() {
+    let mut layer = InferenceLayer::new();
+    layer.add_edge(InferenceEdge {
+        edge_type: InferenceEdgeType::Calls,
+        from: "UserComponent".to_string(),
+        to: "UserService".to_string(),
+        confidence: 0.75,
+        source: InferenceSource::Cbm,
+    });
+    layer.add_semantic_edge(SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Component", "UserComponent"),
+        object: EntityRef::new("angular", "Service", "UserService"),
+        layer: "angular",
+    });
+
+    let entity = EntityRef::new("angular", "Component", "UserComponent");
+    let bundle = layer.all_edges_for(&entity);
+    assert_eq!(bundle.inferred.len(), 1);
+    assert_eq!(bundle.semantic.len(), 1);
 }

@@ -230,3 +230,173 @@ fn core_ir_pass_populates_captures() {
         "class_source_from_capture must produce decorator-inclusive text from CapEntry"
     );
 }
+
+#[test]
+fn pass_context_starts_with_empty_semantic_edges() {
+    let ctx = PassContext::new("source".to_string(), "file.ts".to_string(), Fidelity::Low);
+    // Phase 0 adds the carrier field; Phase 2 wires MetaLayerPass to
+    // populate it and InferenceLayerPass to drain it into the layer.
+    assert!(
+        ctx.semantic_edges.is_empty(),
+        "PassContext must start with no semantic edges"
+    );
+}
+// ── Phase 2: Pipeline Semantic-Edge Integration ─────────────────────
+
+use crate::compression::capture_pipeline::CapEntry;
+use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+
+/// Angular source containing a Component that injects a Service.
+/// `@Component(` is a strong decorator signalling an Angular file.
+const ANGULAR_INJECT_SOURCE: &str = r#"
+import { Component } from '@angular/core';
+import { UserService } from './user.service';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(private userSvc: UserService) {}
+}
+"#;
+
+fn make_angular_class_capture(source: &str) -> CapEntry {
+    CapEntry {
+        name: "class.root".into(),
+        text: "UserComponent".into(),
+        raw_text: source.to_string(),
+        start_byte: 0,
+        end_byte: source.len(),
+    }
+}
+
+fn make_pipeline_with_inference() -> PassPipeline {
+    let mut pipeline = PassPipeline::new();
+    pipeline.add_pass(Box::new(MetaLayerPass::new()));
+    pipeline.add_pass(Box::new(InferenceLayerPass::with_cbm(None)));
+    pipeline
+}
+
+#[test]
+fn pipeline_collects_semantic_edges() {
+    let source = ANGULAR_INJECT_SOURCE.to_string();
+    let cap = make_angular_class_capture(&source);
+    let mut ctx = PassContext::new(source, "user.component.ts".into(), Fidelity::High);
+    ctx.captures = vec![cap];
+
+    let pipeline = make_pipeline_with_inference();
+    let result = pipeline.run(&mut ctx);
+    assert!(result.is_ok(), "pipeline should succeed");
+
+    let layer = ctx.inference_layer.expect("inference layer should exist");
+    let injects: Vec<&SemanticEdge> = layer
+        .semantic_edges()
+        .into_iter()
+        .filter(|e| e.relation == SemanticRelation::Injects)
+        .collect();
+    assert!(
+        !injects.is_empty(),
+        "should have at least one Injects edge in pipeline"
+    );
+
+    let cmp_entity = EntityRef::new("angular", "Component", "UserComponent");
+    let svc_entity = EntityRef::new("angular", "Service", "UserService");
+    let has_injects = injects
+        .iter()
+        .any(|e| e.subject == cmp_entity && e.object == svc_entity);
+    assert!(
+        has_injects,
+        "UserComponent should inject UserService after pipeline"
+    );
+
+    // Verify file_id was attached by MetaLayerPass
+    for edge in layer.semantic_edges() {
+        if edge.subject.name == "UserComponent" {
+            assert_eq!(
+                edge.subject.file.as_deref(),
+                Some("user.component.ts"),
+                "file_id should be attached to subject"
+            );
+        }
+    }
+}
+
+#[test]
+fn pipeline_no_meta_layers_graceful() {
+    // Non-Angular source with no Angular markers
+    let source = "export function add(a: number, b: number): number { return a + b; }".to_string();
+    let mut ctx = PassContext::new(source, "math.ts".into(), Fidelity::Low);
+
+    let pipeline = make_pipeline_with_inference();
+    let result = pipeline.run(&mut ctx);
+    assert!(
+        result.is_ok(),
+        "pipeline should succeed for non-Angular source"
+    );
+
+    let layer = ctx.inference_layer.expect("inference layer should exist");
+    assert!(
+        layer.semantic_edges().is_empty(),
+        "no semantic edges expected for non-Angular source"
+    );
+}
+
+#[test]
+fn pipeline_semantic_edges_are_consumed() {
+    let source = ANGULAR_INJECT_SOURCE.to_string();
+    let cap = make_angular_class_capture(&source);
+    let mut ctx = PassContext::new(source, "user.component.ts".into(), Fidelity::High);
+    ctx.captures = vec![cap];
+
+    let pipeline = make_pipeline_with_inference();
+    let result = pipeline.run(&mut ctx);
+    assert!(result.is_ok(), "pipeline should succeed");
+
+    // After InferenceLayerPass drains them, PassContext should be empty
+    assert!(
+        ctx.semantic_edges.is_empty(),
+        "PassContext.semantic_edges should be empty after InferenceLayerPass"
+    );
+
+    // The same edges must be in the inference layer
+    let layer = ctx.inference_layer.expect("inference layer should exist");
+    assert!(
+        !layer.semantic_edges().is_empty(),
+        "inference layer should have semantic edges after pipeline"
+    );
+}
+
+#[test]
+fn pipeline_preserves_phi_output() {
+    let source = ANGULAR_INJECT_SOURCE.to_string();
+    let cap = make_angular_class_capture(&source);
+    let mut ctx = PassContext::new(source, "user.component.ts".into(), Fidelity::High);
+    ctx.captures = vec![cap];
+
+    let pipeline = make_pipeline_with_inference();
+    let result = pipeline.run(&mut ctx);
+    assert!(result.is_ok());
+
+    // Verify Φ markers are present in the instructions
+    let phi_markers: Vec<&CoreOp> = ctx
+        .instructions
+        .iter()
+        .filter(|op| matches!(op, CoreOp::TypeAlias(_, _)))
+        .collect();
+    assert!(
+        !phi_markers.is_empty(),
+        "Φ markers should be present in pipeline instructions"
+    );
+
+    // The Phi markers include the Angular decorator output.
+    // Verify at least one TypeAlias with a recognized Angular prefix.
+    let has_cmp = ctx.instructions.iter().any(|op| {
+        if let CoreOp::TypeAlias(prefix, _) = op {
+            prefix == "@cmp"
+        } else {
+            false
+        }
+    });
+    assert!(
+        has_cmp,
+        "@cmp alias should be produced for Angular component"
+    );
+}

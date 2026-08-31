@@ -127,6 +127,74 @@ impl RouteShape {
         self.routes.is_empty() && self.guards.is_empty() && self.resolvers.is_empty()
     }
 
+    /// Convert this Routing shape into structured semantic edges
+    /// (Phase 1 of the Semantic Relationship Model).
+    ///
+    /// Produces:
+    /// - Route → `RouteMapsTo` → Component (one per route with a component)
+    /// - Route → `GuardedBy` → Guard (one per guard per route)
+    /// - Route → `ResolvedBy` → Resolver (one per resolver per route)
+    pub fn to_semantic_edges(&self) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
+        use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+
+        let mut edges = Vec::new();
+        for route in &self.routes {
+            let route_entity = EntityRef::new("angular", "Route", &route.path);
+
+            // Route → RouteMapsTo → Component
+            if let Some(ref comp) = route.component {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::RouteMapsTo,
+                    subject: route_entity.clone(),
+                    object: EntityRef::new("angular", "Component", comp),
+                    layer: "angular",
+                });
+            }
+
+            // Route → GuardedBy → Guard
+            for guard in &route.guards {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::GuardedBy,
+                    subject: route_entity.clone(),
+                    object: EntityRef::new("angular", "Guard", guard),
+                    layer: "angular",
+                });
+            }
+
+            // Route → ResolvedBy → Resolver
+            for resolver in &route.resolvers {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::ResolvedBy,
+                    subject: route_entity.clone(),
+                    object: EntityRef::new("angular", "Resolver", resolver),
+                    layer: "angular",
+                });
+            }
+        }
+
+        // Guard declarations
+        for guard in &self.guards {
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: EntityRef::new("angular", "Guard", &guard.name),
+                object: EntityRef::new("angular", "Guard", &guard.kind),
+                layer: "angular",
+            });
+        }
+
+        // Resolver declarations
+        for resolver in &self.resolvers {
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: EntityRef::new("angular", "Resolver", &resolver.name),
+                object: EntityRef::new("angular", "Guard", "Resolve"),
+                layer: "angular",
+            });
+        }
+
+        edges
+    }
+
     /// Render the full `Φ Routing Meta` block at the given fidelity.
     pub fn render(&self, fidelity: Fidelity) -> String {
         if self.is_empty() {
