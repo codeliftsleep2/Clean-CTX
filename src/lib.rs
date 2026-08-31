@@ -45,6 +45,7 @@ pub mod observability;
 pub mod proxy_spawner;
 pub mod spring_meta;
 pub mod tokenizer;
+pub mod workspace;
 
 // Integration tests module
 #[cfg(test)]
