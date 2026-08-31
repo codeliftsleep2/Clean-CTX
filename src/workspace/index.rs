@@ -14,13 +14,14 @@
 // Determinism:       HashMap for O(1) lookup; returned collections are
 //                    sorted for deterministic ordering.
 
+use crate::compression::graph_utils;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::{HashMap, HashSet};
 
 // ── Key types ─────────────────────────────────────────────────────────
 
 /// Entity identity key — excludes file (matching EntityRef identity model).
-type EntityKey = (String, String, String); // (domain, entity_type, name)
+pub type EntityKey = (String, String, String); // (domain, entity_type, name)
 
 /// Edge identity key — deduplicates by (relation, subject identity, object identity).
 /// File is excluded from edge identity.
@@ -392,6 +393,135 @@ impl WorkspaceIndex {
             }
         }
         results
+    }
+
+    // ── Phase 4c: Graph Traversal ──────────────────────────────────
+
+    /// The set of `SemanticRelation` variants that represent dependency
+    /// relationships (not structural/metadata). Used by `transitive_dependencies`
+    /// to determine which forward edges to traverse.
+    const DEPENDENCY_RELATIONS: &'static [SemanticRelation] = &[
+        SemanticRelation::Injects,
+        SemanticRelation::Autowired,
+        SemanticRelation::ImportsModule,
+        SemanticRelation::HandlesAction,
+        SemanticRelation::CallsService,
+        SemanticRelation::HasEntity,
+        SemanticRelation::MapsFrom,
+        SemanticRelation::ConfigurationProperties,
+    ];
+
+    /// Build a deterministic node index from all registered entity identities.
+    ///
+    /// Returns a sorted `Vec<EntityKey>` (the node list) and a
+    /// `HashMap<EntityKey, usize>` mapping each key to its position.
+    /// The sorted order ensures deterministic traversal across calls.
+    fn build_node_index(&self) -> (Vec<EntityKey>, HashMap<EntityKey, usize>) {
+        let mut all_keys: std::collections::HashSet<EntityKey> = std::collections::HashSet::new();
+        all_keys.extend(self.entities.keys().cloned());
+        all_keys.extend(self.forward.keys().cloned());
+        all_keys.extend(self.reverse.keys().cloned());
+        let mut keys: Vec<EntityKey> = all_keys.into_iter().collect();
+        keys.sort();
+        let map: HashMap<EntityKey, usize> = keys
+            .iter()
+            .enumerate()
+            .map(|(i, k)| (k.clone(), i))
+            .collect();
+        (keys, map)
+    }
+
+    /// Check whether the entity graph contains any directed cycles.
+    ///
+    /// Traverses all currently produced semantic relations (both dependency
+    /// and structural). Uses three-color DFS. File provenance is irrelevant
+    /// — operates on `EntityKey` identity only.
+    ///
+    /// Returns `false` for an empty index or a single-node graph with no
+    /// self-loop.
+    pub fn has_cycle(&self) -> bool {
+        let (node_list, index_map) = self.build_node_index();
+        if node_list.is_empty() {
+            return false;
+        }
+
+        let adj_fn = |i: usize| {
+            let key = &node_list[i];
+            self.forward
+                .get(key)
+                .map(|edges| {
+                    edges
+                        .iter()
+                        .filter_map(|e| index_map.get(&entity_key(&e.object)).copied())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        };
+
+        graph_utils::has_cycle(node_list.len(), adj_fn)
+    }
+
+    /// Compute transitive dependencies of an entity identity.
+    ///
+    /// Traverses only dependency-like semantic relations:
+    /// `Injects`, `Autowired`, `ImportsModule`, `HandlesAction`,
+    /// `CallsService`, `HasEntity`, `MapsFrom`, `ConfigurationProperties`.
+    ///
+    /// Structural/metadata relations (`HasSelector`, `RouteMapsTo`, etc.)
+    /// are NOT traversed.
+    ///
+    /// # Arguments
+    /// * `domain` - Entity domain
+    /// * `entity_type` - Entity type
+    /// * `name` - Entity name
+    /// * `depth` - Max traversal depth: `0` = unlimited, `1` = direct,
+    ///   `2` = transitive. Negative behaves as `0`.
+    ///
+    /// # Returns
+    /// `Vec<EntityKey>` — reachable entity identities in BFS order
+    /// (insertion-order derived). The starting entity is excluded.
+    /// Each EntityKey appears at most once.
+    pub fn transitive_dependencies(
+        &self,
+        domain: &str,
+        entity_type: &str,
+        name: &str,
+        depth: i32,
+    ) -> Vec<EntityKey> {
+        let start_key = (
+            domain.to_string(),
+            entity_type.to_string(),
+            name.to_string(),
+        );
+        if !self.forward.contains_key(&start_key) {
+            return Vec::new();
+        }
+
+        let (node_list, index_map) = self.build_node_index();
+
+        let start_idx = match index_map.get(&start_key) {
+            Some(&idx) => idx,
+            None => return Vec::new(),
+        };
+
+        let adj_fn = |i: usize| {
+            let key = &node_list[i];
+            self.forward
+                .get(key)
+                .map(|edges| {
+                    edges
+                        .iter()
+                        .filter(|e| WorkspaceIndex::DEPENDENCY_RELATIONS.contains(&e.relation))
+                        .filter_map(|e| index_map.get(&entity_key(&e.object)).copied())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        };
+
+        let depth_param = if depth < 0 { 0 } else { depth };
+        let indices =
+            graph_utils::transitive_dependencies(start_idx, depth_param, node_list.len(), adj_fn);
+        indices.into_iter().map(|i| node_list[i].clone()).collect()
     }
 }
 

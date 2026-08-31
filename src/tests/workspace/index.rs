@@ -535,3 +535,421 @@ fn phase_4a_identity_queries_unchanged() {
     let reverse = idx.reverse_edges_by_identity("angular", "Service", "UserService");
     assert_eq!(reverse.len(), 1);
 }
+// ── Phase 4c: Graph Traversal — has_cycle ────────────────────────────
+
+#[test]
+fn has_cycle_empty_index() {
+    let idx = WorkspaceIndex::new();
+    assert!(!idx.has_cycle());
+}
+
+#[test]
+fn has_cycle_single_entity() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("a.ts", vec![inject_edge("A", "B", Some("a.ts"))]);
+    assert!(!idx.has_cycle());
+}
+
+#[test]
+fn has_cycle_self_loop() {
+    let mut idx = WorkspaceIndex::new();
+    let self_loop = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Component", "A"),
+        object: EntityRef::new("angular", "Component", "A"),
+        layer: "angular",
+    };
+    idx.add_edges("a.ts", vec![self_loop]);
+    assert!(idx.has_cycle(), "self-loop must be detected as a cycle");
+}
+
+#[test]
+fn has_cycle_simple_cycle() {
+    let mut idx = WorkspaceIndex::new();
+    // Use same domain/entity_type so entity keys chain: A → B → A.
+    let edge1 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", "A"),
+        object: EntityRef::new("angular", "Service", "B"),
+        layer: "angular",
+    };
+    let edge2 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", "B"),
+        object: EntityRef::new("angular", "Service", "A"),
+        layer: "angular",
+    };
+    idx.add_edges("a.ts", vec![edge1, edge2]);
+    assert!(idx.has_cycle(), "A → B → A must be detected as a cycle");
+}
+
+#[test]
+fn has_cycle_no_cycle() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.ts",
+        vec![
+            inject_edge("A", "B", Some("a.ts")),
+            inject_edge("B", "C", Some("a.ts")),
+        ],
+    );
+    assert!(!idx.has_cycle(), "A → B → C has no cycle");
+}
+
+#[test]
+fn has_cycle_structural_cycle() {
+    let mut idx = WorkspaceIndex::new();
+    // Use RouteMapsTo and DeclaresInModule to form a cycle through
+    // structural relations — all relations are traversed for cycle detection.
+    let edge1 = SemanticEdge {
+        relation: SemanticRelation::RouteMapsTo,
+        subject: EntityRef::new("angular", "Route", "/home"),
+        object: EntityRef::new("angular", "Component", "HomeComponent"),
+        layer: "angular",
+    };
+    let edge2 = SemanticEdge {
+        relation: SemanticRelation::DeclaresInModule,
+        subject: EntityRef::new("angular", "Module", "AppModule"),
+        object: EntityRef::new("angular", "Route", "/home"),
+        layer: "angular",
+    };
+    let edge3 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Component", "HomeComponent"),
+        object: EntityRef::new("angular", "Module", "AppModule"),
+        layer: "angular",
+    };
+    idx.add_edges("a.ts", vec![edge1, edge2, edge3]);
+    assert!(
+        idx.has_cycle(),
+        "cycle through mixed relation types must be detected"
+    );
+}
+
+#[test]
+fn has_cycle_ambiguous_entity() {
+    let mut idx = WorkspaceIndex::new();
+    // Same entity identity in two files, single edge B → A (no cycle).
+    idx.add_edges("a.ts", vec![inject_edge("B", "A", Some("a.ts"))]);
+    idx.add_edges("b.ts", vec![inject_edge("B", "A", Some("b.ts"))]);
+    assert!(!idx.has_cycle());
+}
+
+// ── Phase 4c: Graph Traversal — transitive_dependencies ─────────────
+
+#[test]
+fn transitive_deps_unknown_entity() {
+    let idx = WorkspaceIndex::new();
+    let deps = idx.transitive_dependencies("angular", "Component", "NonExistent", 1);
+    assert!(deps.is_empty());
+}
+
+#[test]
+fn transitive_deps_no_outgoing() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("a.ts", vec![inject_edge("A", "B", Some("a.ts"))]);
+    let deps = idx.transitive_dependencies("angular", "Service", "B", 1);
+    assert!(deps.is_empty(), "B has no outgoing edges");
+}
+
+#[test]
+fn transitive_deps_depth_1() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.ts",
+        vec![
+            inject_edge("A", "B", Some("a.ts")),
+            inject_edge("B", "C", Some("a.ts")),
+        ],
+    );
+    let deps = idx.transitive_dependencies("angular", "Component", "A", 1);
+    assert_eq!(deps.len(), 1, "depth=1 should return only B");
+    assert_eq!(
+        deps[0],
+        (
+            "angular".to_string(),
+            "Service".to_string(),
+            "B".to_string()
+        )
+    );
+}
+
+#[test]
+fn transitive_deps_depth_2() {
+    let mut idx = WorkspaceIndex::new();
+    // Same entity_type so chains: A(Service) → B(Service) → C(Service)
+    let e1 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", "A"),
+        object: EntityRef::new("angular", "Service", "B"),
+        layer: "angular",
+    };
+    let e2 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", "B"),
+        object: EntityRef::new("angular", "Service", "C"),
+        layer: "angular",
+    };
+    idx.add_edges("a.ts", vec![e1, e2]);
+    let deps = idx.transitive_dependencies("angular", "Service", "A", 2);
+    assert_eq!(deps.len(), 2, "depth=2 should return B and C");
+}
+
+#[test]
+fn transitive_deps_unlimited() {
+    let mut idx = WorkspaceIndex::new();
+    let e1 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", "A"),
+        object: EntityRef::new("angular", "Service", "B"),
+        layer: "angular",
+    };
+    let e2 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", "B"),
+        object: EntityRef::new("angular", "Service", "C"),
+        layer: "angular",
+    };
+    let e3 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", "C"),
+        object: EntityRef::new("angular", "Service", "D"),
+        layer: "angular",
+    };
+    idx.add_edges("a.ts", vec![e1, e2, e3]);
+    let deps = idx.transitive_dependencies("angular", "Service", "A", 0);
+    assert_eq!(deps.len(), 3, "unlimited depth should return B, C, D");
+}
+#[test]
+fn transitive_deps_with_cycle() {
+    let mut idx = WorkspaceIndex::new();
+    // A(Service) → B(Service) → C(Service) → A(Service)
+    let e1 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", "A"),
+        object: EntityRef::new("angular", "Service", "B"),
+        layer: "angular",
+    };
+    let e2 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", "B"),
+        object: EntityRef::new("angular", "Service", "C"),
+        layer: "angular",
+    };
+    let e3 = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", "C"),
+        object: EntityRef::new("angular", "Service", "A"),
+        layer: "angular",
+    };
+    idx.add_edges("a.ts", vec![e1, e2, e3]);
+    let deps = idx.transitive_dependencies("angular", "Service", "A", 0);
+    assert!(deps.contains(&(
+        "angular".to_string(),
+        "Service".to_string(),
+        "B".to_string()
+    )));
+    assert!(deps.contains(&(
+        "angular".to_string(),
+        "Service".to_string(),
+        "C".to_string()
+    )));
+    assert_eq!(deps.len(), 2, "no infinite loop, start excluded");
+}
+
+#[test]
+fn transitive_deps_ignores_structural() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.ts",
+        vec![
+            inject_edge("A", "B", Some("a.ts")),
+            route_edge("/home", "HomeComponent"),
+        ],
+    );
+    let deps = idx.transitive_dependencies("angular", "Component", "A", 1);
+    assert_eq!(deps.len(), 1, "only Injects relation should be traversed");
+    assert_eq!(
+        deps[0],
+        (
+            "angular".to_string(),
+            "Service".to_string(),
+            "B".to_string()
+        )
+    );
+}
+
+#[test]
+fn transitive_deps_disconnected() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.ts",
+        vec![
+            inject_edge("A", "B", Some("a.ts")),
+            inject_edge("C", "D", Some("a.ts")),
+        ],
+    );
+    let deps = idx.transitive_dependencies("angular", "Component", "A", 0);
+    assert_eq!(deps.len(), 1, "should only return B, not C or D");
+    assert_eq!(
+        deps[0],
+        (
+            "angular".to_string(),
+            "Service".to_string(),
+            "B".to_string()
+        )
+    );
+}
+
+#[test]
+fn transitive_deps_duplicate_edge() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("a.ts", vec![inject_edge("A", "B", Some("a.ts"))]);
+    idx.add_edges("b.ts", vec![inject_edge("A", "B", Some("b.ts"))]);
+    let deps = idx.transitive_dependencies("angular", "Component", "A", 1);
+    assert_eq!(deps.len(), 1, "duplicate edges must not duplicate results");
+    assert_eq!(
+        deps[0],
+        (
+            "angular".to_string(),
+            "Service".to_string(),
+            "B".to_string()
+        )
+    );
+}
+
+#[test]
+fn transitive_deps_deterministic() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.ts",
+        vec![
+            inject_edge("A", "B", Some("a.ts")),
+            inject_edge("B", "C", Some("a.ts")),
+            inject_edge("A", "D", Some("a.ts")),
+        ],
+    );
+    let first = idx.transitive_dependencies("angular", "Component", "A", 0);
+    let second = idx.transitive_dependencies("angular", "Component", "A", 0);
+    assert_eq!(first, second, "same query must produce same result");
+}
+
+// ── Phase 4c: Dependency relation boundary ──────────────────────────
+/// Helper: create an ImportsModule edge (dependency relation).
+fn imports_module_edge(from: &str, to: &str) -> SemanticEdge {
+    SemanticEdge {
+        relation: SemanticRelation::ImportsModule,
+        subject: EntityRef::new("angular", "Module", from),
+        object: EntityRef::new("angular", "Module", to),
+        layer: "angular",
+    }
+}
+
+/// Helper: create a HandlesAction edge (dependency relation).
+fn handles_action_edge(effect: &str, action: &str) -> SemanticEdge {
+    SemanticEdge {
+        relation: SemanticRelation::HandlesAction,
+        subject: EntityRef::new("ngrx", "Effect", effect),
+        object: EntityRef::new("ngrx", "Action", action),
+        layer: "ngrx",
+    }
+}
+
+/// Helper: create a ConfigurationProperties edge (dependency relation).
+fn config_props_edge(config: &str, prefix: &str) -> SemanticEdge {
+    SemanticEdge {
+        relation: SemanticRelation::ConfigurationProperties,
+        subject: EntityRef::new("spring", "Configuration", config),
+        object: EntityRef::new("spring", "Properties", prefix),
+        layer: "spring",
+    }
+}
+
+#[test]
+fn transitive_deps_approved_dependency_traversed_injects() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("a.ts", vec![inject_edge("A", "B", Some("a.ts"))]);
+    let deps = idx.transitive_dependencies("angular", "Component", "A", 1);
+    assert_eq!(deps.len(), 1, "Injects must be traversed");
+}
+
+#[test]
+fn transitive_deps_approved_dependency_traversed_imports_module() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.ts",
+        vec![imports_module_edge("AppModule", "SharedModule")],
+    );
+    let deps = idx.transitive_dependencies("angular", "Module", "AppModule", 1);
+    assert_eq!(deps.len(), 1, "ImportsModule must be traversed");
+}
+
+#[test]
+fn transitive_deps_approved_dependency_traversed_handles_action() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("a.ts", vec![handles_action_edge("LoadUsers$", "loadUsers")]);
+    let deps = idx.transitive_dependencies("ngrx", "Effect", "LoadUsers$", 1);
+    assert_eq!(deps.len(), 1, "HandlesAction must be traversed");
+}
+
+#[test]
+fn transitive_deps_approved_dependency_traversed_config_props() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("a.ts", vec![config_props_edge("AppConfig", "app")]);
+    let deps = idx.transitive_dependencies("spring", "Configuration", "AppConfig", 1);
+    assert_eq!(deps.len(), 1, "ConfigurationProperties must be traversed");
+}
+
+#[test]
+fn transitive_deps_structural_not_traversed_has_selector() {
+    let mut idx = WorkspaceIndex::new();
+    let sel_edge = SemanticEdge {
+        relation: SemanticRelation::HasSelector,
+        subject: EntityRef::new("angular", "Component", "UserCard"),
+        object: EntityRef::new("angular", "Component", "[app-user-card]"),
+        layer: "angular",
+    };
+    idx.add_edges("a.ts", vec![sel_edge]);
+    let deps = idx.transitive_dependencies("angular", "Component", "UserCard", 1);
+    assert!(deps.is_empty(), "HasSelector must NOT be traversed");
+}
+
+#[test]
+fn transitive_deps_structural_not_traversed_route_maps_to() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("a.ts", vec![route_edge("/home", "HomeComponent")]);
+    let deps = idx.transitive_dependencies("angular", "Route", "/home", 1);
+    assert!(deps.is_empty(), "RouteMapsTo must NOT be traversed");
+}
+
+// ── Phase 4c: Phase 4b Regression ────────────────────────────────────
+
+#[test]
+fn phase_4b_find_entities_by_name_unchanged() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("a.ts", vec![inject_edge("A", "B", Some("a.ts"))]);
+    assert_eq!(idx.find_entities_by_name("A").len(), 1);
+    assert!(idx.find_entities_by_name("NonExistent").is_empty());
+}
+
+#[test]
+fn phase_4b_resolve_inject_type_unchanged() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("a.ts", vec![inject_edge("A", "B", Some("a.ts"))]);
+    assert_eq!(idx.resolve_inject_type("B").len(), 1);
+    assert!(idx.resolve_inject_type("A").is_empty());
+}
+
+#[test]
+fn phase_4b_resolve_selector_unchanged() {
+    let mut idx = WorkspaceIndex::new();
+    let sel_edge = SemanticEdge {
+        relation: SemanticRelation::HasSelector,
+        subject: EntityRef::new("angular", "Component", "C"),
+        object: EntityRef::new("angular", "Component", "[app-c]"),
+        layer: "angular",
+    };
+    idx.add_edges("a.ts", vec![sel_edge]);
+    assert_eq!(idx.resolve_selector("app-c").len(), 1);
+    assert!(idx.resolve_selector("nonexistent").is_empty());
+}
