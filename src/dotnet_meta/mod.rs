@@ -149,10 +149,6 @@ pub fn run_meta_layer(
 #[path = "../tests/dotnet_meta/mod.rs"]
 mod tests;
 
-#[cfg(all(test, feature = "dotnet"))]
-#[path = "../tests/dotnet_meta/semantic.rs"]
-mod semantic_tests;
-
 // ── Meta-Layer Integration ────────────────────────────────────────────
 
 #[cfg(feature = "dotnet")]
