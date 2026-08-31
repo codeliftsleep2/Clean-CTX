@@ -364,7 +364,7 @@ impl MetaLayer for SpringBootMetaLayer {
 
     fn extract_semantic_edges(
         &self,
-        source: &str,
+        _source: &str,
         class_captures: &[String],
         fidelity: Fidelity,
         _config: Option<&CleanCtxConfig>,

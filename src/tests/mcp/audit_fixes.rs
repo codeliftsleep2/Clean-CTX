@@ -337,7 +337,6 @@ fn audit11_helper_methods_compile() {
     drop(state.ir_context_read());
     drop(state.ir_context_lock());
     let _gb = state.graph_bridge_lock();
-    let _ag = state.angular_graph_lock();
     let _llm = state.llm_text_cache_lock();
     state.push_warning("test");
     let _drained = state.drain_warnings();
