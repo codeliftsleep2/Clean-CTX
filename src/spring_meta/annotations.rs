@@ -323,7 +323,7 @@ fn classify_annotation(name: &str) -> AnnotationKind {
     }
 }
 
-fn annotation_kind_to_http_method(kind: AnnotationKind) -> String {
+pub(crate) fn annotation_kind_to_http_method(kind: AnnotationKind) -> String {
     match kind {
         AnnotationKind::GetMapping => "GET".to_string(),
         AnnotationKind::PostMapping => "POST".to_string(),
@@ -379,7 +379,7 @@ pub(crate) fn parse_request_mappings(arg: &str) -> Vec<RequestMappingMapping> {
     mappings
 }
 
-fn parse_mapping_paths(arg: &str) -> Vec<String> {
+pub(crate) fn parse_mapping_paths(arg: &str) -> Vec<String> {
     let mut paths = Vec::new();
     let trimmed = arg.trim();
 

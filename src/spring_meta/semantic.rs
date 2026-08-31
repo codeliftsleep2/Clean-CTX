@@ -12,8 +12,9 @@
 use crate::compression::Fidelity;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use crate::spring_meta::annotations::{
-    AnnotationKind, collect_annotations, collect_field_annotations, collect_method_annotations,
-    extract_class_name, find_class_body_open, find_class_head_end, parse_request_mappings,
+    AnnotationKind, annotation_kind_to_http_method, collect_annotations, collect_field_annotations,
+    collect_method_annotations, extract_class_name, find_class_body_open, find_class_head_end,
+    parse_mapping_paths, parse_request_mappings,
 };
 use crate::spring_meta::markers::RequestMappingMapping;
 
@@ -49,6 +50,12 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
                     request_mappings.push(mapping.clone());
                 }
             }
+            AnnotationKind::RequestMapping => {
+                let submappings = parse_request_mappings(&anno.arg);
+                for mapping in &submappings {
+                    request_mappings.push(mapping.clone());
+                }
+            }
             AnnotationKind::Configuration => {
                 is_configuration = true;
             }
@@ -59,6 +66,38 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
                 has_config_props = true;
             }
             _ => {}
+        }
+    }
+
+    // Method-level mappings: scan the class body for @GetMapping, @PostMapping,
+    // @PutMapping, @DeleteMapping, @PatchMapping (same pattern as extract_annotations).
+    if fidelity != Fidelity::Low {
+        if let Some(class_body_start) = find_class_body_open(raw_class) {
+            if let Some(body_end) =
+                crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
+            {
+                let body = &raw_class[class_body_start..];
+                let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
+                for (_method_name, anno_kind, arg) in collect_method_annotations(body_inner) {
+                    if matches!(
+                        anno_kind,
+                        AnnotationKind::GetMapping
+                            | AnnotationKind::PostMapping
+                            | AnnotationKind::PutMapping
+                            | AnnotationKind::DeleteMapping
+                            | AnnotationKind::PatchMapping
+                    ) {
+                        let method = annotation_kind_to_http_method(anno_kind);
+                        let paths = parse_mapping_paths(&arg);
+                        for path in paths {
+                            request_mappings.push(RequestMappingMapping {
+                                method: Some(method.clone()),
+                                path,
+                            });
+                        }
+                    }
+                }
+            }
         }
     }
 

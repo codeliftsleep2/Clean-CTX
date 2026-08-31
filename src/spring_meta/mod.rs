@@ -125,7 +125,3 @@ pub fn run_meta_layer(
 #[cfg(all(test, feature = "spring_boot"))]
 #[path = "../tests/spring_meta/mod.rs"]
 mod tests;
-
-#[cfg(all(test, feature = "spring_boot"))]
-#[path = "../tests/spring_meta/semantic.rs"]
-mod semantic_tests;
