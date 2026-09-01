@@ -1,32 +1,40 @@
 // src/mcp/token_economics.rs
 //
-// Cheap token-economics gate: before entering the expensive compression pipeline
-// (IR compilation + render), predict whether compression at verbatim-body-preserving
-// fidelities is likely to produce a net token savings. If not, skip compression
-// and return the raw file through the existing response contract.
+// Token-economics gate: a two-stage mechanism to ensure Clean-CTX never
+// returns a compressed/hybrid representation that costs more tokens than
+// the raw source.
 //
-// # Principle
+// # Stage 1 — Preflight heuristic (Optimization hint)
 //
-// > Do not perform expensive transformation work until a cheap preflight check
-// > establishes that the transformation is economically justified.
+// Before entering the expensive compression pipeline (IR compilation +
+// render), cheaply predict whether compression at verbatim-body-preserving
+// fidelities (Edit) is likely to produce a net token savings. If not, skip
+// compression early and return raw passthrough.
 //
-// # Design
+// This is purely an optimization hint to avoid unnecessary work. The
+// actual economic decision is made in Stage 2.
 //
-// Structural/skeleton fidelity levels (Low, Medium, High) strip method bodies
-// entirely and produce substantial savings even on very small files.
-// The gate does not apply to them.
+// Structural/skeleton fidelity levels (Low, Medium, High) strip method
+// bodies entirely and produce substantial savings even on very small files.
+// The preflight heuristic does not apply to them — they proceed to
+// compression, and Stage 2 (post-compression) makes the final decision.
 //
-// For verbatim-body-preserving fidelity levels (Edit, Verbatim), the compressed
-// output has significant fixed overhead (header, import listing, structural
-// markers, dictionary footer). A cheap token-count estimate determines whether
-// compression is likely to produce a net saving.
+// # Stage 2 — Post-compression verification (Correctness gate)
+//
+// After the compressed/hybrid representation has been rendered, count the
+// actual tokens of both the raw source and the candidate output. If the
+// candidate costs more tokens than raw, fall back to raw passthrough.
+//
+// This check applies uniformly to all fidelity levels (Low, Medium, High,
+// Edit). Verbatim fidelity bypasses compression entirely, so it is not
+// affected.
 //
 // # Conservative bias
 //
-// The estimator is an optimization hint, never a correctness mechanism. Both
-// false-positive (compress when uneconomical) and false-negative (skip when
-// economical) are safe. Calibration errs toward attempting compression near
-// the boundary.
+// The preflight estimator is an optimization hint, never a correctness
+// mechanism. Both false-positive (compress when uneconomical) and
+// false-negative (skip when economical) are safe. Calibration errs toward
+// attempting compression near the boundary.
 
 use crate::compression::Fidelity;
 

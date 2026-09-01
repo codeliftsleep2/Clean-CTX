@@ -82,6 +82,60 @@ pub(crate) fn contract_fields_focused(
     }
 }
 
+/// Token-economics post-compression check.
+///
+/// After the compressed/hybrid representation has been rendered, compare its
+/// actual token cost against the raw source. If the candidate is more
+/// expensive, fall back to raw passthrough — returning the raw source with
+/// `content_kind: "raw_passthrough"` and `byte_exact: ["document"]`.
+///
+/// Returns `true` if fallback was triggered (caller should `return`),
+/// `false` if the candidate is economically sound (caller should continue).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn maybe_economics_fallback(
+    id: &Value,
+    source: &str,
+    raw_tokens: usize,
+    comp_tokens: usize,
+    state: &McpState,
+    resolved_path: &str,
+    is_angular: bool,
+    fidelity: crate::compression::Fidelity,
+    decision_summary: &str,
+) -> bool {
+    if comp_tokens <= raw_tokens {
+        // Candidate is cheaper or equal → continue normally.
+        return false;
+    }
+    // Candidate is more expensive → fall back to raw passthrough.
+    let fidelity_str = format!("{:?}", fidelity).to_lowercase();
+    state.record_compression(
+        resolved_path,
+        raw_tokens,
+        raw_tokens,
+        &fidelity_str,
+        is_angular,
+        "full",
+        None,
+        "raw_passthrough",
+    );
+    let mut response = serde_json::json!({
+        "jsonrpc": "2.0", "id": id, "result": {
+            "content": [{ "type": "text", "text": source }],
+            "_meta": {
+                "strategy": "full", "fidelity": fidelity_str,
+                "decision_summary": decision_summary,
+                "content_kind": "raw_passthrough",
+                "byte_exact": ["document"],
+                "degradation": null
+            }
+        }
+    });
+    inject_baseline_breakpoint(&mut response, state, source);
+    send_response(&response);
+    true
+}
+
 // ── Handler: compress_code_context ───────────────────────────────
 
 /// P3-2: Main handler for compress_code_context tool.
@@ -813,14 +867,16 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         return;
     }
 
-    // -- Token-economics gate --
+    // -- Token-economics gate (Stage 1: Preflight heuristic) --
     // Before entering the expensive compression pipeline (IR compilation + render),
     // cheaply predict whether compression at verbatim-body-preserving fidelities
-    // will produce a net token savings. If not, skip compression and return the
-    // raw file through the existing response contract.
+    // (Edit) is likely to produce a net token savings. If not, skip compression
+    // early and return raw passthrough.
     //
-    // Structural fidelities (Low, Medium, High) are skipped by the gate because
-    // they strip method bodies entirely and always produce substantial savings.
+    // Structural fidelities (Low, Medium, High) skip this heuristic because they
+    // strip method bodies entirely and produce substantial savings even on very
+    // small files. The actual economic decision is made in Stage 2 below
+    // (post-compression verification) which applies uniformly to all fidelities.
     //
     // Observability: lift prediction and threshold out for the tracing span below
     // so we can correlate predictions with actual outcomes.
@@ -867,30 +923,17 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 }
             }
 
-            state.record_compression(
+            maybe_economics_fallback(
+                id,
+                source,
+                raw_tokens,
+                raw_tokens + 1, // comp_tokens > raw_tokens always (raw passthrough)
+                state,
                 &resolved_path,
-                raw_tokens,
-                raw_tokens,
-                "edit",
                 is_angular,
-                "full",
-                None,
-                "raw_passthrough",
+                crate::compression::Fidelity::Edit,
+                &decision.summary(),
             );
-            let mut response = serde_json::json!({
-                "jsonrpc": "2.0", "id": id, "result": {
-                    "content": [{ "type": "text", "text": source }],
-                    "_meta": {
-                        "strategy": "full", "fidelity": "edit",
-                        "decision_summary": decision.summary(),
-                        "content_kind": "raw_passthrough",
-                        "byte_exact": ["document"],
-                        "degradation": null
-                    }
-                }
-            });
-            inject_baseline_breakpoint(&mut response, state, source);
-            send_response(&response);
             return;
         }
     }
@@ -1014,6 +1057,23 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     let render_ms = render_start.elapsed().as_millis() as u64;
                     raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                     comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
+                    // Post-compression token-economics check: if the
+                    // compressed/hybrid representation costs more tokens than
+                    // the raw source, fall back to raw passthrough. This
+                    // applies to all fidelity levels (Edit, Low, Medium, High).
+                    if maybe_economics_fallback(
+                        id,
+                        source,
+                        raw_tokens,
+                        comp_tokens,
+                        state,
+                        &resolved_path,
+                        is_angular,
+                        effective_fidelity,
+                        &decision.summary(),
+                    ) {
+                        return;
+                    }
                     state.record_compression(
                         &resolved_path,
                         raw_tokens,
@@ -1106,6 +1166,23 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 let render_ms = render_start.elapsed().as_millis() as u64;
                 let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                 let comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
+                // Post-compression token-economics check: if the
+                // compressed/hybrid representation costs more tokens than
+                // the raw source, fall back to raw passthrough. This
+                // applies to all fidelity levels (Edit, Low, Medium, High).
+                if maybe_economics_fallback(
+                    id,
+                    source,
+                    raw_tokens,
+                    comp_tokens,
+                    state,
+                    &resolved_path,
+                    is_angular,
+                    effective_fidelity,
+                    &decision.summary(),
+                ) {
+                    return;
+                }
                 state.record_compression(
                     &resolved_path,
                     raw_tokens,
