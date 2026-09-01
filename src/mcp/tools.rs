@@ -269,6 +269,22 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "required": ["fromRef"]
             }
         }),
+        serde_json::json!({
+            "name": "workspace_query",
+            "description": "Query cross-file semantic relationships accumulated from compiled files. Supports: find_entities (by name), forward_edges (outgoing semantic edges from entity), reverse_edges (incoming semantic edges to entity), entities_in_file (entity occurrences by file), transitive_dependencies (BFS dependency traversal), has_cycle (cycle detection).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "transitive_dependencies", "has_cycle"], "description": "Type of workspace query." },
+                    "domain": { "type": "string", "description": "Framework domain for entity queries (e.g. 'angular', 'spring', 'ngrx'). Required for: forward_edges, reverse_edges, transitive_dependencies." },
+                    "entity_type": { "type": "string", "description": "Entity type for entity queries (e.g. 'Component', 'Service', 'Controller'). Required for: forward_edges, reverse_edges, transitive_dependencies." },
+                    "name": { "type": "string", "description": "Entity name for entity queries. Required for: find_entities, forward_edges, reverse_edges, transitive_dependencies." },
+                    "file_path": { "type": "string", "description": "File path for entities_in_file query." },
+                    "depth": { "type": "integer", "description": "Traversal depth for transitive_dependencies: 0 = unlimited, 1 = direct, 2 = transitive. Default: 1." }
+                },
+                "required": ["type"]
+            }
+        }),
     ]
     .into_iter()
     .chain(cbm::cbm_tool_list())

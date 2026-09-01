@@ -86,6 +86,8 @@ as `filePath`.
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
+| `workspace_query` | `type` | `domain`, `entity_type`, `name`, `file_path`, `depth` | **READ-ONLY** — Query cross-file semantic relationships accumulated from compiled files. Supports `find_entities` (by name), `forward_edges` (outgoing semantic edges from entity), `reverse_edges` (incoming semantic edges to entity), `entities_in_file` (entity occurrences by file), `transitive_dependencies` (BFS dependency traversal with optional `depth` parameter; 0 = unlimited, default 1), and `has_cycle` (cycle detection). Uses the existing `(domain, entity_type, name)` identity model established by WorkspaceIndex. |
+
 ## 2. Tool-Selection Hierarchy
 
 ### 2.1 For Code Understanding

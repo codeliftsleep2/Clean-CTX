@@ -17,6 +17,7 @@ pub mod core;
 pub mod edit;
 pub mod gitdiff;
 pub mod persistence;
+pub mod query;
 pub mod registry;
 pub mod stats;
 pub mod traits;

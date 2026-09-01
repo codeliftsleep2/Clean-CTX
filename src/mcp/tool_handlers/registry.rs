@@ -176,5 +176,15 @@ pub fn create_default_registry() -> HandlerRegistry {
         })
     );
 
+    // workspace_query (src/mcp/tool_handlers/query.rs) — read-only semantic
+    // queries over the WorkspaceIndex.
+    register_tool!(
+        reg,
+        "workspace_query",
+        Box::new(|id, params, state| {
+            crate::mcp::tool_handlers::query::handle_workspace_query(id, params, state);
+        })
+    );
+
     reg
 }

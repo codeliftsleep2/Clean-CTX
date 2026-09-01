@@ -26,6 +26,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 * **Cross-file resolution** — `WorkspaceIndex` replaces the role previously served by the deleted legacy graph modules for semantic cross-file queries.
 * **Graph traversal** — `transitive_dependencies()` and cycle detection for DI and routing relationships.
 
+#### Workspace query interface (Task C)
+
+* **`workspace_query` MCP tool** (`src/mcp/tool_handlers/query.rs`) — read-only cross-file semantic query API over `WorkspaceIndex`. Supports `find_entities`, `forward_edges`, `reverse_edges`, `entities_in_file`, `transitive_dependencies`, and `has_cycle`. Uses the same `(domain, entity_type, name)` identity model. No changes to the write lifecycle, CBM module, or WorkspaceIndex internals.
+* **Handler registration** — registered through the standard handler registry in `src/mcp/tool_handlers/registry.rs`, exposed via `tool_list()` in `src/mcp/tools.rs`.
+* **Docs** — `docs/agent/tooling.md` updated with `workspace_query` entry in the Workspace Tools section.
+
 #### MCP token-economics correction
 
 * **Post-compression token-economics gate** — after the compressed/hybrid representation is rendered, its actual token cost is compared against the raw source. If the candidate costs more tokens than raw, `raw_passthrough` is selected.
