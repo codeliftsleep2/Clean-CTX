@@ -121,7 +121,44 @@ mechanically (git pre-commit + CI + `cargo test encoding`). After editing any
 text file, ensure it is strict UTF-8 without a BOM, and never introduce
 mojibake. See `docs/ENCODING_POLICY.md` for rationale.
 
-### 10. Clean-CTX Usage Protocol
+### 11. Production Integration Gate
+
+Never declare an architectural component complete until its complete
+production lifecycle has been traced and verified: creation → propagation →
+persistence/ownership → lifecycle management → consumption → external
+exposure → live end-to-end reachability.
+
+**Required lifecycle:**
+
+```text
+Producer
+  ↓
+Production pipeline (is the component actually invoked by the default production path?)
+  ↓
+Compilation/result boundary (does the data survive the return?)
+  ↓
+Persistent owner (which production object owns the resulting state?)
+  ↓
+Session/workspace lifecycle (creation, recompilation, deletion, reset?)
+  ↓
+Consumer (what production component actually consumes the data?)
+  ↓
+MCP/API exposure (which real response exposes the capability?)
+  ↓
+Live end-to-end verification
+```
+
+**Evidence that does NOT constitute integration:** the existence of the
+implementation; passing unit tests; passing tests using a custom pipeline; a
+type being present in the architecture; an index being populated by test code;
+a field existing in a state type; documentation claiming the subsystem is
+integrated. Passing unit tests is evidence of implementation correctness, not
+evidence of production integration.
+
+Trace the **real production call path from the external entry point to the
+intended consumer** before reporting an architectural feature as complete.
+
+### 12. Clean-CTX Usage Protocol
 
 Clean-CTX is the primary code-intelligence layer. Follow these rules:
 
