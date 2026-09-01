@@ -899,3 +899,78 @@ fn test_all_edges_for_returns_both_kinds() {
     assert_eq!(bundle.inferred.len(), 1);
     assert_eq!(bundle.semantic.len(), 1);
 }
+// ── Phase 6: CBM Coexistence ──────────────────────────────────────────
+//
+// Verify that CBM-derived inferred edges and meta-layer semantic edges
+// coexist correctly through all_edges_for(). Uses the production path:
+//   new_mock_with_edges() → enrich_from_cbm() for inferred edges
+//   add_semantic_edge()   for semantic edges
+//   all_edges_for()       for combined retrieval
+
+#[test]
+fn test_cbm_and_semantic_edges_coexist_in_all_edges_for() {
+    // Arrange: create a mock CBM bridge with call edges.
+    let mut bridge = new_mock_with_edges(
+        vec![("UserController".to_string(), "UserService".to_string())],
+        HashMap::new(),
+        vec![],
+    );
+
+    let mut layer = InferenceLayer::new();
+
+    // Act 1: enrich from CBM — populates inferred_edges via production path.
+    layer
+        .enrich_from_cbm(Some(&mut bridge))
+        .expect("mock-backed enrichment must succeed");
+
+    // Act 2: add a semantic edge from Spring meta-layer extraction.
+    layer.add_semantic_edge(SemanticEdge {
+        relation: SemanticRelation::EndpointMapsTo,
+        subject: EntityRef::new("spring", "Controller", "UserController"),
+        object: EntityRef::new("spring", "Endpoint", "GET /api/users"),
+        layer: "spring",
+    });
+
+    // Assert: enrichment produced exactly one inferred edge.
+    assert_eq!(
+        layer.inferred_edges.len(),
+        1,
+        "enrich_from_cbm should load 1 call edge"
+    );
+
+    // Assert: layer holds exactly one semantic edge.
+    assert_eq!(layer.semantic_edges.len(), 1, "should have 1 semantic edge");
+
+    // Act 3: query all_edges_for an entity whose name matches the CBM
+    // edge (from="UserController") AND whose identity matches the semantic
+    // edge subject (domain="spring", entity_type="Controller", name="UserController").
+    let entity = EntityRef::new("spring", "Controller", "UserController");
+    let bundle = layer.all_edges_for(&entity);
+
+    // Assert: both edge categories are present — neither suppresses the other.
+    assert_eq!(
+        bundle.inferred.len(),
+        1,
+        "CBM inferred edge must be present in all_edges_for"
+    );
+    assert_eq!(
+        bundle.semantic.len(),
+        1,
+        "semantic edge must be present in all_edges_for"
+    );
+
+    // Verify inferred edge content
+    let inferred = bundle.inferred[0];
+    assert_eq!(inferred.from, "UserController");
+    assert_eq!(inferred.to, "UserService");
+    assert_eq!(inferred.edge_type, InferenceEdgeType::Calls);
+    assert_eq!(inferred.confidence, 0.75);
+    assert_eq!(inferred.source, InferenceSource::Cbm);
+
+    // Verify semantic edge content
+    let semantic = bundle.semantic[0];
+    assert_eq!(semantic.relation, SemanticRelation::EndpointMapsTo);
+    assert_eq!(semantic.subject.name, "UserController");
+    assert_eq!(semantic.object.name, "GET /api/users");
+    assert_eq!(semantic.layer, "spring");
+}
