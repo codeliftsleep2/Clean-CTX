@@ -1,7 +1,7 @@
 # Clean-CTX — Developer Documentation
 
 > **Owner:** How-to-extend (languages/tools/opcodes/Φ markers) + opcode/marker vocabulary + build/test gates · **Status:** Living reference
-> **Version:** 0.5.2 · **Last updated:** 2026-08-30
+> **Version:** 0.6.0 · **Last updated:** 2026-08-31
 >
 > **Test count:** see `docs/CHANGELOG.md` for the current workspace test count.
 
@@ -207,8 +207,7 @@ src/
 │   ├── template.rs         # tree-sitter-html Angular-syntax template extractor
 │   ├── style.rs            # CSS/SCSS class selector + variable extractor
 │   ├── footer.rs           # §ΦMAP workspace footer formatter
-│   ├── graph.rs            # AngularGraph — cross-file DI + selector graph
-│   └── graph_state.rs      # AngularGraphHandle — McpState integration
+│   ├── semantic.rs         # SemanticEdge extraction (Angular/NgRx/RxJS/Signals/Routing)
 ├── diff/                   # AST-level diff engine
 ├── compaction/             # AST node compaction
 ├── decompression/          # Opcode → readable output

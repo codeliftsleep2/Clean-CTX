@@ -18,8 +18,7 @@
 // - `automapper`     : AutoMapper profiles
 // - `serialization`  : JSON serialization attributes
 // - `general`        : Services, DI, validation, caching, identity, logging
-// - `graph`          : cross-file dependency graph (DI, endpoints, hubs)
-// - `graph_state`    : McpState integration
+// - `semantic`       : Semantic edge extraction (extract_semantic_edges)
 // - `footer`         : `§ΦMAP` workspace footer formatter
 // - (this file)      : Public surface, `MetaBlock` struct, `run_meta_layer`
 

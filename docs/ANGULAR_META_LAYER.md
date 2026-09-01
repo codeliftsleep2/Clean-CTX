@@ -4,6 +4,8 @@
 >
 > **Ship status:** see `docs/ROADMAP.md` (R-22 ✅). **Test counts / audit rounds:** see `docs/CHANGELOG.md`. **Ecosystem Deepening (RxJS/NgRx/Signals/Routing):** see `docs/ANGULAR_ECOSYSTEM_DEEPENING.md`.
 >
+> **Note (v0.6.0):** The Angular cross-file dependency graph infrastructure (`AngularGraph`, `GraphCollector`, `graph_state.rs`) was **replaced** by `extract_semantic_edges()` and `WorkspaceIndex`. The Phase 3 documentation below describes the original implementation, which has been migrated. Semantic edges now carry structured relationships through `InferenceLayer.semantic_edges` alongside the existing Phi text markers.
+>
 
 ---
 

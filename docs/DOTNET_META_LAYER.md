@@ -4,6 +4,7 @@
 >
 > **Implementation:** Phase 1 (C# Core) complete with full ASP.NET Core  EF Core  SignalR  AutoMapper  and DI support. The .NET meta-layer is now integrated and available via the dotnet Cargo feature flag (enabled by default).
 > **Ship status:** see `docs/ROADMAP.md`. **Test counts / audit rounds:** see `docs/CHANGELOG.md`. This document does not duplicate them.
+> **Note (v0.6.0):** The .NET graph infrastructure (`DotnetGraph`, `graph_state.rs`) was **replaced** by `extract_semantic_edges()` and `WorkspaceIndex`. Semantic edges now flow through `InferenceLayer.semantic_edges` alongside existing Phi markers.
 
 ---
 

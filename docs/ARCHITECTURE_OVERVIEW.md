@@ -1,8 +1,8 @@
 # Clean-CTX — Architecture Overview
 
 > **Owner:** System + module architecture · **Status:** Living reference
-> **Version:** 0.5.2
-> **Last updated:** 2026-08-30 (0.4.8–0.5.2: structuredContent MCP envelope, CBM transport unification, graph_query fidelity)
+> **Version:** 0.6.0
+> **Last updated:** 2026-08-31 (0.5.2–0.6.0: semantic edge model, WorkspaceIndex, legacy graph removal, token-economics gate)
 >
 > **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
 
@@ -55,18 +55,21 @@
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ Angular Meta-Layer (Φ markers + graph)           │   │
-│  │   detect → decorators → markers → bundler → graph│   │
+│  │ Angular Meta-Layer (Φ markers + semantic edges)        │   │
+│  │   detect → decorators → markers → bundler →            │   │
+│  │   extract_semantic_edges() → InferenceLayer            │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ Spring Boot Meta-Layer (Φ markers + graph)       │   │
-│  │   detect → annotations → markers → graph         │   │
+│  │ Spring Boot Meta-Layer (Φ markers + semantic edges)   │   │
+│  │   detect → annotations → markers →                   │   │
+│  │   extract_semantic_edges() → InferenceLayer            │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ .NET Meta-Layer (Φ markers + graph)              │   │
-│  │   detect → attributes → markers → graph          │   │
+│  │ .NET Meta-Layer (Φ markers + semantic edges)          │   │
+│  │   detect → attributes → markers →                    │   │
+│  │   extract_semantic_edges() → InferenceLayer            │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  All meta-layers dispatched via LayerRegistry:          │
@@ -371,8 +374,7 @@ src/
 │   ├── template.rs               # tree-sitter-html Angular-syntax template extractor
 │   ├── style.rs                  # CSS/SCSS class selector + variable extractor
 │   ├── footer.rs                 # §ΦMAP workspace footer formatter
-│   ├── graph.rs                  # AngularGraph — cross-file DI + selector graph (Phase 3)
-│   └── graph_state.rs            # AngularGraphHandle — McpState integration wrapper
+│   ├── semantic.rs               # SemanticEdge extraction
 │
 ├── decompression/                # Opcode → readable expansion
 │   ├── mod.rs
@@ -804,50 +806,19 @@ Supports Angular's evolving template and decorator syntax:
 
 These are embedded in the `Φtpl:` marker line (`@if`, `@for`) or emit their own `Φ` markers (`Φmodel:`, `Φin:...signal`).
 
-### Phase 3 — Cross-File Dependency Graph (workspace mode only)
+#### WorkspaceIndex (replaces Phase 3 — Cross-File Dependency Graph)
 
-```  
-     compress_workspace (post-bundling)
-          │
-          ▼
-┌──────────────────────────┐
-│ GraphCollector (per-file)│  Reads raw .ts → decorators::extract_graph_entries
-│                          │  Collects (class_name, file_alias, kind, selector, injects)
-└─────────┬────────────────┘
-          │
-          ▼
-┌──────────────────────┐
-│ AngularGraph Builder │  register_class → resolve_all() builds injected_by reverse edges
-└─────────┬────────────┘
-          │
-     ┌────┴──────────────┐
-     ▼                   ▼
-┌──────────────┐  ┌──────────────┐
-│ DI Resolution│  │ Selector     │  resolve_inject_type → `UserService@α12`
-│              │  │ Linkage      │  resolve_selector  → `UserCardComponent@α9`
-└──────┬───────┘  └──────┬───────┘
-       │                 │
-       └──────┬──────────┘
-              ▼
-┌──────────────────────────┐
-│ Φgraph: + §ΦGRAPH Footer │  // Φgraph:UserCardComponent → injects=[UserService@α2] ← injected-by=[] 
-│                          │  §ΦGRAPH
-│                          │    cmp UserCardComponent@α1
-│                          │      Φcmp:injects=[UserService@α2]
-│                          │      selector="app-user-card"
-└──────────────────────────┘
-```
+The legacy cross-file dependency graph infrastructure (`AngularGraph`, `DotnetGraph`,
+`SpringGraph`, `GraphCollector`, and all `graph_state.rs` modules) was **removed** in
+v0.6.0 after semantic coverage was verified through `extract_semantic_edges()` and
+`WorkspaceIndex`.
 
-**Modules:** `src/angular_meta/` — `mod.rs`, `detect.rs`, `decorators.rs`, `markers.rs`, `bundler.rs`, `template.rs`, `style.rs`, `footer.rs`, `graph.rs`, `graph_state.rs`
+Cross-file semantic queries now go through `WorkspaceIndex` (`src/workspace/index.rs`),
+which aggregates `SemanticEdge` objects from all files, deduplicates by identity, and
+provides forward/reverse traversal and transitive dependency resolution.
 
-**Added to McpState:** `angular_graph: AngularGraphHandle` — built once per `compress_workspace` call
-
-**Marker vocabulary:** `Φcmp:`, `Φdir:`, `Φpipe:`, `Φsvc:`, `Φmod:`, `Φin:`, `Φout:`, `Φmodel:`, `Φinjects:`, `Φtpl:`, `Φsty:`, `ΦBUNDLE`, `ΦMAP`, `Φgraph:`, `§ΦGRAPH`
-
-**Key design decisions:**
-- **String-based extraction (no AST re-parse)** — the Meta-Layer walks raw text of existing `class.root` captures rather than building a new tree-sitter query. This keeps the dependency footprint minimal (only `tree-sitter-html` for templates) and avoids duplication with the core compression pipeline.
-- **Typestate pattern (F-ANG-05)** — `AngularGraph` can only be created via `AngularGraphBuilder::build()`, making it a compile-time error to register classes after resolution.
-- **Text-node scanning for modern syntax** — `@if`/`@for`/`@switch` are not valid HTML, so tree-sitter-html parses them as opaque `text` nodes. The extractor uses word-boundary heuristics instead of regex to avoid adding dependencies.
+Phi text markers (`Φcmp:`, `Φsvc:`, `Φmod:`, etc.) remain unchanged and continue to be
+emitted through the existing meta-layer pipeline.
 
 **Resolution rules:**
 - Constructor `private` / `protected` params resolve to `Type@αN` where the type is a registered `@Injectable` class

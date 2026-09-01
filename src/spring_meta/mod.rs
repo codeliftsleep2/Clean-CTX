@@ -14,11 +14,9 @@
 // - `annotations`: `@RestController` / `@Service` / `@Repository` /
 //                  `@Controller` / `@Configuration` / `@RequestMapping` extractor
 // - `markers`    : `Φ` marker construction & expansion
-// - `bundler`    : layer resolver (Controller → Service → Repository)
 // - `properties` : application.properties / application.yml extractor
+// - `semantic`   : Semantic edge extraction (extract_semantic_edges)
 // - `footer`     : `§ΦMAP` workspace footer formatter
-// - `graph`      : cross-file dependency graph (DI, REST endpoints)
-// - `graph_state`: McpState integration
 // - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
 
 pub(crate) mod annotations;
