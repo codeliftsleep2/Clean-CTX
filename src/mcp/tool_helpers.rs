@@ -12,6 +12,7 @@ use crate::compression::Fidelity;
 #[cfg(test)]
 pub(crate) static TEST_INJECTED_IR_FAILURE: std::sync::Mutex<Option<String>> =
     std::sync::Mutex::new(None);
+use crate::layers::meta::semantic::SemanticEdge;
 use crate::mcp::McpState;
 use std::path::PathBuf;
 
@@ -254,7 +255,8 @@ pub(super) fn compile_file_ir(
     file_path: &str,
     fidelity: Fidelity,
     state: &McpState,
-) -> Result<(crate::ir::compiler::CompiledIR, String), crate::error::CleanCtxError> {
+) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
+{
     compile_file_ir_focused(file_path, fidelity, state, None)
 }
 
@@ -273,7 +275,8 @@ pub(super) fn compile_file_ir_focused(
     fidelity: Fidelity,
     state: &McpState,
     focus: Option<&std::collections::HashSet<String>>,
-) -> Result<(crate::ir::compiler::CompiledIR, String), crate::error::CleanCtxError> {
+) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
+{
     // Phase A retirement tests: cfg(test)-only fault injection. The
     // natural CompileError paths (Capture/Layer) are unreachable with
     // valid grammars, so the legacy-fallback branches cannot be exercised
@@ -392,12 +395,17 @@ pub(super) fn compile_file_ir_focused(
         &state.config.type_aliases,
     );
 
+    // Capture semantic edges from the compiler before they are lost on the
+    // next compilation. These edges were produced by MetaLayerPass (Pass 3)
+    // during the production pipeline and survived through compile_inner().
+    let semantic_edges = std::mem::take(&mut compiler.semantic_edges);
+
     // NF-02: Override the version with the next monotonic value.
     // The compiler always sets version=1; we fix it here.
     compiled.version = prev_version.saturating_add(1);
 
-    // A-08: Return source hash along with compiled IR
-    Ok((compiled, source_hash))
+    // A-08: Return source hash along with compiled IR and semantic edges
+    Ok((compiled, semantic_edges, source_hash))
 }
 
 /// Compute an AST-level diff between the file's in-session baseline and

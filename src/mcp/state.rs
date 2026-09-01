@@ -190,6 +190,13 @@ pub struct McpState {
     /// saving ~O(n) where n is the file size in HIR nodes.
     pub llm_text_cache: Mutex<HashMap<String, String>>,
 
+    /// WorkspaceIndex — cross-file semantic index populated from per-file
+    /// compilation. Updated on every file compilation (provide_code_context,
+    /// compress_code_context, delta_code_context, apply_edit) by draining
+    /// stale edges for that file and inserting fresh ones from the latest
+    /// MetaLayerPass extraction.
+    pub workspace_index: RwLock<crate::workspace::index::WorkspaceIndex>,
+
     /// Phase 2: Proxy port for fetching tool-filtering and cache stats.
     /// Defaults to 8787 (the proxy's default port).
     pub proxy_port: u16,
@@ -279,6 +286,7 @@ impl McpState {
             llm_text_cache: Mutex::new(HashMap::new()),
             emitted_breakpoints: Mutex::new(HashSet::new()),
             cache_metrics: Mutex::new(CacheMetrics::default()),
+            workspace_index: RwLock::new(crate::workspace::index::WorkspaceIndex::new()),
             cbm_filter: Mutex::new(CbmFilterState::default()),
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,
@@ -381,6 +389,19 @@ impl McpState {
         lock_or_recover!(self.ir_context.write(), "ir_context")
     }
 
+    /// Lock the workspace index for reading.
+    pub fn workspace_index_read(
+        &self,
+    ) -> std::sync::RwLockReadGuard<'_, crate::workspace::index::WorkspaceIndex> {
+        lock_or_recover!(self.workspace_index.read(), "workspace_index")
+    }
+
+    /// Lock the workspace index for writing.
+    pub fn workspace_index_lock(
+        &self,
+    ) -> std::sync::RwLockWriteGuard<'_, crate::workspace::index::WorkspaceIndex> {
+        lock_or_recover!(self.workspace_index.write(), "workspace_index")
+    }
     /// Lock the session stats for writing.
     pub fn session_stats_lock(&self) -> std::sync::MutexGuard<'_, SessionStats> {
         lock_or_recover!(self.session_stats.lock(), "session_stats")

@@ -26,6 +26,7 @@ use super::layers::{LanguageLayer, PatternRecognizer};
 use super::opcodes::CoreOp;
 use super::pipeline::{PassContext, PassPipeline};
 use crate::compression::Fidelity;
+use crate::layers::meta::semantic::SemanticEdge;
 
 /// The compiled IR for a single file.
 #[derive(Debug, Clone)]
@@ -79,6 +80,12 @@ pub struct IRCompiler {
     language_layers: Vec<Box<dyn LanguageLayer>>,
     /// Pattern recognizers (Layer 4)
     pattern_recognizers: Vec<Box<dyn PatternRecognizer>>,
+    /// Semantic edges captured from the most recent compile_inner() call.
+    /// Populated by draining PassContext.semantic_edges after pipeline.run().
+    /// Reset to empty at the start of each new compilation.
+    /// This is the boundary where meta-layer semantic facts survive the
+    /// production compilation lifecycle (Phase 4 integration).
+    pub semantic_edges: Vec<SemanticEdge>,
 }
 
 impl IRCompiler {
@@ -87,6 +94,7 @@ impl IRCompiler {
             id_counter: 0,
             language_layers: Vec::new(),
             pattern_recognizers: Vec::new(),
+            semantic_edges: Vec::new(),
         }
     }
 
@@ -226,6 +234,11 @@ impl IRCompiler {
                 CompileError::Layer(e.message)
             }
         })?;
+
+        // Capture semantic edges produced by MetaLayerPass (Pass 3) before
+        // PassContext is dropped. This is the boundary where meta-layer
+        // semantic facts survive the production compilation lifecycle.
+        self.semantic_edges = std::mem::take(&mut ctx.semantic_edges);
 
         // Return ownership of language layers and pattern recognizers
         // back to the compiler for reuse in subsequent compilations.

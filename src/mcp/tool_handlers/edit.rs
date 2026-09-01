@@ -143,7 +143,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .and_then(|e| e.to_str())
         .unwrap_or("");
     let pre_compiled = match compile_file_ir_focused(&resolved_path, Fidelity::Edit, state, None) {
-        Ok((ir, _)) => ir,
+        Ok((ir, _, _)) => ir,
         Err(e) => return err_response(id, -32603, e.to_string(), None),
     };
     let units = UnitTable::from_instructions(&pre_compiled.instructions);
@@ -182,8 +182,15 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     // (plan step 5). Post-edit recompile also re-validates the final file.
     let version = match compile_file_ir_focused(&resolved_path, Fidelity::Edit, state, None) {
         // compile_file_ir_focused already assigns version = prev + 1.
-        Ok((post, _)) => {
+        Ok((post, sem_edges, _)) => {
             let v = post.version;
+            // Update workspace index with the post-edit semantic edges.
+            let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+            {
+                let mut idx = state.workspace_index_lock();
+                idx.remove_file(&canonical_path);
+                idx.add_edges(&canonical_path, sem_edges);
+            }
             state
                 .ir_context_lock()
                 .load_ir(post, Some(new_hash.clone()));

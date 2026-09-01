@@ -233,8 +233,16 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
     // P3-2: Build response using extracted helpers
     // If IR compilation fails, fall back to legacy compression but log
     // the structured error for diagnostics (4.4 audit fix).
-    let mut response = if let Ok((ir, _source_hash)) = ir_result {
+    let mut response = if let Ok((ir, semantic_edges, _source_hash)) = ir_result {
+        // Compute canonical file identity for WorkspaceIndex provenance
+        let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
         state.ir_context_lock().load_ir(ir.clone(), None);
+        // Update workspace index: remove stale edges, insert fresh ones.
+        {
+            let mut idx = state.workspace_index_lock();
+            idx.remove_file(&canonical_path);
+            idx.add_edges(&canonical_path, semantic_edges.clone());
+        }
         let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
         let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
         let footer = state.format_dict_footer_for_aliases(&[&ir.file_id]);
@@ -310,7 +318,8 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 "content": [{ "type": "text", "text": llm_text_with_footer }],
                 "ir": crate::ir::hierarchical::ir_to_hierarchical_wire(&ir),
                 "pretty": ir_value, "v": ir.version, "file": ir.file_id,
-                "content_kind": content_kind, "byte_exact": byte_exact
+                "content_kind": content_kind, "byte_exact": byte_exact,
+                "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
             }
         })
     } else {
@@ -489,13 +498,25 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     drop(ir_ctx); // Release lock before expensive compile
 
     // Source changed or no baseline - compile
-    let (compiled, source_hash) = match compile_file_ir(&resolved_path, fidelity, state) {
-        Ok(c) => c,
-        Err(e) => {
-            send_response(&to_jsonrpc_error(id, &e));
-            return;
-        }
-    };
+    let (compiled, semantic_edges, source_hash) =
+        match compile_file_ir(&resolved_path, fidelity, state) {
+            Ok(c) => c,
+            Err(e) => {
+                send_response(&to_jsonrpc_error(id, &e));
+                return;
+            }
+        };
+
+    // Compute canonical file identity for WorkspaceIndex provenance
+    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+
+    // Update workspace index before delta computation: remove stale edges,
+    // insert fresh edges from the latest compilation.
+    {
+        let mut idx = state.workspace_index_lock();
+        idx.remove_file(&canonical_path);
+        idx.add_edges(&canonical_path, semantic_edges.clone());
+    }
 
     // P0-4: Re-acquire lock atomically for delta computation
     // This ensures no other worker modified ir_context between our check and delta computation
@@ -528,7 +549,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                     "strategy": "delta", "fidelity": format!("{:?}", fidelity).to_lowercase(),
                     "content_kind": content_kind, "byte_exact": byte_exact,
-                    "degradation": null
+                    "degradation": null,
+                    "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                 }
             });
             // Delta output is rolling dynamic content — mark as tail (ephemeral).
@@ -540,7 +562,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": format!("Baseline stored for {} (v{})", compiled.file_id, compiled.version) }],
-                    "version": compiled.version, "instruction_count": compiled.instructions.len()
+                    "version": compiled.version, "instruction_count": compiled.instructions.len(),
+                    "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                 }
             });
             // Baseline stored — this is a stable snapshot, inject baseline breakpoint.
@@ -914,7 +937,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 state,
                 focus_methods.as_ref(),
             ) {
-                Ok((compiled, _)) => {
+                Ok((compiled, _, _)) => {
                     state.ir_context_lock().load_ir(compiled, None);
                 }
                 Err(e) => {
@@ -954,7 +977,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     match strategy {
         crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
             let compile_start = Instant::now();
-            let (compiled, _source_hash) = match compile_file_ir_focused(
+            let (compiled, semantic_edges, _source_hash) = match compile_file_ir_focused(
                 &resolved_path,
                 effective_fidelity,
                 state,
@@ -967,6 +990,16 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 }
             };
             let compile_ms = compile_start.elapsed().as_millis() as u64;
+
+            // Compute canonical file identity for WorkspaceIndex provenance
+            let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+
+            // Update workspace index: remove stale edges, insert fresh ones.
+            {
+                let mut idx = state.workspace_index_lock();
+                idx.remove_file(&canonical_path);
+                idx.add_edges(&canonical_path, semantic_edges.clone());
+            }
 
             let delta_start = Instant::now();
             let prev_version = state.file_version(&alias).unwrap_or(0);
@@ -1017,7 +1050,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                                 "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                                 "decision_summary": decision.summary(),
                                 "content_kind": content_kind, "byte_exact": byte_exact,
-                                "degradation": null
+                                "degradation": null,
+                                "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                             }
                         }
                     });
@@ -1092,7 +1126,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                                 "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                                 "decision_summary": decision.summary(),
                                 "content_kind": content_kind, "byte_exact": byte_exact,
-                                "degradation": null
+                                "degradation": null,
+                                "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                             }
                         }
                     });
@@ -1143,10 +1178,20 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             );
             let compile_ms = compile_start.elapsed().as_millis() as u64;
 
-            if let Ok((ir, _source_hash)) = ir_result {
+            if let Ok((ir, semantic_edges, _source_hash)) = ir_result {
                 let render_start = Instant::now();
                 // Note: IR error is logged below in the else branch (4.4 audit fix)
+
+                // Compute canonical file identity for WorkspaceIndex provenance
+                let canonical_path =
+                    crate::dictionary::path::canonical_identity_key(&resolved_path);
                 state.ir_context_lock().load_ir(ir.clone(), None);
+                // Update workspace index: remove stale edges, insert fresh ones.
+                {
+                    let mut idx = state.workspace_index_lock();
+                    idx.remove_file(&canonical_path);
+                    idx.add_edges(&canonical_path, semantic_edges.clone());
+                }
                 let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
                 let llm_text = crate::ir::render_hierarchical_for_llm_focused(
                     &hir,
@@ -1201,7 +1246,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                             "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                             "is_angular": is_angular, "decision_summary": decision.summary(),
                             "content_kind": content_kind, "byte_exact": byte_exact,
-                            "degradation": null
+                            "degradation": null,
+                            "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                         }
                     }
                 });
@@ -1307,6 +1353,9 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     let path_alias = state.get_or_create_alias(resolved_path.clone());
     state.ir_context_lock().remove_file(&path_alias);
     state.llm_text_cache_lock().remove(&path_alias);
+    // Clear workspace index for this file (canonical identity, not alias).
+    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+    state.workspace_index_lock().remove_file(&canonical_path);
 
     // Clear persistence DB entry for this file (use resolved_path, not alias)
     if let Some(ref mut store) = *state.persistence_store_lock() {
@@ -1328,7 +1377,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     let _source_text = source_arc.as_str();
 
     match compile_file_ir(&resolved_path, fidelity, state) {
-        Ok((ir, _source_hash)) => {
+        Ok((ir, _semantic_edges, _source_hash)) => {
             let hir = crate::ir::hierarchical::ir_to_hierarchical(&ir);
             let llm_text = crate::ir::render_hierarchical_for_llm(&hir, fidelity);
             let full = format!(

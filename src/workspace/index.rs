@@ -92,6 +92,9 @@ pub struct WorkspaceIndex {
     edge_set: HashSet<EdgeKey>,
     /// File → entity keys in that file (for provenance tracking).
     file_map: HashMap<String, Vec<EntityKey>>,
+    /// File → edge keys originating from that file (for precise edge cleanup
+    /// on file recompilation or deletion). Populated alongside edge_set.
+    file_edges: HashMap<String, Vec<EdgeKey>>,
     /// Entity name → entity keys (for name-based lookup across domains/types).
     /// Populated alongside the entities map during registration.
     name_index: HashMap<String, Vec<EntityKey>>,
@@ -109,6 +112,7 @@ impl WorkspaceIndex {
             reverse: HashMap::new(),
             edge_set: HashSet::new(),
             file_map: HashMap::new(),
+            file_edges: HashMap::new(),
             name_index: HashMap::new(),
             total_edges_inserted: 0,
             edge_count: 0,
@@ -156,10 +160,17 @@ impl WorkspaceIndex {
             // Dedup: skip if this exact edge identity was already inserted.
             // Forward/reverse indexes are only updated for the first occurrence.
             let key = EdgeKey::from_edge(&edge);
-            if !self.edge_set.insert(key) {
+            if !self.edge_set.insert(key.clone()) {
                 continue;
             }
             self.edge_count += 1;
+
+            // Track this edge key under the originating file for precise
+            // removal on recompilation or file deletion.
+            self.file_edges
+                .entry(file_path.to_string())
+                .or_default()
+                .push(key);
 
             // Forward index: subject -> outgoing edge.
             self.forward.entry(subj_key).or_default().push(edge.clone());
@@ -304,6 +315,79 @@ impl WorkspaceIndex {
         self.edge_count == 0
     }
 
+    /// Remove all edges and entity occurrences originating from the given file.
+    ///
+    /// Called when a file is recompiled (stale edges removed before fresh ones
+    /// are inserted) or when a file is deleted from the workspace. Preserves all
+    /// other files' edges and entities.
+    pub fn remove_file(&mut self, file_path: &str) {
+        // Phase 1: Remove edges tracked to this file via file_edges.
+        if let Some(edge_keys) = self.file_edges.remove(file_path) {
+            for key in edge_keys {
+                self.edge_set.remove(&key);
+            }
+        }
+
+        // Phase 2: Remove entity keys tracked to this file.
+        if let Some(keys) = self.file_map.remove(file_path) {
+            // Remove entities that only existed in this file.
+            for key in &keys {
+                if let Some(occurrences) = self.entities.get_mut(key) {
+                    occurrences.retain(|e| e.file.as_deref() != Some(file_path));
+                    if occurrences.is_empty() {
+                        self.entities.remove(key);
+                    }
+                }
+            }
+
+            // Remove forward edges whose subject entity only exists in this file.
+            for key in &keys {
+                if !self.entities.contains_key(key) {
+                    if let Some(edges) = self.forward.remove(key) {
+                        // Adjust edge_count: only decrement for edges that
+                        // were actually removed (not already cleaned via file_edges).
+                        self.edge_count = self.edge_count.saturating_sub(
+                            edges
+                                .iter()
+                                .filter(|e| {
+                                    e.subject.file.as_deref() == Some(file_path)
+                                        || !self.entities.contains_key(&entity_key(&e.object))
+                                })
+                                .count(),
+                        );
+                    }
+                } else {
+                    // Entity still exists (from another file), clean only this file's edges.
+                    if let Some(edges) = self.forward.get_mut(key) {
+                        let before = edges.len();
+                        edges.retain(|e| {
+                            e.subject.file.as_deref() != Some(file_path)
+                                && e.object.file.as_deref() != Some(file_path)
+                        });
+                        // Adjust edge_count for removed edges.
+                        let _removed = before.saturating_sub(edges.len());
+                        self.edge_count = self.edge_count.saturating_sub(_removed);
+                    }
+                }
+            }
+
+            // Same for reverse edges.
+            for key in &keys {
+                if let Some(edges) = self.reverse.get_mut(key) {
+                    edges.retain(|e| {
+                        e.subject.file.as_deref() != Some(file_path)
+                            && e.object.file.as_deref() != Some(file_path)
+                    });
+                }
+            }
+        }
+
+        // Phase 3: Clean up name_index entries that no longer exist.
+        self.name_index.retain(|_name, keys| {
+            keys.retain(|k| self.entities.contains_key(k));
+            !keys.is_empty()
+        });
+    }
     // ── Phase 4b queries ─────────────────────────────────────────────
 
     /// Find all entity occurrences with the given name across all domains

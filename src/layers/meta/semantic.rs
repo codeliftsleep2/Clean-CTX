@@ -26,7 +26,7 @@
 ///
 /// `PartialEq`/`Hash` cover only (domain, entity_type, name) -- `file` is
 /// excluded so identity matching works across files (plan U1/U2).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct EntityRef {
     /// Framework domain (e.g. "angular", "ngrx", "dotnet", "spring").
     pub domain: &'static str,
@@ -75,7 +75,7 @@ impl std::hash::Hash for EntityRef {
 }
 
 /// The typed relationship between two entities.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
 pub enum SemanticRelation {
     // ---- Angular ----
     /// Component injects a Service via constructor/DI.
@@ -161,7 +161,7 @@ pub enum SemanticRelation {
 /// `layer` (e.g. "angular", "ngrx"). Duplicates are NOT removed during
 /// per-file extraction -- deduplication happens at the workspace index
 /// boundary (plan U2).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SemanticEdge {
     /// The typed relationship.
     pub relation: SemanticRelation,
