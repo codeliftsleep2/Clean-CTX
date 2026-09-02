@@ -193,8 +193,9 @@ fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState) {
             return;
         }
     };
+    let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
     let idx = state.workspace_index_read();
-    let results = idx.entities_in_file(file_path);
+    let results = idx.entities_in_file(&canonical_path);
     let serialized = serde_json::to_value(&results).unwrap_or_default();
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,

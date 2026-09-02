@@ -937,8 +937,19 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 state,
                 focus_methods.as_ref(),
             ) {
-                Ok((compiled, _, _)) => {
+                Ok((compiled, semantic_edges, _)) => {
                     state.ir_context_lock().load_ir(compiled, None);
+
+                    // PERSIST-01: Preserve semantic edges extracted during
+                    // compilation even though the token-economics gate
+                    // predicts the full render is not economical. The
+                    // WorkspaceIndex must reflect the latest compilation
+                    // state regardless of the rendering strategy chosen.
+                    let canonical_path =
+                        crate::dictionary::path::canonical_identity_key(&resolved_path);
+                    let mut idx = state.workspace_index_lock();
+                    idx.remove_file(&canonical_path);
+                    idx.add_edges(&canonical_path, semantic_edges);
                 }
                 Err(e) => {
                     send_response(&to_jsonrpc_error(id, &e));

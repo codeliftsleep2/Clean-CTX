@@ -275,6 +275,69 @@ fn workspace_query_entities_in_file_returns_results() {
 }
 
 #[test]
+fn entities_in_file_production_path_canonicalization() {
+    use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    let id = json!(1);
+
+    // Populate the index using a canonicalized file path, mimicking the
+    // production write path (handle_provide_code_context canonicalizes
+    // via canonical_identity_key before calling add_edges).
+    // Use an existing file so canonical_identity_key resolves to an
+    // absolute path that differs from the raw relative path.
+    let raw_path = "src/tests/mcp/workspace_query.rs";
+    let canonical_path = crate::dictionary::path::canonical_identity_key(raw_path);
+
+    // Prove the test exercises the canonicalization boundary: the
+    // canonicalized path must be a different string from the raw path.
+    assert_ne!(
+        canonical_path, raw_path,
+        "canonical identity must differ from raw path to exercise the boundary"
+    );
+
+    {
+        let mut idx = state.workspace_index_lock();
+        idx.add_edges(
+            &canonical_path,
+            vec![SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: EntityRef::new("test", "Module", "WorkspaceQueryTestModule")
+                    .with_file(canonical_path.clone()),
+                object: EntityRef::new("test", "Function", "test_path_canonicalization")
+                    .with_file(canonical_path.clone()),
+                layer: "test",
+            }],
+        );
+    }
+
+    // Query with the raw (non-canonicalized) path through the MCP handler.
+    // This reproduces the production defect: the user provides a raw path,
+    // while the index stores data under the canonicalized key.
+    let params = json!({
+        "arguments": {
+            "type": "entities_in_file",
+            "file_path": raw_path
+        }
+    });
+    crate::protocol::captured_responses().clear();
+    dispatch_tools_call(&id, "workspace_query", &params, &state);
+    let resp = pop_response();
+
+    assert!(
+        resp.get("result").is_some(),
+        "entities_in_file should succeed"
+    );
+    let entities = &resp["result"]["entities"];
+    assert!(entities.is_array(), "entities should be an array");
+    // RED assertion: FAILS before the canonicalization fix,
+    // PASSES after the fix.
+    assert!(
+        !entities.as_array().unwrap().is_empty(),
+        "entities_in_file with raw path must find entities stored under canonical path"
+    );
+}
+
+#[test]
 fn workspace_query_transitive_dependencies_returns_results() {
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     seed_workspace_index(&state);
@@ -430,5 +493,115 @@ fn workspace_query_does_not_affect_cbm_tools() {
     assert!(
         cbm_resp.get("error").is_some() || cbm_resp.get("result").is_some(),
         "cbm_proxy should still dispatch without panic"
+    );
+}
+
+// ── Token-economics regression (Issue #2) ──────────────────────────
+//
+// Verifies that compile_file_ir_focused semantic edges survive the
+// token-economics unfavorable-prediction fallback path.
+//
+// The write path (handle_provide_code_context) compiles a small file
+// at Edit fidelity. Token-economics predicts the full render is not
+// economical and returns raw passthrough. BEFORE the fix, the extracted
+// semantic edges were bound to `_` and discarded, leaving the
+// WorkspaceIndex empty. AFTER the fix, they are persisted to the index.
+//
+// Uses a .cs file with [ApiController] so DotNetMetaLayer produces
+// semantic entities. The file is intentionally small (<~50 raw tokens)
+// to guarantee the token-economics unfavorable prediction for Edit
+// fidelity on .cs files (threshold ~612 tokens).
+
+#[test]
+#[cfg(any(feature = "csharp", feature = "dotnet"))]
+fn find_entities_after_token_economics_fallback() {
+    use crate::mcp::tools::dispatch_tools_call;
+    use serde_json::json;
+    use tempfile::TempDir;
+
+    let dir = TempDir::new().unwrap();
+    let cs_path = dir.path().join("TestController.cs");
+    let cs_content = r#"
+using Microsoft.AspNetCore.Mvc;
+
+[ApiController]
+[Route("api/test")]
+public class TestController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult Get() => Ok("hello");
+}
+"#;
+    std::fs::write(&cs_path, cs_content).unwrap();
+    let file_str = cs_path.to_string_lossy().to_string();
+
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    let id = json!(1);
+
+    // Step 1: Call provide_code_context with Edit fidelity.
+    // The file is small so token-economics should predict
+    // unfavorable and return raw passthrough.
+    let pcc_params = json!({
+        "arguments": {
+            "filePath": file_str,
+            "fidelity": "edit",
+            "workspaceRoot": dir.path().to_string_lossy().to_string()
+        }
+    });
+    crate::protocol::captured_responses().clear();
+    dispatch_tools_call(&id, "provide_code_context", &pcc_params, &state);
+    let pcc_resp = pop_response();
+    assert!(
+        pcc_resp.get("result").is_some(),
+        "provide_code_context should succeed for small file"
+    );
+
+    // Confirm the response uses the economics fallback (raw passthrough)
+    let is_fallback = pcc_resp["result"]["_meta"]["content_kind"]
+        .as_str()
+        .map(|k| k == "raw_passthrough")
+        .unwrap_or(false);
+    assert!(
+        is_fallback,
+        "small file at Edit fidelity must trigger token-economics fallback: {:?}",
+        pcc_resp["result"]["_meta"]["content_kind"].as_str()
+    );
+
+    // Step 2: Query find_entities for the expected entity name.
+    // DotNetMetaLayer produces: Controller entity named "TestController"
+    let wq_params = json!({
+        "arguments": {
+            "type": "find_entities",
+            "name": "TestController"
+        }
+    });
+    crate::protocol::captured_responses().clear();
+    dispatch_tools_call(&id, "workspace_query", &wq_params, &state);
+    let resp = pop_response();
+
+    assert!(
+        resp.get("result").is_some(),
+        "workspace_query.find_entities should succeed"
+    );
+    let count = resp["result"]["count"].as_i64().unwrap_or(-1);
+    // RED → GREEN: fails before the fix (count == 0 because semantic
+    // edges discarded in token-economics fallback), passes after the
+    // fix (edges persisted to WorkspaceIndex before fallback).
+    assert!(
+        count > 0,
+        "find_entities must find entity after token-economics fallback; count={}",
+        count
+    );
+
+    // Verify the returned entity has the expected identity.
+    let entities = resp["result"]["entities"].as_array().unwrap();
+    let controller_entity = entities.iter().find(|e| {
+        e["domain"].as_str() == Some("dotnet")
+            && e["entity_type"].as_str() == Some("Controller")
+            && e["name"].as_str() == Some("TestController")
+    });
+    assert!(
+        controller_entity.is_some(),
+        "dotnet Controller 'TestController' must be in find_entities results"
     );
 }
