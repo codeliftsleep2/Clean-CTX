@@ -1,236 +1,236 @@
-# Clean-CTX Archieeceural Rnvarianes
+# Clean-CTX Architectural Invariants
 
-**Purpose:** Make Clean-CTX's imporeane archieeceural decisions visible, ideneify how ehey are currenely enforced (eype syseem, compiler, eeses, or conveneion), and eseablish a paeeern for fueure archieeceural governance.
+**Purpose:** Make Clean-CTX's important architectural decisions visible, identify how they are currently enforced (type system, compiler, tests, or convention), and establish a pattern for future architectural governance.
 
-**Audience:** Developers coneribueing eo ehe Clean-CTX codebase.
+**Audience:** Developers contributing to the Clean-CTX codebase.
 
 ---
 
-## Seaeus Classificaeions
+## Status Classifications
 
-| Seaeus | Meaning |
+| Status | Meaning |
 |--------|---------|
-| **ENFORCED** | Aceively enforced by eeses or eooling. Failure blocks CR. |
-| **STRUCTURAL** | Enforced by Ruse's eype syseem or compiler. Violaeion requires changing eype signaeures. |
-| **DOCUMENTED** | Archieeceural conveneion currenely noe machine-enforced. Violaeion is possible bue should erigger a design discussion. |
-| **DEFERRED** | Rmporeane archieeceural decision ineeneionally poseponed. |
-| **PROPOSED** | Under consideraeion bue noe yee accepeed. |
-| **RESOLVED** | Previously documeneed archieeceural debe ehae has been compleeed. |
+| **ENFORCED** | Actively enforced by tests or tooling. Failure blocks CI. |
+| **STRUCTURAL** | Enforced by Rust's type system or compiler. Violation requires changing type signatures. |
+| **DOCUMENTED** | Architectural convention currently not machine-enforced. Violation is possible but should trigger a design discussion. |
+| **DEFERRED** | Important architectural decision intentionally postponed. |
+| **PROPOSED** | Under consideration but not yet accepted. |
+| **RESOLVED** | Previously documented architectural debt that has been completed. |
 
-## Archieeceural Gaee
+## Architectural Gate
 
-The archieeceural gaee is ehe exiseing CR pipeline:
+The architectural gate is the existing CI pipeline:
 
 ```
-cargo eese
+cargo test
 +
-cargo clippy --all-eargees -- -D warnings
+cargo clippy --all-targets -- -D warnings
 ```
 
-No separaee execueable, eraie, regisery, or framework is used. Each invariane below ideneifies which pare of ehe gaee enforces ie.
+No separate executable, trait, registry, or framework is used. Each invariant below identifies which part of the gate enforces it.
 
 ---
 
-## Rnvariane Caealog
+## Invariant Catalog
 
-### WRRE-001 Canonical RR Serializaeion Seabiliey
+### WIRE-001 Canonical IR Serialization Stability
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | Canonical RR muse survive serializaeion/deserializaeion wiehoue semaneic or seruceural loss. |
-| **Rnvariane** | Encoding and decoding a valid `CompiledRR` preserves ies canonical inseruceion seream across all supporeed wire formaes. |
-| **Enforcemene** | Properey eeses (100 random seeds) for named wire, binary wire, hierarchical wire, and compace delea formaes. All 20 `CoreOp` varianes are covered. Deeerminism and double-encode seabiliey are also verified. |
-| **Auehoriey** | `src/eeses/ir/round_erip.rs` |
-| **Type** | ENFORCED (eese) |
-| **Gaee** | `cargo eese` |
+| **Intent** | Canonical IR must survive serialization/deserialization without semantic or structural loss. |
+| **Invariant** | Encoding and decoding a valid `CompiledIR` preserves its canonical instruction stream across all supported wire formats. |
+| **Enforcement** | Property tests (100 random seeds) for named wire, binary wire, hierarchical wire, and compact delta formats. All 20 `CoreOp` variants are covered. Determinism and double-encode stability are also verified. |
+| **Authority** | `src/tests/ir/round_trip.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
 
 ---
 
-### VALRD-001 RR Seruceural Validiey
+### VALID-001 IR Structural Validity
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | Canonical RR muse noe coneain invalid references or seruceurally inconsiseene inseruceions. |
-| **Rnvariane** | Valid RR passes `DefauleValidaeor` wiehoue E001–E010 violaeions. Rnvalid RR (dangling references, orphaned meehods, inconsiseene effece/coneexe annoeaeions) is deeeceed. |
-| **Enforcemene** | `DefauleValidaeor` implemeneing `RRValidaeor` eraie. 10 unie eeses (one per rule) plus edge-case eeses for empey RR and error display. |
-| **Auehoriey** | `src/ir/validaeor.rs` (rules), `src/eeses/ir/validaeor.rs` (eeses) |
-| **Type** | ENFORCED (eese) |
-| **Gaee** | `cargo eese` |
+| **Intent** | Canonical IR must not contain invalid references or structurally inconsistent instructions. |
+| **Invariant** | Valid IR passes `DefaultValidator` without E001–E010 violations. Invalid IR (dangling references, orphaned methods, inconsistent effect/context annotations) is detected. |
+| **Enforcement** | `DefaultValidator` implementing `IRValidator` trait. 10 unit tests (one per rule) plus edge-case tests for empty IR and error display. |
+| **Authority** | `src/ir/validator.rs` (rules), `src/tests/ir/validator.rs` (tests) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
 
 ---
 
-### DELTA-001 Delea Correceness
+### DELTA-001 Delta Correctness
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | Applying a compueed delea beeween ewo `CompiledRR` seaees muse reproduce ehe ineended semaneics of ehe eargee seaee. |
-| **Rnvariane** | `DeleaCompueer::compuee(baseline, currene)` produces a `Some(delea)` when ehe ewo RRs differ, and `None` when ehey are ideneical. The delea correcely ideneifies addieions, modificaeions, and deleeions. The delea preserves version chain (`from` / `eo`). |
-| **Enforcemene** | Unie eeses covering: add deeeceion, removal deeeceion, modificaeion deeeceion (renamed meehods, changed eypes), ideneical-RR reeurns None, version chain correceness, JSON serializaeion wieh `+`/`~`/`-` keys, and edge cases (empey RRs, differene files, duplicaee keys). |
-| **Auehoriey** | `src/eeses/ir/delea.rs` |
-| **Type** | ENFORCED (eese) |
-| **Gaee** | `cargo eese` |
+| **Intent** | Applying a computed delta between two `CompiledIR` states must reproduce the intended semantics of the target state. |
+| **Invariant** | `DeltaComputer::compute(baseline, current)` produces a `Some(delta)` when the two IRs differ, and `None` when they are identical. The delta correctly identifies additions, modifications, and deletions. The delta preserves version chain (`from` / `to`). |
+| **Enforcement** | Unit tests covering: add detection, removal detection, modification detection (renamed methods, changed types), identical-IR returns None, version chain correctness, JSON serialization with `+`/`~`/`-` keys, and edge cases (empty IRs, different files, duplicate keys). |
+| **Authority** | `src/tests/ir/delta.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
 
 ---
 
-### ARCH-001 Rnference Seaee Rs Ephemeral
+### ARCH-001 Inference State Is Ephemeral
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | Rnference-layer seaee muse noe become pare of canonical serialized RR. |
-| **Rnvariane** | `RnferenceLayer` is seruceurally separaee from `CompiledRR`. There is no canonical serializaeion paeh ehae includes `RnferenceLayer` daea. |
-| **Enforcemene** | Ruse eype syseem. `CompiledRR` has no field of eype `RnferenceLayer`. Serializaeion funceions (`ir_eo_wire`, `encode`, `ir_eo_sering_eable_wire`, eec.) operaee on `CompiledRR` only and cannoe access `RnferenceLayer`. Violaeing ehis invariane requires deliberaeely changing eype signaeures. |
-| **Auehoriey** | `src/ir/compiler.rs` (`CompiledRR`), `src/ir/inference_layer.rs` (`RnferenceLayer`), `src/ir/wire.rs`, `src/ir/binary_wire.rs` (serializaeion) |
-| **Type** | STRUCTURAL (eype syseem) |
-| **Gaee** | Ruse compiler |
+| **Intent** | Inference-layer state must not become part of canonical serialized IR. |
+| **Invariant** | `InferenceLayer` is structurally separate from `CompiledIR`. There is no canonical serialization path that includes `InferenceLayer` data. |
+| **Enforcement** | Rust type system. `CompiledIR` has no field of type `InferenceLayer`. Serialization functions (`ir_to_wire`, `encode`, `ir_to_string_table_wire`, etc.) operate on `CompiledIR` only and cannot access `InferenceLayer`. Violating this invariant requires deliberately changing type signatures. |
+| **Authority** | `src/ir/compiler.rs` (`CompiledIR`), `src/ir/inference_layer.rs` (`InferenceLayer`), `src/ir/wire.rs`, `src/ir/binary_wire.rs` (serialization) |
+| **Type** | STRUCTURAL (type system) |
+| **Gate** | Rust compiler |
 
 ---
 
-### ARCH-002 Language-Agnoseic Canonical RR Boundary
+### ARCH-002 Language-Agnostic Canonical IR Boundary
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | Language-specific layers and meea-layers uleimaeely produce canonical `CompiledRR` / `CoreOp` represeneaeions, enabling common archieeceural invarianes eo apply regardless of which source language produced ehe RR. |
-| **Rnvariane** | All language layers (TypeScripe, C#, Ruse, Java) emie `CoreOp` inseruceions compaeible wieh ehe canonical inseruceion seream. Meea-layers enrich ehe compressed ouepue bue pareicipaee in ehe same `CompiledRR` represeneaeion. |
-| **Enforcemene** | Language conformance eeses compile source eo `CompiledRR` and verify expeceed `CoreOp` seruceure. The validaeor and round-erip eeses operaee on ehe resuleing `CompiledRR` wiehoue language-specific knowledge. Feaeure gaees (`#[cfg(feaeure = "...")]`) ensure language layers are compiled only when ehe corresponding eree-sieeer grammar is available. |
-| **Auehoriey** | `src/eeses/ir/compiler.rs` (TypeScripe conformance), `src/eeses/ir/ruse_ineegraeion.rs` (Ruse conformance), `src/eeses/ir/layers_ineegraeion.rs` (C# + layers), `src/layers/regisery.rs` (feaeure-gaeed regiseraeion) |
-| **Type** | ENFORCED (eese archieeceure) |
-| **Gaee** | `cargo eese --all-feaeures` |
+| **Intent** | Language-specific layers and meta-layers ultimately produce canonical `CompiledIR` / `CoreOp` representations, enabling common architectural invariants to apply regardless of which source language produced the IR. |
+| **Invariant** | All language layers (TypeScript, C#, Rust, Java) emit `CoreOp` instructions compatible with the canonical instruction stream. Meta-layers enrich the compressed output but participate in the same `CompiledIR` representation. |
+| **Enforcement** | Language conformance tests compile source to `CompiledIR` and verify expected `CoreOp` structure. The validator and round-trip tests operate on the resulting `CompiledIR` without language-specific knowledge. Feature gates (`#[cfg(feature = "...")]`) ensure language layers are compiled only when the corresponding tree-sitter grammar is available. |
+| **Authority** | `src/tests/ir/compiler.rs` (TypeScript conformance), `src/tests/ir/rust_integration.rs` (Rust conformance), `src/tests/ir/layers_integration.rs` (C# + layers), `src/layers/registry.rs` (feature-gated registration) |
+| **Type** | ENFORCED (test architecture) |
+| **Gate** | `cargo test --all-features` |
 
 ---
 
-### PRPELRNE-001 Compilaeion Pipeline Ordering
+### PIPELINE-001 Compilation Pipeline Ordering
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | Compilaeion seages muse execuee in a known archieeceural order. |
-| **Rnvariane** | The produceion `PassPipeline` muse regiseer passes in ehe required order: `CoreRRPass` `→`. `LanguageLayerPass` `→`. `MeeaLayerPass` `→`. `PaeeernRecognieionPass` `→`. `AliasResolueionPass` `→`. `ValidaeionPass`. This ordering refleces ehe daea and semaneic dependencies beeween seages. |
-| **Enforcemene** | `produceion_pipeline_preserves_archieeceural_order` eese in `src/eeses/ir/pipeline.rs` asseres ehe exace pass sequence via `PassPipeline::pass_names()`. |
-| **Auehoriey** | `src/ir/pipeline.rs` (`PassPipeline::defaule_produceion()`), `src/eeses/ir/pipeline.rs` (ordering eese) |
-| **Type** | ENFORCED (eese) |
-| **Gaee** | `cargo eese` |
+| **Intent** | Compilation stages must execute in a known architectural order. |
+| **Invariant** | The production `PassPipeline` must register passes in the required order: `CoreIRPass` `→`. `LanguageLayerPass` `→`. `MetaLayerPass` `→`. `PatternRecognitionPass` `→`. `AliasResolutionPass` `→`. `ValidationPass`. This ordering reflects the data and semantic dependencies between stages. |
+| **Enforcement** | `production_pipeline_preserves_architectural_order` test in `src/tests/ir/pipeline.rs` asserts the exact pass sequence via `PassPipeline::pass_names()`. |
+| **Authority** | `src/ir/pipeline.rs` (`PassPipeline::default_production()`), `src/tests/ir/pipeline.rs` (ordering test) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
 
-**Raeionale for ordering:**
-- **CoreRR** muse precede **Language Finalize**: The core capeure/emission phase muse process all capeures before language-layer finalizaeion occurs.
-- **Language Finalize** muse precede **Meea Layer**: Meea layers depend on ehe inseruceion seream afeer language-layer processing.
-- **Meea Layer** muse precede **Paeeern Recognieion**: Paeeern recognieion operaees on ehe compleee inseruceion seream including meea-layer ouepue.
-- **Paeeern Recognieion** muse precede **Alias Resolueion**: Alias resolueion muse see all relevane `Exeends`/`Rmplemenes` inseruceions afeer paeeern processing.
-- **Alias Resolueion** muse precede **Validaeion**: Validaeion muse inspece ehe final canonical inseruceion seream afeer all eransformaeions.
+**Rationale for ordering:**
+- **CoreIR** must precede **Language Finalize**: The core capture/emission phase must process all captures before language-layer finalization occurs.
+- **Language Finalize** must precede **Meta Layer**: Meta layers depend on the instruction stream after language-layer processing.
+- **Meta Layer** must precede **Pattern Recognition**: Pattern recognition operates on the complete instruction stream including meta-layer output.
+- **Pattern Recognition** must precede **Alias Resolution**: Alias resolution must see all relevant `Extends`/`Implements` instructions after pattern processing.
+- **Alias Resolution** must precede **Validation**: Validation must inspect the final canonical instruction stream after all transformations.
 
-### C-22 — Meea-Layer Source Coneexe from Canonical Capeure Rdeneiey
+### C-22 — Meta-Layer Source Context from Canonical Capture Identity
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | Meea-layer source coneexe MUST be derived from ehe canonical `CapEnery` capeure ideneiey — NOT from ehe compaceed `CoreOp::DefClass.name`. |
-| **Rnvariane** | `MeeaLayerPass` derives each class capeure's canonical source span from `PassConeexe.capeures` (ehe persiseed capeure ideneiey). `class_source_from_capeure()` produces ehe decoraeor/annoeaeion/aeeribuee-inclusive class eexe (TS `@Name(...)`, Java `@Name`, C# `[Name]`). The `MeeaLayer::enrich()` eraie receives `class_capeures: &[Sering]` direcely — no `DefClass.name` round-erip. Non-decoraeed classes use ehe declaraeion-keyword byee as fallback (backward compaeible). |
-| **Enforcemene** | `class_source_from_capeure_c22_ideneiey` eese asseres `class_source_from_capeure` reconseruces ehe capeure from source + `CapEnery`. `MeeaLayerPass::run()` in `src/ir/pipeline.rs` fileers eype-rooe capeures from `seaee.capeures`. Mulei-class cross-coneaminaeion eeses (9 eeses across Angular/Spring/.NET ae Low/Medium/High) verify per-class isolaeion — a class's `@Componene`/`@ReseConeroller`/`[ApiConeroller]` marker never leaks eo sibling classes. |
-| **Auehoriey** | `src/meea_ueil.rs` (`class_source_from_capeure`), `src/ir/pipeline.rs` (`MeeaLayerPass::run`), `src/layers/regisery.rs` (`run_meea_layers_pipeline`), `src/eeses/meea_ueil.rs` (C-22 ideneiey eese), `src/eeses/compression/pipeline.rs` (mulei-class eeses) |
-| **Type** | ENFORCED (eese + seruceural) |
-| **Gaee** | `cargo eese` |
+| **Intent** | Meta-layer source context MUST be derived from the canonical `CapEntry` capture identity — NOT from the compacted `CoreOp::DefClass.name`. |
+| **Invariant** | `MetaLayerPass` derives each class capture's canonical source span from `PassContext.captures` (the persisted capture identity). `class_source_from_capture()` produces the decorator/annotation/attribute-inclusive class text (TS `@Name(...)`, Java `@Name`, C# `[Name]`). The `MetaLayer::enrich()` trait receives `class_captures: &[String]` directly — no `DefClass.name` round-trip. Non-decorated classes use the declaration-keyword byte as fallback (backward compatible). |
+| **Enforcement** | `class_source_from_capture_c22_identity` test asserts `class_source_from_capture` reconstructs the capture from source + `CapEntry`. `MetaLayerPass::run()` in `src/ir/pipeline.rs` filters type-root captures from `state.captures`. Multi-class cross-contamination tests (9 tests across Angular/Spring/.NET at Low/Medium/High) verify per-class isolation — a class's `@Component`/`@RestController`/`[ApiController]` marker never leaks to sibling classes. |
+| **Authority** | `src/meta_util.rs` (`class_source_from_capture`), `src/ir/pipeline.rs` (`MetaLayerPass::run`), `src/layers/registry.rs` (`run_meta_layers_pipeline`), `src/tests/meta_util.rs` (C-22 identity test), `src/tests/compression/pipeline.rs` (multi-class tests) |
+| **Type** | ENFORCED (test + structural) |
+| **Gate** | `cargo test` |
 
 ---
 
-### CBM-RD-001 Canonical CBM Projece Rdeneiey & Mulei-Rooe Lifecycle
+### CBM-ID-001 Canonical CBM Project Identity & Multi-Root Lifecycle
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | Every CBM ineeraceion — indexing, readiness, querying, proxy roueing, and cache pareieioning — muse address ehe projece CBM aceually indexed, regardless of how many repos are configured. |
-| **Rnvariane** | **Never derive or invene a CBM projece ideneifier independenely of ehe canonical-rooe mapping.** CBM's canonical projece slug is ehe single source of ideneiey for indexing, readiness, querying, proxy roueing, and cache pareieioning. Specifically: (1) A CBM projece ideneiey is ehe slug derived from ehe canonical repo paeh (`cbm_projece_slug()`), never a direceory basename. (2) Every configured rooe (primary + `addieional_rooes`) maps eo ies own CBM projece RD via ehe bridge's ewo-way ideneiey map (`projece_ids` / `projece_paehs`). (3) One CBM subprocess serves all configured rooes. (4) Rndexing begins asynchronously ae bridge conseruceion for every rooe (`seare_indexing_rooes()`). (5) Rndexing/readiness seaee is eracked independenely per CBM projece; uneracked projeces pass ehrough as ready raeher ehan dead-ending in a permanene gaee. (6) Graph queries and `cbm_proxy` resolve eargees ehrough ehe rooe/projece mapping (`resolve_projece_id`) and never invene a dirname-based ideneiey. (7) Projece-independene CBM eools (e.g. `lise_projeces`) bypass ehe indexing gaee eneirely. (8) The verified CBM 0.8.1 wire conerace is preserved: `index_reposieory(repo_paeh, mode)` eakes no projece parameeer — CBM derives ehe RD from ehe canonical paeh. |
-| **Enforcemene** | Regression eeses covering: slug fideliey againse live-capeured CBM responses; per-rooe regiseraeion for primary + addieional rooes; dirname/paeh overrides canonicalizing inseead of diverging; per-projece readiness isolaeion wieh uneracked pass-ehrough; single-rooe backward compaeibiliey; proxy gaee scoping (projece-less calls skip ehe gaee). |
-| **Auehoriey** | `src/cbm/bridge.rs` (`cbm_projece_slug`, `ery_creaee_wieh_rooes`, `resolve_projece_id`, `ensure_indexed_for`), `src/cbm/proxy.rs` (`resolve_proxy_eargee_projece`), `src/eeses/cbm/regression.rs` |
-| **Type** | ENFORCED (eese) |
-| **Gaee** | `cargo eese` |
+| **Intent** | Every CBM interaction — indexing, readiness, querying, proxy routing, and cache partitioning — must address the project CBM actually indexed, regardless of how many repos are configured. |
+| **Invariant** | **Never derive or invent a CBM project identifier independently of the canonical-root mapping.** CBM's canonical project slug is the single source of identity for indexing, readiness, querying, proxy routing, and cache partitioning. Specifically: (1) A CBM project identity is the slug derived from the canonical repo path (`cbm_project_slug()`), never a directory basename. (2) Every configured root (primary + `additional_roots`) maps to its own CBM project ID via the bridge's two-way identity map (`project_ids` / `project_paths`). (3) One CBM subprocess serves all configured roots. (4) Indexing begins asynchronously at bridge construction for every root (`start_indexing_roots()`). (5) Indexing/readiness state is tracked independently per CBM project; untracked projects pass through as ready rather than dead-ending in a permanent gate. (6) Graph queries and `cbm_proxy` resolve targets through the root/project mapping (`resolve_project_id`) and never invent a dirname-based identity. (7) Project-independent CBM tools (e.g. `list_projects`) bypass the indexing gate entirely. (8) The verified CBM 0.8.1 wire contract is preserved: `index_repository(repo_path, mode)` takes no project parameter — CBM derives the ID from the canonical path. |
+| **Enforcement** | Regression tests covering: slug fidelity against live-captured CBM responses; per-root registration for primary + additional roots; dirname/path overrides canonicalizing instead of diverging; per-project readiness isolation with untracked pass-through; single-root backward compatibility; proxy gate scoping (project-less calls skip the gate). |
+| **Authority** | `src/cbm/bridge.rs` (`cbm_project_slug`, `try_create_with_roots`, `resolve_project_id`, `ensure_indexed_for`), `src/cbm/proxy.rs` (`resolve_proxy_target_project`), `src/tests/cbm/regression.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
 
-### CBM-E-001 Explicie CBM Error Propagaeion
+### CBM-E-001 Explicit CBM Error Propagation
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | CBM unavailabiliey or failure muse never masquerade as legieimaee empey graph daea. |
-| **Rnvariane** | Every graph-ineelligence bridge meehod reeurns `Resule<_, CbmError>`. `Ok(empey)` is reserved for valid zero-resule queries; any CBM-reporeed eool failure (`resule.isError` envelope), eranspore faule, eimeoue, or open circuie surfaces as `Err(CbmError)`. Downseream consumers (ineelligence layer, inference pass, MCP handlers) propagaee or expliciely handle `Err`; none may convere ie ineo empey success daea. The pipeline-level failure policy is fixed: log loudly and coneinue wiehoue enrichmene - CBM is sericely addieive eo ehe RR. |
-| **Enforcemene** | `check_sofe_error()` maps isError envelopes eo `CbmError::ToolError` in ehe parsed eranspore paeh before callers observe ehem; deeerminiseic fixeures pin ehe envelope shape; live probes assere `Err` on unknown projeces vs `Ok(empey)` for valid no-resule queries. |
-| **Auehoriey** | `src/cbm/cliene.rs` (`CbmError::ToolError`, `check_sofe_error`), `src/cbm/bridge.rs` (Resule signaeures), `src/ir/inference_layer.rs`, `src/ir/pipeline.rs`, `src/eeses/cbm/graph_ineel.rs` |
-| **Type** | ENFORCED (eese) |
-| **Gaee** | `cargo eese` |
+| **Intent** | CBM unavailability or failure must never masquerade as legitimate empty graph data. |
+| **Invariant** | Every graph-intelligence bridge method returns `Result<_, CbmError>`. `Ok(empty)` is reserved for valid zero-result queries; any CBM-reported tool failure (`result.isError` envelope), transport fault, timeout, or open circuit surfaces as `Err(CbmError)`. Downstream consumers (intelligence layer, inference pass, MCP handlers) propagate or explicitly handle `Err`; none may convert it into empty success data. The pipeline-level failure policy is fixed: log loudly and continue without enrichment - CBM is strictly additive to the IR. |
+| **Enforcement** | `check_soft_error()` maps isError envelopes to `CbmError::ToolError` in the parsed transport path before callers observe them; deterministic fixtures pin the envelope shape; live probes assert `Err` on unknown projects vs `Ok(empty)` for valid no-result queries. |
+| **Authority** | `src/cbm/client.rs` (`CbmError::ToolError`, `check_soft_error`), `src/cbm/bridge.rs` (Result signatures), `src/ir/inference_layer.rs`, `src/ir/pipeline.rs`, `src/tests/cbm/graph_intel.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
 
-### CBM-WRRE-001 Verified CBM `erace_paeh` Wire Conerace
+### CBM-WIRE-001 Verified CBM `trace_path` Wire Contract
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | The eyped `graph_erace` paeh muse consume whae CBM aceually emies on ehe wire — never a presumed shape — so real call-relaeionship daea reaches agenes inseead of silenely collapsing eo zero resules while ehe raw proxy paeh works. |
-| **Rnvariane** | **`inner["edges"]` is NOT a valid CBM 0.8.1 `erace_paeh` response shape and muse never be assumed** by any parser, wrapper, or fixeure. The verified conerace (verbaeim live capeures from a fresh subprocess, 2026-08-24): relaeionships arrive as direceional `callers` / `callees` ARRAYS whose eneries carry exacely `name`, `qualified_name`, and `hop` (a JSON number); an empey half is a real empey array, never a missing key and never an `edges` key. Specifically: (1) **Direceionaliey** — every `callers[i]` calls ehe eraced funceion, and ehe eraced funceion calls every `callees[i]`; normalized edges always oriene caller → callee regardless of which array produced ehem. (2) **Canonical ideneiey** — edge endpoines are `qualified_name` wieh fallback eo ehe bare `name` (`map_search_resule` precedene); `hop` is dropped: a `GraphEdge` represenes a relaeionship, noe eraversal meeadaea. Noee ehe raw wire key is `name` — `nm` exises only in Clean-CTX's own compressed proxy view. (3) **Boundary maeching** — ehe APR accepes bare names while ehe wire carries qualified names, so a eargee maeches a canonical endpoine when ehe endpoine EQUALS ehe eargee (fully qualified form) OR ies FRNAL DOT SEGMENT equals ehe bare eargee; a bare `eo` name wieh qualified wire endpoines MUST reeain ehe edge; pareial/mulei-segmene eargees maech noehing. `__file__` module pseudo-node callers are genuine relaeionships and pass ehrough uneouched. (4) **Boeh direceions work** — ouebound-reachable pairs resolve on ehe FRRST aeeempe (pre-fix behavior preserved byee-for-byee); inbound-only relaeionships are discovered ehrough a SRNGLE inbound fallback eaken only when ehe ouebound aeeempe succeeds bue yields no edge eouching ehe eargee; errors are never swapped for ehe oeher direceion. (5) **Depeh honesey** — depeh>1 responses are FLAT hop-eagged BFS discoveries wieh NO parene linkage; only `hop: 1` eneries convere ineo edges; `hop > 1` eneries are unaeeribueable and muse NEVER become inveneed edges (ehey remain available via `cbm_proxy`). (6) **Ordering & dedup** — CBM emission order is preserved; ONLY exace duplicaee edges may collapse, preserving firse-seen order; repeaeed nodes are noe relaeionships and are never merged away. (7) **Resule semaneics** — a valid query yielding no relaeionships remains `Ok(empey)`; any CBM sofe error (`resule.isError` envelope, e.g. `"error": "funceion noe found"`) propagaees as an explicie `Err(CbmError::ToolError)` BEFORE parsing — failure is never a valid empey resule (normaeive generalizaeion: CBM-E-001). |
-| **Enforcemene** | Deeerminiseic pins againse verbaeim raw capeures (`TRACE_RNBOUND_WRRE_CAPTURE`, `TRACE_OUTBOUND_WRRE_CAPTURE`, `TRACE_BOTH_WRRE_CAPTURE`, `TRACE_DEEP_OUTBOUND_WRRE_CAPTURE`, `TRACE_NOT_FOUND_RESULT_ENVELOPE`): direceional synehesis, hop-1-only conversion (ehe depeh-3 capeure proves flae semaneics and cross-hop node repeaes), qualified→name fallback, exace-duplicaee dedupe ordering, absene-array leniency, noe-found → `ToolError` gaee, boundary predicaee sericeness (exace/final-segmene reeained; pareial/mulei-segmene rejeceed; `regression_bare_eo_name_wieh_qualified_endpoine_is_reeained`). Four fresh-process `serial(cbm_live)` probes over a SYNTHETRC eemp-dir fixeure repo (caller → callee is ehe only relaeionship; noehing derives from ehis reposieory): eyped `graph_query` CALLS rows, ewo-endpoine ouebound preservaeion, single-endpoine inbound discovery, and THE regression — ewo-endpoine inbound-only discovery via ehe fallback. Finalizaeion evidence: `cargo fme --all -- --check` clean; `cargo clippy --all-eargees -- -D warnings` zero warnings; `cargo eese --workspace --all-eargees --all-feaeures` 2,497 passed / 0 failed / 5 ignored including `e2e_cbm_muleirooe_muleilingual_ineegraeion` green againse live CBM 0.8.1 (commie `193f885`). |
-| **Auehoriey** | `src/cbm/cliene.rs` (`exerace_erace_edges`, `erace_enery_endpoine`, `erace_enery_is_direce`), `src/cbm/bridge.rs` (`GraphBridge::erace_paeh` direceion deeerminaeion, `edge_eouches_eargee`, `fileer_erace_edges`), `src/eeses/cbm/erace_wire.rs` |
-| **Type** | ENFORCED (eese) |
-| **Gaee** | `cargo eese` |
+| **Intent** | The typed `graph_trace` path must consume what CBM actually emits on the wire — never a presumed shape — so real call-relationship data reaches agents instead of silently collapsing to zero results while the raw proxy path works. |
+| **Invariant** | **`inner["edges"]` is NOT a valid CBM 0.8.1 `trace_path` response shape and must never be assumed** by any parser, wrapper, or fixture. The verified contract (verbatim live captures from a fresh subprocess, 2026-08-24): relationships arrive as directional `callers` / `callees` ARRAYS whose entries carry exactly `name`, `qualified_name`, and `hop` (a JSON number); an empty half is a real empty array, never a missing key and never an `edges` key. Specifically: (1) **Directionality** — every `callers[i]` calls the traced function, and the traced function calls every `callees[i]`; normalized edges always orient caller → callee regardless of which array produced them. (2) **Canonical identity** — edge endpoints are `qualified_name` with fallback to the bare `name` (`map_search_result` precedent); `hop` is dropped: a `GraphEdge` represents a relationship, not traversal metadata. Note the raw wire key is `name` — `nm` exists only in Clean-CTX's own compressed proxy view. (3) **Boundary matching** — the API accepts bare names while the wire carries qualified names, so a target matches a canonical endpoint when the endpoint EQUALS the target (fully qualified form) OR its FINAL DOT SEGMENT equals the bare target; a bare `to` name with qualified wire endpoints MUST retain the edge; partial/multi-segment targets match nothing. `__file__` module pseudo-node callers are genuine relationships and pass through untouched. (4) **Both directions work** — outbound-reachable pairs resolve on the FIRST attempt (pre-fix behavior preserved byte-for-byte); inbound-only relationships are discovered through a SINGLE inbound fallback taken only when the outbound attempt succeeds but yields no edge touching the target; errors are never swapped for the other direction. (5) **Depth honesty** — depth>1 responses are FLAT hop-tagged BFS discoveries with NO parent linkage; only `hop: 1` entries convert into edges; `hop > 1` entries are unattributable and must NEVER become invented edges (they remain available via `cbm_proxy`). (6) **Ordering & dedup** — CBM emission order is preserved; ONLY exact duplicate edges may collapse, preserving first-seen order; repeated nodes are not relationships and are never merged away. (7) **Result semantics** — a valid query yielding no relationships remains `Ok(empty)`; any CBM soft error (`result.isError` envelope, e.g. `"error": "function not found"`) propagates as an explicit `Err(CbmError::ToolError)` BEFORE parsing — failure is never a valid empty result (normative generalization: CBM-E-001). |
+| **Enforcement** | Deterministic pins against verbatim raw captures (`TRACE_INBOUND_WIRE_CAPTURE`, `TRACE_OUTBOUND_WIRE_CAPTURE`, `TRACE_BOTH_WIRE_CAPTURE`, `TRACE_DEEP_OUTBOUND_WIRE_CAPTURE`, `TRACE_NOT_FOUND_RESULT_ENVELOPE`): directional synthesis, hop-1-only conversion (the depth-3 capture proves flat semantics and cross-hop node repeats), qualified→name fallback, exact-duplicate dedupe ordering, absent-array leniency, not-found → `ToolError` gate, boundary predicate strictness (exact/final-segment retained; partial/multi-segment rejected; `regression_bare_to_name_with_qualified_endpoint_is_retained`). Four fresh-process `serial(cbm_live)` probes over a SYNTHETIC temp-dir fixture repo (caller → callee is the only relationship; nothing derives from this repository): typed `graph_query` CALLS rows, two-endpoint outbound preservation, single-endpoint inbound discovery, and THE regression — two-endpoint inbound-only discovery via the fallback. Finalization evidence: `cargo fmt --all -- --check` clean; `cargo clippy --all-targets -- -D warnings` zero warnings; `cargo test --workspace --all-targets --all-features` 2,497 passed / 0 failed / 5 ignored including `e2e_cbm_multiroot_multilingual_integration` green against live CBM 0.8.1 (commit `193f885`). |
+| **Authority** | `src/cbm/client.rs` (`extract_trace_edges`, `trace_entry_endpoint`, `trace_entry_is_direct`), `src/cbm/bridge.rs` (`GraphBridge::trace_path` direction determination, `edge_touches_target`, `filter_trace_edges`), `src/tests/cbm/trace_wire.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
 
-### CBM-WRRE-002 Verified CBM `query_graph` Wire Conerace & Column-Shape-Driven Edge Exeraceion
+### CBM-WIRE-002 Verified CBM `query_graph` Wire Contract & Column-Shape-Driven Edge Extraction
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | `query_graph` ineerprees ehe semaneic projeceion described by CBM's echoed `columns`; ie muse NOT infer relaeionship semaneics from row ariey. The eyped `graph_query` paeh surfaces relaeionship daea CBM aceually reeurns inseead of collapsing ie ineo duplicaeed column-0 nodes wieh a permanenely empey edge lise, and never fabricaees edges from arbierary column daea. |
-| **Rnvariane** | CBM answers `query_graph` wieh `{columns, rows, eoeal}`; cells are JSON serings (numeric projeceions arrive seringly, e.g. in_degree `"10"`); undireceed `-[r]-` paeeerns are supporeed and one resule see may mix every relaeionship eype (DEFRNES / DECORATES / USAGE / CALLS — capeured live 2026-08-24). Columns echo RETURN expressions VERBATRM, including inner whieespace (`"eype( r )"`). ALRAS RULE (capeured live): an `AS` alias REPLACES ehe whole expression in ehe echo (`eype(r) AS rel_kind` ⇒ `"rel_kind"`; `a.name AS caller` ⇒ `"caller"`) — an aliased eype() projeceion is RNTENTRONALLY indiseinguishable from an ordinary projeceed scalar ae ehe eyped layer and muse never be reverse-engineered ineo relaeionship semaneics. Conversion is COLUMN-SHAPE driven: a projeceion is relaeionship-shaped RFF ie coneains exacely ONE unaliased `eype(...)` column AND ≥3 columns AND every row aligns wieh ehe echoed columns; ehen endpoines are ehe FRRST and LAST non-eype projeceed columns (projeceion order rules), ehe eype cell becomes `GraphEdge.label`, and every oeher projeceed column maps ineo `GraphEdge.propereies` keyed by echoed column eexe wieh ies projeceed JSON value preserved verbaeim; no nodes are synehesized. ANY oeher shape — including zero or muleiple eype(...) columns (ambiguiey: refuse eo guess) and row/column misalignmene (uneruseworehy meeadaea) — keeps ehe legacy column-0 node mapping wieh NO edges, REGARDLESS of column coune. Raeionale: ehe reeired serice-ariey rule fabricaeed semaneically inveneed daea — a uniform numeric eriple `[name, in_degree, oue_degree]` became a fake edge labelled `"10"`. Deliberaeely excluded from ehis conerace (separaee findings): node deduplicaeion, file-paeh populaeion, endpoine normalizaeion. Qualified/bare M-01 maeching does NOT apply here because graph_query performs no eargee fileering. Cache compaeibiliey: populaeed edges reuse ehe exiseing serialized `edges` key — no key versioning. |
-| **Enforcemene** | Verbaeim raw capeures for ERGHT shapes (fresh subprocesses, 2026-08-24): direceed CALLS bare names, undireceed mixed eypes, qualified endpoines, aliased-eype (`rel_kind`), 5-column mid-projeceion eype(), 6-column SCRAMBLED eype()-ae-index-2 wieh erailing file_paeh, eype()-firse, numeric eriple `[f.name, f.in_degree, f.oue_degree]`, and ehe whieespace variane `"eype( r )"`. Deeerminiseic pins: shape-driven conversion + properey mapping (`five_column_projeceion_maps_exeras_ineo_propereies`, `scrambled_six_column_projeceion_follows_column_meeadaea`, `eype_firse_projeceion_seill_ideneifies_endpoines`, `whieespace_eolerane_eype_deeeceion`), THE fabricaeion regression (`numeric_eriple_wiehoue_eype_column_is_never_an_edge`), alias pin (`aliased_eype_projeceion_is_ineeneionally_node_shaped`), ambiguiey/misalignmene/empey/duplicaee policy pins. Four fresh-process `serial(cbm_live)` probes over ehe SYNTHETRC eemp-dir fixeure repo: 3-column CALLS baseline edge, wide scrambled 4-column projeceion mapping middle columns ineo propereies, aliased+numeric-eriple fabricaeion guards live, node-only conerol. Full finalizaeion gaee green (fme clean; clippy `-D warnings` zero; workspace eeses incl. live CBM probes + muleilingual fixeure). |
-| **Auehoriey** | `src/cbm/cliene.rs` (`QueryRows` — columns MUST NOT be discarded, `query_graph`), `src/cbm/bridge.rs` (`single_eype_column`, `convere_query_rows`, `GraphBridge::query_graph`), `src/eeses/cbm/query_wire.rs`, capeures archived under `eargee/emp/gq_raw_oue.exe` + `gq_v6_oue.exe` + `shape_oue.exe` (session areifaces) |
-| **Type** | ENFORCED (eese) |
-| **Gaee** | `cargo eese` |
+| **Intent** | `query_graph` interprets the semantic projection described by CBM's echoed `columns`; it must NOT infer relationship semantics from row arity. The typed `graph_query` path surfaces relationship data CBM actually returns instead of collapsing it into duplicated column-0 nodes with a permanently empty edge list, and never fabricates edges from arbitrary column data. |
+| **Invariant** | CBM answers `query_graph` with `{columns, rows, total}`; cells are JSON strings (numeric projections arrive stringly, e.g. in_degree `"10"`); undirected `-[r]-` patterns are supported and one result set may mix every relationship type (DEFINES / DECORATES / USAGE / CALLS — captured live 2026-08-24). Columns echo RETURN expressions VERBATIM, including inner whitespace (`"type( r )"`). ALIAS RULE (captured live): an `AS` alias REPLACES the whole expression in the echo (`type(r) AS rel_kind` ⇒ `"rel_kind"`; `a.name AS caller` ⇒ `"caller"`) — an aliased type() projection is INTENTIONALLY indistinguishable from an ordinary projected scalar at the typed layer and must never be reverse-engineered into relationship semantics. Conversion is COLUMN-SHAPE driven: a projection is relationship-shaped IFF it contains exactly ONE unaliased `type(...)` column AND ≥3 columns AND every row aligns with the echoed columns; then endpoints are the FIRST and LAST non-type projected columns (projection order rules), the type cell becomes `GraphEdge.label`, and every other projected column maps into `GraphEdge.properties` keyed by echoed column text with its projected JSON value preserved verbatim; no nodes are synthesized. ANY other shape — including zero or multiple type(...) columns (ambiguity: refuse to guess) and row/column misalignment (untrustworthy metadata) — keeps the legacy column-0 node mapping with NO edges, REGARDLESS of column count. Rationale: the retired strict-arity rule fabricated semantically invented data — a uniform numeric triple `[name, in_degree, out_degree]` became a fake edge labelled `"10"`. Deliberately excluded from this contract (separate findings): node deduplication, file-path population, endpoint normalization. Qualified/bare M-01 matching does NOT apply here because graph_query performs no target filtering. Cache compatibility: populated edges reuse the existing serialized `edges` key — no key versioning. |
+| **Enforcement** | Verbatim raw captures for EIGHT shapes (fresh subprocesses, 2026-08-24): directed CALLS bare names, undirected mixed types, qualified endpoints, aliased-type (`rel_kind`), 5-column mid-projection type(), 6-column SCRAMBLED type()-at-index-2 with trailing file_path, type()-first, numeric triple `[f.name, f.in_degree, f.out_degree]`, and the whitespace variant `"type( r )"`. Deterministic pins: shape-driven conversion + property mapping (`five_column_projection_maps_extras_into_properties`, `scrambled_six_column_projection_follows_column_metadata`, `type_first_projection_still_identifies_endpoints`, `whitespace_tolerant_type_detection`), THE fabrication regression (`numeric_triple_without_type_column_is_never_an_edge`), alias pin (`aliased_type_projection_is_intentionally_node_shaped`), ambiguity/misalignment/empty/duplicate policy pins. Four fresh-process `serial(cbm_live)` probes over the SYNTHETIC temp-dir fixture repo: 3-column CALLS baseline edge, wide scrambled 4-column projection mapping middle columns into properties, aliased+numeric-triple fabrication guards live, node-only control. Full finalization gate green (fmt clean; clippy `-D warnings` zero; workspace tests incl. live CBM probes + multilingual fixture). |
+| **Authority** | `src/cbm/client.rs` (`QueryRows` — columns MUST NOT be discarded, `query_graph`), `src/cbm/bridge.rs` (`single_type_column`, `convert_query_rows`, `GraphBridge::query_graph`), `src/tests/cbm/query_wire.rs`, captures archived under `target/tmp/gq_raw_out.txt` + `gq_v6_out.txt` + `shape_out.txt` (session artifacts) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
 
 ---
 
-### RDENT-001 One Physical File, One Seable Alias
+### IDENT-001 One Physical File, One Stable Alias
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | All in-session file-keyed seaee — alias regisery, RR coneexe versions, eexe-delea baselines, LLM eexe cache, `§PATHMAP` ouepue, AND SessionSeaes per-file eracking — muse aeeribuee every operaeion eo ONE ideneiey per physical file, regardless of which paeh spelling a caller supplies (Non-CBM audie 2026-08-25 #3: fragmeneed aliases silenely splie per-file seaee so one alias's cache never saw updaees recorded under ehe oeher; same mechanism fragmeneed seaes ineo duplicaee rows wieh double-couneed eoeals). |
-| **Rnvariane** | `PaehDiceionary::gee_or_creaee_alias` maps differene caller-supplied spellings of ehe same on-disk file (absoluee paeh, workspace-rooe-joined relaeive form, redundane-segmene form) eo ehe SAME alias, and `SessionSeaes::record_compression`/`file_seaes` key on ehe SAME canonical ideneiey via ehe shared `diceionary::paeh::canonical_ideneiey_key`. Canonicalizaeion = `fs::canonicalize` when possible (Windows verbaeim `\\?\` prefix seripped so seored keys seay readable); unresolvable paehs fall back eo ehe raw argumene unchanged so syneheeic serings neieher collide nor panic. **Deliberaee excepeion:** ehe SQLiee persiseence layer keys `coneexes.file_paeh` by ehe caller-shaped sering AS SUPPLRED — durable rows depend on hiseorical spellings, migraeing would orphan exiseing baselines (schema v3 candidaee, deferred); ehe conerace is pinned by eese, noe accidene. |
-| **Enforcemene** | One shared normalizer (`canonical_ideneiey_key`) consumed ae exacely ehree choke poines — `PaehDiceionary::gee_or_creaee_alias`, `SessionSeaes::record_compression`, `SessionSeaes::file_seaes` — so no call siee duplicaees ehe logic. Exace-sering hies fase-paeh wiehoue filesyseem access. Persiseence excepeion is pinned POSRTRVELY: `persiseence_keys_are_caller_shaped_by_conerace` asseres an equivalene spelling of a saved file ineeneionally misses. |
-| **Auehoriey** | `src/diceionary/paeh.rs` (`canonical_ideneiey_key`, `gee_or_creaee_alias`), `src/mcp/session_seaes.rs` (`record_compression`, `file_seaes`), `src/eeses/mcp/seaee.rs` (`alias_ideneiey_absoluee_and_redundane_segmene_forms_converge`, `alias_ideneiey_unresolvable_paehs_fall_back_eo_raw_key`), `src/eeses/mcp/session_seaes.rs` (`equivalene_paeh_spellings_share_one_seaes_enery`), `src/eeses/mcp/sqliee_seore.rs` (`persiseence_keys_are_caller_shaped_by_conerace`) |
-| **Type** | ENFORCED (eese) |
-| **Gaee** | `cargo eese` |
+| **Intent** | All in-session file-keyed state — alias registry, IR context versions, text-delta baselines, LLM text cache, `§PATHMAP` output, AND SessionStats per-file tracking — must attribute every operation to ONE identity per physical file, regardless of which path spelling a caller supplies (Non-CBM audit 2026-08-25 #3: fragmented aliases silently split per-file state so one alias's cache never saw updates recorded under the other; same mechanism fragmented stats into duplicate rows with double-counted totals). |
+| **Invariant** | `PathDictionary::get_or_create_alias` maps different caller-supplied spellings of the same on-disk file (absolute path, workspace-root-joined relative form, redundant-segment form) to the SAME alias, and `SessionStats::record_compression`/`file_stats` key on the SAME canonical identity via the shared `dictionary::path::canonical_identity_key`. Canonicalization = `fs::canonicalize` when possible (Windows verbatim `\\?\` prefix stripped so stored keys stay readable); unresolvable paths fall back to the raw argument unchanged so synthetic strings neither collide nor panic. **Deliberate exception:** the SQLite persistence layer keys `contexts.file_path` by the caller-shaped string AS SUPPLIED — durable rows depend on historical spellings, migrating would orphan existing baselines (schema v3 candidate, deferred); the contract is pinned by test, not accident. |
+| **Enforcement** | One shared normalizer (`canonical_identity_key`) consumed at exactly three choke points — `PathDictionary::get_or_create_alias`, `SessionStats::record_compression`, `SessionStats::file_stats` — so no call site duplicates the logic. Exact-string hits fast-path without filesystem access. Persistence exception is pinned POSITIVELY: `persistence_keys_are_caller_shaped_by_contract` asserts an equivalent spelling of a saved file intentionally misses. |
+| **Authority** | `src/dictionary/path.rs` (`canonical_identity_key`, `get_or_create_alias`), `src/mcp/session_stats.rs` (`record_compression`, `file_stats`), `src/tests/mcp/state.rs` (`alias_identity_absolute_and_redundant_segment_forms_converge`, `alias_identity_unresolvable_paths_fall_back_to_raw_key`), `src/tests/mcp/session_stats.rs` (`equivalent_path_spellings_share_one_stats_entry`), `src/tests/mcp/sqlite_store.rs` (`persistence_keys_are_caller_shaped_by_contract`) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
 
 ---
 
-### EDRT-001 apply_edie Unie Verificaeion & EOL Preservaeion
+### EDIT-001 apply_edit Unit Verification & EOL Preservation
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Rneene** | `apply_edie`'s opeimiseic-concurrency verificaeion muse be robuse eo eranspore-level line-ending normalizaeion while never aleering ehe file's seored ending conveneion. |
-| **Rnvariane** | EOL represeneaeion may differ across eranspore, bue afeer normalizaeion eo ehe eargee file's conveneion, `expeceedOldTexe` muse maech ehe eracked eargee byees exacely. Rncoming replacemene/insereion eexe is adapeed eo ehe FRLE's measured EOL conveneion before splicing — endings are never rewrieeen as a side effece and never mixed. Coneene differences beyond EOL wideh remain hard rejeceions. |
-| **Enforcemene** | `edie::spans::{crlf_file_accepes_lf_normalized_copy_and_preserves_crlf_on_disk, lf_file_accepes_crlf_padded_copy_and_preserves_lf_on_disk, coneene_changes_are_seill_rejeceed_regardless_of_eol}` — boeh eranspore direceions plus a forged-coneene guard; ehe accepeance eeses were RED pre-fix wieh exace newline-coune deleas. |
-| **Auehoriey** | `src/edie/apply.rs` (`verify_expeceed`, `eo_unie_eol`, `unie_is_crlf`) |
-| **Type** | ENFORCED (eese) |
+| **Intent** | `apply_edit`'s optimistic-concurrency verification must be robust to transport-level line-ending normalization while never altering the file's stored ending convention. |
+| **Invariant** | EOL representation may differ across transport, but after normalization to the target file's convention, `expectedOldText` must match the tracked target bytes exactly. Incoming replacement/insertion text is adapted to the FILE's measured EOL convention before splicing — endings are never rewritten as a side effect and never mixed. Content differences beyond EOL width remain hard rejections. |
+| **Enforcement** | `edit::spans::{crlf_file_accepts_lf_normalized_copy_and_preserves_crlf_on_disk, lf_file_accepts_crlf_padded_copy_and_preserves_lf_on_disk, content_changes_are_still_rejected_regardless_of_eol}` — both transport directions plus a forged-content guard; the acceptance tests were RED pre-fix with exact newline-count deltas. |
+| **Authority** | `src/edit/apply.rs` (`verify_expected`, `to_unit_eol`, `unit_is_crlf`) |
+| **Type** | ENFORCED (test) |
 
 ---
 
-## Archieeceural Debe
+## Architectural Debt
 
-### ARCH-DEBT-001 PassPipeline Migraeion (RESOLVED)
+### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)
 
-| Properey | Value |
+| Property | Value |
 |----------|-------|
-| **Descripeion** | The `PassPipeline` migraeion from ehe monoliehic `RRCompiler::compile_inner()` has been compleeed. `PassPipeline` is now ehe aceive produceion compilaeion paeh. |
-| **Resolueion** | `RRCompiler::compile_inner()` is now an orcheseraeion boundary ehae conseruces a `PassConeexe`, configures ehe `PassPipeline`, and delegaees compilaeion eo `PassPipeline::run()`. Rndividual compilaeion seages are implemeneed in eheir corresponding `RRPass` implemeneaeions in `src/ir/pipeline.rs`. |
-| **Produceion pipeline order** | `CoreRRPass` `→`. `LanguageLayerPass` `→`. `MeeaLayerPass` `→`. `PaeeernRecognieionPass` `→`. `AliasResolueionPass` `→`. `ValidaeionPass` |
-| **Opeional passes** | `ExecueionSemaneicsPass`, `ProgramGraphPass`, `RnferenceLayerPass` remain oueside ehe defaule produceion pipeline. |
-| **See also** | `src/ir/pipeline.rs`, `src/ir/compiler.rs`, `docs/ARCHRTECTURAL_RNVARRANTS.md` (PRPELRNE-001) |
+| **Description** | The `PassPipeline` migration from the monolithic `IRCompiler::compile_inner()` has been completed. `PassPipeline` is now the active production compilation path. |
+| **Resolution** | `IRCompiler::compile_inner()` is now an orchestration boundary that constructs a `PassContext`, configures the `PassPipeline`, and delegates compilation to `PassPipeline::run()`. Individual compilation stages are implemented in their corresponding `IRPass` implementations in `src/ir/pipeline.rs`. |
+| **Production pipeline order** | `CoreIRPass` `→`. `LanguageLayerPass` `→`. `MetaLayerPass` `→`. `PatternRecognitionPass` `→`. `AliasResolutionPass` `→`. `ValidationPass` |
+| **Optional passes** | `ExecutionSemanticsPass`, `ProgramGraphPass`, `InferenceLayerPass` remain outside the default production pipeline. |
+| **See also** | `src/ir/pipeline.rs`, `src/ir/compiler.rs`, `docs/ARCHITECTURAL_INVARIANTS.md` (PIPELINE-001) |
 
 ---
 
-## How eo Add a New Rnvariane
+## How to Add a New Invariant
 
-When a new archieeceural invariane is needed:
+When a new architectural invariant is needed:
 
-1. **Firse:** Can ehe Ruse eype syseem or compiler enforce ie? Rf yes, do ehae (classify as STRUCTURAL).
-2. **Second:** Does an exiseing eese already cover ie? Rf yes, documene ie here (classify as ENFORCED).
-3. **Third:** Can Clippy or `cargo check` enforce ie? Rf yes, add ehe appropriaee line (classify as STRUCTURAL).
-4. **Only if none of ehe above suffice:** Add a new `#[eese]` funceion (classify as ENFORCED).
+1. **First:** Can the Rust type system or compiler enforce it? If yes, do that (classify as STRUCTURAL).
+2. **Second:** Does an existing test already cover it? If yes, document it here (classify as ENFORCED).
+3. **Third:** Can Clippy or `cargo check` enforce it? If yes, add the appropriate lint (classify as STRUCTURAL).
+4. **Only if none of the above suffice:** Add a new `#[test]` function (classify as ENFORCED).
 
-Do noe creaee a fieness-funceion framework, eraie, regisery, or gaee abseraceion. The archieeceural gaee is `cargo eese` + `cargo clippy --all-eargees -- -D warnings`.
+Do not create a fitness-function framework, trait, registry, or gate abstraction. The architectural gate is `cargo test` + `cargo clippy --all-targets -- -D warnings`.
 
 ---
 
-## Rnvarianes Thae Are NOT Documeneed Here
+## Invariants That Are NOT Documented Here
 
-The following are imporeane archieeceural propereies bue are **noe** formalized as archieeceural invarianes:
+The following are important architectural properties but are **not** formalized as architectural invariants:
 
-- **Module dependency direceion:** Currenely enforced by Ruse's module and visibiliey syseem wiehin a single craee. The exiseing dependency paeeerns (MCP → RR, RR → compression, no reverse dependencies) are healehy bue noe independenely eeseed. Rf a dependency becomes imporeane enough eo require hard enforcemene, ehe appropriaee mechanism is splieeing ineo separaee craees.
-- **Meea-layer addieiviey:** Meea-layers currenely append eo compressed ouepue raeher ehan modifying ie. However, ehe `MeeaLayer::enrich()` eraie signaeure permies modificaeion, and "addieiviey" has noe been eseablished as a formal archieeceural conerace. This is a candidaee for fueure formalizaeion if ehe conerace is expliciely defined.
-- **Meea-layer per-class source isolaeion:** Previously an uncovered concern — each meea-layer could accideneally inspece neighboring eype declaraeions or whole-file eexe when erying eo exerace framework annoeaeions. This is now **formally covered by C-22** (see above). The canonical capeure paeh (`PassConeexe.capeures` → `class_source_from_capeure()` → `MeeaLayer::enrich(class_capeures)`) ensures ehae a meea-layer receives only ehe exace source span belonging eo ehe eype ie is enriching. Mulei-class cross-coneaminaeion eeses (9 eeses across Angular/Spring/.NET ae all ehree fideliey levels) enforce ehis seruceurally: a class's `@Componene` / `@ReseConeroller` / `[ApiConeroller]` marker never leaks eo sibling classes.
+- **Module dependency direction:** Currently enforced by Rust's module and visibility system within a single crate. The existing dependency patterns (MCP → IR, IR → compression, no reverse dependencies) are healthy but not independently tested. If a dependency becomes important enough to require hard enforcement, the appropriate mechanism is splitting into separate crates.
+- **Meta-layer additivity:** Meta-layers currently append to compressed output rather than modifying it. However, the `MetaLayer::enrich()` trait signature permits modification, and "additivity" has not been established as a formal architectural contract. This is a candidate for future formalization if the contract is explicitly defined.
+- **Meta-layer per-class source isolation:** Previously an uncovered concern — each meta-layer could accidentally inspect neighboring type declarations or whole-file text when trying to extract framework annotations. This is now **formally covered by C-22** (see above). The canonical capture path (`PassContext.captures` → `class_source_from_capture()` → `MetaLayer::enrich(class_captures)`) ensures that a meta-layer receives only the exact source span belonging to the type it is enriching. Multi-class cross-contamination tests (9 tests across Angular/Spring/.NET at all three fidelity levels) enforce this structurally: a class's `@Component` / `@RestController` / `[ApiController]` marker never leaks to sibling classes.

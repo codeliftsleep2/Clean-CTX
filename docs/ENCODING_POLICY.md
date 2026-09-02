@@ -51,9 +51,12 @@ Two deterministic guards back the rule file (no new dependencies):
 
 1. **`scripts/check-utf8.ps1`** — CI step (`.github/workflows/ci.yml`) and
    pre-commit gate. Strictly decodes every tracked text file as BOM-less
-   UTF-8 and rejects known mojibake signature sequences. Intentional
-   occurrences (documentation quoting signatures) require an allowlist entry
-   with justification.
+   UTF-8 and rejects known mojibake signature sequences. It additionally
+   rejects letter-substitution corruption signatures — English text whose
+   characters were systematically rewritten while remaining valid UTF-8
+   (observed 2026-09: `t` → `e`, `I` → `R`), a class byte-level checks
+   cannot see. Intentional occurrences (documentation quoting signatures)
+   require an allowlist entry with justification.
 2. **`src/tests/encoding.rs`** — runs under plain `cargo test`. Asserts the
    repo tree passes the same scan and that the Unicode canary fixture
    ([`src/test_files/unicode_canary.txt`](../src/test_files/unicode_canary.txt))
@@ -133,3 +136,36 @@ When an agent modifies files:
 3. **Commit only after the guard passes**
 4. **Never use `--no-verify`** to bypass the encoding guard. A bypass is a
    project policy violation regardless of justification.
+
+## Root-cause analysis of the 2026-09 letter-substitution incident
+
+### What happened
+
+Commit `cf26196` rewrote `docs/ARCHITECTURAL_INVARIANTS.md` through a
+boundary that systematically substituted lowercase `t` → `e` and uppercase
+`I` → `R` ("the" → "ehe", "Invariant" → "Rnvariane", "IR" → "RR",
+"CI" → "CR"). The file remained valid UTF-8, so both byte-level guards
+passed it; the corruption surfaced during the 2026-09 BuiltinMetaLayer
+follow-up investigation and was confirmed with byte-level probes
+(`Contains('Intent')` = false, `Contains('Rneene')` = true).
+
+### Recovery
+
+The last clean version (`a694462`) was recovered from git history per §7 of
+`.clinerules/encoding.md`. Restoration fidelity was proven mechanically:
+applying the corruption mapping to the restored text reproduced the
+corrupted content byte-for-byte, so every non-ambiguous character was
+preserved and only the ambiguous `t/e` and `I/R` choices came from the
+authoritative clean version.
+
+### Guard extension
+
+Because this class is UTF-8-valid by construction, byte-level signatures
+cannot detect it. Both gates now scan a small set of high-frequency
+letter-substitution tells (`$LetterSubstitutionSignatures` in
+`scripts/check-utf8.ps1`, `LETTER_SUBSTITUTION_SIGNATURES` in
+`src/tests/encoding.rs`, pinned in sync by a dedicated test). The tell set
+was verified zero-hit across the clean tree (501 tracked files) before
+being enforced, and the same intentional-documentation allowlist governs
+both signature families. Pure-ASCII files are scanned for this class — the
+mojibake-only ASCII fast-path skip does not apply to it.

@@ -11,6 +11,10 @@
 //   2. Every repository text file is strictly valid UTF-8, has no BOM, and
 //      contains no known mojibake signature sequences, except paths listed
 //      in the intentional-documentation allowlist.
+//   3. Letter-substitution corruption signatures are additionally rejected:
+//      English text whose characters were systematically rewritten while
+//      remaining valid UTF-8 (observed 2026-09: 't' -> 'e', 'I' -> 'R'), a
+//      class the byte-level mojibake scan cannot see because it is ASCII-pure.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -48,6 +52,29 @@ const MOJIBAKE_SIGNATURES: &[&str] = &[
     "\u{C3}",                 // lone cp1252-mapped lead byte C3
     "\u{C2}",                 // lone lead byte C2
     "\u{FFFD}",               // replacement character (already-substituted bytes)
+];
+
+/// Letter-substitution signatures: ASCII text whose characters were
+/// systematically rewritten while remaining valid UTF-8 - invisible to the
+/// byte-level mojibake scan above. Observed 2026-09 (commit cf26196):
+/// lowercase 't' -> 'e' and uppercase 'I' -> 'R' across
+/// `docs/ARCHITECTURAL_INVARIANTS.md` ("the" -> "ehe", "Invariant" ->
+/// "Rnvariane", "IR" -> "RR"). Each literal was verified zero-hit on the
+/// clean tree (2026-09, 501 tracked files). Mirrors
+/// `$LetterSubstitutionSignatures` in `scripts/check-utf8.ps1`; update both
+/// together (pinned by
+/// `letter_substitution_signatures_stay_in_sync_with_powershell_gate`).
+/// NOTE: pure-ASCII files are NOT exempt from this scan: the class itself
+/// is ASCII-pure.
+const LETTER_SUBSTITUTION_SIGNATURES: &[&str] = &[
+    " ehe ",      // " the "
+    " eype ",     // " type "
+    " eese ",     // " test "
+    "Rnvariane",  // Invariant(s)
+    "Rnference",  // Inference
+    "Rmporeane",  // Important
+    "CompiledRR", // CompiledIR
+    "WRRE",       // TRACE_*_WIRE_* capture names
 ];
 
 // --- Text-file selection ------------------------------------------------------
@@ -138,12 +165,25 @@ fn contains_mojibake(content: &str) -> Option<&'static str> {
         .find(|sig| content.contains(*sig))
 }
 
-/// Files permitted to contain mojibake SIGNATURES because they quote historic
-/// corruption (forensic records). Must stay in sync with the allowlist in
+/// True when no known letter-substitution signature appears anywhere in
+/// `content`. The signatures mirror scripts/check-utf8.ps1; update both
+/// together. Same find-based shape as `contains_mojibake` (clippy 1.96).
+fn contains_letter_substitution(content: &str) -> Option<&'static str> {
+    LETTER_SUBSTITUTION_SIGNATURES
+        .iter()
+        .copied()
+        .find(|sig| content.contains(*sig))
+}
+
+/// Files permitted to contain SIGNATURES (mojibake or letter-substitution)
+/// because they quote or define them (forensic records, the detector sources
+/// themselves). Must stay in sync with the allowlist in
 /// scripts/check-utf8.ps1. Keep reasons beside each entry.
 const MOJIBAKE_ALLOWED_PATHS: &[&str] = &[
     "docs/CHANGELOG.md",
     "docs/ENCODING_POLICY.md", // root-cause analysis section intentionally quotes mojibake patterns as teaching example
+    "scripts/check-utf8.ps1",  // defines the signature tables themselves (detector source)
+    "src/tests/encoding.rs",   // mirrors the signature tables (detector source)
 ];
 
 #[test]
@@ -198,16 +238,23 @@ fn all_repo_text_files_are_strict_utf8_without_mojibake() {
             ),
         };
 
-        // Pure-ASCII files cannot carry mojibake signatures; skip the scan.
-        if !bytes.iter().any(|&b| b > 127) {
-            continue;
-        }
+        // Pure-ASCII files cannot carry byte-level mojibake signatures, but
+        // they CAN carry letter-substitution signatures (that class is
+        // ASCII-pure), so only the mojibake scan is skipped for them.
+        let is_pure_ascii = !bytes.iter().any(|&b| b > 127);
         if MOJIBAKE_ALLOWED_PATHS.contains(&rel_s.as_str()) {
             continue;
         }
-        if let Some(sig) = contains_mojibake(&decoded) {
+        if !is_pure_ascii {
+            if let Some(sig) = contains_mojibake(&decoded) {
+                panic!(
+                    "{rel_s}: mojibake signature {sig:?} found in non-allowlisted file (see docs/ENCODING_POLICY.md)"
+                );
+            }
+        }
+        if let Some(sig) = contains_letter_substitution(&decoded) {
             panic!(
-                "{rel_s}: mojibake signature {sig:?} found in non-allowlisted file (see docs/ENCODING_POLICY.md)"
+                "{rel_s}: letter-substitution signature {sig:?} found in non-allowlisted file - English text was character-rewritten while staying valid UTF-8 (see docs/ENCODING_POLICY.md)"
             );
         }
     }
@@ -220,9 +267,35 @@ fn encoding_gates_stay_in_sync_with_each_other() {
     // contract at the boundary most likely to drift.
     assert_eq!(
         MOJIBAKE_ALLOWED_PATHS,
-        &["docs/CHANGELOG.md", "docs/ENCODING_POLICY.md"],
+        &[
+            "docs/CHANGELOG.md",
+            "docs/ENCODING_POLICY.md",
+            "scripts/check-utf8.ps1",
+            "src/tests/encoding.rs",
+        ],
         "Rust-side allowlist drifted; update scripts/check-utf8.ps1 $MojibakeAllowedPaths together"
     );
+}
+
+#[test]
+fn letter_substitution_signatures_stay_in_sync_with_powershell_gate() {
+    // The letter-substitution signature family exists in BOTH gates; this
+    // pins the Rust literals against the PowerShell source so the two
+    // implementations cannot drift apart silently (same contract as the
+    // allowlist sync test above).
+    let ps =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/check-utf8.ps1"))
+            .expect("scripts/check-utf8.ps1 must be readable from the repo root");
+    assert!(
+        ps.contains("$LetterSubstitutionSignatures"),
+        "scripts/check-utf8.ps1 no longer defines $LetterSubstitutionSignatures; update both gates together"
+    );
+    for sig in LETTER_SUBSTITUTION_SIGNATURES {
+        assert!(
+            ps.contains(sig),
+            "letter-substitution signature {sig:?} missing from scripts/check-utf8.ps1; update both gates together"
+        );
+    }
 }
 
 /// Strict UTF-8 decode using only std: never substitutes anything.

@@ -7,7 +7,11 @@
       2. Files must not contain known mojibake signature sequences produced by
          UTF-8 text misinterpreted as Windows-1252/Latin-1 and re-encoded,
          nor U+FFFD replacement characters.
-    Intentional occurrences (documentation that QUOTES mojibake signatures)
+      3. Files must not contain known letter-substitution corruption
+         signatures: English text whose characters were systematically
+         rewritten (observed 2026-09: lowercase 't' -> 'e', uppercase 'I' -> 'R')
+         while remaining valid UTF-8, invisible to byte-level checks.
+    Intentional occurrences (documentation that QUOTES signature sequences)
     must be registered in $MojibakeAllowedPaths below with justification.
     Silent expansion of the allowlist is forbidden.
 .EXAMPLE
@@ -72,14 +76,37 @@ $Signatures = @(
     @{ Name = "emoji-mangled-pair";      Sig = (([string][char]0xF0) + ([string][char]0x17F)) }
 )
 
+# --- Letter-substitution signatures (English-word corruption) -----------------
+# Second corruption class: characters systematically REWRITTEN while the file
+# stays valid UTF-8, so the byte-level mojibake scan above cannot see it.
+# Observed 2026-09 (commit cf26196): lowercase 't' -> 'e' and uppercase
+# 'I' -> 'R' across docs/ARCHITECTURAL_INVARIANTS.md ("the" -> "ehe",
+# "Invariant" -> "Rnvariane", "IR" -> "RR", "CI" -> "CR"). The literals below
+# are high-frequency tells of that mapping; each was verified zero-hit on the
+# clean tree (2026-09, 501 tracked files) before being enforced. Extend only
+# with new verified-zero-hit literals; same allowlist semantics as mojibake.
+$LetterSubstitutionSignatures = @(
+    @{ Name = "the->ehe";        Sig = ' ehe ' }       # " the "
+    @{ Name = "type->eype";      Sig = ' eype ' }      # " type "
+    @{ Name = "test->eese";      Sig = ' eese ' }      # " test "
+    @{ Name = "Invariant";       Sig = 'Rnvariane' }   # Invariant(s)
+    @{ Name = "Inference";       Sig = 'Rnference' }   # Inference
+    @{ Name = "Important";       Sig = 'Rmporeane' }   # Important
+    @{ Name = "IR->RR";          Sig = 'CompiledRR' }  # CompiledIR
+    @{ Name = "WIRE->WRRE";      Sig = 'WRRE' }        # TRACE_*_WIRE_* capture names
+)
+
 # --- Intentional-documentation allowlist -------------------------------------
-# Files where mojibake-signature characters legitimately occur because they
-# QUOTE historical corruption (bug reports, changelogs, forensic notes).
-# Each entry requires a stated reason. Adding entries to silence real
-# corruption is forbidden; every addition must be reviewed like code.
+# Files where signature characters (mojibake OR letter-substitution) legitimately
+# occur because they QUOTE historical corruption (bug reports, changelogs,
+# forensic notes). Each entry requires a stated reason. Adding entries to
+# silence real corruption is forbidden; every addition must be reviewed like
+# code. Mirrored by MOJIBAKE_ALLOWED_PATHS in src/tests/encoding.rs.
 $MojibakeAllowedPaths = @{
     'docs/CHANGELOG.md' = 'Historical bug-fix record quoting mojibake sequences'
     'docs/ENCODING_POLICY.md' = 'Root-cause analysis section intentionally quotes actual mojibake byte sequences as a documented teaching example (part of the forensic record)'
+    'scripts/check-utf8.ps1' = 'Defines the signature tables themselves; the detector source necessarily contains its own ASCII letter-substitution signature strings'
+    'src/tests/encoding.rs' = 'Mirrors the signature tables (Rust twin gate); the detector source necessarily contains its own ASCII letter-substitution signature strings'
 }
 
 # --- Scan --------------------------------------------------------------------
@@ -87,6 +114,7 @@ $violations      = New-Object System.Collections.Generic.List[string]
 $invalidUtf8Count = 0
 $bomCount         = 0
 $mojiCount        = 0
+$subCount         = 0
 $scanOk           = 0
 
 foreach ($rel in $tracked) {
@@ -134,6 +162,18 @@ foreach ($rel in $tracked) {
                     "MOJIBAKE`t${rel}:$($i + 1)`t{0}" -f $sigEntry.Name)
             }
         }
+
+        # Letter-substitution scan (same allowlist; runs on ALL decoded files,
+        # including pure-ASCII ones — this class lives in ASCII).
+        foreach ($sigEntry in $LetterSubstitutionSignatures) {
+            $idx = $lines[$i].IndexOf($sigEntry.Sig, [System.StringComparison]::Ordinal)
+            if ($idx -lt 0) { continue }
+            if (-not $allowed) {
+                $subCount++
+                $violations.Add(
+                    "SUBSTITUTION`t${rel}:$($i + 1)`t{0}" -f $sigEntry.Name)
+            }
+        }
     }
 }
 
@@ -144,19 +184,21 @@ if ($violations.Count -gt 0) {
     Write-Host 'UTF-8 / mojibake validation FAILED:' -ForegroundColor Red
     foreach ($v in $violations) { Write-Host "  $v" -ForegroundColor Yellow }
     Write-Host ''
-    Write-Host ('Totals: invalid-utf8={0}  bom={1}  mojibake={2}  read-failures={3}' -f `
-        $invalidUtf8Count, $bomCount, $mojiCount, `
+    Write-Host ('Totals: invalid-utf8={0}  bom={1}  mojibake={2}  substitution={3}  read-failures={4}' -f `
+        $invalidUtf8Count, $bomCount, $mojiCount, $subCount, `
         @($violations | Where-Object { $_ -like 'READ-FAIL*' }).Count)
     Write-Host ''
     Write-Host 'A MOJIBAKE hit means text crossed an encoding boundary incorrectly.'
-    Write-Host 'Do NOT blind-replace characters. See docs/ENCODING_POLICY.md:'
-    Write-Host 'identify the boundary (shell pipe? editor default? writer?), fix the'
-    Write-Host 'boundary, then restore the intended characters. Quoting signatures in'
-    Write-Host 'documentation requires an entry in $MojibakeAllowedPaths with justification.'
+    Write-Host 'A SUBSTITUTION hit means English text was character-rewritten while'
+    Write-Host 'staying valid UTF-8 (observed 2026-09: t->e, I->R). Do NOT blind-replace'
+    Write-Host 'characters. See docs/ENCODING_POLICY.md: identify the boundary (shell'
+    Write-Host 'pipe? editor default? writer?), fix the boundary, then restore the'
+    Write-Host 'intended text from git history. Quoting signatures in documentation'
+    Write-Host 'requires an entry in $MojibakeAllowedPaths with justification.'
     $failed = $true
 }
 else {
-    Write-Host ('PASS: {0} text files valid UTF-8 (strict), 0 BOMs, 0 unexplained mojibake signatures.' -f $tracked.Count)
+    Write-Host ('PASS: {0} text files valid UTF-8 (strict), 0 BOMs, 0 unexplained mojibake or letter-substitution signatures.' -f $tracked.Count)
 }
 
 exit $(if ($failed) { 1 } else { 0 })
