@@ -15,17 +15,27 @@ use serde_json::json;
 /// a file has been compiled through the production pipeline.
 fn seed_workspace_index(state: &crate::mcp::McpState) {
     use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+    use tempfile::TempDir;
+
+    let _dir = TempDir::new().unwrap();
+    let controller_path = _dir.path().join("UserController.java");
+    let service_path = _dir.path().join("UserService.java");
+    std::fs::write(&controller_path, "public class UserController {}").unwrap();
+    std::fs::write(&service_path, "public class UserService {}").unwrap();
+    let controller_str = controller_path.to_string_lossy().to_string();
+    let service_str = service_path.to_string_lossy().to_string();
+
     let mut idx = state.workspace_index_lock();
 
     // Simulate a UserController that autowires UserService
     idx.add_edges(
-        "src/UserController.java",
+        &controller_str,
         vec![SemanticEdge {
             relation: SemanticRelation::Autowired,
             subject: EntityRef::new("spring", "Controller", "UserController")
-                .with_file("src/UserController.java".into()),
+                .with_file(controller_str.clone()),
             object: EntityRef::new("spring", "Service", "UserService")
-                .with_file("src/UserController.java".into()),
+                .with_file(controller_str.clone()),
             layer: "spring",
         }],
     );
@@ -33,13 +43,13 @@ fn seed_workspace_index(state: &crate::mcp::McpState) {
     // Simulate a UserService that is a service
     // (no self-loop — avoid creating a cycle in the seed data)
     idx.add_edges(
-        "src/UserService.java",
+        &service_str,
         vec![SemanticEdge {
             relation: SemanticRelation::EndpointMapsTo,
             subject: EntityRef::new("spring", "Service", "UserService")
-                .with_file("src/UserService.java".into()),
+                .with_file(service_str.clone()),
             object: EntityRef::new("spring", "Endpoint", "/api/users")
-                .with_file("src/UserService.java".into()),
+                .with_file(service_str.clone()),
             layer: "spring",
         }],
     );
@@ -255,13 +265,51 @@ fn workspace_query_reverse_edges_returns_results() {
 }
 #[test]
 fn workspace_query_entities_in_file_returns_results() {
+    use tempfile::TempDir;
+    let dir = TempDir::new().unwrap();
+    let controller_path = dir.path().join("UserController.java");
+    std::fs::write(&controller_path, "public class UserController {}").unwrap();
+    let controller_str = controller_path.to_string_lossy().to_string();
+
+    let service_path = dir.path().join("UserService.java");
+    std::fs::write(&service_path, "public class UserService {}").unwrap();
+    let service_str = service_path.to_string_lossy().to_string();
+
     let state = crate::mcp::McpState::new(crate::tests::test_config());
-    seed_workspace_index(&state);
+    let mut idx = state.workspace_index_lock();
+    use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+
+    idx.add_edges(
+        &controller_str,
+        vec![SemanticEdge {
+            relation: SemanticRelation::Autowired,
+            subject: EntityRef::new("spring", "Controller", "UserController")
+                .with_file(controller_str.clone()),
+            object: EntityRef::new("spring", "Service", "UserService")
+                .with_file(controller_str.clone()),
+            layer: "spring",
+        }],
+    );
+
+    idx.add_edges(
+        &service_str,
+        vec![SemanticEdge {
+            relation: SemanticRelation::EndpointMapsTo,
+            subject: EntityRef::new("spring", "Service", "UserService")
+                .with_file(service_str.clone()),
+            object: EntityRef::new("spring", "Endpoint", "/api/users")
+                .with_file(service_str.clone()),
+            layer: "spring",
+        }],
+    );
+    drop(idx);
+
     let id = json!(1);
     let params = json!({
         "arguments": {
             "type": "entities_in_file",
-            "file_path": "src/UserController.java"
+            "file_path": controller_str,
+            "workspaceRoot": dir.path().to_string_lossy().to_string()
         }
     });
     crate::protocol::captured_responses().clear();
@@ -277,22 +325,33 @@ fn workspace_query_entities_in_file_returns_results() {
 #[test]
 fn entities_in_file_production_path_canonicalization() {
     use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+    use crate::mcp::tool_helpers::resolve_file_path_checked;
+    use tempfile::TempDir;
+
+    let dir = TempDir::new().unwrap();
+    let cs_path = dir.path().join("TestController.cs");
+    std::fs::write(&cs_path, "public class TestController {}").unwrap();
+
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = json!(1);
 
-    // Populate the index using a canonicalized file path, mimicking the
-    // production write path (handle_provide_code_context canonicalizes
-    // via canonical_identity_key before calling add_edges).
-    // Use an existing file so canonical_identity_key resolves to an
-    // absolute path that differs from the raw relative path.
-    let raw_path = "src/tests/mcp/workspace_query.rs";
-    let canonical_path = crate::dictionary::path::canonical_identity_key(raw_path);
+    // Populate the index using the production-style path:
+    // resolve_file_path_checked() → canonical_identity_key().
+    // This is identical to how handle_provide_code_context
+    // stores paths.
+    let relative_path = "TestController.cs";
+    let resolved = resolve_file_path_checked(
+        relative_path,
+        Some(dir.path().to_string_lossy().as_ref()),
+        &[],
+    )
+    .unwrap();
+    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved);
 
-    // Prove the test exercises the canonicalization boundary: the
-    // canonicalized path must be a different string from the raw path.
+    // The resolved canonical path differs from the raw relative path.
     assert_ne!(
-        canonical_path, raw_path,
-        "canonical identity must differ from raw path to exercise the boundary"
+        canonical_path, relative_path,
+        "resolved+cannonical path must differ from raw relative path"
     );
 
     {
@@ -301,22 +360,24 @@ fn entities_in_file_production_path_canonicalization() {
             &canonical_path,
             vec![SemanticEdge {
                 relation: SemanticRelation::Defines,
-                subject: EntityRef::new("test", "Module", "WorkspaceQueryTestModule")
+                subject: EntityRef::new("test", "Module", "TestQueryModule")
                     .with_file(canonical_path.clone()),
-                object: EntityRef::new("test", "Function", "test_path_canonicalization")
+                object: EntityRef::new("test", "Function", "test_query_fn")
                     .with_file(canonical_path.clone()),
                 layer: "test",
             }],
         );
     }
 
-    // Query with the raw (non-canonicalized) path through the MCP handler.
-    // This reproduces the production defect: the user provides a raw path,
-    // while the index stores data under the canonicalized key.
+    // Query with the same relative path and workspaceRoot.
+    // This reproduces the production defect: the handler must
+    // resolve the path (relative → absolute via workspaceRoot)
+    // BEFORE canonicalizing, matching the write-side pipeline.
     let params = json!({
         "arguments": {
             "type": "entities_in_file",
-            "file_path": raw_path
+            "file_path": relative_path,
+            "workspaceRoot": dir.path().to_string_lossy().to_string()
         }
     });
     crate::protocol::captured_responses().clear();
@@ -329,11 +390,14 @@ fn entities_in_file_production_path_canonicalization() {
     );
     let entities = &resp["result"]["entities"];
     assert!(entities.is_array(), "entities should be an array");
-    // RED assertion: FAILS before the canonicalization fix,
-    // PASSES after the fix.
+    // RED → GREEN: would fail with only canonical_identity_key()
+    // (the previous fix) because raw relative path "TestController.cs"
+    // does not exist from CWD and resolves to a different key.
+    // Passes after adding resolve_file_path_checked so the handler
+    // uses the same workspaceRoot-aware resolution as the write path.
     assert!(
         !entities.as_array().unwrap().is_empty(),
-        "entities_in_file with raw path must find entities stored under canonical path"
+        "entities_in_file must find entities stored under resolved+cannonical path"
     );
 }
 

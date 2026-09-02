@@ -193,7 +193,26 @@ fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState) {
             return;
         }
     };
-    let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
+    let workspace_root = args["workspaceRoot"].as_str();
+    let resolved_path = match super::super::tool_helpers::resolve_file_path_checked(
+        file_path,
+        workspace_root,
+        &state.config.additional_roots,
+    ) {
+        Ok(p) => p,
+        Err(_msg) => {
+            // File does not exist or is outside workspace boundary —
+            // return empty results (the user asked for a file that
+            // hasn't been compiled). This matches the pre-fix behavior
+            // where a non-existent path produced no entities.
+            send_response(&serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "result": { "entities": [], "count": 0 }
+            }));
+            return;
+        }
+    };
+    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
     let idx = state.workspace_index_read();
     let results = idx.entities_in_file(&canonical_path);
     let serialized = serde_json::to_value(&results).unwrap_or_default();
