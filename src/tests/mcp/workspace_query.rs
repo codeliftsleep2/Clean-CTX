@@ -1051,7 +1051,7 @@ fn builtin_declaration_coverage() {
         ),
     ];
 
-        for (rel, source, entity_type, name) in fixtures {
+    for (rel, source, entity_type, name) in fixtures {
         compile_via_provide_code_context(&dir, &state, rel, source);
         let entities = find_entities(&state, name);
         let matches = assert_builtin_entity(&entities, entity_type, name);
