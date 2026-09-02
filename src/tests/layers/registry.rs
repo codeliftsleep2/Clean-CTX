@@ -8,10 +8,10 @@ use crate::layers::LayerRegistry;
 #[test]
 fn collect_semantic_edges_defaults_to_empty() {
     let registry = LayerRegistry::default();
-    // Phase 0: no meta-layer overrides extract_semantic_edges yet, so the
-    // trait's default empty impl applies under every feature combination.
-    // The dispatch + default-impl contract is what we verify here; Phase 1
-    // makes Angular return real edges.
+    // With NO type captures, no meta layer — including the always-on
+    // BuiltinMetaLayer — has any declaration to project, so the collection
+    // is empty under every feature combination. The dispatch + empty-capture
+    // contract is what we verify here.
     let edges = registry.collect_semantic_edges("class Foo {}", &[], Fidelity::Low, None);
     assert!(edges.is_empty());
 }

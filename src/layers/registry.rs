@@ -71,6 +71,15 @@ impl LayerRegistry {
         reg.meta_layers
             .push(Box::new(crate::dotnet_meta::DotNetMetaLayer::new()));
 
+        // Always-on fallback meta layer: indexes ordinary type declarations
+        // (classes/interfaces/structs/enums/traits/records) as `builtin`
+        // entities. Registered LAST so framework semantics run first; the
+        // `builtin` domain is disjoint from framework domains, so ordering
+        // never affects identity correctness.
+        reg.meta_layers.push(Box::new(
+            crate::layers::meta::builtin::BuiltinMetaLayer::new(),
+        ));
+
         reg
     }
 
@@ -152,17 +161,21 @@ impl LayerRegistry {
     /// `is_applicable` and, if true, calls `extract_semantic_edges`. Edges
     /// are NOT deduplicated here -- deduplication happens at the workspace
     /// index boundary (semantic plan U2).
+    ///
+    /// `class_captures` is a slice of `(capture_name, capture_text)` pairs so
+    /// the always-on `BuiltinMetaLayer` can classify ordinary declarations
+    /// without re-parsing the source. Framework layers ignore the name.
     pub fn collect_semantic_edges(
         &self,
         source: &str,
-        class_captures: &[String],
+        class_captures: &[(String, String)],
         fidelity: Fidelity,
         config: Option<&CleanCtxConfig>,
     ) -> Vec<SemanticEdge> {
         let mut edges = Vec::new();
         for layer in &self.meta_layers {
             if layer.is_applicable(source, std::path::Path::new(""), config) {
-                edges.extend(layer.extract_semantic_edges(
+                edges.extend(layer.extract_semantic_edges_paired(
                     source,
                     class_captures,
                     fidelity,

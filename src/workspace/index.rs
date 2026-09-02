@@ -13,6 +13,17 @@
 // File provenance:   file_id is retained for entity disambiguation.
 // Determinism:       HashMap for O(1) lookup; returned collections are
 //                    sorted for deterministic ordering.
+//
+// Registration records: a self-referential `Defines` edge (subject identity
+//                     == object identity) is an entity-registration carrier,
+//                     not a semantic relationship. `add_edges` normalizes it
+//                     at the index write boundary — the entity is registered
+//                     once with file provenance and the record never enters
+//                     edge_set / file_edges / forward / reverse. Real
+//                     relationships are unaffected: `Defines(A, B)` stays a
+//                     graph edge, and non-Defines self-loops (e.g.
+//                     `Injects(A, A)`) remain cycles. Enforced by
+//                     tests::self_defines_edge_is_registration_record_only.
 
 use crate::compression::graph_utils;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
@@ -135,6 +146,12 @@ impl WorkspaceIndex {
     /// Entity registration happens BEFORE the edge dedup check so that
     /// entity occurrences from all files are tracked even when the edge
     /// itself is a duplicate (architectural review, Phase 4a).
+    ///
+    /// Registration-record normalization (index write boundary): a
+    /// self-referential `Defines` edge — subject identity == object identity —
+    /// is an entity-registration carrier, not a relationship. It registers the
+    /// entity once with file provenance and is never inserted into `edge_set`,
+    /// `file_edges`, `forward`, or `reverse`.
     pub fn add_edges(&mut self, file_path: &str, edges: Vec<SemanticEdge>) {
         let mut file_entity_keys: Vec<EntityKey> = Vec::new();
 
@@ -151,9 +168,26 @@ impl WorkspaceIndex {
                 edge.object.file = Some(file_path.to_string());
             }
 
-            // Register entities (all occurrences retained).
             let subj_key = entity_key(&edge.subject);
             let obj_key = entity_key(&edge.object);
+
+            // Registration-record normalization (index write boundary):
+            // a self-referential `Defines` edge — subject identity == object
+            // identity — is an entity-registration carrier (e.g.
+            // BuiltinMetaLayer declaring an ordinary type), NOT a semantic
+            // relationship. It registers the entity once with file provenance
+            // and never enters the relationship graph (edge_set / file_edges /
+            // forward / reverse), so graph queries (`has_cycle`, forward and
+            // reverse edges) only ever see real relationships. Real
+            // relationships are unaffected: `Defines(A, B)` remains a graph
+            // edge, and a non-Defines self-loop (e.g. `Injects(A, A)`) remains
+            // a detected cycle (tests::has_cycle_self_loop).
+            if edge.relation == SemanticRelation::Defines && subj_key == obj_key {
+                self.register_entity(&subj_key, edge.subject, &mut file_entity_keys);
+                continue;
+            }
+
+            // Register entities (all occurrences retained).
             self.register_entity(&subj_key, edge.subject.clone(), &mut file_entity_keys);
             self.register_entity(&obj_key, edge.object.clone(), &mut file_entity_keys);
 

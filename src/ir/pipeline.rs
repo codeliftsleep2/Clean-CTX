@@ -778,7 +778,12 @@ impl IRPass for MetaLayerPass {
         // the decorator/annotation/attribute-inclusive class text to detect
         // framework semantics (Angular @Component, Spring @RestController,
         // .NET [ApiController]).
-        let class_captures: Vec<String> = state
+        //
+        // Each capture's NAME is paired with its source span so the always-on
+        // BuiltinMetaLayer can classify ordinary declarations (class vs
+        // interface vs struct vs enum vs trait vs record) without re-parsing
+        // the source text.
+        let class_entries: Vec<(String, String)> = state
             .captures
             .iter()
             .filter(|cap| {
@@ -793,8 +798,15 @@ impl IRPass for MetaLayerPass {
                         | "impl.root"
                 )
             })
-            .map(|cap| crate::meta_util::class_source_from_capture(&state.source, cap).to_string())
+            .map(|cap| {
+                (
+                    cap.name.clone(),
+                    crate::meta_util::class_source_from_capture(&state.source, cap).to_string(),
+                )
+            })
             .collect();
+        let class_captures: Vec<String> =
+            class_entries.iter().map(|(_, text)| text.clone()).collect();
 
         let meta_results = crate::layers::LayerRegistry::global().run_meta_layers_pipeline(
             &state.source,
@@ -824,7 +836,7 @@ impl IRPass for MetaLayerPass {
         //   InferenceLayerPass CONSUMES -> InferenceLayer.semantic_edges (permanent)
         let mut semantic_edges = crate::layers::LayerRegistry::global().collect_semantic_edges(
             &state.source,
-            &class_captures,
+            &class_entries,
             state.fidelity,
             None,
         );

@@ -280,6 +280,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "entity_type": { "type": "string", "description": "Entity type for entity queries (e.g. 'Component', 'Service', 'Controller'). Required for: forward_edges, reverse_edges, transitive_dependencies." },
                     "name": { "type": "string", "description": "Entity name for entity queries. Required for: find_entities, forward_edges, reverse_edges, transitive_dependencies." },
                     "file_path": { "type": "string", "description": "File path for entities_in_file query." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root used to resolve relative file_path values in entities_in_file (matches the write-side resolve_file_path_checked contract). Defaults to CWD. Not relevant to identity/name-based query types." },
                     "depth": { "type": "integer", "description": "Traversal depth for transitive_dependencies: 0 = unlimited, 1 = direct, 2 = transitive. Default: 1." }
                 },
                 "required": ["type"]

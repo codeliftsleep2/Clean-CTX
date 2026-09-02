@@ -635,6 +635,198 @@ fn has_cycle_ambiguous_entity() {
     assert!(!idx.has_cycle());
 }
 
+// ── Registration records (B1 write boundary) ─────────────────────────
+
+#[test]
+fn self_defines_edge_is_registration_record_only() {
+    let mut idx = WorkspaceIndex::new();
+    // Self-referential `Defines` — the shape BuiltinMetaLayer emits to
+    // register an ordinary declaration. It is a registration carrier, not a
+    // relationship: register once, never index as an edge.
+    idx.add_edges(
+        "a.ts",
+        vec![SemanticEdge {
+            relation: SemanticRelation::Defines,
+            subject: EntityRef::new("builtin", "Class", "UserService"),
+            object: EntityRef::new("builtin", "Class", "UserService"),
+            layer: "builtin",
+        }],
+    );
+
+    assert_eq!(
+        idx.entities_by_identity("builtin", "Class", "UserService")
+            .len(),
+        1,
+        "registration record must register exactly one occurrence"
+    );
+    assert_eq!(
+        idx.find_entities_by_name("UserService").len(),
+        1,
+        "name lookup must see exactly one occurrence"
+    );
+    assert_eq!(
+        idx.edge_count(),
+        0,
+        "registration record must not become a graph edge"
+    );
+    assert!(
+        idx.forward_edges_by_identity("builtin", "Class", "UserService")
+            .is_empty(),
+        "registration record must not appear in the forward index"
+    );
+    assert!(
+        idx.reverse_edges_by_identity("builtin", "Class", "UserService")
+            .is_empty(),
+        "registration record must not appear in the reverse index"
+    );
+    assert_eq!(
+        idx.entities_in_file("a.ts").len(),
+        1,
+        "file bookkeeping must contain exactly one occurrence"
+    );
+    assert!(
+        !idx.has_cycle(),
+        "registration record must not create a cycle"
+    );
+}
+
+#[test]
+fn self_defines_recompile_does_not_accumulate() {
+    let mut idx = WorkspaceIndex::new();
+    let registration = || SemanticEdge {
+        relation: SemanticRelation::Defines,
+        subject: EntityRef::new("builtin", "Class", "Foo"),
+        object: EntityRef::new("builtin", "Class", "Foo"),
+        layer: "builtin",
+    };
+
+    idx.add_edges("a.ts", vec![registration()]);
+    assert_eq!(idx.entities_by_identity("builtin", "Class", "Foo").len(), 1);
+    assert_eq!(idx.edge_count(), 0);
+
+    // Production recompile lifecycle: remove_file → add_edges, repeatedly.
+    idx.remove_file("a.ts");
+    idx.add_edges("a.ts", vec![registration()]);
+    idx.remove_file("a.ts");
+    idx.add_edges("a.ts", vec![registration()]);
+
+    assert_eq!(
+        idx.entities_by_identity("builtin", "Class", "Foo").len(),
+        1,
+        "recompilation must not accumulate registration occurrences"
+    );
+    assert_eq!(
+        idx.edge_count(),
+        0,
+        "registration records must never accumulate as graph edges"
+    );
+    assert!(
+        idx.forward_edges_by_identity("builtin", "Class", "Foo")
+            .is_empty()
+    );
+    assert!(
+        idx.reverse_edges_by_identity("builtin", "Class", "Foo")
+            .is_empty()
+    );
+    assert_eq!(idx.entities_in_file("a.ts").len(), 1);
+    assert!(!idx.has_cycle());
+}
+
+#[test]
+fn framework_defines_edges_still_traversed() {
+    let mut idx = WorkspaceIndex::new();
+    // Non-self `Defines(A, B)` — the shape framework layers emit (e.g.
+    // angular routing Guard → Guard.kind). Subject and object differ, so
+    // this is a real relationship, not a registration record.
+    let defines = SemanticEdge {
+        relation: SemanticRelation::Defines,
+        subject: EntityRef::new("angular", "Guard", "AuthGuard"),
+        object: EntityRef::new("angular", "Guard", "CanActivate"),
+        layer: "angular",
+    };
+    // Closing the loop with a dependency edge proves the Defines edge is
+    // traversed by graph algorithms.
+    let injects = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Guard", "CanActivate"),
+        object: EntityRef::new("angular", "Guard", "AuthGuard"),
+        layer: "angular",
+    };
+    idx.add_edges("a.ts", vec![defines, injects]);
+
+    assert_eq!(
+        idx.edge_count(),
+        2,
+        "real Defines relationships must remain graph edges"
+    );
+    // AuthGuard is the subject of the Defines edge and the object of the
+    // Injects edge; CanActivate is the reverse. Registration happens per
+    // edge endpoint (pre-existing general behavior, unchanged by B1), so
+    // each identity has two same-file occurrences.
+    assert_eq!(
+        idx.entities_by_identity("angular", "Guard", "AuthGuard")
+            .len(),
+        2
+    );
+    assert_eq!(
+        idx.entities_by_identity("angular", "Guard", "CanActivate")
+            .len(),
+        2
+    );
+
+    let outgoing = idx.forward_edges_by_identity("angular", "Guard", "AuthGuard");
+    assert_eq!(outgoing.len(), 1);
+    assert_eq!(outgoing[0].relation, SemanticRelation::Defines);
+
+    let incoming = idx.reverse_edges_by_identity("angular", "Guard", "CanActivate");
+    assert_eq!(incoming.len(), 1);
+    assert_eq!(incoming[0].relation, SemanticRelation::Defines);
+
+    assert!(
+        idx.has_cycle(),
+        "Defines(A, B) + Injects(B, A) must be traversed as a cycle"
+    );
+}
+
+#[test]
+fn partial_class_two_files_two_occurrences() {
+    let mut idx = WorkspaceIndex::new();
+    // Same identity from two different files (e.g. C# partial classes):
+    // cross-file occurrences are never deduplicated.
+    let registration = || SemanticEdge {
+        relation: SemanticRelation::Defines,
+        subject: EntityRef::new("builtin", "Class", "Foo"),
+        object: EntityRef::new("builtin", "Class", "Foo"),
+        layer: "builtin",
+    };
+
+    idx.add_edges("a.cs", vec![registration()]);
+    idx.add_edges("b.cs", vec![registration()]);
+
+    let entities = idx.entities_by_identity("builtin", "Class", "Foo");
+    assert_eq!(
+        entities.len(),
+        2,
+        "cross-file occurrences of one identity must remain distinct"
+    );
+    let files: Vec<Option<&String>> = entities.iter().map(|e| e.file.as_ref()).collect();
+    assert!(files.contains(&Some(&"a.cs".to_string())));
+    assert!(files.contains(&Some(&"b.cs".to_string())));
+
+    assert_eq!(
+        idx.entities_in_file("a.cs").len(),
+        1,
+        "each file discovers exactly its own occurrence"
+    );
+    assert_eq!(idx.entities_in_file("b.cs").len(), 1);
+    assert_eq!(
+        idx.edge_count(),
+        0,
+        "registration records must not become graph edges"
+    );
+    assert!(!idx.has_cycle());
+}
+
 // ── Phase 4c: Graph Traversal — transitive_dependencies ─────────────
 
 #[test]

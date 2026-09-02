@@ -17,6 +17,7 @@
 // in this file for historical reasons. New meta-layers should NOT follow
 // this pattern.
 
+pub mod builtin;
 pub mod semantic;
 
 use crate::compression::Fidelity;
@@ -93,6 +94,10 @@ pub trait MetaLayer: Send + Sync {
 
     /// Extract structured semantic edges for the given source file.
     ///
+    /// Legacy text-only contract. Framework meta-layers implement this from
+    /// the class-source spans; the always-on `BuiltinMetaLayer` uses
+    /// [`Self::extract_semantic_edges_paired`] instead.
+    ///
     /// Returns an empty vector by default -- meta-layers are NOT required
     /// to produce semantic edges. Semantic edges are structural facts
     /// (implicit confidence 1.0) discovered by the same per-framework
@@ -107,6 +112,29 @@ pub trait MetaLayer: Send + Sync {
         _config: Option<&CleanCtxConfig>,
     ) -> Vec<SemanticEdge> {
         Vec::new()
+    }
+
+    /// Extract structured semantic edges with capture-type information.
+    ///
+    /// `class_captures` is a slice of `(capture_name, capture_text)` pairs —
+    /// the capture identity (e.g. `"class.root"`, `"interface.root"`,
+    /// `"trait.root"`) paired with the class-source span. The default
+    /// implementation forwards to [`Self::extract_semantic_edges`] after
+    /// discarding the capture names, so framework layers keep their
+    /// existing text-only contract; only layers that need the capture type
+    /// (the always-on `BuiltinMetaLayer`) override this method.
+    fn extract_semantic_edges_paired(
+        &self,
+        source: &str,
+        class_captures: &[(String, String)],
+        fidelity: Fidelity,
+        config: Option<&CleanCtxConfig>,
+    ) -> Vec<SemanticEdge> {
+        let texts: Vec<String> = class_captures
+            .iter()
+            .map(|(_, text)| text.clone())
+            .collect();
+        self.extract_semantic_edges(source, &texts, fidelity, config)
     }
 }
 
