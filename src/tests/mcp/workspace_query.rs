@@ -172,7 +172,9 @@ fn workspace_query_find_entities_returns_results() {
     assert!(resp.get("result").is_some(), "should return result");
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let entities = &sc["entities"];
     assert!(entities.is_array(), "entities should be an array");
     assert!(
@@ -197,7 +199,9 @@ fn workspace_query_find_entities_empty_index() {
     );
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let entities = &sc["entities"];
     assert!(entities.is_array(), "entities should be an array");
     assert_eq!(
@@ -228,7 +232,9 @@ fn workspace_query_forward_edges_returns_results() {
     assert!(resp.get("result").is_some(), "should return result");
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let edges = &sc["edges"];
     assert!(edges.is_array(), "edges should be an array");
     let count = sc["count"].as_i64().unwrap_or(0);
@@ -263,7 +269,9 @@ fn workspace_query_reverse_edges_returns_results() {
     assert!(resp.get("result").is_some(), "should return result");
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let edges = &sc["edges"];
     assert!(edges.is_array(), "edges should be an array");
     let count = sc["count"].as_i64().unwrap_or(0);
@@ -331,7 +339,9 @@ fn workspace_query_entities_in_file_returns_results() {
     assert!(resp.get("result").is_some(), "should return result");
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let entities = &sc["entities"];
     assert!(entities.is_array(), "entities should be an array");
     let count = sc["count"].as_i64().unwrap_or(0);
@@ -406,7 +416,9 @@ fn entities_in_file_production_path_canonicalization() {
     );
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let entities = &sc["entities"];
     assert!(entities.is_array(), "entities should be an array");
     // RED → GREEN: would fail with only canonical_identity_key()
@@ -440,7 +452,9 @@ fn workspace_query_transitive_dependencies_returns_results() {
     assert!(resp.get("result").is_some(), "should return result");
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let deps = &sc["dependencies"];
     assert!(deps.is_array(), "dependencies should be an array");
     let count = sc["count"].as_i64().unwrap_or(-1);
@@ -467,7 +481,9 @@ fn workspace_query_transitive_dependencies_default_depth() {
     let resp = pop_response();
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let depth_used = sc["depth_used"].as_i64().unwrap_or(-1);
     assert_eq!(depth_used, 1, "default depth should be 1");
 }
@@ -484,7 +500,9 @@ fn workspace_query_has_cycle_returns_result() {
     assert!(resp.get("result").is_some(), "should return result");
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let has_cycle = sc["has_cycle"].as_bool().unwrap_or(false);
     assert!(!has_cycle, "seeded data should not have cycles");
 }
@@ -503,7 +521,9 @@ fn workspace_query_has_cycle_empty_index() {
     );
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let has_cycle = sc["has_cycle"].as_bool().unwrap_or(true);
     assert!(!has_cycle, "empty index should not have cycles");
 }
@@ -530,7 +550,9 @@ fn workspace_query_empty_index_forward_edges() {
     );
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let edges = &sc["edges"];
     assert!(edges.is_array(), "edges should be an array");
     assert_eq!(
@@ -559,7 +581,9 @@ fn workspace_query_empty_index_entities_in_file() {
     );
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let entities = &sc["entities"];
     assert!(entities.is_array(), "entities should be an array");
     assert_eq!(
@@ -686,7 +710,9 @@ public class TestController : ControllerBase
     );
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let count = sc["count"].as_i64().unwrap_or(-1);
     // RED → GREEN: fails before the fix (count == 0 because semantic
     // edges discarded in token-economics fallback), passes after the
@@ -770,7 +796,9 @@ fn find_entities(state: &crate::mcp::McpState, name: &str) -> serde_json::Value 
     );
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     sc["entities"].clone()
 }
 
@@ -878,7 +906,9 @@ fn builtin_entities_in_file_end_to_end() {
     );
     let result = resp["result"].as_object().expect("result object");
     assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     let matches = assert_builtin_entity(&sc["entities"], "Class", "UserService");
     assert_eq!(
         matches.len(),
@@ -1021,7 +1051,7 @@ fn builtin_declaration_coverage() {
         ),
     ];
 
-    for (rel, source, entity_type, name) in fixtures {
+        for (rel, source, entity_type, name) in fixtures {
         compile_via_provide_code_context(&dir, &state, rel, source);
         let entities = find_entities(&state, name);
         let matches = assert_builtin_entity(&entities, entity_type, name);
@@ -1032,6 +1062,7 @@ fn builtin_declaration_coverage() {
             entities
         );
     }
+}
 
 // ── outputSchema contract ─────────────────────────────────────────────
 //
@@ -1053,11 +1084,17 @@ fn workspace_query_tool_declares_output_schema() {
         .as_object()
         .expect("outputSchema.properties must be an object");
     // All six query result shapes must be represented.
-    for key in ["entities", "edges", "dependencies", "count", "has_cycle", "depth_used"] {
+    for key in [
+        "entities",
+        "edges",
+        "dependencies",
+        "count",
+        "has_cycle",
+        "depth_used",
+    ] {
         assert!(
             props.contains_key(key),
             "outputSchema.properties must contain '{key}'"
         );
     }
-}
 }

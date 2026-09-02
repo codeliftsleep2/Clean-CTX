@@ -304,7 +304,11 @@ fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
 fn handle_has_cycle(id: &Value, state: &McpState) {
     let idx = state.workspace_index_read();
     let has_cycle = idx.has_cycle();
-    let text = if has_cycle { "Cycle detected." } else { "No cycle detected." };
+    let text = if has_cycle {
+        "Cycle detected."
+    } else {
+        "No cycle detected."
+    };
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
