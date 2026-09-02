@@ -72,9 +72,13 @@ fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
     let idx = state.workspace_index_read();
     let results = idx.find_entities_by_name(name);
     let serialized = serde_json::to_value(&results).unwrap_or_default();
+    let count = results.len();
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
-        "result": { "entities": serialized, "count": results.len() }
+        "result": {
+            "content": [{ "type": "text", "text": format!("Found {count} entities.") }],
+            "structuredContent": { "entities": serialized, "count": count }
+        }
     }));
 }
 
@@ -122,9 +126,13 @@ fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
     let idx = state.workspace_index_read();
     let results = idx.forward_edges_by_identity(domain, entity_type, name);
     let serialized = serde_json::to_value(&results).unwrap_or_default();
+    let count = results.len();
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
-        "result": { "edges": serialized, "count": results.len() }
+        "result": {
+            "content": [{ "type": "text", "text": format!("Found {count} outgoing edges.") }],
+            "structuredContent": { "edges": serialized, "count": count }
+        }
     }));
 }
 
@@ -172,9 +180,13 @@ fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
     let idx = state.workspace_index_read();
     let results = idx.reverse_edges_by_identity(domain, entity_type, name);
     let serialized = serde_json::to_value(&results).unwrap_or_default();
+    let count = results.len();
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
-        "result": { "edges": serialized, "count": results.len() }
+        "result": {
+            "content": [{ "type": "text", "text": format!("Found {count} incoming edges.") }],
+            "structuredContent": { "edges": serialized, "count": count }
+        }
     }));
 }
 
@@ -207,7 +219,10 @@ fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState) {
             // where a non-existent path produced no entities.
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
-                "result": { "entities": [], "count": 0 }
+                "result": {
+                    "content": [{ "type": "text", "text": "Found 0 entities in file." }],
+                    "structuredContent": { "entities": [], "count": 0 }
+                }
             }));
             return;
         }
@@ -216,9 +231,13 @@ fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState) {
     let idx = state.workspace_index_read();
     let results = idx.entities_in_file(&canonical_path);
     let serialized = serde_json::to_value(&results).unwrap_or_default();
+    let count = results.len();
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
-        "result": { "entities": serialized, "count": results.len() }
+        "result": {
+            "content": [{ "type": "text", "text": format!("Found {count} entities in file.") }],
+            "structuredContent": { "entities": serialized, "count": count }
+        }
     }));
 }
 
@@ -267,12 +286,16 @@ fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
     let idx = state.workspace_index_read();
     let results = idx.transitive_dependencies(domain, entity_type, name, depth);
     let serialized = serde_json::to_value(&results).unwrap_or_default();
+    let count = results.len();
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
-            "dependencies": serialized,
-            "count": results.len(),
-            "depth_used": depth
+            "content": [{ "type": "text", "text": format!("Found {count} dependencies (depth {depth}).") }],
+            "structuredContent": {
+                "dependencies": serialized,
+                "count": count,
+                "depth_used": depth
+            }
         }
     }));
 }
@@ -281,9 +304,13 @@ fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
 fn handle_has_cycle(id: &Value, state: &McpState) {
     let idx = state.workspace_index_read();
     let has_cycle = idx.has_cycle();
+    let text = if has_cycle { "Cycle detected." } else { "No cycle detected." };
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
-        "result": { "has_cycle": has_cycle }
+        "result": {
+            "content": [{ "type": "text", "text": text }],
+            "structuredContent": { "has_cycle": has_cycle }
+        }
     }));
 }
 

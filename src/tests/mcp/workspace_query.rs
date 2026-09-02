@@ -6,6 +6,7 @@
 // response format.
 
 use crate::mcp::tools::dispatch_tools_call;
+use crate::tests::assert_valid_mcp_envelope;
 use serde_json::json;
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -169,13 +170,16 @@ fn workspace_query_find_entities_returns_results() {
     dispatch_tools_call(&id, "workspace_query", &params, &state);
     let resp = pop_response();
     assert!(resp.get("result").is_some(), "should return result");
-    let entities = &resp["result"]["entities"];
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let entities = &sc["entities"];
     assert!(entities.is_array(), "entities should be an array");
     assert!(
         !entities.as_array().unwrap().is_empty(),
         "should find at least one entity"
     );
-    let count = resp["result"]["count"].as_i64().unwrap_or(0);
+    let count = sc["count"].as_i64().unwrap_or(0);
     assert!(count > 0, "count should be > 0");
 }
 
@@ -191,14 +195,17 @@ fn workspace_query_find_entities_empty_index() {
         resp.get("result").is_some(),
         "empty index should return result, not error"
     );
-    let entities = &resp["result"]["entities"];
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let entities = &sc["entities"];
     assert!(entities.is_array(), "entities should be an array");
     assert_eq!(
         entities.as_array().unwrap().len(),
         0,
         "empty index should return empty array"
     );
-    let count = resp["result"]["count"].as_i64().unwrap_or(-1);
+    let count = sc["count"].as_i64().unwrap_or(-1);
     assert_eq!(count, 0, "count should be 0 for empty result");
 }
 
@@ -219,9 +226,12 @@ fn workspace_query_forward_edges_returns_results() {
     dispatch_tools_call(&id, "workspace_query", &params, &state);
     let resp = pop_response();
     assert!(resp.get("result").is_some(), "should return result");
-    let edges = &resp["result"]["edges"];
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let edges = &sc["edges"];
     assert!(edges.is_array(), "edges should be an array");
-    let count = resp["result"]["count"].as_i64().unwrap_or(0);
+    let count = sc["count"].as_i64().unwrap_or(0);
     assert!(count > 0, "should have at least one forward edge");
     if let Some(edge) = edges.as_array().and_then(|a| a.first()) {
         let relation = edge["relation"].as_str().unwrap_or("");
@@ -251,9 +261,12 @@ fn workspace_query_reverse_edges_returns_results() {
     dispatch_tools_call(&id, "workspace_query", &params, &state);
     let resp = pop_response();
     assert!(resp.get("result").is_some(), "should return result");
-    let edges = &resp["result"]["edges"];
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let edges = &sc["edges"];
     assert!(edges.is_array(), "edges should be an array");
-    let count = resp["result"]["count"].as_i64().unwrap_or(0);
+    let count = sc["count"].as_i64().unwrap_or(0);
     assert!(count > 0, "should have at least one reverse edge");
     if let Some(edge) = edges.as_array().and_then(|a| a.first()) {
         let subj_name = edge["subject"]["name"].as_str().unwrap_or("");
@@ -316,9 +329,12 @@ fn workspace_query_entities_in_file_returns_results() {
     dispatch_tools_call(&id, "workspace_query", &params, &state);
     let resp = pop_response();
     assert!(resp.get("result").is_some(), "should return result");
-    let entities = &resp["result"]["entities"];
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let entities = &sc["entities"];
     assert!(entities.is_array(), "entities should be an array");
-    let count = resp["result"]["count"].as_i64().unwrap_or(0);
+    let count = sc["count"].as_i64().unwrap_or(0);
     assert!(count > 0, "should have at least one entity in file");
 }
 
@@ -388,7 +404,10 @@ fn entities_in_file_production_path_canonicalization() {
         resp.get("result").is_some(),
         "entities_in_file should succeed"
     );
-    let entities = &resp["result"]["entities"];
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let entities = &sc["entities"];
     assert!(entities.is_array(), "entities should be an array");
     // RED → GREEN: would fail with only canonical_identity_key()
     // (the previous fix) because raw relative path "TestController.cs"
@@ -419,11 +438,14 @@ fn workspace_query_transitive_dependencies_returns_results() {
     dispatch_tools_call(&id, "workspace_query", &params, &state);
     let resp = pop_response();
     assert!(resp.get("result").is_some(), "should return result");
-    let deps = &resp["result"]["dependencies"];
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let deps = &sc["dependencies"];
     assert!(deps.is_array(), "dependencies should be an array");
-    let count = resp["result"]["count"].as_i64().unwrap_or(-1);
+    let count = sc["count"].as_i64().unwrap_or(-1);
     assert!(count >= 0, "count should be >= 0");
-    let depth_used = resp["result"]["depth_used"].as_i64().unwrap_or(-1);
+    let depth_used = sc["depth_used"].as_i64().unwrap_or(-1);
     assert_eq!(depth_used, 1, "depth_used should match the requested depth");
 }
 
@@ -443,7 +465,10 @@ fn workspace_query_transitive_dependencies_default_depth() {
     crate::protocol::captured_responses().clear();
     dispatch_tools_call(&id, "workspace_query", &params, &state);
     let resp = pop_response();
-    let depth_used = resp["result"]["depth_used"].as_i64().unwrap_or(-1);
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let depth_used = sc["depth_used"].as_i64().unwrap_or(-1);
     assert_eq!(depth_used, 1, "default depth should be 1");
 }
 
@@ -457,8 +482,11 @@ fn workspace_query_has_cycle_returns_result() {
     dispatch_tools_call(&id, "workspace_query", &params, &state);
     let resp = pop_response();
     assert!(resp.get("result").is_some(), "should return result");
-    let has_cycle = &resp["result"]["has_cycle"];
-    assert_eq!(has_cycle, false, "seeded data should not have cycles");
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let has_cycle = sc["has_cycle"].as_bool().unwrap_or(false);
+    assert!(!has_cycle, "seeded data should not have cycles");
 }
 
 #[test]
@@ -473,8 +501,11 @@ fn workspace_query_has_cycle_empty_index() {
         resp.get("result").is_some(),
         "empty index should return result"
     );
-    let has_cycle = &resp["result"]["has_cycle"];
-    assert_eq!(has_cycle, false, "empty index should not have cycles");
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let has_cycle = sc["has_cycle"].as_bool().unwrap_or(true);
+    assert!(!has_cycle, "empty index should not have cycles");
 }
 // ── Empty index tests ────────────────────────────────────────────────
 
@@ -497,7 +528,10 @@ fn workspace_query_empty_index_forward_edges() {
         resp.get("result").is_some(),
         "empty index should return result"
     );
-    let edges = &resp["result"]["edges"];
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let edges = &sc["edges"];
     assert!(edges.is_array(), "edges should be an array");
     assert_eq!(
         edges.as_array().unwrap().len(),
@@ -523,7 +557,10 @@ fn workspace_query_empty_index_entities_in_file() {
         resp.get("result").is_some(),
         "should return result even for missing file"
     );
-    let entities = &resp["result"]["entities"];
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let entities = &sc["entities"];
     assert!(entities.is_array(), "entities should be an array");
     assert_eq!(
         entities.as_array().unwrap().len(),
@@ -647,7 +684,10 @@ public class TestController : ControllerBase
         resp.get("result").is_some(),
         "workspace_query.find_entities should succeed"
     );
-    let count = resp["result"]["count"].as_i64().unwrap_or(-1);
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let count = sc["count"].as_i64().unwrap_or(-1);
     // RED → GREEN: fails before the fix (count == 0 because semantic
     // edges discarded in token-economics fallback), passes after the
     // fix (edges persisted to WorkspaceIndex before fallback).
@@ -658,7 +698,7 @@ public class TestController : ControllerBase
     );
 
     // Verify the returned entity has the expected identity.
-    let entities = resp["result"]["entities"].as_array().unwrap();
+    let entities = sc["entities"].as_array().unwrap();
     let controller_entity = entities.iter().find(|e| {
         e["domain"].as_str() == Some("dotnet")
             && e["entity_type"].as_str() == Some("Controller")
@@ -728,7 +768,10 @@ fn find_entities(state: &crate::mcp::McpState, name: &str) -> serde_json::Value 
         "find_entities should succeed for {:?}",
         name
     );
-    resp["result"]["entities"].clone()
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    sc["entities"].clone()
 }
 
 /// Collect entities matching `builtin` domain + exact (entity_type, name).
@@ -790,9 +833,14 @@ fn builtin_plain_class_end_to_end() {
         &state,
     );
     let cycle_resp = pop_response();
+    let cycle_result = cycle_resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(cycle_result);
+    let cycle_sc = cycle_result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
     assert_eq!(
-        cycle_resp["result"]["has_cycle"],
-        json!(false),
+        cycle_sc["has_cycle"].as_bool(),
+        Some(false),
         "ordinary builtin registration must not be reported as a cycle: {:?}",
         cycle_resp
     );
@@ -828,16 +876,19 @@ fn builtin_entities_in_file_end_to_end() {
         "entities_in_file should succeed: {:?}",
         resp
     );
-    let matches = assert_builtin_entity(&resp["result"]["entities"], "Class", "UserService");
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"].as_object().expect("structuredContent");
+    let matches = assert_builtin_entity(&sc["entities"], "Class", "UserService");
     assert_eq!(
         matches.len(),
         1,
         "entities_in_file must report exactly one occurrence per declaration: {}",
-        resp["result"]["entities"]
+        sc["entities"]
     );
     assert_eq!(
-        resp["result"]["count"],
-        json!(1),
+        sc["count"].as_i64(),
+        Some(1),
         "file bookkeeping must not duplicate registration records: {}",
         resp["result"]
     );
@@ -981,4 +1032,32 @@ fn builtin_declaration_coverage() {
             entities
         );
     }
+
+// ── outputSchema contract ─────────────────────────────────────────────
+//
+// Verifies that tools/list exposes outputSchema for workspace_query,
+// matching the convention established by apply_edit and CBM tools.
+
+#[test]
+fn workspace_query_tool_declares_output_schema() {
+    let tools = crate::mcp::tools::tool_list();
+    let wq = tools
+        .iter()
+        .find(|t| t["name"] == "workspace_query")
+        .expect("workspace_query must be in tool_list");
+    let schema = wq["outputSchema"]
+        .as_object()
+        .expect("workspace_query must declare outputSchema");
+    assert_eq!(schema["type"], "object");
+    let props = schema["properties"]
+        .as_object()
+        .expect("outputSchema.properties must be an object");
+    // All six query result shapes must be represented.
+    for key in ["entities", "edges", "dependencies", "count", "has_cycle", "depth_used"] {
+        assert!(
+            props.contains_key(key),
+            "outputSchema.properties must contain '{key}'"
+        );
+    }
+}
 }

@@ -284,6 +284,38 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "depth": { "type": "integer", "description": "Traversal depth for transitive_dependencies: 0 = unlimited, 1 = direct, 2 = transitive. Default: 1." }
                 },
                 "required": ["type"]
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "entities": {
+                        "type": "array",
+                        "description": "Matching entities (find_entities, entities_in_file).",
+                        "items": { "type": "object" }
+                    },
+                    "edges": {
+                        "type": "array",
+                        "description": "Semantic edges (forward_edges, reverse_edges).",
+                        "items": { "type": "object" }
+                    },
+                    "dependencies": {
+                        "type": "array",
+                        "description": "Transitive dependency entities (transitive_dependencies).",
+                        "items": { "type": "object" }
+                    },
+                    "count": {
+                        "type": "integer",
+                        "description": "Number of result items."
+                    },
+                    "has_cycle": {
+                        "type": "boolean",
+                        "description": "Cycle detection result (has_cycle)."
+                    },
+                    "depth_used": {
+                        "type": "integer",
+                        "description": "Actual traversal depth used (transitive_dependencies)."
+                    }
+                }
             }
         }),
     ]
