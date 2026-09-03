@@ -432,6 +432,45 @@ fn count_trailing_flags(slice: &[CoreOp], offset: usize, method_id: &str) -> usi
     count
 }
 
+/// True when `op` is one of the annotation ops that reference `method_id`
+/// and have NO equivalent representation inside a compressed `PatternOp`.
+///
+/// The CTOR patterns consume `DefMethod(M)`, and the validator registers
+/// method identities ONLY from `DefMethod` — a `Pattern` op does not
+/// re-register the identity, and its payload (class id, method id, deps,
+/// return type, property) cannot carry DataFlow / SideEffect /
+/// ExecutionContext / ControlFlow facts. Consuming `DefMethod(M)` while such
+/// an op survives after the consumed span would orphan it (E007/E008/E009/
+/// E010), so the ctor patterns must DECLINE compression for that region,
+/// leaving the original — fully valid and fully annotated — instruction
+/// sequence in place.
+fn op_is_unrepresentable_method_ref(op: &CoreOp, method_id: &str) -> bool {
+    match op {
+        CoreOp::DataFlow(mid, _, _)
+        | CoreOp::SideEffect(mid, _)
+        | CoreOp::ExecutionContext(mid, _)
+        | CoreOp::ControlFlow(mid, _, _) => mid == method_id,
+        _ => false,
+    }
+}
+
+/// After a ctor pattern's consumed span, the wrapper consumes the run of
+/// immediately adjacent `Flags(method_id)` ops (established contract). If any
+/// op AFTER that flag run still references `method_id`, compression would
+/// orphan it — the caller must decline.
+fn trailing_region_references_method(slice: &[CoreOp], offset: usize, method_id: &str) -> bool {
+    let mut idx = offset;
+    while idx < slice.len() {
+        match &slice[idx] {
+            CoreOp::Flags(mid, _) if mid == method_id => idx += 1,
+            _ => break,
+        }
+    }
+    slice
+        .get(idx)
+        .is_some_and(|op| op_is_unrepresentable_method_ref(op, method_id))
+}
+
 /// Try to match and consume a pattern at the start of `slice`.
 ///
 /// Centralized wrapper that enforces the invariant:
@@ -576,6 +615,14 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
         return None;
     }
 
+    // Orphan guard: if anything after the consumed span (past the wrapper's
+    // trailing-Flags run) still references this method, the region cannot be
+    // compressed without orphaning the reference — decline and leave the
+    // original valid sequence in place.
+    if trailing_region_references_method(slice, idx, &method_id) {
+        return None;
+    }
+
     Some((
         PatternOp::Constructor {
             class_id,
@@ -599,6 +646,11 @@ fn try_empty_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
     };
     if let CoreOp::Return(mid, _) = &slice[1] {
         if mid == &method_id {
+            // Orphan guard (same contract as try_ctor_pattern): decline when
+            // the region after DEF_M + RET still references this method.
+            if trailing_region_references_method(slice, 2, &method_id) {
+                return None;
+            }
             return Some((
                 PatternOp::EmptyConstructor {
                     class_id,

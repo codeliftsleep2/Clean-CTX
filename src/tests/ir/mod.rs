@@ -26,3 +26,11 @@ mod rust_integration;
 #[cfg(feature = "rust")]
 #[path = "rust_stats_integration.rs"]
 mod rust_stats_integration;
+
+// RED->GREEN regression: ctor-pattern consumption orphaning M-referencing
+// annotations (Issue #36 / Addendum #37). The ctor patterns decline
+// compression when the region after the span still references the method —
+// PatternOp cannot represent those annotations, so the original valid
+// sequence is preserved.
+#[path = "regression_ctor_pattern_orphan.rs"]
+mod regression_ctor_pattern_orphan;

@@ -46,6 +46,45 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-002: IR Consumptive Pattern Compression Orphaning Method Identities
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-03 |
+| **Environment** | Claude + Clean-CTX IR pipeline (production `PassPipeline::default_production()`) |
+| **Repository/context** | Real Angular workspace; a component constructor calling `.subscribe()` (DI param + RxJS callbacks in body). |
+| **Symptom** | IR compilation failed with `[E007] DATAFLOW references unknown method 'M16'; [E003] FLAGS references unknown method 'M16'` — the compile itself returned `Err`, not merely corrupt output. |
+| **Root cause** | The consumptive CTOR pattern compressed `DefMethod(M)` into `Pattern(CTOR, ..., M)` while leaving surviving `DataFlow(M, ...`/`Flags(M, ...)` ops with no valid owner. The validator registers method identities ONLY from `DefMethod`; `PatternOp` has no payload slot for DataFlow / SideEffect / ExecutionContext / ControlFlow facts. The first invalid state was created by CTOR pattern compression — NOT by TypeScript extraction (the pre-pattern stream was fully valid)and NOT by validation. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/ir/regression_ctor_pattern_orphan.rs` (covers CTOR, EMPTY_CTOR, and the original orphan scenario) |
+| **Live scenario required?** | No |
+| **Architectural invariant** | IR identity-preservation invariant for consumptive pattern transformations |
+| **Status** | Fixed |
+
+**Distillation note:** nested-callback depth alone was ruled out; the four initially suspected AST candidates (bare arrow parameter, nested plain callback, optional chaining, destructuring) were all ruled out;and the TypeScript constructor/arrow capture-kind coverage gap remains a **separate** issue, NOT causal. The fix deliberately declines CTOR / EMPTY_CTOR compression when an unrepresentable M-reference exists; healthy CTOR compression remains intact when only representable trailing `Flags` are present.
+
+**Architectural invariant (IR pattern-transformation layer, framework/language-agnostic):**
+
+> A consumptive IR pattern must never consume a `DefMethod(M)` while leaving behind surviving IR operations that reference `M` without preserving a valid representation/ownership relationship. If a consumptive pattern cannot represent an M-referencing operation (`DataFlow`, `SideEffect`, `ExecutionContext`, `ControlFlow`) within the resulting pattern representation, it must decline compression rather than consume the `DefMethod` and orphan the reference.
+
+
+
+Evidence (minimal trigger: constructor with ≥1 DI parameter + `.subscribe()` in its body):
+
+```text
+Pre-pattern (valid):                   After faulty CTOR compression (invalid):
+  DefMethod(M)                          Pattern(CTOR,, M)
+  Param(M, ...)                         DataFlow(M,, ...)
+  Return(M, ...)                       Flags(M,, ...)
+  Flags(M,, ...)
+  DataFlow(M,, ...)
+  Flags(M,, ...)
+
+Result: [E007] DATAFLOW references unknown method M; [E003] FLAGS references unknown method M
+```
+
+---
 ## DIS-2026-001: workspace_query MCP Response Envelope Bypass
 
 | Field | Value |

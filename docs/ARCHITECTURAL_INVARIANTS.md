@@ -212,6 +212,18 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Gate** | `cargo test` |
 
 ---
+### IRPAT-001 IR Identity Preservation During Consumptive Pattern Transformations
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Consumptive IR pattern compression must never corrupt the method-identity ownership relationship between a compressed `DefMethod` and the annotations that reference it. |
+| **Invariant** | A consumptive IR pattern transformation must not consume a `DefMethod(M)` while leaving surviving IR operations that reference `M` without a valid representation/ownership relationship. If an M-referencing operation cannot be represented within the resulting `PatternOp`, the pattern must decline compression rather than consume the `DefMethod` and orphan the reference. The currently relevant M-referencing operation kinds are `DataFlow`, `SideEffect`, `ExecutionContext`, and `ControlFlow` — but the invariant governs ANY future M-referencing op kind. This is an **IR transformation invariant**, not a rule specific to Angular, TypeScript, constructors, or RxJS. |
+| **Enforcement** | `CompressingPatternRecognizer` declines CTOR/EMPTY_CTOR compression when an unrepresentable M-reference survives after the pattern's consumed span (see `try_ctor_pattern` / `try_empty_ctor_pattern` orphan guards in `src/ir/patterns.rs`). Regression: `src/tests/ir/regression_ctor_pattern_orphan.rs` (covers CTOR with DI+subscribe+control flow, CTOR with subscribe, EMPTY_CTOR with subscribe, the stream-level orphan invariant, and healthy-compression controls). |
+| **Authority** | `src/ir/patterns.rs` (`op_is_unrepresentable_method_ref`, `trailing_region_references_method`, orphan guards); regression `src/tests/ir/regression_ctor_pattern_orphan.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
 
 ## Architectural Debt
 
