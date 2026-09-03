@@ -821,6 +821,86 @@ fn assert_builtin_entity(
         .collect()
 }
 
+/// Query `forward_edges` through the MCP dispatch and return the edges array.
+fn query_forward_edges(
+    state: &crate::mcp::McpState,
+    domain: &str,
+    entity_type: &str,
+    name: &str,
+) -> serde_json::Value {
+    let params = json!({
+        "arguments": {
+            "type": "forward_edges",
+            "domain": domain,
+            "entity_type": entity_type,
+            "name": name
+        }
+    });
+    crate::protocol::captured_responses().clear();
+    dispatch_tools_call(&json!(1), "workspace_query", &params, state);
+    let resp = pop_response();
+    assert!(
+        resp.get("result").is_some(),
+        "forward_edges should succeed for {domain}/{name}: {resp:?}"
+    );
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
+    sc["edges"].clone()
+}
+
+/// Query `entities_in_file` through the MCP dispatch and return the entity
+/// array.
+fn query_entities_in_file(
+    state: &crate::mcp::McpState,
+    file_path: &str,
+    workspace_root: &std::path::Path,
+) -> serde_json::Value {
+    let params = json!({
+        "arguments": {
+            "type": "entities_in_file",
+            "file_path": file_path,
+            "workspaceRoot": workspace_root.to_string_lossy().to_string()
+        }
+    });
+    crate::protocol::captured_responses().clear();
+    dispatch_tools_call(&json!(1), "workspace_query", &params, state);
+    let resp = pop_response();
+    assert!(
+        resp.get("result").is_some(),
+        "entities_in_file should succeed for {file_path}: {resp:?}"
+    );
+    let result = resp["result"].as_object().expect("result object");
+    assert_valid_mcp_envelope(result);
+    let sc = result["structuredContent"]
+        .as_object()
+        .expect("structuredContent");
+    sc["entities"].clone()
+}
+
+/// Does the edges array contain an edge with the given relation whose object
+/// is the exact (domain, entity_type, name) entity?
+fn edges_contain_to(
+    edges: &serde_json::Value,
+    relation: &str,
+    domain: &str,
+    entity_type: &str,
+    name: &str,
+) -> bool {
+    edges
+        .as_array()
+        .unwrap_or_else(|| panic!("expected edges array, got {edges}"))
+        .iter()
+        .any(|e| {
+            e["relation"].as_str() == Some(relation)
+                && e["object"]["domain"].as_str() == Some(domain)
+                && e["object"]["entity_type"].as_str() == Some(entity_type)
+                && e["object"]["name"].as_str() == Some(name)
+        })
+}
+
 // Test 1 — plain class end-to-end.
 #[test]
 fn builtin_plain_class_end_to_end() {
@@ -1062,6 +1142,98 @@ fn builtin_declaration_coverage() {
             entities
         );
     }
+}
+
+// Test 6 — decorated TS class + corrected NgRx semantic names through the
+// real production path. The builtin layer must register the decorated
+// declaration's real name (`ShellComponent`, not the `@Component(...)`
+// decorator head), and the NgRx edges must carry the corrected semantic
+// names (`panelState`, `TOGGLE_PANEL`) while preserving the action-creator
+// form (`someAction`).
+#[test]
+fn builtin_decorated_class_and_ngrx_semantic_names_production_path() {
+    use tempfile::TempDir;
+
+    let dir = TempDir::new().unwrap();
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    let rel = "widget-shell.component.ts";
+    let source = r#"
+import { Component } from '@angular/core';
+import { Store } from '@ngrx/store';
+import { TOGGLE_PANEL, someAction } from '../store/actions';
+
+@Component({ selector: 'widget-shell' })
+export class ShellComponent {
+  constructor(private store: Store) {}
+
+  ngOnInit() {
+    this.store.pipe(select('panelState'));
+    this.store.dispatch({ type: TOGGLE_PANEL });
+    this.store.dispatch(someAction());
+  }
+}
+"#;
+    compile_via_provide_code_context(&dir, &state, rel, source);
+
+    // The builtin Class for the decorated TS declaration must carry the real
+    // class name — never the `@Component(...)` decorator head.
+    let entities = find_entities(&state, "ShellComponent");
+    let matches = assert_builtin_entity(&entities, "Class", "ShellComponent");
+    assert_eq!(
+        matches.len(),
+        1,
+        "decorated TS class must register a builtin Class named ShellComponent: {}",
+        entities
+    );
+
+    // No decorator-truncated builtin name may be registered for this file.
+    let in_file = query_entities_in_file(&state, rel, dir.path());
+    let garbage = in_file
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| {
+            e["domain"].as_str() == Some("builtin")
+                && e["name"]
+                    .as_str()
+                    .map(|n| n.starts_with('@') || n.starts_with('['))
+                    .unwrap_or(false)
+        })
+        .count();
+    assert_eq!(
+        garbage, 0,
+        "no decorator-truncated builtin entity may be registered: {}",
+        in_file
+    );
+
+    // The corrected NgRx semantic names must survive into the workspace
+    // index under the component subject.
+    let edges = query_forward_edges(&state, "angular", "Component", "ShellComponent");
+    assert!(
+        edges_contain_to(&edges, "Selects", "ngrx", "Selector", "panelState"),
+        "select('panelState') must index a Selects edge to panelState: {}",
+        edges
+    );
+    assert!(
+        edges_contain_to(&edges, "Dispatches", "ngrx", "Action", "TOGGLE_PANEL"),
+        "dispatch({{ type: TOGGLE_PANEL }}) must index a Dispatches edge to TOGGLE_PANEL: {}",
+        edges
+    );
+    assert!(
+        edges_contain_to(&edges, "Dispatches", "ngrx", "Action", "someAction"),
+        "dispatch(someAction()) must keep indexing an edge to someAction: {}",
+        edges
+    );
+    assert!(
+        !edges_contain_to(&edges, "Selects", "ngrx", "Selector", "'panelState'"),
+        "the raw quoted selector slice must never reach the index: {}",
+        edges
+    );
+    assert!(
+        !edges_contain_to(&edges, "Dispatches", "ngrx", "Action", "{"),
+        "the object-literal opening brace must never reach the index: {}",
+        edges
+    );
 }
 
 // ── outputSchema contract ─────────────────────────────────────────────

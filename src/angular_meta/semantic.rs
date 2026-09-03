@@ -63,7 +63,7 @@ pub fn class_to_semantic_edges(
             edges.push(SemanticEdge {
                 relation: SemanticRelation::HasSelector,
                 subject: subject.clone(),
-                object: EntityRef::new("angular", "Component", format!("[{}]", sel)),
+                object: EntityRef::new("angular", "Component", sel),
                 layer: "angular",
             });
         }

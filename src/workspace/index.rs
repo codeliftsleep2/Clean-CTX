@@ -511,14 +511,17 @@ impl WorkspaceIndex {
     /// Resolve a CSS selector string to component/directive entity
     /// occurrences that expose that selector.
     ///
-    /// Algorithm: selector → `[selector]` marker entity → incoming
+    /// Algorithm: selector → selector entity (by literal name) → incoming
     /// `HasSelector` edges → subject entity occurrences.
+    ///
+    /// The selector is stored verbatim in the `HasSelector` object's
+    /// `EntityRef.name` (Selector-Value Invariant); no lookup encoding is
+    /// applied here.
     ///
     /// Returns all matching entity occurrences. Preserves ambiguity and
     /// insertion order.
     pub fn resolve_selector(&self, selector: &str) -> Vec<&EntityRef> {
-        let marker_name = format!("[{}]", selector);
-        let marker_keys = match self.name_index.get(&marker_name) {
+        let marker_keys = match self.name_index.get(selector) {
             Some(k) => k,
             None => return Vec::new(),
         };

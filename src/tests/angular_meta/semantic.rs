@@ -457,6 +457,181 @@ export class UserComponent {
     );
 }
 
+// ── HasSelector literal selector-value regression ────────────────────
+// The HasSelector object's EntityRef.name MUST be the exact CSS selector
+// string declared in the @Component decorator, without any artificial
+// encoding (no bracket marker, no normalization). Three distinct selector
+// forms MUST remain distinct.
+
+#[test]
+fn has_selector_preserves_literal_selector_forms() {
+    // Element selector: selector: 'app-widget'
+    let element_source = r#"
+import { Component } from '@angular/core';
+@Component({ selector: 'app-widget' })
+export class WidgetComponent {}
+"#;
+    // Attribute selector: selector: '[app-widget]'
+    let attribute_source = r#"
+import { Component } from '@angular/core';
+@Component({ selector: '[app-widget]' })
+export class WidgetComponent {}
+"#;
+    // Class selector: selector: '.app-widget'
+    let class_source = r#"
+import { Component } from '@angular/core';
+@Component({ selector: '.app-widget' })
+export class WidgetComponent {}
+"#;
+
+    let layer = AngularMetaLayer::new();
+
+    let element_edges = layer.extract_semantic_edges(
+        element_source,
+        &[element_source.to_string()],
+        Fidelity::High,
+        None,
+    );
+    let attribute_edges = layer.extract_semantic_edges(
+        attribute_source,
+        &[attribute_source.to_string()],
+        Fidelity::High,
+        None,
+    );
+    let class_edges = layer.extract_semantic_edges(
+        class_source,
+        &[class_source.to_string()],
+        Fidelity::High,
+        None,
+    );
+
+    // Element selector: stored verbatim, no wrapping.
+    let element_sel = element_edges
+        .iter()
+        .find(|e| e.relation == SemanticRelation::HasSelector)
+        .expect("element selector edge must exist");
+    assert_eq!(
+        element_sel.object,
+        EntityRef::new("angular", "Component", "app-widget"),
+        "element selector 'app-widget' must be stored as the bare string"
+    );
+
+    // Attribute selector: stored verbatim, including its square brackets.
+    let attribute_sel = attribute_edges
+        .iter()
+        .find(|e| e.relation == SemanticRelation::HasSelector)
+        .expect("attribute selector edge must exist");
+    assert_eq!(
+        attribute_sel.object,
+        EntityRef::new("angular", "Component", "[app-widget]"),
+        "attribute selector '[app-widget]' must be stored verbatim, not double-bracketed"
+    );
+
+    // Class selector: stored verbatim, including its leading dot.
+    let class_sel = class_edges
+        .iter()
+        .find(|e| e.relation == SemanticRelation::HasSelector)
+        .expect("class selector edge must exist");
+    assert_eq!(
+        class_sel.object,
+        EntityRef::new("angular", "Component", ".app-widget"),
+        "class selector '.app-widget' must be stored verbatim"
+    );
+
+    // The three forms MUST remain distinct semantic identities.
+    assert_ne!(
+        element_sel.object, attribute_sel.object,
+        "element selector 'app-widget' and attribute selector '[app-widget]' must be distinct"
+    );
+    assert_ne!(
+        element_sel.object, class_sel.object,
+        "element selector 'app-widget' and class selector '.app-widget' must be distinct"
+    );
+    assert_ne!(
+        attribute_sel.object, class_sel.object,
+        "attribute selector '[app-widget]' and class selector '.app-widget' must be distinct"
+    );
+}
+
+// ── Phase 4e: NgRx site-name semantic values ──────────────────────────
+//   - `select('panelState')` surfaces the value `panelState`
+//     (not the raw `'panelState'` source slice)
+//   - `dispatch({ type: TOGGLE_PANEL })` surfaces `TOGGLE_PANEL`
+//     (not the opening `{`)
+//   - `dispatch(someAction())` keeps surfacing `someAction`
+
+#[test]
+fn ngrx_site_names_quoted_select_and_object_literal_dispatch() {
+    let source = r#"
+import { Component } from '@angular/core';
+import { Store } from '@ngrx/store';
+import { TOGGLE_PANEL, someAction } from '../store/actions';
+
+@Component({ selector: 'widget-shell' })
+export class ShellComponent {
+    collapsed$ = this.store.pipe(select('panelState'));
+
+    constructor(private store: Store) {}
+
+    ngOnInit() {
+        this.store.dispatch({ type: TOGGLE_PANEL });
+        this.store.dispatch(someAction());
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    // Selects: the quoted literal's semantic value, never the raw slice.
+    let selects: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Selects)
+        .collect();
+    assert_eq!(selects.len(), 1, "exactly one Selects edge expected");
+    assert_eq!(
+        selects[0].object,
+        EntityRef::new("ngrx", "Selector", "panelState"),
+        "select('panelState') must surface the literal value panelState, \
+         not the raw 'panelState' source slice"
+    );
+
+    // Dispatches: object-literal and action-creator forms, each exactly once.
+    let dispatches: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Dispatches)
+        .collect();
+    assert_eq!(
+        dispatches.len(),
+        2,
+        "object-literal and action-creator dispatch each produce one edge"
+    );
+    assert!(
+        dispatches
+            .iter()
+            .all(|e| e.subject == EntityRef::new("angular", "Component", "ShellComponent")),
+        "dispatcher subject must be the component class"
+    );
+    assert!(
+        dispatches
+            .iter()
+            .any(|e| e.object == EntityRef::new("ngrx", "Action", "TOGGLE_PANEL")),
+        "dispatch({{ type: TOGGLE_PANEL }}) must surface the TOGGLE_PANEL action"
+    );
+    assert!(
+        dispatches
+            .iter()
+            .any(|e| e.object == EntityRef::new("ngrx", "Action", "someAction")),
+        "dispatch(someAction()) must keep surfacing the someAction action"
+    );
+    assert!(
+        dispatches
+            .iter()
+            .all(|e| e.object != EntityRef::new("ngrx", "Action", "{")),
+        "the object-literal opening brace must never become an action name"
+    );
+}
+
 // ── Phase 4d: NgModule DeclaresInModule precision ──────────────────
 
 #[test]

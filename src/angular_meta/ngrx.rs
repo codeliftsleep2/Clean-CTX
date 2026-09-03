@@ -1567,26 +1567,27 @@ fn extract_call_sites(source: &str, shape: &mut NgRxShape) {
             let (body, end_offset) =
                 crate::angular_meta::util::collect_call_body(&source[after_start..]);
 
-            // The action/selector name is the first identifier in the body
-            // (e.g. `loadUsersSuccess({ users })` → `loadUsersSuccess`;
-            // `selectUser({ id })` → `selectUser`).
-            let first_ident = body
-                .trim_start()
-                .split(['(', ',', ' ', '\t', '\n', '\r'])
-                .next()
-                .map(|s| s.trim().to_string())
-                .unwrap_or_default();
+            // The semantic site name depends on the call-site flavour:
+            //   - Dispatch action creator (`someAction()`) -> `someAction`
+            //   - Dispatch object literal (`{ type: TOGGLE_PANEL }`) ->
+            //     `TOGGLE_PANEL`
+            //   - Select / PipeSelect identifier or quoted literal
+            //     (`selectAllUsers` / `'panelState'`) -> semantic value
+            let site_name = match kind {
+                SiteKind::Dispatch => dispatch_action_name(&body),
+                SiteKind::Select | SiteKind::PipeSelect => select_selector_name(&body),
+            };
 
-            if !first_ident.is_empty() {
+            if let Some(name) = site_name {
                 match kind {
                     SiteKind::Dispatch => {
-                        shape.dispatch_sites.push(DispatchSite {
-                            action_name: first_ident,
-                        });
+                        shape
+                            .dispatch_sites
+                            .push(DispatchSite { action_name: name });
                     }
                     SiteKind::Select | SiteKind::PipeSelect => {
                         shape.select_sites.push(SelectSite {
-                            selector_name: first_ident,
+                            selector_name: name,
                         });
                     }
                 }
@@ -1595,6 +1596,105 @@ fn extract_call_sites(source: &str, shape: &mut NgRxShape) {
             search_from = after_start + end_offset;
         }
     }
+}
+
+/// First token of a call body slice under the established site-name split
+/// semantics: the segment before the first `(`, `,`, or whitespace.
+///
+/// Examples:
+///   `someAction()`       -> `someAction`
+///   `selectAllUsers`     -> `selectAllUsers`
+///   `selectUser({ id })` -> `selectUser`
+fn first_body_token(body: &str) -> Option<String> {
+    let token = body
+        .trim_start()
+        .split(['(', ',', ' ', '\t', '\n', '\r'])
+        .next()
+        .map(|s| s.trim())
+        .unwrap_or_default();
+    if token.is_empty() {
+        None
+    } else {
+        Some(token.to_string())
+    }
+}
+
+/// Derive the semantic selector name for a `select(...)` / `pipe(select(...))`
+/// call body (the raw slice between the outer parens).
+///
+/// Supported forms (the established contract, plus quoted literals):
+///   `selectAllUsers`   -> `selectAllUsers` (identifier)
+///   `'panelState'`     -> `panelState`    (quoted string literal)
+///   `"panelState"`     -> `panelState`
+///
+/// A whole-token quoted literal is surfaced as its unquoted content so the
+/// semantic value is the literal's value rather than a raw source slice.
+fn select_selector_name(body: &str) -> Option<String> {
+    let token = first_body_token(body)?;
+    if token.len() >= 2
+        && ((token.starts_with('\'') && token.ends_with('\''))
+            || (token.starts_with('"') && token.ends_with('"')))
+    {
+        return Some(token[1..token.len() - 1].to_string());
+    }
+    Some(token)
+}
+
+/// Derive the action name for a `dispatch(...)` call body (raw slice between
+/// the outer parens).
+///
+/// Supported forms:
+///   `someAction()`           -> `someAction`    (action creator)
+///   `{ type: TOGGLE_PANEL }` -> `TOGGLE_PANEL`  (object literal)
+///
+/// The object-literal form requires a bare-identifier-valued `type`
+/// property; anything else yields `None` so unsupported object literals are
+/// skipped rather than emitting punctuation or fabricated names.
+fn dispatch_action_name(body: &str) -> Option<String> {
+    let trimmed = body.trim_start();
+    if trimmed.starts_with('{') {
+        return object_literal_action_name(trimmed);
+    }
+    first_body_token(body)
+}
+
+/// Extract the action name from the established NgRx object-literal action
+/// form `{ type: TOGGLE_PANEL }`.
+///
+/// Only the `type` property with a bare identifier value is accepted. No
+/// general object/expression parsing is performed — anything outside this
+/// shape returns `None`.
+fn object_literal_action_name(trimmed_body: &str) -> Option<String> {
+    let close = crate::meta_util::find_matching_brace(trimmed_body, '{')?;
+    if close <= 1 {
+        return None;
+    }
+    let inner = &trimmed_body[1..close];
+    for part in crate::meta_util::split_top_level(inner, ',') {
+        let (key, value) = match part.split_once(':') {
+            Some((k, v)) => (k.trim(), v.trim()),
+            None => continue,
+        };
+        let key = key.trim_matches(|c| c == '"' || c == '\'');
+        if key != "type" {
+            continue;
+        }
+        // The established form requires a bare identifier value.
+        return is_identifier(value).then_some(value.to_string());
+    }
+    None
+}
+
+/// A valid bare identifier (JavaScript-style, Unicode-aware). Used to
+/// validate object-literal `type` values so punctuation, member expressions,
+/// and other non-action shapes never become action identities.
+fn is_identifier(s: &str) -> bool {
+    let mut chars = s.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first.is_alphabetic() || first == '_' || first == '$')
+        && chars.all(|c| c.is_alphanumeric() || c == '_' || c == '$')
 }
 
 /// The flavour of store call site extracted by [`extract_call_sites`].

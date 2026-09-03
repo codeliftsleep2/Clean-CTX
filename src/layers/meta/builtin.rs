@@ -117,13 +117,20 @@ impl MetaLayer for BuiltinMetaLayer {
 /// Extract the bare declaration name using the existing class-name extraction
 /// infrastructure (`src/compaction/class.rs`). No new parsing logic.
 fn declaration_name(capture_name: &str, raw_class: &str) -> String {
+    // C-22 class spans are decorator/annotation-inclusive by design. The
+    // shared class-name extractors assume the declaration header is
+    // reachable from byte 0, so trim any leading `@Decorator(...)` /
+    // `@Annotation` group (TypeScript decorators, Java annotations) before
+    // delegating. C# `[Attribute]` prefixes are handled inside the shared
+    // extractor itself.
+    let declaration_root = strip_leading_annotations(raw_class);
     let extracted = match capture_name {
         // Only Rust emits `trait.root`; its traits/structs/enums go through
         // the Rust-aware extractor (`pub`-prefix stripping).
-        "trait.root" => crate::compaction::class::extract_rust_struct_name(raw_class),
+        "trait.root" => crate::compaction::class::extract_rust_struct_name(declaration_root),
         // Every other supported type root shares the class-like declaration
         // shape (modifiers + keyword + optional base list).
-        _ => crate::compaction::class::extract_class_name(raw_class),
+        _ => crate::compaction::class::extract_class_name(declaration_root),
     };
     // Collapse to the bare entity identity name:
     //   - "Foo:Base" / "Foo:Base,IFoo" (extract_class_name appends a TS
@@ -138,4 +145,52 @@ fn declaration_name(capture_name: &str, raw_class: &str) -> String {
         .unwrap_or("")
         .trim()
         .to_string()
+}
+
+/// Strip leading `@Decorator(...)` / `@Annotation` groups from a class span.
+///
+/// The builtin layer receives decorator/annotation-inclusive source spans by
+/// design (invariant C-22: `class_source_from_capture`). TypeScript
+/// decorators (`@Component({...})`) and Java annotations (`@RestController`)
+/// precede the declaration with `@`-prefixed groups that the shared
+/// class-name extractors do not understand (their attribute stripping covers
+/// C# `[...]` only). This trims every leading `@` group — with or without a
+/// balanced `(...)` argument list — so the remaining text starts at the
+/// declaration header (`export class ...`, `public class ...`).
+///
+/// Generic by construction: no framework vocabulary is consulted.
+fn strip_leading_annotations(text: &str) -> &str {
+    let mut rest = text.trim_start();
+    loop {
+        if !rest.starts_with('@') {
+            return rest;
+        }
+        // Advance past the annotation name (identifier, optionally dotted).
+        let bytes = rest.as_bytes();
+        let mut name_end = 1;
+        while name_end < bytes.len()
+            && (bytes[name_end] == b'.'
+                || bytes[name_end].is_ascii_alphanumeric()
+                || bytes[name_end] == b'_'
+                || bytes[name_end] == b'$')
+        {
+            name_end += 1;
+        }
+        // Optional balanced argument group: `@Name(...)`.
+        if name_end < bytes.len() && bytes[name_end] == b'(' {
+            let group = &rest[name_end..];
+            match crate::meta_util::find_matching_brace(group, '(') {
+                Some(close) => {
+                    rest = rest[name_end + close + 1..].trim_start();
+                    continue;
+                }
+                // Unbalanced argument group — leave the text unchanged
+                // (defensive; the shared extractor fails safe too).
+                None => return rest,
+            }
+        }
+        // Bare annotation (`@Name`) — advance past the name so stacked
+        // annotations are all consumed.
+        rest = rest[name_end..].trim_start();
+    }
 }

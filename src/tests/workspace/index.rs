@@ -452,7 +452,7 @@ fn resolve_selector_returns_component_with_matching_selector() {
     let edge = SemanticEdge {
         relation: SemanticRelation::HasSelector,
         subject: EntityRef::new("angular", "Component", "UserCardComponent"),
-        object: EntityRef::new("angular", "Component", "[app-user-card]"),
+        object: EntityRef::new("angular", "Component", "app-user-card"),
         layer: "angular",
     };
     idx.add_edges("user-card.ts", vec![edge]);
@@ -494,7 +494,7 @@ fn resolve_selector_file_provenance_preserved() {
         object: EntityRef {
             domain: "angular",
             entity_type: "Component",
-            name: "[app-header]".to_string(),
+            name: "app-header".to_string(),
             file: None,
         },
         layer: "angular",
@@ -504,6 +504,70 @@ fn resolve_selector_file_provenance_preserved() {
     let results = idx.resolve_selector("app-header");
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].file.as_deref(), Some("header.component.ts"));
+}
+
+// ── HasSelector literal-value regression ─────────────────────────────
+// resolve_selector() MUST match against the literal selector string stored
+// by the HasSelector edge, with no bracket encoding. The three distinct
+// selector forms MUST resolve independently.
+
+#[test]
+fn resolve_selector_literal_forms_are_distinct() {
+    let mut idx = WorkspaceIndex::new();
+
+    // Three components, each with a different selector form.
+    let element_edge = SemanticEdge {
+        relation: SemanticRelation::HasSelector,
+        subject: EntityRef::new("angular", "Component", "ElementComp"),
+        object: EntityRef::new("angular", "Component", "app-widget"),
+        layer: "angular",
+    };
+    let attribute_edge = SemanticEdge {
+        relation: SemanticRelation::HasSelector,
+        subject: EntityRef::new("angular", "Component", "AttributeComp"),
+        object: EntityRef::new("angular", "Component", "[app-widget]"),
+        layer: "angular",
+    };
+    let class_edge = SemanticEdge {
+        relation: SemanticRelation::HasSelector,
+        subject: EntityRef::new("angular", "Component", "ClassComp"),
+        object: EntityRef::new("angular", "Component", ".app-widget"),
+        layer: "angular",
+    };
+    idx.add_edges(
+        "selectors.ts",
+        vec![element_edge, attribute_edge, class_edge],
+    );
+
+    // Element selector resolves with bare name.
+    let element_results = idx.resolve_selector("app-widget");
+    assert_eq!(element_results.len(), 1);
+    assert_eq!(element_results[0].name, "ElementComp");
+
+    // Attribute selector resolves with bracketed form.
+    let attribute_results = idx.resolve_selector("[app-widget]");
+    assert_eq!(attribute_results.len(), 1);
+    assert_eq!(attribute_results[0].name, "AttributeComp");
+
+    // Class selector resolves with dotted form.
+    let class_results = idx.resolve_selector(".app-widget");
+    assert_eq!(class_results.len(), 1);
+    assert_eq!(class_results[0].name, "ClassComp");
+
+    // Cross-form lookups MUST NOT match.
+    assert!(
+        idx.resolve_selector("app-widget").len() == 1
+            && idx.resolve_selector("app-widget")[0].name == "ElementComp",
+        "bare 'app-widget' must resolve only the element selector"
+    );
+    assert!(
+        idx.resolve_selector("[app-widget]").len() == 1
+            && idx.resolve_selector("[app-widget]")[0].name == "AttributeComp",
+        "'[app-widget]' must resolve only the attribute selector"
+    );
+
+    // Unknown selector returns empty.
+    assert!(idx.resolve_selector("nonexistent").is_empty());
 }
 
 // ── Phase 4b: Phase 4a regression ───────────────────────────────────
@@ -1029,7 +1093,7 @@ fn resolve_selector_unique_despite_subject_multi_edge() {
     let selector = SemanticEdge {
         relation: SemanticRelation::HasSelector,
         subject: EntityRef::new("angular", "Component", "UserCard"),
-        object: EntityRef::new("angular", "Component", "[app-user-card]"),
+        object: EntityRef::new("angular", "Component", "app-user-card"),
         layer: "angular",
     };
     idx.add_edges(
@@ -1322,7 +1386,7 @@ fn transitive_deps_structural_not_traversed_has_selector() {
     let sel_edge = SemanticEdge {
         relation: SemanticRelation::HasSelector,
         subject: EntityRef::new("angular", "Component", "UserCard"),
-        object: EntityRef::new("angular", "Component", "[app-user-card]"),
+        object: EntityRef::new("angular", "Component", "app-user-card"),
         layer: "angular",
     };
     idx.add_edges("a.ts", vec![sel_edge]);
@@ -1362,7 +1426,7 @@ fn phase_4b_resolve_selector_unchanged() {
     let sel_edge = SemanticEdge {
         relation: SemanticRelation::HasSelector,
         subject: EntityRef::new("angular", "Component", "C"),
-        object: EntityRef::new("angular", "Component", "[app-c]"),
+        object: EntityRef::new("angular", "Component", "app-c"),
         layer: "angular",
     };
     idx.add_edges("a.ts", vec![sel_edge]);
