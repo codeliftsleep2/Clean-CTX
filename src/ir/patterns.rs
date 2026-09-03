@@ -439,17 +439,27 @@ fn count_trailing_flags(slice: &[CoreOp], offset: usize, method_id: &str) -> usi
 /// method identities ONLY from `DefMethod` — a `Pattern` op does not
 /// re-register the identity, and its payload (class id, method id, deps,
 /// return type, property) cannot carry DataFlow / SideEffect /
-/// ExecutionContext / ControlFlow facts. Consuming `DefMethod(M)` while such
+/// ExecutionContext / ControlFlow / Body facts. Consuming `DefMethod(M)` while such
 /// an op survives after the consumed span would orphan it (E007/E008/E009/
-/// E010), so the ctor patterns must DECLINE compression for that region,
-/// leaving the original — fully valid and fully annotated — instruction
-/// sequence in place.
+/// E010, and E003 for the trailing `Flags` run the Body op detaches from the
+/// consumed span — DIS-2026-003), so the ctor patterns must DECLINE
+/// compression for that region, leaving the original — fully valid and fully
+/// annotated — instruction sequence in place.
+///
+/// DIS-2026-003: `Body(M, ...)` is emitted by the language layer at
+/// Edit+ fidelity, between a constructor's `Return(M)` and its trailing
+/// `Flags(M, ["PRIVATE"])` (parameter property). The `Body` op breaks the
+/// wrapper's adjacent trailing-Flags run, so `Flags(M)` is no longer
+/// adjacent to the consumed span and cannot be consumed by the wrapper.
+/// Treating `Body(M)` as unrepresentable makes the orphan guard decline
+/// compression for that region, preserving the full valid sequence.
 fn op_is_unrepresentable_method_ref(op: &CoreOp, method_id: &str) -> bool {
     match op {
         CoreOp::DataFlow(mid, _, _)
         | CoreOp::SideEffect(mid, _)
         | CoreOp::ExecutionContext(mid, _)
-        | CoreOp::ControlFlow(mid, _, _) => mid == method_id,
+        | CoreOp::ControlFlow(mid, _, _)
+        | CoreOp::Body(mid, _, _, _) => mid == method_id,
         _ => false,
     }
 }

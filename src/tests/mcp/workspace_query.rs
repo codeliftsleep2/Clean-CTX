@@ -1164,6 +1164,8 @@ import { TOGGLE_PANEL, someAction } from '../store/actions';
 
 @Component({ selector: 'widget-shell' })
 export class ShellComponent {
+  constructor(private store: Store) {}
+
   ngOnInit() {
     this.store.pipe(select('panelState'));
     this.store.dispatch({ type: TOGGLE_PANEL });

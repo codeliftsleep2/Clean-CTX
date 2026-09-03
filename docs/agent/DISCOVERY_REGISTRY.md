@@ -96,10 +96,12 @@ Result: [E007] DATAFLOW references unknown method M; [E003] FLAGS references unk
 | **Root cause** | The consumptive CTOR pattern compressed the empty constructor's `DefMethod(M)` into `Pattern(CTOR, ..., M)` while leaving surviving IR operations that reference a different method (`ngOnInit`, M5) without a valid owner. The existing CTOR orphan-prevention fix (DIS-2026-002) covers the case where unrepresentable M-referencing operations exist within the constructor body, but not the case where the constructor is empty and the references belong to a separate method. |
 | **Classification** | Semantic |
 | **Reproducible locally?** | Yes |
-| **Local regression** | `src/tests/mcp/workspace_query.rs::builtin_decorated_class_and_ngrx_semantic_names_production_path` (fixture reshaped to avoid trigger) |
+| **Local regression** | `src/tests/ir/regression_ctor_pattern_orphan.rs::edit_fidelity_param_property_ctor_does_not_orphan_flags` (compiler-level regression at Fidelity::Edit); `src/tests/mcp/workspace_query.rs::builtin_decorated_class_and_ngrx_semantic_names_production_path` (production-path fixture restored with the empty constructor) |
 | **Live scenario required?** | No |
-| **Architectural invariant** | Same as DIS-2026-002: IR identity-preservation for consumptive pattern transformations |
-| **Status** | Open (workaround: fixture reshaping) |
+| **Architectural invariant** | Same as DIS-2026-002 (IRPAT-001): IR identity-preservation for consumptive pattern transformations |
+| **Status** | Fixed |
+
+**Fix (2026-09-04):** `op_is_unrepresentable_method_ref` in `src/ir/patterns.rs` now treats `Body(M, ...)` as an unrepresentable M-referencing operation, alongside `DataFlow`, `SideEffect`, `ExecutionContext`, and `ControlFlow`. At Edit fidelity the TS language layer emits `Body(M)` between a constructor's `Return(M)` and its trailing `Flags(M, ["PRIVATE"])` (parameter property); the `Body` op breaks the wrapper's adjacent trailing-Flags run, so `Flags(M)` would survive as an orphan (E003) if compression consumed `DefMethod(M)`. The extended guard makes the CTOR/EMPTY_CTOR patterns decline compression for that region, preserving the full valid sequence. The production-path fixture (empty constructor restored) and the new compiler-level Edit-fidelity regression both pass.
 
 **Distillation note:** This defect predates the selector-representation fix and is unrelated to it. The existing CTOR orphan-prevention fix (DIS-2026-002) covers the constructor-body case but NOT this shape. Separate IR/compiler defect.
 
@@ -115,7 +117,9 @@ export class ShellComponent {
 }
 ```
 
-**Workaround:** Removed the unnecessary empty constructor from the test fixture (no `HasStore` edge was being verified).
+---
+
+**Resolved (2026-09-04):** Production fix implemented in `src/ir/patterns.rs`. The earlier fixture workaround (removing the empty constructor) is no longer needed — and has been reverted so the production-path test exercises the exact DIS-2026-003 scenario again.
 ---
 ## DIS-2026-001: workspace_query MCP Response Envelope Bypass
 

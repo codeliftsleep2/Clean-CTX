@@ -293,3 +293,97 @@ fn empty_ctor_subscribe_references_only_registered_methods() {
         "constructor DefMethod must remain (ownership for its annotations)"
     );
 }
+
+// === DIS-2026-003: Edit-fidelity Body op breaks the trailing-Flags window ===
+//
+// At `Fidelity::Edit` the TypeScript layer emits `Body(M, ...)` operations.
+// For an empty constructor with a parameter property the Edit-fidelity
+// pre-pattern stream is:
+//
+//   DefMethod(M, constructor)
+//   Param(M, ...)
+//   Return(M, ...)
+//   Body(M, "{}", ...)              ← Edit-only: sits between Return and Flags
+//   Flags(M, ["PRIVATE"])           ← parameter-property modifier
+//
+// The CTOR compression window (`[leading Flags] + [DEF_M + Param* + Return]
+// + [trailing Flags(M)]`) is broken by the Body op: the trailing `Flags(M)`
+// is no longer adjacent to the consumed span, so the wrapper cannot consume
+// it. Pre-fix, the orphan guard did not consider `Body(M)` an unrepresentable
+// M-reference, so compression proceeded and orphaned `Flags(M)` (E003).
+// The fix adds `Body` to `op_is_unrepresentable_method_ref`, making the
+// guard decline compression and preserve the full valid sequence.
+//
+// Minimal structural reproducer (independent of the original application
+// fixture — no NgRx, no Angular, no `this.store` reference required):
+
+const EDIT_FIDELITY_PARAM_PROPERTY: &str = r#"
+class Example {
+    constructor(private store: Store) {}
+
+    ngOnInit() {
+        console.log('unrelated operation outside the constructor');
+    }
+}
+"#;
+
+/// Compile at an explicit fidelity (the shared `compile_with` helper pins
+/// `Fidelity::Low`, which does not emit `Body` ops — the DIS-2026-003
+/// trigger requires Edit fidelity).
+fn compile_with_fidelity(source: &str, file_id: &str, fidelity: Fidelity) -> Vec<CoreOp> {
+    let (language, query_string) =
+        crate::compression::language::language_for_extension("ts").expect("TS language");
+    let mut compiler = IRCompiler::new();
+    compiler.add_language_layer(Box::new(TypeScriptLayer::new()));
+    compiler.add_pattern_recognizer(Box::new(CodePatternRecognizer::new()));
+    compiler.add_pattern_recognizer(Box::new(CompressingPatternRecognizer::new()));
+    let ir = compiler
+        .compile(source, file_id, language, query_string, fidelity, None)
+        .unwrap_or_else(|e| panic!("{file_id} should compile: {e}"));
+    ir.instructions
+}
+
+#[test]
+fn edit_fidelity_param_property_ctor_does_not_orphan_flags() {
+    // Full production pipeline at Fidelity::Edit — the fidelity that emits
+    // `Body(M)` ops. Compilation itself must succeed (pre-fix it failed with
+    // `[E003] FLAGS references unknown method 'M…'` inside the pipeline's
+    // ValidationPass).
+    let instructions =
+        compile_with_fidelity(EDIT_FIDELITY_PARAM_PROPERTY, "edit-ctor.ts", Fidelity::Edit);
+    println!("=== EDIT-FIDELITY PARAM-PROPERTY STREAM (full pipeline) ===");
+    for (i, op) in instructions.iter().enumerate() {
+        println!("  [{i:3}] {op:?}");
+    }
+
+    // The constructor's DefMethod must still be present (the pattern must
+    // have declined compression, preserving the identity for its Flags).
+    assert!(
+        instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::DefMethod(_, _, name) if name == "constructor")),
+        "constructor DefMethod must remain — CTOR compression must decline \
+         when an Edit-fidelity Body op detaches the trailing Flags from the \
+         consumed span"
+    );
+
+    // No orphaned M-references anywhere in the stream.
+    let orphans = orphaned_refs(&instructions);
+    assert!(
+        orphans.is_empty(),
+        "Edit-fidelity param-property ctor must not orphan method refs; got: {orphans:?}"
+    );
+
+    // Validator must be clean — no E003 (orphaned Flags), no E007 (orphaned
+    // DataFlow), and no other validation violation.
+    let ir = crate::ir::compiler::CompiledIR {
+        file_id: "edit-ctor.ts".into(),
+        instructions,
+        version: 1,
+    };
+    let errors = DefaultValidator::new().validate(&ir);
+    assert!(
+        errors.is_empty(),
+        "Edit-fidelity param-property ctor must validate cleanly (no E003/E007); got: {errors:?}"
+    );
+}
