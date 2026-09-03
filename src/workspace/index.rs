@@ -8,6 +8,9 @@
 //
 // Entity ambiguity:  multiple files may contain the same entity identity.
 //                     All occurrences are stored; never silently overwritten.
+// Occurrence identity: (domain, entity_type, name, file) — within one file an
+//                     identity is registered exactly once, no matter how many
+//                     edges mention it.
 // Edge deduplication: identical edges inserted multiple times produce one
 //                     indexed edge. First occurrence wins.
 // File provenance:   file_id is retained for entity disambiguation.
@@ -139,9 +142,11 @@ impl WorkspaceIndex {
     /// Edges are deduplicated by identity: (relation, subject identity,
     /// object identity). First occurrence wins.
     ///
-    /// Entities are NOT deduplicated by identity — multiple occurrences of
-    /// the same (domain, entity_type, name) in different files are all
-    /// retained. This is the approved ambiguity model.
+    /// Entity occurrences are deduplicated by occurrence identity:
+    /// (domain, entity_type, name, file). An entity that participates in many
+    /// edges within one file is registered exactly once for that file; the
+    /// same (domain, entity_type, name) in a different file remains a
+    /// distinct occurrence. This is the approved ambiguity model.
     ///
     /// Entity registration happens BEFORE the edge dedup check so that
     /// entity occurrences from all files are tracked even when the edge
@@ -213,16 +218,28 @@ impl WorkspaceIndex {
             self.reverse.entry(obj_key).or_default().push(edge);
         }
 
-        // Track file -> entity keys for provenance.
+        // Track file -> entity keys for provenance. One entry per unique
+        // (entity identity, file) occurrence — the same occurrence identity
+        // rule applied during registration — so `entities_in_file` can never
+        // report the same occurrence twice even if a file is ingested twice
+        // without an intervening `remove_file`.
         if !file_entity_keys.is_empty() {
-            self.file_map
-                .entry(file_path.to_string())
-                .or_default()
-                .extend(file_entity_keys);
+            let entry = self.file_map.entry(file_path.to_string()).or_default();
+            for key in file_entity_keys.iter() {
+                if !entry.contains(key) {
+                    entry.push(key.clone());
+                }
+            }
         }
     }
 
-    /// Register a single entity occurrence. All occurrences are retained.
+    /// Register a single entity occurrence.
+    ///
+    /// Occurrence identity is (domain, entity_type, name, file): registering
+    /// the same occurrence again is a no-op. An entity that participates in
+    /// many edges within one file is registered exactly once for that file;
+    /// the same identity in a different file remains a distinct occurrence
+    /// (cross-file ambiguity preserved).
     fn register_entity(
         &mut self,
         key: &EntityKey,
@@ -235,7 +252,15 @@ impl WorkspaceIndex {
         if !name_entries.contains(key) {
             name_entries.push(key.clone());
         }
-        self.entities.entry(key.clone()).or_default().push(entity);
+        // Idempotent occurrence registration: edge participation must not
+        // multiply occurrences. An entity mentioned by N edges in one file
+        // is registered once for that file (occurrence identity:
+        // (domain, entity_type, name, file)).
+        let occurrences = self.entities.entry(key.clone()).or_default();
+        if occurrences.iter().any(|e| e.file == entity.file) {
+            return;
+        }
+        occurrences.push(entity);
         file_entity_keys.push(key.clone());
     }
     // ── Core queries (Phase 4a) ──────────────────────────────────────

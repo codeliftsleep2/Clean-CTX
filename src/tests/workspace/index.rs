@@ -760,18 +760,19 @@ fn framework_defines_edges_still_traversed() {
         "real Defines relationships must remain graph edges"
     );
     // AuthGuard is the subject of the Defines edge and the object of the
-    // Injects edge; CanActivate is the reverse. Registration happens per
-    // edge endpoint (pre-existing general behavior, unchanged by B1), so
-    // each identity has two same-file occurrences.
+    // Injects edge; CanActivate is the reverse. Occurrence identity is
+    // (domain, entity_type, name, file): both identities participate in two
+    // edges in the same file, so each is registered exactly once for it.
+    // Edge participation does not multiply registrations.
     assert_eq!(
         idx.entities_by_identity("angular", "Guard", "AuthGuard")
             .len(),
-        2
+        1
     );
     assert_eq!(
         idx.entities_by_identity("angular", "Guard", "CanActivate")
             .len(),
-        2
+        1
     );
 
     let outgoing = idx.forward_edges_by_identity("angular", "Guard", "AuthGuard");
@@ -825,6 +826,229 @@ fn partial_class_two_files_two_occurrences() {
         "registration records must not become graph edges"
     );
     assert!(!idx.has_cycle());
+}
+// ── Occurrence Identity (C1): idempotent entity registration ──────────
+//
+// Occurrence identity is (domain, entity_type, name, file). These tests
+// prove that edge participation does not multiply registrations, that
+// cross-file ambiguity is preserved, and that the occurrence-based query
+// surfaces report each occurrence exactly once.
+
+/// Helper: build a ControllerAction edge (dotnet controller shape).
+fn controller_action_edge(controller: &str, action: &str) -> SemanticEdge {
+    SemanticEdge {
+        relation: SemanticRelation::ControllerAction,
+        subject: EntityRef::new("dotnet", "Controller", controller),
+        object: EntityRef::new("dotnet", "Action", action),
+        layer: "dotnet",
+    }
+}
+
+/// Helper: build a HasRoute edge (dotnet controller shape).
+fn has_route_edge(controller: &str, route: &str) -> SemanticEdge {
+    SemanticEdge {
+        relation: SemanticRelation::HasRoute,
+        subject: EntityRef::new("dotnet", "Controller", controller),
+        object: EntityRef::new("dotnet", "Route", route),
+        layer: "dotnet",
+    }
+}
+
+/// A: Multi-edge single entity — multiple legitimate edges mentioning the
+/// same subject must produce exactly one entity occurrence.
+#[test]
+fn multi_edge_subject_registers_one_occurrence() {
+    let mut idx = WorkspaceIndex::new();
+    // Controller shape: 1 HasRoute + 3 ControllerAction — the subject
+    // participates in 4 legitimate edges in one file.
+    let mut edges = vec![has_route_edge("OrdersController", "api/orders")];
+    for action in ["GetAll", "GetById", "Create"] {
+        edges.push(controller_action_edge("OrdersController", action));
+    }
+    idx.add_edges("orders.cs", edges);
+
+    assert_eq!(idx.edge_count(), 4, "every legitimate edge is indexed");
+    assert_eq!(
+        idx.entities_by_identity("dotnet", "Controller", "OrdersController")
+            .len(),
+        1,
+        "the subject participated in 4 edges but must be registered once for the file"
+    );
+    assert_eq!(
+        idx.entity_occurrence_count(),
+        5,
+        "semantic content: 1 controller + 1 route + 3 actions"
+    );
+}
+
+/// B: Cross-file preservation — the same entity identity occurring in two
+/// files (each mentioning it in multiple edges) must produce two
+/// occurrences, one per file.
+#[test]
+fn cross_file_occurrences_preserved_for_multi_edge_subjects() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.cs",
+        vec![
+            has_route_edge("OrdersController", "api/orders"),
+            controller_action_edge("OrdersController", "GetAll"),
+            controller_action_edge("OrdersController", "GetById"),
+        ],
+    );
+    idx.add_edges(
+        "b.cs",
+        vec![
+            has_route_edge("OrdersController", "api/orders"),
+            controller_action_edge("OrdersController", "GetAll"),
+        ],
+    );
+
+    let entities = idx.entities_by_identity("dotnet", "Controller", "OrdersController");
+    assert_eq!(
+        entities.len(),
+        2,
+        "cross-file occurrences of one identity must remain distinct"
+    );
+    let files: Vec<Option<&String>> = entities.iter().map(|e| e.file.as_ref()).collect();
+    assert!(files.contains(&Some(&"a.cs".to_string())));
+    assert!(files.contains(&Some(&"b.cs".to_string())));
+
+    assert_eq!(
+        idx.entities_in_file("a.cs").len(),
+        4,
+        "file A discovers exactly its own occurrences: controller + route + 2 actions"
+    );
+    assert_eq!(
+        idx.entities_in_file("b.cs").len(),
+        3,
+        "file B discovers exactly its own occurrences: controller + route + 1 action"
+    );
+}
+
+/// C: Recompile/re-ingest idempotency — repeated ingestion of the same file
+/// must not accumulate duplicate entity occurrences, both with and without
+/// an intervening `remove_file`.
+#[test]
+fn reingest_does_not_accumulate_occurrences() {
+    let mut idx = WorkspaceIndex::new();
+    let edges = || {
+        vec![
+            has_route_edge("OrdersController", "api/orders"),
+            controller_action_edge("OrdersController", "GetAll"),
+            controller_action_edge("OrdersController", "GetById"),
+        ]
+    };
+
+    // Misuse pattern: repeated ingestion without an intervening remove_file.
+    idx.add_edges("orders.cs", edges());
+    let after_first = idx.entity_occurrence_count();
+    idx.add_edges("orders.cs", edges());
+    assert_eq!(
+        idx.entity_occurrence_count(),
+        after_first,
+        "re-ingesting the same file must not accumulate occurrences"
+    );
+    assert_eq!(
+        idx.entities_in_file("orders.cs").len(),
+        after_first,
+        "entities_in_file must not report duplicates after re-ingestion"
+    );
+
+    // Production recompile lifecycle: remove_file → add_edges.
+    idx.remove_file("orders.cs");
+    idx.add_edges("orders.cs", edges());
+    assert_eq!(
+        idx.entity_occurrence_count(),
+        after_first,
+        "recompilation must not accumulate occurrences"
+    );
+    assert_eq!(idx.edge_count(), 3, "the legitimate edge set is unchanged");
+}
+
+/// D: `entities_in_file()` uniqueness — a file whose entity is referenced by
+/// multiple edges must return that entity exactly once.
+#[test]
+fn entities_in_file_reports_each_occurrence_once() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "orders.cs",
+        vec![
+            has_route_edge("OrdersController", "api/orders"),
+            controller_action_edge("OrdersController", "GetAll"),
+            controller_action_edge("OrdersController", "GetById"),
+        ],
+    );
+
+    let file_entities = idx.entities_in_file("orders.cs");
+    assert_eq!(
+        file_entities.len(),
+        4,
+        "controller + route + 2 actions — the controller is mentioned by 3 edges but returned once"
+    );
+    let distinct: std::collections::BTreeSet<(&str, &str, &str)> = file_entities
+        .iter()
+        .map(|e| (e.domain, e.entity_type, e.name.as_str()))
+        .collect();
+    assert_eq!(
+        distinct.len(),
+        file_entities.len(),
+        "every returned occurrence must be a distinct identity"
+    );
+}
+
+/// E: Resolution-surface uniqueness — occurrence-based resolution must not
+/// multiply an occurrence merely because it participates in multiple edges.
+#[test]
+fn resolve_inject_type_unique_despite_multiple_injectors() {
+    let mut idx = WorkspaceIndex::new();
+    // Three components in one file inject the same service.
+    idx.add_edges(
+        "app.ts",
+        vec![
+            inject_edge("CompA", "UserService", Some("app.ts")),
+            inject_edge("CompB", "UserService", Some("app.ts")),
+            inject_edge("CompC", "UserService", Some("app.ts")),
+        ],
+    );
+
+    let targets = idx.resolve_inject_type("UserService");
+    assert_eq!(
+        targets.len(),
+        1,
+        "a target injected by 3 components must resolve to one occurrence, not 3"
+    );
+    assert_eq!(targets[0].file.as_deref(), Some("app.ts"));
+}
+
+#[test]
+fn resolve_selector_unique_despite_subject_multi_edge() {
+    let mut idx = WorkspaceIndex::new();
+    // One component: 1 HasSelector + 2 Injects — the subject participates in
+    // 3 edges. Selector resolution must not multiply by the subject's other
+    // edges.
+    let selector = SemanticEdge {
+        relation: SemanticRelation::HasSelector,
+        subject: EntityRef::new("angular", "Component", "UserCard"),
+        object: EntityRef::new("angular", "Component", "[app-user-card]"),
+        layer: "angular",
+    };
+    idx.add_edges(
+        "user-card.ts",
+        vec![
+            selector,
+            inject_edge("UserCard", "SvcOne", Some("user-card.ts")),
+            inject_edge("UserCard", "SvcTwo", Some("user-card.ts")),
+        ],
+    );
+
+    let resolved = idx.resolve_selector("app-user-card");
+    assert_eq!(
+        resolved.len(),
+        1,
+        "selector resolution must return the component once regardless of its other edges"
+    );
+    assert_eq!(resolved[0].name, "UserCard");
+    assert_eq!(resolved[0].file.as_deref(), Some("user-card.ts"));
 }
 
 // ── Phase 4c: Graph Traversal — transitive_dependencies ─────────────

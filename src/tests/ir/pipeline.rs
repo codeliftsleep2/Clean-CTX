@@ -400,3 +400,169 @@ fn pipeline_preserves_phi_output() {
         "@cmp alias should be produced for Angular component"
     );
 }
+
+// ── Ingestion-boundary regression: entity occurrences unique per (identity, file) ──
+//
+// HISTORY: born RED against the unmodified implementation (RED phase), where
+// it failed with "expected: 14 unique (identity, file) registrations,
+// actual: 25" and "(dotnet, Controller, OrdersController) registered 12x
+// (expected 1)". The architecture investigation established that entity
+// registration is intentionally DERIVED from semantic edges at the
+// WorkspaceIndex write boundary — the producer stream is therefore not the
+// permanent observation point, and the test is re-anchored to the actual
+// ingestion path. The function name is retained so the historical RED
+// command (`cargo test --lib
+// producer_registers_each_entity_identity_once_per_file`) is the exact
+// command that must now be GREEN.
+//
+// INVARIANT under test (B1 occurrence identity, commit 6dfa86f, completed by
+// the C1 idempotent-registration boundary): through the real production
+// pipeline and the real WorkspaceIndex ingestion,
+//   1. the legitimate semantic edges are preserved (one ControllerAction per
+//      action, one HasRoute, one builtin self-Defines carrier), and
+//   2. every entity occurrence is registered exactly once per
+//      (domain, entity_type, name, file) — edge participation never
+//      multiplies registrations, while cross-file occurrences remain
+//      distinct.
+#[test]
+fn producer_registers_each_entity_identity_once_per_file() {
+    const ACTION_COUNT: usize = 11;
+    let actions: [(&str, &str); ACTION_COUNT] = [
+        ("GetAll", "[HttpGet]"),
+        ("GetById", "[HttpGet(\"{id}\")]"),
+        ("Search", "[HttpGet(\"search\")]"),
+        ("Create", "[HttpPost]"),
+        ("BulkCreate", "[HttpPost(\"bulk\")]"),
+        ("Update", "[HttpPut(\"{id}\")]"),
+        ("Patch", "[HttpPatch(\"{id}\")]"),
+        ("Delete", "[HttpDelete(\"{id}\")]"),
+        ("Archive", "[HttpPost(\"{id}/archive\")]"),
+        ("Restore", "[HttpPost(\"{id}/restore\")]"),
+        ("Export", "[HttpGet(\"export\")]"),
+    ];
+    let mut src = String::from(
+        "using Microsoft.AspNetCore.Mvc;\n\nnamespace Api.Controllers;\n\n[ApiController]\n[Route(\"api/orders\")]\npublic class OrdersController : ControllerBase\n{\n",
+    );
+    for (name, attr) in actions {
+        src.push_str(&format!(
+            "    {attr}\n    public IActionResult {name}(int id) {{ return Ok(); }}\n\n"
+        ));
+    }
+    src.push_str("}\n");
+
+    // Production compile path: PassPipeline::default_production() with the
+    // C# language + CS_QUERY, exactly as IRCompiler::compile_inner configures
+    // it. Medium fidelity: ControllerAction edges are Medium+ (per
+    // extract_dotnet_semantic_edges).
+    let mut ctx = PassContext::new(src, "OrdersController.cs".into(), Fidelity::Medium);
+    ctx.canonical_path = Some("C:/repo/OrdersController.cs".into());
+    ctx.language =
+        Some(crate::compression::language::safe_csharp_language().expect("csharp grammar enabled"));
+    ctx.query_string = crate::queries::CS_QUERY.to_string();
+    PassPipeline::default_production()
+        .run(&mut ctx)
+        .expect("production pipeline should succeed");
+
+    // The exact stream handed to WorkspaceIndex ingestion.
+    let edges = ctx.semantic_edges;
+    // ── Semantic unit cardinality (the established representation) ──
+    // One action → exactly one ControllerAction edge; one controller →
+    // exactly one HasRoute edge. (These hold today; they anchor the semantic
+    // unit so the invariant below cannot be satisfied by dropping facts.)
+    let controller_actions: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::ControllerAction)
+        .collect();
+    assert_eq!(
+        controller_actions.len(),
+        ACTION_COUNT,
+        "one action → one ControllerAction edge expected, got {}: {:?}",
+        controller_actions.len(),
+        controller_actions
+            .iter()
+            .map(|e| e.object.name.as_str())
+            .collect::<Vec<_>>()
+    );
+    let distinct_actions: std::collections::BTreeSet<&str> = controller_actions
+        .iter()
+        .map(|e| e.object.name.as_str())
+        .collect();
+    assert_eq!(
+        distinct_actions.len(),
+        ACTION_COUNT,
+        "each action must be a distinct semantic fact"
+    );
+    assert_eq!(
+        edges
+            .iter()
+            .filter(|e| e.relation == SemanticRelation::HasRoute)
+            .count(),
+        1,
+        "one controller → one HasRoute edge expected"
+    );
+
+    // ── THE INVARIANT (occurrence identity): one registration per
+    // (identity, file), proven through the ACTUAL ingestion path — the edge
+    // stream is fed to a WorkspaceIndex exactly as the MCP handlers do it.
+    let canonical = "C:/repo/OrdersController.cs";
+    let mut idx = crate::workspace::index::WorkspaceIndex::new();
+    idx.add_edges(canonical, edges);
+
+    // Semantic edges preserved: the edge graph holds every legitimate
+    // relationship (11 ControllerAction + 1 HasRoute); the self-Defines
+    // carrier is normalized at the write boundary and never becomes a graph
+    // edge.
+    assert_eq!(
+        idx.edge_count(),
+        ACTION_COUNT + 1,
+        "11 ControllerAction + 1 HasRoute edges must be indexed"
+    );
+    assert_eq!(
+        idx.forward_edges_by_identity("dotnet", "Controller", "OrdersController")
+            .len(),
+        ACTION_COUNT + 1,
+        "the Controller subject keeps all 12 outgoing relationships"
+    );
+
+    // Entity occurrences are unique per (identity, file). The fixture's
+    // semantic content is 1 Controller + 11 Actions + 1 Route + 1 builtin
+    // Class registration — each must appear exactly once, and nothing else
+    // may be registered.
+    let mut known: Vec<(&str, &str, String)> = vec![
+        ("dotnet", "Controller", "OrdersController".to_string()),
+        ("dotnet", "Route", "api/orders".to_string()),
+        ("builtin", "Class", "OrdersController".to_string()),
+    ];
+    for (name, _) in actions {
+        known.push(("dotnet", "Action", name.to_string()));
+    }
+    for (domain, entity_type, name) in &known {
+        let occurrences = idx.entities_by_identity(domain, entity_type, name);
+        assert_eq!(
+            occurrences.len(),
+            1,
+            "occurrence ({domain}, {entity_type}, {name}) must be registered exactly once \
+             for the file — edge participation must not multiply registrations"
+        );
+        assert_eq!(
+            occurrences[0].file.as_deref(),
+            Some(canonical),
+            "file provenance must be preserved on the single occurrence"
+        );
+    }
+    assert_eq!(
+        idx.entity_occurrence_count(),
+        known.len(),
+        "registration records must equal distinct (identity, file) pairs — \
+         no occurrence may exist outside the fixture's semantic content"
+    );
+
+    // Representative check (the RED-phase offender): the Controller subject
+    // participates in 12 edges yet owns exactly one occurrence.
+    assert_eq!(
+        idx.entities_by_identity("dotnet", "Controller", "OrdersController")
+            .len(),
+        1,
+        "the Controller is registered once for the file despite participating in 12 edges"
+    );
+}
