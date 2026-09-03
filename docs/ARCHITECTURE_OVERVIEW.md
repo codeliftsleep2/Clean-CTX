@@ -55,21 +55,21 @@
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ Angular Meta-Layer (Φ markers + semantic edges)        │   │
-│  │   detect → decorators → markers → bundler →            │   │
-│  │   extract_semantic_edges() → InferenceLayer            │   │
+│  │ Angular Meta-Layer (Φ markers + semantic edges)  │   │
+│  │   detect → decorators → markers → bundler →      │   │
+│  │   extract_semantic_edges() → InferenceLayer      │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ Spring Boot Meta-Layer (Φ markers + semantic edges)   │   │
-│  │   detect → annotations → markers →                   │   │
-│  │   extract_semantic_edges() → InferenceLayer            │   │
+│  │ SpringBoot Meta-Layer (Φ markers +semantic edges)│   │
+│  │   detect → annotations → markers →               │   │
+│  │   extract_semantic_edges() → InferenceLayer      │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ .NET Meta-Layer (Φ markers + semantic edges)          │   │
-│  │   detect → attributes → markers →                    │   │
-│  │   extract_semantic_edges() → InferenceLayer            │   │
+│  │ .NET Meta-Layer (Φ markers + semantic edges)     │   │
+│  │   detect → attributes → markers →                │   │
+│  │   extract_semantic_edges() → InferenceLayer      │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  All meta-layers dispatched via LayerRegistry:          │
@@ -107,10 +107,10 @@ stdin reader thread           Dispatcher thread pool (N workers)
                                    └────────────┬────────────┘
                                                 │
                                    ┌────────────▼────────┐
-                                   │  Stdout writer      │ │
-                                      Dedicated thread, 
-                                      no interleaving    
-                                   └────────────────┘
+                                   │  Stdout writer      │ 
+                                   │  Dedicated thread,  │
+                                   │ no interleaving     │  
+                                   └─────────────────────┘
 ```
 
 **How it works:**
