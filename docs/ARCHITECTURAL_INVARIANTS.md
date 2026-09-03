@@ -217,9 +217,35 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | Property | Value |
 |----------|-------|
 | **Intent** | Consumptive IR pattern compression must never corrupt the method-identity ownership relationship between a compressed `DefMethod` and the annotations that reference it. |
-| **Invariant** | A consumptive IR pattern transformation must not consume a `DefMethod(M)` while leaving surviving IR operations that reference `M` without a valid representation/ownership relationship. If an M-referencing operation cannot be represented within the resulting `PatternOp`, the pattern must decline compression rather than consume the `DefMethod` and orphan the reference. The currently relevant M-referencing operation kinds are `DataFlow`, `SideEffect`, `ExecutionContext`, and `ControlFlow` — but the invariant governs ANY future M-referencing op kind. This is an **IR transformation invariant**, not a rule specific to Angular, TypeScript, constructors, or RxJS. |
-| **Enforcement** | `CompressingPatternRecognizer` declines CTOR/EMPTY_CTOR compression when an unrepresentable M-reference survives after the pattern's consumed span (see `try_ctor_pattern` / `try_empty_ctor_pattern` orphan guards in `src/ir/patterns.rs`). Regression: `src/tests/ir/regression_ctor_pattern_orphan.rs` (covers CTOR with DI+subscribe+control flow, CTOR with subscribe, EMPTY_CTOR with subscribe, the stream-level orphan invariant, and healthy-compression controls). |
+| **Invariant** | A consumptive IR pattern transformation must not consume a `DefMethod(M)` while leaving surviving IR operations that reference `M` without a valid representation/ownership relationship. If an M-referencing operation cannot be represented within the resulting `PatternOp`, the pattern must decline compression rather than consume the `DefMethod` and orphan the reference. The currently relevant M-referencing operation kinds are `DataFlow`, `SideEffect`, `ExecutionContext`, `ControlFlow`, and `Body` — but the invariant governs ANY future M-referencing op kind. This is an **IR transformation invariant**, not a rule specific to Angular, TypeScript, constructors, or RxJS. |
+| **Enforcement** | `CompressingPatternRecognizer` declines CTOR/EMPTY_CTOR compression when an unrepresentable M-reference survives after the pattern's consumed span (see `try_ctor_pattern` / `try_empty_ctor_pattern` orphan guards in `src/ir/patterns.rs`). Regression: `src/tests/ir/regression_ctor_pattern_orphan.rs` (covers CTOR with DI+subscribe+control flow, CTOR with subscribe, EMPTY_CTOR with subscribe, the Edit-fidelity param-property Body/Flags orphan (DIS-2026-003), the stream-level orphan invariant, and healthy-compression controls). |
 | **Authority** | `src/ir/patterns.rs` (`op_is_unrepresentable_method_ref`, `trailing_region_references_method`, orphan guards); regression `src/tests/ir/regression_ctor_pattern_orphan.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
+
+### SEL-001 Selector-Value Invariant
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Semantic-edge object names must carry the exact semantic value declared by the source; index/lookup mechanics must never contaminate entity identity. |
+| **Invariant** | The `name` field of a `HasSelector` semantic edge's object `EntityRef` MUST contain the exact CSS selector string declared by the source code (`@Component({ selector: '...' })`), without artificial encoding, wrapping, or normalization. Distinct selector forms (`app-widget`, `[app-widget]`, `.app-widget`) are distinct semantic identities. |
+| **Enforcement** | `src/tests/angular_meta/semantic.rs::has_selector_preserves_literal_selector_forms` (literal extraction of all three selector forms + pairwise distinctness); `src/tests/workspace/index.rs::resolve_selector_literal_forms_are_distinct` (literal lookup through `WorkspaceIndex`, cross-form isolation). |
+| **Authority** | `src/angular_meta/semantic.rs` (`class_to_semantic_edges`), `src/workspace/index.rs` (`resolve_selector`) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
+
+### IDX-001 Index-Encoding Invariant
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Index/search mechanics are implementation detail; entity identity is semantic. The two must not be conflated. |
+| **Invariant** | Internal lookup-key encoding MUST NOT leak into semantic entity identity. `WorkspaceIndex` may derive lookup structures, but those encodings must not be reflected in `EntityRef.name`. Selector resolution is a distinct operation from generic name lookup — `resolve_selector()` performs literal lookup against the stored `HasSelector` object name rather than reconstructing an encoded key. |
+| **Enforcement** | `src/tests/workspace/index.rs::resolve_selector_literal_forms_are_distinct` (proves literal lookup and that distinct selector forms resolve independently — no cross-form match, no bracket-encoding match). |
+| **Authority** | `src/workspace/index.rs` (`resolve_selector`, `name_index`), `src/angular_meta/semantic.rs` (`HasSelector` construction) |
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
 
