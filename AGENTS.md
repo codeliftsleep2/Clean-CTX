@@ -111,6 +111,34 @@ is coherent, and the repository is consistent with these rules: architecturally
 coherent, behaviorally preserved, properly tested, zero-warning, documented
 accurately, free of obsolete implementation paths.
 
+#### Two-environment Definition of Done
+
+Clean-CTX is verified in two complementary environments that are NOT unified:
+
+```text
+CONTROLLED LABORATORY        FIELD TEST
+Cline + Rust + samples    Claude + real repositories
+  deterministic, cheap      emergent, scale-dependent
+```
+
+- **Local development gate** — for all applicable changes:
+  implementation verified; relevant existing sample fixtures pass; a new
+  regression fixture added only when a reproducible behavior requires one
+  (the governing principle: a fixture protects an identified invariant or
+  regression, never exists merely for file count); MCP contract verified
+  locally when applicable; actual binary/stdio path verified when applicable;
+  zero clippy warnings.
+- **Real-world gate** — for changes affecting externally visible behavior
+  (and only when a relevant live scenario exists): Claude can consume the
+  changed behavior; the relevant real-workspace scenario verifies; no newly
+  discovered client/workspace regression. Expensive live testing is NOT
+  required for purely internal changes that cannot affect the live system
+  boundary.
+- **Live discoveries** (field findings) are recorded in
+  `docs/agent/DISCOVERY_REGISTRY.md` and distilled into cheap local
+  regressions whenever reproducible; scale-dependent findings remain
+  documented live scenarios.
+
 Run the single authoritative Final Verification Gate from
 `docs/agent/verification.md`; do not re-derive command lists here.
 

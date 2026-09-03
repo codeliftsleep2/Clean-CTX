@@ -43,3 +43,7 @@ pub(crate) mod phase_b_retirement_tests;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/phase3_contract.rs"]
 pub(crate) mod phase3_contract_tests;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/envelope_contract.rs"]
+pub(crate) mod envelope_contract_tests;

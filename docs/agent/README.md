@@ -39,3 +39,4 @@ architectural facts and is NOT duplicated here.
 | `incremental-migration.md` | Incremental architectural migration procedure | performing a designated migration |
 | `releases.md` | Gated release, changelog & versioning accounting | a behavior-affecting build ships |
 | `tooling.md` | Comprehensive MCP/code-context tool selection, workflow, and antipatterns guide | choosing how to read, understand, edit, or verify code |
+| `DISCOVERY_REGISTRY.md` | Live-discovery ledger: real-workspace findings → root cause → local regression / live scenario | recording or closing a real-world (Claude) discovery |
