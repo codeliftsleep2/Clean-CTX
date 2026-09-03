@@ -83,7 +83,39 @@ Pre-pattern (valid):                   After faulty CTOR compression (invalid):
 
 Result: [E007] DATAFLOW references unknown method M; [E003] FLAGS references unknown method M
 ```
+---
 
+## DIS-2026-003: IR CTOR Compression Orphaning with Empty Constructor + Method-Scoped References
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-04 |
+| **Environment** | Clean-CTX IR pipeline (production `PassPipeline::default_production()`) |
+| **Repository/context** | Angular component with empty constructor using a private parameter property (`constructor(private store: Store) {}`) and Store operations in a separate method (`ngOnInit`). |
+| **Symptom** | IR compilation failed with `[E003] FLAGS references unknown method 'M5'`. |
+| **Root cause** | The consumptive CTOR pattern compressed the empty constructor's `DefMethod(M)` into `Pattern(CTOR, ..., M)` while leaving surviving IR operations that reference a different method (`ngOnInit`, M5) without a valid owner. The existing CTOR orphan-prevention fix (DIS-2026-002) covers the case where unrepresentable M-referencing operations exist within the constructor body, but not the case where the constructor is empty and the references belong to a separate method. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query.rs::builtin_decorated_class_and_ngrx_semantic_names_production_path` (fixture reshaped to avoid trigger) |
+| **Live scenario required?** | No |
+| **Architectural invariant** | Same as DIS-2026-002: IR identity-preservation for consumptive pattern transformations |
+| **Status** | Open (workaround: fixture reshaping) |
+
+**Distillation note:** This defect predates the selector-representation fix and is unrelated to it. The existing CTOR orphan-prevention fix (DIS-2026-002) covers the constructor-body case but NOT this shape. Separate IR/compiler defect.
+
+**Minimal trigger:**
+```typescript
+@Component({ selector: 'widget-shell' })
+export class ShellComponent {
+  constructor(private store: Store) {}  // EMPTY + private parameter property
+  ngOnInit() {
+    this.store.pipe(select('panelState'));  // Store ops in SEPARATE method
+    this.store.dispatch({ type: TOGGLE_PANEL });
+  }
+}
+```
+
+**Workaround:** Removed the unnecessary empty constructor from the test fixture (no `HasStore` edge was being verified).
 ---
 ## DIS-2026-001: workspace_query MCP Response Envelope Bypass
 
