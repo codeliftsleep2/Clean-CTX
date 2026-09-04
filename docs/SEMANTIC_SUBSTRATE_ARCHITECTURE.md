@@ -374,6 +374,19 @@ Explicitly deferred until an actual consumer requires them:
 
 Generic multi-hop traversal MAY be introduced later, defined in terms of relations and identities, when a concrete consumer demonstrates the need. Convenience never justifies moving framework semantics into the query layer.
 
+### Name-collision disambiguation and path-prefix narrowing (recorded decision - 2026-09-04)
+
+Measured against this repository's own source tree, cross-file name collisions are a common, permanent condition rather than an anomaly: 24 type names were found declared in more than one file (16 of them production-only - for example `MetaBlock`, `PhiLine`, `PhiLineKind` each declared in three framework modules), generic names recur across workspace trees (`UserService`, `User`), and the index already retains every occurrence instead of overwriting (SEM-002/SEM-005; the ambiguity tests in `src/tests/workspace/index.rs`). This does not weaken SEM-001 or the Model C namespace decision; it clarifies how four distinct notions relate:
+
+1. **Semantic identity** - `(domain, entity_type, name)` (SEM-001). Two declarations that converge onto the same identity remain ONE semantic graph node for identity-based traversal.
+2. **Occurrence provenance** - `EntityRef.file` records where each occurrence was observed (SEM-002); all occurrences are retained.
+3. **Query-time disambiguation** - callers narrow results by provenance. A future optional path-prefix narrowing on `find_entities_by_name` (the sole name-keyed entry point) MUST be described as "return occurrences whose provenance falls under this path" - never as "find the entity defined in this directory", because role/reference occurrences may carry the file where the reference was observed rather than the definition file (SEM-002, SEM-008). This is the same narrowing pattern as the `relation` filter above; a path prefix is generic file-system data (SEM-015).
+4. **Fine-grained source-symbol identity** - CBM's `qualified_name` system. A separate, optional mechanism for consumers that need source-symbol-level resolution; it coexists with Clean-CTX identity and is NOT a repair for it (the semantic plan's decision stands: different identity systems intentionally).
+
+**Limitation (normative):** path narrowing solves lookup ambiguity only - it does NOT split merged graph identity. Because identity excludes `file`, `transitive_dependencies` and `has_cycle` cannot be path-narrowed into per-declaration graphs without changing the identity model, and multiple same-identity declarations within one file are indistinguishable by provenance. Where split-node traversal is genuinely required, CBM's qualified identities are the designated coexisting mechanism, not an identity change here.
+
+**Query-surface conclusion (recorded):** `find_entities_by_name` is the natural location for the future path-prefix narrowing; `forward_edges`/`reverse_edges` already operate on full semantic identity and need no path filtering initially; `entities_in_file` already provides file-to-entity lookup; no query DSL, path-aware graph traversal, or identity redesign is justified by this investigation. The path-prefix capability is recorded as a **justified future additive query enhancement** - not implementation work in this phase.
+
 ---
 
 ## 14. Existing relation vocabulary and preservation
@@ -461,6 +474,9 @@ Architectural patterns are derived by composing semantic facts. First-class patt
 
 **SEM-018 - Relation Direction Contract**
 Every relation has a documented subject/object/direction. Reverse traversal semantics follow from direction (for example, reverse-`Implements` and reverse-`Binds` yield providers of a contract/token; forward-`Injects` yields dependencies of a consumer). Type: DOCUMENTED.
+
+**SEM-019 - Query-Time Disambiguation Versus Identity**
+Path-derived narrowing (when introduced) filters occurrences by provenance and MUST NOT extend, split, or re-namespace semantic identity; it MUST NOT be described as definition-site lookup, because role/reference occurrences carry reference-site provenance (SEM-002, SEM-008). Merged graph identity persists for identity-based traversal regardless of provenance filtering; same-identity occurrences within one file are not distinguishable by provenance. Fine-grained source-symbol resolution (CBM qualified identities) is a separate, optional, coexisting mechanism - not an identity change here. Type: DOCUMENTED (to be pinned by test when the narrowing capability lands).
 
 ---
 
