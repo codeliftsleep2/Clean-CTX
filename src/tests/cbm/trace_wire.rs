@@ -235,8 +235,13 @@ fn absent_arrays_and_non_direct_hops_yield_no_invented_edges() {
 
 // ── Deterministic pins: M-01 target filter under qualified identity ──
 
-fn ge(from: &str, to: &str) -> serde_json::Value {
-    serde_json::json!({"from": from, "to": to, "label": "calls"})
+fn ge(from: &str, to: &str) -> crate::cbm::bridge::GraphEdge {
+    crate::cbm::bridge::GraphEdge {
+        from: from.to_string(),
+        to: to.to_string(),
+        label: "calls".into(),
+        properties: std::collections::HashMap::new(),
+    }
 }
 
 #[test]
@@ -248,17 +253,17 @@ fn target_filter_matches_bare_and_qualified_endpoints() {
         ge("a", "p.unrelated.symbol"),                 // touches nothing
     ];
 
-    let kept = filter_trace_edges(&edges, &Some("query_graph".to_string()));
+    let kept = filter_trace_edges(edges.clone(), &Some("query_graph".to_string()));
     assert_eq!(
         kept.len(),
         2,
         "qualified-suffix matches on either endpoint: {kept:?}"
     );
 
-    let bare = filter_trace_edges(&edges, &Some("bare_exact".to_string()));
+    let bare = filter_trace_edges(edges.clone(), &Some("bare_exact".to_string()));
     assert_eq!(bare.len(), 1, "exact bare-name match still works");
 
-    let none = filter_trace_edges(&edges, &None);
+    let none = filter_trace_edges(edges.clone(), &None);
     assert_eq!(
         none.len(),
         4,
@@ -269,7 +274,7 @@ fn target_filter_matches_bare_and_qualified_endpoints() {
 #[test]
 fn target_filter_preserves_wire_order() {
     let edges = vec![ge("f", "p.b"), ge("f", "p.a"), ge("f", "p.c")];
-    let kept = filter_trace_edges(&edges, &None);
+    let kept = filter_trace_edges(edges.clone(), &None);
     assert_eq!(kept[0].to, "p.b");
     assert_eq!(kept[1].to, "p.a");
     assert_eq!(kept[2].to, "p.c");
@@ -286,16 +291,13 @@ fn regression_bare_to_name_with_qualified_endpoint_is_retained() {
         "tw_probe_callee",
         "C-Users-MNasty-AppData-Local-Temp-cleanctx_trace_wire_x.src.trace_fixture.tw_probe_caller",
     )];
-    let kept = filter_trace_edges(&edges, &Some("tw_probe_caller".to_string()));
+    let kept = filter_trace_edges(edges.clone(), &Some("tw_probe_caller".to_string()));
     assert_eq!(
         kept.len(),
         1,
         "bare to-name must retain the qualified wire edge, got {kept:?}"
     );
-    assert_eq!(
-        kept[0].to, edges[0]["to"],
-        "wire identity preserved untouched"
-    );
+    assert_eq!(kept[0].to, edges[0].to, "wire identity preserved untouched");
 }
 
 /// The boundary contract is EXACT-OR-FINAL-SEGMENT, nothing looser:
@@ -304,14 +306,14 @@ fn regression_bare_to_name_with_qualified_endpoint_is_retained() {
 fn target_filter_rejects_partial_and_multisegment_targets() {
     let edges = vec![ge("f", "p.mod.tw_probe_caller")];
     for target in ["probe_caller", "mod.tw_probe_caller"] {
-        let kept = filter_trace_edges(&edges, &Some(target.to_string()));
+        let kept = filter_trace_edges(edges.clone(), &Some(target.to_string()));
         assert!(
             kept.is_empty(),
             "non-contract target '{target}' must not match"
         );
     }
     // Fully qualified target matches exactly.
-    let exact = filter_trace_edges(&edges, &Some("p.mod.tw_probe_caller".to_string()));
+    let exact = filter_trace_edges(edges, &Some("p.mod.tw_probe_caller".to_string()));
     assert_eq!(exact.len(), 1);
 }
 

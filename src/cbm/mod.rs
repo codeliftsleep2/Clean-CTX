@@ -22,6 +22,7 @@ pub mod json_compress;
 pub mod proxy;
 pub mod setup;
 pub mod tools;
+pub mod wire;
 
 // Re-export the public API for external consumers.
 pub use bridge::{
@@ -35,6 +36,7 @@ pub use handlers::{
 };
 pub use setup::{CbmSetupInfo, cbm_setup_check};
 pub use tools::cbm_tool_list;
+pub use wire::{parse_architecture, parse_search_results, parse_trace};
 
 #[cfg(test)]
 #[path = "tests.rs"]

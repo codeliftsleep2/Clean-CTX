@@ -30,6 +30,15 @@ pub enum CbmError {
         tool: String,
         message: String,
     },
+    /// CBM 0.10.x daemon admission conflict (version/build/ABI/cache-root
+    /// mismatch with an already-active daemon). CBM fails before doing work
+    /// and records the conflict; this is a distinct, retryable condition —
+    /// never a successful empty result.
+    DaemonConflict(String),
+    /// Startup coordination (the 0.10.x per-account daemon) did not become
+    /// ready within the startup deadline. Distinct from an ordinary query
+    /// timeout — a later retry may succeed once the daemon is coordinated.
+    StartupTimeout(Duration),
 }
 
 impl std::fmt::Display for CbmError {
@@ -43,6 +52,14 @@ impl std::fmt::Display for CbmError {
             CbmError::ToolError { tool, message } => {
                 write!(f, "CBM {tool} failed: {message}")
             }
+            CbmError::DaemonConflict(msg) => write!(
+                f,
+                "CBM daemon conflict (version/build/cache-root mismatch with an active daemon): {msg}"
+            ),
+            CbmError::StartupTimeout(d) => write!(
+                f,
+                "CBM startup coordination timed out after {d:?} (daemon not ready)"
+            ),
         }
     }
 }
@@ -84,6 +101,11 @@ pub struct CbmClient {
     request_id: AtomicU64,
     status: CbmStatus,
     timeout: Duration,
+    /// CBM 0.10.x startup deadline (daemon coordination). Once the first
+    /// JSON-RPC response arrives, ordinary `timeout` applies. Distinct from
+    /// `timeout` so daemon coordination delays never consume the query-timeout
+    /// budget (decision document §6.2).
+    startup_deadline: Option<Instant>,
     /// Circuit breaker: consecutive transient failures.
     consecutive_failures: u32,
     /// When the circuit opened (set to Degraded). None when circuit is closed.
@@ -111,8 +133,36 @@ pub(crate) fn is_retryable(error: &CbmError) -> bool {
         error,
         CbmError::ConnectionLost(_)
             | CbmError::Timeout(_)
+            | CbmError::StartupTimeout(_)
+            | CbmError::DaemonConflict(_)
             | CbmError::RpcError { code: -32603, .. }
     )
+}
+
+/// Classify a startup-window process exit as a daemon conflict or a plain
+/// connection loss. CBM 0.10.x admission conflicts (version/build/ABI/
+/// cache-root mismatch with an already-active daemon) fail before doing any
+/// work; their stderr text is surfaced distinctly from an ordinary pipe
+/// failure so Clean-CTX can treat them as retryable and actionable
+/// (decision document §6.2 — never a successful empty result).
+pub(crate) fn classify_startup_failure(msg: &str) -> CbmError {
+    let lower = msg.to_ascii_lowercase();
+    let conflict_hints = [
+        "conflict",
+        "daemon",
+        "admission",
+        "cache root",
+        "cache_root",
+        "different root",
+        "version mismatch",
+        "abi",
+    ];
+    let is_conflict = conflict_hints.iter().any(|h| lower.contains(h));
+    if is_conflict {
+        CbmError::DaemonConflict(msg.to_string())
+    } else {
+        CbmError::ConnectionLost(msg.to_string())
+    }
 }
 
 /// Soft-error gate for parsed CBM tool results.
@@ -250,14 +300,24 @@ impl CbmClient {
     pub fn try_launch(
         binary_path: &Path,
         timeout: Duration,
+        startup_timeout: Duration,
         max_consecutive_failures: u32,
         circuit_cooldown_secs: u64,
+        cache_root: Option<&str>,
     ) -> Result<Option<Self>, CbmError> {
         if !binary_path.exists() || !binary_path.is_file() {
             return Ok(None);
         }
 
-        let mut child = Command::new(binary_path)
+        // CBM 0.10.8 daemon-backed lifecycle (decision document §6): pin
+        // `CBM_CACHE_DIR` to the Clean-CTX-managed canonical cache root so
+        // the session joins (or starts) the correct cache cohort. When no
+        // root is configured, CBM's own default applies.
+        let mut cmd = Command::new(binary_path);
+        if let Some(root) = cache_root {
+            cmd.env("CBM_CACHE_DIR", root);
+        }
+        let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -328,6 +388,7 @@ impl CbmClient {
             request_id: AtomicU64::new(1),
             status: CbmStatus::Available,
             timeout,
+            startup_deadline: Some(Instant::now() + startup_timeout),
             consecutive_failures: 0,
             degraded_since: None,
             max_consecutive_failures,
@@ -430,14 +491,26 @@ impl CbmClient {
         // C-2 fix: accumulate lines until we have complete JSON, honouring the
         // deadline on every receive call.
         let mut buf = String::new();
-        let deadline = std::time::Instant::now() + self.timeout;
+        // During the 0.10.x startup/daemon-coordination window a distinct
+        // startup deadline applies; once the first response arrives we switch
+        // to the ordinary query timeout (decision document §6.2).
+        let startup_deadline = self.startup_deadline.take();
+        let during_startup = startup_deadline.is_some();
+        let deadline = match startup_deadline {
+            Some(sd) => sd,
+            None => std::time::Instant::now() + self.timeout,
+        };
         loop {
             let remaining = deadline.saturating_duration_since(std::time::Instant::now());
             if remaining.is_zero() {
                 let _ = self.child.kill();
                 let _ = self.child.try_wait();
                 self.status = CbmStatus::Degraded("timeout".into());
-                return Err(CbmError::Timeout(self.timeout));
+                return Err(if during_startup {
+                    CbmError::StartupTimeout(self.timeout)
+                } else {
+                    CbmError::Timeout(self.timeout)
+                });
             }
             match self.stdout_rx.recv_timeout(remaining) {
                 Ok(Ok(line)) => {
@@ -458,16 +531,29 @@ impl CbmClient {
                 }
                 Ok(Err(msg)) => {
                     self.status = CbmStatus::Degraded("exited".into());
+                    if during_startup {
+                        // 0.10.x daemon admission conflicts fail before any
+                        // work; surface them distinctly instead of as an
+                        // ordinary connection loss.
+                        return Err(classify_startup_failure(&msg));
+                    }
                     return Err(CbmError::ConnectionLost(msg));
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     let _ = self.child.kill();
                     let _ = self.child.try_wait();
                     self.status = CbmStatus::Degraded("timeout".into());
-                    return Err(CbmError::Timeout(self.timeout));
+                    return Err(if during_startup {
+                        CbmError::StartupTimeout(self.timeout)
+                    } else {
+                        CbmError::Timeout(self.timeout)
+                    });
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                     self.status = CbmStatus::Degraded("exited".into());
+                    if during_startup {
+                        return Err(classify_startup_failure("CBM exited"));
+                    }
                     return Err(CbmError::ConnectionLost("CBM exited".into()));
                 }
             }
@@ -619,7 +705,9 @@ impl CbmClient {
         project: &str,
         label: Option<&str>,
     ) -> Value {
-        let mut args = serde_json::json!({"name_pattern": name_pattern, "project": project});
+        let mut args = serde_json::json!(
+            {"name_pattern": name_pattern, "project": project, "format": "json"}
+        );
         if let Some(l) = label {
             args["label"] = serde_json::Value::String(l.to_string());
         }
@@ -631,43 +719,52 @@ impl CbmClient {
         name_pattern: &str,
         project: &str,
         label: Option<&str>,
-    ) -> Result<Vec<Value>, CbmError> {
+    ) -> Result<Value, CbmError> {
         let args = Self::build_search_graph_args(name_pattern, project, label);
         let r = self.call_tool("search_graph", args)?;
-        let inner = self.parse_cbm_response(&r)?;
-        Ok(inner["results"].as_array().cloned().unwrap_or_default())
+        self.parse_cbm_response(&r)
     }
 
     /// Trace call paths in the CBM knowledge graph.
     ///
-    /// CBM params: `function_name`, `direction` (inbound|outbound|both), `depth`, `project`
+    /// CBM 0.10.8 params: `function_name`, `direction` (inbound|outbound|both),
+    /// `depth`, `project`, `format` ("json" required for the typed path), and
+    /// optional `mode` ("calls" | "data_flow" | "cross_service").
     ///
-    /// Wire contract (2026-08-24): CBM answers with `callers` / `callees`
-    /// arrays — NOT an `edges` key. [`extract_trace_edges`] normalizes that
-    /// real shape into `{"from","to","label"}` objects. A missing function is
-    /// reported by CBM as a soft error (`result.isError` +
-    /// `"error":"function not found"`), which [`check_soft_error`] maps to
-    /// [`CbmError::ToolError`] before this parser runs — failure is never a
-    /// valid empty result (F11 invariant).
+    /// Returns the raw inner response body; wire parsing is delegated to the
+    /// wire adapter (`crate::cbm::wire::parse_trace`). A missing function is
+    /// reported by CBM as a soft error (`result.isError` + `"error"` key),
+    /// which [`check_soft_error`] maps to [`CbmError::ToolError`] before this
+    /// parser runs — failure is never a valid empty result (F11 invariant).
     pub fn trace_path(
         &mut self,
         function_name: &str,
         direction: &str,
         project: &str,
         depth: Option<usize>,
-    ) -> Result<Vec<Value>, CbmError> {
-        let mut args = serde_json::json!({"function_name": function_name, "direction": direction, "project": project});
+        mode: Option<&str>,
+    ) -> Result<Value, CbmError> {
+        let mut args = serde_json::json!({"function_name": function_name, "direction": direction, "project": project, "format": "json"});
         if let Some(d) = depth {
             args["depth"] = serde_json::Value::Number(serde_json::Number::from(d));
         }
+        if let Some(m) = mode {
+            args["mode"] = serde_json::Value::String(m.to_string());
+        }
         let r = self.call_tool("trace_path", args)?;
-        let inner = self.parse_cbm_response(&r)?;
-        Ok(extract_trace_edges(&inner, function_name))
+        self.parse_cbm_response(&r)
     }
 
-    /// Get architecture overview from CBM.
+    /// Get architecture overview from CBM 0.10.8.
+    ///
+    /// CBM 0.10.8 emits a compact summary by default; `packages`/`boundaries`
+    /// sections require explicit `aspects`. Clean-CTX requests both so the
+    /// adapter can map them to modules/dependencies.
     pub fn get_architecture(&mut self, project: &str) -> Result<Value, CbmError> {
-        let r = self.call_tool("get_architecture", serde_json::json!({"project": project}))?;
+        let r = self.call_tool(
+            "get_architecture",
+            serde_json::json!({"project": project, "aspects": ["packages", "boundaries"]}),
+        )?;
         // get_architecture may or may not wrap in content array — try both
         if r.get("content").is_some() {
             self.parse_cbm_response(&r)
@@ -707,77 +804,7 @@ impl CbmClient {
         Ok(QueryRows { columns, rows })
     }
 
-    /// Get symbol importance (caller count) from CBM via Cypher query.
-    ///
-    /// CBM has no dedicated `get_symbol_importance` tool, but `in_degree`
-    /// on function nodes provides the same information.
-    pub fn get_symbol_importance(
-        &mut self,
-        project: &str,
-        min_degree: Option<usize>,
-    ) -> Result<Vec<Value>, CbmError> {
-        let min = min_degree.unwrap_or(1);
-        let cypher = format!(
-            "MATCH (f:Function) WHERE f.in_degree >= {} RETURN f.name, f.file_path, f.in_degree, f.out_degree ORDER BY f.in_degree DESC",
-            min
-        );
-        let table = self.query_graph(&cypher, project)?;
-        Ok(table
-            .rows
-            .into_iter()
-            .map(|row| {
-                let name = row
-                    .first()
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let file = row
-                    .get(1)
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let in_degree = row
-                    .get(2)
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| s.parse::<f64>().ok())
-                    .unwrap_or(0.0);
-                let out_degree = row
-                    .get(3)
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| s.parse::<f64>().ok())
-                    .unwrap_or(0.0);
-                serde_json::json!({
-                    "name": name,
-                    "file": file,
-                    "in_degree": in_degree as u64,
-                    "out_degree": out_degree as u64,
-                    "importance": in_degree / 100.0,  // normalized score for blending
-                })
-            })
-            .collect())
-    }
-
-    /// Get dead code candidates from CBM via Cypher query.
-    ///
-    /// CBM has no dedicated `get_dead_code` tool, but functions with
-    /// `in_degree = 0` and `is_entry_point = false` are dead code.
-    pub fn get_dead_code(&mut self, project: &str) -> Result<Vec<Value>, CbmError> {
-        let cypher = "MATCH (f:Function) WHERE f.in_degree = 0 AND f.is_entry_point = false RETURN f.name, f.file_path".to_string();
-        let table = self.query_graph(&cypher, project)?;
-        Ok(table
-            .rows
-            .into_iter()
-            .map(|row| {
-                serde_json::json!({
-                    "name": row.first().and_then(|v| v.as_str()).unwrap_or(""),
-                    "file": row.get(1).and_then(|v| v.as_str()).unwrap_or(""),
-                    "reason": "no callers",
-                })
-            })
-            .collect())
-    }
-
-    /// Trigger indexing of a repository in CBM 0.8.1+.
+    /// Trigger indexing of a repository.
     /// Uses `index_repository` with `repo_path` and `mode` parameters.
     pub fn index_repository(&mut self, repo_path: &str, mode: &str) -> Result<Value, CbmError> {
         self.call_tool(

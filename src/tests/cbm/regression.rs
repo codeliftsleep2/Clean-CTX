@@ -990,9 +990,9 @@ fn proxy_target_resolution_gates_only_project_bound_calls() {
 
 #[test]
 fn parse_architecture_maps_packages_and_boundaries_from_live_payload() {
-    use crate::cbm::bridge::parse_architecture_response;
-
-    let arch = serde_json::json!({
+    // Legacy flat-array shape, pinned through the wire adapter (which
+    // shape-detects both the 0.10.8 section model and this legacy form).
+    let arch = crate::cbm::wire::parse_architecture(&serde_json::json!({
         "packages": [
             {"name": "cbm", "node_count": 81, "fan_in": 0, "fan_out": 0},
             {"name": "tests", "node_count": 65, "fan_in": 0, "fan_out": 0},
@@ -1003,12 +1003,11 @@ fn parse_architecture_maps_packages_and_boundaries_from_live_payload() {
             {"from": "mcp", "to": "cbm", "call_count": 18},
             {"from": "tests", "to": "mcp", "call_count": 7}
         ]
-    });
+    }))
+    .expect("legacy architecture payload must parse");
 
-    let ov = parse_architecture_response(&arch);
-
-    assert_eq!(ov.modules.len(), 3, "packages[] must map to modules");
-    let cbm = ov
+    assert_eq!(arch.modules.len(), 3, "packages[] must map to modules");
+    let cbm = arch
         .modules
         .iter()
         .find(|m| m.name == "cbm")
@@ -1016,11 +1015,11 @@ fn parse_architecture_maps_packages_and_boundaries_from_live_payload() {
     assert_eq!(cbm.file_count, 81, "node_count maps into file_count");
 
     assert_eq!(
-        ov.dependencies.len(),
+        arch.dependencies.len(),
         3,
         "boundaries[] must map to dependencies"
     );
-    let dep = ov
+    let dep = arch
         .dependencies
         .iter()
         .find(|d| d.from == "tests" && d.to == "cbm")
@@ -1030,25 +1029,22 @@ fn parse_architecture_maps_packages_and_boundaries_from_live_payload() {
 
 #[test]
 fn parse_architecture_tolerates_small_graph_without_boundaries_key() {
-    use crate::cbm::bridge::parse_architecture_response;
-
-    let arch = serde_json::json!({
+    let arch = crate::cbm::wire::parse_architecture(&serde_json::json!({
         "packages": [
             {"name": "main", "node_count": 4}
         ]
         // Intentionally no `boundaries` key — tests the missing-key fallback.
-    });
+    }))
+    .expect("legacy architecture payload without boundaries must parse");
 
-    let ov = parse_architecture_response(&arch);
-
-    assert_eq!(ov.modules.len(), 1);
-    assert_eq!(ov.modules[0].name, "main");
-    assert_eq!(ov.modules[0].file_count, 4);
+    assert_eq!(arch.modules.len(), 1);
+    assert_eq!(arch.modules[0].name, "main");
+    assert_eq!(arch.modules[0].file_count, 4);
 
     // The mini payload has NO `boundaries` key — the old parser read a
-    // key that never exists; the new one defaults to empty instead of
+    // key that never exists; the adapter defaults to empty instead of
     // erroring.
-    assert!(ov.dependencies.is_empty());
+    assert!(arch.dependencies.is_empty());
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1090,14 +1086,16 @@ const SEARCH_RESULT_WIRE_CAPTURE: &str = r#"{"total":1,"results":[{"name":"Graph
 
 #[test]
 fn map_search_result_keeps_results_using_cbm_081_field_names() {
-    use crate::cbm::bridge::map_search_result;
-
+    // This is a legacy-tolerance pin: the wire adapter shape-detects both the
+    // CBM 0.10.8 tree/table model and the legacy `results[]` envelope and must
+    // keep results for the legacy shape (verified against live captures).
     let envelope: serde_json::Value =
         serde_json::from_str(SEARCH_RESULT_WIRE_CAPTURE).expect("captured envelope parses");
-    let results = envelope["results"].as_array().expect("results array");
+    let nodes =
+        crate::cbm::wire::parse_search_results(&envelope).expect("result must NOT be dropped");
 
-    assert_eq!(results.len(), 1, "capture sanity");
-    let node = map_search_result(&results[0]).expect("result must NOT be dropped");
+    assert_eq!(nodes.len(), 1, "capture sanity");
+    let node = &nodes[0];
 
     assert_eq!(node.name, "GraphBridge");
     assert_eq!(node.label, "Class");
@@ -1629,5 +1627,66 @@ fn apply_edit_marks_dirty_instead_of_reindexing() {
     assert!(
         bridge.is_project_dirty("test-project"),
         "must be dirty after mark"
+    );
+}
+
+// ── CBM 0.10.8 daemon lifecycle: startup classification (decision §6) ──
+
+#[test]
+fn startup_failure_with_conflict_signature_classifies_as_daemon_conflict() {
+    use crate::cbm::client::CbmError;
+    use crate::cbm::client::{classify_startup_failure, is_retryable};
+
+    let d_conflict = classify_startup_failure(
+        "admission conflict: active daemon uses a different canonical cache root",
+    );
+    match &d_conflict {
+        CbmError::DaemonConflict(msg) => {
+            assert!(msg.contains("cache root"), "reason preserved: {msg}");
+        }
+        other => panic!("conflict signature must map to DaemonConflict, got {other:?}"),
+    }
+    assert!(
+        is_retryable(&d_conflict),
+        "DaemonConflict is a retryable/unavailable condition — never empty success"
+    );
+
+    let plain = classify_startup_failure("CBM exited");
+    assert!(
+        matches!(plain, CbmError::ConnectionLost(_)),
+        "non-conflict startup exit stays ConnectionLost: {plain:?}"
+    );
+    assert!(is_retryable(&plain), "ConnectionLost remains retryable");
+
+    let startup_timeout = CbmError::StartupTimeout(std::time::Duration::from_secs(30));
+    assert!(
+        is_retryable(&startup_timeout),
+        "StartupTimeout is retryable (daemon coordination may later succeed)"
+    );
+    let display = startup_timeout.to_string();
+    assert!(
+        display.contains("startup") && display.contains("coord"),
+        "StartupTimeout Display is distinct from a plain query timeout: {display}"
+    );
+}
+
+#[test]
+fn daemon_conflict_is_never_treated_as_successful_empty_data() {
+    use crate::cbm::client::CbmError;
+    // The migration invariant: a daemon conflict is Err, and a valid empty graph
+    // is Ok(empty). These are distinct and never conflated.
+    let conflict = CbmError::DaemonConflict("version/cache-root mismatch".into());
+    assert!(
+        !matches!(conflict, CbmError::ToolError { .. }),
+        "conflict is classified as its own error family, not a tool soft-error"
+    );
+    // `Ok(empty)` remains reserved for valid zero-result queries — the
+    // wire-adapter shape detection returns None (not an empty Ok) for unknown
+    // shapes, and the bridge maps that to Err(ParseError), so a malformed CBM
+    // response can never pretend to be a successful empty result.
+    let unknown = crate::cbm::wire::parse_search_results(&serde_json::json!({"unexpected": true}));
+    assert!(
+        unknown.is_none(),
+        "unknown shape → None (not a fabricated empty)"
     );
 }

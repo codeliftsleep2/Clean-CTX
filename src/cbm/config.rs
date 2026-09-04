@@ -53,6 +53,22 @@ pub struct CbmConfig {
     #[serde(default = "default_query_timeout_ms")]
     pub query_timeout_ms: u64,
 
+    /// Startup coordination timeout (ms) for the CBM 0.10.x daemon-backed
+    /// session. Distinct from `query_timeout_ms`: this bounds the initial
+    /// daemon-coordination wait before the first query timeout applies.
+    /// Default: 30000 (30s).
+    #[serde(default = "default_query_timeout_ms")]
+    pub startup_timeout_ms: u64,
+
+    /// Clean-CTX-managed canonical CBM cache root (`CBM_CACHE_DIR`).
+    ///
+    /// Pinned per the CBM 0.10.8 migration decision (§6.2): Clean-CTX owns
+    /// its cache cohort, isolated from other CBM consumers. When `None`,
+    /// CBM's own default (`~/.cache/codebase-memory-mcp`) is used and the
+    /// pin is not set in the spawn environment.
+    #[serde(default)]
+    pub cache_root: Option<String>,
+
     /// Minimum compatible CBM version (semver). Warn at startup if incompatible.
     #[serde(default)]
     pub cbm_min_version: Option<String>,
@@ -80,6 +96,8 @@ impl Default for CbmConfig {
             cache_ttl: default_cache_ttl(),
             enabled: default_enabled(),
             query_timeout_ms: default_query_timeout_ms(),
+            startup_timeout_ms: default_query_timeout_ms(),
+            cache_root: None,
             cbm_min_version: None,
             log_dir: default_log_dir(),
             max_retries: default_max_retries(),

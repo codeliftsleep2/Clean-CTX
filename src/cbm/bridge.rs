@@ -71,23 +71,6 @@ pub struct ArchitectureDependency {
 /// Key sets vary between projects/modes (small graphs omit `boundaries`,
 /// large ones may omit `entry_points`) — missing keys deserialize to
 /// empty vecs rather than erroring.
-/// Map one CBM 0.8.1 `search_graph` result object onto [`GraphNode`].
-///
-/// CBM emits `qualified_name` / `file_path` — there is **no `id`** and **no
-/// `file`** key (verified against live captures). The previous mapping
-/// required `n["id"]`, so `filter_map`'s `?` silently dropped EVERY result
-/// and wrapper searches were always empty regardless of the pattern.
-pub(crate) fn map_search_result(n: &Value) -> Option<GraphNode> {
-    let name = n["name"].as_str()?;
-    Some(GraphNode {
-        id: n["qualified_name"].as_str().unwrap_or(name).to_string(),
-        label: n["label"].as_str().unwrap_or("").to_string(),
-        name: name.to_string(),
-        file: n["file_path"].as_str().unwrap_or("").to_string(),
-        properties: HashMap::new(),
-    })
-}
-
 /// M-01 post-filter predicate: does `edge` touch the requested target?
 ///
 /// Boundary normalization contract (2026-08-24 fix): CBM identifies symbols
@@ -115,25 +98,17 @@ pub(crate) fn edge_touches_target(edge: &GraphEdge, target: &str) -> bool {
     endpoint_matches(&edge.from, target) || endpoint_matches(&edge.to, target)
 }
 
-/// Convert normalized wire edges into [`GraphEdge`]s, applying the M-01
-/// post-filter when a target is specified. Preserves CBM emission order.
+/// Apply the M-01 post-filter to wire-adapter edges when a target is
+/// specified. Preserves CBM emission order.
 pub(crate) fn filter_trace_edges(
-    edges: &[Value],
+    edges: Vec<GraphEdge>,
     filter_target: &Option<String>,
 ) -> Vec<GraphEdge> {
     edges
-        .iter()
-        .filter_map(|e| {
-            let ge = GraphEdge {
-                from: e["from"].as_str()?.to_string(),
-                to: e["to"].as_str()?.to_string(),
-                label: e["label"].as_str().unwrap_or("").into(),
-                properties: HashMap::new(),
-            };
-            match filter_target {
-                Some(target) if !edge_touches_target(&ge, target) => None,
-                _ => Some(ge),
-            }
+        .into_iter()
+        .filter(|ge| match filter_target {
+            Some(target) => edge_touches_target(ge, target),
+            None => true,
         })
         .collect()
 }
@@ -320,41 +295,6 @@ fn find_projection_column(columns: &[String], property: &str) -> Option<usize> {
 /// served again. The SQLite schema is unchanged; pre-0.5.1 `cypher:` rows
 /// stay in the database untouched (never read, never migrated).
 pub(crate) const QUERY_CACHE_KEY_NAMESPACE: &str = "cypher2";
-
-pub(crate) fn parse_architecture_response(arch: &Value) -> ArchitectureOverview {
-    let modules = arch["packages"]
-        .as_array()
-        .map(|ms| {
-            ms.iter()
-                .filter_map(|m| {
-                    Some(ArchitectureModule {
-                        name: m["name"].as_str()?.to_string(),
-                        path: String::new(),
-                        file_count: m["node_count"].as_u64().unwrap_or(0) as usize,
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    let dependencies = arch["boundaries"]
-        .as_array()
-        .map(|ds| {
-            ds.iter()
-                .filter_map(|d| {
-                    Some(ArchitectureDependency {
-                        from: d["from"].as_str()?.to_string(),
-                        to: d["to"].as_str()?.to_string(),
-                        kind: "calls".to_string(),
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    ArchitectureOverview {
-        modules,
-        dependencies,
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeadCodeEntry {
@@ -551,8 +491,10 @@ impl GraphBridge {
                 Some(path) => match CbmClient::try_launch(
                     &path,
                     Duration::from_millis(config.query_timeout_ms),
+                    Duration::from_millis(config.startup_timeout_ms),
                     config.max_retries,
                     config.circuit_cooldown_secs,
+                    config.cache_root.as_deref(),
                 ) {
                     Ok(Some(c)) => {
                         eprintln!("[clean-ctx-cbm] Launched from: {}", path.display());
@@ -1295,16 +1237,32 @@ impl GraphBridge {
             .map_err(|e| CbmError::ParseError(format!("cached symbol_importance: {e}")));
         }
         let project = self.project_str();
-        let symbols = self.query(move |c| c.get_symbol_importance(&project, Some(1)))?;
-        let map: HashMap<_, _> = symbols
+        // CBM 0.10.8 migration: the former `CbmClient::get_symbol_importance`
+        // Cypher helper was retired (decision document §8.3). Importance is
+        // now derived via `query_graph` — a native CBM tool — against the
+        // 0.10.8 schema (the `Function` label exists there, unlike 0.8.1).
+        // The preferred long-term path is native `search_graph`
+        // (relationship/direction/min_degree filters) once the importance
+        // consumer is wired to production.
+        let cypher = "MATCH (f:Function) WHERE f.in_degree >= 1 RETURN f.name, f.file_path, f.in_degree, f.out_degree ORDER BY f.in_degree DESC".to_string();
+        let table = self.query(move |c| c.query_graph(&cypher, &project))?;
+        let map: HashMap<_, _> = table
+            .rows
             .iter()
-            .filter_map(|e| {
+            .filter_map(|row| {
+                let name = row.first().and_then(|v| v.as_str())?;
+                let file = row.get(1).and_then(|v| v.as_str()).unwrap_or("");
+                let in_degree = row
+                    .get(2)
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .unwrap_or(0.0);
                 Some((
-                    e["name"].as_str()?.to_string(),
+                    name.to_string(),
                     SymbolImportance {
-                        symbol: e["name"].as_str()?.to_string(),
-                        score: e["importance"].as_f64().unwrap_or(0.0),
-                        file: e["file"].as_str().unwrap_or("").to_string(),
+                        symbol: name.to_string(),
+                        score: in_degree / 100.0,
+                        file: file.to_string(),
                     },
                 ))
             })
@@ -1489,10 +1447,11 @@ impl GraphBridge {
         }
         let project = self.project_str();
         let arch = self.query(move |c| c.get_architecture(&project))?;
-        // CBM 0.8.1 emits packages/boundaries (not modules/
-        // dependencies) — map through the verified wire-schema
-        // parser instead of reading keys that never exist.
-        let ov = parse_architecture_response(&arch);
+        // Wire adapter (0.10.8): parse the aspects-driven `{cols, rows}`
+        // section model (packages → modules, boundaries → dependencies);
+        // shape-detects the legacy flat arrays.
+        let ov = crate::cbm::wire::parse_architecture(&arch)
+            .ok_or_else(|| CbmError::ParseError("unrecognized get_architecture shape".into()))?;
         self.cache_insert(&key, &ov);
         Ok(ov)
     }
@@ -1657,9 +1616,11 @@ impl GraphBridge {
         // cbm_proxy path, which forwards CBM-native arguments unchanged.
         let result = self.query(move |c| c.search_graph(&name_pattern, &project, None));
         match result {
-            Ok(nodes) => {
+            Ok(body) => {
                 self.set_last_error(None);
-                let gn: Vec<GraphNode> = nodes.iter().filter_map(map_search_result).collect();
+                // Wire adapter (0.10.8): parse the tree/table response with
+                // FQN reconstruction; shape-detects the legacy envelope.
+                let gn = crate::cbm::wire::parse_search_results(&body).unwrap_or_default();
                 self.cache_insert(&key, &gn);
                 gn
             }
@@ -1727,12 +1688,15 @@ impl GraphBridge {
         let first = {
             let f = from.to_string();
             let project = project.clone();
-            self.query(move |c| c.trace_path(&f, first_direction, &project, Some(3)))
+            self.query(move |c| c.trace_path(&f, first_direction, &project, Some(3), None))
         };
         let outcome = match first {
             Err(e) => Err(e),
-            Ok(edges) => {
-                let ge = filter_trace_edges(&edges, &filter_target);
+            Ok(body) => {
+                // Wire adapter (0.10.8): parse the callers/callees table
+                // models; shape-detects the legacy arrays.
+                let edges = crate::cbm::wire::parse_trace(&body, from);
+                let ge = filter_trace_edges(edges, &filter_target);
                 if !ge.is_empty() || !allow_fallback {
                     Ok(ge)
                 } else {
@@ -1741,8 +1705,12 @@ impl GraphBridge {
                     // ONLY inbound (the target calls `from`). Errors here are
                     // propagated, never masked as empty data.
                     let f = from.to_string();
-                    match self.query(move |c| c.trace_path(&f, "inbound", &project, Some(3))) {
-                        Ok(edges) => Ok(filter_trace_edges(&edges, &filter_target)),
+                    match self.query(move |c| c.trace_path(&f, "inbound", &project, Some(3), None))
+                    {
+                        Ok(body) => {
+                            let edges = crate::cbm::wire::parse_trace(&body, from);
+                            Ok(filter_trace_edges(edges, &filter_target))
+                        }
                         Err(e) => Err(e),
                     }
                 }

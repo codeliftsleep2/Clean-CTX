@@ -151,6 +151,17 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
 
+### CBM-DAEMON-001 CBM 0.10.x Daemon-Backed Lifecycle & Cache-Root Isolation
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Clean-CTX owns its CBM MCP session/process; CBM coordinates that session through a shared local daemon. Clean-CTX must pin a stable cache root and classify daemon admission conflicts distinctly — never convert a startup failure into a successful empty graph result. |
+| **Invariant** | Under CBM 0.10.x the launched executable is a daemon-coordinated session/frontend, not an independently owned runtime. Clean-CTX (1) pins `CBM_CACHE_DIR` to the configured `cache_root` in the spawn environment when set, defining its own cache cohort; (2) enforces a distinct startup-coordination deadline (`startup_timeout_ms`) separate from the ordinary query timeout; (3) classifies daemon admission conflicts (version/build/ABI/cache-root mismatch with an already-active daemon) as `CbmError::DaemonConflict` and startup-coordination timeout as `CbmError::StartupTimeout` — both retryable, never folded into empty success; (4) preserves the one-CBM-version-per-cache-root admission rule (a conflicting root is rejected by CBM before any work). CLI one-shot mode and daemon reuse are CBM-managed; Clean-CTX owns only its session. |
+| **Enforcement** | `try_launch` sets `CBM_CACHE_DIR` from `CbmConfig::cache_root`; `send_and_receive_raw` uses the startup deadline until the first response then falls back to query timeout; `classify_startup_failure` maps startup-window exits with conflict signatures to `CbmError::DaemonConflict`; `is_retryable` treats both new variants as retryable. |
+| **Authority** | `src/cbm/client.rs` (`try_launch`, `send_and_receive_raw`, `classify_startup_failure`), `src/cbm/config.rs` (`CbmConfig::cache_root`, `startup_timeout_ms`), `src/cbm/bridge.rs` (`try_create`) |
+| **Type** | DOCUMENTED (config + classification) |
+| **Gate** | `cargo test cbm` |
+
 ### CBM-WIRE-001 Verified CBM `trace_path` Wire Contract
 
 | Property | Value |
@@ -188,7 +199,18 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### EDIT-001 apply_edit Unit Verification & EOL Preservation
+### CBM-WIRE-003 CBM 0.10.8 Tree/Table Response Shapes (`search_graph`, `trace_path`, `get_architecture`)
+
+| Property | Value |
+|----------|-------|
+| **Intent** | The typed CBM adapter must consume the CBM 0.10.8 tree/table response model for `search_graph`, `trace_path`, and `get_architecture` — never a presumed 0.8.1 envelope — so typed results keep reaching agents after the daemon-era retrieval rewrite. |
+| **Invariant** | CBM 0.10.8 (format="json") emits column-ordered table models: `search_graph` → `{total, count, cols, groups:[{qn_prefix, file, rows[]}], has_more}` (FQN = `qn_prefix + "." + name`; file provenance is per-group); `trace_path` → `callers`/`callees` as `{cols, rows}` tables with `callers_total`/`callees_total`; `get_architecture` → each aspect section (`packages`, `boundaries`, …) as `{cols, rows}`, with `packages`/`boundaries` requested explicitly via `aspects`. The wire adapter (`src/cbm/wire.rs`) is the sole shape-detection owner: presence of `cols`/`rows`/`groups` selects the 0.10.8 path; the legacy `results[]`/flat-array shapes are tolerated for backward-compat parsing but are NOT a migration target. Unknown/malformed shapes must fail cleanly (empty/None → no fabricated graph data), never crash and never masquerade as successful typed results. |
+| **Enforcement** | `src/cbm/wire.rs` deterministic fixtures covering the 0.10.8 tree/table shapes, FQN reconstruction, per-group file provenance, empty results, and unknown-shape `None`; legacy-shape tolerance pins migrated from the removed `map_search_result`/`parse_architecture_response`/`extract_trace_edges` call paths. |
+| **Authority** | `src/cbm/wire.rs` (`parse_search_results`, `parse_trace`, `parse_architecture`), `src/cbm/client.rs` (tool arg `format:"json"` / `aspects`), `src/cbm/bridge.rs` (adapter call sites) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test cbm::wire` |
+
+---
 
 | Property | Value |
 |----------|-------|
