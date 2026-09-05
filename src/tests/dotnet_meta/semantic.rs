@@ -358,3 +358,339 @@ public class OrderService : IOrderService
         "Implements must NOT imply Binds (no DI registration present)"
     );
 }
+
+// ── Constructor consumption (Phase 12) ────────────────────────────────
+
+fn injects(edges: &[SemanticEdge]) -> Vec<&SemanticEdge> {
+    edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Injects)
+        .collect()
+}
+
+#[test]
+fn ctor_injects_basic_field_dependency() {
+    let source = r#"
+public class CustomerRepository
+{
+    private readonly IApplicationDbContext _context;
+
+    public CustomerRepository(IApplicationDbContext context)
+    {
+        _context = context;
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = injects(&edges);
+    assert_eq!(edges.len(), 1, "one Injects edge expected");
+    assert_eq!(
+        edges[0].subject,
+        EntityRef::new("builtin", "Class", "CustomerRepository")
+    );
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("dotnet", "Token", "IApplicationDbContext")
+    );
+    assert_eq!(edges[0].layer, "dotnet");
+}
+
+#[test]
+fn ctor_injects_nullable_parameter_normalized() {
+    let source = r#"
+public class CustomerRepository
+{
+    private readonly IApplicationDbContext _context;
+
+    public CustomerRepository(IApplicationDbContext? context)
+    {
+        _context = context;
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = injects(&edges);
+    assert_eq!(
+        edges.len(),
+        1,
+        "nullable param should match non-nullable field"
+    );
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("dotnet", "Token", "IApplicationDbContext")
+    );
+}
+
+#[test]
+fn ctor_injects_non_matching_parameter_no_edge() {
+    let source = r#"
+public class CustomerRepository
+{
+    private readonly IApplicationDbContext _context;
+
+    public CustomerRepository(IOtherService svc)
+    {
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    assert!(
+        injects(&edges).is_empty(),
+        "non-matching param must not produce Injects"
+    );
+}
+
+#[test]
+fn ctor_injects_parameter_without_field_no_edge() {
+    let source = r#"
+public class CustomerRepository
+{
+    public CustomerRepository(IApplicationDbContext context)
+    {
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    assert!(
+        injects(&edges).is_empty(),
+        "param without same-class field must not produce Injects"
+    );
+}
+
+#[test]
+fn ctor_injects_generic_type_preserved() {
+    let source = r#"
+public class CustomerRepository
+{
+    private readonly IRepository<Customer> _repo;
+
+    public CustomerRepository(IRepository<Customer> repository)
+    {
+        _repo = repository;
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = injects(&edges);
+    assert_eq!(edges.len(), 1, "generic type must be preserved exactly");
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("dotnet", "Token", "IRepository<Customer>")
+    );
+}
+
+#[test]
+fn ctor_injects_different_generic_args_distinct() {
+    let source = r#"
+public class CustomerRepository
+{
+    private readonly IRepository<Customer> _repo;
+
+    public CustomerRepository(IRepository<Order> repository)
+    {
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    assert!(
+        injects(&edges).is_empty(),
+        "different generic args must not match"
+    );
+}
+
+#[test]
+fn ctor_injects_qualified_name_exact() {
+    let source = r#"
+public class CustomerRepository
+{
+    private readonly My.Namespace.IBar _bar;
+
+    public CustomerRepository(My.Namespace.IBar bar)
+    {
+        _bar = bar;
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = injects(&edges);
+    assert_eq!(edges.len(), 1, "qualified name must match exactly");
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("dotnet", "Token", "My.Namespace.IBar")
+    );
+}
+
+#[test]
+fn ctor_injects_qualified_name_does_not_match_short() {
+    let source = r#"
+public class CustomerRepository
+{
+    private readonly My.Namespace.IBar _bar;
+
+    public CustomerRepository(IBar bar)
+    {
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    assert!(
+        injects(&edges).is_empty(),
+        "short name must not match qualified field (no namespace resolution)"
+    );
+}
+
+#[test]
+fn ctor_injects_multiple_parameters() {
+    let source = r#"
+public class CustomerRepository
+{
+    private readonly IApplicationDbContext _context;
+    private readonly ILogger _logger;
+
+    public CustomerRepository(IApplicationDbContext context, ILogger logger)
+    {
+        _context = context;
+        _logger = logger;
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = injects(&edges);
+    assert_eq!(edges.len(), 2, "both matching params should emit");
+    let names: Vec<&str> = edges.iter().map(|e| e.object.name.as_str()).collect();
+    assert!(names.contains(&"IApplicationDbContext"));
+    assert!(names.contains(&"ILogger"));
+}
+
+#[test]
+fn ctor_injects_multiple_constructors_independent() {
+    let source = r#"
+public class CustomerRepository
+{
+    private readonly IApplicationDbContext _context;
+
+    public CustomerRepository()
+    {
+    }
+
+    public CustomerRepository(IApplicationDbContext context)
+    {
+        _context = context;
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = injects(&edges);
+    assert_eq!(edges.len(), 1, "only the matching constructor should emit");
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("dotnet", "Token", "IApplicationDbContext")
+    );
+}
+
+#[test]
+fn ctor_injects_primary_constructor_unsupported() {
+    // Primary constructors (C# 12) are explicitly deferred.
+    let source = r#"
+public class CustomerRepository(IApplicationDbContext context)
+{
+    private readonly IApplicationDbContext _context;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    assert!(
+        injects(&edges).is_empty(),
+        "primary constructors must not be activated by this phase"
+    );
+}
+
+#[test]
+fn ctor_injects_low_fidelity_no_edges() {
+    let source = r#"
+public class CustomerRepository
+{
+    private readonly IApplicationDbContext _context;
+
+    public CustomerRepository(IApplicationDbContext context)
+    {
+        _context = context;
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Low, None);
+    assert!(
+        injects(&edges).is_empty(),
+        "Low fidelity must not establish field/property dependencies"
+    );
+}
+
+#[test]
+fn ctor_injects_no_binds_traversal() {
+    // Injects must be emitted WITHOUT resolving the implementation via Binds.
+    let source = r#"
+using Microsoft.Extensions.DependencyInjection;
+
+public class CustomerRepository
+{
+    private readonly IApplicationDbContext _context;
+
+    public CustomerRepository(IApplicationDbContext context)
+    {
+        _context = context;
+    }
+
+    public void Configure(IServiceCollection services)
+    {
+        services.AddScoped<IApplicationDbContext, ApplicationDbContext>();
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = DotNetMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects_edges = injects(&edges);
+    assert_eq!(injects_edges.len(), 1, "Injects edge must be present");
+    assert_eq!(
+        injects_edges[0].subject,
+        EntityRef::new("builtin", "Class", "CustomerRepository")
+    );
+    assert_eq!(
+        injects_edges[0].object,
+        EntityRef::new("dotnet", "Token", "IApplicationDbContext")
+    );
+    // No edge should connect the consumer directly to the implementation.
+    let direct_impl: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| {
+            e.relation == SemanticRelation::Injects && e.object.name == "ApplicationDbContext"
+        })
+        .collect();
+    assert!(
+        direct_impl.is_empty(),
+        "Injects must not resolve through Binds to the implementation"
+    );
+}
