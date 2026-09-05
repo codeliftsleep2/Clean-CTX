@@ -220,7 +220,7 @@ pub fn format_class_entry(name: &str, fields: &[String], fidelity: Fidelity) -> 
 
 /// Pull the type names that follow a given keyword (`extends` or `implements`)
 /// out of a class declaration string.
-fn extract_base_types(decl: &str, keyword: &str) -> Vec<String> {
+pub(crate) fn extract_base_types(decl: &str, keyword: &str) -> Vec<String> {
     let Some(after) = decl.split_once(keyword) else {
         return Vec::new();
     };

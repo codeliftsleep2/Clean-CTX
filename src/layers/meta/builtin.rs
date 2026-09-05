@@ -106,12 +106,38 @@ impl MetaLayer for BuiltinMetaLayer {
             edges.push(SemanticEdge {
                 relation: SemanticRelation::Defines,
                 subject: entity.clone(),
-                object: entity,
+                object: entity.clone(),
                 layer: "builtin",
             });
+
+            // Generic `Extends` from `extends` keyword. Authoritative across
+            // Java and TypeScript (the target is always class-like). C# `:`
+            // syntax is NOT emitted — its flat base list cannot distinguish
+            // an optional base class from interfaces without inference.
+            for base_name in parse_extends_bases(raw_class) {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::Extends,
+                    subject: entity.clone(),
+                    object: EntityRef::new("builtin", "Class", &base_name),
+                    layer: "builtin",
+                });
+            }
         }
         edges
     }
+}
+
+/// Parse base class names from the `extends` keyword in a class declaration.
+///
+/// Returns the list of base type names that follow `extends`. This is
+/// authoritative for `Extends` across Java and TypeScript — the target of
+/// `extends` is always class-like. Does NOT handle C# `:` syntax (its flat
+/// base list cannot distinguish an optional base class from interfaces).
+fn parse_extends_bases(raw_class: &str) -> Vec<String> {
+    let declaration_root = strip_leading_annotations(raw_class);
+    let decl = declaration_root.lines().next().unwrap_or(declaration_root);
+    let decl = decl.split('{').next().unwrap_or(decl).trim();
+    crate::compaction::class::extract_base_types(decl, "extends")
 }
 
 /// Extract the bare declaration name using the existing class-name extraction
@@ -194,3 +220,7 @@ fn strip_leading_annotations(text: &str) -> &str {
         rest = rest[name_end..].trim_start();
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/layers/meta/builtin.rs"]
+mod tests;
