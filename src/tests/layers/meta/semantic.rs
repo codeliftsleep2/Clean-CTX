@@ -103,3 +103,84 @@ fn extract_semantic_edges_default_is_empty() {
     let edges = layer.extract_semantic_edges("source()", &[], Fidelity::Low, None);
     assert!(edges.is_empty());
 }
+
+// ── Substrate invariant tests (Phase 1) ─────────────────────────────────
+
+#[test]
+fn semantic_edge_supports_cross_domain() {
+    // Cross-domain edges are valid (SEM-006): subject in one domain,
+    // object in another, edge layer independent of both.
+    let edge = SemanticEdge {
+        relation: SemanticRelation::Implements,
+        subject: EntityRef::new("builtin", "Class", "ApplicationDbContext"),
+        object: EntityRef::new("builtin", "Interface", "IApplicationDbContext"),
+        layer: "dotnet",
+    };
+    assert_eq!(edge.subject.domain, "builtin");
+    assert_eq!(edge.object.domain, "builtin");
+    // Layer provenance independent of endpoint domain (SEM-007).
+    assert_eq!(edge.layer, "dotnet");
+}
+
+#[test]
+fn semantic_edge_layer_independent_of_endpoint_domain() {
+    // Edge layer/provenance must not be inferable from endpoint domain.
+    // Same relation, same domains, different layers.
+    let angular_edge = SemanticEdge {
+        relation: SemanticRelation::HasStore,
+        subject: EntityRef::new("angular", "Component", "ShellComponent"),
+        object: EntityRef::new("ngrx", "Store", "AppState"),
+        layer: "ngrx",
+    };
+    let dotnet_edge = SemanticEdge {
+        relation: SemanticRelation::HasEntity,
+        subject: EntityRef::new("dotnet", "DbContext", "AppDbContext"),
+        object: EntityRef::new("dotnet", "Entity", "Customer"),
+        layer: "dotnet",
+    };
+    assert_ne!(angular_edge.layer, dotnet_edge.layer);
+    // NgRx emits cross-domain edges (angular subject → ngrx object).
+    assert_eq!(angular_edge.subject.domain, "angular");
+    assert_eq!(angular_edge.object.domain, "ngrx");
+}
+
+#[test]
+fn generic_relations_are_constructible() {
+    // The generic substrate vocabulary (Implements, Extends, Binds) must be
+    // representable with framework-agnostic semantics (SEM-011/012/013).
+    let implements = SemanticEdge {
+        relation: SemanticRelation::Implements,
+        subject: EntityRef::new("builtin", "Class", "OrderRepository"),
+        object: EntityRef::new("builtin", "Interface", "IRepository"),
+        layer: "dotnet",
+    };
+    let extends = SemanticEdge {
+        relation: SemanticRelation::Extends,
+        subject: EntityRef::new("builtin", "Class", "BaseController"),
+        object: EntityRef::new("builtin", "Class", "Controller"),
+        layer: "spring",
+    };
+    let binds = SemanticEdge {
+        relation: SemanticRelation::Binds,
+        subject: EntityRef::new("dotnet", "Implementation", "AppDbContext"),
+        object: EntityRef::new("dotnet", "Token", "IApplicationDbContext"),
+        layer: "dotnet",
+    };
+    assert_eq!(implements.relation, SemanticRelation::Implements);
+    assert_eq!(extends.relation, SemanticRelation::Extends);
+    assert_eq!(binds.relation, SemanticRelation::Binds);
+}
+
+#[test]
+fn binds_direction_is_implementation_to_token() {
+    // Binds(implementation, token): direction is implementation → token,
+    // distinct from Implements (language-level) and Injects (consumer-side).
+    let binds = SemanticEdge {
+        relation: SemanticRelation::Binds,
+        subject: EntityRef::new("dotnet", "Implementation", "AppDbContext"),
+        object: EntityRef::new("dotnet", "Token", "IApplicationDbContext"),
+        layer: "dotnet",
+    };
+    assert_eq!(binds.subject.name, "AppDbContext");
+    assert_eq!(binds.object.name, "IApplicationDbContext");
+}

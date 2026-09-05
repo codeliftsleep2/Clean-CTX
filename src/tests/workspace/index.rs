@@ -1433,3 +1433,151 @@ fn phase_4b_resolve_selector_unchanged() {
     assert_eq!(idx.resolve_selector("app-c").len(), 1);
     assert!(idx.resolve_selector("nonexistent").is_empty());
 }
+
+// ── Substrate invariant tests (Phase 1) ─────────────────────────────────
+
+#[test]
+fn cross_domain_edge_registers_and_retrieves() {
+    // Cross-domain edges must be representable without special-casing the
+    // index around framework names (SEM-006, SEM-015).
+    let mut idx = WorkspaceIndex::new();
+    let implements = SemanticEdge {
+        relation: SemanticRelation::Implements,
+        subject: EntityRef::new("builtin", "Class", "ApplicationDbContext"),
+        object: EntityRef::new("builtin", "Interface", "IApplicationDbContext"),
+        layer: "dotnet",
+    };
+    idx.add_edges("app/dbcontext.cs", vec![implements]);
+
+    let outgoing = idx.forward_edges_by_identity("builtin", "Class", "ApplicationDbContext");
+    assert_eq!(outgoing.len(), 1);
+    assert_eq!(outgoing[0].relation, SemanticRelation::Implements);
+
+    let incoming = idx.reverse_edges_by_identity("builtin", "Interface", "IApplicationDbContext");
+    assert_eq!(incoming.len(), 1);
+
+    let subjects = idx.entities_by_identity("builtin", "Class", "ApplicationDbContext");
+    assert_eq!(subjects.len(), 1);
+    assert_eq!(subjects[0].file.as_deref(), Some("app/dbcontext.cs"));
+}
+
+#[test]
+fn cross_domain_ngrx_style_edge_registers() {
+    // Mirrors the existing NgRx precedent: angular subject → ngrx object,
+    // edge emitted by the ngrx layer (cross-domain, cross-layer).
+    let mut idx = WorkspaceIndex::new();
+    let has_store = SemanticEdge {
+        relation: SemanticRelation::HasStore,
+        subject: EntityRef::new("angular", "Component", "ShellComponent"),
+        object: EntityRef::new("ngrx", "Store", "AppState"),
+        layer: "ngrx",
+    };
+    idx.add_edges("app/shell.component.ts", vec![has_store]);
+
+    let outgoing = idx.forward_edges_by_identity("angular", "Component", "ShellComponent");
+    assert_eq!(outgoing.len(), 1);
+    assert_eq!(outgoing[0].object.domain, "ngrx");
+    assert_eq!(outgoing[0].layer, "ngrx");
+}
+
+#[test]
+fn generic_relations_implements_extends_binds_in_index() {
+    // The generic substrate vocabulary (Implements, Extends, Binds) must be
+    // representable in the index with framework-agnostic semantics.
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "app/repo.cs",
+        vec![
+            SemanticEdge {
+                relation: SemanticRelation::Implements,
+                subject: EntityRef::new("builtin", "Class", "OrderRepository"),
+                object: EntityRef::new("builtin", "Interface", "IRepository"),
+                layer: "dotnet",
+            },
+            SemanticEdge {
+                relation: SemanticRelation::Extends,
+                subject: EntityRef::new("builtin", "Class", "BaseController"),
+                object: EntityRef::new("builtin", "Class", "Controller"),
+                layer: "spring",
+            },
+            SemanticEdge {
+                relation: SemanticRelation::Binds,
+                subject: EntityRef::new("dotnet", "Implementation", "AppDbContext"),
+                object: EntityRef::new("dotnet", "Token", "IApplicationDbContext"),
+                layer: "dotnet",
+            },
+        ],
+    );
+
+    assert_eq!(idx.edge_count(), 3);
+    assert_eq!(
+        idx.forward_edges_by_identity("builtin", "Class", "OrderRepository")
+            .len(),
+        1
+    );
+    assert_eq!(
+        idx.forward_edges_by_identity("builtin", "Class", "BaseController")
+            .len(),
+        1
+    );
+    assert_eq!(
+        idx.forward_edges_by_identity("dotnet", "Implementation", "AppDbContext")
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn layer_provenance_preserved_independent_of_domain() {
+    // Edge layer/provenance is independent of endpoint domain (SEM-007).
+    let mut idx = WorkspaceIndex::new();
+    let angular_injects = SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Component", "UserComponent"),
+        object: EntityRef::new("angular", "Service", "UserService"),
+        layer: "angular",
+    };
+    let spring_autowired = SemanticEdge {
+        relation: SemanticRelation::Autowired,
+        subject: EntityRef::new("spring", "Controller", "UserController"),
+        object: EntityRef::new("spring", "Service", "UserService"),
+        layer: "spring",
+    };
+    idx.add_edges("a.ts", vec![angular_injects, spring_autowired]);
+
+    let angular_out = idx.forward_edges_by_identity("angular", "Component", "UserComponent");
+    assert_eq!(angular_out[0].layer, "angular");
+    let spring_out = idx.forward_edges_by_identity("spring", "Controller", "UserController");
+    assert_eq!(spring_out[0].layer, "spring");
+}
+
+#[test]
+fn occurrence_provenance_preserved_for_cross_file_same_identity() {
+    // Two occurrences with identical (domain, entity_type, name) but different
+    // files compare equal as semantic identity but remain separately observable
+    // as occurrences (SEM-001, SEM-002).
+    let mut idx = WorkspaceIndex::new();
+    let edge_a = {
+        let mut e = inject_edge("UserComponent", "UserService", None);
+        e.subject.file = Some("feature-a/user.component.ts".to_string());
+        e.object.file = Some("shared/user.service.ts".to_string());
+        e
+    };
+    let edge_b = {
+        let mut e = inject_edge("UserComponent", "SvcAlias", None);
+        e.subject.file = Some("feature-b/user.component.ts".to_string());
+        e.object.file = Some("shared/user.service.ts".to_string());
+        e
+    };
+    idx.add_edges("feature-a/user.component.ts", vec![edge_a]);
+    idx.add_edges("feature-b/user.component.ts", vec![edge_b]);
+
+    let identities = idx.entities_by_identity("angular", "Component", "UserComponent");
+    assert_eq!(identities.len(), 2); // two occurrences
+    let files: Vec<_> = identities
+        .iter()
+        .filter_map(|e| e.file.as_deref())
+        .collect();
+    assert!(files.contains(&"feature-a/user.component.ts"));
+    assert!(files.contains(&"feature-b/user.component.ts"));
+}

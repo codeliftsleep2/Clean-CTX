@@ -152,6 +152,14 @@ pub enum SemanticRelation {
     Defines,
     /// One symbol calls another.
     Calls,
+    /// Within an injection/binding system, the subject is registered or
+    /// resolvable as the object's abstraction/token.
+    ///
+    /// Direction: implementation → token. Distinct from `Implements`
+    /// (language-level contract) and `Injects`/`Autowired` (consumer-side
+    /// dependency). Deliberately encodes no lifetime, qualifier,
+    /// multi-provider, or alias semantics.
+    Binds,
 }
 
 /// A structured semantic relationship between two entities.
