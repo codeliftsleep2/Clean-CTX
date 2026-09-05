@@ -620,6 +620,190 @@ pub(crate) fn parse_module_fields(arg: &str) -> (Vec<String>, Vec<String>, Vec<S
     (decl, imp, exp)
 }
 
+/// A mapping from a provider implementation to its DI token, extracted from
+/// an Angular `providers: [...]` configuration.
+///
+/// `implementation` is the class that satisfies the token (e.g. `UserService`).
+/// `token` is the provider key (e.g. `IUserService`, or `UserService` for the
+/// class-shorthand form where the class provides itself).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderMapping {
+    pub implementation: String,
+    pub token: String,
+}
+
+/// Extract Angular DI provider mappings from a class capture.
+///
+/// Parses `providers: [...]` from `@Component`, `@Directive`, and `@NgModule`
+/// decorator arguments. Supports class shorthand (`[UserService]`) and explicit
+/// `useClass` (`{ provide: IUserService, useClass: UserService }`). Other
+/// provider forms (`useExisting`, `useFactory`, `useValue`) are ignored.
+pub fn extract_angular_providers(raw_class: &str) -> Vec<ProviderMapping> {
+    let head_end = match find_class_head_end(raw_class) {
+        Some(e) => e,
+        None => return Vec::new(),
+    };
+    let head = &raw_class[..head_end];
+    let decorators = collect_decorators(head);
+
+    let mut mappings = Vec::new();
+    for dec in &decorators {
+        if !matches!(
+            dec.kind,
+            DecoratorKind::Component | DecoratorKind::Directive | DecoratorKind::NgModule
+        ) {
+            continue;
+        }
+        if let Some(array_text) = extract_providers_array(&dec.arg) {
+            mappings.extend(parse_provider_entries(&array_text));
+        }
+    }
+    mappings
+}
+
+/// Locate the `providers:` key in a decorator argument and return its array
+/// value (the text between `[` and the matching `]`).
+fn extract_providers_array(arg: &str) -> Option<String> {
+    let trimmed = arg.trim();
+    let inner = if trimmed.starts_with('{') && trimmed.ends_with('}') {
+        trimmed[1..trimmed.len() - 1].trim()
+    } else {
+        trimmed
+    };
+    for part in split_top_level(inner, ',') {
+        let part = part.trim();
+        if let Some(colon) = part.find(':') {
+            let key = part[..colon].trim();
+            if key == "providers" {
+                return Some(part[colon + 1..].trim().to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Parse the contents of a `providers: [...]` array into provider mappings.
+fn parse_provider_entries(array_text: &str) -> Vec<ProviderMapping> {
+    let text = array_text.trim();
+    if !text.starts_with('[') {
+        return Vec::new();
+    }
+    let close = match crate::meta_util::find_matching_brace(text, '[') {
+        Some(c) => c,
+        None => return Vec::new(),
+    };
+    let inner = &text[1..close];
+
+    let mut entries = Vec::new();
+    for elem in split_top_level(inner, ',') {
+        if let Some(mapping) = parse_provider_entry(&elem) {
+            entries.push(mapping);
+        }
+    }
+    entries
+}
+
+/// Parse a single provider entry: either a class shorthand or an explicit
+/// `{ provide, useClass }` object.
+fn parse_provider_entry(elem: &str) -> Option<ProviderMapping> {
+    let elem = elem.trim();
+    if elem.is_empty() {
+        return None;
+    }
+    if elem.starts_with('{') {
+        parse_explicit_provider(elem)
+    } else {
+        // Class shorthand: the class provides itself as its own token.
+        Some(ProviderMapping {
+            implementation: elem.to_string(),
+            token: elem.to_string(),
+        })
+    }
+}
+
+/// Split a provider-object's inner text on top-level commas, respecting
+/// nested `()`, `[]`, `{}`, **and `<>`** groups plus string literals.
+///
+/// This is distinct from `meta_util::split_top_level` (which does not track
+/// `<>` depth) because Angular DI tokens can be generic types such as
+/// `IRepository<Customer, Order>` where the comma inside `<>` must not split.
+fn split_provider_object(inner: &str) -> Vec<String> {
+    let mut segments = Vec::new();
+    let mut depth = 0i32;
+    let mut generic = 0i32;
+    let mut start = 0usize;
+    let mut chars = inner.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' if depth > 0 => depth -= 1,
+            '<' => generic += 1,
+            '>' if generic > 0 => generic -= 1,
+            '\'' => {
+                crate::meta_util::skip_string(&mut chars, i, '\'');
+            }
+            '"' => {
+                crate::meta_util::skip_string(&mut chars, i, '"');
+            }
+            '`' => {
+                crate::meta_util::skip_template(&mut chars, i);
+            }
+            c if c == ',' && depth == 0 && generic == 0 => {
+                let seg = inner[start..i].trim();
+                if !seg.is_empty() {
+                    segments.push(seg.to_string());
+                }
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    let tail = inner[start..].trim();
+    if !tail.is_empty() {
+        segments.push(tail.to_string());
+    }
+    segments
+}
+
+/// Parse an explicit provider object `{ provide: X, useClass: Y }`.
+///
+/// Only `useClass` yields a generic `Binds` mapping. `useExisting`, `useFactory`,
+/// and `useValue` are ignored (they represent different semantics). Returns
+/// `None` if the object does not contain both `provide` and `useClass` keys,
+/// failing closed rather than guessing.
+fn parse_explicit_provider(obj: &str) -> Option<ProviderMapping> {
+    let obj = obj.trim();
+    let inner = if obj.starts_with('{') && obj.ends_with('}') {
+        obj[1..obj.len() - 1].trim()
+    } else {
+        obj
+    };
+
+    let mut token = None;
+    let mut implementation = None;
+
+    for part in split_provider_object(inner) {
+        let part = part.trim();
+        if let Some(colon) = part.find(':') {
+            let key = part[..colon].trim();
+            let value = part[colon + 1..].trim();
+            match key {
+                "provide" => token = Some(value.to_string()),
+                "useClass" => implementation = Some(value.to_string()),
+                _ => {}
+            }
+        }
+    }
+
+    match (token, implementation) {
+        (Some(token), Some(implementation)) => Some(ProviderMapping {
+            implementation,
+            token,
+        }),
+        _ => None,
+    }
+}
+
 fn parse_identifier_list(value: &str) -> Vec<String> {
     let trimmed = value.trim();
     if !trimmed.starts_with('[') {

@@ -189,3 +189,34 @@ pub fn routes_to_semantic_edges(
     }
     edges
 }
+
+/// Build generic `Binds` semantic edges from Angular DI provider mappings.
+///
+/// Each provider mapping becomes:
+/// ```text
+/// angular/Service/<implementation> → Binds → angular/Token/<token>
+/// ```
+///
+/// The implementation uses the existing `angular/Service` role (the standard
+/// Angular injectable identity). Provider tokens get their own `angular/Token`
+/// role, distinct from the service that satisfies them.
+///
+/// `useExisting`, `useFactory`, and `useValue` forms are not represented here
+/// (they carry different semantics and are out of scope for generic `Binds`).
+pub fn providers_to_semantic_edges(
+    providers: &[crate::angular_meta::decorators::ProviderMapping],
+) -> Vec<SemanticEdge> {
+    let mut edges: Vec<SemanticEdge> = Vec::new();
+    for mapping in providers {
+        if mapping.implementation.is_empty() || mapping.token.is_empty() {
+            continue;
+        }
+        edges.push(SemanticEdge {
+            relation: SemanticRelation::Binds,
+            subject: EntityRef::new("angular", "Service", &mapping.implementation),
+            object: EntityRef::new("angular", "Token", &mapping.token),
+            layer: "angular",
+        });
+    }
+    edges
+}

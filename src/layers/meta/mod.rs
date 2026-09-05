@@ -270,6 +270,17 @@ impl MetaLayer for AngularMetaLayer {
                     ));
                 }
             }
+
+            // Angular DI provider configuration (useClass / class shorthand).
+            // Provider tokens are projected as generic `Binds` edges:
+            //   angular/Service/<impl> → Binds → angular/Token/<token>
+            for raw_class in class_captures {
+                let providers =
+                    crate::angular_meta::decorators::extract_angular_providers(raw_class);
+                edges.extend(crate::angular_meta::semantic::providers_to_semantic_edges(
+                    &providers,
+                ));
+            }
         }
 
         // 2. NgRx semantic edges — the shape extraction already parses the

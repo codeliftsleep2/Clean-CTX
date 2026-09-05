@@ -788,3 +788,371 @@ fn pipe_and_ngrx_edges_in_workspace_index() {
         "Component must have outgoing HasStore edge"
     );
 }
+
+// ── Angular DI Provider Projection (Phase 15) ────────────────────────
+
+fn binds(edges: &[SemanticEdge]) -> Vec<&SemanticEdge> {
+    edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .collect()
+}
+
+#[test]
+fn provider_class_shorthand() {
+    let source = r#"
+import { Component } from '@angular/core';
+import { UserService } from './user.service';
+
+@Component({
+  selector: 'app-user',
+  providers: [UserService]
+})
+export class UserComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = binds(&edges);
+    assert_eq!(
+        edges.len(),
+        1,
+        "class shorthand should produce one Binds edge"
+    );
+    assert_eq!(
+        edges[0].subject,
+        EntityRef::new("angular", "Service", "UserService")
+    );
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("angular", "Token", "UserService")
+    );
+    assert_eq!(edges[0].layer, "angular");
+}
+
+#[test]
+fn provider_use_class() {
+    let source = r#"
+import { Component } from '@angular/core';
+import { UserService } from './user.service';
+
+@Component({
+  selector: 'app-user',
+  providers: [{ provide: IUserService, useClass: UserService }]
+})
+export class UserComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = binds(&edges);
+    assert_eq!(edges.len(), 1, "useClass should produce one Binds edge");
+    assert_eq!(
+        edges[0].subject,
+        EntityRef::new("angular", "Service", "UserService")
+    );
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("angular", "Token", "IUserService")
+    );
+}
+
+#[test]
+fn provider_multiple_mixed() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-user',
+  providers: [
+    UserService,
+    { provide: IUserService, useClass: UserService },
+    { provide: IConfigService, useClass: ConfigService }
+  ]
+})
+export class UserComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = binds(&edges);
+    assert_eq!(
+        edges.len(),
+        3,
+        "three providers should produce three Binds edges"
+    );
+    let tokens: Vec<&str> = edges.iter().map(|e| e.object.name.as_str()).collect();
+    assert!(tokens.contains(&"UserService"));
+    assert!(tokens.contains(&"IUserService"));
+    assert!(tokens.contains(&"IConfigService"));
+}
+
+#[test]
+fn provider_multiple_use_class() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-user',
+  providers: [
+    { provide: IUserService, useClass: UserService },
+    { provide: IConfigService, useClass: ConfigService }
+  ]
+})
+export class UserComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = binds(&edges);
+    assert_eq!(
+        edges.len(),
+        2,
+        "two useClass providers should produce two edges"
+    );
+}
+
+#[test]
+fn provider_use_existing_no_binds() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-user',
+  providers: [{ provide: IUserService, useExisting: UserService }]
+})
+export class UserComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    assert!(
+        binds(&edges).is_empty(),
+        "useExisting must not produce Binds"
+    );
+}
+
+#[test]
+fn provider_use_factory_no_binds() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-user',
+  providers: [{ provide: IUserService, useFactory: createUserService }]
+})
+export class UserComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    assert!(
+        binds(&edges).is_empty(),
+        "useFactory must not produce Binds"
+    );
+}
+
+#[test]
+fn provider_use_value_no_binds() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-user',
+  providers: [{ provide: CONFIG, useValue: config }]
+})
+export class UserComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    assert!(binds(&edges).is_empty(), "useValue must not produce Binds");
+}
+
+#[test]
+fn provider_exact_token_spelling() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-user',
+  providers: [{ provide: My.Namespace.IToken, useClass: MyService }]
+})
+export class UserComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = binds(&edges);
+    assert_eq!(edges.len(), 1, "qualified token should be preserved");
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("angular", "Token", "My.Namespace.IToken")
+    );
+}
+
+#[test]
+fn provider_malformed_syntax_fail_closed() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-user',
+  providers: [{ provide: IUserService, useExisting: SomeComplex.Existing }]
+})
+export class UserComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    assert!(
+        binds(&edges).is_empty(),
+        "unsupported provider forms must fail closed"
+    );
+}
+
+#[test]
+fn provider_in_directive() {
+    let source = r#"
+import { Directive } from '@angular/core';
+
+@Directive({
+  selector: '[appHighlight]',
+  providers: [HighlightService]
+})
+export class HighlightDirective {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = binds(&edges);
+    assert_eq!(edges.len(), 1, "Directive providers should emit Binds");
+    assert_eq!(
+        edges[0].subject,
+        EntityRef::new("angular", "Service", "HighlightService")
+    );
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("angular", "Token", "HighlightService")
+    );
+}
+
+#[test]
+fn provider_in_ngmodule() {
+    let source = r#"
+import { NgModule } from '@angular/core';
+
+@NgModule({
+  declarations: [],
+  providers: [UserService],
+  imports: []
+})
+export class AppModule {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = binds(&edges);
+    assert_eq!(edges.len(), 1, "NgModule providers should emit Binds");
+    assert_eq!(
+        edges[0].subject,
+        EntityRef::new("angular", "Service", "UserService")
+    );
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("angular", "Token", "UserService")
+    );
+}
+
+#[test]
+fn provider_no_changes_to_existing_consumption() {
+    // Verify that adding provider extraction does NOT alter the existing
+    // constructor-injection (Injects) behavior.
+    let source = r#"
+import { Component } from '@angular/core';
+import { UserService } from './user.service';
+
+@Component({
+  selector: 'app-user',
+  providers: [{ provide: IUserService, useClass: UserService }]
+})
+export class UserComponent {
+  constructor(private userSvc: UserService) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    // Injects edges must still be present (existing behavior unchanged).
+    let injects_count = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Injects)
+        .count();
+    assert!(injects_count > 0, "Injects edges must still be emitted");
+    // Binds edges must also be present.
+    let binds_count = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .count();
+    assert_eq!(binds_count, 1, "one Binds edge from useClass provider");
+}
+
+#[test]
+fn provider_multi_arg_generic_preserved() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-customer',
+  providers: [
+    { provide: IRepository<Customer, Order>, useClass: CustomerRepository }
+  ]
+})
+export class CustomerComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = binds(&edges);
+    assert_eq!(
+        edges.len(),
+        1,
+        "multi-arg generic token should be preserved"
+    );
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("angular", "Token", "IRepository<Customer, Order>")
+    );
+    assert_eq!(
+        edges[0].subject,
+        EntityRef::new("angular", "Service", "CustomerRepository")
+    );
+}
+
+#[test]
+fn provider_single_arg_generic_preserved() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-customer',
+  providers: [
+    { provide: IRepository<Customer>, useClass: CustomerRepository }
+  ]
+})
+export class CustomerComponent {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = binds(&edges);
+    assert_eq!(
+        edges.len(),
+        1,
+        "single-arg generic token should be preserved"
+    );
+    assert_eq!(
+        edges[0].object,
+        EntityRef::new("angular", "Token", "IRepository<Customer>")
+    );
+}
