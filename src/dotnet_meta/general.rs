@@ -265,11 +265,40 @@ fn extract_all_class_names(source: &str) -> Vec<String> {
     names
 }
 
-/// Extract DI registration patterns.
-fn extract_di_registrations(class_source: &str) -> Vec<String> {
+/// A structured DI registration fact extracted from source.
+///
+/// This is the authoritative structured representation of a DI registration
+/// before it is projected into either:
+/// - `Φdi` text markers (via `format_di_registration`)
+/// - `Binds` semantic edges (via `extract_dotnet_di_bindings`)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DiRegistration {
+    /// The abstraction/token type (first generic argument, e.g., `IService` in
+    /// `AddScoped<IService, Service>()`).
+    pub(crate) service: String,
+    /// The implementation type (second generic argument, e.g., `Service` in
+    /// `AddScoped<IService, Service>()`). `None` for single-type registrations
+    /// like `AddDbContext<T>()`.
+    pub(crate) impl_type: Option<String>,
+    /// The lifetime pattern (e.g., "AddScoped", "AddSingleton").
+    pub(crate) lifetime: String,
+}
+
+/// Format a `DiRegistration` into a `Φdi:<Service> → <Registration>` marker.
+pub(crate) fn format_di_registration(reg: &DiRegistration) -> String {
+    match &reg.impl_type {
+        Some(impl_type) => build_di_line(&reg.service, &format!("{}<{}>", reg.lifetime, impl_type)),
+        None => build_di_line(&reg.service, &format!("{}<{}>", reg.lifetime, reg.service)),
+    }
+}
+
+/// Extract DI registration patterns as structured data.
+///
+/// Returns `Vec<DiRegistration>` for use by both Φdi marker generation and
+/// Binds semantic-edge projection.
+pub(crate) fn extract_di_registrations_structured(class_source: &str) -> Vec<DiRegistration> {
     let mut registrations = Vec::new();
 
-    // Look for AddScoped, AddSingleton, AddTransient, AddDbContext
     let di_patterns = [
         ("AddScoped<", "AddScoped"),
         ("AddSingleton<", "AddSingleton"),
@@ -277,30 +306,30 @@ fn extract_di_registrations(class_source: &str) -> Vec<String> {
         ("AddDbContext<", "AddDbContext"),
     ];
 
-    for (pattern, _) in &di_patterns {
+    for (pattern, lifetime) in &di_patterns {
         let mut search_start = 0;
         while let Some(pos) = class_source[search_start..].find(pattern) {
             let actual_pos = search_start + pos;
             let rest = &class_source[actual_pos + pattern.len()..];
 
-            // Extract interface and implementation
             if let Some(generic_end) = rest.find('>') {
                 let types = rest[..generic_end].trim().to_string();
 
-                // Split by comma
                 if let Some(comma_pos) = types.find(',') {
                     let service = types[..comma_pos].trim().to_string();
                     let impl_type = types[comma_pos + 1..].trim().to_string();
-                    registrations.push(build_di_line(
-                        &service,
-                        &format!("{}<{}>", &pattern[..pattern.len() - 1], impl_type),
-                    ));
+                    registrations.push(DiRegistration {
+                        service,
+                        impl_type: Some(impl_type),
+                        lifetime: lifetime.to_string(),
+                    });
                 } else {
                     // Single type (e.g., AddDbContext<AppDbContext>)
-                    registrations.push(build_di_line(
-                        &types,
-                        &format!("{}<{}>", &pattern[..pattern.len() - 1], types),
-                    ));
+                    registrations.push(DiRegistration {
+                        service: types.clone(),
+                        impl_type: None,
+                        lifetime: lifetime.to_string(),
+                    });
                 }
             }
 
@@ -311,6 +340,17 @@ fn extract_di_registrations(class_source: &str) -> Vec<String> {
     registrations.dedup();
     registrations.truncate(10);
     registrations
+}
+
+/// Extract DI registration patterns (legacy Φdi string output).
+///
+/// Preserved for backward compatibility. New code should use
+/// `extract_di_registrations_structured` for semantic-edge projection.
+fn extract_di_registrations(class_source: &str) -> Vec<String> {
+    extract_di_registrations_structured(class_source)
+        .iter()
+        .map(format_di_registration)
+        .collect()
 }
 
 /// Extract validation attributes and FluentValidation validators.

@@ -105,6 +105,40 @@ pub fn extract_dotnet_semantic_edges(
         }
     }
 
+    // ── DI Bindings: implementation → abstraction/token ──
+    edges.extend(extract_dotnet_di_bindings(raw_class));
+
+    edges
+}
+
+/// Extract `Binds` semantic edges from DI registrations.
+///
+/// For two-type registrations like `AddScoped<IService, Service>()`, emits:
+/// `Service Binds IService` (implementation → abstraction/token).
+///
+/// Single-type registrations like `AddDbContext<T>()` are skipped — they have
+/// no explicit abstraction/token endpoint.
+pub fn extract_dotnet_di_bindings(raw_class: &str) -> Vec<SemanticEdge> {
+    let mut edges: Vec<SemanticEdge> = Vec::new();
+
+    let registrations = crate::dotnet_meta::general::extract_di_registrations_structured(raw_class);
+
+    for reg in &registrations {
+        let impl_type = match &reg.impl_type {
+            Some(impl_type) => impl_type,
+            None => continue, // Single-type registration: no Binds edge
+        };
+
+        // Subject = implementation, Object = abstraction/token
+        // Direction: implementation → abstraction/token
+        edges.push(SemanticEdge {
+            relation: SemanticRelation::Binds,
+            subject: EntityRef::new("dotnet", "Implementation", impl_type),
+            object: EntityRef::new("dotnet", "Token", &reg.service),
+            layer: "dotnet",
+        });
+    }
+
     edges
 }
 // ── Private Helpers (mirroring existing .NET extractor patterns) ──────────
