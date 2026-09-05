@@ -570,6 +570,75 @@ fn resolve_selector_literal_forms_are_distinct() {
     assert!(idx.resolve_selector("nonexistent").is_empty());
 }
 
+// ── Phase 7: Reference-resolution contract (B) ───────────────────────
+
+/// resolve_inject_type must NOT traverse Binds: a Binds edge alone (without an
+/// Injects/Autowired edge on the same name) must not make an implementation
+/// resolvable as an injection target.
+#[test]
+fn resolve_inject_type_ignores_binds_edges() {
+    let mut idx = WorkspaceIndex::new();
+    // AppDbContext is bound to IApplicationDbContext via Binds, but no
+    // consumer injects it through an Injects/Autowired edge in this graph.
+    idx.add_edges(
+        "app/services/config.cs",
+        vec![SemanticEdge {
+            relation: SemanticRelation::Binds,
+            subject: EntityRef::new("dotnet", "Implementation", "AppDbContext"),
+            object: EntityRef::new("dotnet", "Token", "IApplicationDbContext"),
+            layer: "dotnet",
+        }],
+    );
+
+    // Neither the implementation nor the token is returned: Binds is not an
+    // injection/consumption relation.
+    assert!(
+        idx.resolve_inject_type("AppDbContext").is_empty(),
+        "Binds subject must not be treated as an injection target"
+    );
+    assert!(
+        idx.resolve_inject_type("IApplicationDbContext").is_empty(),
+        "Binds object must not be treated as an injection target"
+    );
+}
+
+/// resolve_selector must preserve ALL components sharing the same selector
+/// literal — two distinct components exposing the same selector both resolve.
+#[test]
+fn resolve_selector_multiple_components_share_selector() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.component.ts",
+        vec![SemanticEdge {
+            relation: SemanticRelation::HasSelector,
+            subject: EntityRef::new("angular", "Component", "ComponentA"),
+            object: EntityRef::new("angular", "Component", "app-shared"),
+            layer: "angular",
+        }],
+    );
+    idx.add_edges(
+        "b.component.ts",
+        vec![SemanticEdge {
+            relation: SemanticRelation::HasSelector,
+            subject: EntityRef::new("angular", "Component", "ComponentB"),
+            object: EntityRef::new("angular", "Component", "app-shared"),
+            layer: "angular",
+        }],
+    );
+
+    let results = idx.resolve_selector("app-shared");
+    assert_eq!(
+        results.len(),
+        2,
+        "both components exposing the shared selector must resolve"
+    );
+    let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
+    assert!(
+        names.contains(&"ComponentA") && names.contains(&"ComponentB"),
+        "both matching components must be present (no uniqueness assumption)"
+    );
+}
+
 // ── Phase 4b: Phase 4a regression ───────────────────────────────────
 
 #[test]
