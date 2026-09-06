@@ -246,3 +246,194 @@ public class HealthController {
         "enrich() must still produce Φrest: markers after semantic extraction"
     );
 }
+// ── Phase 19: @Autowired declared-type repair ─────────────────────────
+
+fn autowired(edges: &[SemanticEdge]) -> Vec<&SemanticEdge> {
+    edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Autowired)
+        .collect()
+}
+
+#[test]
+fn autowired_field_multiline_targets_declared_type() {
+    // Canonical shape from src/test_files/java/UserController.java.
+    let source = r#"
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
+
+@RestController
+public class UserController {
+
+    @Autowired
+    private UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].subject,
+        EntityRef::new("spring", "Controller", "UserController")
+    );
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Service", "UserService")
+    );
+    assert_eq!(autowired[0].relation, SemanticRelation::Autowired);
+    assert_eq!(autowired[0].layer, "spring");
+}
+
+#[test]
+fn autowired_field_inline_targets_declared_type() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+
+@RestController
+public class UserController {
+    @Autowired private UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    // The declared type — not the modifier token `private` — is the identity.
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Service", "UserService")
+    );
+}
+
+#[test]
+fn autowired_field_qualified_type_preserved() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+
+@RestController
+public class UserController {
+    @Autowired
+    private com.example.UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Service", "com.example.UserService")
+    );
+}
+#[test]
+fn autowired_field_generic_type_preserved() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+
+@RestController
+public class UserController {
+    @Autowired
+    private Repository<Customer> repository;
+
+    @Autowired
+    private Repository<Customer, Order> dualRepository;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 2);
+    let types: Vec<&str> = autowired.iter().map(|e| e.object.name.as_str()).collect();
+    assert!(types.contains(&"Repository<Customer>"));
+    assert!(
+        types.contains(&"Repository<Customer, Order>"),
+        "commas inside generic arguments must not split the type"
+    );
+}
+
+#[test]
+fn autowired_field_with_qualifier_uses_declared_type() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+
+@RestController
+public class UserController {
+    @Autowired
+    @Qualifier("specialUserService")
+    private UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    // The qualifier value is not semantic data in this phase; the declared
+    // dependency type is the identity.
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Service", "UserService")
+    );
+    assert!(!edges.iter().any(|e| e.object.name == "specialUserService"));
+}
+
+#[test]
+fn autowired_malformed_declarations_fail_closed() {
+    // Missing field name → no edge. Missing type → no edge.
+    // Setter/method `@Autowired` → no edge.
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+
+@RestController
+public class UserController {
+    @Autowired
+    private;
+
+    @Autowired
+    UserService;
+
+    @Autowired
+    public void setUserService(UserService svc) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    assert!(
+        autowired(&edges).is_empty(),
+        "malformed declarations must fail closed"
+    );
+    assert!(!edges.iter().any(|e| e.object.name == "?"));
+    assert!(!edges.iter().any(|e| e.object.name == "private"));
+    assert!(!edges.iter().any(|e| e.object.name == "public"));
+}
+
+#[test]
+fn autowired_multiple_fields_each_typed() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+
+@RestController
+public class UserController {
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private UserRepository userRepository;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 2);
+    let types: Vec<&str> = autowired.iter().map(|e| e.object.name.as_str()).collect();
+    assert!(types.contains(&"UserService"));
+    assert!(types.contains(&"UserRepository"));
+}

@@ -186,13 +186,13 @@ pub fn extract_annotations(raw_class: &str, fidelity: Fidelity) -> Option<Annota
     {
         let body = &raw_class[class_body_start..];
         let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-        for (field_name, anno_kind) in collect_field_annotations(body_inner) {
-            match anno_kind {
+        for fa in collect_field_annotations(body_inner) {
+            match fa.kind {
                 AnnotationKind::Autowired => {
-                    autowired_fields.push(field_name.clone());
+                    autowired_fields.push(fa.field_name);
                 }
                 AnnotationKind::Value => {
-                    value_fields.push(field_name.clone());
+                    value_fields.push(fa.field_name);
                 }
                 _ => {}
             }
@@ -509,8 +509,159 @@ pub(crate) fn collect_method_annotations(body: &str) -> Vec<(String, AnnotationK
     out
 }
 
-pub(crate) fn collect_field_annotations(body: &str) -> Vec<(String, AnnotationKind)> {
-    let mut out: Vec<(String, AnnotationKind)> = Vec::new();
+/// A field-level `@Autowired` / `@Value` occurrence with its parsed
+/// declaration.
+///
+/// Phase 19: the semantic layer consumes `declared_type` (the declared
+/// dependency identity); the `Φaut:`/`Φval:` marker path consumes
+/// `field_name`. Occurrences whose declaration cannot be parsed confidently
+/// are dropped entirely (fail closed) rather than emitted with a fabricated
+/// identity such as `?` or a stray modifier token.
+#[derive(Debug, Clone)]
+pub(crate) struct FieldAnnotation {
+    pub(crate) field_name: String,
+    pub(crate) kind: AnnotationKind,
+    /// Declared field type — exact source spelling (qualified names and
+    /// generic arguments preserved, no truncation).
+    pub(crate) declared_type: String,
+}
+
+fn is_java_ident_byte(c: u8) -> bool {
+    c.is_ascii_alphanumeric() || c == b'_' || c == b'$'
+}
+
+fn is_java_ws(c: u8) -> bool {
+    c == b' ' || c == b'\t' || c == b'\n' || c == b'\r'
+}
+
+/// Parse the field declaration that follows a field annotation, advancing
+/// `i` past the parsed region. Returns `(declared_type, field_name)`, or
+/// `None` when the declaration cannot be parsed confidently (fail closed).
+///
+/// Accepted shape (subset of Java field declarations):
+/// ```text
+/// {@Annotation(args)}* {modifier}* Type name
+/// ```
+/// where `Type` is a qualified dotted name with an optional generic
+/// argument list `<...>` (nested generics and commas inside `<>` are
+/// preserved) and optional `[]` array suffixes. A `(` reached before the
+/// declaration completes — i.e. a method/setter declaration — fails closed.
+fn parse_field_declaration(body: &str, i: &mut usize) -> Option<(String, String)> {
+    let bytes = body.as_bytes();
+    let len = bytes.len();
+    let mut pos = *i;
+
+    // Skip intervening annotations (`@Qualifier("x")`, ...) and modifiers.
+    loop {
+        while pos < len && is_java_ws(bytes[pos]) {
+            pos += 1;
+        }
+        if pos >= len {
+            return None;
+        }
+        if bytes[pos] == b'@' {
+            pos += 1;
+            let anno_name_start = pos;
+            while pos < len && is_java_ident_byte(bytes[pos]) {
+                pos += 1;
+            }
+            if pos == anno_name_start {
+                return None; // `@` not followed by an identifier
+            }
+            if pos < len && bytes[pos] == b'(' {
+                let (consumed, _) = consume_call_expression(body, pos)?;
+                pos += consumed;
+            }
+            continue;
+        }
+        let tok_start = pos;
+        while pos < len && is_java_ident_byte(bytes[pos]) {
+            pos += 1;
+        }
+        if pos == tok_start {
+            return None; // declaration never starts (e.g. stray `;`)
+        }
+        let tok = &body[tok_start..pos];
+        if matches!(
+            tok,
+            "public" | "private" | "protected" | "static" | "final" | "transient" | "volatile"
+        ) {
+            continue; // modifier — keep scanning for the declared type
+        }
+        // `tok` begins the declared type. Walk it: identifier characters and
+        // dots, an optional generic block `<...>` (depth-tracked, so commas
+        // and spaces inside `<>` are preserved), and `[]` array suffixes.
+        // Whitespace at generic depth 0 ends the type.
+        let type_start = tok_start;
+        let mut generic = 0usize;
+        while pos < len {
+            let c = bytes[pos];
+            if generic > 0 {
+                // Inside a generic argument list: everything except the
+                // tracked delimiters is type text.
+                match c {
+                    b'<' => generic += 1,
+                    b'>' => generic -= 1,
+                    _ => {}
+                }
+                pos += 1;
+                continue;
+            }
+            match c {
+                b'<' => {
+                    generic += 1;
+                    pos += 1;
+                }
+                b'.' | b'[' | b']' => pos += 1,
+                c if c.is_ascii_alphanumeric() || c == b'_' || c == b'$' => pos += 1,
+                b' ' | b'\t' | b'\n' | b'\r' => break,
+                _ => return None, // `(`, `;`, `=`, `{`, `:`, quotes, ... → fail closed
+            }
+        }
+        if generic != 0 {
+            return None; // unbalanced generics
+        }
+        let type_span = body[type_start..pos].trim_end();
+        if type_span.is_empty() {
+            return None;
+        }
+        while pos < len && is_java_ws(bytes[pos]) {
+            pos += 1;
+        }
+        let name_start = pos;
+        while pos < len && is_java_ident_byte(bytes[pos]) {
+            pos += 1;
+        }
+        if pos == name_start {
+            return None; // no field name — fail closed
+        }
+        let field_name = body[name_start..pos].to_string();
+        // A `(` right after the name is a method declaration (setter
+        // injection) — not a field. Fail closed.
+        let mut peek = pos;
+        while peek < len && is_java_ws(bytes[peek]) {
+            peek += 1;
+        }
+        *i = pos;
+        if peek < len && bytes[peek] == b'(' {
+            return None;
+        }
+        return Some((type_span.to_string(), field_name));
+    }
+}
+
+/// Scan the class body for field-level `@Autowired` and `@Value`
+/// annotations, pairing each with its parsed declaration.
+///
+/// Phase 19: the previously-returned bare field-name token (which produced
+/// fabricated identities such as `?` for canonical multi-line declarations
+/// or `private` for inline ones) is replaced by a parsed
+/// `(field_name, declared_type)` pair. The annotation's own arguments
+/// (`@Value("...")`, `@Autowired(required = false)`) are consumed first so
+/// they are never mistaken for the declaration. Occurrences whose
+/// declaration cannot be parsed confidently are dropped (fail closed).
+pub(crate) fn collect_field_annotations(body: &str) -> Vec<FieldAnnotation> {
+    let mut out: Vec<FieldAnnotation> = Vec::new();
     let bytes = body.as_bytes();
     let len = bytes.len();
     let mut i = 0;
@@ -522,13 +673,8 @@ pub(crate) fn collect_field_annotations(body: &str) -> Vec<(String, AnnotationKi
         }
         i += 1;
         let name_start = i;
-        while i < len {
-            let c = bytes[i];
-            if c.is_ascii_alphanumeric() || c == b'_' || c == b'$' {
-                i += 1;
-            } else {
-                break;
-            }
+        while i < len && is_java_ident_byte(bytes[i]) {
+            i += 1;
         }
         if i == name_start {
             continue;
@@ -539,28 +685,30 @@ pub(crate) fn collect_field_annotations(body: &str) -> Vec<(String, AnnotationKi
             "Value" => Some(AnnotationKind::Value),
             _ => None,
         };
-        if let Some(k) = kind {
-            while i < len && (bytes[i] == b' ' || bytes[i] == b'\t') {
-                i += 1;
-            }
-            let field_start = i;
-            while i < len {
-                let c = bytes[i];
-                if c == b'\n' || c == b'{' || c == b'=' || c == b';' || c == b':' {
-                    break;
+        // Consume the annotation's own arguments so their contents are
+        // never mistaken for the field declaration.
+        if i < len && bytes[i] == b'(' {
+            match consume_call_expression(body, i) {
+                Some((consumed, _)) => i += consumed,
+                None => {
+                    // Unterminated annotation arguments — fail closed.
+                    i += 1;
+                    continue;
                 }
-                i += 1;
-            }
-            let field_segment = body[field_start..i].trim();
-            let field_name = field_segment
-                .split_whitespace()
-                .next()
-                .unwrap_or("?")
-                .to_string();
-            if !field_name.is_empty() {
-                out.push((field_name, k));
             }
         }
+        let Some(kind) = kind else {
+            continue;
+        };
+        if let Some((declared_type, field_name)) = parse_field_declaration(body, &mut i) {
+            out.push(FieldAnnotation {
+                field_name,
+                kind,
+                declared_type,
+            });
+        }
+        // Failed parses drop the occurrence (fail closed); `i` has been
+        // advanced past the scanned region by `parse_field_declaration`.
     }
 
     out
