@@ -31,7 +31,7 @@ Currently supports **TypeScript, C#, Rust, Java** language layers with **Angular
 Clean-CTX understands code as more than text:
 
 * **Language-aware parsing** - tree-sitter grammars extract structure, not just tokens, for TypeScript, C#, Rust, and Java.
-* **Semantic intermediate representation (IR)** - source compiles into a typed compiler IR (`DefClass`, `DefMethod`, `DefField`, patterns, scopes), from which meta-layers extract a semantic model of entities with identity, provenance, and relationships.
+* **Semantic Intermediate Representation (SIR)** - source compiles into a typed compiler IR (`DefClass`, `DefMethod`, `DefField`, patterns, scopes), from which meta-layers extract a semantic model of entities with identity, provenance, and relationships.
 * **Entity identity** - every class, service, component, action, and selector is identified by `(domain, entity_type, name)` with file provenance, so the same entity referenced from multiple files compares equal.
 * **Semantic relationships** - typed edges between entities: `Injects`, `HasSelector`, `Dispatches`, `Selects`, `HandlesAction`, `RouteMapsTo`, `Autowired`, `ControllerAction`, `HasEntity`, and 20+ more, each with confidence 1.0 and layer provenance.
 * **Provenance tracking** - every semantic edge records which meta-layer discovered it.
