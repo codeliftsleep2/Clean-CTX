@@ -1650,3 +1650,236 @@ fn occurrence_provenance_preserved_for_cross_file_same_identity() {
     assert!(files.contains(&"feature-a/user.component.ts"));
     assert!(files.contains(&"feature-b/user.component.ts"));
 }
+// ── Phase 29-A: resolve_bindings (provider-side token resolution) ─────
+
+/// Helper: build a Binds edge (provider identity → token identity).
+fn binds_edge(
+    domain: &'static str,
+    subject_type: &'static str,
+    subject: &str,
+    token: &str,
+) -> SemanticEdge {
+    SemanticEdge {
+        relation: SemanticRelation::Binds,
+        subject: EntityRef::new(domain, subject_type, subject),
+        object: EntityRef::new(domain, "Token", token),
+        layer: domain,
+    }
+}
+
+/// Basic binding: Service/UserService → Binds → Token/UserService resolves
+/// the provider occurrence with its definition-site provenance.
+#[test]
+fn resolve_bindings_returns_bound_provider() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "user-service.java",
+        vec![binds_edge(
+            "spring",
+            "Service",
+            "UserService",
+            "UserService",
+        )],
+    );
+
+    let providers = idx.resolve_bindings("spring", "Token", "UserService");
+    assert_eq!(providers.len(), 1);
+    assert_eq!(
+        providers[0],
+        &EntityRef::new("spring", "Service", "UserService")
+            .with_file("user-service.java".to_string())
+    );
+}
+
+/// Ambiguity: multiple distinct provider identities binding the same token
+/// are ALL returned — none is selected or collapsed.
+#[test]
+fn resolve_bindings_preserves_multiple_providers() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("a.java", vec![binds_edge("spring", "Service", "A", "X")]);
+    idx.add_edges("b.java", vec![binds_edge("spring", "Repository", "B", "X")]);
+
+    let providers = idx.resolve_bindings("spring", "Token", "X");
+    assert_eq!(providers.len(), 2, "both providers must be returned");
+    let names: Vec<&str> = providers.iter().map(|p| p.name.as_str()).collect();
+    assert!(
+        names.contains(&"A") && names.contains(&"B"),
+        "distinct provider identities must not be merged (they share only the token)"
+    );
+}
+
+/// No binding: an Autowired reference alone is not a binding; the controller
+/// must not appear, and an unknown token resolves to nothing.
+#[test]
+fn resolve_bindings_ignores_non_binds_edges_and_unknown_tokens() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "controller.java",
+        vec![SemanticEdge {
+            relation: SemanticRelation::Autowired,
+            subject: EntityRef::new("spring", "Controller", "UserController"),
+            object: EntityRef::new("spring", "Token", "UserService"),
+            layer: "spring",
+        }],
+    );
+
+    assert!(
+        idx.resolve_bindings("spring", "Token", "Unknown")
+            .is_empty()
+    );
+    let providers = idx.resolve_bindings("spring", "Token", "UserService");
+    assert!(
+        providers.is_empty(),
+        "an Autowired reference must never produce a provider"
+    );
+}
+
+/// Direction correctness: a Binds edge whose SUBJECT is the token (outgoing
+/// from the requested identity) must never be inspected.
+#[test]
+fn resolve_bindings_does_not_inspect_outgoing_edges() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "weird.java",
+        vec![SemanticEdge {
+            relation: SemanticRelation::Binds,
+            subject: EntityRef::new("spring", "Token", "X"),
+            object: EntityRef::new("spring", "Service", "Y"),
+            layer: "spring",
+        }],
+    );
+
+    assert!(
+        idx.resolve_bindings("spring", "Token", "X").is_empty(),
+        "outgoing Binds edges from the token must not produce providers"
+    );
+}
+
+/// Provenance: returned occurrences retain the existing EntityRef.file
+/// provenance attached at the index write boundary.
+#[test]
+fn resolve_bindings_preserves_provider_provenance() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "services/user-service.java",
+        vec![binds_edge(
+            "spring",
+            "Service",
+            "UserService",
+            "UserService",
+        )],
+    );
+
+    let providers = idx.resolve_bindings("spring", "Token", "UserService");
+    assert_eq!(providers.len(), 1);
+    assert_eq!(
+        providers[0].file.as_deref(),
+        Some("services/user-service.java")
+    );
+}
+
+/// Occurrence semantics: the same provider identity in two files yields two
+/// occurrences (the duplicate edge identity is deduped first-wins, but entity
+/// registration happens before dedup). The resolver must preserve exactly
+/// this existing behavior — no new deduplication.
+#[test]
+fn resolve_bindings_preserves_occurrence_multiplicity() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a/user-service.java",
+        vec![binds_edge(
+            "spring",
+            "Service",
+            "UserService",
+            "UserService",
+        )],
+    );
+    idx.add_edges(
+        "b/user-service.java",
+        vec![binds_edge(
+            "spring",
+            "Service",
+            "UserService",
+            "UserService",
+        )],
+    );
+
+    let providers = idx.resolve_bindings("spring", "Token", "UserService");
+    assert_eq!(
+        providers.len(),
+        2,
+        "both file occurrences of the provider identity must resolve"
+    );
+    let files: Vec<&str> = providers.iter().filter_map(|p| p.file.as_deref()).collect();
+    assert!(
+        files.contains(&"a/user-service.java") && files.contains(&"b/user-service.java"),
+        "occurrence provenance must be preserved"
+    );
+}
+
+/// Cross-domain isolation: identity is (domain, entity_type, name); querying
+/// a different domain's token must not return another domain's provider.
+#[test]
+fn resolve_bindings_is_domain_isolated() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges("svc.java", vec![binds_edge("spring", "Service", "X", "X")]);
+
+    assert!(idx.resolve_bindings("dotnet", "Token", "X").is_empty());
+    assert!(idx.resolve_bindings("angular", "Token", "X").is_empty());
+    assert_eq!(idx.resolve_bindings("spring", "Token", "X").len(), 1);
+}
+
+/// Exact identity match: no normalization, namespace stripping, generic
+/// stripping, or case folding. Distinct spellings are distinct tokens.
+#[test]
+fn resolve_bindings_requires_exact_identity() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "a.java",
+        vec![binds_edge(
+            "spring",
+            "Service",
+            "UserService",
+            "UserService",
+        )],
+    );
+
+    assert!(
+        idx.resolve_bindings("spring", "Token", "com.example.UserService")
+            .is_empty()
+    );
+    assert!(
+        idx.resolve_bindings("spring", "Token", "userservice")
+            .is_empty()
+    );
+    assert!(
+        idx.resolve_bindings("spring", "Token", "UserService ")
+            .is_empty()
+    );
+}
+
+/// Production dual-binding shape (Phases 23/25): an explicitly named provider
+/// binds both its class token and its name token; both resolve to the same
+/// provider identity.
+#[test]
+fn resolve_bindings_resolves_named_binding_tokens() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "user-service.java",
+        vec![
+            binds_edge("spring", "Service", "UserService", "UserService"),
+            binds_edge("spring", "Service", "UserService", "specialUserService"),
+        ],
+    );
+
+    assert_eq!(
+        idx.resolve_bindings("spring", "Token", "UserService").len(),
+        1
+    );
+    assert_eq!(
+        idx.resolve_bindings("spring", "Token", "specialUserService")
+            .len(),
+        1,
+        "the explicit name token resolves to the same provider"
+    );
+}

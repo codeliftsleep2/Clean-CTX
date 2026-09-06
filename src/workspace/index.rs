@@ -508,6 +508,56 @@ impl WorkspaceIndex {
         results
     }
 
+    /// Resolve all provider entity occurrences bound to a semantic token
+    /// identity (Phase 29-A).
+    ///
+    /// Given an exact `(domain, entity_type, name)` identity, returns every
+    /// indexed entity occurrence whose identity is the SUBJECT of a `Binds`
+    /// edge whose OBJECT identity matches the request:
+    ///
+    /// ```text
+    /// Provider  → Binds     → Token/X   resolve_bindings(.., "Token", "X") → provider occurrences
+    /// Consumer  → Autowired → Token/X   resolve_inject_type("X")           → token occurrences
+    /// ```
+    ///
+    /// This is the provision-side counterpart of [`Self::resolve_inject_type`].
+    /// Contract:
+    /// - exact identity match — no normalization, aliasing, import resolution,
+    ///   or fuzzy matching of any kind;
+    /// - only incoming `SemanticRelation::Binds` edges produce results —
+    ///   `Autowired` and every other relation are ignored, and outgoing edges
+    ///   from the requested identity are never inspected;
+    /// - ALL matching provider identities and ALL their indexed occurrences
+    ///   are returned — ambiguity is preserved and no provider is selected;
+    /// - occurrences retain their existing `EntityRef.file` provenance;
+    /// - no claim is made about runtime dependency selection or
+    ///   source-definition resolution.
+    ///
+    /// Framework-neutral: consumes only `EntityKey`, `SemanticRelation::Binds`,
+    /// and the indexed occurrence model. The fact that Spring currently
+    /// supplies the production `Binds` edges is incidental; any domain that
+    /// emits `Binds` resolves identically without changes to this type.
+    pub fn resolve_bindings(&self, domain: &str, entity_type: &str, name: &str) -> Vec<&EntityRef> {
+        let key = (
+            domain.to_string(),
+            entity_type.to_string(),
+            name.to_string(),
+        );
+        let mut results: Vec<&EntityRef> = Vec::new();
+        if let Some(incoming) = self.reverse.get(&key) {
+            for edge in incoming {
+                if edge.relation != SemanticRelation::Binds {
+                    continue;
+                }
+                let subj_key = entity_key(&edge.subject);
+                if let Some(occurrences) = self.entities.get(&subj_key) {
+                    results.extend(occurrences.iter());
+                }
+            }
+        }
+        results
+    }
+
     /// Resolve a CSS selector string to component/directive entity
     /// occurrences that expose that selector.
     ///
