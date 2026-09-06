@@ -1609,7 +1609,7 @@ fn layer_provenance_preserved_independent_of_domain() {
     let spring_autowired = SemanticEdge {
         relation: SemanticRelation::Autowired,
         subject: EntityRef::new("spring", "Controller", "UserController"),
-        object: EntityRef::new("spring", "Service", "UserService"),
+        object: EntityRef::new("spring", "Token", "UserService"),
         layer: "spring",
     };
     idx.add_edges("a.ts", vec![angular_injects, spring_autowired]);

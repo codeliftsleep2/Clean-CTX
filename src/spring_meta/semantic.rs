@@ -91,28 +91,67 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
     // The implementation identity is the class itself (authoritative from the
     // class capture). The token is the explicit @Service("name") value if
     // present, otherwise the class name (Spring's default bean name key).
+    // Phase 23: dual binding for explicit names — an explicitly named
+    // component remains injectable by both its explicit name and its class name.
     if is_service {
-        let token = service_name.unwrap_or_else(|| class_name.clone());
-        edges.push(SemanticEdge {
-            relation: SemanticRelation::Binds,
-            subject: EntityRef::new("spring", "Service", &class_name),
-            object: EntityRef::new("spring", "Token", &token),
-            layer: "spring",
-        });
+        if let Some(name) = &service_name {
+            // Explicit name: bind to both the class token and the name token.
+            if *name != class_name {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::Binds,
+                    subject: EntityRef::new("spring", "Service", &class_name),
+                    object: EntityRef::new("spring", "Token", &class_name),
+                    layer: "spring",
+                });
+            }
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Binds,
+                subject: EntityRef::new("spring", "Service", &class_name),
+                object: EntityRef::new("spring", "Token", name),
+                layer: "spring",
+            });
+        } else {
+            // Default name: bind to class token only.
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Binds,
+                subject: EntityRef::new("spring", "Service", &class_name),
+                object: EntityRef::new("spring", "Token", &class_name),
+                layer: "spring",
+            });
+        }
     }
 
     // Provision: @Repository → Binds → Token
     // NOTE: spring/Repository is a new semantic role introduced by this phase.
     // It is the data-access analogue of spring/Service. The token follows the
     // same convention: explicit @Repository("name") value or class name.
+    // Phase 23: dual binding for explicit names.
     if is_repository {
-        let token = repository_name.unwrap_or_else(|| class_name.clone());
-        edges.push(SemanticEdge {
-            relation: SemanticRelation::Binds,
-            subject: EntityRef::new("spring", "Repository", &class_name),
-            object: EntityRef::new("spring", "Token", &token),
-            layer: "spring",
-        });
+        if let Some(name) = &repository_name {
+            // Explicit name: bind to both the class token and the name token.
+            if *name != class_name {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::Binds,
+                    subject: EntityRef::new("spring", "Repository", &class_name),
+                    object: EntityRef::new("spring", "Token", &class_name),
+                    layer: "spring",
+                });
+            }
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Binds,
+                subject: EntityRef::new("spring", "Repository", &class_name),
+                object: EntityRef::new("spring", "Token", name),
+                layer: "spring",
+            });
+        } else {
+            // Default name: bind to class token only.
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Binds,
+                subject: EntityRef::new("spring", "Repository", &class_name),
+                object: EntityRef::new("spring", "Token", &class_name),
+                layer: "spring",
+            });
+        }
     }
 
     // Method-level mappings: scan the class body for @GetMapping, @PostMapping,
@@ -165,7 +204,7 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
         }
     }
 
-    // Controller -> Autowired -> Service
+    // Controller -> Autowired -> Token
     if is_controller && fidelity == Fidelity::High {
         if let Some(class_body_start) = find_class_body_open(raw_class) {
             if let Some(body_end) =
@@ -183,10 +222,12 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
                     if fa.kind != AnnotationKind::Autowired {
                         continue;
                     }
+                    // Phase 23: qualifier overrides the type-based token.
+                    let token = fa.qualifier.as_ref().unwrap_or(&fa.declared_type);
                     edges.push(SemanticEdge {
                         relation: SemanticRelation::Autowired,
                         subject: controller.clone(),
-                        object: EntityRef::new("spring", "Service", &fa.declared_type),
+                        object: EntityRef::new("spring", "Token", token),
                         layer: "spring",
                     });
                 }

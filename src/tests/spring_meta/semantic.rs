@@ -278,9 +278,10 @@ public class UserController {
         autowired[0].subject,
         EntityRef::new("spring", "Controller", "UserController")
     );
+    // Phase 23: object role is now Token (source-level DI key).
     assert_eq!(
         autowired[0].object,
-        EntityRef::new("spring", "Service", "UserService")
+        EntityRef::new("spring", "Token", "UserService")
     );
     assert_eq!(autowired[0].relation, SemanticRelation::Autowired);
     assert_eq!(autowired[0].layer, "spring");
@@ -302,9 +303,10 @@ public class UserController {
     let autowired = autowired(&edges);
     assert_eq!(autowired.len(), 1);
     // The declared type — not the modifier token `private` — is the identity.
+    // Phase 23: object role is now Token (source-level DI key).
     assert_eq!(
         autowired[0].object,
-        EntityRef::new("spring", "Service", "UserService")
+        EntityRef::new("spring", "Token", "UserService")
     );
 }
 
@@ -324,9 +326,10 @@ public class UserController {
     let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
     let autowired = autowired(&edges);
     assert_eq!(autowired.len(), 1);
+    // Phase 23: object role is now Token (source-level DI key).
     assert_eq!(
         autowired[0].object,
-        EntityRef::new("spring", "Service", "com.example.UserService")
+        EntityRef::new("spring", "Token", "com.example.UserService")
     );
 }
 #[test]
@@ -374,13 +377,11 @@ public class UserController {
     let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
     let autowired = autowired(&edges);
     assert_eq!(autowired.len(), 1);
-    // The qualifier value is not semantic data in this phase; the declared
-    // dependency type is the identity.
+    // Phase 23: qualifier overrides the type-based token.
     assert_eq!(
         autowired[0].object,
-        EntityRef::new("spring", "Service", "UserService")
+        EntityRef::new("spring", "Token", "specialUserService")
     );
-    assert!(!edges.iter().any(|e| e.object.name == "specialUserService"));
 }
 
 #[test]
@@ -499,15 +500,14 @@ public class UserService {
     let layer = SpringBootMetaLayer::new();
     let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
     let b = binds(&edges);
-    assert_eq!(b.len(), 1);
-    assert_eq!(
-        b[0].subject,
-        EntityRef::new("spring", "Service", "UserService")
-    );
-    assert_eq!(
-        b[0].object,
-        EntityRef::new("spring", "Token", "userService")
-    );
+    // Phase 23: dual binding — explicit name produces both class token and name token.
+    assert_eq!(b.len(), 2);
+    assert!(b
+        .iter()
+        .any(|e| e.object == EntityRef::new("spring", "Token", "UserService")));
+    assert!(b
+        .iter()
+        .any(|e| e.object == EntityRef::new("spring", "Token", "userService")));
 }
 
 #[test]
@@ -598,15 +598,14 @@ public class UserRepository {
     let layer = SpringBootMetaLayer::new();
     let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
     let b = binds(&edges);
-    assert_eq!(b.len(), 1);
-    assert_eq!(
-        b[0].subject,
-        EntityRef::new("spring", "Repository", "UserRepository")
-    );
-    assert_eq!(
-        b[0].object,
-        EntityRef::new("spring", "Token", "userRepository")
-    );
+    // Phase 23: dual binding — explicit name produces both class token and name token.
+    assert_eq!(b.len(), 2);
+    assert!(b
+        .iter()
+        .any(|e| e.object == EntityRef::new("spring", "Token", "UserRepository")));
+    assert!(b
+        .iter()
+        .any(|e| e.object == EntityRef::new("spring", "Token", "userRepository")));
 }
 
 // -- @Bean (fail closed on Binds) -------------------------------------------
@@ -695,17 +694,141 @@ public class UserController {
     let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
     let autowired = autowired(&edges);
     assert_eq!(autowired.len(), 1);
+    // Phase 23: object role is now Token (source-level DI key).
     assert_eq!(
         autowired[0].object,
-        EntityRef::new("spring", "Service", "UserService")
+        EntityRef::new("spring", "Token", "UserService")
     );
 }
 
-// -- Isolation: no @Component, no qualifier, no constructor injection -------
+// -- Isolation: no @Component, no constructor injection -----------------------
 
 #[test]
-fn provision_does_not_add_component_or_qualifier() {
-    // @Component is not recognized; @Qualifier is not semantic data.
+fn provision_does_not_add_component() {
+    // @Component is not recognized.
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    // No component-based edge
+    assert!(!edges.iter().any(|e| e.subject.entity_type == "Component"));
+    // Autowired still works
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+}
+
+// ── Phase 23: Consumer token migration ──────────────────────────────────────
+
+#[test]
+fn autowired_concrete_type_targets_token() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "UserService")
+    );
+}
+
+#[test]
+fn autowired_interface_type_targets_token() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private IUserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "IUserService")
+    );
+}
+
+#[test]
+fn autowired_required_false_still_targets_token() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired(required = false)
+    private UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "UserService")
+    );
+}
+
+#[test]
+fn autowired_qualified_interface_targets_qualifier_token() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    @Qualifier("specialUserService")
+    private IUserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "specialUserService")
+    );
+}
+
+#[test]
+fn autowired_qualified_concrete_type_targets_qualifier_token() {
     let source = r#"
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -722,11 +845,403 @@ public class UserController {
     let layer = SpringBootMetaLayer::new();
     let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
 
-    // No qualifier-based edge
-    assert!(!edges.iter().any(|e| e.object.name == "specialUserService"));
-    // No component-based edge
-    assert!(!edges.iter().any(|e| e.subject.entity_type == "Component"));
-    // Autowired still works
     let autowired = autowired(&edges);
     assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "specialUserService")
+    );
+}
+
+#[test]
+fn autowired_malformed_qualifier_falls_back_to_type() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    @Qualifier
+    private UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "UserService")
+    );
+}
+
+#[test]
+fn autowired_unsupported_qualifier_expression_fails_closed() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    @Qualifier("a b")
+    private UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "UserService")
+    );
+}
+
+#[test]
+fn autowired_multiple_fields_each_typed_token() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private UserService userService;
+    @Autowired
+    private OrderService orderService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 2);
+    assert!(autowired
+        .iter()
+        .any(|e| e.object == EntityRef::new("spring", "Token", "UserService")));
+    assert!(autowired
+        .iter()
+        .any(|e| e.object == EntityRef::new("spring", "Token", "OrderService")));
+}
+
+#[test]
+fn autowired_generic_type_exact_spelling() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private Repository<Customer> repository;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "Repository<Customer>")
+    );
+}
+
+#[test]
+fn autowired_malformed_field_fails_closed() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 0);
+}
+
+// ── Phase 23: Provider dual binding ────────────────────────────────────────
+
+#[test]
+fn service_default_name_one_binding() {
+    let source = r#"
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let binds: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .collect();
+    assert_eq!(binds.len(), 1);
+    assert_eq!(
+        binds[0].object,
+        EntityRef::new("spring", "Token", "UserService")
+    );
+}
+
+#[test]
+fn service_explicit_name_dual_binding() {
+    let source = r#"
+import org.springframework.stereotype.Service;
+
+@Service("specialUserService")
+public class UserService {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let binds: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .collect();
+    assert_eq!(binds.len(), 2);
+    assert!(binds
+        .iter()
+        .any(|e| e.object == EntityRef::new("spring", "Token", "UserService")));
+    assert!(binds
+        .iter()
+        .any(|e| e.object == EntityRef::new("spring", "Token", "specialUserService")));
+}
+
+#[test]
+fn service_explicit_name_equals_class_name_no_duplicate() {
+    let source = r#"
+import org.springframework.stereotype.Service;
+
+@Service("UserService")
+public class UserService {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let binds: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .collect();
+    assert_eq!(binds.len(), 1);
+    assert_eq!(
+        binds[0].object,
+        EntityRef::new("spring", "Token", "UserService")
+    );
+}
+
+#[test]
+fn repository_default_name_one_binding() {
+    let source = r#"
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class UserRepository {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let binds: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .collect();
+    assert_eq!(binds.len(), 1);
+    assert_eq!(
+        binds[0].object,
+        EntityRef::new("spring", "Token", "UserRepository")
+    );
+}
+
+#[test]
+fn repository_explicit_name_dual_binding() {
+    let source = r#"
+import org.springframework.stereotype.Repository;
+
+@Repository("userRepo")
+public class UserRepository {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let binds: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .collect();
+    assert_eq!(binds.len(), 2);
+    assert!(binds
+        .iter()
+        .any(|e| e.object == EntityRef::new("spring", "Token", "UserRepository")));
+    assert!(binds
+        .iter()
+        .any(|e| e.object == EntityRef::new("spring", "Token", "userRepo")));
+}
+
+// ── Phase 23: Composition convergence ──────────────────────────────────────
+
+#[test]
+fn composition_service_and_autowired_converge() {
+    let service_source = r#"
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {}
+"#;
+    let controller_source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private UserService userService;
+}
+"#;
+    let layer = SpringBootMetaLayer::new();
+
+    let service_edges = layer.extract_semantic_edges(service_source, &[service_source.to_string()], Fidelity::Medium, None);
+    let controller_edges = layer.extract_semantic_edges(controller_source, &[controller_source.to_string()], Fidelity::High, None);
+
+    let service_token = service_edges
+        .iter()
+        .find(|e| e.relation == SemanticRelation::Binds)
+        .map(|e| e.object.clone())
+        .unwrap();
+    let consumer_token = controller_edges
+        .iter()
+        .find(|e| e.relation == SemanticRelation::Autowired)
+        .map(|e| e.object.clone())
+        .unwrap();
+
+    assert_eq!(service_token, consumer_token);
+    assert_eq!(service_token, EntityRef::new("spring", "Token", "UserService"));
+}
+
+#[test]
+fn composition_explicit_service_and_qualified_autowired_converge() {
+    let service_source = r#"
+import org.springframework.stereotype.Service;
+
+@Service("specialUserService")
+public class UserService {}
+"#;
+    let controller_source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    @Qualifier("specialUserService")
+    private IUserService userService;
+}
+"#;
+    let layer = SpringBootMetaLayer::new();
+
+    let service_edges = layer.extract_semantic_edges(service_source, &[service_source.to_string()], Fidelity::Medium, None);
+    let controller_edges = layer.extract_semantic_edges(controller_source, &[controller_source.to_string()], Fidelity::High, None);
+
+    let service_token = service_edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .find(|e| e.object.name == "specialUserService")
+        .map(|e| e.object.clone())
+        .unwrap();
+    let consumer_token = controller_edges
+        .iter()
+        .find(|e| e.relation == SemanticRelation::Autowired)
+        .map(|e| e.object.clone())
+        .unwrap();
+
+    assert_eq!(service_token, consumer_token);
+    assert_eq!(service_token, EntityRef::new("spring", "Token", "specialUserService"));
+}
+
+#[test]
+fn composition_explicit_service_and_type_autowired_converge_via_class_token() {
+    let service_source = r#"
+import org.springframework.stereotype.Service;
+
+@Service("specialUserService")
+public class UserService {}
+"#;
+    let controller_source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private UserService userService;
+}
+"#;
+    let layer = SpringBootMetaLayer::new();
+
+    let service_edges = layer.extract_semantic_edges(service_source, &[service_source.to_string()], Fidelity::Medium, None);
+    let controller_edges = layer.extract_semantic_edges(controller_source, &[controller_source.to_string()], Fidelity::High, None);
+
+    let service_class_token = service_edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .find(|e| e.object.name == "UserService")
+        .map(|e| e.object.clone())
+        .unwrap();
+    let consumer_token = controller_edges
+        .iter()
+        .find(|e| e.relation == SemanticRelation::Autowired)
+        .map(|e| e.object.clone())
+        .unwrap();
+
+    assert_eq!(service_class_token, consumer_token);
+    assert_eq!(service_class_token, EntityRef::new("spring", "Token", "UserService"));
+}
+
+// ── Phase 23: Isolation ────────────────────────────────────────────────────
+
+#[test]
+fn autowired_does_not_alter_bean_produces() {
+    let source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean
+    public UserService userService() { return new UserService(); }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let bean_produces: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::BeanProduces)
+        .collect();
+    assert_eq!(bean_produces.len(), 1);
+    assert_eq!(
+        bean_produces[0].object,
+        EntityRef::new("spring", "Bean", "userService")
+    );
 }

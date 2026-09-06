@@ -524,6 +524,9 @@ pub(crate) struct FieldAnnotation {
     /// Declared field type — exact source spelling (qualified names and
     /// generic arguments preserved, no truncation).
     pub(crate) declared_type: String,
+    /// Phase 23: qualifier value from `@Qualifier("value")` preceding this
+    /// field. When present, the qualifier overrides the type-based token.
+    pub(crate) qualifier: Option<String>,
 }
 
 fn is_java_ident_byte(c: u8) -> bool {
@@ -665,6 +668,10 @@ pub(crate) fn collect_field_annotations(body: &str) -> Vec<FieldAnnotation> {
     let bytes = body.as_bytes();
     let len = bytes.len();
     let mut i = 0;
+    // Phase 23: track the most recent `@Qualifier("value")` so it can be
+    // attached to the next `@Autowired` field. Qualifier can appear before
+    // OR after `@Autowired`, so we also look ahead after finding Autowired.
+    let mut pending_qualifier: Option<String> = None;
 
     while i < len {
         if bytes[i] != b'@' {
@@ -685,6 +692,24 @@ pub(crate) fn collect_field_annotations(body: &str) -> Vec<FieldAnnotation> {
             "Value" => Some(AnnotationKind::Value),
             _ => None,
         };
+        // Phase 23: capture qualifier value from `@Qualifier("value")`.
+        if name == "Qualifier" && i < len && bytes[i] == b'(' {
+            if let Some((consumed, arg)) = consume_call_expression(body, i) {
+                i += consumed;
+                let arg = arg.trim();
+                // Only accept simple string-literal qualifier values.
+                let stripped = arg.strip_prefix('"').and_then(|s| s.strip_suffix('"'));
+                if let Some(val) = stripped {
+                    if !val.is_empty() && !val.contains(' ') && !val.contains(',') {
+                        pending_qualifier = Some(val.to_string());
+                    }
+                }
+                // Qualifier is not a field annotation itself.
+                continue;
+            }
+            i += 1;
+            continue;
+        }
         // Consume the annotation's own arguments so their contents are
         // never mistaken for the field declaration.
         if i < len && bytes[i] == b'(' {
@@ -700,11 +725,46 @@ pub(crate) fn collect_field_annotations(body: &str) -> Vec<FieldAnnotation> {
         let Some(kind) = kind else {
             continue;
         };
+        // Phase 23: look ahead for `@Qualifier` AFTER `@Autowired` (e.g.
+        // `@Autowired @Qualifier("x") private Type field`).
+        if pending_qualifier.is_none() {
+            let mut peek = i;
+            while peek < len {
+                while peek < len && is_java_ws(bytes[peek]) {
+                    peek += 1;
+                }
+                if peek >= len || bytes[peek] != b'@' {
+                    break;
+                }
+                peek += 1;
+                let q_start = peek;
+                while peek < len && is_java_ident_byte(bytes[peek]) {
+                    peek += 1;
+                }
+                let q_name = &body[q_start..peek];
+                if q_name == "Qualifier" && peek < len && bytes[peek] == b'(' {
+                    if let Some((_consumed, arg)) = consume_call_expression(body, peek) {
+                        let arg = arg.trim();
+                        let stripped =
+                            arg.strip_prefix('"').and_then(|s| s.strip_suffix('"'));
+                        if let Some(val) = stripped {
+                            if !val.is_empty() && !val.contains(' ') && !val.contains(',') {
+                                pending_qualifier = Some(val.to_string());
+                            }
+                        }
+                        break;
+                    }
+                }
+                // Not a qualifier annotation — stop looking ahead.
+                break;
+            }
+        }
         if let Some((declared_type, field_name)) = parse_field_declaration(body, &mut i) {
             out.push(FieldAnnotation {
                 field_name,
                 kind,
                 declared_type,
+                qualifier: pending_qualifier.take(),
             });
         }
         // Failed parses drop the occurrence (fail closed); `i` has been

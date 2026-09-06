@@ -35,7 +35,7 @@ fn seed_workspace_index(state: &crate::mcp::McpState) {
             relation: SemanticRelation::Autowired,
             subject: EntityRef::new("spring", "Controller", "UserController")
                 .with_file(controller_str.clone()),
-            object: EntityRef::new("spring", "Service", "UserService")
+            object: EntityRef::new("spring", "Token", "UserService")
                 .with_file(controller_str.clone()),
             layer: "spring",
         }],
@@ -306,7 +306,7 @@ fn workspace_query_entities_in_file_returns_results() {
             relation: SemanticRelation::Autowired,
             subject: EntityRef::new("spring", "Controller", "UserController")
                 .with_file(controller_str.clone()),
-            object: EntityRef::new("spring", "Service", "UserService")
+            object: EntityRef::new("spring", "Token", "UserService")
                 .with_file(controller_str.clone()),
             layer: "spring",
         }],
