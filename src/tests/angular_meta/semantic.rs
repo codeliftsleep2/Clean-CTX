@@ -35,7 +35,7 @@ export class UserComponent {
     assert!(!injects.is_empty(), "should have at least one Injects edge");
 
     let cmp_entity = EntityRef::new("angular", "Component", "UserComponent");
-    let svc_entity = EntityRef::new("angular", "Service", "UserService");
+    let svc_entity = EntityRef::new("angular", "Token", "UserService");
     let has_injects = injects
         .iter()
         .any(|e| e.subject == cmp_entity && e.object == svc_entity);
@@ -1154,5 +1154,432 @@ export class CustomerComponent {}
     assert_eq!(
         edges[0].object,
         EntityRef::new("angular", "Token", "IRepository<Customer>")
+    );
+}
+
+// ── Phase 17: constructor-consumption token convergence ──────────────────
+
+fn injects(edges: &[SemanticEdge]) -> Vec<&SemanticEdge> {
+    edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Injects)
+        .collect()
+}
+
+#[test]
+fn ctor_injects_concrete_class_targets_token() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(private svc: UserService) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "UserService")
+    );
+    assert_eq!(
+        injects[0].subject,
+        EntityRef::new("angular", "Component", "UserComponent")
+    );
+    assert_eq!(injects[0].relation, SemanticRelation::Injects);
+}
+#[test]
+fn ctor_injects_preserves_qualified_name() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(private svc: My.Namespace.UserService) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "My.Namespace.UserService")
+    );
+}
+
+#[test]
+fn ctor_injects_generic_token_preserves_args() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(private repo: IRepository<Customer>) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "IRepository<Customer>")
+    );
+}
+
+#[test]
+fn ctor_injects_multi_arg_generic_not_split() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(private repo: IRepository<Customer, Order>) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "IRepository<Customer, Order>")
+    );
+}
+
+#[test]
+fn ctor_injects_nullable_type_normalized() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(private svc: IUserService | null) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "IUserService")
+    );
+}
+
+#[test]
+fn ctor_injects_explicit_inject_token_overrides_type() {
+    let source = r#"
+import { Component, Inject } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(@Inject(IUserService) private svc: UserService) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    // @Inject(IUserService) wins over the declared type UserService.
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "IUserService")
+    );
+}
+
+#[test]
+fn ctor_injects_optional_and_inject_decorators() {
+    let source = r#"
+import { Component, Inject, Optional } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(@Optional() @Inject(MY_TOKEN) private svc: string) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    // @Optional() is a behavior modifier; @Inject(MY_TOKEN) is the DI key.
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "MY_TOKEN")
+    );
+}
+
+#[test]
+fn ctor_injects_string_inject_token_fails_closed() {
+    let source = r#"
+import { Component, Inject } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(@Inject('API_BASE_URL') private apiBaseUrl: string) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert!(injects.is_empty(), "string-literal tokens must fail closed");
+}
+
+#[test]
+fn ctor_injects_malformed_inject_fails_closed() {
+    let source = r#"
+import { Component, Inject } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(@Inject( private svc: UserService) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert!(injects.is_empty(), "malformed @Inject must fail closed");
+}
+
+#[test]
+fn ctor_injects_multiple_parameters() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(private a: AService, private b: BService) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 2);
+    let tokens: Vec<&str> = injects.iter().map(|e| e.object.name.as_str()).collect();
+    assert!(tokens.contains(&"AService"));
+    assert!(tokens.contains(&"BService"));
+}
+
+#[test]
+fn ctor_injects_default_value_cut() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(private svc: UserService = new UserService()) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "UserService")
+    );
+}
+
+#[test]
+fn signal_inject_targets_token_not_field_name() {
+    let source = r#"
+import { Component, inject } from '@angular/core';
+import { UserService } from './user.service';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    private userService = inject(UserService);
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "UserService")
+    );
+}
+
+#[test]
+fn signal_inject_generic_token_preserved() {
+    let source = r#"
+import { Component, inject } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    private repo = inject(IRepository<Customer>);
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "IRepository<Customer>")
+    );
+}
+#[test]
+fn injects_and_binds_useclass_converge_on_token() {
+    let source = r#"
+import { Component, Inject } from '@angular/core';
+
+@Component({
+  selector: 'app-user',
+  providers: [{ provide: IUserService, useClass: UserService }]
+})
+export class UserComponent {
+  constructor(@Inject(IUserService) private svc: UserService) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let bind_edges = binds(&edges);
+    let inject_edges = injects(&edges);
+    assert_eq!(bind_edges.len(), 1);
+    assert_eq!(inject_edges.len(), 1);
+    // Binds object and Injects object converge on the same token identity.
+    assert_eq!(
+        bind_edges[0].object,
+        EntityRef::new("angular", "Token", "IUserService")
+    );
+    assert_eq!(
+        inject_edges[0].object,
+        EntityRef::new("angular", "Token", "IUserService")
+    );
+    // Binds is provider-side (implementation), Injects is consumer-side.
+    assert_eq!(
+        bind_edges[0].subject,
+        EntityRef::new("angular", "Service", "UserService")
+    );
+}
+
+#[test]
+fn injects_and_binds_shorthand_converge_on_token() {
+    let source = r#"
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-user',
+  providers: [UserService]
+})
+export class UserComponent {
+  constructor(private svc: UserService) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let bind_edges = binds(&edges);
+    let inject_edges = injects(&edges);
+    assert_eq!(bind_edges.len(), 1);
+    assert_eq!(inject_edges.len(), 1);
+    // Class-shorthand provider token == concrete-class constructor token.
+    assert_eq!(
+        bind_edges[0].object,
+        EntityRef::new("angular", "Token", "UserService")
+    );
+    assert_eq!(
+        inject_edges[0].object,
+        EntityRef::new("angular", "Token", "UserService")
+    );
+}
+#[test]
+fn ctor_injects_typeof_inject_fails_closed() {
+    let source = r#"
+import { Component, Inject } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(@Inject(typeof Foo) private svc: UserService) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert!(
+        injects.is_empty(),
+        "typeof token expression must fail closed"
+    );
+}
+
+#[test]
+fn ctor_injects_comma_inject_fails_closed() {
+    let source = r#"
+import { Component, Inject } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(@Inject(A, B) private svc: UserService) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert!(
+        injects.is_empty(),
+        "comma-separated token expression must fail closed"
+    );
+}
+
+#[test]
+fn ctor_injects_generic_inject_token_preserved() {
+    let source = r#"
+import { Component, Inject } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(@Inject(IRepository<Customer>) private repo: CustomerRepository) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "IRepository<Customer>")
+    );
+}
+
+#[test]
+fn ctor_injects_multiarg_generic_inject_token_preserved() {
+    let source = r#"
+import { Component, Inject } from '@angular/core';
+
+@Component({ selector: 'app-user' })
+export class UserComponent {
+    constructor(@Inject(IRepository<Customer, Order>) private repo: CustomerRepository) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = AngularMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let injects = injects(&edges);
+    assert_eq!(injects.len(), 1);
+    assert_eq!(
+        injects[0].object,
+        EntityRef::new("angular", "Token", "IRepository<Customer, Order>")
     );
 }

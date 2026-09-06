@@ -298,7 +298,7 @@ fn pipeline_collects_semantic_edges() {
     );
 
     let cmp_entity = EntityRef::new("angular", "Component", "UserComponent");
-    let svc_entity = EntityRef::new("angular", "Service", "UserService");
+    let svc_entity = EntityRef::new("angular", "Token", "UserService");
     let has_injects = injects
         .iter()
         .any(|e| e.subject == cmp_entity && e.object == svc_entity);

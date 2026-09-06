@@ -69,13 +69,17 @@ pub fn class_to_semantic_edges(
         }
     }
 
-    // Component → Injects → Service for each injected type
+    // Component → Injects → Token for each injected DI token.
+    // Phase 17: consumer-side Injects targets the source-level DI-key role
+    // `angular/Token/<token>` so it converges with provider Binds objects.
+    // Injects is a token-reference fact; it does NOT claim provider existence
+    // or runtime resolution.
     if kind == ClassKind::Component || kind == ClassKind::Service || kind == ClassKind::Directive {
         for injected in injects {
             edges.push(SemanticEdge {
                 relation: SemanticRelation::Injects,
                 subject: subject.clone(),
-                object: EntityRef::new("angular", "Service", injected),
+                object: EntityRef::new("angular", "Token", injected),
                 layer: "angular",
             });
         }

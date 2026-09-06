@@ -289,6 +289,10 @@ struct SignalField {
     kind: SignalKind,
     name: String,
     alias: Option<String>,
+    /// Raw `inject(...)` argument (present only for `SignalKind::Inject`).
+    /// Phase 17: the semantic dependency token is the `inject(...)` argument,
+    /// not the field name.
+    inject_arg: Option<String>,
 }
 
 /// Scan the class body for signal-based Angular function calls:
@@ -364,7 +368,16 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                     name
                 };
 
-                out.push(SignalField { kind, name, alias });
+                out.push(SignalField {
+                    kind,
+                    name,
+                    alias,
+                    inject_arg: if func_name == "inject" {
+                        Some(arg.trim().to_string())
+                    } else {
+                        None
+                    },
+                });
             }
         }
         i += 1;
@@ -951,36 +964,160 @@ pub(crate) fn extract_constructor_injects(raw_class: &str) -> Option<Vec<String>
         .map(|(_, p)| p)
         .unwrap_or_default();
 
+    // Phase 17: DI-token extraction. Parameter splitting must be generic-aware
+    // (a comma inside `IRepository<Customer, Order>` must not split).
     let mut types: Vec<String> = Vec::new();
-    for param in split_top_level(&params, ',') {
+    for param in split_provider_object(&params) {
         let param = param.trim();
         if param.is_empty() {
             continue;
         }
-        let has_inject_modifier = param.starts_with("private ")
-            || param.starts_with("protected ")
-            || param.starts_with("public ")
-            || param.starts_with("readonly private ")
-            || param.starts_with("readonly protected ")
-            || param.starts_with("readonly public ");
+
+        // 1. Recognize leading parameter decorators (`@Inject`, `@Optional`, ...).
+        //    `@Inject(...)` explicitly identifies the DI token and takes
+        //    precedence over the declared TypeScript parameter type.
+        //    `@Optional`/`@Self`/`@SkipSelf`/`@Host` are injection-behavior
+        //    modifiers and carry no token identity of their own.
+        let mut rest = param;
+        let mut explicit_token: Option<String> = None;
+        loop {
+            let t = rest.trim_start();
+            if !t.starts_with('@') {
+                rest = t;
+                break;
+            }
+            let after_at = &t[1..];
+            let name_len = after_at
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .map(|c| c.len_utf8())
+                .sum::<usize>();
+            if name_len == 0 {
+                // `@` not followed by an identifier — malformed; fail closed.
+                rest = "";
+                break;
+            }
+            let name = &after_at[..name_len];
+            let mut idx = 1 + name_len;
+            if t.as_bytes().get(idx) == Some(&b'(') {
+                // Decorator call `@Name(args)`.
+                let Some((consumed, arg)) = consume_call_expression(t, idx) else {
+                    // Unterminated decorator call — fail closed.
+                    rest = "";
+                    break;
+                };
+                idx += consumed;
+                if name == "Inject" {
+                    explicit_token = Some(arg.trim().to_string());
+                }
+            }
+            rest = t[idx..].trim();
+        }
+
+        // 2. An explicit `@Inject(token)` overrides the declared type. Fail
+        //    closed when the token expression is not source-representable.
+        if let Some(tok) = explicit_token {
+            if let Some(t) = token_from_inject_arg(&tok) {
+                types.push(t);
+            }
+            continue;
+        }
+
+        // 3. Ordinary (undecorated) parameter-property idiom: visibility
+        //    modifier + colon type.
+        let has_inject_modifier = rest.starts_with("private ")
+            || rest.starts_with("protected ")
+            || rest.starts_with("public ")
+            || rest.starts_with("readonly private ")
+            || rest.starts_with("readonly protected ")
+            || rest.starts_with("readonly public ");
         if !has_inject_modifier {
             continue;
         }
-        let Some(colon) = param.find(':') else {
+
+        // 4. Declared type → token (exact spelling, nullable-stripped only).
+        let Some(colon) = rest.find(':') else {
             continue;
         };
-        let type_part = param[colon + 1..].trim();
+        let type_part = rest[colon + 1..].trim();
         let type_part = type_part.split('=').next().unwrap_or(type_part).trim();
-        let type_name: String = type_part
-            .chars()
-            .take_while(|c| c.is_alphanumeric() || *c == '_')
-            .collect();
-        if !type_name.is_empty() {
-            types.push(type_name);
+        if let Some(t) = token_from_type(type_part) {
+            types.push(t);
         }
     }
 
     if types.is_empty() { None } else { Some(types) }
+}
+
+/// Derive the DI-token spelling for a `@Inject(...)` / `inject(...)` argument.
+///
+/// Uses exact source spelling and accepts identifier-like token expressions
+/// (plain identifiers, dotted names, and identifiers with generic type
+/// arguments). Fails closed for anything the source-level token model cannot
+/// represent: string-literal tokens, operators, parens, or empty arguments.
+fn token_from_inject_arg(arg: &str) -> Option<String> {
+    let t = arg.trim();
+    if t.is_empty() || t.starts_with('\'') || t.starts_with('"') {
+        return None;
+    }
+    let first = t.chars().next()?;
+    if !(first.is_ascii_alphanumeric() || first == '_') {
+        return None;
+    }
+    // Accept only identifier-like source-level token expressions:
+    //   - identifiers and qualified (dotted) names;
+    //   - an optional generic argument list `<...>` whose interior may
+    //     contain commas/spaces (`IRepository<Customer, Order>`).
+    // Reject anything else (operators, `typeof`, `new`, parens, top-level
+    // commas/spaces, stray or unbalanced `<>`, ...) so ambiguous
+    // expression-like arguments fail closed rather than fabricating a token.
+    let mut generic_depth = 0usize;
+    for c in t.chars() {
+        match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '_' | '.' => {}
+            '<' => generic_depth += 1,
+            '>' => {
+                if generic_depth == 0 {
+                    return None;
+                }
+                generic_depth -= 1;
+            }
+            ',' | ' ' => {
+                // Commas/spaces are only legitimate inside a generic block.
+                if generic_depth == 0 {
+                    return None;
+                }
+            }
+            _ => return None,
+        }
+    }
+    if generic_depth != 0 {
+        return None; // unbalanced `<` ... `>` block
+    }
+    Some(t.to_string())
+}
+
+/// Derive the DI-token spelling from a declared TypeScript parameter type.
+///
+/// Exact source spelling; only a trailing nullable/optional marker is stripped
+/// (`?`, `| null`, `| undefined` — the ratified Phase 17 normalization). No
+/// generic stripping, no namespace qualification, no final-token extraction,
+/// no type resolution.
+fn token_from_type(raw: &str) -> Option<String> {
+    let mut t = raw.trim().to_string();
+    loop {
+        let mut changed = false;
+        for suf in ["?", "| null", "| undefined"] {
+            if let Some(stripped) = t.strip_suffix(suf) {
+                t = stripped.trim_end().to_string();
+                changed = true;
+            }
+        }
+        if !changed || t.is_empty() {
+            break;
+        }
+    }
+    if t.is_empty() { None } else { Some(t) }
 }
 
 fn is_word_byte(c: u8) -> bool {
@@ -1153,7 +1290,14 @@ pub fn extract_graph_entries(
         let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
         for sf in collect_signal_fields(body_inner) {
             if let SignalKind::Inject = sf.kind {
-                injects.push(sf.name.clone());
+                // Phase 17: the dependency token is the `inject(...)` argument
+                // (source-level DI key), not the field name. Fail closed when the
+                // argument is not a source-representable token expression.
+                if let Some(arg) = sf.inject_arg.as_deref() {
+                    if let Some(t) = token_from_inject_arg(arg) {
+                        injects.push(t);
+                    }
+                }
             }
         }
     }
