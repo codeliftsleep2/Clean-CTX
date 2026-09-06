@@ -130,7 +130,7 @@ pub fn extract_annotations(raw_class: &str, fidelity: Fidelity) -> Option<Annota
     {
         let body = &raw_class[class_body_start..];
         let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-        for (method_name, anno_kind, arg) in collect_method_annotations(body_inner) {
+        for (method_name, anno_kind, arg, _return_type) in collect_method_annotations(body_inner) {
             match anno_kind {
                 AnnotationKind::Bean => {
                     bean_methods.push(method_name.clone());
@@ -406,8 +406,15 @@ pub(crate) fn parse_mapping_paths(arg: &str) -> Vec<String> {
     paths
 }
 
-pub(crate) fn collect_method_annotations(body: &str) -> Vec<(String, AnnotationKind, String)> {
-    let mut out: Vec<(String, AnnotationKind, String)> = Vec::new();
+/// A captured method-level annotation.
+///
+/// Fields: `(method_name, kind, arg, return_type)`.
+/// `return_type` is `Some(...)` only for `@Bean` methods where the declared
+/// return type could be extracted authoritatively; `None` otherwise.
+pub(crate) fn collect_method_annotations(
+    body: &str,
+) -> Vec<(String, AnnotationKind, String, Option<String>)> {
+    let mut out: Vec<(String, AnnotationKind, String, Option<String>)> = Vec::new();
     let bytes = body.as_bytes();
     let len = bytes.len();
     let mut i = 0;
@@ -488,8 +495,15 @@ pub(crate) fn collect_method_annotations(body: &str) -> Vec<(String, AnnotationK
                             j -= 1;
                         }
                         let method_name = body[j..name_end].trim().to_string();
+                        // Phase 25: for @Bean methods, also extract the declared
+                        // return type by continuing to backtrack past the method name.
+                        let return_type = if k == AnnotationKind::Bean && !method_name.is_empty() {
+                            extract_bean_return_type(body, j)
+                        } else {
+                            None
+                        };
                         if !method_name.is_empty() {
-                            out.push((method_name, k, arg));
+                            out.push((method_name, k, arg, return_type));
                         }
                         break;
                     }
@@ -507,6 +521,116 @@ pub(crate) fn collect_method_annotations(body: &str) -> Vec<(String, AnnotationK
     }
 
     out
+}
+
+/// Extract the declared return type of a `@Bean` method by backtracking from
+/// the method name position. Returns `None` when the return type cannot be
+/// established authoritatively (fail closed).
+///
+/// Supported: simple identifiers, qualified dotted names, and a single-level
+/// generic argument list `<...>` (commas and spaces inside `<>` are
+/// preserved; nested generics fail closed). Modifiers are skipped.
+fn extract_bean_return_type(body: &str, method_name_start: usize) -> Option<String> {
+    let bytes = body.as_bytes();
+    let mut j = method_name_start;
+
+    // Skip whitespace before method name
+    while j > 0 && (bytes[j - 1] == b' ' || bytes[j - 1] == b'\t') {
+        j -= 1;
+    }
+
+    // Skip modifiers (public, private, protected, static, final, abstract,
+    // synchronized, native, strictfp)
+    loop {
+        let tok_start = j;
+        while j > 0
+            && (bytes[j - 1].is_ascii_alphanumeric()
+                || bytes[j - 1] == b'_'
+                || bytes[j - 1] == b'$')
+        {
+            j -= 1;
+        }
+        let tok = &body[j..tok_start];
+        if matches!(
+            tok,
+            "public"
+                | "private"
+                | "protected"
+                | "static"
+                | "final"
+                | "abstract"
+                | "synchronized"
+                | "native"
+                | "strictfp"
+        ) {
+            // Skip whitespace before modifier
+            while j > 0 && (bytes[j - 1] == b' ' || bytes[j - 1] == b'\t') {
+                j -= 1;
+            }
+            continue;
+        }
+        // Not a modifier — this is the start of the return type. Restore the
+        // position to the type-token start.
+        j = tok_start;
+        break;
+    }
+
+    if j == 0 {
+        return None;
+    }
+
+    // Capture the return type scanning right-to-left: identifier chars, dots,
+    // and a single balanced generic block `<...>`.
+    let type_end = j;
+    let mut generic_depth = 0usize;
+    while j > 0 {
+        match bytes[j - 1] {
+            b'>' => {
+                if generic_depth == 0 {
+                    generic_depth = 1;
+                    j -= 1;
+                } else {
+                    // Nested generic — fail closed.
+                    return None;
+                }
+            }
+            b'<' => {
+                if generic_depth == 0 {
+                    // Unbalanced `<` — fail closed.
+                    return None;
+                }
+                generic_depth = 0;
+                j -= 1;
+            }
+            b'.' | b'_' | b'$' => {
+                j -= 1;
+            }
+            c if c.is_ascii_alphanumeric() => {
+                j -= 1;
+            }
+            b' ' | b'\t' | b'\n' | b'\r' if generic_depth > 0 => {
+                // Whitespace inside a generic block is part of the type.
+                j -= 1;
+            }
+            b' ' | b'\t' | b'\n' | b'\r' => {
+                // Whitespace at the outermost level ends the type.
+                break;
+            }
+            _ => {
+                // Unexpected char (e.g. '[', ']', '?', '&') — fail closed.
+                return None;
+            }
+        }
+    }
+    if generic_depth != 0 {
+        return None;
+    }
+
+    let return_type = body[j..type_end].trim().to_string();
+    if return_type.is_empty() || return_type.chars().all(|c| c.is_ascii_whitespace()) {
+        return None;
+    }
+    Some(return_type)
 }
 
 /// A field-level `@Autowired` / `@Value` occurrence with its parsed
@@ -729,13 +853,10 @@ pub(crate) fn collect_field_annotations(body: &str) -> Vec<FieldAnnotation> {
         // `@Autowired @Qualifier("x") private Type field`).
         if pending_qualifier.is_none() {
             let mut peek = i;
-            while peek < len {
-                while peek < len && is_java_ws(bytes[peek]) {
-                    peek += 1;
-                }
-                if peek >= len || bytes[peek] != b'@' {
-                    break;
-                }
+            while peek < len && is_java_ws(bytes[peek]) {
+                peek += 1;
+            }
+            if peek < len && bytes[peek] == b'@' {
                 peek += 1;
                 let q_start = peek;
                 while peek < len && is_java_ident_byte(bytes[peek]) {
@@ -745,18 +866,14 @@ pub(crate) fn collect_field_annotations(body: &str) -> Vec<FieldAnnotation> {
                 if q_name == "Qualifier" && peek < len && bytes[peek] == b'(' {
                     if let Some((_consumed, arg)) = consume_call_expression(body, peek) {
                         let arg = arg.trim();
-                        let stripped =
-                            arg.strip_prefix('"').and_then(|s| s.strip_suffix('"'));
+                        let stripped = arg.strip_prefix('"').and_then(|s| s.strip_suffix('"'));
                         if let Some(val) = stripped {
                             if !val.is_empty() && !val.contains(' ') && !val.contains(',') {
                                 pending_qualifier = Some(val.to_string());
                             }
                         }
-                        break;
                     }
                 }
-                // Not a qualifier annotation — stop looking ahead.
-                break;
             }
         }
         if let Some((declared_type, field_name)) = parse_field_declaration(body, &mut i) {

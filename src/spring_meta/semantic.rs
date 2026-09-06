@@ -163,7 +163,9 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
             {
                 let body = &raw_class[class_body_start..];
                 let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-                for (_method_name, anno_kind, arg) in collect_method_annotations(body_inner) {
+                for (_method_name, anno_kind, arg, _return_type) in
+                    collect_method_annotations(body_inner)
+                {
                     if matches!(
                         anno_kind,
                         AnnotationKind::GetMapping
@@ -235,7 +237,7 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
         }
     }
 
-    // Configuration -> BeanProduces
+    // Configuration -> BeanProduces (and Binds for @Bean methods)
     if is_configuration {
         let config = EntityRef::new("spring", "Configuration", &class_name);
         if let Some(class_body_start) = find_class_body_open(raw_class) {
@@ -244,14 +246,70 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
             {
                 let body = &raw_class[class_body_start..];
                 let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-                for (method_name, anno_kind, _arg) in collect_method_annotations(body_inner) {
+                for (method_name, anno_kind, arg, return_type) in
+                    collect_method_annotations(body_inner)
+                {
                     if matches!(anno_kind, AnnotationKind::Bean) {
+                        // BeanProduces: factory declaration fact (preserved)
                         edges.push(SemanticEdge {
                             relation: SemanticRelation::BeanProduces,
                             subject: config.clone(),
                             object: EntityRef::new("spring", "Bean", &method_name),
                             layer: "spring",
                         });
+                        // Phase 25: Binds projection when return type is authoritative.
+                        // Dual-binding rule: a @Bean method provides both its return
+                        // type (for plain @Autowired by type) and its bean name (for
+                        // @Autowired @Qualifier by name).
+                        // Generic/array return types fail closed: they cannot be
+                        // reduced to a safe provider identity in this phase.
+                        if let Some(ret) = &return_type {
+                            if !ret.contains(['<', '>', '[', ']']) {
+                                let provider = EntityRef::new("spring", "Service", ret);
+                                // Token for type-based lookup (plain @Autowired)
+                                let type_token = EntityRef::new("spring", "Token", ret);
+                                if type_token != EntityRef::new("spring", "Token", &method_name) {
+                                    edges.push(SemanticEdge {
+                                        relation: SemanticRelation::Binds,
+                                        subject: provider.clone(),
+                                        object: type_token,
+                                        layer: "spring",
+                                    });
+                                }
+                                // Token for name-based lookup (@Qualifier).
+                                // Phase 25: only accept a simple quoted-string bean
+                                // name. Array forms (@Bean({"a","b"})) and other
+                                // non-quoted args fail closed (no name-token).
+                                let name_token = if !arg.trim().is_empty() {
+                                    let trimmed = arg.trim();
+                                    match trimmed
+                                        .strip_prefix('"')
+                                        .and_then(|s| s.strip_suffix('"'))
+                                    {
+                                        Some(stripped)
+                                            if !stripped.is_empty()
+                                                && !stripped.contains('{')
+                                                && !stripped.contains(',') =>
+                                        {
+                                            Some(EntityRef::new("spring", "Token", stripped))
+                                        }
+                                        _ => None,
+                                    }
+                                } else {
+                                    Some(EntityRef::new("spring", "Token", &method_name))
+                                };
+                                if let Some(name_token) = name_token {
+                                    if name_token != EntityRef::new("spring", "Token", ret) {
+                                        edges.push(SemanticEdge {
+                                            relation: SemanticRelation::Binds,
+                                            subject: provider,
+                                            object: name_token,
+                                            layer: "spring",
+                                        });
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

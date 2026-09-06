@@ -502,12 +502,14 @@ public class UserService {
     let b = binds(&edges);
     // Phase 23: dual binding — explicit name produces both class token and name token.
     assert_eq!(b.len(), 2);
-    assert!(b
-        .iter()
-        .any(|e| e.object == EntityRef::new("spring", "Token", "UserService")));
-    assert!(b
-        .iter()
-        .any(|e| e.object == EntityRef::new("spring", "Token", "userService")));
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "UserService"))
+    );
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "userService"))
+    );
 }
 
 #[test]
@@ -600,21 +602,24 @@ public class UserRepository {
     let b = binds(&edges);
     // Phase 23: dual binding — explicit name produces both class token and name token.
     assert_eq!(b.len(), 2);
-    assert!(b
-        .iter()
-        .any(|e| e.object == EntityRef::new("spring", "Token", "UserRepository")));
-    assert!(b
-        .iter()
-        .any(|e| e.object == EntityRef::new("spring", "Token", "userRepository")));
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "UserRepository"))
+    );
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "userRepository"))
+    );
 }
 
 // -- @Bean (fail closed on Binds) -------------------------------------------
 
 #[test]
-fn bean_preserves_bean_produces_no_binds() {
-    // The current extraction path does NOT capture the @Bean method's return
-    // type, so the Binds projection must fail closed. BeanProduces (the
-    // factory declaration fact) remains present.
+fn bean_preserves_bean_produces_with_binds() {
+    // Phase 25: @Bean method with capturable return type produces both
+    // BeanProduces (factory fact) and Binds (provision fact). Dual-binding:
+    // return type token (for plain @Autowired) and method name token
+    // (for @Qualifier).
     let source = r#"
 import org.springframework.context.annotation.*;
 
@@ -634,18 +639,24 @@ public class AppConfig {
     let bp = bean_produces(&edges);
     assert!(!bp.is_empty(), "BeanProduces should remain present");
 
-    // No Binds edge is created (return type not authoritative)
+    // Binds edge is created (return type captured)
     let b = binds(&edges);
+    assert!(!b.is_empty(), "@Bean should produce Binds edges");
+    // Dual binding: type token + method name token
     assert!(
-        b.is_empty(),
-        "@Bean must NOT produce a Binds edge (return type not captured)"
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "UserService"))
+    );
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "userService"))
     );
 }
 
 #[test]
-fn bean_explicit_name_no_binds() {
-    // Even with an explicit @Bean("name"), the Binds projection fails closed
-    // because the implementation type (return type) is not captured.
+fn bean_explicit_name_with_binds() {
+    // Phase 25: @Bean("name") with capturable return type produces Binds
+    // with explicit name as the token (plus return type token).
     let source = r#"
 import org.springframework.context.annotation.*;
 
@@ -665,11 +676,19 @@ public class AppConfig {
     let bp = bean_produces(&edges);
     assert!(!bp.is_empty(), "BeanProduces should remain present");
 
-    // No Binds edge
+    // Binds edge with explicit name token
     let b = binds(&edges);
     assert!(
-        b.is_empty(),
-        "@Bean with explicit name must NOT produce a Binds edge"
+        !b.is_empty(),
+        "@Bean with explicit name should produce Binds"
+    );
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "specialUserService"))
+    );
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "UserService"))
     );
 }
 
@@ -925,12 +944,16 @@ public class UserController {
 
     let autowired = autowired(&edges);
     assert_eq!(autowired.len(), 2);
-    assert!(autowired
-        .iter()
-        .any(|e| e.object == EntityRef::new("spring", "Token", "UserService")));
-    assert!(autowired
-        .iter()
-        .any(|e| e.object == EntityRef::new("spring", "Token", "OrderService")));
+    assert!(
+        autowired
+            .iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "UserService"))
+    );
+    assert!(
+        autowired
+            .iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "OrderService"))
+    );
 }
 
 #[test]
@@ -1019,12 +1042,16 @@ public class UserService {}
         .filter(|e| e.relation == SemanticRelation::Binds)
         .collect();
     assert_eq!(binds.len(), 2);
-    assert!(binds
-        .iter()
-        .any(|e| e.object == EntityRef::new("spring", "Token", "UserService")));
-    assert!(binds
-        .iter()
-        .any(|e| e.object == EntityRef::new("spring", "Token", "specialUserService")));
+    assert!(
+        binds
+            .iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "UserService"))
+    );
+    assert!(
+        binds
+            .iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "specialUserService"))
+    );
 }
 
 #[test]
@@ -1090,12 +1117,16 @@ public class UserRepository {}
         .filter(|e| e.relation == SemanticRelation::Binds)
         .collect();
     assert_eq!(binds.len(), 2);
-    assert!(binds
-        .iter()
-        .any(|e| e.object == EntityRef::new("spring", "Token", "UserRepository")));
-    assert!(binds
-        .iter()
-        .any(|e| e.object == EntityRef::new("spring", "Token", "userRepo")));
+    assert!(
+        binds
+            .iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "UserRepository"))
+    );
+    assert!(
+        binds
+            .iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "userRepo"))
+    );
 }
 
 // ── Phase 23: Composition convergence ──────────────────────────────────────
@@ -1120,8 +1151,18 @@ public class UserController {
 "#;
     let layer = SpringBootMetaLayer::new();
 
-    let service_edges = layer.extract_semantic_edges(service_source, &[service_source.to_string()], Fidelity::Medium, None);
-    let controller_edges = layer.extract_semantic_edges(controller_source, &[controller_source.to_string()], Fidelity::High, None);
+    let service_edges = layer.extract_semantic_edges(
+        service_source,
+        &[service_source.to_string()],
+        Fidelity::Medium,
+        None,
+    );
+    let controller_edges = layer.extract_semantic_edges(
+        controller_source,
+        &[controller_source.to_string()],
+        Fidelity::High,
+        None,
+    );
 
     let service_token = service_edges
         .iter()
@@ -1135,7 +1176,10 @@ public class UserController {
         .unwrap();
 
     assert_eq!(service_token, consumer_token);
-    assert_eq!(service_token, EntityRef::new("spring", "Token", "UserService"));
+    assert_eq!(
+        service_token,
+        EntityRef::new("spring", "Token", "UserService")
+    );
 }
 
 #[test]
@@ -1160,8 +1204,18 @@ public class UserController {
 "#;
     let layer = SpringBootMetaLayer::new();
 
-    let service_edges = layer.extract_semantic_edges(service_source, &[service_source.to_string()], Fidelity::Medium, None);
-    let controller_edges = layer.extract_semantic_edges(controller_source, &[controller_source.to_string()], Fidelity::High, None);
+    let service_edges = layer.extract_semantic_edges(
+        service_source,
+        &[service_source.to_string()],
+        Fidelity::Medium,
+        None,
+    );
+    let controller_edges = layer.extract_semantic_edges(
+        controller_source,
+        &[controller_source.to_string()],
+        Fidelity::High,
+        None,
+    );
 
     let service_token = service_edges
         .iter()
@@ -1176,7 +1230,10 @@ public class UserController {
         .unwrap();
 
     assert_eq!(service_token, consumer_token);
-    assert_eq!(service_token, EntityRef::new("spring", "Token", "specialUserService"));
+    assert_eq!(
+        service_token,
+        EntityRef::new("spring", "Token", "specialUserService")
+    );
 }
 
 #[test]
@@ -1199,8 +1256,18 @@ public class UserController {
 "#;
     let layer = SpringBootMetaLayer::new();
 
-    let service_edges = layer.extract_semantic_edges(service_source, &[service_source.to_string()], Fidelity::Medium, None);
-    let controller_edges = layer.extract_semantic_edges(controller_source, &[controller_source.to_string()], Fidelity::High, None);
+    let service_edges = layer.extract_semantic_edges(
+        service_source,
+        &[service_source.to_string()],
+        Fidelity::Medium,
+        None,
+    );
+    let controller_edges = layer.extract_semantic_edges(
+        controller_source,
+        &[controller_source.to_string()],
+        Fidelity::High,
+        None,
+    );
 
     let service_class_token = service_edges
         .iter()
@@ -1215,7 +1282,10 @@ public class UserController {
         .unwrap();
 
     assert_eq!(service_class_token, consumer_token);
-    assert_eq!(service_class_token, EntityRef::new("spring", "Token", "UserService"));
+    assert_eq!(
+        service_class_token,
+        EntityRef::new("spring", "Token", "UserService")
+    );
 }
 
 // ── Phase 23: Isolation ────────────────────────────────────────────────────
@@ -1244,4 +1314,282 @@ public class AppConfig {
         bean_produces[0].object,
         EntityRef::new("spring", "Bean", "userService")
     );
+}
+
+// ── Phase 25: @Bean provision semantics ────────────────────────────────────
+
+#[test]
+fn bean_basic_emits_dual_binds() {
+    let source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean
+    public UserService userService() {
+        return new UserService();
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let bp = bean_produces(&edges);
+    assert!(!bp.is_empty(), "BeanProduces should remain present");
+
+    let b = binds(&edges);
+    assert_eq!(b.len(), 2, "dual binding: type token + method name token");
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "UserService"))
+    );
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "userService"))
+    );
+}
+
+#[test]
+fn bean_explicit_name_emits_dual_binds() {
+    let source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean("specialUserService")
+    public UserService userService() {
+        return new UserService();
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let b = binds(&edges);
+    assert_eq!(b.len(), 2, "dual binding: type token + explicit name token");
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "UserService"))
+    );
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "specialUserService"))
+    );
+}
+
+#[test]
+fn bean_qualified_type_preserved() {
+    let source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean
+    public com.example.UserService userService() {
+        return new com.example.UserService();
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let b = binds(&edges);
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "com.example.UserService"))
+    );
+}
+
+#[test]
+fn bean_generic_return_type_no_binds() {
+    let source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean
+    public List<UserService> userServices() {
+        return new ArrayList<>();
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let bp = bean_produces(&edges);
+    assert!(!bp.is_empty(), "BeanProduces should remain present");
+
+    let b = binds(&edges);
+    assert!(
+        b.is_empty(),
+        "@Bean with generic return type should NOT produce Binds"
+    );
+}
+
+#[test]
+fn bean_multiple_names_no_fabricated_name_token() {
+    let source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean({"a", "b"})
+    public UserService userService() {
+        return new UserService();
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let bp = bean_produces(&edges);
+    assert!(!bp.is_empty(), "BeanProduces should remain present");
+
+    let b = binds(&edges);
+    // No fabricated name token from the array form. The type-based token from
+    // the return type is still authoritative and must remain.
+    assert!(
+        !b.iter()
+            .any(|e| e.object.name.contains('{') || e.object.name.contains(',')),
+        "@Bean multiple names must NOT fabricate a name token"
+    );
+    assert!(
+        b.iter()
+            .any(|e| e.object == EntityRef::new("spring", "Token", "UserService"))
+    );
+}
+
+#[test]
+fn bean_malformed_return_type_fails_closed() {
+    let source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean
+    public;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    let b = binds(&edges);
+    assert!(
+        b.is_empty(),
+        "@Bean with malformed return type should NOT produce Binds"
+    );
+}
+
+#[test]
+fn bean_convergence_plain_autowired() {
+    let bean_source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean
+    public UserService userService() {
+        return new UserService();
+    }
+}
+"#;
+    let autowired_source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private UserService userService;
+}
+"#;
+    let layer = SpringBootMetaLayer::new();
+
+    let bean_edges = layer.extract_semantic_edges(
+        bean_source,
+        &[bean_source.to_string()],
+        Fidelity::Medium,
+        None,
+    );
+    let autowired_edges = layer.extract_semantic_edges(
+        autowired_source,
+        &[autowired_source.to_string()],
+        Fidelity::High,
+        None,
+    );
+
+    let bean_type_token = bean_edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .find(|e| e.object.name == "UserService")
+        .map(|e| e.object.clone())
+        .unwrap();
+    let autowired_token = autowired_edges
+        .iter()
+        .find(|e| e.relation == SemanticRelation::Autowired)
+        .map(|e| e.object.clone())
+        .unwrap();
+
+    assert_eq!(bean_type_token, autowired_token);
+}
+
+#[test]
+fn bean_convergence_qualified_autowired() {
+    let bean_source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean("specialUserService")
+    public UserService userService() {
+        return new UserService();
+    }
+}
+"#;
+    let autowired_source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    @Qualifier("specialUserService")
+    private UserService userService;
+}
+"#;
+    let layer = SpringBootMetaLayer::new();
+
+    let bean_edges = layer.extract_semantic_edges(
+        bean_source,
+        &[bean_source.to_string()],
+        Fidelity::Medium,
+        None,
+    );
+    let autowired_edges = layer.extract_semantic_edges(
+        autowired_source,
+        &[autowired_source.to_string()],
+        Fidelity::High,
+        None,
+    );
+
+    let bean_name_token = bean_edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .find(|e| e.object.name == "specialUserService")
+        .map(|e| e.object.clone())
+        .unwrap();
+    let autowired_token = autowired_edges
+        .iter()
+        .find(|e| e.relation == SemanticRelation::Autowired)
+        .map(|e| e.object.clone())
+        .unwrap();
+
+    assert_eq!(bean_name_token, autowired_token);
 }
