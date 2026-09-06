@@ -1912,3 +1912,39 @@ public class BrokenService {
     assert!(!edges.iter().any(|e| e.object.name == "private"));
     assert!(!edges.iter().any(|e| e.object.name == "public"));
 }
+// ── Phase 30-A: Implements ≠ Binds (Spring side) ─────────────────────────
+
+/// A Spring @Repository implementing an interface binds ONLY its own class
+/// token. The implemented interface is a language-level fact (projected by
+/// the builtin layer, Phase 30-A) and must never receive a fabricated Binds
+/// edge from the Spring semantic emitter.
+#[test]
+fn repository_implements_does_not_bind_interface_token() {
+    let source = r#"
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class SqlUserRepository implements UserRepository {}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    let binds: Vec<&SemanticEdge> = edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .collect();
+    assert_eq!(
+        binds.len(),
+        1,
+        "the repository binds exactly its own class token"
+    );
+    assert_eq!(
+        binds[0].object,
+        EntityRef::new("spring", "Token", "SqlUserRepository")
+    );
+    assert!(
+        !binds.iter().any(|e| e.object.name == "UserRepository"),
+        "no Binds edge to the implemented interface token may be invented"
+    );
+}

@@ -7,7 +7,7 @@
 use crate::compression::Fidelity;
 use crate::layers::meta::MetaLayer;
 use crate::layers::meta::builtin::BuiltinMetaLayer;
-use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
+use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
 fn class_capture(name: &str, text: &str) -> (String, String) {
     (name.to_string(), text.to_string())
@@ -137,4 +137,144 @@ fn builtin_self_defines_preserved_with_extends() {
     assert_eq!(defines_edges.len(), 1);
     assert_eq!(defines_edges[0].subject.name, "UserComponent");
     assert_eq!(defines_edges[0].object.name, "UserComponent");
+}
+// ── Phase 30-A: Java `implements` semantic projection ─────────────────────
+
+/// Build a Java-attributed source containing `decl`. Java language
+/// attribution comes from the `package` declaration (see `is_java_source`).
+fn java_source(decl: &str) -> String {
+    format!("package com.example;\n\n{}\n", decl)
+}
+
+#[test]
+fn builtin_emits_implements_for_java_class() {
+    let layer = BuiltinMetaLayer::new();
+    let cap = "public class Foo implements Bar {}";
+    let source = java_source(cap);
+    let captures = [class_capture("class.root", cap)];
+    let edges = layer.extract_semantic_edges_paired(&source, &captures, Fidelity::High, None);
+
+    let ifaces = find_edges_by_relation(&edges, SemanticRelation::Implements);
+    assert_eq!(ifaces.len(), 1);
+    assert_eq!(ifaces[0].subject, EntityRef::new("builtin", "Class", "Foo"));
+    assert_eq!(
+        ifaces[0].object,
+        EntityRef::new("builtin", "Interface", "Bar")
+    );
+    assert_eq!(ifaces[0].layer, "builtin");
+}
+
+#[test]
+fn builtin_emits_implements_for_multiple_interfaces() {
+    let layer = BuiltinMetaLayer::new();
+    let cap = "public class Foo implements A, B, C {}";
+    let source = java_source(cap);
+    let captures = [class_capture("class.root", cap)];
+    let edges = layer.extract_semantic_edges_paired(&source, &captures, Fidelity::High, None);
+
+    let ifaces = find_edges_by_relation(&edges, SemanticRelation::Implements);
+    assert_eq!(ifaces.len(), 3);
+    assert!(
+        ifaces
+            .iter()
+            .all(|e| e.subject == EntityRef::new("builtin", "Class", "Foo"))
+    );
+    let names: Vec<&str> = ifaces.iter().map(|e| e.object.name.as_str()).collect();
+    assert!(names.contains(&"A") && names.contains(&"B") && names.contains(&"C"));
+}
+
+#[test]
+fn builtin_java_extends_and_implements_coexist() {
+    let layer = BuiltinMetaLayer::new();
+    let cap = "public class Foo extends Base implements A, B {}";
+    let source = java_source(cap);
+    let captures = [class_capture("class.root", cap)];
+    let edges = layer.extract_semantic_edges_paired(&source, &captures, Fidelity::High, None);
+
+    let ext = find_edges_by_relation(&edges, SemanticRelation::Extends);
+    assert_eq!(ext.len(), 1, "exactly one Extends edge");
+    assert_eq!(ext[0].subject, EntityRef::new("builtin", "Class", "Foo"));
+    assert_eq!(ext[0].object, EntityRef::new("builtin", "Class", "Base"));
+
+    let ifaces = find_edges_by_relation(&edges, SemanticRelation::Implements);
+    assert_eq!(ifaces.len(), 2, "implements A and B are both projected");
+}
+
+#[test]
+fn builtin_implements_never_creates_binds() {
+    let layer = BuiltinMetaLayer::new();
+    // Spring-annotated Java class: the builtin layer projects the language
+    // fact, but must NEVER derive a DI registration from it.
+    let cap = "@Repository\npublic class Foo implements Bar {}";
+    let source = java_source(cap);
+    let captures = [class_capture("class.root", cap)];
+    let edges = layer.extract_semantic_edges_paired(&source, &captures, Fidelity::High, None);
+
+    assert_eq!(
+        find_edges_by_relation(&edges, SemanticRelation::Implements).len(),
+        1
+    );
+    assert!(
+        find_edges_by_relation(&edges, SemanticRelation::Binds).is_empty(),
+        "Implements must never fabricate a Binds edge"
+    );
+}
+
+#[test]
+fn builtin_implements_generic_uses_bare_interface_name() {
+    let layer = BuiltinMetaLayer::new();
+    // The authoritative shared extractor strips generic arguments at the
+    // first `<` — this phase preserves that exact behavior (no new erasure
+    // rules, no normalization). The consumer-side `Token/Repository<User>`
+    // mismatch remains a separate fail-closed boundary.
+    let cap = "public class RepositoryImpl implements Repository<User> {}";
+    let source = java_source(cap);
+    let captures = [class_capture("class.root", cap)];
+    let edges = layer.extract_semantic_edges_paired(&source, &captures, Fidelity::High, None);
+
+    let ifaces = find_edges_by_relation(&edges, SemanticRelation::Implements);
+    assert_eq!(ifaces.len(), 1);
+    assert_eq!(
+        ifaces[0].object,
+        EntityRef::new("builtin", "Interface", "Repository")
+    );
+    assert_ne!(
+        ifaces[0].object,
+        EntityRef::new("builtin", "Interface", "Repository<User>")
+    );
+}
+
+#[test]
+fn builtin_implements_qualified_interface_preserved() {
+    let layer = BuiltinMetaLayer::new();
+    let cap = "public class Foo implements com.example.Bar {}";
+    let source = java_source(cap);
+    let captures = [class_capture("class.root", cap)];
+    let edges = layer.extract_semantic_edges_paired(&source, &captures, Fidelity::High, None);
+
+    let ifaces = find_edges_by_relation(&edges, SemanticRelation::Implements);
+    assert_eq!(ifaces.len(), 1);
+    assert_eq!(
+        ifaces[0].object,
+        EntityRef::new("builtin", "Interface", "com.example.Bar")
+    );
+}
+
+#[test]
+fn builtin_defers_implements_for_non_java_source() {
+    let layer = BuiltinMetaLayer::new();
+    // TypeScript-styled source: no `package` and no Java `import a.b.C;`
+    // marker → NOT attributed as Java → the `implements` shape is deferred
+    // (the language-agnostic deferral boundary, now pinned concretely).
+    let ts_source = "import { Injectable } from '@angular/core';\n\n@Injectable()\nexport class Foo implements Bar {}\n";
+    let captures = [class_capture(
+        "class.root",
+        "export class Foo implements Bar {}",
+    )];
+    let edges = layer.extract_semantic_edges_paired(ts_source, &captures, Fidelity::High, None);
+
+    assert!(
+        find_edges_by_relation(&edges, SemanticRelation::Implements).is_empty(),
+        "non-Java-attributed sources must not emit Implements"
+    );
 }

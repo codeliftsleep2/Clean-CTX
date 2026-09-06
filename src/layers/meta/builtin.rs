@@ -82,12 +82,18 @@ impl MetaLayer for BuiltinMetaLayer {
 
     fn extract_semantic_edges_paired(
         &self,
-        _source: &str,
+        source: &str,
         class_captures: &[(String, String)],
         _fidelity: Fidelity,
         _config: Option<&CleanCtxConfig>,
     ) -> Vec<SemanticEdge> {
         let mut edges = Vec::new();
+        // Java language attribution for the semantic projection. The builtin
+        // layer is language-agnostic (no language parameter reaches it); the
+        // `implements` shape is Java language knowledge, so it is only
+        // projected when the source text is attributed to Java (see
+        // `is_java_source`). The emitted relation itself stays generic.
+        let is_java = is_java_source(source);
         for (capture_name, raw_class) in class_captures {
             let entity_type = match capture_name.as_str() {
                 "class.root" => "Class",
@@ -122,6 +128,24 @@ impl MetaLayer for BuiltinMetaLayer {
                     layer: "builtin",
                 });
             }
+
+            // Phase 30-A: `Implements` projection.
+            // builtin/Class/<implementation> → Implements → builtin/Interface/<interface>
+            // for each authoritative Java `implements` clause. Java language
+            // knowledge (`is_java_source`) decides the keyword means
+            // `Implements`; the relation remains the generic `Implements`.
+            // This NEVER creates a `Binds` edge — the DI registration fact
+            // (`Implements ≠ Binds`) stays an independent concern.
+            if is_java {
+                for iface_name in parse_implements_bases(raw_class) {
+                    edges.push(SemanticEdge {
+                        relation: SemanticRelation::Implements,
+                        subject: entity.clone(),
+                        object: EntityRef::new("builtin", "Interface", &iface_name),
+                        layer: "builtin",
+                    });
+                }
+            }
         }
         edges
     }
@@ -138,6 +162,54 @@ fn parse_extends_bases(raw_class: &str) -> Vec<String> {
     let decl = declaration_root.lines().next().unwrap_or(declaration_root);
     let decl = decl.split('{').next().unwrap_or(decl).trim();
     crate::compaction::class::extract_base_types(decl, "extends")
+}
+
+/// Parse interface names from the `implements` keyword in a class
+/// declaration.
+///
+/// Mirror of [`Self::parse_extends_bases`] for the Java `implements` clause,
+/// reusing the same authoritative shared extractor
+/// (`compaction::class::extract_base_types`), which splits top-level commas,
+/// strips generic arguments at the first `<`, preserves qualified names, and
+/// returns nothing when the keyword is absent (fail closed).
+///
+/// Callers MUST gate this on Java language attribution
+/// ([`Self::is_java_source`]): `implements` is a Java (and TypeScript)
+/// keyword, and this layer only projects it when the source is attributed
+/// to Java.
+fn parse_implements_bases(raw_class: &str) -> Vec<String> {
+    let declaration_root = strip_leading_annotations(raw_class);
+    let decl = declaration_root.lines().next().unwrap_or(declaration_root);
+    let decl = decl.split('{').next().unwrap_or(decl).trim();
+    crate::compaction::class::extract_base_types(decl, "implements")
+}
+
+/// Establish Java language attribution for a source file.
+///
+/// The BuiltinMetaLayer receives no language parameter, so Java language
+/// knowledge must be derived from the source text. Within the supported
+/// language set (TypeScript, C#, Rust, Java) the `package` declaration and
+/// the semicolon-terminated `import a.b.C;` statement are Java-only markers
+/// (TypeScript uses `import ... from '...'`, C# uses `using`, Rust uses
+/// `use`). Comment lines are skipped so commented-out fragments do not
+/// attribute a file as Java.
+///
+/// Fails closed: a source with neither marker is NOT attributed as Java,
+/// preserving the language-agnostic behavior and the historical deferral.
+fn is_java_source(source: &str) -> bool {
+    let is_comment_line = |t: &str| {
+        t.starts_with("//") || t.starts_with("/*") || t.starts_with('*') || t.starts_with('#')
+    };
+    source.lines().any(|line| {
+        let t = line.trim_start();
+        if is_comment_line(t) {
+            return false;
+        }
+        (t.starts_with("package ") && t.contains(';'))
+            || ((t.starts_with("import ") || t.starts_with("import static "))
+                && t.contains(';')
+                && !t.contains(" from "))
+    })
 }
 
 /// Extract the bare declaration name using the existing class-name extraction
