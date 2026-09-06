@@ -798,7 +798,7 @@ pub(crate) fn extract_class_name(raw: &str) -> Option<String> {
     None
 }
 
-fn unquote(s: &str) -> &str {
+pub(crate) fn unquote(s: &str) -> &str {
     let s = s.trim();
     if s.len() >= 2 {
         let bytes = s.as_bytes();

@@ -437,3 +437,296 @@ public class UserController {
     assert!(types.contains(&"UserService"));
     assert!(types.contains(&"UserRepository"));
 }
+
+// ============================================================================
+// Phase 21: Spring DI Provision Semantics (@Service, @Repository, @Bean)
+// ============================================================================
+
+// -- Helpers -----------------------------------------------------------------
+
+fn binds(edges: &[SemanticEdge]) -> Vec<&SemanticEdge> {
+    edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::Binds)
+        .collect()
+}
+
+fn bean_produces(edges: &[SemanticEdge]) -> Vec<&SemanticEdge> {
+    edges
+        .iter()
+        .filter(|e| e.relation == SemanticRelation::BeanProduces)
+        .collect()
+}
+
+// -- @Service ----------------------------------------------------------------
+
+#[test]
+fn service_default_class_name_token() {
+    let source = r#"
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {
+    public List<String> findAll() { return null; }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let b = binds(&edges);
+    assert_eq!(b.len(), 1, "should have exactly one Binds edge");
+    assert_eq!(
+        b[0].subject,
+        EntityRef::new("spring", "Service", "UserService")
+    );
+    assert_eq!(
+        b[0].object,
+        EntityRef::new("spring", "Token", "UserService")
+    );
+}
+
+#[test]
+fn service_explicit_name_token() {
+    let source = r#"
+import org.springframework.stereotype.Service;
+
+@Service("userService")
+public class UserService {
+    public List<String> findAll() { return null; }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let b = binds(&edges);
+    assert_eq!(b.len(), 1);
+    assert_eq!(
+        b[0].subject,
+        EntityRef::new("spring", "Service", "UserService")
+    );
+    assert_eq!(
+        b[0].object,
+        EntityRef::new("spring", "Token", "userService")
+    );
+}
+
+#[test]
+fn service_multiple_classes_independent() {
+    // In the real pipeline, each class capture is a separate class.root span.
+    // Multiple classes are processed as separate captures, not one combined capture.
+    let source1 = r#"
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {}
+"#;
+    let source2 = r#"
+import org.springframework.stereotype.Service;
+
+@Service
+public class OrderService {}
+"#;
+    let layer = SpringBootMetaLayer::new();
+
+    let edges1 =
+        layer.extract_semantic_edges(source1, &[source1.to_string()], Fidelity::Medium, None);
+    let edges2 =
+        layer.extract_semantic_edges(source2, &[source2.to_string()], Fidelity::Medium, None);
+
+    let b1 = binds(&edges1);
+    let b2 = binds(&edges2);
+    assert_eq!(b1.len(), 1);
+    assert_eq!(b2.len(), 1);
+    assert_eq!(
+        b1[0].object,
+        EntityRef::new("spring", "Token", "UserService")
+    );
+    assert_eq!(
+        b2[0].object,
+        EntityRef::new("spring", "Token", "OrderService")
+    );
+
+    // Each class is its own implementation identity
+    assert_eq!(
+        b1[0].subject,
+        EntityRef::new("spring", "Service", "UserService")
+    );
+    assert_eq!(
+        b2[0].subject,
+        EntityRef::new("spring", "Service", "OrderService")
+    );
+}
+
+// -- @Repository -------------------------------------------------------------
+
+#[test]
+fn repository_default_class_name_token() {
+    let source = r#"
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class UserRepository {
+    public User findById(Long id) { return null; }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let b = binds(&edges);
+    assert_eq!(b.len(), 1, "should have exactly one Binds edge");
+    assert_eq!(
+        b[0].subject,
+        EntityRef::new("spring", "Repository", "UserRepository")
+    );
+    assert_eq!(
+        b[0].object,
+        EntityRef::new("spring", "Token", "UserRepository")
+    );
+}
+
+#[test]
+fn repository_explicit_name_token() {
+    let source = r#"
+import org.springframework.stereotype.Repository;
+
+@Repository("userRepository")
+public class UserRepository {
+    public User findById(Long id) { return null; }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let b = binds(&edges);
+    assert_eq!(b.len(), 1);
+    assert_eq!(
+        b[0].subject,
+        EntityRef::new("spring", "Repository", "UserRepository")
+    );
+    assert_eq!(
+        b[0].object,
+        EntityRef::new("spring", "Token", "userRepository")
+    );
+}
+
+// -- @Bean (fail closed on Binds) -------------------------------------------
+
+#[test]
+fn bean_preserves_bean_produces_no_binds() {
+    // The current extraction path does NOT capture the @Bean method's return
+    // type, so the Binds projection must fail closed. BeanProduces (the
+    // factory declaration fact) remains present.
+    let source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean
+    public UserService userService() {
+        return new UserService();
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    // BeanProduces (factory fact) is preserved
+    let bp = bean_produces(&edges);
+    assert!(!bp.is_empty(), "BeanProduces should remain present");
+
+    // No Binds edge is created (return type not authoritative)
+    let b = binds(&edges);
+    assert!(
+        b.is_empty(),
+        "@Bean must NOT produce a Binds edge (return type not captured)"
+    );
+}
+
+#[test]
+fn bean_explicit_name_no_binds() {
+    // Even with an explicit @Bean("name"), the Binds projection fails closed
+    // because the implementation type (return type) is not captured.
+    let source = r#"
+import org.springframework.context.annotation.*;
+
+@Configuration
+public class AppConfig {
+    @Bean("specialUserService")
+    public UserService userService() {
+        return new UserService();
+    }
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+
+    // BeanProduces preserved (factory fact)
+    let bp = bean_produces(&edges);
+    assert!(!bp.is_empty(), "BeanProduces should remain present");
+
+    // No Binds edge
+    let b = binds(&edges);
+    assert!(
+        b.is_empty(),
+        "@Bean with explicit name must NOT produce a Binds edge"
+    );
+}
+
+// -- Isolation: @Autowired unchanged -----------------------------------------
+
+#[test]
+fn provision_does_not_change_autowired_endpoint() {
+    // Phase 21 must not alter the existing Autowired edge. The endpoint
+    // remains spring/Service/<declared-type> (Phase 19 behavior).
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Service", "UserService")
+    );
+}
+
+// -- Isolation: no @Component, no qualifier, no constructor injection -------
+
+#[test]
+fn provision_does_not_add_component_or_qualifier() {
+    // @Component is not recognized; @Qualifier is not semantic data.
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    @Qualifier("specialUserService")
+    private UserService userService;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+
+    // No qualifier-based edge
+    assert!(!edges.iter().any(|e| e.object.name == "specialUserService"));
+    // No component-based edge
+    assert!(!edges.iter().any(|e| e.subject.entity_type == "Component"));
+    // Autowired still works
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+}

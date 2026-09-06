@@ -14,7 +14,7 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use crate::spring_meta::annotations::{
     AnnotationKind, annotation_kind_to_http_method, collect_annotations, collect_field_annotations,
     collect_method_annotations, extract_class_name, find_class_body_open, find_class_head_end,
-    parse_mapping_paths, parse_request_mappings,
+    parse_mapping_paths, parse_request_mappings, unquote,
 };
 use crate::spring_meta::markers::RequestMappingMapping;
 
@@ -37,6 +37,10 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
 
     let mut is_controller = false;
     let mut is_configuration = false;
+    let mut is_service = false;
+    let mut service_name: Option<String> = None;
+    let mut is_repository = false;
+    let mut repository_name: Option<String> = None;
     let mut request_mappings: Vec<RequestMappingMapping> = Vec::new();
     let mut bean_methods: Vec<String> = Vec::new();
     let mut has_config_props = false;
@@ -59,6 +63,20 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
             AnnotationKind::Configuration => {
                 is_configuration = true;
             }
+            AnnotationKind::Service => {
+                is_service = true;
+                let arg = anno.arg.trim();
+                if !arg.is_empty() {
+                    service_name = Some(unquote(arg).to_string());
+                }
+            }
+            AnnotationKind::Repository => {
+                is_repository = true;
+                let arg = anno.arg.trim();
+                if !arg.is_empty() {
+                    repository_name = Some(unquote(arg).to_string());
+                }
+            }
             AnnotationKind::Bean => {
                 bean_methods.push(anno.arg.trim().to_string());
             }
@@ -67,6 +85,34 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
             }
             _ => {}
         }
+    }
+
+    // Provision: @Service → Binds → Token
+    // The implementation identity is the class itself (authoritative from the
+    // class capture). The token is the explicit @Service("name") value if
+    // present, otherwise the class name (Spring's default bean name key).
+    if is_service {
+        let token = service_name.unwrap_or_else(|| class_name.clone());
+        edges.push(SemanticEdge {
+            relation: SemanticRelation::Binds,
+            subject: EntityRef::new("spring", "Service", &class_name),
+            object: EntityRef::new("spring", "Token", &token),
+            layer: "spring",
+        });
+    }
+
+    // Provision: @Repository → Binds → Token
+    // NOTE: spring/Repository is a new semantic role introduced by this phase.
+    // It is the data-access analogue of spring/Service. The token follows the
+    // same convention: explicit @Repository("name") value or class name.
+    if is_repository {
+        let token = repository_name.unwrap_or_else(|| class_name.clone());
+        edges.push(SemanticEdge {
+            relation: SemanticRelation::Binds,
+            subject: EntityRef::new("spring", "Repository", &class_name),
+            object: EntityRef::new("spring", "Token", &token),
+            layer: "spring",
+        });
     }
 
     // Method-level mappings: scan the class body for @GetMapping, @PostMapping,
