@@ -206,32 +206,54 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
         }
     }
 
-    // Controller -> Autowired -> Token
-    if is_controller && fidelity == Fidelity::High {
-        if let Some(class_body_start) = find_class_body_open(raw_class) {
-            if let Some(body_end) =
-                crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
-            {
-                let body = &raw_class[class_body_start..];
-                let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-                let controller = EntityRef::new("spring", "Controller", &class_name);
-                for fa in collect_field_annotations(body_inner) {
-                    // Phase 19: the dependency identity is the DECLARED
-                    // FIELD TYPE (exact source spelling). Occurrences whose
-                    // declaration cannot be parsed confidently are dropped
-                    // by the extractor (fail closed) and emit no edge —
-                    // no `?`/modifier-placeholder identities.
-                    if fa.kind != AnnotationKind::Autowired {
-                        continue;
+    // Spring-role -> Autowired -> Token
+    // Phase 28: general DI consumption projection. The historical
+    // controller-only gate predates the role-agnostic Phase 19 field parser;
+    // every existing authoritative Spring role identity now projects the
+    // same source-level declared-dependency fact. A class with multiple
+    // roles emits one edge per role identity (parallel-identity model:
+    // distinct subjects are distinct edges, not duplicates).
+    if fidelity == Fidelity::High {
+        let mut subjects: Vec<EntityRef> = Vec::new();
+        if is_controller {
+            subjects.push(EntityRef::new("spring", "Controller", &class_name));
+        }
+        if is_service {
+            subjects.push(EntityRef::new("spring", "Service", &class_name));
+        }
+        if is_repository {
+            subjects.push(EntityRef::new("spring", "Repository", &class_name));
+        }
+        if is_configuration {
+            subjects.push(EntityRef::new("spring", "Configuration", &class_name));
+        }
+        if !subjects.is_empty() {
+            if let Some(class_body_start) = find_class_body_open(raw_class) {
+                if let Some(body_end) =
+                    crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
+                {
+                    let body = &raw_class[class_body_start..];
+                    let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
+                    for fa in collect_field_annotations(body_inner) {
+                        // Phase 19: the dependency identity is the DECLARED
+                        // FIELD TYPE (exact source spelling). Occurrences whose
+                        // declaration cannot be parsed confidently are dropped
+                        // by the extractor (fail closed) and emit no edge —
+                        // no `?`/modifier-placeholder identities.
+                        if fa.kind != AnnotationKind::Autowired {
+                            continue;
+                        }
+                        // Phase 23: qualifier overrides the type-based token.
+                        let token = fa.qualifier.as_ref().unwrap_or(&fa.declared_type);
+                        for subject in &subjects {
+                            edges.push(SemanticEdge {
+                                relation: SemanticRelation::Autowired,
+                                subject: subject.clone(),
+                                object: EntityRef::new("spring", "Token", token),
+                                layer: "spring",
+                            });
+                        }
                     }
-                    // Phase 23: qualifier overrides the type-based token.
-                    let token = fa.qualifier.as_ref().unwrap_or(&fa.declared_type);
-                    edges.push(SemanticEdge {
-                        relation: SemanticRelation::Autowired,
-                        subject: controller.clone(),
-                        object: EntityRef::new("spring", "Token", token),
-                        layer: "spring",
-                    });
                 }
             }
         }

@@ -1593,3 +1593,322 @@ public class UserController {
 
     assert_eq!(bean_name_token, autowired_token);
 }
+// ── Phase 28: General DI consumption (per-role Autowired) ──────────────
+
+#[test]
+fn autowired_service_field_targets_declared_type() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class OrderService {
+    @Autowired
+    private OrderRepository repository;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1, "one field, one role, one edge");
+    assert_eq!(
+        autowired[0].subject,
+        EntityRef::new("spring", "Service", "OrderService")
+    );
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "OrderRepository")
+    );
+}
+
+#[test]
+fn autowired_repository_field_targets_declared_type() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class OrderRepositoryImpl {
+    @Autowired
+    private AuditService audit;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].subject,
+        EntityRef::new("spring", "Repository", "OrderRepositoryImpl")
+    );
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "AuditService")
+    );
+}
+
+#[test]
+fn autowired_configuration_field_targets_declared_type() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class AppConfig {
+    @Autowired
+    private SomeService service;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].subject,
+        EntityRef::new("spring", "Configuration", "AppConfig")
+    );
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "SomeService")
+    );
+    // Ordinary field injection into the configuration object itself;
+    // no BeanProduces facts are implied by the field.
+    assert!(
+        edges
+            .iter()
+            .all(|e| e.relation != SemanticRelation::BeanProduces)
+    );
+}
+
+#[test]
+fn autowired_qualified_service_field_uses_qualifier_token() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+
+@Service
+public class OrderService {
+    @Autowired
+    @Qualifier("specialRepository")
+    private Repository repository;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].subject,
+        EntityRef::new("spring", "Service", "OrderService")
+    );
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "specialRepository")
+    );
+    assert_ne!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "Repository")
+    );
+}
+
+#[test]
+fn autowired_service_qualified_type_preserved() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class OrderService {
+    @Autowired
+    private com.example.audit.AuditService audit;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "com.example.audit.AuditService")
+    );
+}
+
+#[test]
+fn autowired_service_generic_type_exact_spelling() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ReportService {
+    @Autowired
+    private List<OrderRepository> repositories;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 1);
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "List<OrderRepository>")
+    );
+}
+
+#[test]
+fn autowired_service_multiple_dependencies_each_typed() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class OrderService {
+    @Autowired
+    private OrderRepository repository;
+
+    @Autowired
+    private PaymentGateway gateway;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 2);
+    assert!(
+        autowired
+            .iter()
+            .all(|e| e.subject == EntityRef::new("spring", "Service", "OrderService"))
+    );
+    let types: Vec<&str> = autowired.iter().map(|e| e.object.name.as_str()).collect();
+    assert!(types.contains(&"OrderRepository"));
+    assert!(types.contains(&"PaymentGateway"));
+}
+
+#[test]
+fn autowired_service_duplicate_types_share_edge_identity() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ReportService {
+    @Autowired
+    private AuditService first;
+
+    @Autowired
+    private AuditService second;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(autowired.len(), 2, "extractor emits per field occurrence");
+    // Established contract: no per-extraction dedup; WorkspaceIndex::add_edges
+    // deduplicates by (relation, subject identity, object identity), so these
+    // two edges are ONE graph edge. Field names are not part of the edge
+    // identity — no field-level multiplicity is introduced.
+    assert_eq!(autowired[0].subject, autowired[1].subject);
+    assert_eq!(autowired[0].relation, autowired[1].relation);
+    assert_eq!(autowired[0].object, autowired[1].object);
+}
+
+#[test]
+fn autowired_multi_role_class_emits_per_role() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
+
+@Service
+@Repository
+public class Foo {
+    @Autowired
+    private BarService bar;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    let autowired = autowired(&edges);
+    assert_eq!(
+        autowired.len(),
+        2,
+        "one edge per authoritative role identity"
+    );
+    assert_eq!(
+        autowired[0].subject,
+        EntityRef::new("spring", "Service", "Foo")
+    );
+    assert_eq!(
+        autowired[1].subject,
+        EntityRef::new("spring", "Repository", "Foo")
+    );
+    assert_eq!(
+        autowired[0].object,
+        EntityRef::new("spring", "Token", "BarService")
+    );
+    assert_eq!(autowired[0].object, autowired[1].object);
+}
+
+#[test]
+fn autowired_service_high_fidelity_gate_preserved() {
+    // The semantic High-fidelity threshold applies to every role (Phase 27).
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class OrderService {
+    @Autowired
+    private OrderRepository repository;
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let medium = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    assert!(autowired(&medium).is_empty(), "Medium must not emit");
+    let low = layer.extract_semantic_edges(source, &class_captures, Fidelity::Low, None);
+    assert!(autowired(&low).is_empty(), "Low must not emit");
+}
+
+#[test]
+fn autowired_service_malformed_and_setter_fail_closed() {
+    // Missing field name → no edge. Missing type → no edge.
+    // Setter `@Autowired` → no edge. Role identity does not loosen the
+    // Phase 19 fail-closed contract.
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class BrokenService {
+    @Autowired
+    private;
+
+    @Autowired
+    UserService;
+
+    @Autowired
+    public void setThing(Thing thing) {}
+}
+"#;
+    let class_captures = vec![source.to_string()];
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::High, None);
+    assert!(
+        autowired(&edges).is_empty(),
+        "malformed declarations must fail closed for services too"
+    );
+    assert!(!edges.iter().any(|e| e.object.name == "?"));
+    assert!(!edges.iter().any(|e| e.object.name == "private"));
+    assert!(!edges.iter().any(|e| e.object.name == "public"));
+}

@@ -135,7 +135,8 @@ pub enum SemanticRelation {
     /// A SignalR hub method targets a client method.
     HubMethodTargets,
     // ---- Spring ----
-    /// A controller autowires a service.
+    /// A Spring-managed class declares an @Autowired field dependency on
+    /// the token (declared type, or qualifier value when present).
     Autowired,
     /// A controller endpoint maps to a handler.
     EndpointMapsTo,
