@@ -821,7 +821,7 @@ fn d1_data_flow_consultation_produces_request_scoped_context() {
         symbols: ["helper".to_string(), "CriticalAPI".to_string()].into_iter().collect::<HashSet<_>>(),
         files: ["src/helper.rs".to_string(), "api.rs".to_string()].into_iter().collect::<HashSet<_>>(),
     };
-    seed_data_flow(&mut bridge, "CriticalAPI", 2, df);
+    seed_data_flow(&bridge, "CriticalAPI", 2, df);
 
     let config = crate::config::CleanCtxConfig::default(); // data_flow_enabled defaults true
     let source = "pub struct ApiClient { key: String }";
@@ -870,7 +870,7 @@ fn d1_multiple_seeds_deduplicate_and_bounding() {
     );
     let mut bridge = new_mock(data);
     seed_data_flow(
-        &mut bridge,
+        &bridge,
         "SeedA",
         2,
         DataFlowContext {
@@ -879,7 +879,7 @@ fn d1_multiple_seeds_deduplicate_and_bounding() {
         },
     );
     seed_data_flow(
-        &mut bridge,
+        &bridge,
         "SeedB",
         2,
         DataFlowContext {
@@ -980,7 +980,7 @@ fn d1_data_flow_relevant_symbol_retained_through_skip_set() {
     // Data-flow identifies "helper" as participating in the request-relevant
     // flow (bare name resolvable against this file's importance entries).
     seed_data_flow(
-        &mut bridge,
+        &bridge,
         "CriticalAPI",
         2,
         DataFlowContext {

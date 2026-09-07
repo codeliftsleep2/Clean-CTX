@@ -119,17 +119,24 @@ use crate::cbm::bridge::GraphEdge;
 
 /// Parse a CBM `trace_path` response into Clean-CTX `GraphEdge`s.
 ///
-/// CBM 0.10.8 emits `callers`/`callees` as table models:
+/// CBM 0.10.8 (`format="json"`) emits `callers`/`callees` as the grouped
+/// tree model for every mode (`calls`, `data_flow`, `cross_service`):
 /// ```text
 /// { function, direction, mode?,
-///   callees_total, callees: { cols, rows },
-///   callers_total, callers: { cols, rows },
+///   callees_total, callees: { cols, groups: [{ qn_prefix, rows }] },
+///   callers_total, callers: { cols, groups: [{ qn_prefix, rows }] },
 ///   truncated?, next_cursor? }
 /// ```
-/// Each row carries `[name, qualified_name, hop, ...]` keyed by `cols`.
+/// Each row carries `[name, hop, ...]` keyed by `cols`; the full qualified
+/// name is `qn_prefix + "." + name` (or just `name` when `qn_prefix` is
+/// empty — the name is then already fully qualified).
 ///
-/// Legacy shape (tolerated): `callers`/`callees` as arrays of
-/// `{ name, qualified_name, hop }`.
+/// Also tolerated:
+/// * Flat table (`{ cols, rows }`) — earlier 0.10.x shape, kept for backward
+///   compatibility.
+/// * Legacy array (`callers`/`callees` as arrays of
+///   `{ name, qualified_name, hop }`) — CBM 0.8.1 shape, delegated to the
+///   verified legacy parser.
 pub fn parse_trace(body: &Value, function_qn: &str) -> Vec<GraphEdge> {
     let has_tables = body.get("callees").and_then(Value::as_object).is_some()
         || body.get("callers").and_then(Value::as_object).is_some();
@@ -172,12 +179,25 @@ pub fn parse_trace(body: &Value, function_qn: &str) -> Vec<GraphEdge> {
     edges
 }
 
-/// Parse one `callers`/`callees` table (`{ cols, rows }`) into edges.
+/// Parse one `callers`/`callees` table into edges.
+///
+/// Dispatches on shape:
+/// * Grouped tree (`{ cols, groups: [{ qn_prefix, rows }] }`) — the CBM 0.10.8
+///   JSON wire format. This is the primary path.
+/// * Flat table (`{ cols, rows }`) — tolerated for backward compatibility.
 fn parse_trace_table(
     table: &serde_json::Map<String, Value>,
     function_qn: &str,
     caller_to_callee: bool,
 ) -> Vec<GraphEdge> {
+    // Grouped tree: rows live inside `groups[].rows`, namespaced under
+    // `groups[].qn_prefix`. This is what CBM 0.10.8 JSON emits for every mode.
+    if let Some(groups) = table.get("groups").and_then(Value::as_array) {
+        return parse_trace_groups(groups, function_qn, caller_to_callee);
+    }
+
+    // Flat table: rows live directly under `rows`. Tolerated for backward
+    // compatibility with earlier 0.10.x shapes.
     let cols = table.get("cols").and_then(|c| c.as_array());
     let rows = table.get("rows").and_then(|r| r.as_array());
     let (cols, rows) = match (cols, rows) {
@@ -207,6 +227,65 @@ fn parse_trace_table(
             label: "calls".into(),
             properties: HashMap::new(),
         });
+    }
+    edges
+}
+
+/// Parse the grouped tree model (`groups: [{ qn_prefix, rows }]`) into edges.
+///
+/// CBM's serializer (`bfs_to_tree_json`) segments each qualified name at the
+/// last dot: the prefix becomes `qn_prefix`, the trailing segment becomes the
+/// row `name`. Reconstruct the full qualified name accordingly. When
+/// `qn_prefix` is empty the name is already fully qualified.
+///
+/// FQN reconstruction follows the same convention as `parse_search_results`:
+/// `qn_prefix + "." + name` when non-empty, else bare `name`.
+fn parse_trace_groups(
+    groups: &[Value],
+    function_qn: &str,
+    caller_to_callee: bool,
+) -> Vec<GraphEdge> {
+    let mut edges = Vec::new();
+    for group in groups {
+        let group_obj = match group.as_object() {
+            Some(o) => o,
+            None => continue,
+        };
+        let qn_prefix = group_obj
+            .get("qn_prefix")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let rows = match group_obj.get("rows").and_then(Value::as_array) {
+            Some(r) => r,
+            None => continue,
+        };
+        for row in rows {
+            let row_arr = match row.as_array() {
+                Some(a) => a,
+                None => continue,
+            };
+            // Column 0 is `name` (the short segment after the prefix).
+            let name = row_str(row_arr, 0);
+            if name.is_empty() {
+                continue;
+            }
+            let qn = if qn_prefix.is_empty() {
+                name.to_string()
+            } else {
+                format!("{}.{}", qn_prefix, name)
+            };
+            let (from, to) = if caller_to_callee {
+                (function_qn.to_string(), qn)
+            } else {
+                (qn, function_qn.to_string())
+            };
+            edges.push(GraphEdge {
+                from,
+                to,
+                label: "calls".into(),
+                properties: HashMap::new(),
+            });
+        }
     }
     edges
 }
@@ -427,5 +506,181 @@ mod tests {
         let ov = parse_architecture(&body).expect("should parse legacy arrays");
         assert_eq!(ov.modules.len(), 1);
         assert_eq!(ov.dependencies.len(), 1);
+    }
+
+    // ── Trace grouped tree model (CBM 0.10.8 JSON wire format) ─────────
+
+    /// Test B — Grouped tree: the actual CBM 0.10.8 JSON shape.
+    #[test]
+    fn parse_trace_grouped_tree_basic() {
+        let body = serde_json::json!({
+            "function": "proj.main",
+            "direction": "both",
+            "mode": "data_flow",
+            "callees_total": 1,
+            "callees": {
+                "cols": ["name", "hop"],
+                "groups": [
+                    {
+                        "qn_prefix": "proj.src",
+                        "rows": [["helper", 1]]
+                    }
+                ]
+            },
+            "callers_total": 1,
+            "callers": {
+                "cols": ["name", "hop"],
+                "groups": [
+                    {
+                        "qn_prefix": "proj.entry",
+                        "rows": [["run", 1]]
+                    }
+                ]
+            }
+        });
+        let edges = parse_trace(&body, "proj.main");
+        assert_eq!(edges.len(), 2, "one callee + one caller edge");
+        assert!(
+            edges
+                .iter()
+                .any(|e| e.from == "proj.main" && e.to == "proj.src.helper"),
+            "callee FQN reconstructed from qn_prefix + name"
+        );
+        assert!(
+            edges
+                .iter()
+                .any(|e| e.from == "proj.entry.run" && e.to == "proj.main"),
+            "caller FQN reconstructed from qn_prefix + name"
+        );
+    }
+
+    /// Test C — Multiple groups: all qn_prefix groups parsed.
+    #[test]
+    fn parse_trace_grouped_tree_multiple_groups() {
+        let body = serde_json::json!({
+            "function": "proj.main",
+            "direction": "outbound",
+            "callees": {
+                "cols": ["name", "hop"],
+                "groups": [
+                    { "qn_prefix": "proj.src", "rows": [["helper", 1], ["util", 2]] },
+                    { "qn_prefix": "other.pkg", "rows": [["remote_func", 1]] },
+                    { "qn_prefix": "", "rows": [["bare_symbol", 1]] }
+                ]
+            }
+        });
+        let edges = parse_trace(&body, "proj.main");
+        assert_eq!(edges.len(), 4, "2 + 1 + 1 edges across 3 groups");
+        assert!(edges.iter().any(|e| e.to == "proj.src.helper"));
+        assert!(edges.iter().any(|e| e.to == "proj.src.util"));
+        assert!(edges.iter().any(|e| e.to == "other.pkg.remote_func"));
+        assert!(
+            edges.iter().any(|e| e.to == "bare_symbol"),
+            "empty qn_prefix means name is already fully qualified"
+        );
+    }
+
+    /// Test D — data_flow mode adds `args` column; grouped parser ignores
+    /// unconsumed columns gracefully.
+    #[test]
+    fn parse_trace_grouped_tree_with_extra_columns() {
+        let body = serde_json::json!({
+            "function": "proj.main",
+            "direction": "outbound",
+            "mode": "data_flow",
+            "callees": {
+                "cols": ["name", "hop", "args"],
+                "groups": [
+                    {
+                        "qn_prefix": "proj.src",
+                        "rows": [["helper", 1, "[arg1, arg2]"]]
+                    }
+                ]
+            }
+        });
+        let edges = parse_trace(&body, "proj.main");
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].from, "proj.main");
+        assert_eq!(edges[0].to, "proj.src.helper");
+        // args column is not represented in GraphEdge (by design).
+        assert_eq!(edges[0].properties.len(), 0);
+    }
+
+    /// Test F — Malformed grouped rows: non-array rows are skipped.
+    #[test]
+    fn parse_trace_grouped_tree_malformed_rows_skipped() {
+        let body = serde_json::json!({
+            "function": "proj.main",
+            "direction": "outbound",
+            "callees": {
+                "cols": ["name", "hop"],
+                "groups": [
+                    {
+                        "qn_prefix": "proj.src",
+                        "rows": [
+                            ["helper", 1],
+                            "not-an-array",
+                            [],
+                            ["", 1],
+                            ["valid", 2]
+                        ]
+                    }
+                ]
+            }
+        });
+        let edges = parse_trace(&body, "proj.main");
+        // "helper" and "valid" parse; "not-an-array", [], and "" are skipped.
+        assert_eq!(edges.len(), 2);
+        assert!(edges.iter().any(|e| e.to == "proj.src.helper"));
+        assert!(edges.iter().any(|e| e.to == "proj.src.valid"));
+    }
+
+    /// Cross-service parsing regression: representative cross_service shape.
+    #[test]
+    fn parse_trace_cross_service_grouped_tree() {
+        let body = serde_json::json!({
+            "function": "proj.gateway.handle",
+            "direction": "both",
+            "mode": "cross_service",
+            "callees_total": 2,
+            "callees": {
+                "cols": ["name", "hop"],
+                "groups": [
+                    { "qn_prefix": "proj.service", "rows": [["process", 1]] },
+                    { "qn_prefix": "external.api", "rows": [["fetch", 1]] }
+                ]
+            },
+            "callers_total": 1,
+            "callers": {
+                "cols": ["name", "hop"],
+                "groups": [
+                    { "qn_prefix": "proj.routes", "rows": [["route_handler", 1]] }
+                ]
+            }
+        });
+        let edges = parse_trace(&body, "proj.gateway.handle");
+        assert_eq!(edges.len(), 3);
+        assert!(edges
+            .iter()
+            .any(|e| e.from == "proj.gateway.handle" && e.to == "proj.service.process"));
+        assert!(edges
+            .iter()
+            .any(|e| e.from == "proj.gateway.handle" && e.to == "external.api.fetch"));
+        assert!(edges
+            .iter()
+            .any(|e| e.from == "proj.routes.route_handler" && e.to == "proj.gateway.handle"));
+    }
+
+    /// Empty groups produce zero edges (graceful, no crash).
+    #[test]
+    fn parse_trace_grouped_tree_empty() {
+        let body = serde_json::json!({
+            "function": "proj.main",
+            "direction": "both",
+            "callees": { "cols": ["name", "hop"], "groups": [] },
+            "callers": { "cols": ["name", "hop"], "groups": [] }
+        });
+        let edges = parse_trace(&body, "proj.main");
+        assert!(edges.is_empty());
     }
 }

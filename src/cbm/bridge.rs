@@ -2552,7 +2552,6 @@ pub mod test_helpers {
     /// Lets tests exercise `trace_data_flow` without a CBM client — the
     /// cached entry is served by `check_cache` before any transport. The
     /// client stays `None`, so the query path is never reached.
-
     pub fn seed_data_flow(
         bridge: &GraphBridge,
         seed: &str,
