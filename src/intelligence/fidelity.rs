@@ -17,7 +17,33 @@
 // entirely. This replaces the post-compression enrichment pattern.
 
 use crate::compression::Fidelity;
+use crate::cbm::SymbolImportance;
 use std::collections::{HashMap, HashSet};
+
+/// Request-scoped CBM intelligence for a single context-compilation request.
+///
+/// This struct carries CBM-derived advisory intelligence that is specific to
+/// one compilation request. It is NOT session-scoped state and must NOT be
+/// stored in `WorkspaceIndex`, `CompiledIR`, or any persistent structure.
+///
+/// Ownership lifecycle:
+/// - Created during `compute_strategy()` after CBM consultation
+/// - Carried by `ContextDecision` into `compile_file_ir_focused()`
+/// - Consumed by the compiler's skip-set filtering machinery
+/// - Dropped when the request completes
+///
+/// The compiler itself never sees this type — it only receives the derived
+/// `skip_set: Option<HashSet<String>>` parameter, keeping the compiler
+/// CBM-agnostic.
+#[derive(Debug, Clone)]
+pub struct CbmIntelligence {
+    /// CBM symbol importance scores (symbol → importance).
+    /// Session-cached by GraphBridge; cloned here for request-local use.
+    pub importance: HashMap<String, SymbolImportance>,
+    /// Symbols to exclude from compression (score < 0.4).
+    /// Derived from `importance` via `build_cbm_skip_set`.
+    pub skip_set: HashSet<String>,
+}
 
 /// A fidelity recommendation from the intelligence layer.
 #[derive(Debug, Clone, PartialEq)]

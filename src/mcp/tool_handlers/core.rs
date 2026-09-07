@@ -822,6 +822,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     // Phase 1: Heuristics decision
     let heuristics_start = Instant::now();
     let ir_read = state.ir_context_read();
+    // Acquire CBM bridge for compiler-mediated intelligence consultation.
+    // The bridge is locked only for the duration of `decide()`; the resulting
+    // CbmIntelligence is owned by `ContextDecision` and the lock is released
+    // before compilation (which needs `&mut McpState`).
+    let mut bridge_guard = state.graph_bridge_lock();
+    let bridge_opt = bridge_guard.as_mut();
     let decision = match crate::mcp::heuristics::decide(
         &resolved_path,
         explicit_fidelity,
@@ -831,6 +837,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         source,
         Some(&alias),
         None,
+        bridge_opt,
     ) {
         Ok(d) => d,
         Err(e) => {
@@ -841,6 +848,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             return;
         }
     };
+    drop(bridge_guard); // Release CBM lock before compilation (needs &mut McpState).
     drop(ir_read);
     let heuristics_ms = heuristics_start.elapsed().as_millis() as u64;
 
@@ -936,6 +944,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 crate::compression::Fidelity::Edit,
                 state,
                 focus_methods.as_ref(),
+                decision.cbm_intelligence.as_ref(),
             ) {
                 Ok((compiled, semantic_edges, _)) => {
                     state.ir_context_lock().load_ir(compiled, None);
@@ -993,6 +1002,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 effective_fidelity,
                 state,
                 focus_methods.as_ref(),
+                decision.cbm_intelligence.as_ref(),
             ) {
                 Ok(c) => c,
                 Err(e) => {
@@ -1186,6 +1196,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 effective_fidelity,
                 state,
                 focus_methods.as_ref(),
+                decision.cbm_intelligence.as_ref(),
             );
             let compile_ms = compile_start.elapsed().as_millis() as u64;
 

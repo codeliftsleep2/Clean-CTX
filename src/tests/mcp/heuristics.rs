@@ -29,6 +29,7 @@ fn decide_ok(
         source,
         path_alias,
         stored_fidelity,
+        None, // bridge: tests use None (no CBM consultation)
     )
     .expect("decide should succeed")
 }
@@ -842,6 +843,7 @@ fn test_invalid_explicit_fidelity_returns_error() {
         "export class Foo {}",
         None,
         None,
+        None, // bridge
     );
     assert!(
         result.is_err(),
@@ -867,6 +869,7 @@ fn test_valid_explicit_fidelity_succeeds() {
         "export class Foo {}",
         None,
         None,
+        None, // bridge
     );
     assert!(result.is_ok(), "valid explicit fidelity should succeed");
     assert_eq!(result.unwrap().fidelity, Fidelity::Edit);

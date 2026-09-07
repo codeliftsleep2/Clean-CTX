@@ -142,7 +142,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("");
-    let pre_compiled = match compile_file_ir_focused(&resolved_path, Fidelity::Edit, state, None) {
+    let pre_compiled = match compile_file_ir_focused(&resolved_path, Fidelity::Edit, state, None, None) {
         Ok((ir, _, _)) => ir,
         Err(e) => return err_response(id, -32603, e.to_string(), None),
     };
@@ -180,7 +180,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     // Refresh session baseline so the next provide_code_context call on
     // this file yields an incremental delta instead of a full recompress
     // (plan step 5). Post-edit recompile also re-validates the final file.
-    let version = match compile_file_ir_focused(&resolved_path, Fidelity::Edit, state, None) {
+    let version = match compile_file_ir_focused(&resolved_path, Fidelity::Edit, state, None, None) {
         // compile_file_ir_focused already assigns version = prev + 1.
         Ok((post, sem_edges, _)) => {
             let v = post.version;

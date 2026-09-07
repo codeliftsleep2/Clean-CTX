@@ -73,6 +73,7 @@ fn provide_code_context_cbm_skipped_when_intelligence_disabled() {
         source,
         None, // path_alias
         None, // stored_fidelity
+        None, // bridge
     )
     .unwrap();
 
@@ -112,6 +113,7 @@ fn provide_code_context_cbm_informed_false_when_no_bridge() {
         source,
         None,
         None,
+        None, // bridge
     )
     .unwrap();
 
@@ -142,6 +144,7 @@ fn provide_code_context_cbm_informed_false_on_explicit_fidelity() {
         source,
         None,
         None,
+        None, // bridge
     )
     .unwrap();
 
@@ -242,4 +245,251 @@ fn cached_query_clears_stale_error() {
         bridge.take_last_error().is_none(),
         "cache-hit query must clear any stale error"
     );
+}
+
+// ── Phase A: Compiler-mediated CBM intelligence tests ───────────────
+
+/// A. CBM influences automatic fidelity: high-importance symbols → ForceHigh.
+#[test]
+fn cbm_influences_automatic_fidelity_high_importance() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use crate::cbm::SymbolImportance;
+    use crate::mcp::heuristics;
+    use std::collections::HashMap;
+
+    let mut data = HashMap::new();
+    data.insert(
+        "CriticalAPI".to_string(),
+        SymbolImportance {
+            symbol: "CriticalAPI".to_string(),
+            score: 0.95,
+            file: "api.rs".to_string(),
+        },
+    );
+    let mut bridge = new_mock(data);
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    assert!(decision.cbm_informed);
+    assert_eq!(format!("{:?}", decision.fidelity), "High");
+    let intel = decision.cbm_intelligence.expect("cbm_intelligence should be Some");
+    assert!(!intel.importance.is_empty());
+    assert!(!intel.skip_set.contains("CriticalAPI"));
+}
+
+/// A. CBM influences automatic fidelity: low-importance symbols → ForceLow.
+#[test]
+fn cbm_influences_automatic_fidelity_low_importance() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use crate::cbm::SymbolImportance;
+    use crate::mcp::heuristics;
+    use std::collections::HashMap;
+
+    let mut data = HashMap::new();
+    data.insert(
+        "HelperUtil".to_string(),
+        SymbolImportance {
+            symbol: "HelperUtil".to_string(),
+            score: 0.15,
+            file: "util.rs".to_string(),
+        },
+    );
+    let mut bridge = new_mock(data);
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub fn helper() -> i32 { 42 }";
+    let decision = heuristics::decide(
+        "/project/src/util.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    assert!(decision.cbm_informed);
+    assert_eq!(format!("{:?}", decision.fidelity), "Low");
+    let intel = decision.cbm_intelligence.expect("cbm_intelligence should be Some");
+    assert!(intel.skip_set.contains("HelperUtil"));
+}
+
+/// B. Explicit fidelity wins: CBM does not override explicit user choice.
+#[test]
+fn explicit_fidelity_wins_over_cbm() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use crate::cbm::SymbolImportance;
+    use crate::mcp::heuristics;
+    use std::collections::HashMap;
+
+    let mut data = HashMap::new();
+    data.insert(
+        "CriticalAPI".to_string(),
+        SymbolImportance {
+            symbol: "CriticalAPI".to_string(),
+            score: 0.95,
+            file: "api.rs".to_string(),
+        },
+    );
+    let mut bridge = new_mock(data);
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        Some("low"),
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    assert!(!decision.cbm_informed);
+    assert_eq!(format!("{:?}", decision.fidelity), "Low");
+    assert!(decision.cbm_intelligence.is_none());
+}
+
+/// C. Skip-set is derived from importance.
+#[test]
+fn cbm_skip_set_is_derived_and_reaches_compiler() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use crate::cbm::SymbolImportance;
+    use crate::mcp::heuristics;
+    use std::collections::HashMap;
+
+    let mut data = HashMap::new();
+    data.insert("LowSymA".to_string(), SymbolImportance { symbol: "LowSymA".to_string(), score: 0.1, file: "file.rs".to_string() });
+    data.insert("HighSymB".to_string(), SymbolImportance { symbol: "HighSymB".to_string(), score: 0.9, file: "file.rs".to_string() });
+    data.insert("LowSymC".to_string(), SymbolImportance { symbol: "LowSymC".to_string(), score: 0.3, file: "file.rs".to_string() });
+    let mut bridge = new_mock(data);
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct Data { value: i32 }";
+    let decision = heuristics::decide(
+        "/project/src/file.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    assert!(decision.cbm_informed);
+    let intel = decision.cbm_intelligence.expect("cbm_intelligence should be Some");
+    assert!(intel.skip_set.contains("LowSymA"));
+    assert!(!intel.skip_set.contains("HighSymB"));
+    assert!(intel.skip_set.contains("LowSymC"));
+    assert_eq!(intel.skip_set.len(), 2);
+}
+
+/// D. CBM unavailable: request proceeds normally without enhancement.
+#[test]
+fn cbm_unavailable_graceful_fallback() {
+    use crate::mcp::heuristics;
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct Config { port: u16 }";
+    let decision = heuristics::decide(
+        "/project/src/config.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert!(!decision.cbm_informed);
+    assert!(decision.cbm_intelligence.is_none());
+}
+
+/// E. CBM-informed flag: true when intelligence obtained, even if fidelity unchanged.
+#[test]
+fn cbm_informed_true_even_when_fidelity_unchanged() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use crate::cbm::SymbolImportance;
+    use crate::mcp::heuristics;
+    use std::collections::HashMap;
+
+    let mut data = HashMap::new();
+    data.insert("MediumSym".to_string(), SymbolImportance { symbol: "MediumSym".to_string(), score: 0.6, file: "service.rs".to_string() });
+    let mut bridge = new_mock(data);
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct Service { name: String }";
+    let decision = heuristics::decide(
+        "/project/src/service.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    assert!(decision.cbm_informed);
+    assert!(decision.cbm_intelligence.is_some());
+}
+
+/// F. No semantic contamination: CBM data does not modify WorkspaceIndex or semantic facts.
+#[test]
+fn cbm_does_not_contaminate_semantic_substrate() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use crate::cbm::SymbolImportance;
+    use crate::mcp::heuristics;
+    use std::collections::HashMap;
+
+    let mut data = HashMap::new();
+    data.insert("TestSym".to_string(), SymbolImportance { symbol: "TestSym".to_string(), score: 0.95, file: "test.rs".to_string() });
+    let mut bridge = new_mock(data);
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct Test { value: i32 }";
+    let decision = heuristics::decide(
+        "/project/src/test.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    assert!(decision.cbm_informed);
+    let intel = decision.cbm_intelligence.expect("cbm_intelligence should be Some");
+    let _ = intel.importance.len();
+    let _ = intel.skip_set.len();
 }

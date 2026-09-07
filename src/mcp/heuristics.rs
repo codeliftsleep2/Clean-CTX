@@ -26,6 +26,12 @@ use crate::config::CleanCtxConfig;
 use crate::ir::replay::ContextState;
 use std::path::Path;
 
+// CBM intelligence types — used by `decide()` for compiler-mediated CBM consultation.
+// The `CbmIntelligence` struct itself lives in `intelligence::fidelity` and is
+// re-exported here for use in `ContextDecision`.
+pub use crate::intelligence::fidelity::CbmIntelligence;
+use crate::intelligence::fidelity::{apply_recommendation, build_cbm_skip_set, cbm_informed_fidelity};
+
 /// What compression strategy should `provide_code_context` use?
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContextStrategy {
@@ -66,7 +72,18 @@ pub struct ContextDecision {
     /// V2: the file classification that was used (or General if none).
     pub file_class: FileClass,
     /// Whether the CBM Intelligence Layer influenced this decision.
+    ///
+    /// `true` means CBM intelligence was successfully obtained and was
+    /// available to inform this request. It does NOT mean CBM necessarily
+    /// changed the final fidelity — CBM may have returned `NoRecommendation`.
     pub cbm_informed: bool,
+    /// Request-scoped CBM intelligence derived from graph analysis.
+    ///
+    /// `Some` when CBM was available and consulted; `None` when CBM was
+    /// unavailable, disabled, or the request had explicit fidelity/intent.
+    /// This is request-local data — it is NOT stored in WorkspaceIndex,
+    /// CompiledIR, or any persistent structure.
+    pub cbm_intelligence: Option<crate::intelligence::fidelity::CbmIntelligence>,
 }
 
 impl ContextDecision {
@@ -90,9 +107,24 @@ impl ContextDecision {
         } else {
             "no_cbm"
         };
+        let skip_str = if let Some(intel) = &self.cbm_intelligence {
+            format!("cbm_skip={}", intel.skip_set.len())
+        } else {
+            String::new()
+        };
         format!(
-            "fidelity={:?}, strategy={}, class={}, angular={}, lines={}, cbm={}",
-            self.fidelity, strategy_str, class_str, angular_str, self.source_line_count, cbm_str
+            "fidelity={:?}, strategy={}, class={}, angular={}, lines={}, cbm={}{}",
+            self.fidelity,
+            strategy_str,
+            class_str,
+            angular_str,
+            self.source_line_count,
+            cbm_str,
+            if skip_str.is_empty() {
+                String::new()
+            } else {
+                format!(", {skip_str}")
+            }
         )
     }
 }
@@ -513,6 +545,11 @@ pub fn decide(
     path_alias: Option<&str>,
     // C-1: Previously persisted fidelity from the DB, if available.
     stored_fidelity: Option<Fidelity>,
+    // CBM bridge for compiler-mediated intelligence consultation.
+    // When `Some`, CBM symbol importance may influence automatic fidelity
+    // and produce a request-scoped skip-set. `None` means CBM is unavailable
+    // and the decision proceeds without intelligence enhancement.
+    bridge: Option<&mut crate::cbm::GraphBridge>,
 ) -> Result<ContextDecision, String> {
     let path = Path::new(file_path);
 
@@ -565,6 +602,58 @@ pub fn decide(
         }
     }
 
+    // ── CBM Intelligence Consultation ──────────────────────────────────
+    // Consult CBM for advisory intelligence that can improve context selection.
+    // This is a pre-compression filter: CBM reduces token output by excluding
+    // low-importance symbols, rather than appending enrichment after the fact.
+    //
+    // Only consulted when:
+    //   - No explicit fidelity or intent was provided (explicit choices always win)
+    //   - CBM bridge is available
+    //   - Intelligence layer is enabled in config
+    //
+    // CBM failure is opportunistic: any error results in `cbm_informed = false`
+    // and the baseline fidelity is preserved exactly.
+    let mut cbm_intelligence = None;
+    let mut cbm_informed = false;
+
+    let needs_cbm = explicit_fidelity.is_none()
+        && explicit_intent.is_none()
+        && bridge.is_some()
+        && config.intelligence.enabled;
+
+    if needs_cbm {
+        // SAFETY: `needs_cbm` checks `bridge.is_some()`, so `unwrap()` cannot panic.
+        let bridge_mut = bridge.unwrap();
+
+        // Retrieve CBM symbol importance (session-cached by GraphBridge).
+        match bridge_mut.get_symbol_importance_mut() {
+            Ok(importance) => {
+                // Derive fidelity recommendation from importance scores.
+                let recommendation =
+                    cbm_informed_fidelity(file_path, &importance, crate::intelligence::fidelity::FidelityRecommendation::NoRecommendation);
+
+                // Apply recommendation only if it's a definitive signal.
+                if let Some(new_fidelity) = apply_recommendation(&recommendation) {
+                    fidelity = new_fidelity;
+                }
+
+                // Build request-scoped skip-set from low-importance symbols.
+                let skip_set = build_cbm_skip_set(file_path, &importance);
+
+                cbm_intelligence = Some(CbmIntelligence {
+                    importance,
+                    skip_set,
+                });
+                cbm_informed = true;
+            }
+            Err(_) => {
+                // CBM unavailable or query failed — proceed without enhancement.
+                // `cbm_informed` stays `false`, fidelity stays at baseline.
+            }
+        }
+    }
+
     // Determine strategy: check for baselines using the dict alias
     // (where they're actually stored), falling back to raw path.
     let check_key = path_alias.unwrap_or(file_path);
@@ -597,7 +686,8 @@ pub fn decide(
         is_angular,
         source_line_count: line_count,
         file_class,
-        cbm_informed: false,
+        cbm_informed,
+        cbm_intelligence,
     })
 }
 

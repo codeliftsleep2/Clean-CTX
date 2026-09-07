@@ -257,7 +257,7 @@ pub(super) fn compile_file_ir(
     state: &McpState,
 ) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
 {
-    compile_file_ir_focused(file_path, fidelity, state, None)
+    compile_file_ir_focused(file_path, fidelity, state, None, None)
 }
 
 /// Compile a file to IR with symbol targeting (`focus`).
@@ -275,6 +275,11 @@ pub(super) fn compile_file_ir_focused(
     fidelity: Fidelity,
     state: &McpState,
     focus: Option<&std::collections::HashSet<String>>,
+    // CBM request-scoped intelligence. When provided, its skip-set takes
+    // precedence over the transitional `CbmFilterState` in `McpState`.
+    // The compiler itself never sees this type — only the derived
+    // `skip_set` is passed through, keeping the compiler CBM-agnostic.
+    cbm_intelligence: Option<&crate::intelligence::fidelity::CbmIntelligence>,
 ) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
 {
     // Phase A retirement tests: cfg(test)-only fault injection. The
@@ -375,7 +380,13 @@ pub(super) fn compile_file_ir_focused(
 
     // CBM filter-first: pass the skip set so low-importance symbols
     // are excluded from IR output entirely.
-    let skip_set = state.get_skip_set(file_path);
+    // Request-scoped CbmIntelligence (from compiler-mediated CBM consultation)
+    // takes precedence over the transitional CbmFilterState in McpState.
+    let skip_set = if let Some(intel) = cbm_intelligence {
+        Some(intel.skip_set.clone())
+    } else {
+        state.get_skip_set(file_path)
+    };
     let mut compiled = compiler.compile_focused(
         source,
         &path_alias,
