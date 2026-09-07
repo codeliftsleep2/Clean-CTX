@@ -492,6 +492,31 @@ pub struct IntelligenceConfig {
     /// Default: 10 files.
     #[serde(default = "default_max_blast_radius")]
     pub max_blast_radius_files: usize,
+    /// Enable CBM data-flow context expansion (Phase D1). When enabled
+    /// (and the master `enabled` switch is on, Clean-CTX traces the request
+    /// file's highest-importance symbols via `trace_path(mode="data_flow")`
+    /// and carries the bounded result as request-scoped advisory context in
+    /// `CbmIntelligence.data_flow` (symbols/files participating in a
+    /// request-relevant data flow). Default: true.
+    #[serde(default = "default_true")]
+    pub data_flow_enabled: bool,
+    /// Maximum number of seed symbols traced per request (Phase D1)..
+    /// Each seed is one bounded CBM trace call. Default: 3.
+    #[serde(default = "default_data_flow_seeds")]
+    pub data_flow_seeds: usize,
+    /// Data-flow trace depth (Phase D1). Capped to keep each trace cheap.
+
+    /// Default: 2.
+    #[serde(default = "default_data_flow_depth")]
+    pub data_flow_depth: usize,
+    /// Maximum number of data-flow symbols carried per request (Phase D1).
+    /// Prevents context explosion. Default: 12.
+    #[serde(default = "default_data_flow_max_symbols")]
+    pub data_flow_max_symbols: usize,
+    /// Maximum number of data-flow files carried per request (Phase D1).
+    /// Prevents context explosion. Default: 6.
+    #[serde(default = "default_data_flow_max_files")]
+    pub data_flow_max_files: usize,
 }
 
 impl Default for IntelligenceConfig {
@@ -500,12 +525,33 @@ impl Default for IntelligenceConfig {
             enabled: true,
             blast_radius_enabled: false,
             max_blast_radius_files: 10,
+            data_flow_enabled: true,
+            data_flow_seeds: default_data_flow_seeds(),
+            data_flow_depth: default_data_flow_depth(),
+            data_flow_max_symbols: default_data_flow_max_symbols(),
+            data_flow_max_files: default_data_flow_max_files(),
         }
     }
 }
 
 fn default_max_blast_radius() -> usize {
     10
+}
+
+fn default_data_flow_seeds() -> usize {
+    3
+}
+
+fn default_data_flow_depth() -> usize {
+    2
+}
+
+fn default_data_flow_max_symbols() -> usize {
+    12
+}
+
+fn default_data_flow_max_files() -> usize {
+    6
 }
 
 /// Observability configuration for metrics export.

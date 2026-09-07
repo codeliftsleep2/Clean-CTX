@@ -26,8 +26,8 @@ pub mod wire;
 
 // Re-export the public API for external consumers.
 pub use bridge::{
-    ArchitectureOverview, ChangeSet, DeadCodeEntry, GraphBridge, GraphEdge, GraphNode, QueryResult,
-    RecoveryOutcome, SymbolImportance,
+    ArchitectureOverview, ChangeSet, DataFlowContext, DeadCodeEntry, GraphBridge, GraphEdge, GraphNode,
+    QueryResult, RecoveryOutcome, SymbolImportance,
 };
 pub use client::CbmClient;
 pub use config::{CbmConfig, CbmStatus};

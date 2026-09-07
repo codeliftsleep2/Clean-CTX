@@ -3,7 +3,7 @@
 // Graph Bridge — translates CBM graph data into Clean-CTX concepts.
 // Entirely self-contained with its own types and caching.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -318,6 +318,23 @@ pub struct GraphEdge {
     pub to: String,
     pub label: String,
     pub properties: HashMap<String, Value>,
+}
+
+/// Request-scoped data-flow context derived from CBM's `trace_path(mode="data_flow")`.
+///
+/// Carries the bounded set of workspace symbols/files that participate in a
+/// data flow relevant to the current compilation request. CBM's advisory
+/// data-flow intelligence — never a Clean-CTX semantic fact. See
+/// `CbmIntelligence::data_flow` for ownership.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DataFlowContext {
+    /// Symbols participating in the request-relevant data flow.
+
+    /// Resolved from the trace endpoints (bare symbol names).
+    pub symbols: HashSet<String>,
+    /// Files containing the traced symbols (resolved via symbol importance
+    /// when available; best-effort).
+    pub files: HashSet<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1808,6 +1825,72 @@ impl GraphBridge {
         }
     }
 
+    /// Trace the data-flow neighborhood of a symbol (Phase D1).
+    ///
+    /// Uses CBM's `trace_path(mode="data_flow")` — a single bounded
+    /// JSON-RPC round-trip. The result is interpreted as request-scoped
+    /// **advisory context intelligence**: the set of workspace symbols/files
+    /// participating in a data flow relevant to the current compilation request.
+    ///
+    /// Ownership: returns a Clean-CTX bridge-domain type. The **caller**
+    /// decides which seeds to trace, whether/which candidates to retain or
+    /// elevate, and how many to include — bridge does not make policy.
+    /// Resolution of files is best-effort via the symbol-importance cache;
+    /// symbols whose file cannot be resolved are still carried in `symbols`.
+    ///
+    /// Cache: per `(seed, depth)` key — repeated calls are cheap.
+    /// Errors degrade to an empty context (failure is advisory, never a
+    /// compilation failure).
+    pub fn trace_data_flow(
+        &mut self,
+        seed: &str,
+        depth: usize,
+    ) -> Result<DataFlowContext, CbmError> {
+        self.ensure_operational();
+        let key = format!("data_flow:{seed}:{depth}");
+        if self.check_cache(&key) {
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .map_err(|e| CbmError::ParseError(format!("cached data_flow: {e}")));
+        }
+        let project = self.project_str();
+        let body = match self
+            .query(move |c| c.trace_path(seed, "both", &project, Some(depth), Some("data_flow")))
+        {
+            Ok(b) => b,
+            Err(e) => {
+                self.set_last_error(Some(e));
+                return Ok(DataFlowContext { symbols: HashSet::new(), files: HashSet::new() });
+            }
+        };
+        // Parse the 0.10.8 callers/callees table model into edges.
+
+        let edges = crate::cbm::wire::parse_trace(&body, seed);
+        let mut ctx = DataFlowContext { symbols: HashSet::new(), files: HashSet::new() };
+        // Best-effort file resolution via the symbol-importance cache (session
+        // cached — zero extra CBM queries in the common path).
+        let importance = self.get_symbol_importance().unwrap_or_default();
+        for e in edges {
+            for endpoint in [&e.from, &e.to] {
+                // Trace endpoints are qualified names (e.g. `proj.main`); the
+                // importance map is keyed by bare names. Strip the qn prefix.
+                let bare = endpoint.split('.').next_back().unwrap_or(endpoint.as_str());
+                ctx.symbols.insert(bare.to_string());
+                if let Some(info) = importance.get(bare) {
+                    ctx.files.insert(info.file.clone());
+                }
+            }
+        }
+        self.cache_insert(&key, &ctx);
+        Ok(ctx)
+    }
+
     pub fn invalidate_symbol(&mut self, symbol: &str) {
         self.cache.retain(|k, _| !k.contains(symbol));
     }
@@ -2453,7 +2536,7 @@ pub mod test_helpers {
             last_recovery: None,
             recovery_attempts: 0,
         };
-        // Seed a cache entry so is_available() is true (client is None).
+        // Seed a cache entry so is_available() is true ((client is None).)
         bridge.cache.insert(
             "__available__".to_string(),
             CachedGraphData {
@@ -2462,6 +2545,27 @@ pub mod test_helpers {
             },
         );
         bridge
+    }
+
+    /// Seed a cached data-flow trace for a symbol (Phase D1 tests).
+    ///
+    /// Lets tests exercise `trace_data_flow` without a CBM client — the
+    /// cached entry is served by `check_cache` before any transport. The
+    /// client stays `None`, so the query path is never reached.
+
+    pub fn seed_data_flow(
+        bridge: &GraphBridge,
+        seed: &str,
+        depth: usize,
+        ctx: DataFlowContext,
+    ) {
+        bridge.cache.insert(
+            format!("data_flow:{seed}:{depth}"),
+            CachedGraphData {
+                data: serde_json::to_value(&ctx).unwrap_or_default(),
+                expires_at: Instant::now() + Duration::from_secs(3600),
+            },
+        );
     }
 
     /// Create a mock GraphBridge pre-seeded with call edges,

@@ -30,7 +30,10 @@ use std::path::Path;
 // The `CbmIntelligence` struct itself lives in `intelligence::fidelity` and is
 // re-exported here for use in `ContextDecision`.
 pub use crate::intelligence::fidelity::CbmIntelligence;
-use crate::intelligence::fidelity::{apply_recommendation, build_cbm_skip_set, cbm_informed_fidelity};
+use crate::intelligence::fidelity::{
+    apply_recommendation, bound_data_flow, build_cbm_skip_set, cbm_informed_fidelity,
+    data_flow_seed_symbols, retain_data_flow_relevant_symbols,
+};
 
 /// What compression strategy should `provide_code_context` use?
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,6 +115,18 @@ impl ContextDecision {
         } else {
             String::new()
         };
+        // D1: report whether request-scoped data-flow expansion produced
+        // candidates (advisory diagnostic only).
+        let df_str = if let Some(Some(df)) = self.cbm_intelligence.as_ref().map(|i| i.data_flow.as_ref()) {
+            format!("cbm_df={}sym/{}files", df.symbols.len(), df.files.len())
+        } else {
+            String::new()
+        };
+        let extras = [skip_str, df_str]
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .map(|s| format!(", {s}"))
+            .collect::<String>();
         format!(
             "fidelity={:?}, strategy={}, class={}, angular={}, lines={}, cbm={}{}",
             self.fidelity,
@@ -120,11 +135,7 @@ impl ContextDecision {
             angular_str,
             self.source_line_count,
             cbm_str,
-            if skip_str.is_empty() {
-                String::new()
-            } else {
-                format!(", {skip_str}")
-            }
+            extras,
         )
     }
 }
@@ -639,11 +650,73 @@ pub fn decide(
                 }
 
                 // Build request-scoped skip-set from low-importance symbols.
+
                 let skip_set = build_cbm_skip_set(file_path, &importance);
+
+                // ── D1: CBM data-flow context expansion ──────────────────────
+                // After commitment of importance + skip-set, optionally trace
+                // the file's highest-importance symbols via CBM's
+                // `trace_path(mode="data_flow")`. The result is bounded, merged
+                // across seeds, and carried as request-scoped advisory context in
+                // `CbmIntelligence.data_flow`. Then a data-flow-identified
+                // in-file symbol is retained through the skip-set (it is
+                // request-relevant despite low static importance; see
+                // `retain_data_flow_relevant_symbols` for the architectural
+                // rationale). Data-flow failure is advisory — it never makes
+                // compilation fail; the skip-set remains unchanged on error.
+
+                let mut data_flow = None; // Option<DataFlowContext>
+                if config.intelligence.data_flow_enabled {
+
+                    let seeds = data_flow_seed_symbols(
+                        file_path,
+                        &importance,
+                        config.intelligence.data_flow_seeds,
+                    );
+                    if !seeds.is_empty() {
+                        let mut merged = crate::cbm::bridge::DataFlowContext {
+                            symbols: std::collections::HashSet::new(),
+                            files: std::collections::HashSet::new(),
+                        };
+                        for seed in seeds {
+                            if let Ok(df) = bridge_mut.trace_data_flow(
+                                &seed,
+                                config.intelligence.data_flow_depth,
+                            ) {
+                                // Deduplicate across seeds via set union.
+
+                                merged.symbols.extend(df.symbols);
+                                merged.files.extend(df.files);
+                            }
+                            // Err → skip this seed — partial results are
+                                // allowed; the feature remains advisory.
+                        }
+                        if !merged.symbols.is_empty() {
+                            data_flow = Some(bound_data_flow(
+                                merged,
+                                config.intelligence.data_flow_max_symbols,
+                                config.intelligence.data_flow_max_files,
+                            ));
+                        }
+                    }
+                }
+                // D1 skip-set interaction: retain data-flow-relevant in-file
+                // symbols through the skip-set (bounded, advisory, request-scoped).
+                let skip_set = if let Some(df) = &data_flow {
+                    retain_data_flow_relevant_symbols(
+                        file_path,
+                        &skip_set,
+                        &importance,
+                        df,
+                    )
+                } else {
+                    skip_set
+                };
 
                 cbm_intelligence = Some(CbmIntelligence {
                     importance,
                     skip_set,
+                    data_flow,
                 });
                 cbm_informed = true;
             }

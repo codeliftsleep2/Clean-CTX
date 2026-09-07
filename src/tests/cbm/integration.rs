@@ -402,7 +402,7 @@ fn cbm_skip_set_is_derived_and_reaches_compiler() {
     .unwrap();
 
     assert!(decision.cbm_informed);
-    let intel = decision.cbm_intelligence.expect("cbm_intelligence should be Some");
+    let intel = decision.cbm_intelligence.as_ref().expect("cbm_intelligence should be Some");
     assert!(intel.skip_set.contains("LowSymA"));
     assert!(!intel.skip_set.contains("HighSymB"));
     assert!(intel.skip_set.contains("LowSymC"));
@@ -798,3 +798,215 @@ fn recovery_never_fails_compilation_contract() {
     assert_eq!(bridge.recovery_attempts(), 1, "recovery must be bounded by cooldown");
 }
 
+
+// ── Phase D1: CBM data-flow intelligence & context expansion tests ─────
+
+/// Successful data-flow consultation: seeds are traced, candidates parsed
+/// and carried request-scoped as advisory `CbmIntelligence.data_flow`.
+#[test]
+fn d1_data_flow_consultation_produces_request_scoped_context() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_data_flow};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    let mut data = HashMap::new();
+    data.insert(
+        "CriticalAPI".to_string(),
+        SymbolImportance { symbol: "CriticalAPI".into(), score: 0.95, file: "api.rs".into() },
+    );
+    let mut bridge = new_mock(data);
+    // Seed a cached data-flow trace for the seed symbol (no CBM client needed).
+    let df = DataFlowContext {
+        symbols: ["helper".to_string(), "CriticalAPI".to_string()].into_iter().collect::<HashSet<_>>(),
+        files: ["src/helper.rs".to_string(), "api.rs".to_string()].into_iter().collect::<HashSet<_>>(),
+    };
+    seed_data_flow(&mut bridge, "CriticalAPI", 2, df);
+
+    let config = crate::config::CleanCtxConfig::default(); // data_flow_enabled defaults true
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    assert!(decision.cbm_informed);
+    let intel = decision.cbm_intelligence.as_ref().expect("cbm_intelligence should be Some");
+    let df = intel.data_flow.as_ref().expect("data_flow should be Some (seeded trace)");
+    assert!(df.symbols.contains("helper"), "trace endpoints parsed into symbols");
+    assert!(df.files.contains("src/helper.rs"), "files resolved via importance");
+    assert!(decision.summary().contains("cbm_df="), "summary reports data-flow diagnostics");
+}
+
+/// Multiple seeds: overlapping results are deduplicated and ordering is
+/// deterministic (seeds sorted by importance score, descending; bounded).
+#[test]
+fn d1_multiple_seeds_deduplicate_and_bounding() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_data_flow};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    let mut data = HashMap::new();
+    data.insert(
+        "SeedA".to_string(),
+        SymbolImportance { symbol: "SeedA".into(), score: 0.95, file: "api.rs".into() },
+    );
+    data.insert(
+        "SeedB".to_string(),
+        SymbolImportance { symbol: "SeedB".into(), score: 0.6, file: "api.rs".into() },
+    );
+    data.insert(
+        "Shared".to_string(),
+        SymbolImportance { symbol: "Shared".into(), score: 0.2, file: "api.rs".into() },
+    );
+    let mut bridge = new_mock(data);
+    seed_data_flow(
+        &mut bridge,
+        "SeedA",
+        2,
+        DataFlowContext {
+            symbols: ["shared".to_string()].into_iter().collect::<HashSet<_>>(),
+            files: HashSet::new(),
+        },
+    );
+    seed_data_flow(
+        &mut bridge,
+        "SeedB",
+        2,
+        DataFlowContext {
+            symbols: ["shared".to_string()].into_iter().collect::<HashSet<_>>(),
+            files: HashSet::new(),
+        },
+    );
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    let intel = decision.cbm_intelligence.expect("Some");
+    let df = intel.data_flow.expect("Some");
+    assert_eq!(
+        df.symbols.iter().filter(|s| *s == "shared").count(),
+        1,
+        "overlapping seed results are deduplicated"
+    );
+    assert!(
+        df.symbols.len() <= 12,
+        "bounded by data_flow_max_symbols (12)"
+    );
+}
+/// Empty or failed data-flow consultation produces NO expansion — the
+/// request still succeeds with `data_flow = None` and the skip-set unchanged.
+#[test]
+fn d1_empty_or_failed_data_flow_produces_no_expansion() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use crate::cbm::SymbolImportance;
+    use crate::mcp::heuristics;
+    use std::collections::HashMap;
+
+    let mut data = HashMap::new();
+    data.insert(
+        "CriticalAPI".to_string(),
+        SymbolImportance { symbol: "CriticalAPI".into(), score: 0.95, file: "api.rs".into() },
+    );
+    // No seeded data-flow → the mock's trace query fails (client None) →
+    // empty → data_flow = None (graceful degradation; compilation succeeds).
+    let mut bridge = new_mock(data);
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+    assert!(decision.cbm_informed, "importance still succeeded");
+    assert!(
+        decision.cbm_intelligence.as_ref().unwrap().data_flow.is_none(),
+        "failed data-flow must yield no expansion"
+    );
+    assert!(
+        !decision.summary().contains("cbm_df="),
+        "no data-flow candidates → no diagnostic"
+    );
+}
+
+/// Skip-set interaction: a data-flow-identified in-file symbol is retained
+/// through the skip-set (removed from it), while non-relevant low-importance
+/// symbols remain excluded.
+#[test]
+fn d1_data_flow_relevant_symbol_retained_through_skip_set() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_data_flow};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    let mut data = HashMap::new();
+    data.insert(
+        "helper".to_string(),
+        SymbolImportance { symbol: "helper".into(), score: 0.1, file: "api.rs".into() },
+    );
+    data.insert(
+        "CriticalAPI".to_string(),
+        SymbolImportance { symbol: "CriticalAPI".into(), score: 0.95, file: "api.rs".into() },
+    );
+    let mut bridge = new_mock(data);
+    // Data-flow identifies "helper" as participating in the request-relevant
+    // flow (bare name resolvable against this file's importance entries).
+    seed_data_flow(
+        &mut bridge,
+        "CriticalAPI",
+        2,
+        DataFlowContext {
+            symbols: ["helper".to_string()].into_iter().collect::<HashSet<_>>(),
+            files: HashSet::new(),
+        },
+    );
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    let intel = decision.cbm_intelligence.expect("Some");
+    assert!(
+        !intel.skip_set.contains("helper"),
+        "data-flow-relevant symbol must be retained through the skip-set"
+    );
+}

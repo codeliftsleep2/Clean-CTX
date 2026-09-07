@@ -43,6 +43,17 @@ pub struct CbmIntelligence {
     /// Symbols to exclude from compression (score < 0.4).
     /// Derived from `importance` via `build_cbm_skip_set`.
     pub skip_set: HashSet<String>,
+    /// Request-scoped data-flow context (Phase D1): the bounded set of
+    /// workspace symbols/files that participate in a data flow relevant to
+    /// this compilation request. `None` when data-flow consultation was not
+    /// performed or produced no candidates.
+    ///
+    /// This is **advisory context expansion intelligence** — it never enters
+    /// `WorkspaceIndex`, `CompiledIR`, or semantic identity. The compiler
+    /// consumes only the derived `skip_set` parameter; this field is carried
+    /// request-scoped purely for context-selection/expansion decisions above
+    /// the compiler.
+    pub data_flow: Option<crate::cbm::bridge::DataFlowContext>,
 }
 
 /// A fidelity recommendation from the intelligence layer.
@@ -141,6 +152,87 @@ pub fn apply_recommendation(rec: &FidelityRecommendation) -> Option<Fidelity> {
         FidelityRecommendation::ForceLow => Some(Fidelity::Low),
         FidelityRecommendation::NoRecommendation => None,
     }
+}
+
+/// Select the highest-importance symbols for a file to use as data-flow
+/// trace seeds (Phase D1).
+///
+/// Returns at most `max_seeds` symbols (sorted by score, descending) whose
+/// importance entry path-matches the requested file. An empty result means
+/// CBM knows no symbols for this file — the caller skips data-flow consultation.
+pub fn data_flow_seed_symbols(
+    file_path: &str,
+    symbol_importance: &HashMap<String, crate::cbm::SymbolImportance>,
+    max_seeds: usize,
+) -> Vec<String> {
+    let mut seeds: Vec<_> = symbol_importance
+        .values()
+        .filter(|info| path_matches(file_path, &info.file))
+        .collect();
+    seeds.sort_by(|a, b| b.score.total_cmp(&a.score));
+    seeds
+        .into_iter()
+        .take(max_seeds)
+        .map(|info| info.symbol.clone())
+        .collect()
+}
+
+/// Bound a merged data-flow context to the configured maxima (Phase D1).
+///
+/// Expansion must be bounded — a single seed can produce a large trace.
+pub fn bound_data_flow(
+    ctx: crate::cbm::bridge::DataFlowContext,
+    max_symbols: usize,
+    max_files: usize,
+) -> crate::cbm::bridge::DataFlowContext {
+    let mut symbols: Vec<_> = ctx.symbols.into_iter().collect();
+    symbols.sort();
+    symbols.truncate(max_symbols);
+    let mut files: Vec<_> = ctx.files.into_iter().collect();
+    files.sort();
+    files.truncate(max_files);
+    crate::cbm::bridge::DataFlowContext {
+        symbols: symbols.into_iter().collect(),
+        files: files.into_iter().collect(),
+    }
+}
+
+/// Apply the Phase D1 skip-set interaction decision:
+///
+/// **Data-flow-identified in-file symbols are retained** (removed from the
+/// skip-set). Rationale (evidence from the existing context-selection
+/// architecture): the skip-set's purpose is to exclude *low-importance*
+/// symbols (`build_cbm_skip_set`, score < 0.4). A symbol that CBM's
+/// data-flow trace explicitly identifies as participating in the request's
+/// data flow is request-relevant despite its static centrality — excluding
+/// it would defeat the filter's stated purpose (which is token reduction on
+/// *irrelevant* symbols, not on request-relevant ones). The retention is
+/// bounded: only symbols present in `data_flow.symbols` whose importance
+/// entry path-matches the current file are removed; all other skip-set
+/// semantics are unchanged. This is an advisory, request-scoped decision —
+/// it never alters `WorkspaceIndex`, `CompiledIR`, or semantic facts.
+/// Returns the *modified* skip-set (caller owns it}.
+pub fn retain_data_flow_relevant_symbols(
+    file_path: &str,
+    skip_set: &HashSet<String>,
+    symbol_importance: &HashMap<String, crate::cbm::SymbolImportance>,
+    data_flow: &crate::cbm::bridge::DataFlowContext,
+) -> HashSet<String> {
+    // Bare-name lookup of importance entries for THIS file.
+    let in_file: HashSet<&str> = symbol_importance
+        .values()
+        .filter(|info| path_matches(file_path, &info.file))
+        .map(|info| info.symbol.as_str())
+        .collect();
+    skip_set
+        .iter()
+        .filter(|&symbol| {
+            let data_flow_match = data_flow.symbols.iter().any(|df_sym| df_sym == symbol)
+                | data_flow.symbols.iter().any(|df_sym| df_sym.ends_with(&format!(".{symbol}")));
+            !(data_flow_match && in_file.contains(symbol.as_str()))
+        })
+        .cloned()
+        .collect()
 }
 
 /// P1-11: Proper path matching — checks if two file paths point to the same file.
