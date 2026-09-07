@@ -1667,6 +1667,16 @@ fn binds_edge(
     }
 }
 
+/// Helper: build an Implements edge (implementing class → interface).
+fn implements_edge(impl_name: &str, iface_name: &str) -> SemanticEdge {
+    SemanticEdge {
+        relation: SemanticRelation::Implements,
+        subject: EntityRef::new("builtin", "Class", impl_name),
+        object: EntityRef::new("builtin", "Interface", iface_name),
+        layer: "builtin",
+    }
+}
+
 /// Basic binding: Service/UserService → Binds → Token/UserService resolves
 /// the provider occurrence with its definition-site provenance.
 #[test]
@@ -1881,5 +1891,282 @@ fn resolve_bindings_resolves_named_binding_tokens() {
             .len(),
         1,
         "the explicit name token resolves to the same provider"
+    );
+}
+
+// ── Phase 31-A: interface-typed provider resolution ───────────────────────
+//
+// These tests pin the contract of `resolve_interface_providers`: given an
+// exact interface identity, return every provider occurrence that (a) is the
+// subject of a Binds edge, (b) shares the name of an implementing class, and
+// (c) whose occurrence file intersects that implementing class's files. No
+// provider is selected; nothing is stored; every non-match fails closed.
+
+/// Single candidate: one class implements the interface and binds a provider
+/// token in the same file. The provider occurrence carries definition-site
+/// provenance (the class's own file).
+#[test]
+fn resolve_interface_providers_single_candidate() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "user-repo.java",
+        vec![
+            implements_edge("SqlUserRepository", "UserRepository"),
+            binds_edge("spring", "Repository", "SqlUserRepository", "SqlUserRepository"),
+        ],
+    );
+
+    let providers = idx.resolve_interface_providers("builtin", "Interface", "UserRepository");
+    assert_eq!(providers.len(), 1);
+    assert_eq!(
+        providers[0],
+        &EntityRef::new("spring", "Repository", "SqlUserRepository")
+            .with_file("user-repo.java".to_string())
+    );
+}
+
+/// Multiple candidates: two distinct classes implement the same interface;
+/// both providers are returned, neither selected.
+#[test]
+fn resolve_interface_providers_multiple_candidates() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "sql-user-repo.java",
+        vec![
+            implements_edge("SqlUserRepository", "UserRepository"),
+            binds_edge("spring", "Repository", "SqlUserRepository", "SqlUserRepository"),
+        ],
+    );
+    idx.add_edges(
+        "mongo-user-repo.java",
+        vec![
+            implements_edge("MongoUserRepository", "UserRepository"),
+            binds_edge("spring", "Repository", "MongoUserRepository", "MongoUserRepository"),
+        ],
+    );
+
+    let providers = idx.resolve_interface_providers("builtin", "Interface", "UserRepository");
+    assert_eq!(providers.len(), 2, "both implementing providers must surface");
+    let names: Vec<&str> = providers.iter().map(|p| p.name.as_str()).collect();
+    assert!(names.contains(&"SqlUserRepository"));
+    assert!(names.contains(&"MongoUserRepository"));
+}
+
+/// Cross-file same-name negative (the load-bearing precision test).
+///
+/// A plain implementing class `EmailService` lives in f1 (builtin only, no
+/// Spring, no Binds). A Spring `@Repository EmailService` lives in f2 (Binds,
+/// no implements clause). A name-only join would falsely bridge f2's provider
+/// to f1's implementer. The file-intersected join must return NOTHING: the
+/// provider's file (f2) does not contain a same-named implementing class.
+#[test]
+fn resolve_interface_providers_cross_file_same_name_is_excluded() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "impl-only.java",
+        vec![implements_edge("EmailService", "MessageService")],
+    );
+    idx.add_edges(
+        "provider-only.java",
+        vec![binds_edge("spring", "Repository", "EmailService", "EmailService")],
+    );
+
+    assert!(
+        idx.resolve_interface_providers("builtin", "Interface", "MessageService")
+            .is_empty(),
+        "provider in a different file than its same-named implementer must not resolve"
+    );
+}
+
+/// No-Binds exclusion: a class that implements the interface but has no Binds
+/// edge is not a provider.
+#[test]
+fn resolve_interface_providers_excludes_class_without_binds() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "plain-impl.java",
+        vec![implements_edge("Foo", "Bar")],
+    );
+
+    assert!(
+        idx.resolve_interface_providers("builtin", "Interface", "Bar")
+            .is_empty(),
+        "an implementer with no Binds edge is not a provider"
+    );
+}
+
+/// No-Implements exclusion: a provider (has Binds) that does not implement the
+/// queried interface resolves to nothing.
+#[test]
+fn resolve_interface_providers_excludes_provider_without_implements() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "binds-only.java",
+        vec![binds_edge("spring", "Repository", "Foo", "Foo")],
+    );
+
+    assert!(
+        idx.resolve_interface_providers("builtin", "Interface", "Bar")
+            .is_empty(),
+        "a provider that does not implement the interface must not resolve"
+    );
+}
+
+/// Qualified-token fail-closed: a qualifier name is a bean-name key, never a
+/// registered `builtin/Interface` identity. Querying it as an interface yields
+/// nothing — the named token still resolves via the direct path.
+#[test]
+fn resolve_interface_providers_qualified_token_fails_closed() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "sql-repo.java",
+        vec![
+            implements_edge("SqlUserRepository", "UserRepository"),
+            binds_edge("spring", "Repository", "SqlUserRepository", "SqlUserRepository"),
+            binds_edge("spring", "Repository", "SqlUserRepository", "sqlRepository"),
+        ],
+    );
+
+    assert!(
+        idx.resolve_interface_providers("builtin", "Interface", "sqlRepository")
+            .is_empty(),
+        "a qualifier name is not a registered interface identity"
+    );
+    // The named token still resolves via the direct path.
+    assert_eq!(
+        idx.resolve_bindings("spring", "Token", "sqlRepository").len(),
+        1
+    );
+}
+
+/// Generic-token fail-closed: `Repository<User>` is not the bare interface
+/// identity `Repository`. Exact match only — no generic stripping.
+#[test]
+fn resolve_interface_providers_generic_token_fails_closed() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "repo.java",
+        vec![
+            implements_edge("Repo", "Repository"),
+            binds_edge("spring", "Repository", "Repo", "Repo"),
+        ],
+    );
+
+    assert!(
+        idx.resolve_interface_providers("builtin", "Interface", "Repository<User>")
+            .is_empty(),
+        "a generic token must not match the bare interface identity"
+    );
+    // The bare interface resolves normally.
+    assert_eq!(
+        idx.resolve_interface_providers("builtin", "Interface", "Repository")
+            .len(),
+        1
+    );
+}
+
+/// Explicit-name dual-binding coexistence: a named provider binds both its
+/// class token and its name token. Interface resolution returns the provider;
+/// both tokens resolve via the direct path to the same identity.
+#[test]
+fn resolve_interface_providers_explicit_name_binding_coexists() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "named.java",
+        vec![
+            implements_edge("UserService", "IUserService"),
+            binds_edge("spring", "Service", "UserService", "UserService"),
+            binds_edge("spring", "Service", "UserService", "specialUserService"),
+        ],
+    );
+
+    assert_eq!(
+        idx.resolve_interface_providers("builtin", "Interface", "IUserService")
+            .len(),
+        1
+    );
+    assert_eq!(
+        idx.resolve_bindings("spring", "Token", "UserService").len(),
+        1
+    );
+    assert_eq!(
+        idx.resolve_bindings("spring", "Token", "specialUserService").len(),
+        1,
+        "the explicit name token resolves to the same provider"
+    );
+}
+
+/// Multi-role double candidacy: one class is both @Service and @Repository.
+/// Both provider identities implement the interface; both are returned.
+#[test]
+fn resolve_interface_providers_multi_role_double_candidacy() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "multi.java",
+        vec![
+            implements_edge("UserService", "IUserService"),
+            binds_edge("spring", "Service", "UserService", "UserService"),
+            binds_edge("spring", "Repository", "UserService", "UserService"),
+        ],
+    );
+
+    let providers = idx.resolve_interface_providers("builtin", "Interface", "IUserService");
+    assert_eq!(providers.len(), 2, "both provider roles must surface");
+    let types: Vec<&str> = providers.iter().map(|p| p.entity_type).collect();
+    assert!(types.contains(&"Service"));
+    assert!(types.contains(&"Repository"));
+}
+
+/// Direct-path regression: `resolve_bindings` is untouched by the new
+/// resolver, and querying an interface with no Implementations yields nothing.
+#[test]
+fn resolve_interface_providers_direct_path_unaffected() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "direct.java",
+        vec![binds_edge("spring", "Service", "UserService", "UserService")],
+    );
+
+    assert_eq!(
+        idx.resolve_bindings("spring", "Token", "UserService").len(),
+        1,
+        "direct binding resolution is unchanged"
+    );
+    assert!(
+        idx.resolve_interface_providers("builtin", "Interface", "UserService")
+            .is_empty(),
+        "no Implements edge means no interface-typed resolution"
+    );
+}
+
+/// Cross-domain isolation: the interface identity is (domain, entity_type,
+/// name). Querying a different domain's interface identity returns nothing,
+/// even when a same-named interface exists in another domain.
+#[test]
+fn resolve_interface_providers_is_domain_isolated() {
+    let mut idx = WorkspaceIndex::new();
+    idx.add_edges(
+        "repo.java",
+        vec![
+            implements_edge("OrderRepo", "IRepo"),
+            binds_edge("spring", "Repository", "OrderRepo", "OrderRepo"),
+        ],
+    );
+
+    assert_eq!(
+        idx.resolve_interface_providers("builtin", "Interface", "IRepo")
+            .len(),
+        1,
+        "the correct domain resolves"
+    );
+    assert!(
+        idx.resolve_interface_providers("dotnet", "Interface", "IRepo")
+            .is_empty(),
+        "a different domain's interface identity must not resolve"
+    );
+    assert!(
+        idx.resolve_interface_providers("angular", "Interface", "IRepo")
+            .is_empty(),
+        "a different domain's interface identity must not resolve"
     );
 }

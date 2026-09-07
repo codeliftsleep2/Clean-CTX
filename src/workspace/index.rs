@@ -558,6 +558,112 @@ impl WorkspaceIndex {
         results
     }
 
+    /// Resolve all provider entity occurrences that could satisfy a
+    /// dependency on the given interface identity via an `Implements` →
+    /// declaration-join bridge (Phase 31-A).
+    ///
+    /// Given an exact `(domain, entity_type, name)` interface identity (e.g.
+    /// `builtin/Interface/UserRepository`), returns every indexed provider
+    /// entity occurrence that satisfies ALL of:
+    ///   (a) it is the subject of an outgoing `Binds` edge (a provision fact);
+    ///   (b) its identity name equals an implementing class's name — i.e. the
+    ///       requested interface identity is the object of an incoming
+    ///       `Implements` edge whose subject is a class with that name (a
+    ///       language fact);
+    ///   (c) its occurrence file intersects that implementing class's
+    ///       occurrence files — the (name, file) declaration join. A provider
+    ///       whose file does NOT contain a same-named implementing class is
+    ///       excluded (this is the load-bearing precision element that keeps
+    ///       the join from degrading into a name-only heuristic).
+    ///
+    /// The declaration join is a deterministic composition over existing
+    /// indexed facts at the occurrence-model granularity — not a heuristic.
+    /// Within one file a name resolves to one declaration (the existing
+    /// ambiguity model); across files same-named declarations are distinct.
+    ///
+    /// Contract:
+    /// - exact identity match for the interface — no normalization, generic
+    ///   stripping, or aliasing. A generic token (`Repository<User>`) never
+    ///   matches a bare interface identity (`Repository`);
+    /// - only incoming `Implements` edges identify implementing classes, and
+    ///   only outgoing `Binds` edges identify providers. `Autowired` and every
+    ///   other relation are ignored;
+    /// - ALL qualifying provider occurrences are returned — ambiguity is
+    ///   preserved and no provider is selected. Multiple implementing classes,
+    ///   multiple provider identities (multi-role), and multiple file
+    ///   occurrences all surface independently;
+    /// - occurrence multiplicity and `EntityRef.file` provenance are
+    ///   preserved (definition-site provenance for class providers);
+    /// - nothing is stored: no `Satisfies`, `InferredBinds`, or equivalent
+    ///   edge is written. The result is query-time-only;
+    /// - fail closed: a qualified token, a generic token, a name with no
+    ///   `Implements`, a provider with no `Binds`, or any cross-file
+    ///   same-name mismatch yields an empty result.
+    ///
+    /// Framework-neutral: consumes only `EntityKey`, `SemanticRelation::
+    /// Implements`, `SemanticRelation::Binds`, and the indexed occurrence
+    /// model. The fact that Java + Spring currently supply the production
+    /// `Implements`/`Binds` edges is incidental; any domain that emits those
+    /// relations resolves identically without changes to this type.
+    pub fn resolve_interface_providers(
+        &self,
+        domain: &str,
+        entity_type: &str,
+        name: &str,
+    ) -> Vec<&EntityRef> {
+        // 1. Incoming Implements edges → implementing-class subjects.
+        //    Group each implementing class's occurrence files by name so the
+        //    declaration join is per-class (a global file union would falsely
+        //    bridge a same-named provider in one file to an implementer in
+        //    another).
+        let implementing = self.reverse_edges_by_identity(domain, entity_type, name);
+        let mut impl_class_files: HashMap<&str, HashSet<&str>> = HashMap::new();
+        for edge in &implementing {
+            if edge.relation != SemanticRelation::Implements {
+                continue;
+            }
+            let subj = &edge.subject;
+            let files = impl_class_files.entry(subj.name.as_str()).or_default();
+            for occ in self.entities_by_identity(subj.domain, subj.entity_type, &subj.name) {
+                if let Some(ref f) = occ.file {
+                    files.insert(f.as_str());
+                }
+            }
+        }
+        if impl_class_files.is_empty() {
+            return Vec::new();
+        }
+
+        // 2. For each implementing-class name, find provider occurrences that
+        //    share the name, whose file intersects the implementing class's
+        //    files, and that are subjects of an outgoing Binds edge.
+        let mut results: Vec<&EntityRef> = Vec::new();
+        for (iname, files) in &impl_class_files {
+            for provider_occ in self.find_entities_by_name(iname) {
+                let file_matches = provider_occ
+                    .file
+                    .as_ref()
+                    .map(|f| files.contains(f.as_str()))
+                    .unwrap_or(false);
+                if !file_matches {
+                    continue;
+                }
+                let has_binds = self
+                    .forward_edges_by_identity(
+                        provider_occ.domain,
+                        provider_occ.entity_type,
+                        &provider_occ.name,
+                    )
+                    .iter()
+                    .any(|e| e.relation == SemanticRelation::Binds);
+                if has_binds {
+                    results.push(provider_occ);
+                }
+            }
+        }
+        results
+    }
+
     /// Resolve a CSS selector string to component/directive entity
     /// occurrences that expose that selector.
     ///
