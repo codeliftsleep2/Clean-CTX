@@ -116,6 +116,87 @@ pub struct CbmClient {
     circuit_cooldown_secs: u64,
 }
 
+#[cfg(test)]
+impl CbmClient {
+    /// Test-only: build a `CbmClient` whose child has already exited, so
+    /// `child_alive()` returns false. Lets recovery tests exercise the
+    /// dead-child path deterministically without the CBM binary.
+    ///
+    /// Spawns `echo` (exits immediately on every platform), wires up the
+    /// same pipes/threads as `try_launch`, then returns. The child is
+    /// guaranteed dead by the time this returns.
+    pub fn with_exited_child() -> Self {
+        // Spawn a process that exits immediately, then reap it so
+        // `child_alive()` is deterministically false. Platform-specific
+        // because Windows has no standalone `echo`/`true` binary (they are
+        // shell builtins), whereas Unix does.
+        let mut cmd = if cfg!(windows) {
+            let mut c = std::process::Command::new("cmd");
+            c.args(["/c", "exit", "0"]);
+            c
+        } else {
+            std::process::Command::new("true")
+        };
+        let mut child = cmd
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn immediate-exit process");
+        // Take pipes BEFORE waiting — wait() closes them.
+        let stdin = child.stdin.take().expect("stdin");
+        let stdout = child.stdout.take().expect("stdout");
+        let stderr = child.stderr.take().expect("stderr");
+
+        // The process exits immediately; reap it so child_alive() is deterministically false.
+        let _ = child.wait();
+
+        let (stdout_tx, stdout_rx) =
+            std::sync::mpsc::sync_channel::<Result<String, String>>(256);
+        let _stdout_reader = std::thread::Builder::new()
+            .name("cbm-stdout-reader".into())
+            .spawn(move || {
+                let mut reader = std::io::BufReader::new(stdout);
+                let mut line = String::new();
+                match reader.read_line(&mut line) {
+                    Ok(0) => {
+                        let _ = stdout_tx.send(Err("CBM exited".to_string()));
+                    }
+                    Ok(_) => {
+                        let _ = stdout_tx.send(Ok(line));
+                    }
+                    Err(e) => {
+                        let _ = stdout_tx.send(Err(e.to_string()));
+                    }
+                }
+            })
+            .ok();
+        let _stderr_drainer = std::thread::Builder::new()
+            .name("cbm-stderr-drain".into())
+            .spawn(move || {
+                let reader = std::io::BufReader::new(stderr);
+                for _l in reader.lines().map_while(Result::ok) {}
+            })
+            .ok();
+
+        Self {
+            child,
+            stdin: std::io::BufWriter::new(stdin),
+            stdout_rx,
+            _stdout_reader,
+            _stderr_drainer,
+            request_id: std::sync::atomic::AtomicU64::new(1),
+            status: CbmStatus::Available,
+            timeout: std::time::Duration::from_secs(30),
+            startup_deadline: None,
+            consecutive_failures: 0,
+            degraded_since: None,
+            max_consecutive_failures: 3,
+            circuit_cooldown_secs: 30,
+        }
+    }
+}
+
 /// Determines whether a CBM error is transient and should be retried.
 ///
 /// Retryable errors:
@@ -398,6 +479,35 @@ impl CbmClient {
 
     pub fn status(&self) -> &CbmStatus {
         &self.status
+    }
+
+    /// Whether the spawned CBM subprocess is still alive.
+    ///
+    /// Runtime-recovery liveness check (Phase D0): a dead child means the
+    /// JSON-RPC session this client owns is broken — every subsequent call
+    /// would fail regardless of the circuit breaker state. Clean-CTX owns
+    /// this process (it spawned it), so a dead child is the one condition
+    /// under which automatic relaunch is legitimate.
+    ///
+    /// Non-destructive: uses `try_wait`, never kills or reaps beyond the
+    /// exit-status probe.
+    pub(crate) fn child_alive(&mut self) -> bool {
+        match self.child.try_wait() {
+            Ok(None) => true,          // still running
+            Ok(Some(_)) => false,      // exited
+            Err(_) => false,           // cannot determine → treat as dead
+        }
+    }
+
+    /// Tear down the subprocess this client owns (Phase D0 recovery teardown).
+    ///
+    /// Used only when a freshly respawned session is rejected by the shared
+    /// daemon at handshake: the just-spawned child is Clean-CTX's own, so
+    /// killing it is ownership-legitimate (unlike touching a live foreign
+    /// session). After this call the client is inert; the caller drops it.
+    pub(crate) fn kill_for_recovery(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.try_wait();
     }
 
     // ── Circuit breaker ─────────────────────────────────────────

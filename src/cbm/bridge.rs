@@ -385,6 +385,49 @@ pub(crate) struct ProjectFreshness {
     pub(crate) indexed_generation: u64,
 }
 
+/// Outcome of a runtime-recovery attempt (Phase D0).
+///
+/// Surfaced via `get_cbm_status._meta.recovery` for lifecycle diagnostics.
+/// Recovery outcomes are advisory runtime information — never semantic facts.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RecoveryOutcome {
+    /// Dead child respawned and the JSON-RPC session validated.
+    Recovered,
+    /// Relaunch/validation failed; Clean-CTX degraded gracefully.
+    Failed(String),
+    /// The shared CBM daemon rejected our session (version/build/cache-root
+    /// mismatch). Never retried automatically — Clean-CTX must not fight
+    /// another session's coordination state.
+    DaemonConflict(String),
+    /// The configured binary vanished; nothing to relaunch.
+    BinaryMissing,
+}
+
+impl RecoveryOutcome {
+    /// Stable short label for status serialization.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RecoveryOutcome::Recovered => "recovered",
+            RecoveryOutcome::Failed(_) => "failed",
+            RecoveryOutcome::DaemonConflict(_) => "daemon_conflict",
+            RecoveryOutcome::BinaryMissing => "binary_missing",
+        }
+    }
+}
+
+/// Launch parameters captured at bridge construction so a broken-but-owned
+/// CBM subprocess can be relaunched with identical settings (Phase D0).
+#[derive(Debug, Clone)]
+pub(crate) struct LaunchParams {
+    pub(crate) binary_path: Option<PathBuf>,
+    pub(crate) timeout: Duration,
+    pub(crate) startup_timeout: Duration,
+    pub(crate) max_retries: u32,
+    pub(crate) circuit_cooldown_secs: u64,
+    pub(crate) cache_root: Option<String>,
+    pub(crate) enabled: bool,
+}
+
 /// Graph bridge with TTL caching and graceful degradation.
 pub struct GraphBridge {
     /// CBM subprocess client, wrapped in Arc<Mutex<>> so the background
@@ -436,6 +479,14 @@ pub struct GraphBridge {
     /// Cleared on every successful query so a stale error is never
     /// re-reported.
     pub(crate) last_error: Option<CbmError>,
+
+    /// Launch parameters captured at construction (Phase D0 runtime recovery).
+    /// `None` only for bridges built by test mocks that bypass `try_create`.
+    pub(crate) launch: Option<LaunchParams>,
+    /// Outcome + time of the most recent runtime-recovery attempt.
+    pub(crate) last_recovery: Option<(RecoveryOutcome, Instant)>,
+    /// Total recovery attempts this session (diagnostics; storm accounting).
+    pub(crate) recovery_attempts: u32,
 }
 
 impl GraphBridge {
@@ -487,9 +538,9 @@ impl GraphBridge {
         }
 
         let client = if config.enabled {
-            match binary_path {
+            match binary_path.as_ref() {
                 Some(path) => match CbmClient::try_launch(
-                    &path,
+                    path,
                     Duration::from_millis(config.query_timeout_ms),
                     Duration::from_millis(config.startup_timeout_ms),
                     config.max_retries,
@@ -538,6 +589,19 @@ impl GraphBridge {
             indexing_state: Arc::new(Mutex::new(HashMap::new())),
             freshness: Arc::new(Mutex::new(HashMap::new())),
             last_error: None,
+            // Phase D0: capture launch parameters so a dead-but-owned child
+            // can be relaunched with identical settings later.
+            launch: Some(LaunchParams {
+                binary_path,
+                timeout: Duration::from_millis(config.query_timeout_ms),
+                startup_timeout: Duration::from_millis(config.startup_timeout_ms),
+                max_retries: config.max_retries,
+                circuit_cooldown_secs: config.circuit_cooldown_secs,
+                cache_root: config.cache_root.clone(),
+                enabled: config.enabled,
+            }),
+            last_recovery: None,
+            recovery_attempts: 0,
         };
 
         // K-1: Start indexing immediately when CBM launched successfully.
@@ -1228,6 +1292,11 @@ impl GraphBridge {
     pub fn get_symbol_importance(
         &mut self,
     ) -> Result<HashMap<String, SymbolImportance>, CbmError> {
+        // Phase D0: bounded runtime self-healing before intelligence use.
+        // No-op on a healthy runtime; a dead-but-owned child is respawned and
+        // revalidated once per cooldown. Failure here degrades exactly as a
+        // failed query would — never a compiler failure.
+        self.ensure_operational();
         let key = "symbol_importance".to_string();
         if self.check_cache(&key) {
             return serde_json::from_value(
@@ -1846,6 +1915,166 @@ impl GraphBridge {
         }
     }
 
+    // ── Runtime health & self-healing (Phase D0) ────────────────────────
+
+    /// Detect a broken CBM runtime and make one bounded recovery attempt.
+    ///
+    /// Policy (Phase D0):
+    /// 1. Healthy runtime → no-op. A stale/incomplete index NEVER triggers a
+    ///    process restart — index problems are owned by the existing
+    ///    `ensure_indexed()`/freshness lifecycle.
+    /// 2. Only a **dead child that Clean-CTX owns** is relaunched. A live
+    ///    process is never killed; the circuit breaker governs transient
+    ///    failures on a live process (M-1 self-healing on cooldown elapse).
+    /// 3. Attempts are bounded: at most one attempt per circuit-cooldown
+    ///    interval (the configured cooldown doubles as the recovery cooldown —
+    ///    one knob, no second retry system). A `DaemonConflict` outcome is
+    ///    never retried: the shared daemon rejected our session, and
+    ///    Clean-CTX must not fight another session's coordination state.
+    /// 4. Recovery NEVER fails compilation: the caller (intelligence
+    ///    consultation) already degrades to `cbm_informed = false` on any
+    ///    error; this method only improves availability.
+    pub fn ensure_operational(&mut self) {
+        self.update_status();
+
+        // Detect: is the Clean-CTX-owned CBM subprocess dead? This is checked
+        // regardless of status — a child killed by a single timeout still
+        // reports Available until the circuit opens, but its session is
+        // already broken. `client: None` (never launched / disabled / binary
+        // missing at construction) is a cold-start condition owned by
+        // `try_create`, not a mid-session break — no relaunch.
+        let child_dead = {
+            let mut guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
+            match guard.as_mut() {
+                Some(client) => !client.child_alive(),
+                None => false,
+            }
+        };
+        if !child_dead {
+            // Live child (or no client):
+            //  - Available  → healthy; index staleness is the index
+            //                 lifecycle's job, never a process restart.
+            //  - Degraded   → the circuit breaker governs the live process
+            //                 (M-1 self-healing when cooldown elapses).
+            return;
+        }
+
+        // Attempt gate: cooldown since the last recovery attempt (storm
+        // prevention). Reuses the circuit-cooldown knob.
+        let cooldown = self
+            .launch
+            .as_ref()
+            .map(|p| p.circuit_cooldown_secs)
+            .unwrap_or(0);
+        if let Some((_, at)) = &self.last_recovery {
+            if at.elapsed() < Duration::from_secs(cooldown) {
+                return; // bounded — wait for the cooldown before trying again
+            }
+        }
+
+        let Some(params) = self.launch.clone() else {
+            return; // mock/test bridge — no launch context, nothing to relaunch
+        };
+        if !params.enabled {
+            return; // CBM disabled by config — recovery would fight the user
+        }
+
+        self.recovery_attempts += 1;
+        let outcome = self.respawn_client(&params);
+        eprintln!(
+            "[clean-ctx-cbm] Runtime recovery attempt {}: {:?}",
+            self.recovery_attempts, outcome
+        );
+        self.apply_recovery_outcome(outcome);
+    }
+
+    /// One relaunch attempt of the Clean-CTX-owned CBM subprocess, followed
+    /// by session revalidation. Exactly one spawn + one JSON-RPC round-trip —
+    /// no internal retry loop (the circuit breaker governs steady-state
+    /// retries; the cooldown gate governs recovery retries).
+    fn respawn_client(&mut self, params: &LaunchParams) -> RecoveryOutcome {
+        let Some(binary) = params.binary_path.as_ref() else {
+            return RecoveryOutcome::BinaryMissing;
+        };
+        let new_client = match CbmClient::try_launch(
+            binary,
+            params.timeout,
+            params.startup_timeout,
+            params.max_retries,
+            params.circuit_cooldown_secs,
+            params.cache_root.as_deref(),
+        ) {
+            Ok(Some(c)) => c,
+            Ok(None) => return RecoveryOutcome::BinaryMissing,
+            Err(CbmError::DaemonConflict(msg)) => {
+                return RecoveryOutcome::DaemonConflict(msg);
+            }
+            Err(e) => return RecoveryOutcome::Failed(e.to_string()),
+        };
+
+        *self.client.lock().unwrap_or_else(|p| p.into_inner()) = Some(new_client);
+        self.status = CbmStatus::Available;
+
+        // Revalidation (spec: a successful spawn is not proof of health).
+        // One real JSON-RPC round-trip proves the session is operational.
+        let validation = {
+            let mut guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
+            match guard.as_mut() {
+                Some(c) => c
+                    .call_tool("list_projects", serde_json::json!({}))
+                    .map(|_| ()),
+                None => Err(CbmError::ConnectionLost("client vanished".into())),
+            }
+        };
+        match validation {
+            Ok(()) => {
+                self.start_indexing_roots();
+                RecoveryOutcome::Recovered
+            }
+            Err(CbmError::DaemonConflict(msg)) => {
+                if let Some(c) = self.client.lock().unwrap_or_else(|p| p.into_inner()).as_mut() {
+                    c.kill_for_recovery();
+                }
+                *self.client.lock().unwrap_or_else(|p| p.into_inner()) = None;
+                RecoveryOutcome::DaemonConflict(msg)
+            }
+            Err(e) => RecoveryOutcome::Failed(e.to_string()),
+        }
+    }
+
+    /// Map a recovery outcome onto bridge state. Separated from
+    /// `respawn_client` so outcome handling is deterministically testable.
+    pub(crate) fn apply_recovery_outcome(&mut self, outcome: RecoveryOutcome) {
+        match &outcome {
+            RecoveryOutcome::Recovered => {
+                self.status = CbmStatus::Available;
+            }
+            RecoveryOutcome::DaemonConflict(msg) => {
+                self.status = CbmStatus::Degraded(format!("daemon conflict (not retried): {msg}"));
+            }
+            RecoveryOutcome::Failed(msg) => {
+                self.status = CbmStatus::Degraded(format!("recovery failed: {msg}"));
+            }
+            RecoveryOutcome::BinaryMissing => {
+                self.status = CbmStatus::Unavailable;
+            }
+        }
+        self.last_recovery = Some((outcome, Instant::now()));
+    }
+
+    /// Last recovery outcome + seconds since the attempt, for
+    /// `get_cbm_status._meta.recovery`. `None` when recovery never ran.
+    pub fn last_recovery(&self) -> Option<(&'static str, u64)> {
+        self.last_recovery
+            .as_ref()
+            .map(|(outcome, at)| (outcome.as_str(), at.elapsed().as_secs()))
+    }
+
+    /// Total recovery attempts this session (diagnostics).
+    pub fn recovery_attempts(&self) -> u32 {
+        self.recovery_attempts
+    }
+
     // â”€â”€ Internal helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     /// Disk key scope: `{project_name}:{key}` so the effective disk
@@ -2173,6 +2402,10 @@ pub mod test_helpers {
             project_ids: HashMap::new(),
             project_paths: HashMap::new(),
             last_error: None,
+            // Phase D0: mocks have no launch context — recovery is a no-op.
+            launch: None,
+            last_recovery: None,
+            recovery_attempts: 0,
         };
         // Pre-seed the symbol_importance cache entry
         let key = "symbol_importance".to_string();
@@ -2215,6 +2448,10 @@ pub mod test_helpers {
             project_ids: HashMap::new(),
             project_paths: HashMap::new(),
             last_error: None,
+            // Phase D0: mocks have no launch context — recovery is a no-op.
+            launch: None,
+            last_recovery: None,
+            recovery_attempts: 0,
         };
         // Seed a cache entry so is_available() is true (client is None).
         bridge.cache.insert(
@@ -2254,6 +2491,10 @@ pub mod test_helpers {
             project_ids: HashMap::new(),
             project_paths: HashMap::new(),
             last_error: None,
+            // Phase D0: mocks have no launch context — recovery is a no-op.
+            launch: None,
+            last_recovery: None,
+            recovery_attempts: 0,
         };
         let ttl = Duration::from_secs(3600);
         let call_json = serde_json::to_value(&call_edges).unwrap_or_default();

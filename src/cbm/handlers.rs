@@ -364,10 +364,8 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
 /// map wasn't populated yet). The handler now only *reads* the current
 /// indexing state via `bridge.indexing_state()`.
 pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
-    let (status, details, version, indexing_info, freshness_info, coverage_info) = match state
-        .graph_bridge_lock()
-        .as_mut()
-    {
+    let (status, details, version, indexing_info, freshness_info, coverage_info, recovery_info) =
+        match state.graph_bridge_lock().as_mut() {
         Some(bridge) => {
             // Refresh the live circuit-breaker status (no indexing trigger).
             bridge.update_status();
@@ -500,7 +498,16 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
                 }))
             };
 
-            (s, d, v, idx_info, freshness_info, coverage_info)
+            // ── Recovery diagnostics (Phase D0, advisory lifecycle info) ──
+            let recovery_info = bridge.last_recovery().map(|(outcome, secs_ago)| {
+                serde_json::json!({
+                    "last_outcome": outcome,
+                    "secs_since_attempt": secs_ago,
+                    "attempts": bridge.recovery_attempts(),
+                })
+            });
+
+            (s, d, v, idx_info, freshness_info, coverage_info, recovery_info)
         }
         None => {
             let d = match &state.cbm_status {
@@ -513,7 +520,7 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
                 "is_current": false,
                 "is_sufficient": false,
             }));
-            (state.cbm_status.clone(), d, String::new(), None, None, coverage_info)
+            (state.cbm_status.clone(), d, String::new(), None, None, coverage_info, None)
         }
     };
 
@@ -545,6 +552,9 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
     }
     if let Some(coverage) = coverage_info {
         response["result"]["_meta"]["coverage"] = coverage;
+    }
+    if let Some(recovery) = recovery_info {
+        response["result"]["_meta"]["recovery"] = recovery;
     }
     send_response(&response);
 }
