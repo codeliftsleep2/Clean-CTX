@@ -1261,7 +1261,12 @@ impl GraphBridge {
                     name.to_string(),
                     SymbolImportance {
                         symbol: name.to_string(),
-                        score: in_degree / 100.0,
+                        // Normalized caller centrality, capped at 1.0. The
+                        // documented contract (graph_intel live test) requires
+                        // scores within [0.0, 1.0]; without the cap a symbol
+                        // with in_degree >= 101 (e.g. a hot dispatcher in a
+                        // large repo) would exceed the range.
+                        score: (in_degree / 100.0).min(1.0),
                         file: file.to_string(),
                     },
                 ))

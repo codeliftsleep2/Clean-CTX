@@ -364,7 +364,7 @@ pub fn handle_get_architecture(id: &Value, params: &Value, state: &McpState) {
 /// map wasn't populated yet). The handler now only *reads* the current
 /// indexing state via `bridge.indexing_state()`.
 pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
-    let (status, details, version, indexing_info, freshness_info) = match state
+    let (status, details, version, indexing_info, freshness_info, coverage_info) = match state
         .graph_bridge_lock()
         .as_mut()
     {
@@ -465,14 +465,55 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
                 }
             };
 
-            (s, d, v, idx_info, freshness_info)
+            // ── Coverage status (advisory lifecycle intelligence) ──
+            // Derived from indexing state + freshness. Does NOT trigger indexing.
+            // Answers: Is the graph indexed? Is it current? Is coverage sufficient?
+            let coverage_info = {
+                let coverage_status = match &idx_info {
+                    Some(info) => match info["status"].as_str() {
+                        Some("complete") => "complete",
+                        Some("in_progress") => "in_progress",
+                        Some("failed") => "failed",
+                        _ => "unknown",
+                    },
+                    None => "not_started",
+                };
+                let is_current = match &freshness_info {
+                    Some(fresh) => {
+                        // If any project is stale, coverage is not current
+                        let projects = fresh["projects"].as_object();
+                        match projects {
+                            Some(projects) => !projects.values().any(|p| {
+                                p["is_stale"].as_bool().unwrap_or(false)
+                            }),
+                            None => true, // No freshness data means no known staleness
+                        }
+                    }
+                    None => true, // No freshness data means no known staleness
+                };
+                // Coverage is sufficient only when indexing is complete AND current
+                let is_sufficient = coverage_status == "complete" && is_current;
+                Some(serde_json::json!({
+                    "status": coverage_status,
+                    "is_current": is_current,
+                    "is_sufficient": is_sufficient,
+                }))
+            };
+
+            (s, d, v, idx_info, freshness_info, coverage_info)
         }
         None => {
             let d = match &state.cbm_status {
                 crate::cbm::CbmStatus::Available => "CBM configured but not connected.".into(),
                 _ => "CBM not available.".into(),
             };
-            (state.cbm_status.clone(), d, String::new(), None, None)
+            // No bridge available: coverage unknown
+            let coverage_info = Some(serde_json::json!({
+                "status": "unknown",
+                "is_current": false,
+                "is_sufficient": false,
+            }));
+            (state.cbm_status.clone(), d, String::new(), None, None, coverage_info)
         }
     };
 
@@ -501,6 +542,9 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
     }
     if let Some(paths) = checked_paths {
         response["result"]["_meta"]["checked_paths"] = serde_json::json!(paths);
+    }
+    if let Some(coverage) = coverage_info {
+        response["result"]["_meta"]["coverage"] = coverage;
     }
     send_response(&response);
 }

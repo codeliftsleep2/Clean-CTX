@@ -461,6 +461,197 @@ fn cbm_informed_true_even_when_fidelity_unchanged() {
     assert!(decision.cbm_intelligence.is_some());
 }
 
+// ── Phase B: CBM coverage lifecycle tests ────────────────────────────
+
+/// B. Coverage/status information obtainable through the Clean-CTX boundary.
+/// `handle_get_cbm_status` must include a `coverage` field in `_meta`.
+#[test]
+fn get_cbm_status_reports_coverage_field() {
+    use crate::mcp::McpState;
+    use crate::protocol::CAPTURED_RESPONSES;
+
+    let state = McpState::new(crate::tests::test_config());
+    CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
+
+    crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
+
+    let captured = CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner());
+    assert!(!captured.is_empty(), "response must be captured");
+    let resp = &captured[0];
+
+    let coverage = resp["result"]["_meta"]["coverage"].as_object();
+    assert!(
+        coverage.is_some(),
+        "_meta must contain a coverage field; got: {resp}"
+    );
+    let coverage = coverage.unwrap();
+    assert!(coverage.contains_key("status"), "coverage.status must be present: {coverage:?}");
+    assert!(coverage.contains_key("is_current"), "coverage.is_current must be present: {coverage:?}");
+    assert!(coverage.contains_key("is_sufficient"), "coverage.is_sufficient must be present: {coverage:?}");
+}
+
+/// B. Coverage incomplete: no bridge → coverage unknown, NOT silently complete.
+#[test]
+fn get_cbm_status_coverage_unknown_without_bridge() {
+    use crate::mcp::McpState;
+    use crate::protocol::CAPTURED_RESPONSES;
+
+    let state = McpState::new(crate::tests::test_config());
+    CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
+
+    crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
+
+    let captured = CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner());
+    let resp = &captured[0];
+    let coverage = &resp["result"]["_meta"]["coverage"];
+
+    assert_eq!(
+        coverage["status"].as_str(),
+        Some("unknown"),
+        "coverage.status must be 'unknown' without a bridge: {coverage}"
+    );
+    assert_eq!(
+        coverage["is_sufficient"].as_bool(),
+        Some(false),
+        "coverage must NOT be reported sufficient without a bridge"
+    );
+}
+
+/// B. Coverage/current index: complete indexing + clean freshness → sufficient.
+#[test]
+fn get_cbm_status_coverage_sufficient_when_complete_and_current() {
+    use crate::cbm::bridge::test_helpers::new_mock_empty;
+    use crate::mcp::McpState;
+    use crate::protocol::CAPTURED_RESPONSES;
+
+    let state = McpState::new(crate::tests::test_config());
+    {
+        let mut guard = state.graph_bridge_lock();
+        let bridge = new_mock_empty();
+        bridge.indexing_state.lock().unwrap_or_else(|p| p.into_inner()).insert(
+            "test-project".to_string(),
+            crate::cbm::bridge::IndexingState::Complete,
+        );
+        bridge.freshness.lock().unwrap_or_else(|p| p.into_inner()).insert(
+            "test-project".to_string(),
+            crate::cbm::bridge::ProjectFreshness {
+                dirty_generation: 3,
+                indexed_generation: 3,
+            },
+        );
+        *guard = Some(bridge);
+    }
+
+    CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
+    crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
+
+    let captured = CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner());
+    let resp = &captured[0];
+    let coverage = &resp["result"]["_meta"]["coverage"];
+
+    assert_eq!(coverage["status"].as_str(), Some("complete"), "indexing Complete → coverage.status 'complete': {coverage}");
+    assert_eq!(coverage["is_current"].as_bool(), Some(true), "clean freshness → is_current true: {coverage}");
+    assert_eq!(coverage["is_sufficient"].as_bool(), Some(true), "complete + current → is_sufficient true: {coverage}");
+}
+
+/// B. Coverage incomplete: stale index is NOT reported as sufficient.
+#[test]
+fn get_cbm_status_coverage_not_sufficient_when_stale() {
+    use crate::cbm::bridge::test_helpers::new_mock_empty;
+    use crate::mcp::McpState;
+    use crate::protocol::CAPTURED_RESPONSES;
+
+    let state = McpState::new(crate::tests::test_config());
+    {
+        let mut guard = state.graph_bridge_lock();
+        let bridge = new_mock_empty();
+        bridge.indexing_state.lock().unwrap_or_else(|p| p.into_inner()).insert(
+            "test-project".to_string(),
+            crate::cbm::bridge::IndexingState::Complete,
+        );
+        bridge.freshness.lock().unwrap_or_else(|p| p.into_inner()).insert(
+            "test-project".to_string(),
+            crate::cbm::bridge::ProjectFreshness {
+                dirty_generation: 5,
+                indexed_generation: 3,
+            },
+        );
+        *guard = Some(bridge);
+    }
+
+    CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
+    crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
+
+    let captured = CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner());
+    let resp = &captured[0];
+    let coverage = &resp["result"]["_meta"]["coverage"];
+
+    assert_eq!(coverage["status"].as_str(), Some("complete"), "indexing Complete → status 'complete': {coverage}");
+    assert_eq!(coverage["is_current"].as_bool(), Some(false), "stale freshness → is_current false: {coverage}");
+    assert_eq!(coverage["is_sufficient"].as_bool(), Some(false), "complete + stale → NOT sufficient: {coverage}");
+}
+
+/// B. Coverage incomplete while indexing in progress.
+#[test]
+fn get_cbm_status_coverage_in_progress() {
+    use crate::cbm::bridge::test_helpers::new_mock_empty;
+    use crate::mcp::McpState;
+    use crate::protocol::CAPTURED_RESPONSES;
+    use std::time::Instant;
+
+    let state = McpState::new(crate::tests::test_config());
+    {
+        let mut guard = state.graph_bridge_lock();
+        let bridge = new_mock_empty();
+        bridge.indexing_state.lock().unwrap_or_else(|p| p.into_inner()).insert(
+            "test-project".to_string(),
+            crate::cbm::bridge::IndexingState::InProgress {
+                started_at: Instant::now(),
+            },
+        );
+        *guard = Some(bridge);
+    }
+
+    CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
+    crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
+
+    let captured = CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner());
+    let resp = &captured[0];
+    let coverage = &resp["result"]["_meta"]["coverage"];
+
+    assert_eq!(coverage["status"].as_str(), Some("in_progress"), "indexing InProgress → coverage 'in_progress': {coverage}");
+    assert_eq!(coverage["is_sufficient"].as_bool(), Some(false), "in-progress indexing → NOT sufficient: {coverage}");
+}
+
+/// B. Coverage failed: failed indexing is reported, never masked as complete.
+#[test]
+fn get_cbm_status_coverage_failed() {
+    use crate::cbm::bridge::test_helpers::new_mock_empty;
+    use crate::mcp::McpState;
+    use crate::protocol::CAPTURED_RESPONSES;
+
+    let state = McpState::new(crate::tests::test_config());
+    {
+        let mut guard = state.graph_bridge_lock();
+        let bridge = new_mock_empty();
+        bridge.indexing_state.lock().unwrap_or_else(|p| p.into_inner()).insert(
+            "test-project".to_string(),
+            crate::cbm::bridge::IndexingState::Failed("boom".to_string()),
+        );
+        *guard = Some(bridge);
+    }
+
+    CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
+    crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
+
+    let captured = CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner());
+    let resp = &captured[0];
+    let coverage = &resp["result"]["_meta"]["coverage"];
+
+    assert_eq!(coverage["status"].as_str(), Some("failed"), "indexing Failed → coverage 'failed': {coverage}");
+    assert_eq!(coverage["is_sufficient"].as_bool(), Some(false), "failed indexing → NOT sufficient: {coverage}");
+}
+
 /// F. No semantic contamination: CBM data does not modify WorkspaceIndex or semantic facts.
 #[test]
 fn cbm_does_not_contaminate_semantic_substrate() {
