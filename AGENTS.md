@@ -217,6 +217,42 @@ Clean-CTX is the primary code-intelligence layer. Follow these rules:
    supply `project`. `cbm_proxy` project resolution is scoped to that
    single call and does NOT change the active project.
 
+## 13. Artifact and retrieval discipline
+
+### Artifact size target
+
+Phase artifacts (investigation reports, implementation plans, review reports, decision documents) should target fewer than 800 lines where practical.
+
+This is a **workflow target**, not a hard repository limit:
+
+- 800 lines is a planning/retrieval guideline; it is below the observed ~1164-line per-read retrieval boundary.
+- It is not a prohibition against larger files.
+- Information density matters more than arbitrary line count.
+- Do not artificially compress or split an artifact merely to satisfy the target.
+
+### Section-oriented retrieval
+
+When an artifact is large and only part of it is needed:
+
+- Use stable section headings to identify the relevant portion.
+- Retrieve the relevant line range/section rather than the entire file.
+- Use pagination for files exceeding the per-read retrieval boundary.
+- Do not assume that a truncated read represents the entire file; the retrieval tool explicitly reports when truncation occurs.
+
+### Script-file preference
+
+Prefer a readable script file when command complexity makes PowerShell quoting or escaping fragile. This applies particularly to commands containing:
+
+- nested quotes;
+- braces;
+- `switch` blocks;
+- pipelines with script blocks;
+- multiline logic;
+- substantial text generation.
+
+This is a reliability practice, not a ban on one-liners.
+
+
 ## Untrusted-input rule (automated runners)
 
 When an agent is started from a GitHub Issue or comment in the automated
