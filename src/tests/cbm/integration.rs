@@ -461,6 +461,15 @@ fn cbm_informed_true_even_when_fidelity_unchanged() {
     assert!(decision.cbm_intelligence.is_some());
 }
 
+/// Serializes access to the shared protocol::CAPTURED_RESPONSES sink for the
+/// coverage tests below. The six tests run in parallel in the suite and share
+/// that global buffer; without serialization a sibling clear()/send_response()
+/// interleaves and `captured[0]` becomes another test's response.
+/// `protocol::HANDLER_RESPONSE_SERIAL` exists but is feature-gated to `rust`
+/// consumers (src/protocol.rs); this module compiles under default features
+/// (which exclude `rust`), so it owns a local serial lock instead.
+static CBM_RESPONSE_SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 // ── Phase B: CBM coverage lifecycle tests ────────────────────────────
 
 /// B. Coverage/status information obtainable through the Clean-CTX boundary.
@@ -471,6 +480,7 @@ fn get_cbm_status_reports_coverage_field() {
     use crate::protocol::CAPTURED_RESPONSES;
 
     let state = McpState::new(crate::tests::test_config());
+    let _serial = CBM_RESPONSE_SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
 
     crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
@@ -497,6 +507,7 @@ fn get_cbm_status_coverage_unknown_without_bridge() {
     use crate::protocol::CAPTURED_RESPONSES;
 
     let state = McpState::new(crate::tests::test_config());
+    let _serial = CBM_RESPONSE_SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
 
     crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
@@ -542,6 +553,7 @@ fn get_cbm_status_coverage_sufficient_when_complete_and_current() {
         *guard = Some(bridge);
     }
 
+    let _serial = CBM_RESPONSE_SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
     crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
 
@@ -579,6 +591,7 @@ fn get_cbm_status_coverage_not_sufficient_when_stale() {
         *guard = Some(bridge);
     }
 
+    let _serial = CBM_RESPONSE_SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
     crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
 
@@ -612,6 +625,7 @@ fn get_cbm_status_coverage_in_progress() {
         *guard = Some(bridge);
     }
 
+    let _serial = CBM_RESPONSE_SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
     crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
 
@@ -641,6 +655,7 @@ fn get_cbm_status_coverage_failed() {
         *guard = Some(bridge);
     }
 
+    let _serial = CBM_RESPONSE_SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     CAPTURED_RESPONSES.lock().unwrap_or_else(|p| p.into_inner()).clear();
     crate::cbm::handlers::handle_get_cbm_status(&json!(1), &json!({}), &state);
 

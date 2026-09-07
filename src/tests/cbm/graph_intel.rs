@@ -5,7 +5,7 @@
 // Verifies that Clean-CTX's graph-intelligence features consume REAL CBM
 // data correctly:
 //
-//   - `get_symbol_importance_mut` (bridge) / `get_symbol_importance` (client)
+//   - `get_symbol_importance` (bridge) / `get_symbol_importance` (client)
 //   - dead-code detection
 //   - blast radius / affected-symbol analysis
 //   - architecture analysis
@@ -172,7 +172,7 @@ fn disk_cache_project_isolation_across_workspace_switches() {
         bridge.cache.get("symbol_importance").is_none(),
         "switching workspace roots must clear the in-memory cache"
     );
-    let from_b = bridge.get_symbol_importance_mut();
+    let from_b = bridge.get_symbol_importance();
     assert!(
         from_b.is_err(),
         "repo B query must FAIL (no client), never return a fake-empty Ok"
@@ -182,7 +182,7 @@ fn disk_cache_project_isolation_across_workspace_switches() {
     // exact seeded entry (no CBM round-trip needed).
     bridge.set_workspace_root(root_a.path());
     let from_a = bridge
-        .get_symbol_importance_mut()
+        .get_symbol_importance()
         .expect("repo A's disk-cached entry must hydrate without error");
     assert_eq!(from_a.len(), 1, "repo A's entry must hydrate from disk");
     let info = from_a.get("RepoAOnlySymbol").expect("seeded symbol");
@@ -261,7 +261,7 @@ fn live_symbol_importance_scores_are_nonzero_and_bounded() {
     // F2w/F11: scores flow through the Result API; an Ok(map) is always a
     // complete, valid result.
     let map = bridge
-        .get_symbol_importance_mut()
+        .get_symbol_importance()
         .expect("importance query must succeed on a live indexed graph");
     assert!(
         !map.is_empty(),
@@ -545,10 +545,10 @@ fn live_intel_queries_propagate_errors_on_unknown_project() {
         "first failure must surface CBM's semantic error, got: {first}"
     );
 
-    let importance = bridge.get_symbol_importance_mut();
+    let importance = bridge.get_symbol_importance();
     assert!(
         importance.is_err(),
-        "F11 REGRESSION: get_symbol_importance_mut returned Ok on an unknown project"
+        "F11 REGRESSION: get_symbol_importance returned Ok on an unknown project"
     );
     let blast = bridge.get_blast_radius("anything", 1);
     assert!(

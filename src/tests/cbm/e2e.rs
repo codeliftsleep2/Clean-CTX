@@ -336,7 +336,7 @@ fn e2e_bridge_graceful_degradation_all_queries() {
     // query must never masquerade as "valid query, zero results". The
     // user-facing wrappers (search/trace/query_graph) keep their graceful
     // empty results with take_last_error() diagnostics.
-    let importance = bridge.get_symbol_importance_mut();
+    let importance = bridge.get_symbol_importance();
     assert!(
         importance.is_err(),
         "Symbol importance should fail without CBM, not return empty Ok"

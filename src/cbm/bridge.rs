@@ -1219,9 +1219,13 @@ impl GraphBridge {
 
     /// Per-symbol importance scores derived from CBM caller counts.
     ///
+    /// The `&mut self` receiver exists solely for internal cache mutation
+    /// (`check_cache`/`cache_insert`); the returned map is an owned value
+    /// that callers never mutate — hence the name carries no `_mut` suffix.
+    ///
     /// Errors (CBM unavailable / failed / rejected the query) propagate as
     /// [`CbmError::Err`] — an `Ok(map)` is always a valid, complete result.
-    pub fn get_symbol_importance_mut(
+    pub fn get_symbol_importance(
         &mut self,
     ) -> Result<HashMap<String, SymbolImportance>, CbmError> {
         let key = "symbol_importance".to_string();

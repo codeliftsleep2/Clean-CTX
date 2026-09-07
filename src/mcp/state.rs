@@ -67,21 +67,6 @@ macro_rules! lock_or_recover {
     };
 }
 
-/// Per-file CBM filter state: symbols to skip during compression.
-///
-/// Populated by the CBM Intelligence Layer **before** compression runs.
-/// The compression pipeline checks this set for each capture and drops
-/// low-importance symbols (score < 0.4) entirely, so CBM reduces token
-/// output instead of adding enrichment data after the fact.
-///
-/// Keyed by absolute file path; value is the set of low-importance
-/// symbol names to exclude from the compressed output.
-#[derive(Debug, Clone, Default)]
-pub struct CbmFilterState {
-    /// Symbol names to skip, keyed by file path.
-    pub skip_sets: HashMap<String, HashSet<String>>,
-}
-
 /// P0-3: Cache entry with metadata for invalidation.
 ///
 /// Tracks file modification time and size to detect when a cached
@@ -175,11 +160,6 @@ pub struct McpState {
 
     /// CBM integration status, mirrored for quick access.
     pub cbm_status: crate::cbm::CbmStatus,
-
-    /// CBM filter state: per-file skip sets populated by the Intelligence
-    /// Layer before compression. When a symbol has low importance (< 0.4),
-    /// it is added here and the capture pipeline drops it during compression.
-    pub cbm_filter: Mutex<CbmFilterState>,
 
     /// Phase 1 (Fix D): Cache of rendered LLM-optimized hierarchical IR text,
     /// keyed by path alias (e.g., "α1").
@@ -287,7 +267,6 @@ impl McpState {
             emitted_breakpoints: Mutex::new(HashSet::new()),
             cache_metrics: Mutex::new(CacheMetrics::default()),
             workspace_index: RwLock::new(crate::workspace::index::WorkspaceIndex::new()),
-            cbm_filter: Mutex::new(CbmFilterState::default()),
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,
             proxy_port,
@@ -412,11 +391,6 @@ impl McpState {
         lock_or_recover!(self.source_cache.lock(), "source_cache")
     }
 
-    /// Lock the CBM filter state for writing.
-    pub fn cbm_filter_lock(&self) -> std::sync::MutexGuard<'_, CbmFilterState> {
-        lock_or_recover!(self.cbm_filter.lock(), "cbm_filter")
-    }
-
     /// Lock the LLM text cache for writing.
     pub fn llm_text_cache_lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, String>> {
         lock_or_recover!(self.llm_text_cache.lock(), "llm_text_cache")
@@ -513,11 +487,6 @@ impl McpState {
     pub fn invalidate_source_cache(&self, path: &str) {
         let cache_key = Self::resolve_cache_key(path);
         lock_or_recover!(self.source_cache.lock(), "source_cache").remove(&cache_key);
-    }
-
-    /// Access CBM filter skip set for a file (thread-safe convenience method).
-    pub fn get_skip_set(&self, file_path: &str) -> Option<HashSet<String>> {
-        self.cbm_filter_lock().skip_sets.get(file_path).cloned()
     }
 
     pub fn flush_persistence(&self) -> usize {

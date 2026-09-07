@@ -346,10 +346,6 @@ fn audit11_helper_methods_compile() {
     drop(_ps); // Release before flush
     let _flush = state.flush_persistence();
     let _sc = state.source_cache_lock();
-    // Test cbm_filter_lock directly, then drop before get_skip_set (which locks internally)
-    let _cf = state.cbm_filter_lock();
-    drop(_cf); // Release before get_skip_set to avoid reentrant deadlock
-    let _skip = state.get_skip_set("x.rs");
     let _cm = state.cache_metrics_lock();
 }
 

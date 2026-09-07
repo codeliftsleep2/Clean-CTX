@@ -627,7 +627,7 @@ pub fn decide(
         let bridge_mut = bridge.unwrap();
 
         // Retrieve CBM symbol importance (session-cached by GraphBridge).
-        match bridge_mut.get_symbol_importance_mut() {
+        match bridge_mut.get_symbol_importance() {
             Ok(importance) => {
                 // Derive fidelity recommendation from importance scores.
                 let recommendation =

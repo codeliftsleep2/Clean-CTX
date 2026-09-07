@@ -80,7 +80,7 @@ fn expired_cache_entry_is_evicted() {
     };
     let mut bridge = GraphBridge::try_create(&config, Path::new("."));
 
-    // Insert expired entry under "symbol_importance" so get_symbol_importance_mut
+    // Insert expired entry under "symbol_importance" so get_symbol_importance
     // finds it via check_cache, evicts it, then the query fails (no CBM),
     // returning an empty map — but the expired entry should be gone.
     bridge.cache.insert(
@@ -91,10 +91,10 @@ fn expired_cache_entry_is_evicted() {
         },
     );
 
-    // get_symbol_importance_mut calls check_cache("symbol_importance")
+    // get_symbol_importance calls check_cache("symbol_importance")
     // which finds the expired entry, evicts it, then fails the query.
     // F11: the failure now propagates as Err instead of an empty map.
-    let result = bridge.get_symbol_importance_mut();
+    let result = bridge.get_symbol_importance();
     assert!(
         result.is_err(),
         "F11: failed query must be Err, not a fake-empty Ok"
@@ -385,7 +385,7 @@ fn circuit_breaker_opens_after_three_failures() {
     // F11: intel queries propagate failures as Err; the user-facing
     // wrappers (search/trace) keep their graceful empty + take_last_error
     // behavior, which handlers translate into error responses.
-    assert!(bridge.get_symbol_importance_mut().is_err());
+    assert!(bridge.get_symbol_importance().is_err());
     assert!(bridge.get_dead_code().is_err());
     assert!(bridge.get_architecture().is_err());
     assert!(bridge.search("test").is_empty());
@@ -436,9 +436,9 @@ fn p0_2_regression_mock_empty_is_available() {
     );
 }
 
-/// P0-2 REGRESSION: Mock's get_symbol_importance_mut returns cached data.
+/// P0-2 REGRESSION: Mock's get_symbol_importance returns cached data.
 ///
-/// Before the fix, `get_symbol_importance_mut()` would call `query()` which
+/// Before the fix, `get_symbol_importance()` would call `query()` which
 /// returned Err (no client), so the mock always returned empty data.
 /// After the fix, the cache is checked first and pre-seeded data is returned.
 #[test]
@@ -459,7 +459,7 @@ fn p0_2_regression_mock_returns_cached_data() {
 
     let mut bridge = new_mock(data);
     let result = bridge
-        .get_symbol_importance_mut()
+        .get_symbol_importance()
         .expect("cached importance must hydrate without error");
     assert_eq!(result.len(), 1, "Should return 1 cached symbol");
     assert!(

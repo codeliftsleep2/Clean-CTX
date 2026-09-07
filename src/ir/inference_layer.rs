@@ -229,7 +229,7 @@ impl InferenceLayer {
         }
 
         // Symbol importance (confidence = 0.75)
-        for (name, info) in bridge.get_symbol_importance_mut()? {
+        for (name, info) in bridge.get_symbol_importance()? {
             self.annotations
                 .entry(name)
                 .or_default()

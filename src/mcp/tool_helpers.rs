@@ -275,10 +275,10 @@ pub(super) fn compile_file_ir_focused(
     fidelity: Fidelity,
     state: &McpState,
     focus: Option<&std::collections::HashSet<String>>,
-    // CBM request-scoped intelligence. When provided, its skip-set takes
-    // precedence over the transitional `CbmFilterState` in `McpState`.
-    // The compiler itself never sees this type — only the derived
-    // `skip_set` is passed through, keeping the compiler CBM-agnostic.
+    // CBM request-scoped intelligence. When provided, its skip-set is passed
+    // to the compiler for filter-first compression. The compiler itself never
+    // sees this type — only the derived `skip_set` is passed through, keeping
+    // the compiler CBM-agnostic.
     cbm_intelligence: Option<&crate::intelligence::fidelity::CbmIntelligence>,
 ) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
 {
@@ -378,15 +378,13 @@ pub(super) fn compile_file_ir_focused(
         crate::ir::patterns::CompressingPatternRecognizer::new(),
     ));
 
-    // CBM filter-first: pass the skip set so low-importance symbols
-    // are excluded from IR output entirely.
+    // CBM filter-first: pass the request-scoped skip set so low-importance
+    // symbols are excluded from IR output entirely.
     // Request-scoped CbmIntelligence (from compiler-mediated CBM consultation)
-    // takes precedence over the transitional CbmFilterState in McpState.
-    let skip_set = if let Some(intel) = cbm_intelligence {
-        Some(intel.skip_set.clone())
-    } else {
-        state.get_skip_set(file_path)
-    };
+    // is the sole source of filter-first data. When no intelligence was
+    // obtained (CBM unavailable/disabled/explicit fidelity), no filtering
+    // occurs — `None` preserves the exact pre-CBM compilation behavior.
+    let skip_set = cbm_intelligence.map(|intel| intel.skip_set.clone());
     let mut compiled = compiler.compile_focused(
         source,
         &path_alias,
