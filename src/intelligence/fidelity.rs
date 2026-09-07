@@ -54,6 +54,17 @@ pub struct CbmIntelligence {
     /// request-scoped purely for context-selection/expansion decisions above
     /// the compiler.
     pub data_flow: Option<crate::cbm::bridge::DataFlowContext>,
+    /// Request-scoped cross-service context (Phase D2): the bounded set of
+    /// workspace symbols/files reachable through a cross-service-relevant
+    /// path from this request's seed symbols
+    /// (`trace_path(mode="cross_service")`). `None` when cross-service
+    /// consultation was not performed or produced no candidates.
+    ///
+    /// Same advisory, request-scoped, ephemeral semantics as `data_flow` —
+    /// never `WorkspaceIndex`, `CompiledIR`, or semantic identity. The claim
+    /// is reachability only, never service identity or architectural
+    /// service discovery.
+    pub cross_service: Option<crate::cbm::bridge::DataFlowContext>,
 }
 
 /// A fidelity recommendation from the intelligence layer.
@@ -218,6 +229,46 @@ pub fn retain_data_flow_relevant_symbols(
     symbol_importance: &HashMap<String, crate::cbm::SymbolImportance>,
     data_flow: &crate::cbm::bridge::DataFlowContext,
 ) -> HashSet<String> {
+    retain_relevant_symbols(file_path, skip_set, symbol_importance, data_flow)
+}
+
+/// Apply the Phase D2 skip-set interaction decision:
+///
+/// **Cross-service-identified in-file symbols are retained** (removed from
+/// the skip-set), with exactly the same semantics and rationale as
+/// [`retain_data_flow_relevant_symbols`]: a symbol CBM's cross-service trace
+/// identifies as reachable through a cross-service-relevant path from the
+/// request's seeds is request-relevant despite low static centrality.
+/// Retention is restricted to symbols belonging to the **requested current
+/// workspace file** (via `path_matches` over the importance entries), so a
+/// cross-repository symbol name that happens to collide cannot retain an
+/// unrelated current-workspace symbol outside the requested file. Union
+/// semantics with the D1 pass: both passes only REMOVE from the skip-set,
+/// so a symbol retained by either relevance source stays retained, and no
+/// symbol is ever added. Advisory, request-scoped, bounded — never
+/// `WorkspaceIndex`, `CompiledIR`, or semantic identity.
+pub fn retain_cross_service_relevant_symbols(
+    file_path: &str,
+    skip_set: &HashSet<String>,
+    symbol_importance: &HashMap<String, crate::cbm::SymbolImportance>,
+    cross_service: &crate::cbm::bridge::DataFlowContext,
+) -> HashSet<String> {
+    retain_relevant_symbols(file_path, skip_set, symbol_importance, cross_service)
+}
+
+/// Shared retention core for D1 (data-flow) and D2 (cross-service).
+///
+/// The smallest mechanically necessary adaptation (Phase D2): the D1
+/// retention logic was already exactly the semantics D2 requires — the
+/// trace-context parameter is the same `DataFlowContext` type — so the body
+/// was extracted verbatim into this private helper and both public
+/// retention functions delegate to it. No behavior change for D1 callers.
+fn retain_relevant_symbols(
+    file_path: &str,
+    skip_set: &HashSet<String>,
+    symbol_importance: &HashMap<String, crate::cbm::SymbolImportance>,
+    ctx: &crate::cbm::bridge::DataFlowContext,
+) -> HashSet<String> {
     // Bare-name lookup of importance entries for THIS file.
     let in_file: HashSet<&str> = symbol_importance
         .values()
@@ -227,9 +278,9 @@ pub fn retain_data_flow_relevant_symbols(
     skip_set
         .iter()
         .filter(|&symbol| {
-            let data_flow_match = data_flow.symbols.iter().any(|df_sym| df_sym == symbol)
-                | data_flow.symbols.iter().any(|df_sym| df_sym.ends_with(&format!(".{symbol}")));
-            !(data_flow_match && in_file.contains(symbol.as_str()))
+            let trace_match = ctx.symbols.iter().any(|t_sym| t_sym == symbol)
+                | ctx.symbols.iter().any(|t_sym| t_sym.ends_with(&format!(".{symbol}")));
+            !(trace_match && in_file.contains(symbol.as_str()))
         })
         .cloned()
         .collect()

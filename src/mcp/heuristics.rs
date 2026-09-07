@@ -32,7 +32,8 @@ use std::path::Path;
 pub use crate::intelligence::fidelity::CbmIntelligence;
 use crate::intelligence::fidelity::{
     apply_recommendation, bound_data_flow, build_cbm_skip_set, cbm_informed_fidelity,
-    data_flow_seed_symbols, retain_data_flow_relevant_symbols,
+    data_flow_seed_symbols, retain_cross_service_relevant_symbols,
+    retain_data_flow_relevant_symbols,
 };
 
 /// What compression strategy should `provide_code_context` use?
@@ -122,7 +123,16 @@ impl ContextDecision {
         } else {
             String::new()
         };
-        let extras = [skip_str, df_str]
+        // D2: report whether request-scoped cross-service expansion produced
+        // candidates (advisory diagnostic only).
+        let cs_str = if let Some(Some(cs)) =
+            self.cbm_intelligence.as_ref().map(|i| i.cross_service.as_ref())
+        {
+            format!("cbm_cs={}sym/{}files", cs.symbols.len(), cs.files.len())
+        } else {
+            String::new()
+        };
+        let extras = [skip_str, df_str, cs_str]
             .into_iter()
             .filter(|s| !s.is_empty())
             .map(|s| format!(", {s}"))
@@ -713,10 +723,72 @@ pub fn decide(
                     skip_set
                 };
 
+                // ── D2: CBM cross-service context expansion ──────────────────
+                // Same consultation permission as D1 (inside `needs_cbm`,
+                // which already enforces the explicit fidelity/intent gate),
+                // gated by its own config switch. Seeds reuse the D1
+                // deterministic highest-importance selection, bounded by
+                // `cross_service_seeds`. Results are merged across seeds
+                // (partial seed failure is allowed), bounded AFTER merging,
+                // and carried request-scoped as advisory context in
+                // `CbmIntelligence.cross_service`. A cross-service-identified
+                // in-file symbol is retained through the skip-set (union
+                // semantics with D1 — both passes only remove). Failure is
+                // advisory — it never makes compilation fail.
+                let mut cross_service = None; // Option<DataFlowContext>
+                if config.intelligence.cross_service_enabled {
+                    let cs_seeds = data_flow_seed_symbols(
+                        file_path,
+                        &importance,
+                        config.intelligence.cross_service_seeds,
+                    );
+                    if !cs_seeds.is_empty() {
+                        let mut merged = crate::cbm::bridge::DataFlowContext {
+                            symbols: std::collections::HashSet::new(),
+                            files: std::collections::HashSet::new(),
+                        };
+                        for seed in cs_seeds {
+                            if let Ok(cs) = bridge_mut.trace_cross_service(
+                                &seed,
+                                config.intelligence.cross_service_depth,
+                            ) {
+                                // Deduplicate across seeds via set union.
+                                merged.symbols.extend(cs.symbols);
+                                merged.files.extend(cs.files);
+                            }
+                            // Err → skip this seed — partial results are
+                            // allowed; the feature remains advisory.
+                        }
+                        if !merged.symbols.is_empty() {
+                            cross_service = Some(bound_data_flow(
+                                merged,
+                                config.intelligence.cross_service_max_symbols,
+                                config.intelligence.cross_service_max_files,
+                            ));
+                        }
+                    }
+                }
+                // D2 skip-set interaction: retain cross-service-relevant
+                // in-file symbols through the skip-set. Union semantics with
+                // D1 — both passes only REMOVE, so their relative order is
+                // not semantically significant; D1 runs first per the
+                // documented chain.
+                let skip_set = if let Some(cs) = &cross_service {
+                    retain_cross_service_relevant_symbols(
+                        file_path,
+                        &skip_set,
+                        &importance,
+                        cs,
+                    )
+                } else {
+                    skip_set
+                };
+
                 cbm_intelligence = Some(CbmIntelligence {
                     importance,
                     skip_set,
                     data_flow,
+                    cross_service,
                 });
                 cbm_informed = true;
             }

@@ -1869,9 +1869,86 @@ impl GraphBridge {
                 return Ok(DataFlowContext { symbols: HashSet::new(), files: HashSet::new() });
             }
         };
-        // Parse the 0.10.8 callers/callees table model into edges.
+        // Parse the 0.10.8 callers/callees table model into edges and
+        // resolve files best-effort (shared D1/D2 post-parse step).
+        let ctx = self.trace_context_from_wire(&body, seed);
+        self.cache_insert(&key, &ctx);
+        Ok(ctx)
+    }
 
-        let edges = crate::cbm::wire::parse_trace(&body, seed);
+    /// Trace the cross-service neighborhood of a symbol (Phase D2).
+    ///
+    /// Mirrors [`GraphBridge::trace_data_flow`], requesting
+    /// `trace_path(mode="cross_service")` — CBM follows
+    /// CALLS/DATA_FLOWS/HTTP_CALLS/ASYNC_CALLS plus the CROSS_* cross-repo
+    /// edge types, so the frontier is larger than data-flow. The result is
+    /// interpreted as request-scoped **advisory context intelligence**: the
+    /// set of workspace symbols/files reachable through a
+    /// cross-service-relevant path from the seed. This is reachability
+    /// only — never service identity or architectural service discovery.
+    ///
+    /// Cross-repository boundary: only symbols whose bare name resolves in
+    /// the CURRENT project's importance map contribute a file, so external
+    /// file paths never enter `files`; unresolvable symbols remain in
+    /// `symbols` as advisory information only.
+    ///
+    /// Cache: per `(seed, depth)` key, prefixed `cross_service:` — a
+    /// distinct namespace from `data_flow:` so the two trace modes can
+    /// never collide. Session-scoped, same as D1.
+    /// Errors degrade to an empty context (failure is advisory, never a
+    /// compilation failure).
+    pub fn trace_cross_service(
+        &mut self,
+        seed: &str,
+        depth: usize,
+    ) -> Result<DataFlowContext, CbmError> {
+        self.ensure_operational();
+        let key = format!("cross_service:{seed}:{depth}");
+        if self.check_cache(&key) {
+            return serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .map_err(|e| CbmError::ParseError(format!("cached cross_service: {e}")));
+        }
+        let project = self.project_str();
+        let body = match self.query(move |c| {
+            c.trace_path(seed, "both", &project, Some(depth), Some("cross_service"))
+        }) {
+            Ok(b) => b,
+            Err(e) => {
+                self.set_last_error(Some(e));
+                return Ok(DataFlowContext { symbols: HashSet::new(), files: HashSet::new() });
+            }
+        };
+        let ctx = self.trace_context_from_wire(&body, seed);
+        self.cache_insert(&key, &ctx);
+        Ok(ctx)
+    }
+
+    /// Shared post-parse step for both trace modes (Phase D1/D2).
+    ///
+    /// The smallest mechanically necessary Phase D2 adaptation: `trace_data_flow`'s
+    /// parse-and-resolve body was extracted verbatim into this method so
+    /// `trace_cross_service` can reuse it without a second parsing layer.
+    /// D1 behavior is unchanged (same logic, same call order).
+    ///
+    /// Parses a raw CBM `trace_path` response body via `wire::parse_trace`
+    /// (the 0.10.8 grouped `{cols, groups}` table model plus tolerated
+    /// shapes), then resolves files best-effort through the session-cached
+    /// symbol-importance map — zero extra CBM queries in the common path.
+    ///
+    /// Trace endpoints are qualified names (e.g. `proj.main`); the
+    /// importance map is keyed by bare names, so the qn prefix is stripped.
+    /// Symbols whose file cannot be resolved are still carried in `symbols`;
+    /// only files known to the CURRENT project's importance map can enter
+    /// `files`, which mechanically excludes cross-repository file paths.
+    fn trace_context_from_wire(&mut self, body: &Value, seed: &str) -> DataFlowContext {
+        let edges = crate::cbm::wire::parse_trace(body, seed);
         let mut ctx = DataFlowContext { symbols: HashSet::new(), files: HashSet::new() };
         // Best-effort file resolution via the symbol-importance cache (session
         // cached — zero extra CBM queries in the common path).
@@ -1887,8 +1964,7 @@ impl GraphBridge {
                 }
             }
         }
-        self.cache_insert(&key, &ctx);
-        Ok(ctx)
+        ctx
     }
 
     pub fn invalidate_symbol(&mut self, symbol: &str) {
@@ -2565,6 +2641,41 @@ pub mod test_helpers {
                 expires_at: Instant::now() + Duration::from_secs(3600),
             },
         );
+    }
+
+    /// Seed a cached cross-service trace for a symbol (Phase D2 tests).
+    ///
+    /// Mirror of [`test_helpers::seed_data_flow`] under the distinct
+    /// `cross_service:` cache namespace, so cache-separation tests can prove
+    /// the two trace modes never collide.
+    pub fn seed_cross_service(
+        bridge: &GraphBridge,
+        seed: &str,
+        depth: usize,
+        ctx: DataFlowContext,
+    ) {
+        bridge.cache.insert(
+            format!("cross_service:{seed}:{depth}"),
+            CachedGraphData {
+                data: serde_json::to_value(&ctx).unwrap_or_default(),
+                expires_at: Instant::now() + Duration::from_secs(3600),
+            },
+        );
+    }
+
+    /// Expose the shared wire→context step for Phase D2 tests.
+    ///
+    /// Lets tests exercise the ACTUAL parser → bridge path — a raw CBM
+    /// `trace_path` response body (grouped `{cols, groups}` shape) flows
+    /// through `wire::parse_trace` and the bridge's real importance-based
+    /// file resolution — without a CBM transport. The bridge must have its
+    /// importance cache pre-seeded (e.g. via [`test_helpers::new_mock`]).
+    pub fn trace_context_from_wire(
+        bridge: &mut GraphBridge,
+        body: &serde_json::Value,
+        seed: &str,
+    ) -> DataFlowContext {
+        bridge.trace_context_from_wire(body, seed)
     }
 
     /// Create a mock GraphBridge pre-seeded with call edges,

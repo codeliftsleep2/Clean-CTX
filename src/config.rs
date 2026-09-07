@@ -517,6 +517,32 @@ pub struct IntelligenceConfig {
     /// Prevents context explosion. Default: 6.
     #[serde(default = "default_data_flow_max_files")]
     pub data_flow_max_files: usize,
+    /// Enable CBM cross-service context expansion (Phase D2). When enabled
+    /// (and the master `enabled` switch is on), Clean-CTX traces the request
+    /// file's highest-importance symbols via
+    /// `trace_path(mode="cross_service")` and carries the bounded result as
+    /// request-scoped advisory context in `CbmIntelligence.cross_service`
+    /// (symbols/files reachable through a cross-service-relevant path).
+    /// Default: true.
+    #[serde(default = "default_true")]
+    pub cross_service_enabled: bool,
+    /// Maximum number of cross-service seed symbols traced per request
+    /// (Phase D2). Each seed is one bounded CBM trace call. Default: 3.
+    #[serde(default = "default_cross_service_seeds")]
+    pub cross_service_seeds: usize,
+    /// Cross-service trace depth (Phase D2). Capped to keep each trace cheap.
+    /// Default: 2.
+    #[serde(default = "default_cross_service_depth")]
+    pub cross_service_depth: usize,
+    /// Maximum number of cross-service symbols carried per request (Phase D2).
+    /// Cross-service traces follow ten edge types, so frontiers are larger
+    /// than data-flow. Default: 20.
+    #[serde(default = "default_cross_service_max_symbols")]
+    pub cross_service_max_symbols: usize,
+    /// Maximum number of cross-service files carried per request (Phase D2).
+    /// Default: 8.
+    #[serde(default = "default_cross_service_max_files")]
+    pub cross_service_max_files: usize,
 }
 
 impl Default for IntelligenceConfig {
@@ -530,6 +556,11 @@ impl Default for IntelligenceConfig {
             data_flow_depth: default_data_flow_depth(),
             data_flow_max_symbols: default_data_flow_max_symbols(),
             data_flow_max_files: default_data_flow_max_files(),
+            cross_service_enabled: true,
+            cross_service_seeds: default_cross_service_seeds(),
+            cross_service_depth: default_cross_service_depth(),
+            cross_service_max_symbols: default_cross_service_max_symbols(),
+            cross_service_max_files: default_cross_service_max_files(),
         }
     }
 }
@@ -552,6 +583,22 @@ fn default_data_flow_max_symbols() -> usize {
 
 fn default_data_flow_max_files() -> usize {
     6
+}
+
+fn default_cross_service_seeds() -> usize {
+    3
+}
+
+fn default_cross_service_depth() -> usize {
+    2
+}
+
+fn default_cross_service_max_symbols() -> usize {
+    20
+}
+
+fn default_cross_service_max_files() -> usize {
+    8
 }
 
 /// Observability configuration for metrics export.

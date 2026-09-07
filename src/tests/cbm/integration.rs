@@ -1010,3 +1010,593 @@ fn d1_data_flow_relevant_symbol_retained_through_skip_set() {
         "data-flow-relevant symbol must be retained through the skip-set"
     );
 }
+
+// ── Phase D2: CBM cross-service intelligence & context expansion tests ──
+
+/// Test 1 — Successful cross-service consultation: seeds are traced,
+/// candidates carried request-scoped as advisory `CbmIntelligence.cross_service`.
+#[test]
+fn d2_cross_service_consultation_produces_request_scoped_context() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_cross_service};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    let mut data = HashMap::new();
+    data.insert(
+        "CriticalAPI".to_string(),
+        SymbolImportance { symbol: "CriticalAPI".into(), score: 0.95, file: "api.rs".into() },
+    );
+    let mut bridge = new_mock(data);
+    seed_cross_service(
+        &bridge,
+        "CriticalAPI",
+        2,
+        DataFlowContext {
+            symbols: ["gateway".to_string(), "helper".to_string()]
+                .into_iter()
+                .collect::<HashSet<_>>(),
+            files: ["svc.rs".to_string()].into_iter().collect::<HashSet<_>>(),
+        },
+    );
+
+    let config = crate::config::CleanCtxConfig::default(); // cross_service_enabled defaults true
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    assert!(decision.cbm_informed);
+    let intel = decision.cbm_intelligence.as_ref().expect("cbm_intelligence should be Some");
+    let cs = intel
+        .cross_service
+        .as_ref()
+        .expect("cross_service should be Some (seeded trace)");
+    assert!(cs.symbols.contains("gateway"), "trace endpoints parsed into symbols");
+    assert!(decision.summary().contains("cbm_cs="), "summary reports cross-service diagnostics");
+}
+
+/// Test 2 — Multiple cross-service seeds: queried, merged, deduplicated,
+/// and bounded deterministically.
+#[test]
+fn d2_multiple_seeds_merged_deduplicated_and_bounded() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_cross_service};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    let mut data = HashMap::new();
+    data.insert(
+        "SeedA".to_string(),
+        SymbolImportance { symbol: "SeedA".into(), score: 0.95, file: "api.rs".into() },
+    );
+    data.insert(
+        "SeedB".to_string(),
+        SymbolImportance { symbol: "SeedB".into(), score: 0.6, file: "api.rs".into() },
+    );
+    let mut bridge = new_mock(data);
+    seed_cross_service(
+        &bridge,
+        "SeedA",
+        2,
+        DataFlowContext {
+            symbols: ["shared".to_string(), "alpha".to_string()]
+                .into_iter()
+                .collect::<HashSet<_>>(),
+            files: HashSet::new(),
+        },
+    );
+    seed_cross_service(
+        &bridge,
+        "SeedB",
+        2,
+        DataFlowContext {
+            symbols: ["shared".to_string(), "beta".to_string()]
+                .into_iter()
+                .collect::<HashSet<_>>(),
+            files: HashSet::new(),
+        },
+    );
+
+    let mut config = crate::config::CleanCtxConfig::default();
+    // Bound to 2 so the merged/deduplicated set {alpha, beta, shared} is
+    // deterministically truncated to {alpha, beta}.
+    config.intelligence.cross_service_max_symbols = 2;
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    let cs = decision
+        .cbm_intelligence
+        .expect("cbm_intelligence Some")
+        .cross_service
+        .expect("cross_service Some");
+    assert_eq!(cs.symbols.len(), 2, "bounded by cross_service_max_symbols (2)");
+    assert!(cs.symbols.contains("alpha") && cs.symbols.contains("beta"));
+    assert!(!cs.symbols.contains("shared"), "bounding is deterministic after merge");
+}
+
+/// Test 3 — Cache separation: `cross_service:{seed}:{depth}` must never be
+/// satisfied by a `data_flow:{seed}:{depth}` entry, and vice versa.
+#[test]
+fn d2_cross_service_cache_namespace_is_distinct() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_cross_service, seed_data_flow};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use std::collections::{HashMap, HashSet};
+
+    let mut data = HashMap::new();
+    data.insert(
+        "S".to_string(),
+        SymbolImportance { symbol: "S".into(), score: 0.9, file: "api.rs".into() },
+    );
+    let df_ctx = DataFlowContext {
+        symbols: ["df_symbol".to_string()].into_iter().collect::<HashSet<_>>(),
+        files: HashSet::new(),
+    };
+    let cs_ctx = DataFlowContext {
+        symbols: ["cs_symbol".to_string()].into_iter().collect::<HashSet<_>>(),
+        files: HashSet::new(),
+    };
+
+    // Direction 1 — a data_flow entry must NOT satisfy a cross_service request.
+    let mut bridge = new_mock(data.clone());
+    seed_data_flow(&bridge, "S", 2, df_ctx.clone());
+    // Cold cross_service cache + no transport → degraded empty context, not
+    // the cached data_flow result.
+    let cs = bridge.trace_cross_service("S", 2).expect("degraded, not failed");
+    assert!(
+        cs.symbols.is_empty(),
+        "data_flow cache entry must not satisfy a cross_service request"
+    );
+    // Once a cross_service entry exists, its own namespace serves it.
+    seed_cross_service(&bridge, "S", 2, cs_ctx.clone());
+    let cs_hit = bridge.trace_cross_service("S", 2).expect("cache hit");
+    assert!(cs_hit.symbols.contains("cs_symbol"), "cross_service cache namespace serves its own hit");
+
+    // Direction 2 (fresh bridge) — a cross_service entry must NOT satisfy a
+    // data_flow request.
+    let mut bridge2 = new_mock(data.clone());
+    seed_cross_service(&bridge2, "S", 2, cs_ctx.clone());
+    let df = bridge2.trace_data_flow("S", 2).expect("degraded, not failed");
+    assert!(
+        df.symbols.is_empty(),
+        "cross_service cache entry must not satisfy a data_flow request"
+    );
+    // Once a data_flow entry exists, its own namespace serves it.
+    seed_data_flow(&bridge2, "S", 2, df_ctx.clone());
+    let df_hit = bridge2.trace_data_flow("S", 2).expect("cache hit");
+    assert!(df_hit.symbols.contains("df_symbol"), "data_flow cache namespace serves its own hit");
+}
+
+/// Test 4 — Skip-set interaction: a cross-service-identified in-file symbol
+/// is retained through the skip-set.
+#[test]
+fn d2_cross_service_relevant_symbol_retained_through_skip_set() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_cross_service};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    let mut data = HashMap::new();
+    data.insert(
+        "helper".to_string(),
+        SymbolImportance { symbol: "helper".into(), score: 0.1, file: "api.rs".into() },
+    );
+    data.insert(
+        "CriticalAPI".to_string(),
+        SymbolImportance { symbol: "CriticalAPI".into(), score: 0.95, file: "api.rs".into() },
+    );
+    let mut bridge = new_mock(data);
+    seed_cross_service(
+        &bridge,
+        "CriticalAPI",
+        2,
+        DataFlowContext {
+            symbols: ["helper".to_string()].into_iter().collect::<HashSet<_>>(),
+            files: HashSet::new(),
+        },
+    );
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    let intel = decision.cbm_intelligence.expect("Some");
+    assert!(
+        !intel.skip_set.contains("helper"),
+        "cross-service-relevant symbol must be retained through the skip-set"
+    );
+}
+
+/// Test 5 — A low-importance in-file symbol NOT identified by D2 remains
+/// skipped (retention never adds; only demonstrable relevance retains).
+#[test]
+fn d2_non_relevant_low_importance_symbol_remains_skipped() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_cross_service};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    let mut data = HashMap::new();
+    data.insert(
+        "helper".to_string(),
+        SymbolImportance { symbol: "helper".into(), score: 0.1, file: "api.rs".into() },
+    );
+    data.insert(
+        "bystander".to_string(),
+        SymbolImportance { symbol: "bystander".into(), score: 0.1, file: "api.rs".into() },
+    );
+    data.insert(
+        "CriticalAPI".to_string(),
+        SymbolImportance { symbol: "CriticalAPI".into(), score: 0.95, file: "api.rs".into() },
+    );
+    let mut bridge = new_mock(data);
+    seed_cross_service(
+        &bridge,
+        "CriticalAPI",
+        2,
+        DataFlowContext {
+            symbols: ["helper".to_string()].into_iter().collect::<HashSet<_>>(),
+            files: HashSet::new(),
+        },
+    );
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    let intel = decision.cbm_intelligence.expect("Some");
+    assert!(
+        !intel.skip_set.contains("helper"),
+        "cross-service-relevant symbol retained"
+    );
+    assert!(
+        intel.skip_set.contains("bystander"),
+        "non-relevant low-importance symbol must remain skipped"
+    );
+}
+
+/// Test 6 — Cross-repository boundary: cross-repo symbols stay as advisory
+/// symbol information, but no external file enters the compilable file set.
+#[test]
+fn d2_cross_repository_files_never_enter_compilable_set() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_cross_service, trace_context_from_wire};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    // Part A — bridge wire path: a grouped cross_service response whose
+    // callees include a cross-repo qualified endpoint. Only bare names known
+    // to the CURRENT project's importance map resolve to files; external
+    // file paths can never appear because file provenance comes exclusively
+    // from the current project's importance entries.
+    let mut data = HashMap::new();
+    data.insert(
+        "main".to_string(),
+        SymbolImportance { symbol: "main".into(), score: 0.9, file: "api.rs".into() },
+    );
+    let mut bridge = new_mock(data);
+    let body = serde_json::json!({
+        "function": "proj.main",
+        "direction": "outbound",
+        "mode": "cross_service",
+        "callees": {
+            "cols": ["name", "hop"],
+            "groups": [
+                { "qn_prefix": "other.repo", "rows": [["handler", 1]] },
+                { "qn_prefix": "proj.main", "rows": [["main", 1]] }
+            ]
+        }
+    });
+    let ctx = trace_context_from_wire(&mut bridge, &body, "proj.main");
+    assert!(ctx.symbols.contains("handler"), "cross-repo symbol kept as advisory info");
+    assert!(ctx.symbols.contains("main"));
+    assert!(
+        ctx.files.iter().all(|f| f == "api.rs"),
+        "files must resolve only to current-workspace importance entries"
+    );
+
+    // Part B — decision level: an unresolvable external symbol stays in
+    // `symbols` but contributes no file.
+    let mut data2 = HashMap::new();
+    data2.insert(
+        "CriticalAPI".to_string(),
+        SymbolImportance { symbol: "CriticalAPI".into(), score: 0.95, file: "api.rs".into() },
+    );
+    let mut bridge2 = new_mock(data2);
+    seed_cross_service(
+        &bridge2,
+        "CriticalAPI",
+        2,
+        DataFlowContext {
+            symbols: ["external_handler".to_string()].into_iter().collect::<HashSet<_>>(),
+            files: HashSet::new(),
+        },
+    );
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge2),
+    )
+    .unwrap();
+
+    let intel = decision.cbm_intelligence.expect("Some");
+    let cs = intel.cross_service.expect("cross_service Some");
+    assert!(cs.symbols.contains("external_handler"), "advisory symbol retained in context");
+    assert!(
+        cs.files.is_empty(),
+        "unresolved external files must never enter the compilable file set"
+    );
+}
+
+/// Test 7 — Partial seed failure: a failed seed is skipped; successful
+/// seeds still contribute.
+#[test]
+fn d2_partial_seed_failure_still_yields_successful_seeds() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_cross_service};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    let mut data = HashMap::new();
+    data.insert(
+        "SeedA".to_string(),
+        SymbolImportance { symbol: "SeedA".into(), score: 0.95, file: "api.rs".into() },
+    );
+    data.insert(
+        "SeedB".to_string(),
+        SymbolImportance { symbol: "SeedB".into(), score: 0.6, file: "api.rs".into() },
+    );
+    let mut bridge = new_mock(data);
+    // Only SeedA has a trace; SeedB's trace fails (no transport) and is skipped.
+    seed_cross_service(
+        &bridge,
+        "SeedA",
+        2,
+        DataFlowContext {
+            symbols: ["alpha".to_string()].into_iter().collect::<HashSet<_>>(),
+            files: HashSet::new(),
+        },
+    );
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    let cs = decision
+        .cbm_intelligence
+        .expect("cbm_intelligence Some")
+        .cross_service
+        .expect("successful seed must still contribute");
+    assert!(cs.symbols.contains("alpha"), "SeedA's candidates present");
+}
+
+/// Test 8 — Empty/failure degradation: no cross-service result leaves
+/// compilation behavior at the established baseline.
+#[test]
+fn d2_empty_or_failed_cross_service_produces_no_expansion() {
+    use crate::cbm::bridge::test_helpers::new_mock;
+    use crate::cbm::SymbolImportance;
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    let mut data = HashMap::new();
+    data.insert(
+        "CriticalAPI".to_string(),
+        SymbolImportance { symbol: "CriticalAPI".into(), score: 0.95, file: "api.rs".into() },
+    );
+    // Seeds exist (importance present) but no cross-service trace is
+    // available (no transport, cold cache) → degraded empty context → None.
+    let mut bridge = new_mock(data);
+
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+
+    assert!(decision.cbm_informed, "baseline CBM intelligence unaffected");
+    // Capture the summary before partially moving cbm_intelligence out.
+    let summary = decision.summary();
+    let intel = decision.cbm_intelligence.expect("Some");
+    assert!(
+        intel.cross_service.is_none(),
+        "no cross-service candidates → None"
+    );
+    assert!(
+        !summary.contains("cbm_cs="),
+        "no cross-service candidates → no diagnostic"
+    );
+    // Skip-set semantics unchanged: no unrelated symbols appear.
+    assert_eq!(intel.skip_set, HashSet::new());
+}
+
+/// Test 9 — Explicit override: explicit fidelity AND explicit intent each
+/// prevent the entire CBM consultation, including D2.
+#[test]
+fn d2_explicit_fidelity_and_intent_prevent_cross_service_consultation() {
+    use crate::cbm::bridge::test_helpers::{new_mock, seed_cross_service};
+    use crate::cbm::{DataFlowContext, SymbolImportance};
+    use crate::mcp::heuristics;
+    use std::collections::{HashMap, HashSet};
+
+    let make_bridge = || {
+        let mut data = HashMap::new();
+        data.insert(
+            "CriticalAPI".to_string(),
+            SymbolImportance { symbol: "CriticalAPI".into(), score: 0.95, file: "api.rs".into() },
+        );
+        let bridge = new_mock(data);
+        seed_cross_service(
+            &bridge,
+            "CriticalAPI",
+            2,
+            DataFlowContext {
+                symbols: ["gateway".to_string()].into_iter().collect::<HashSet<_>>(),
+                files: HashSet::new(),
+            },
+        );
+        bridge
+    };
+    let config = crate::config::CleanCtxConfig::default();
+    let source = "pub struct ApiClient { key: String }";
+
+    // Explicit fidelity → no CBM intelligence consultation at all.
+    let mut bridge = make_bridge();
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        Some("high"),
+        None,
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+    assert!(decision.cbm_intelligence.is_none(), "explicit fidelity → no consultation");
+    assert!(!decision.cbm_informed);
+
+    // Explicit intent → no CBM intelligence consultation at all.
+    let mut bridge = make_bridge();
+    let decision = heuristics::decide(
+        "/project/src/api.rs",
+        None,
+        Some("overview"),
+        &config,
+        &crate::ir::replay::ContextState::new(),
+        source,
+        None,
+        None,
+        Some(&mut bridge),
+    )
+    .unwrap();
+    assert!(decision.cbm_intelligence.is_none(), "explicit intent → no consultation");
+    assert!(!decision.cbm_informed);
+}
+
+/// Test 10 — Wire integration: a grouped `{cols, groups}` cross_service
+/// response flows through `wire::parse_trace()` and the bridge's real
+/// importance-based file resolution end-to-end (parser → bridge, not a
+/// pre-seeded context).
+#[test]
+fn d2_wire_grouped_response_parsed_end_to_end() {
+    use crate::cbm::bridge::test_helpers::{new_mock, trace_context_from_wire};
+    use crate::cbm::SymbolImportance;
+    use std::collections::HashMap;
+
+    let mut data = HashMap::new();
+    data.insert(
+        "main".to_string(),
+        SymbolImportance { symbol: "main".into(), score: 0.9, file: "api.rs".into() },
+    );
+    data.insert(
+        "route".to_string(),
+        SymbolImportance { symbol: "route".into(), score: 0.7, file: "routes.rs".into() },
+    );
+    // "handler" deliberately absent from importance → cross-repo style
+    // unresolvable endpoint.
+    let mut bridge = new_mock(data);
+
+    let body = serde_json::json!({
+        "function": "proj.main",
+        "direction": "both",
+        "mode": "cross_service",
+        "callees_total": 1,
+        "callees": {
+            "cols": ["name", "hop"],
+            "groups": [
+                { "qn_prefix": "proj.svc", "rows": [["handler", 1]] }
+            ]
+        },
+        "callers_total": 1,
+        "callers": {
+            "cols": ["name", "hop"],
+            "groups": [
+                { "qn_prefix": "proj.routes", "rows": [["route", 1]] }
+            ]
+        }
+    });
+
+    let ctx = trace_context_from_wire(&mut bridge, &body, "proj.main");
+
+    // Bare names from BOTH legs, plus the seed itself (an endpoint of every
+    // edge), present as advisory symbols.
+    assert!(ctx.symbols.contains("main"), "seed endpoint present");
+    assert!(ctx.symbols.contains("handler"), "callee endpoint present");
+    assert!(ctx.symbols.contains("route"), "caller endpoint present");
+    // Files resolved ONLY through the current project's importance map.
+    assert!(ctx.files.contains("api.rs"), "seed file resolved via importance");
+    assert!(ctx.files.contains("routes.rs"), "caller file resolved via importance");
+    assert!(!ctx.files.iter().any(|f| f.contains("handler")), "unresolvable endpoint contributes no file");
+}
