@@ -47,3 +47,7 @@ pub(crate) mod phase3_contract_tests;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/envelope_contract.rs"]
 pub(crate) mod envelope_contract_tests;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/d4_advisory_meta.rs"]
+pub(crate) mod d4_advisory_meta_tests;

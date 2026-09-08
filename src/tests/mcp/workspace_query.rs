@@ -259,7 +259,7 @@ fn workspace_query_reverse_edges_returns_results() {
         "arguments": {
             "type": "reverse_edges",
             "domain": "spring",
-            "entity_type": "Service",
+            "entity_type": "Token",
             "name": "UserService"
         }
     });

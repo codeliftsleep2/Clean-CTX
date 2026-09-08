@@ -1082,6 +1082,7 @@ fn economics_candidate_worse_than_raw_triggers_fallback() {
         false,
         crate::compression::Fidelity::Edit,
         "test",
+        None,
     );
     assert!(result, "should fall back when candidate > raw");
 }
@@ -1101,6 +1102,7 @@ fn economics_candidate_cheaper_than_raw_does_not_trigger_fallback() {
         false,
         crate::compression::Fidelity::Edit,
         "test",
+        None,
     );
     assert!(!result, "should NOT fall back when candidate < raw");
 }
@@ -1120,6 +1122,7 @@ fn economics_candidate_equal_to_raw_does_not_trigger_fallback() {
         false,
         crate::compression::Fidelity::Edit,
         "test",
+        None,
     );
     assert!(!result, "should NOT fall back when candidate == raw");
 }
@@ -1145,6 +1148,7 @@ fn economics_fallback_works_for_all_fidelity_levels() {
             false,
             *fidelity,
             "test",
+            None,
         );
         assert!(result, "{fidelity:?}: must fall back when candidate > raw");
         let result = maybe_economics_fallback(
@@ -1157,6 +1161,7 @@ fn economics_fallback_works_for_all_fidelity_levels() {
             false,
             *fidelity,
             "test",
+            None,
         );
         assert!(
             !result,

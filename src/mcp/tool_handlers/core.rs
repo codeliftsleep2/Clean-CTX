@@ -102,6 +102,7 @@ pub(crate) fn maybe_economics_fallback(
     is_angular: bool,
     fidelity: crate::compression::Fidelity,
     decision_summary: &str,
+    cbm_meta: Option<&serde_json::Value>,
 ) -> bool {
     if comp_tokens <= raw_tokens {
         // Candidate is cheaper or equal → continue normally.
@@ -131,9 +132,86 @@ pub(crate) fn maybe_economics_fallback(
             }
         }
     });
+    // Phase D4: attach the advisory `_meta.cbm` block (raw-passthrough branch).
+    inject_cbm_advisory_meta(&mut response, cbm_meta);
     inject_baseline_breakpoint(&mut response, state, source);
     send_response(&response);
     true
+}
+
+// ── Phase D4: advisory `_meta.cbm` metadata ────────────────────────
+//
+// Retrieval-only CBM advisory metadata. Emits the already-collected D1/D2
+// `CbmIntelligence` (bounded `data_flow`/`cross_service` contexts) into the
+// MCP `_meta.cbm` block so agents can navigate to related files/symbols.
+//
+// Authority boundary: strictly advisory. The emitted arrays are the
+// *reduced* Clean-CTX representation — bare symbol names and CBM-reported
+// file path strings from `DataFlowContext`. They are NOT the CBM wire trace:
+// no hop, direction, relationship chain, symbol↔file pairing, or CBM project
+// identity is preserved in `DataFlowContext`, so none is emitted. This must
+// never be presented as Clean-CTX semantic entities, definitions,
+// dependencies, or WorkspaceIndex facts.
+
+/// Build the advisory `_meta.cbm` value from the request-scoped D1/D2 CBM
+/// intelligence.
+///
+/// Each capability whose context is `Some` is emitted as
+/// `{symbols: [...], files: [...]}` (deterministically sorted, and already
+/// bounded by the D1/D2 collection bounds — no re-bounding happens here).
+/// Capabilities whose context is `None` are omitted entirely: absence means
+/// "no advisory result", never "CBM found nothing".
+pub(crate) fn cbm_advisory_meta(
+    intel: &crate::intelligence::fidelity::CbmIntelligence,
+) -> serde_json::Value {
+    let mut cbm = serde_json::Map::new();
+    cbm.insert("advisory".into(), serde_json::Value::Bool(true));
+    if let Some(df) = intel.data_flow.as_ref() {
+        cbm.insert("data_flow".into(), cbm_advisory_capability(df));
+    }
+    if let Some(cs) = intel.cross_service.as_ref() {
+        cbm.insert("cross_service".into(), cbm_advisory_capability(cs));
+    }
+    serde_json::Value::Object(cbm)
+}
+
+/// Render one `DataFlowContext` as `{symbols: [...], files: [...]}` with
+/// deterministic (sorted) ordering.
+fn cbm_advisory_capability(ctx: &crate::cbm::bridge::DataFlowContext) -> serde_json::Value {
+    let mut symbols: Vec<_> = ctx.symbols.iter().cloned().collect();
+    symbols.sort();
+    let mut files: Vec<_> = ctx.files.iter().cloned().collect();
+    files.sort();
+    let mut cap = serde_json::Map::new();
+    cap.insert(
+        "symbols".into(),
+        serde_json::Value::Array(symbols.into_iter().map(serde_json::Value::String).collect::<Vec<_>>()),
+    );
+    cap.insert(
+        "files".into(),
+        serde_json::Value::Array(files.into_iter().map(serde_json::Value::String).collect::<Vec<_>>()),
+    );
+    serde_json::Value::Object(cap)
+}
+
+/// Inject the advisory `_meta.cbm` block into a JSON-RPC `result._meta`
+/// object.
+///
+/// No-op when `cbm` is `None` (the response omits the block, per the D4
+/// emission rules) or when the response carries no `_meta` (error paths).
+pub(crate) fn inject_cbm_advisory_meta(
+    response: &mut serde_json::Value,
+    cbm: Option<&serde_json::Value>,
+) {
+    if let Some(cbm_value) = cbm {
+        if let Some(result_obj) = response.get_mut("result") {
+            if let Some(meta) = result_obj.get_mut("_meta") {
+                if let Some(obj) = meta.as_object_mut() {
+                    obj.insert("cbm".into(), cbm_value.clone());
+                }
+            }
+        }
+    }
 }
 
 // ── Handler: compress_code_context ───────────────────────────────
@@ -852,6 +930,17 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     drop(ir_read);
     let heuristics_ms = heuristics_start.elapsed().as_millis() as u64;
 
+    // Phase D4: prebuild the advisory `_meta.cbm` block once from the
+    // already-collected D1/D2 CBM intelligence (`CbmIntelligence`). `None`
+    // when CBM was not consulted (explicit fidelity/intent, unavailability,
+    // or consultation failure) → the response omits `_meta.cbm` entirely.
+    // This is pure rendering of existing data — no additional CBM
+    // consultation occurs at response time.
+    let cbm_advisory = decision
+        .cbm_intelligence
+        .as_ref()
+        .map(cbm_advisory_meta);
+
     let effective_fidelity = decision.fidelity;
     // Gap 5/3/6 fixes: self-reporting contract fields (content_kind,
     // byte_exact) plus a degradation signal for the legacy fallback.
@@ -893,6 +982,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 }
             }
         });
+        inject_cbm_advisory_meta(&mut response, cbm_advisory.as_ref());
         inject_baseline_breakpoint(&mut response, state, &full);
         send_response(&response);
         return;
@@ -976,6 +1066,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 is_angular,
                 crate::compression::Fidelity::Edit,
                 &decision.summary(),
+                cbm_advisory.as_ref(),
             );
             return;
         }
@@ -1076,6 +1167,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                             }
                         }
                     });
+                    // Phase D4: attach the advisory `_meta.cbm` block (delta branch).
+                    inject_cbm_advisory_meta(&mut response, cbm_advisory.as_ref());
                     // Delta output is rolling dynamic content — mark as tail (ephemeral).
                     inject_tail_breakpoint(&mut response, state);
                     send_response(&response);
@@ -1126,6 +1219,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         is_angular,
                         effective_fidelity,
                         &decision.summary(),
+                        cbm_advisory.as_ref(),
                     ) {
                         return;
                     }
@@ -1152,6 +1246,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                             }
                         }
                     });
+                    // Phase D4: attach the advisory `_meta.cbm` block (delta→full branch).
+                    inject_cbm_advisory_meta(&mut response, cbm_advisory.as_ref());
                     // Inject baseline cache breakpoint for the stable full-compression output.
                     inject_baseline_breakpoint(&mut response, state, &full);
                     send_response(&response);
@@ -1247,6 +1343,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     is_angular,
                     effective_fidelity,
                     &decision.summary(),
+                    cbm_advisory.as_ref(),
                 ) {
                     return;
                 }
@@ -1273,6 +1370,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         }
                     }
                 });
+                // Phase D4: attach the advisory `_meta.cbm` block (full-compress branch).
+                inject_cbm_advisory_meta(&mut response, cbm_advisory.as_ref());
                 // Inject baseline cache breakpoint for the stable full-compression output.
                 inject_baseline_breakpoint(&mut response, state, &full);
                 send_response(&response);
