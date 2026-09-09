@@ -608,16 +608,53 @@ impl IRPass for CoreIRPass {
                     }
                 }
                 "impl.root" => {
-                    if state.current_class.is_none() {
-                        let self_type = cap.text.split(':').next().unwrap_or(&cap.text).to_string();
-                        if !self_type.is_empty() {
-                            let class_id = state.next_id("C");
-                            state
-                                .instructions
-                                .push(CoreOp::DefClass(class_id.clone(), self_type.clone()));
-                            state.push_type_scope(class_id, cap.end_byte);
-                            state.layer_context.current_class_name = Some(cap.raw_text.clone());
-                            state.layer_context.current_class_bare_name = Some(self_type);
+                    // In Rust, `impl Foo { ... }` does NOT define a new type —
+                    // it adds methods to the EXISTING type `Foo`. Two cases:
+                    //
+                    //  (a) struct precedes the impl (`pub struct S; impl S {}`):
+                    //      the struct's scope expired before the impl starts.
+                    //      We must REUSE the struct's class_id (push a scope
+                    //      with the SAME id, emit NO new DefClass) so the impl's
+                    //      methods attach to it and emit their Flags — while
+                    //      keeping the DefClass count at exactly 1.
+                    //  (b) standalone impl (no preceding type): create a
+                    //      DefClass for the self-type (Phase C regression).
+                    //
+                    // Capture the class BEFORE pruning expired scopes so we
+                    // can detect case (a). refresh_type_owner pops the
+                    // expired struct scope; if a class was current a moment
+                    // ago but isn't now, that expired class is the struct
+                    // this impl implements.
+                    let prev_class = state.current_class.clone();
+                    state.refresh_type_owner(cap.start_byte);
+                    match &state.current_class {
+                        Some(cid) => {
+                            // Impl nested inside a still-open scope — reuse it.
+                            state.push_type_scope(cid.clone(), cap.end_byte);
+                        }
+                        None => {
+                            if let Some(class_id) = prev_class {
+                                // Case (a): reuse the struct's class, no new
+                                // DefClass. Re-establish it as owner so member
+                                // captures inside the impl attach and emit Flags.
+                                state.push_type_scope(class_id, cap.end_byte);
+                            } else {
+                                // Case (b): standalone impl — create a
+                                // DefClass for the self-type.
+                                let self_type =
+                                    cap.text.split(':').next().unwrap_or(&cap.text).to_string();
+                                if !self_type.is_empty() {
+                                    let class_id = state.next_id("C");
+                                    state.instructions.push(CoreOp::DefClass(
+                                        class_id.clone(),
+                                        self_type.clone(),
+                                    ));
+                                    state.push_type_scope(class_id, cap.end_byte);
+                                    state.layer_context.current_class_name =
+                                        Some(cap.raw_text.clone());
+                                    state.layer_context.current_class_bare_name = Some(self_type);
+                                }
+                            }
                         }
                     }
 

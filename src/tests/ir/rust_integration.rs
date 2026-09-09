@@ -298,6 +298,71 @@ fn rust_method_with_all_flags() {
     );
 }
 
+/// Regression (CI `--all-features` rust_integration failure): a struct
+/// preceding an impl must not suppress the impl's scope. The legacy
+/// `current_class.is_none()` gate in the `impl.root` arm skipped scope
+/// creation whenever ANY class was current — including the struct's
+/// ALREADY-EXPIRED scope — so the first method capture popped the expired
+/// scope, resolved to no owner, hit the `method.root` `continue`, and both
+/// the DefMethod and the RustLayer Flags ops were silently dropped.
+#[test]
+fn rust_impl_after_struct_keeps_methods_and_flags() {
+    let source = r#"
+        pub struct Service;
+        impl Service {
+            pub async fn get_data(&self) -> String {
+                "data".to_string()
+            }
+        }
+    "#;
+    let ir = compile_rust(source);
+
+    // The method must exist…
+    let method_ids: Vec<(&str, &str)> = ir
+        .instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::DefMethod(cid, mid, name) if name == "get_data" => {
+                Some((cid.as_str(), mid.as_str()))
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(
+        !method_ids.is_empty(),
+        "method inside a struct-following impl must produce a DefMethod"
+    );
+
+    // …be owned by a class named Service…
+    let class_names: Vec<&str> = ir
+        .instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::DefClass(id, name) => Some((id.as_str(), name.as_str())),
+            _ => None,
+        })
+        .filter(|(id, _)| method_ids.iter().any(|(cid, _)| cid == id))
+        .map(|(_, name)| name)
+        .collect();
+    assert!(
+        class_names.iter().any(|n| n.contains("Service")),
+        "get_data must be owned by a Service class, got: {class_names:?}"
+    );
+
+    // …and carry its flags (the original CI failure signature).
+    let mids: Vec<&str> = method_ids.iter().map(|(_, mid)| *mid).collect();
+    let has_async = ir.instructions.iter().any(|op| {
+        matches!(op, CoreOp::Flags(tid, flags)
+            if mids.contains(&tid.as_str()) && flags.contains(&"ASYNC".to_string()))
+    });
+    let has_export = ir.instructions.iter().any(|op| {
+        matches!(op, CoreOp::Flags(tid, flags)
+            if mids.contains(&tid.as_str()) && flags.contains(&"EXPORT".to_string()))
+    });
+    assert!(has_async, "get_data must produce ASYNC");
+    assert!(has_export, "get_data must produce EXPORT");
+}
+
 // ── Class-Level Flags ──────────────────────────────────────────────
 
 #[test]
