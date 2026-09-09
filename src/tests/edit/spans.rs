@@ -409,7 +409,10 @@ fn nested_enum_method_after_enum_keeps_class_identity_end_to_end() {
     // the tracked record text (flow A: copy tool output).
     let new_source = replace_with_record_text(&source, "SomeService.After")
         .unwrap_or_else(|e| panic!("replace_body must succeed for SomeService.After: {e}"));
-    assert!(new_source.contains("REPLACED;"), "new body must land on disk");
+    assert!(
+        new_source.contains("REPLACED;"),
+        "new body must land on disk"
+    );
     assert!(
         !new_source.contains("return this.name;"),
         "old body must be replaced"
@@ -443,7 +446,14 @@ fn nested_enum_outer_class_renders_without_static_and_enum_stays_nested() {
     let mut compiler = IRCompiler::new();
     compiler.add_language_layer(Box::new(crate::ir::layers::csharp::CSharpLayer::new()));
     let ir = compiler
-        .compile(&source, "nested_service_render", language, query, Fidelity::Medium, None)
+        .compile(
+            &source,
+            "nested_service_render",
+            language,
+            query,
+            Fidelity::Medium,
+            None,
+        )
         .expect("compilation should succeed");
     let hir = ir_to_hierarchical(&ir);
     let rendered = render_hierarchical_for_llm(&hir, Fidelity::Medium);

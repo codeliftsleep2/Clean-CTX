@@ -316,11 +316,7 @@ fn nested_enum_fixture() -> String {
 /// Compile the nested-enum fixture at Medium fidelity so enum-member
 /// fields are visible (`extract_field` suppresses fields at Low).
 fn compile_nested_enum_medium(file_id: &str) -> PassContext {
-    let mut ctx = PassContext::new(
-        nested_enum_fixture(),
-        file_id.into(),
-        Fidelity::Medium,
-    );
+    let mut ctx = PassContext::new(nested_enum_fixture(), file_id.into(), Fidelity::Medium);
     ctx.language =
         Some(crate::compression::language::safe_csharp_language().expect("csharp grammar enabled"));
     ctx.query_string = crate::queries::CS_QUERY.to_string();
@@ -409,9 +405,10 @@ fn core_ir_nested_enum_members_stay_inside_the_enum() {
         .instructions
         .iter()
         .filter_map(|op| match op {
-            CoreOp::DefField(cid, _fid, name) => {
-                Some((class_by_id.get(cid).cloned().unwrap_or_default(), name.clone()))
-            }
+            CoreOp::DefField(cid, _fid, name) => Some((
+                class_by_id.get(cid).cloned().unwrap_or_default(),
+                name.clone(),
+            )),
             _ => None,
         })
         .collect();

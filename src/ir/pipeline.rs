@@ -556,9 +556,7 @@ impl IRPass for CoreIRPass {
                 // vocabulary: the shared CS_QUERY never emits struct/trait/
                 // impl roots, so those stay on the Rust path; enum roots
                 // from C# go through the shared class-name extractor.
-                "struct.root" | "trait.root" | "impl.root" => {
-                    Some(extract_rust_struct_name(raw))
-                }
+                "struct.root" | "trait.root" | "impl.root" => Some(extract_rust_struct_name(raw)),
                 "enum.root" => {
                     if query_string == crate::queries::CS_QUERY {
                         Some(extract_class_name(raw))

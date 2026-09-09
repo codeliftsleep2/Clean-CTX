@@ -269,7 +269,10 @@ fn cs_body_comment_and_string_static_do_not_mark_class_static() {
 
 #[test]
 fn cs_legitimate_static_class_stays_static() {
-    assert!(cs_has_class_flag("public static class SomeClass\n{\n}", "STATIC"));
+    assert!(cs_has_class_flag(
+        "public static class SomeClass\n{\n}",
+        "STATIC"
+    ));
 }
 
 #[test]
@@ -283,7 +286,10 @@ fn cs_body_static_call_does_not_mark_method_static() {
 
 #[test]
 fn cs_legitimate_static_method_stays_static() {
-    assert!(cs_method_has_flag("public static void Helper() { }", "STATIC"));
+    assert!(cs_method_has_flag(
+        "public static void Helper() { }",
+        "STATIC"
+    ));
 }
 
 // ── C# SignalR Hub / IDisposable Regression Tests ─────
