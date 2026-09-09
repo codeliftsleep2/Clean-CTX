@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.6.2] - 2026-09-08
+
+### Fixed
+
+* **IR nested-type ownership (span-aware) — `apply_edit` "unit not found" for methods after a nested type** — `CoreIRPass` used a single `current_class` slot, so a nested `enum`/`class` declaration overwrote it with no scope restoration; every member lexically after the nested type was reparented to it and `UnitTable` materialized `SomeStatus.After` instead of `SomeService.After`, so `apply_edit replace_body` reported `unit not found`. `PassContext` now carries a span-keyed `TypeScope` stack: type roots push `[start_byte, end_byte)` scopes, member captures (`method`/`constructor`/`func`/`arrow`/`field.root`) refresh ownership to the innermost scope containing them (mirroring the proven `diff/builder.rs` containment contract), and `impl.root` reuses the struct's `class_id` (no duplicate `DefClass`) so methods attach and emit their Flags. Also routes C# `enum.root` naming through `extract_class_name` instead of the Rust-only `pub`-stripper (a `public enum Foo` no longer became `DefClass "public"`). (`src/ir/pipeline.rs`)
+* **C# static-flag contamination — non-static classes rendered `cl: EXPORT STATIC`** — `CSharpLayer::extract_class_flags`/`extract_method_flags` scanned the FULL declaration node (head + body) with `contains("static")` substring matching, so a `static` token inside any body, comment, or string marked the enclosing class/method `STATIC`. Both now inspect only the declaration head (attribute-stripped, cut at the first `{`/`;`/depth-zero `=>` outside string/char literals) with word-boundary token matching via `has_head_modifier`; legitimate `public static class` and static methods remain flagged. (`src/ir/layers/csharp.rs`)
+
+### Tests
+
+| Area | Count |
+|------|------:|
+| `src/tests/ir/pipeline.rs` — nested-enum / nested-class span-containment ownership; enum members stay inside the enum | 3 tests |
+| `src/tests/ir/layers/mod.rs` — C# static-flag isolation (body calls/comments/strings) + legitimate static class/method recognition | 5 tests |
+| `src/tests/edit/spans.rs` — `apply_edit` end-to-end (read identity == write identity, no lookup fallback); render check (`cl: EXPORT` without `STATIC`, enum renders its own section) | 2 tests |
+| `src/tests/ir/rust_integration.rs` — struct-following-impl methods attach and emit Flags (CI `--all-features` regression) | 1 test |
+
+### Verification
+
+Focused suites green: `ir::pipeline` 21, `ir::layers` 51, `ir::` 648, `edit::` 28, `diff::` 40, `compaction` 95, `compression` 125, `mcp::` 209 (8 ignored), `gitdiff::` 50, `layers::` 85, `rust_integration` 39. `cargo clippy --all-targets --all-features -- -D warnings` clean. `scripts/check-utf8.ps1` PASS (501 files, 0 BOMs).
+
+---
+
 ## [0.6.1] - 2026-09-04
 
 ### Added
@@ -1275,7 +1297,7 @@ This project follows [Semantic Versioning](https://semver.org/). Major version z
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 0.6.1 | 2026-09-04 | **Post-0.6.0 semantic/IR correctness completion.** SemanticEdge production lifecycle wiring into WorkspaceIndex (Phases A/B); `workspace_query` MCP tool with canonical envelope + `outputSchema`; BuiltinMetaLayer entity projection; entity-occurrence dedup; IR CTOR identity preservation (DIS-2026-002/IRPAT-001) and Edit-fidelity Body/Flags orphan prevention (DIS-2026-003); NgRx Selects/Dispatches semantic names; decorated builtin class names; literal HasSelector representation (Selector-Value + Index-Encoding invariants) — 2,281 passed, 1 known environmental CBM e2e failure, 8 ignored |
+| 0.6.2 | 2026-09-08 | **IR nested-type span-ownership + C# static-flag isolation.** CoreIRPass span-keyed TypeScope stack fixes `apply_edit` "unit not found" for methods after nested enums/classes (DIS-2026-004); C# class/method flag extraction scoped to declaration head with word-boundary matching (no more body-token contamination); C# `enum.root` naming routed through `extract_class_name`; `impl.root` reuses struct `class_id` — 11 new regressions, `rust_integration` 39, clippy clean |
 | 0.6.0 | 2026-08-31 | **Semantic architecture (Phases 1–6), WorkspaceIndex, workspace_query, token-economics gate.** Typed `SemanticEdge`/`EntityRef`/`SemanticRelation` model; per-meta-layer semantic-edge extraction (Angular/NgRx/.NET/Spring); `WorkspaceIndex` cross-file index with traversal/dedup; `workspace_query` MCP tool; post-compression token-economics gate; legacy meta-layer graph modules removed |
 | 0.5.2 | 2026-08-29 | **CBM transport pipeline deduplication.** Unified write/read/flush/timeout/disconnect state machine extracted into shared `send_and_receive_raw()`; retry-loop and dead-subprocess recovery asymmetry between semantic and raw entry points eliminated |
 | 0.5.1 | 2026-08-29 | **graph_query node-result data fidelity.** Node-shaped Cypher projections (`RETURN f.name, f.file_path`) no longer collapse to column-0-only nodes with hard-coded empty `file`/`label` and dropped columns: `file_path` populates `GraphNode.file`, a recognized `label` column populates `GraphNode.label`, and extra projected columns are preserved in `GraphNode.properties`; the query-cache namespace was bumped `cypher:` -> `cypher2:` to invalidate pre-fix entries. 0.5.0 conformance fix — no MCP schema change |

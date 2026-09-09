@@ -85,6 +85,38 @@ Result: [E007] DATAFLOW references unknown method M; [E003] FLAGS references unk
 ```
 ---
 
+## DIS-2026-004: IR Nested-Type Ownership Reparents Enclosing-Class Methods + C# Static-Flag Contamination
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-08 |
+| **Environment** | Claude + Clean-CTX v0.6.1 (production `provide_code_context` → `apply_edit`) |
+| **Repository/context** | Real C# repository; a non-static service class containing an instance constructor, instance methods, and a nested public enum with 2+ members (registered as a scoped DI service elsewhere). |
+| **Symptom** | `apply_edit` with `replace_body` reported `unit not found: OrderService.SomeMethod` for a method that `provide_code_context(fidelity="edit")` confirmed existed and was byte-identical. The same `ClassName.MethodName` convention succeeded moments earlier against a plain static helper class and a plain test class. `provide_code_context` also rendered `cl: EXPORT STATIC` for the non-static class and showed the nested enum's members as stray class-level fields outside the enum boundary. |
+| **Root cause** | Two independent IR defects, both in the production `CoreIRPass` / `CSharpLayer` path. (1) `CoreIRPass` used a single `current_class` slot with no scope restoration — a nested `enum.root`/`class.root` capture overwrote it, reparenting every member lexically after the nested type to that type; `UnitTable::materialize` then keyed the method under the nested type's name, so `UnitTable::resolve` returned `NotFound`. (2) `CSharpLayer::extract_class_flags`/`extract_method_flags` scanned the FULL declaration node (head + body) with `contains("static")` substring matching, so any `static` token in a body, comment, or string contaminated the enclosing class/method flags. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/ir/pipeline.rs` (nested-enum / nested-class span-containment ownership, enum members stay inside the enum); `src/tests/ir/layers/mod.rs` (C# static-flag isolation + legitimate static class/method recognition); `src/tests/edit/spans.rs` (`apply_edit` end-to-end identity + render check); `src/tests/ir/rust_integration.rs` (struct-following-impl methods attach and emit Flags) |
+| **Live scenario required?** | No |
+| **Architectural invariant** | Structural type invariant (a declaration's modifiers reflect only its own declaration head, never body tokens) + nested-type boundary invariant (members of a nested type stay inside it and never leak into the enclosing type) |
+| **Status** | Fixed |
+
+**Fix (2026-09-08):** `PassContext` now carries a span-keyed `TypeScope` stack in `src/ir/pipeline.rs`: type roots push `[start_byte, end_byte)` scopes, member captures refresh ownership to the innermost scope containing them (mirroring the proven `diff/builder.rs` containment contract), and `impl.root` reuses the struct's `class_id` (no duplicate `DefClass`) so methods attach and emit their Flags. C# flag extraction in `src/ir/layers/csharp.rs` now inspects only the declaration head with word-boundary token matching via `has_head_modifier`; legitimate `public static class` and static methods remain flagged. C# `enum.root` naming routed through `extract_class_name` instead of the Rust-only `pub`-stripper.
+
+**Distillation note:** The live trigger shape (non-static class + nested enum + method after the enum) was distilled to cheap deterministic local fixtures. A separate process finding: the `rust_integration` suite is `#[cfg(feature = "rust")]` and never ran under default features, so the defect was only exercisable in CI's `--all-features` build.
+
+**Minimal trigger:**
+```csharp
+public class OrderService
+{
+    public enum OrderStatus { Pending, Shipped }   // nested type
+
+    public void MethodAfterEnum() { }              // reparented to OrderStatus → "unit not found"
+}
+```
+
+---
+
 ## DIS-2026-003: IR CTOR Compression Orphaning with Empty Constructor + Method-Scoped References
 
 | Field | Value |
