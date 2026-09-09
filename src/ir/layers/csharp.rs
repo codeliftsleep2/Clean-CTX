@@ -20,11 +20,66 @@
 //   - IDisposable → SideEffect("io")
 
 use super::{LanguageLayer, LayerContext};
+use crate::compaction::modifiers::strip_csharp_attributes;
 use crate::ir::opcodes::{
     CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CTX_REALTIME, CTX_TRANSACTION_SCOPE, CoreOp, DATAFLOW_READ,
     DATAFLOW_WRITE, EFFECT_ASYNC, EFFECT_IO, EFFECT_TRANSACTION, FLAG_ABSTRACT, FLAG_ASYNC,
     FLAG_EXPORT, FLAG_PRIVATE, FLAG_PROTECTED, FLAG_STATIC,
 };
+
+/// True when `head` (a declaration head, never a full body) carries `word`
+/// as a standalone modifier token. Splits on non-identifier characters so
+/// `static` inside `SomeStaticType`, `"static ..."`, or `// static` never
+/// matches, while `public static class` and `(static ...)` still do.
+fn has_head_modifier(head: &str, word: &str) -> bool {
+    head.split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '@'))
+        .any(|tok| tok == word)
+}
+
+/// Cut `head` at the first depth-zero `=>` outside string/char literals.
+/// Expression-bodied members carry their body after the arrow; the arrow
+/// itself is never part of the signature head.
+fn split_depth_zero_arrow(head: &str) -> &str {
+    let bytes = head.as_bytes();
+    let mut i = 0;
+    let mut depth = 0i32;
+    let mut str_ch: Option<u8> = None;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if let Some(q) = str_ch {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == q {
+                str_ch = None;
+            }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' | b'\'' => {
+                str_ch = Some(b);
+                i += 1;
+            }
+            b'(' | b'[' | b'<' => {
+                depth += 1;
+                i += 1;
+            }
+            b')' | b']' | b'>' => {
+                depth -= 1;
+                i += 1;
+            }
+            b'=' if depth == 0 && i + 1 < bytes.len() && bytes[i + 1] == b'>' => {
+                return &head[..i];
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+    head
+}
 
 /// C# language layer (Layer 2).
 /// Processes C#-specific captures and emits additional CoreOp instructions.
@@ -78,37 +133,55 @@ impl CSharpLayer {
         (base, interfaces)
     }
 
-    /// Extract class-level flags (public/abstract/static).
+    /// Extract class-level flags (public/abstract/static) from a C# type
+    /// declaration. Only the declaration HEAD (modifiers + keyword + name +
+    /// base list, i.e. text before the first `{`) is inspected: the layer
+    /// receives the full declaration node (head + body), so scanning the
+    /// whole node would let a `static` token inside a method body, comment,
+    /// string, or nested declaration leak onto the enclosing class.
     fn extract_class_flags(class_head: &str) -> Vec<String> {
+        let head = strip_csharp_attributes(class_head);
+        let head = head.split('{').next().unwrap_or(head);
+        let head = head.lines().next().unwrap_or(head);
         let mut flags = Vec::new();
-        if class_head.starts_with("public ") || class_head.contains(" public ") {
+        if has_head_modifier(head, "public") {
             flags.push(FLAG_EXPORT.to_string());
         }
-        if class_head.contains("abstract ") {
+        if has_head_modifier(head, "abstract") {
             flags.push(FLAG_ABSTRACT.to_string());
         }
-        if class_head.contains("static ") {
+        if has_head_modifier(head, "static") {
             flags.push(FLAG_STATIC.to_string());
         }
         flags
     }
 
     /// Extract method-level flags (async, static, virtual, override, visibility).
+    /// Only the signature HEAD (text before the body `{`, expression arrow,
+    /// or trailing `;`) is inspected with word-boundary token matching, so a
+    /// `static` call, comment, or string inside the method body can never
+    /// mark the method itself as static.
     fn extract_method_flags(raw_sig: &str) -> Vec<String> {
+        let head = strip_csharp_attributes(raw_sig);
+        let head = head.split('{').next().unwrap_or(head);
+        let head = head.split(';').next().unwrap_or(head);
+        // Expression-bodied members (`=> expr;`) carry no block body; the
+        // arrow and everything after it is body, never signature.
+        let head = split_depth_zero_arrow(head);
         let mut flags = Vec::new();
-        if raw_sig.contains("async") {
+        if has_head_modifier(head, "async") {
             flags.push(FLAG_ASYNC.to_string());
         }
-        if raw_sig.contains("private") {
+        if has_head_modifier(head, "private") {
             flags.push(FLAG_PRIVATE.to_string());
         }
-        if raw_sig.contains("protected") {
+        if has_head_modifier(head, "protected") {
             flags.push(FLAG_PROTECTED.to_string());
         }
-        if raw_sig.contains("static") {
+        if has_head_modifier(head, "static") {
             flags.push(FLAG_STATIC.to_string());
         }
-        if raw_sig.contains("abstract") {
+        if has_head_modifier(head, "abstract") {
             flags.push(FLAG_ABSTRACT.to_string());
         }
         flags
@@ -295,6 +368,11 @@ impl LanguageLayer for CSharpLayer {
                     }
                 }
             }
+            // Nested type roots own their own members but emit no class-level
+            // flags through this layer: only `class.root` carries EXPORT/etc.
+            // Routing them through the class arm would reset per-class R-43a
+            // state and misattribute the enclosing class's flags.
+            "interface.root" | "struct.root" | "enum.root" | "trait.root" | "record.root" => {}
             "method.root" => {
                 // Extract method-level flags
                 let method_flags = Self::extract_method_flags(raw_text);

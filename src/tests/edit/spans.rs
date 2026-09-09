@@ -347,6 +347,152 @@ fn lf_expression_bodies_and_braces_in_strings_hold_invariant() {
     assert_span_invariant(&source, &ir);
 }
 
+// ── Nested-type ownership end-to-end (live failure shape) ──────────────
+//
+// Non-static class + constructor + method before a nested 2-member enum +
+// method after the enum: the method after the enum must keep the
+// `ClassName.MethodName` identity on BOTH the read path (compiled IR /
+// hierarchical render) and the write path (`UnitTable` + `replace_body`).
+// No lookup fallback is involved — the structural representation itself
+// must be correct.
+
+fn nested_service_source() -> String {
+    [
+        "namespace MyApp.Services",
+        "{",
+        "    public class SomeService",
+        "    {",
+        "        private readonly string name;",
+        "",
+        "        public SomeService(string name)",
+        "        {",
+        "            this.name = name;",
+        "        }",
+        "",
+        "        public int Before()",
+        "        {",
+        "            return 1;",
+        "        }",
+        "",
+        "        public enum SomeStatus",
+        "        {",
+        "            First,",
+        "            Second",
+        "        }",
+        "",
+        "        public string After()",
+        "        {",
+        "            return this.name;",
+        "        }",
+        "    }",
+        "}",
+        "",
+    ]
+    .join("\n")
+}
+
+#[test]
+fn nested_enum_method_after_enum_keeps_class_identity_end_to_end() {
+    let source = nested_service_source();
+    let ir = compile_edit(&source, "nested_service_e2e");
+    assert_span_invariant(&source, &ir);
+    let units = UnitTable::from_instructions(&ir.instructions);
+
+    // Read path: the established `ClassName.MethodName` identity resolves.
+    let rec = units
+        .resolve("SomeService.After")
+        .unwrap_or_else(|e| panic!("SomeService.After must resolve on the read path: {e}"));
+    assert_eq!(rec.name, "After");
+    assert_eq!(rec.class_name.as_deref(), Some("SomeService"));
+
+    // Write path: `replace_body` succeeds against the SAME identity using
+    // the tracked record text (flow A: copy tool output).
+    let new_source = replace_with_record_text(&source, "SomeService.After")
+        .unwrap_or_else(|e| panic!("replace_body must succeed for SomeService.After: {e}"));
+    assert!(new_source.contains("REPLACED;"), "new body must land on disk");
+    assert!(
+        !new_source.contains("return this.name;"),
+        "old body must be replaced"
+    );
+
+    // The sibling method before the enum keeps its identity too.
+    assert!(
+        units.resolve("SomeService.Before").is_ok(),
+        "SomeService.Before must also resolve"
+    );
+    // And the method must not exist under the nested type's name.
+    assert!(
+        units.resolve("SomeStatus.After").is_err(),
+        "After must not be attributed to the nested enum"
+    );
+}
+
+#[test]
+fn nested_enum_outer_class_renders_without_static_and_enum_stays_nested() {
+    use crate::compression::language::detect_language;
+    use crate::ir::compiler::IRCompiler;
+    use crate::ir::hierarchical::ir_to_hierarchical;
+    use crate::ir::render_llm::render_hierarchical_for_llm;
+
+    // Medium fidelity so the nested enum's two members survive as fields
+    // (`extract_field` suppresses fields at Low). The C# language layer
+    // must be registered: `ClassFlags` (EXPORT/STATIC) are emitted by the
+    // layer, not Core IR — a bare `IRCompiler::new()` yields no flags.
+    let source = nested_service_source();
+    let (language, query) = detect_language(&source);
+    let mut compiler = IRCompiler::new();
+    compiler.add_language_layer(Box::new(crate::ir::layers::csharp::CSharpLayer::new()));
+    let ir = compiler
+        .compile(&source, "nested_service_render", language, query, Fidelity::Medium, None)
+        .expect("compilation should succeed");
+    let hir = ir_to_hierarchical(&ir);
+    let rendered = render_hierarchical_for_llm(&hir, Fidelity::Medium);
+
+    let service = hir
+        .classes
+        .iter()
+        .find(|c| c.name == "SomeService")
+        .expect("outer class must exist in hierarchical IR");
+    let flags = service.class_flags.clone().unwrap_or_default();
+    assert!(
+        flags.iter().any(|f| f == "EXPORT"),
+        "outer class keeps EXPORT, got: {flags:?}"
+    );
+    assert!(
+        !flags.iter().any(|f| f == "STATIC"),
+        "non-static outer class must never render STATIC, got: {flags:?}"
+    );
+    assert!(
+        rendered.contains("cl: EXPORT\n"),
+        "rendered output must show `cl: EXPORT` without STATIC, got:\n{rendered}"
+    );
+    assert!(
+        !rendered.contains("STATIC"),
+        "no STATIC anywhere for this fixture, got:\n{rendered}"
+    );
+
+    let method_names: Vec<&str> = service.methods.iter().map(|m| m.name.as_str()).collect();
+    assert!(
+        method_names.contains(&"Before") && method_names.contains(&"After"),
+        "outer class must own both methods, got: {method_names:?}"
+    );
+    let enum_node = hir
+        .classes
+        .iter()
+        .find(|c| c.name == "SomeStatus")
+        .expect("nested enum must render as its own section");
+    assert!(
+        enum_node.methods.is_empty(),
+        "nested enum must own zero ordinary methods"
+    );
+    assert_eq!(
+        enum_node.fields.len(),
+        2,
+        "nested enum keeps its two members, got: {:?}",
+        enum_node.fields
+    );
+}
+
 // ── Line-ending transport regression ──────────────────────────────────
 //
 // The reported residual: on CRLF files, a content-identical body copy

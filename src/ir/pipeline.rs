@@ -61,6 +61,17 @@ impl std::fmt::Display for PassError {
 
 impl std::error::Error for PassError {}
 
+/// Active nested-type scope: the class id plus the source span of the
+/// type declaration that owns it.
+#[derive(Debug, Clone)]
+pub struct TypeScope {
+    /// Class alias id allocated for this type declaration.
+    pub class_id: String,
+    /// Byte offset one past the end of the type declaration node.
+    /// Scopes are pruned once the walk passes this offset.
+    pub end_byte: usize,
+}
+
 /// A single pass in the IR compilation pipeline.
 /// Each pass transforms or enriches the compilation state.
 pub trait IRPass {
@@ -106,7 +117,12 @@ pub struct PassContext {
     /// Current method's accumulated flags (F-28).
     pub current_method_flags: Vec<String>,
     /// Current class ID (set when processing a class capture).
+    /// Nested-type aware: mirrors the innermost entry of `type_scopes`.
     pub current_class: Option<String>,
+    /// Open type-declaration scopes keyed by source span.
+    /// A declaration is owned by the innermost scope whose
+    /// `[start_byte, end_byte)` window contains it.
+    pub type_scopes: Vec<TypeScope>,
     /// Tree-sitter language for capture pipeline.
     pub language: Option<tree_sitter::Language>,
     /// Query string for capture pipeline.
@@ -137,6 +153,7 @@ impl PassContext {
             current_method: None,
             current_method_flags: Vec::new(),
             current_class: None,
+            type_scopes: Vec::new(),
             language: None,
             query_string: String::new(),
             skip_set: None,
@@ -169,6 +186,48 @@ impl PassContext {
             }
         }
         self.current_method_flags.clear();
+    }
+
+    /// Push a type-declaration scope. Closed scopes are pruned lazily by
+    /// `refresh_type_owner`, so entering a nested type never orphans the
+    /// enclosing type's later members.
+    fn push_type_scope(&mut self, class_id: String, end_byte: usize) {
+        self.type_scopes.push(TypeScope {
+            class_id: class_id.clone(),
+            end_byte,
+        });
+        self.current_class = Some(class_id.clone());
+        self.layer_context.current_class = Some(class_id);
+    }
+
+    /// Resolve the innermost type scope whose `[start_byte, end_byte)`
+    /// window contains `at`. Scopes that ended at or before `at` are popped.
+    /// `current_class` (and its layer-context mirror) track the result so
+    /// every member attaches to its true enclosing type.
+    fn refresh_type_owner(&mut self, at: usize) {
+        while let Some(scope) = self.type_scopes.last() {
+            if scope.end_byte <= at {
+                self.type_scopes.pop();
+            } else {
+                break;
+            }
+        }
+        let owner = self.type_scopes.last().map(|s| s.class_id.clone());
+        self.current_class = owner.clone();
+        self.layer_context.current_class = owner;
+    }
+
+    /// Push the file-wide synthetic scope for top-level functions
+    /// (`func.root`/`arrow.root` with no enclosing class). It must remain
+    /// the innermost owner for all subsequent top-level functions in this
+    /// file, so it sits ABOVE any other scope and is never pruned.
+    fn push_file_scope(&mut self, class_id: String) {
+        self.type_scopes.push(TypeScope {
+            class_id: class_id.clone(),
+            end_byte: usize::MAX,
+        });
+        self.current_class = Some(class_id.clone());
+        self.layer_context.current_class = Some(class_id);
     }
 
     /// Parse a method signature string into a `MethodSig`.
@@ -491,8 +550,21 @@ impl IRPass for CoreIRPass {
             fidelity,
             |capture_name, raw, fidelity| match capture_name {
                 "class.root" => Some(extract_class_name(raw)),
-                "struct.root" | "enum.root" | "trait.root" | "impl.root" => {
+                // `extract_rust_struct_name` only strips Rust visibility
+                // (`pub `, ...), so a C# `public enum X` routed through it
+                // keeps `public` as its DefClass name. Route by QUERY
+                // vocabulary: the shared CS_QUERY never emits struct/trait/
+                // impl roots, so those stay on the Rust path; enum roots
+                // from C# go through the shared class-name extractor.
+                "struct.root" | "trait.root" | "impl.root" => {
                     Some(extract_rust_struct_name(raw))
+                }
+                "enum.root" => {
+                    if query_string == crate::queries::CS_QUERY {
+                        Some(extract_class_name(raw))
+                    } else {
+                        Some(extract_rust_struct_name(raw))
+                    }
                 }
                 "method.root" => Some(extract_method_sig(raw, fidelity)),
                 "field.root" => Some(extract_field(raw, fidelity)),
@@ -520,8 +592,7 @@ impl IRPass for CoreIRPass {
                     state
                         .instructions
                         .push(CoreOp::DefClass(class_id.clone(), cap.text.clone()));
-                    state.current_class = Some(class_id.clone());
-                    state.layer_context.current_class = Some(class_id.clone());
+                    state.push_type_scope(class_id.clone(), cap.end_byte);
                     state.layer_context.current_class_name = Some(cap.raw_text.clone());
                     state.layer_context.current_class_bare_name = Some(cap.text.clone());
 
@@ -546,8 +617,7 @@ impl IRPass for CoreIRPass {
                             state
                                 .instructions
                                 .push(CoreOp::DefClass(class_id.clone(), self_type.clone()));
-                            state.current_class = Some(class_id.clone());
-                            state.layer_context.current_class = Some(class_id);
+                            state.push_type_scope(class_id, cap.end_byte);
                             state.layer_context.current_class_name = Some(cap.raw_text.clone());
                             state.layer_context.current_class_bare_name = Some(self_type);
                         }
@@ -560,6 +630,10 @@ impl IRPass for CoreIRPass {
                     }
                 }
                 "method.root" | "constructor.root" | "func.root" | "arrow.root" => {
+                    // Nested-type ownership: a member belongs to the innermost
+                    // type whose source span contains it. A nested type that
+                    // closed before this member starts can never own it.
+                    state.refresh_type_owner(cap.start_byte);
                     let class_id = match &state.current_class {
                         Some(cid) => cid.clone(),
                         None => {
@@ -569,8 +643,7 @@ impl IRPass for CoreIRPass {
                                     synt_id.clone(),
                                     format!("__file_{}", file_id),
                                 ));
-                                state.current_class = Some(synt_id.clone());
-                                state.layer_context.current_class = Some(synt_id.clone());
+                                state.push_file_scope(synt_id.clone());
                                 state.layer_context.current_class_name =
                                     Some(format!("__file_{}", file_id));
                                 state.layer_context.current_class_bare_name =
@@ -619,6 +692,7 @@ impl IRPass for CoreIRPass {
                     }
                 }
                 "field.root" => {
+                    state.refresh_type_owner(cap.start_byte);
                     let class_id = match &state.current_class {
                         Some(cid) => cid.clone(),
                         None => continue,

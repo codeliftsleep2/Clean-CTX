@@ -218,6 +218,74 @@ fn cs_layer_extracts_abstract_flag() {
     );
 }
 
+// ── C# static-flag isolation (head-only extraction) ─────────────────
+//
+// The layer receives the full declaration node (head + body). A `static`
+// token inside a method body, comment, or string must never mark the
+// enclosing class or method as static.
+
+fn cs_has_class_flag(raw: &str, flag: &str) -> bool {
+    let mut layer = CSharpLayer::new();
+    let mut ctx = LayerContext::new(raw, Fidelity::Low);
+    ctx.current_class = Some("C1".into());
+    layer
+        .process_capture("class.root", raw, &mut ctx)
+        .iter()
+        .any(|op| {
+            matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.iter().any(|f| f == flag))
+        })
+}
+
+fn cs_method_has_flag(raw: &str, flag: &str) -> bool {
+    let mut layer = CSharpLayer::new();
+    let mut ctx = LayerContext::new(raw, Fidelity::Low);
+    ctx.current_class = Some("C1".into());
+    ctx.current_method = Some("M1".into());
+    layer
+        .process_capture("method.root", raw, &mut ctx)
+        .iter()
+        .any(|op| {
+            matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.iter().any(|f| f == flag))
+        })
+}
+
+#[test]
+fn cs_body_static_call_does_not_mark_class_static() {
+    let raw = "public class SomeService {\n    public void Method() {\n        SomeStaticType.DoSomething();\n    }\n}";
+    assert!(
+        !cs_has_class_flag(raw, "STATIC"),
+        "non-static class with a static call in its body must not gain STATIC"
+    );
+}
+
+#[test]
+fn cs_body_comment_and_string_static_do_not_mark_class_static() {
+    let raw = "public class SomeService {\n    public void Method() {\n        // static helper\n        var s = \"static value\";\n    }\n}";
+    assert!(
+        !cs_has_class_flag(raw, "STATIC"),
+        "comment/string `static` in the body must not mark the class static"
+    );
+}
+
+#[test]
+fn cs_legitimate_static_class_stays_static() {
+    assert!(cs_has_class_flag("public static class SomeClass\n{\n}", "STATIC"));
+}
+
+#[test]
+fn cs_body_static_call_does_not_mark_method_static() {
+    let raw = "public void Method() {\n    SomeStaticType.DoSomething();\n}";
+    assert!(
+        !cs_method_has_flag(raw, "STATIC"),
+        "non-static method with a static call in its body must not gain STATIC"
+    );
+}
+
+#[test]
+fn cs_legitimate_static_method_stays_static() {
+    assert!(cs_method_has_flag("public static void Helper() { }", "STATIC"));
+}
+
 // ── C# SignalR Hub / IDisposable Regression Tests ─────
 
 #[test]

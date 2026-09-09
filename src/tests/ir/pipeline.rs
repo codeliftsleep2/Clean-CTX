@@ -241,6 +241,191 @@ fn pass_context_starts_with_empty_semantic_edges() {
         "PassContext must start with no semantic edges"
     );
 }
+
+// ── Nested-type ownership (CoreIRPass span containment) ───────────────
+//
+// `CoreIRPass` must attribute a member to the innermost type whose source
+// span contains it. A nested type that closed before the member starts can
+// never own it — the same contract the diff snapshot builder already
+// enforces with its `open_scopes` stack.
+
+/// Compile a C# source string through the production pipeline.
+fn compile_cs_production(source: &str, file_id: &str) -> PassContext {
+    let mut ctx = PassContext::new(source.to_string(), file_id.into(), Fidelity::Low);
+    ctx.language =
+        Some(crate::compression::language::safe_csharp_language().expect("csharp grammar enabled"));
+    ctx.query_string = crate::queries::CS_QUERY.to_string();
+    PassPipeline::default_production()
+        .run(&mut ctx)
+        .expect("production pipeline should succeed");
+    ctx
+}
+
+/// Map every `DefMethod` to its owning `DefClass` name.
+fn method_owners(ctx: &PassContext) -> Vec<(String, String)> {
+    let mut class_by_id = std::collections::HashMap::new();
+    for op in &ctx.instructions {
+        if let CoreOp::DefClass(id, name) = op {
+            class_by_id.insert(id.clone(), name.clone());
+        }
+    }
+    ctx.instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::DefMethod(cid, _mid, name) => Some((
+                class_by_id.get(cid).cloned().unwrap_or_default(),
+                name.clone(),
+            )),
+            _ => None,
+        })
+        .collect()
+}
+
+fn nested_enum_fixture() -> String {
+    [
+        "namespace MyApp.Services",
+        "{",
+        "    public class SomeService",
+        "    {",
+        "        public SomeService()",
+        "        {",
+        "        }",
+        "",
+        "        public int Before()",
+        "        {",
+        "            return 1;",
+        "        }",
+        "",
+        "        public enum SomeStatus",
+        "        {",
+        "            First,",
+        "            Second",
+        "        }",
+        "",
+        "        public int After()",
+        "        {",
+        "            return 2;",
+        "        }",
+        "    }",
+        "}",
+        "",
+    ]
+    .join("\n")
+}
+
+/// Compile the nested-enum fixture at Medium fidelity so enum-member
+/// fields are visible (`extract_field` suppresses fields at Low).
+fn compile_nested_enum_medium(file_id: &str) -> PassContext {
+    let mut ctx = PassContext::new(
+        nested_enum_fixture(),
+        file_id.into(),
+        Fidelity::Medium,
+    );
+    ctx.language =
+        Some(crate::compression::language::safe_csharp_language().expect("csharp grammar enabled"));
+    ctx.query_string = crate::queries::CS_QUERY.to_string();
+    PassPipeline::default_production()
+        .run(&mut ctx)
+        .expect("production pipeline should succeed");
+    ctx
+}
+
+#[test]
+fn core_ir_nested_enum_does_not_steal_enclosing_methods() {
+    let ctx = compile_cs_production(&nested_enum_fixture(), "nested_enum.cs");
+    let owners = method_owners(&ctx);
+    let owner_of = |name: &str| {
+        owners
+            .iter()
+            .find_map(|(owner, method)| (*method == name).then_some(owner.clone()))
+    };
+    assert_eq!(
+        owner_of("Before"),
+        Some("SomeService".to_string()),
+        "method before the nested enum must stay with the outer class, got: {owners:?}"
+    );
+    assert_eq!(
+        owner_of("After"),
+        Some("SomeService".to_string()),
+        "method after the nested enum closed must return to the outer class, got: {owners:?}"
+    );
+    let stolen: Vec<_> = owners
+        .iter()
+        .filter(|(owner, _)| owner == "SomeStatus")
+        .collect();
+    assert!(
+        stolen.is_empty(),
+        "nested enum must never own ordinary methods, got: {stolen:?}"
+    );
+}
+
+#[test]
+fn core_ir_nested_class_ownership_follows_span_containment() {
+    let source = [
+        "namespace MyApp",
+        "{",
+        "    public class Outer",
+        "    {",
+        "        public class Inner",
+        "        {",
+        "            public void InnerMethod() { }",
+        "        }",
+        "",
+        "        public void OuterMethod() { }",
+        "    }",
+        "}",
+        "",
+    ]
+    .join("\n");
+    let ctx = compile_cs_production(&source, "nested_class.cs");
+    let owners = method_owners(&ctx);
+    let owner_of = |name: &str| {
+        owners
+            .iter()
+            .find_map(|(owner, method)| (*method == name).then_some(owner.clone()))
+    };
+    assert_eq!(
+        owner_of("InnerMethod"),
+        Some("Inner".to_string()),
+        "inner method must stay with Inner, got: {owners:?}"
+    );
+    assert_eq!(
+        owner_of("OuterMethod"),
+        Some("Outer".to_string()),
+        "outer method declared after Inner closed must belong to Outer, got: {owners:?}"
+    );
+}
+
+#[test]
+fn core_ir_nested_enum_members_stay_inside_the_enum() {
+    let ctx = compile_nested_enum_medium("nested_enum_fields.cs");
+    let mut class_by_id = std::collections::HashMap::new();
+    for op in &ctx.instructions {
+        if let CoreOp::DefClass(id, name) = op {
+            class_by_id.insert(id.clone(), name.clone());
+        }
+    }
+    let field_owners: Vec<(String, String)> = ctx
+        .instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::DefField(cid, _fid, name) => {
+                Some((class_by_id.get(cid).cloned().unwrap_or_default(), name.clone()))
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(
+        !field_owners.is_empty(),
+        "nested enum members must be captured, got no fields"
+    );
+    for (owner, _name) in &field_owners {
+        assert_eq!(
+            owner, "SomeStatus",
+            "enum members must remain inside the nested enum, got: {field_owners:?}"
+        );
+    }
+}
 // ── Phase 2: Pipeline Semantic-Edge Integration ─────────────────────
 
 use crate::compression::capture_pipeline::CapEntry;
