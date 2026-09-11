@@ -85,6 +85,40 @@ Result: [E007] DATAFLOW references unknown method M; [E003] FLAGS references unk
 ```
 ---
 
+## DIS-2026-005: workspace_query Coverage/Hydration Cardinality Coupling
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-11 |
+| **Environment** | Claude + Clean-CTX field testing (`workspace_query` against real repositories) |
+| **Repository/context** | Large real workspace; WorkspaceIndex populated demand-side only by the files compiled so far in the session. |
+| **Symptom** | `workspace_query` coverage/hydration behavior was coupled to result cardinality: `initial count == 0` was treated as the hydration trigger and `initial count > 0` was treated as sufficient coverage. A partial index could report confidently wrong coverage in both directions — a fresh session (empty index) and a partially-warmed session (non-zero but incomplete index) both failed to discover relevant files that original CBM could resolve. Additionally, the hydration design risked CBM graph semantics (relationship counts/types/direction) leaking into `workspace_query` results rather than CBM merely suggesting which files Clean-CTX should compile. |
+| **Root cause** | Hydration eligibility had been defined from result cardinality instead of from coverage capability and query type. A partial `WorkspaceIndex` is the expected steady state (session-scoped, demand-populated), so cardinality is never evidence of either "empty meaning needs hydration" or "non-empty meaning complete". Separately, the CBM→hydration boundary must be deliberately narrowed: CBM supplies candidate file paths only (`GraphNode.file`), and every other CBM graph semantic is discarded before compilation. Only Clean-CTX semantic edges produced by compiling accepted candidates may enter `WorkspaceIndex`. |
+| **Classification** | Emergent |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query_2.rs` — RED-9 partial-nonzero hydration (non-zero initial result remains hydration-eligible; authoritative initial result survives), RED-10 fresh-index hydration (empty index is hydration-eligible), RED-11 CBM authority/cardinality isolation (CBM relationship count never determines results), RED-12 hard bound (max 5 previously-unindexed candidates, deterministic lexical order, one hydration pass, no second cycle), RED-13 candidate-with-no-matching-relation (zero fabricated relationships), RED-14 per-query-type eligibility classification (`find_entities`/`forward_edges`/`reverse_edges`/`transitive_dependencies` eligible; `entities_in_file`/`has_cycle` never hydrate). |
+| **Live scenario required?** | Yes — bounded CBM candidate discovery with a live CBM binary against real workspaces (does CBM resolve useful candidate files for the requested entity? do accepted candidates pass `resolve_file_path_checked`?). |
+| **Architectural invariant** | WSC-001 (authoritative facts do not imply authoritative coverage), WSC-002 (CBM discovers candidates; Clean-CTX alone determines WorkspaceIndex semantics) — `docs/ARCHITECTURAL_INVARIANTS.md` |
+| **Status** | Fixed |
+
+**Distillation note:** the corrected flow is
+`initial WorkspaceIndex query → hydration eligibility (query-type identity, NOT cardinality) →
+bounded CBM candidate-file discovery → extract candidate paths ONLY → discard CBM graph semantics →
+dedup / exclude already-indexed / deterministic order / max 5 → resolve_file_path_checked →
+compile_file_ir_focused → Clean-CTX semantic extraction → semantic_edges → WorkspaceIndex →
+rerun ORIGINAL WorkspaceIndex query exactly once → final result`.
+Truthful hydration metadata (`hydration_attempted`, `candidates_discovered`, `candidates_compiled`)
+is returned without implying completeness. If more valid candidates exist than the cap permits,
+coverage necessarily remains partial.
+
+**Test injection seam:** `TEST_HYDRATION_CANDIDATES` (cfg(test)-only static, following the
+`TEST_INJECTED_IR_FAILURE` pattern) injects ONLY candidate file paths — never semantic edges,
+entities, precompiled IR, or results. Injected paths flow through the full production hydration
+path, so the regressions prove CBM discovers where Clean-CTX should look while Clean-CTX alone
+determines what semantic facts exist.
+
+---
+
 ## DIS-2026-004: IR Nested-Type Ownership Reparents Enclosing-Class Methods + C# Static-Flag Contamination
 
 | Field | Value |

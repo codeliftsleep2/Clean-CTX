@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.6.3] - 2026-09-11
+
+### Added
+
+* **Bounded hydration for `workspace_query`** — for query types carrying a searchable entity name (`find_entities`, `forward_edges`, `reverse_edges`, `transitive_dependencies`), ONE bounded CBM candidate-file discovery pass runs per request after the initial WorkspaceIndex query — eligibility is evaluated from query-type identity, independent of initial result cardinality (RED-9 partial-nonzero hydration; RED-10 fresh-index hydration). CBM supplies candidate file paths ONLY (extracted from `GraphNode.file`; CBM edge counts, relationship types, direction, hop/depth, and result cardinality are discarded before crossing the hydration boundary). Candidate paths flow through `resolve_file_path_checked` → `compile_file_ir_focused` → Clean-CTX semantic extraction → `semantic_edges` → `WorkspaceIndex` — there is no path from a CBM relationship to a WorkspaceIndex relationship without intervening Clean-CTX compilation. At most 5 previously-unindexed candidates are compiled per request (deduplicated, already-indexed excluded, deterministic lexical ordering — a bounding mechanism, not a relevance claim). The original WorkspaceIndex query reruns exactly once after hydration; there is no second hydration cycle. (`src/mcp/tool_handlers/query.rs`, `src/workspace/index.rs`)
+* **Hydration metadata in `workspace_query` responses** — `hydration_attempted`, `candidates_discovered`, and `candidates_compiled` in `structuredContent` across all six query types. `entities_in_file` and `has_cycle` report `hydration_attempted: false` (they provide no entity/symbol identity for bounded candidate discovery — no guessed or broadened CBM search). Hydration failure, CBM unavailability, candidate rejection, or compilation failure degrades gracefully to the WorkspaceIndex evidence already available. Coverage remains partial — hydration improves evidence and never establishes repository-wide completeness. (`src/mcp/tool_handlers/query.rs`)
+* **Constituent invariants + discovery record** — WSC-001 (authoritative facts do not imply authoritative coverage: absence from a partially populated `WorkspaceIndex` is never confirmed absence from the workspace; result cardinality never drives hydration decisions or completeness claims) and WSC-002 (CBM discovery may influence compilation scope; Clean-CTX extraction alone determines WorkspaceIndex semantics; candidate-file cardinality is not result cardinality) recorded in `docs/ARCHITECTURAL_INVARIANTS.md`; field finding recorded as DIS-2026-005 in `docs/agent/DISCOVERY_REGISTRY.md`. `workspace_query` tool contract updated in `docs/agent/tooling.md`.
+
+### Fixed
+
+* **CBM symbol importance score capping** — `CbmClient::get_symbol_importance` normalized the score as `in_degree / 100.0`, which exceeded the documented `[0.0, 1.0]` contract for hot symbols (e.g. `dispatch_tools_call` scored 1.08 at in_degree 108); the score is now capped at 1.0. Found in live testing (`live_symbol_importance_scores_are_nonzero_and_bounded`). (`src/cbm/client.rs`)
+
+### Tests
+
+| Area | Count |
+|------|------:|
+| `src/tests/mcp/workspace_query_2.rs` — RED-9 partial-nonzero hydration (non-zero initial result remains hydration-eligible; authoritative initial result survives the rerun), RED-10 fresh-index hydration (empty index is hydration-eligible; candidate compiled through the production path), RED-11 CBM authority/cardinality isolation (CBM relationship count never determines `workspace_query` results), RED-12 hard hydration bound (7 candidates > cap; ≤5 compiled; deterministic selection; no second cycle), RED-13 candidate with no matching Clean-CTX relation (zero fabricated relationships), RED-14 per-query-type hydration-eligibility classification (4 eligible types hydrate exactly once; 2 non-eligible types never hydrate) | 6 tests |
+
+Regressions are exercised through the MCP dispatch boundary using a `cfg(test)`-only candidate-path injection seam (`TEST_HYDRATION_CANDIDATES`, following the `TEST_INJECTED_IR_FAILURE` pattern). The seam injects candidate file paths ONLY — never semantic edges, entities, precompiled IR, or results — so injected candidates flow through the full production hydration path: discovery → dedup/order/bound → `resolve_file_path_checked` → `compile_file_ir_focused` → Clean-CTX semantic extraction → `WorkspaceIndex` → original query rerun. Hydration regressions are serialized (`TEST_SERIALIZE`) because the injection seam and the global `LayerRegistry` are not safe for concurrent access across threads.
+
+### Verification
+
+- Hydration suite + symbol-importance focused run: **7 passed, 0 failed** (serialized).
+- Full library suite: **2296 passed, 0 failed** — 2 live-CBM environmental tests (`e2e_apply_edit_triggers_reindex_and_graph_is_fresh`, `live_proxy_exercises_all_cbm_tools`) pass standalone; parallel full-suite CBM live contamination is a known environmental limitation (DIS-2026-005 live scenario).
+- `cargo clippy --all-targets --all-features -- -D warnings` — zero warnings.
+- `cargo fmt` — clean.
+- `scripts/check-utf8.ps1` — PASS (502 text files valid UTF-8, 0 BOMs, 0 mojibake).
+- `cargo test encoding` — PASS.
+
+---
+
 ## [0.6.2] - 2026-09-08
 
 ### Fixed
@@ -1297,7 +1328,7 @@ This project follows [Semantic Versioning](https://semver.org/). Major version z
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 0.6.2 | 2026-09-08 | **IR nested-type span-ownership + C# static-flag isolation.** CoreIRPass span-keyed TypeScope stack fixes `apply_edit` "unit not found" for methods after nested enums/classes (DIS-2026-004); C# class/method flag extraction scoped to declaration head with word-boundary matching (no more body-token contamination); C# `enum.root` naming routed through `extract_class_name`; `impl.root` reuses struct `class_id` — 11 new regressions, `rust_integration` 39, clippy clean |
+| 0.6.3 | 2026-09-11 | **Bounded hydration for `workspace_query` + CBM importance cap.** Eligible query types (`find_entities`/`forward_edges`/`reverse_edges`/`transitive_dependencies`) run ONE bounded CBM candidate-file discovery pass after the initial WorkspaceIndex query — eligibility from query-type identity, never result cardinality (RED-9 partial-nonzero, RED-10 fresh-index); CBM supplies candidate file paths only → `resolve_file_path_checked` → `compile_file_ir_focused` → Clean-CTX `semantic_edges` → WorkspaceIndex → original query rerun exactly once (max 5 previously-unindexed candidates, deterministic order, no second cycle); `entities_in_file`/`has_cycle` never hydrate; truthful `hydration_attempted`/`candidates_discovered`/`candidates_compiled` metadata; coverage stays partial (WSC-001/WSC-002, DIS-2026-005); CBM symbol importance capped at 1.0 (in_degree > 100 violated the `[0.0, 1.0]` contract) — 6 new hydration regressions via cfg(test) candidate-path-only seam, full suite 2296 passed, clippy clean |
 | 0.6.0 | 2026-08-31 | **Semantic architecture (Phases 1–6), WorkspaceIndex, workspace_query, token-economics gate.** Typed `SemanticEdge`/`EntityRef`/`SemanticRelation` model; per-meta-layer semantic-edge extraction (Angular/NgRx/.NET/Spring); `WorkspaceIndex` cross-file index with traversal/dedup; `workspace_query` MCP tool; post-compression token-economics gate; legacy meta-layer graph modules removed |
 | 0.5.2 | 2026-08-29 | **CBM transport pipeline deduplication.** Unified write/read/flush/timeout/disconnect state machine extracted into shared `send_and_receive_raw()`; retry-loop and dead-subprocess recovery asymmetry between semantic and raw entry points eliminated |
 | 0.5.1 | 2026-08-29 | **graph_query node-result data fidelity.** Node-shaped Cypher projections (`RETURN f.name, f.file_path`) no longer collapse to column-0-only nodes with hard-coded empty `file`/`label` and dropped columns: `file_path` populates `GraphNode.file`, a recognized `label` column populates `GraphNode.label`, and extra projected columns are preserved in `GraphNode.properties`; the query-cache namespace was bumped `cypher:` -> `cypher2:` to invalidate pre-fix entries. 0.5.0 conformance fix — no MCP schema change |

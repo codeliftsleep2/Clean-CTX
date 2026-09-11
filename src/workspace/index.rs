@@ -348,6 +348,11 @@ impl WorkspaceIndex {
         self.file_map.len()
     }
 
+    /// Access the file map (file path → entity keys) for hydration dedup.
+    pub fn file_map(&self) -> &std::collections::HashMap<String, Vec<EntityKey>> {
+        &self.file_map
+    }
+
     /// Get the total number of unique entity identities.
     pub fn entity_identity_count(&self) -> usize {
         self.entities.len()
