@@ -57,9 +57,16 @@ fn seed_workspace_index(state: &crate::mcp::McpState) {
 }
 
 fn pop_response() -> serde_json::Value {
-    crate::protocol::captured_responses()
-        .pop()
-        .expect("handler must send response")
+    let mut guard = match crate::protocol::CAPTURED_RESPONSES.lock() {
+        Ok(g) => g,
+        Err(_) => panic!("handler must send response (sink poisoned)"),
+    };
+    let result = guard.pop();
+    drop(guard);
+    match result {
+        Some(v) => v,
+        None => panic!("handler must send response"),
+    }
 }
 
 // ── Query type validation tests ───────────────────────────────────────

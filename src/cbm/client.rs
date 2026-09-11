@@ -751,7 +751,10 @@ impl CbmClient {
                     "file": file,
                     "in_degree": in_degree as u64,
                     "out_degree": out_degree as u64,
-                    "importance": in_degree / 100.0,  // normalized score for blending
+                    // Normalized score for blending. Capped at 1.0: CBM graphs
+                    // with in_degree > 100 (hot symbols) would exceed the
+                    // documented [0.0, 1.0] importance contract.
+                    "importance": (in_degree / 100.0).min(1.0),
                 })
             })
             .collect())

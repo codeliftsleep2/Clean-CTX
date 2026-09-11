@@ -251,6 +251,32 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### WSC-001 Authoritative Facts Do Not Imply Authoritative Coverage
+
+| Property | Value |
+|----------|-------|
+| **Intent** | WorkspaceIndex is demand-populated and session-scoped. Its facts are authoritative for the semantic evidence compiled into the index, but the index must never be presented as a complete picture of the workspace. |
+| **Invariant** | Absence of an entity or relationship from a partially populated `WorkspaceIndex` must never be represented as confirmed absence from the workspace. `workspace_query` results are authoritative for what Clean-CTX currently knows — never evidence of completeness. Result cardinality (including `0`) must never drive hydration decisions or completeness claims: `initial count == 0` is not "needs hydration" and `initial count > 0` is not "sufficiently covered". Bounded hydration improves evidence; it never establishes repository-wide completeness, so coverage remains `partial`. |
+| **Enforcement** | `src/mcp/tool_handlers/query.rs` (`run_query_with_hydration` — initial query always executes first, hydration eligibility is evaluated from query-type identity independent of result cardinality, original query reruns exactly once, no `complete` coverage state exists); `src/tests/mcp/workspace_query_2.rs::red9_partial_nonzero_hydration` (non-zero initial result remains hydration-eligible and the authoritative initial result survives the rerun); `red10_fresh_index_hydration` (fresh empty index is hydration-eligible). |
+| **Authority** | `src/mcp/tool_handlers/query.rs` (`run_query_with_hydration`, `is_hydration_eligible`), `src/tests/mcp/workspace_query_2.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
+
+### WSC-002 CBM Discovers Candidates; Clean-CTX Alone Determines WorkspaceIndex Semantics
+
+| Property | Value |
+|----------|-------|
+| **Intent** | CBM may discover candidate files so Clean-CTX's own semantic graph becomes better populated, but CBM graph semantics must never become WorkspaceIndex facts. The candidate-file boundary is deliberately narrow. |
+| **Invariant** | CBM discovery may influence compilation scope only: CBM supplies candidate file paths (reduced to path identity — edge counts, relationship types, caller/callee semantics, direction, hop/depth, entity classification, importance, and result cardinality are discarded before crossing into the hydration path). There is no path from a CBM relationship to a WorkspaceIndex relationship without intervening `resolve_file_path_checked` → `compile_file_ir_focused` → Clean-CTX semantic extraction → `semantic_edges` → `WorkspaceIndex.add_edges`. A candidate that Clean-CTX compiles but that yields zero matching semantic edges contributes zero fabricated relationships — candidate-file cardinality is not result cardinality (N CBM relationships, M candidates, and K `workspace_query` results are independent counts). |
+| **Enforcement** | `src/mcp/tool_handlers/query.rs` (`discover_candidate_paths` — extracts `GraphNode.file` paths only; `select_candidates` — dedup/exclude-indexed/deterministic-sort/hard cap 5; `compile_candidate` — path validation + existing compiler path; WorkspaceIndex updated only from returned `semantic_edges`); `src/tests/mcp/workspace_query_2.rs::red11_cbm_authority_cardinality_isolation` (CBM relationship count cannot leak into `workspace_query` results); `red13_no_match` (compiled candidate with no matching Clean-CTX relation yields no fabricated relationship); `red12_bound` (hard 5-candidate bound, deterministic selection, no second hydration cycle). |
+| **Authority** | `src/mcp/tool_handlers/query.rs` (`discover_candidate_paths`, `select_candidates`, `compile_candidate`), `src/tests/mcp/workspace_query_2.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
+
 ## Architectural Debt
 
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)
