@@ -80,7 +80,7 @@ fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
         }
     };
     let workspace_root = args["workspaceRoot"].as_str();
-    let (results, count, hydration_attempted, candidates_discovered, candidates_compiled) =
+    let (results, count, hydration_attempted, hydration) =
         run_query_with_hydration(state, "find_entities", name, workspace_root, |idx| {
             let r = idx.find_entities_by_name(name);
             let c = r.len();
@@ -94,8 +94,10 @@ fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
                 "entities": results,
                 "count": count,
                 "hydration_attempted": hydration_attempted,
-                "candidates_discovered": candidates_discovered,
-                "candidates_compiled": candidates_compiled,
+                "candidates_discovered": hydration.candidates_discovered,
+                "candidates_compiled": hydration.candidates_compiled,
+                "project_coverage": hydration.project_coverage,
+                "project_coverage_truncated": hydration.project_coverage_truncated,
             }
         }
     }));
@@ -114,7 +116,7 @@ fn run_query_with_hydration<F>(
     query_name: &str,
     workspace_root: Option<&str>,
     query_fn: F,
-) -> (Value, usize, bool, usize, usize)
+) -> (Value, usize, bool, super::hydration::HydrationReport)
 where
     F: Fn(&crate::workspace::index::WorkspaceIndex) -> (Value, usize),
 {
@@ -130,12 +132,16 @@ where
         &serde_json::json!({ "name": query_name }),
     );
     if !eligible {
-        return (initial_results, initial_count, false, 0, 0);
+        return (
+            initial_results,
+            initial_count,
+            false,
+            super::hydration::HydrationReport::default(),
+        );
     }
 
     // Step 3: One bounded hydration pass.
-    let (discovered, compiled) =
-        super::hydration::hydrate_workspace_index(state, query_name, workspace_root);
+    let hydration = super::hydration::hydrate_workspace_index(state, query_name, workspace_root);
 
     // Step 4: Rerun original query exactly once.
     let (final_results, final_count) = {
@@ -143,7 +149,7 @@ where
         query_fn(&idx)
     };
 
-    (final_results, final_count, true, discovered, compiled)
+    (final_results, final_count, true, hydration)
 }
 
 /// `forward_edges`: outgoing semantic edges from an entity.
@@ -193,7 +199,7 @@ fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
     let domain_owned = domain.to_string();
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
-    let (results, count, hydration_attempted, candidates_discovered, candidates_compiled) =
+    let (results, count, hydration_attempted, hydration) =
         run_query_with_hydration(state, "forward_edges", name, workspace_root, {
             let domain = domain_owned.clone();
             let et = et_owned.clone();
@@ -212,8 +218,10 @@ fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
                 "edges": results,
                 "count": count,
                 "hydration_attempted": hydration_attempted,
-                "candidates_discovered": candidates_discovered,
-                "candidates_compiled": candidates_compiled,
+                "candidates_discovered": hydration.candidates_discovered,
+                "candidates_compiled": hydration.candidates_compiled,
+                "project_coverage": hydration.project_coverage,
+                "project_coverage_truncated": hydration.project_coverage_truncated,
             }
         }
     }));
@@ -266,7 +274,7 @@ fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
     let domain_owned = domain.to_string();
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
-    let (results, count, hydration_attempted, candidates_discovered, candidates_compiled) =
+    let (results, count, hydration_attempted, hydration) =
         run_query_with_hydration(state, "reverse_edges", name, workspace_root, {
             let domain = domain_owned.clone();
             let et = et_owned.clone();
@@ -285,8 +293,10 @@ fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
                 "edges": results,
                 "count": count,
                 "hydration_attempted": hydration_attempted,
-                "candidates_discovered": candidates_discovered,
-                "candidates_compiled": candidates_compiled,
+                "candidates_discovered": hydration.candidates_discovered,
+                "candidates_compiled": hydration.candidates_compiled,
+                "project_coverage": hydration.project_coverage,
+                "project_coverage_truncated": hydration.project_coverage_truncated,
             }
         }
     }));
@@ -397,7 +407,7 @@ fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
     let depth_captured = depth;
-    let (results, count, hydration_attempted, candidates_discovered, candidates_compiled) =
+    let (results, count, hydration_attempted, hydration) =
         run_query_with_hydration(state, "transitive_dependencies", name, workspace_root, {
             let domain = domain_owned.clone();
             let et = et_owned.clone();
@@ -417,8 +427,10 @@ fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
                 "count": count,
                 "depth_used": depth,
                 "hydration_attempted": hydration_attempted,
-                "candidates_discovered": candidates_discovered,
-                "candidates_compiled": candidates_compiled,
+                "candidates_discovered": hydration.candidates_discovered,
+                "candidates_compiled": hydration.candidates_compiled,
+                "project_coverage": hydration.project_coverage,
+                "project_coverage_truncated": hydration.project_coverage_truncated,
             }
         }
     }));

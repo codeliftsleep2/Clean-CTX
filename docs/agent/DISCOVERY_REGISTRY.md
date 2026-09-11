@@ -46,6 +46,33 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-007: Session-Local CBM Readiness Suppressed Queryable Persisted Graphs
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-11 |
+| **Environment** | Claude + Clean-CTX v0.6.3 field testing (`workspace_query` against a configured additional root) |
+| **Repository/context** | Primary workspace plus an additional repository whose persisted CBM graph was immediately queryable through a project-explicit `cbm_proxy` call in the same process. |
+| **Symptom** | Repeated hydration returned `hydration_attempted: true`, zero discovered/compiled candidates, and zero semantic results even though direct project-explicit CBM search returned the additional-root entity. |
+| **Root cause** | Registration and enumeration were correct. Hydration reached the additional project, but required `ensure_indexed_for(project)` to return `Ready` before calling `search_in_project`. Bridge-local `StillIndexing`/`NotStarted` or `Failed` bookkeeping therefore suppressed a query against an already-usable persisted CBM graph. The local readiness map describes this process's indexing activity; it is not evidence that persisted graph data is absent or unusable. |
+| **Classification** | Emergent |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/cbm/project_search.rs::additional_root_registration_matches_proxy_resolution_and_enumeration`; `src/tests/mcp/workspace_query_3.rs` RED-19 through RED-22 (queryable graph under `StillIndexing`/failed readiness, actual search-failure isolation, and deterministic bounded project coverage metadata). |
+| **Live scenario required?** | Yes — rerun the original additional-root-only query and confirm the candidate is searched/compiled while `project_coverage` reports the observed local readiness. |
+| **Architectural invariant** | WSC-001/WSC-002 |
+| **Status** | Fixed |
+
+**Resolution:** hydration treats bridge-local readiness as diagnostic state, not
+search authority. Any available bridge attempts the existing project-explicit
+search for `Ready`, `StillIndexing`/`NotStarted`, and locally failed projects.
+Only actual CBM unavailability skips search; an actual project search failure is
+reported locally and does not prevent other configured projects from being
+searched. Bounded `project_coverage` metadata makes searched, search-failed, and
+skipped projects visible without exposing CBM payloads or changing semantic
+authority.
+
+---
+
 ## DIS-2026-006: workspace_query Hydration Searched Only the Active CBM Project
 
 | Field | Value |

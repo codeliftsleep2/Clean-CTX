@@ -2,33 +2,63 @@
 
 use crate::cbm::GraphNode;
 use crate::mcp::McpState;
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 use std::collections::HashMap;
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 use std::sync::Mutex;
 
 pub(crate) const HYDRATION_MAX_CANDIDATES: usize = 5;
+const HYDRATION_MAX_PROJECT_COVERAGE: usize = 16;
 
-#[cfg(test)]
+#[derive(Default)]
+pub(super) struct HydrationReport {
+    pub(super) candidates_discovered: usize,
+    pub(super) candidates_compiled: usize,
+    pub(super) project_coverage: Vec<ProjectCoverage>,
+    pub(super) project_coverage_truncated: bool,
+}
+
+#[derive(Serialize)]
+pub(super) struct ProjectCoverage {
+    project: String,
+    status: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    readiness: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<&'static str>,
+}
+
+#[cfg(all(test, feature = "rust"))]
 pub(crate) static TEST_HYDRATION_CANDIDATES: Mutex<Option<Vec<String>>> = Mutex::new(None);
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 pub(crate) type TestProjectSearchResult = Result<Vec<GraphNode>, String>;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
+#[derive(Clone, Copy)]
+pub(crate) enum TestProjectReadiness {
+    Ready,
+    StillIndexing,
+    Failed,
+    Unavailable,
+}
+
+#[cfg(all(test, feature = "rust"))]
 struct TestProjectSearchConfig {
     owner: std::thread::ThreadId,
     results: HashMap<String, TestProjectSearchResult>,
+    readiness: HashMap<String, TestProjectReadiness>,
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 static TEST_PROJECT_SEARCH_RESULTS: Mutex<Option<TestProjectSearchConfig>> = Mutex::new(None);
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 pub(crate) static TEST_SEARCHED_PROJECTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 #[cfg(all(test, feature = "rust"))]
@@ -38,11 +68,22 @@ pub(crate) fn set_test_project_search_results(results: HashMap<String, TestProje
         .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned") = Some(TestProjectSearchConfig {
         owner: std::thread::current().id(),
         results,
+        readiness: HashMap::new(),
     });
     TEST_SEARCHED_PROJECTS
         .lock()
         .expect("TEST_SEARCHED_PROJECTS lock poisoned")
         .clear();
+}
+
+#[cfg(all(test, feature = "rust"))]
+pub(crate) fn set_test_project_readiness(readiness: HashMap<String, TestProjectReadiness>) {
+    TEST_PROJECT_SEARCH_RESULTS
+        .lock()
+        .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned")
+        .as_mut()
+        .expect("project search results configured first")
+        .readiness = readiness;
 }
 
 #[cfg(all(test, feature = "rust"))]
@@ -75,24 +116,35 @@ pub(super) fn hydrate_workspace_index(
     state: &McpState,
     query_name: &str,
     workspace_root: Option<&str>,
-) -> (usize, usize) {
-    let candidate_paths = discover_candidate_paths(state, query_name);
+) -> HydrationReport {
+    let (candidate_paths, mut project_coverage) = discover_candidate_paths(state, query_name);
     let discovered = candidate_paths.len();
     let selected = select_candidates(state, candidate_paths, HYDRATION_MAX_CANDIDATES);
     let compiled = selected
         .iter()
         .filter(|path| compile_candidate(state, path, workspace_root))
         .count();
-    (discovered, compiled)
+    project_coverage.sort_by(|left, right| left.project.cmp(&right.project));
+    let project_coverage_truncated = project_coverage.len() > HYDRATION_MAX_PROJECT_COVERAGE;
+    project_coverage.truncate(HYDRATION_MAX_PROJECT_COVERAGE);
+    HydrationReport {
+        candidates_discovered: discovered,
+        candidates_compiled: compiled,
+        project_coverage,
+        project_coverage_truncated,
+    }
 }
 
-fn discover_candidate_paths(state: &McpState, query_name: &str) -> Vec<String> {
-    #[cfg(test)]
+fn discover_candidate_paths(
+    state: &McpState,
+    query_name: &str,
+) -> (Vec<String>, Vec<ProjectCoverage>) {
+    #[cfg(all(test, feature = "rust"))]
     {
         if !has_test_project_search() {
             if let Ok(injected) = TEST_HYDRATION_CANDIDATES.lock() {
                 if let Some(paths) = injected.as_ref() {
-                    return paths.clone();
+                    return (paths.clone(), Vec::new());
                 }
             }
         }
@@ -100,34 +152,95 @@ fn discover_candidate_paths(state: &McpState, query_name: &str) -> Vec<String> {
 
     let mut bridge_guard = state.graph_bridge_lock();
     let Some(bridge) = bridge_guard.as_mut() else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
     let projects = bridge.configured_projects();
     let mut candidates = Vec::new();
+    let mut coverage = Vec::new();
+
+    for configured_root in &state.config.additional_roots {
+        let resolved = bridge.resolve_project_id(configured_root);
+        if !projects.iter().any(|(project, _)| project == &resolved) {
+            coverage.push(ProjectCoverage {
+                project: resolved,
+                status: "skipped",
+                readiness: None,
+                reason: Some("additional_root_not_registered"),
+            });
+        }
+    }
 
     for (project, root) in projects {
-        #[cfg(test)]
-        if let Some(result) = test_project_search(&project) {
-            if let Ok(nodes) = result {
-                append_project_paths(&mut candidates, &root, nodes);
+        #[cfg(all(test, feature = "rust"))]
+        if let Some(readiness) = test_project_readiness(&project) {
+            let readiness = match readiness {
+                TestProjectReadiness::Ready => "ready",
+                TestProjectReadiness::StillIndexing => "still_indexing",
+                TestProjectReadiness::Failed => "failed",
+                TestProjectReadiness::Unavailable => {
+                    coverage.push(ProjectCoverage {
+                        project,
+                        status: "skipped",
+                        readiness: None,
+                        reason: Some("cbm_unavailable"),
+                    });
+                    continue;
+                }
+            };
+            let result = test_project_search(&project).expect("configured project search result");
+            match result {
+                Ok(nodes) => {
+                    append_project_paths(&mut candidates, &root, nodes);
+                    coverage.push(ProjectCoverage {
+                        project,
+                        status: "searched",
+                        readiness: Some(readiness),
+                        reason: None,
+                    });
+                }
+                Err(_) => coverage.push(ProjectCoverage {
+                    project,
+                    status: "search_failed",
+                    readiness: Some(readiness),
+                    reason: Some("search_failed"),
+                }),
             }
             continue;
         }
 
         if !bridge.is_available() {
+            coverage.push(ProjectCoverage {
+                project,
+                status: "skipped",
+                readiness: None,
+                reason: Some("cbm_unavailable"),
+            });
             continue;
         }
-        if !matches!(
-            bridge.ensure_indexed_for(&project),
-            Ok(crate::cbm::bridge::IndexingStatus::Ready)
-        ) {
-            continue;
-        }
-        if let Ok(nodes) = bridge.search_in_project(&project, query_name) {
-            append_project_paths(&mut candidates, &root, nodes);
+        let readiness = match bridge.ensure_indexed_for(&project) {
+            Ok(crate::cbm::bridge::IndexingStatus::Ready) => "ready",
+            Ok(crate::cbm::bridge::IndexingStatus::StillIndexing { .. }) => "still_indexing",
+            Err(_) => "failed",
+        };
+        match bridge.search_in_project(&project, query_name) {
+            Ok(nodes) => {
+                append_project_paths(&mut candidates, &root, nodes);
+                coverage.push(ProjectCoverage {
+                    project,
+                    status: "searched",
+                    readiness: Some(readiness),
+                    reason: None,
+                });
+            }
+            Err(_) => coverage.push(ProjectCoverage {
+                project,
+                status: "search_failed",
+                readiness: Some(readiness),
+                reason: Some("search_failed"),
+            }),
         }
     }
-    candidates
+    (candidates, coverage)
 }
 
 fn append_project_paths(candidates: &mut Vec<String>, root: &Path, nodes: Vec<GraphNode>) {
@@ -195,7 +308,7 @@ pub(crate) fn compile_candidate(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 fn test_project_search(project: &str) -> Option<TestProjectSearchResult> {
     let results = TEST_PROJECT_SEARCH_RESULTS
         .lock()
@@ -217,7 +330,25 @@ fn test_project_search(project: &str) -> Option<TestProjectSearchResult> {
     )
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
+fn test_project_readiness(project: &str) -> Option<TestProjectReadiness> {
+    let results = TEST_PROJECT_SEARCH_RESULTS
+        .lock()
+        .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned");
+    let configured = results.as_ref()?;
+    if configured.owner != std::thread::current().id() {
+        return None;
+    }
+    Some(
+        configured
+            .readiness
+            .get(project)
+            .copied()
+            .unwrap_or(TestProjectReadiness::Ready),
+    )
+}
+
+#[cfg(all(test, feature = "rust"))]
 fn has_test_project_search() -> bool {
     TEST_PROJECT_SEARCH_RESULTS
         .lock()

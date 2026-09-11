@@ -3,8 +3,8 @@
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
-    TestProjectSearchResult, clear_test_project_search_results, searched_projects,
-    set_test_project_search_results,
+    TestProjectReadiness, TestProjectSearchResult, clear_test_project_search_results,
+    searched_projects, set_test_project_readiness, set_test_project_search_results,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -47,24 +47,25 @@ fn call_find(
     name: &str,
     workspace_root: &Path,
 ) -> serde_json::Map<String, serde_json::Value> {
-    let (entities, count, hydration_attempted, candidates_discovered, candidates_compiled) =
-        super::run_query_with_hydration(
-            state,
-            "find_entities",
-            name,
-            Some(&workspace_root.to_string_lossy()),
-            |index| {
-                let entities = index.find_entities_by_name(name);
-                let count = entities.len();
-                (serde_json::to_value(entities).unwrap_or_default(), count)
-            },
-        );
+    let (entities, count, hydration_attempted, hydration) = super::run_query_with_hydration(
+        state,
+        "find_entities",
+        name,
+        Some(&workspace_root.to_string_lossy()),
+        |index| {
+            let entities = index.find_entities_by_name(name);
+            let count = entities.len();
+            (serde_json::to_value(entities).unwrap_or_default(), count)
+        },
+    );
     serde_json::json!({
         "entities": entities,
         "count": count,
         "hydration_attempted": hydration_attempted,
-        "candidates_discovered": candidates_discovered,
-        "candidates_compiled": candidates_compiled,
+        "candidates_discovered": hydration.candidates_discovered,
+        "candidates_compiled": hydration.candidates_compiled,
+        "project_coverage": hydration.project_coverage,
+        "project_coverage_truncated": hydration.project_coverage_truncated,
     })
     .as_object()
     .expect("structured result")
@@ -79,6 +80,27 @@ fn configure_results(
         (primary.0.to_string(), primary.1),
         (additional.0.to_string(), additional.1),
     ]));
+}
+
+fn configure_readiness(entries: &[(&str, TestProjectReadiness)]) {
+    set_test_project_readiness(
+        entries
+            .iter()
+            .map(|(project, readiness)| ((*project).to_string(), *readiness))
+            .collect(),
+    );
+}
+
+fn coverage_entry<'a>(
+    sc: &'a serde_json::Map<String, serde_json::Value>,
+    project: &str,
+) -> &'a serde_json::Value {
+    sc["project_coverage"]
+        .as_array()
+        .expect("coverage array")
+        .iter()
+        .find(|entry| entry["project"] == project)
+        .expect("project coverage entry")
 }
 
 fn assert_both_projects_searched(primary: &str, additional: &str) {
@@ -296,4 +318,211 @@ fn red18_per_project_failure_degrades_locally() {
     assert_eq!(sc["candidates_compiled"], 1);
     assert!(entities.iter().any(|entity| entity["name"] == "Survivor"));
     clear_test_project_search_results();
+}
+
+#[test]
+fn additional_root_registration_is_reached_by_hydration_discovery() {
+    let _serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let primary = tempfile::TempDir::new().unwrap();
+    let additional = tempfile::TempDir::new().unwrap();
+    let state = state_with_roots(primary.path(), &[additional.path().to_path_buf()]);
+    let primary_slug = project_slug(primary.path());
+    let additional_slug = project_slug(additional.path());
+    configure_results(
+        (&primary_slug, Ok(Vec::new())),
+        (&additional_slug, Ok(Vec::new())),
+    );
+
+    let sc = call_find(&state, "Absent", primary.path());
+
+    assert_eq!(sc["candidates_discovered"], 0);
+    assert_both_projects_searched(&primary_slug, &additional_slug);
+    let coverage = sc["project_coverage"].as_array().expect("coverage array");
+    assert_eq!(coverage.len(), 2);
+    assert!(
+        coverage
+            .iter()
+            .any(|entry| { entry["project"] == primary_slug && entry["status"] == "searched" })
+    );
+    assert!(
+        coverage
+            .iter()
+            .any(|entry| { entry["project"] == additional_slug && entry["status"] == "searched" })
+    );
+    assert_eq!(sc["project_coverage_truncated"], false);
+    clear_test_project_search_results();
+}
+
+#[test]
+fn red19_still_indexing_project_with_queryable_graph_is_searched() {
+    let _serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let primary = tempfile::TempDir::new().unwrap();
+    let additional = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        additional.path().join("Persisted.ts"),
+        "export class Persisted {}",
+    )
+    .unwrap();
+    let state = state_with_roots(primary.path(), &[additional.path().to_path_buf()]);
+    let primary_slug = project_slug(primary.path());
+    let additional_slug = project_slug(additional.path());
+    configure_results(
+        (&primary_slug, Ok(Vec::new())),
+        (&additional_slug, Ok(vec![node("Persisted.ts")])),
+    );
+    configure_readiness(&[(&additional_slug, TestProjectReadiness::StillIndexing)]);
+
+    let sc = call_find(&state, "Persisted", primary.path());
+
+    assert_both_projects_searched(&primary_slug, &additional_slug);
+    assert_eq!(sc["candidates_discovered"], 1);
+    assert_eq!(sc["candidates_compiled"], 1);
+    assert_eq!(sc["count"], 1);
+    assert_eq!(coverage_entry(&sc, &additional_slug)["status"], "searched");
+    assert_eq!(
+        coverage_entry(&sc, &additional_slug)["readiness"],
+        "still_indexing"
+    );
+    clear_test_project_search_results();
+}
+
+#[test]
+fn red20_failed_readiness_with_queryable_graph_is_searched() {
+    let _serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let primary = tempfile::TempDir::new().unwrap();
+    let additional = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        additional.path().join("PersistedAfterFailure.ts"),
+        "export class PersistedAfterFailure {}",
+    )
+    .unwrap();
+    let state = state_with_roots(primary.path(), &[additional.path().to_path_buf()]);
+    let primary_slug = project_slug(primary.path());
+    let additional_slug = project_slug(additional.path());
+    configure_results(
+        (&primary_slug, Ok(Vec::new())),
+        (&additional_slug, Ok(vec![node("PersistedAfterFailure.ts")])),
+    );
+    configure_readiness(&[(&additional_slug, TestProjectReadiness::Failed)]);
+
+    let sc = call_find(&state, "PersistedAfterFailure", primary.path());
+
+    assert_both_projects_searched(&primary_slug, &additional_slug);
+    assert_eq!(sc["candidates_discovered"], 1);
+    assert_eq!(sc["candidates_compiled"], 1);
+    assert_eq!(sc["count"], 1);
+    assert_eq!(coverage_entry(&sc, &additional_slug)["status"], "searched");
+    assert_eq!(coverage_entry(&sc, &additional_slug)["readiness"], "failed");
+    clear_test_project_search_results();
+}
+
+#[test]
+fn red21_search_failure_is_local_and_other_project_still_hydrates() {
+    let _serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let primary = tempfile::TempDir::new().unwrap();
+    let additional = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        additional.path().join("SurvivesSearchFailure.ts"),
+        "export class SurvivesSearchFailure {}",
+    )
+    .unwrap();
+    let state = state_with_roots(primary.path(), &[additional.path().to_path_buf()]);
+    let primary_slug = project_slug(primary.path());
+    let additional_slug = project_slug(additional.path());
+    configure_results(
+        (&primary_slug, Err("search failed".into())),
+        (&additional_slug, Ok(vec![node("SurvivesSearchFailure.ts")])),
+    );
+
+    let sc = call_find(&state, "SurvivesSearchFailure", primary.path());
+
+    assert_both_projects_searched(&primary_slug, &additional_slug);
+    assert_eq!(
+        coverage_entry(&sc, &primary_slug)["status"],
+        "search_failed"
+    );
+    assert_eq!(
+        coverage_entry(&sc, &primary_slug)["reason"],
+        "search_failed"
+    );
+    assert_eq!(sc["count"], 1);
+    clear_test_project_search_results();
+}
+
+#[test]
+fn red22_project_coverage_distinguishes_every_discovery_outcome() {
+    let _serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let primary = tempfile::TempDir::new().unwrap();
+    let search_fails = tempfile::TempDir::new().unwrap();
+    let unavailable = tempfile::TempDir::new().unwrap();
+    let never_registered = primary.path().join("not-present-at-startup");
+    let additional = vec![
+        search_fails.path().to_path_buf(),
+        unavailable.path().to_path_buf(),
+        never_registered.clone(),
+    ];
+    let state = state_with_roots(primary.path(), &additional);
+    let primary_slug = project_slug(primary.path());
+    let failed_slug = project_slug(search_fails.path());
+    let unavailable_slug = project_slug(unavailable.path());
+    let unregistered_slug = crate::cbm::bridge::cbm_project_slug(&never_registered);
+    set_test_project_search_results(HashMap::from([
+        (primary_slug.clone(), Ok(Vec::new())),
+        (failed_slug.clone(), Err("search failed".into())),
+        (unavailable_slug.clone(), Ok(Vec::new())),
+    ]));
+    configure_readiness(&[(&unavailable_slug, TestProjectReadiness::Unavailable)]);
+
+    let sc = call_find(&state, "Absent", primary.path());
+
+    assert_eq!(coverage_entry(&sc, &primary_slug)["status"], "searched");
+    assert_eq!(coverage_entry(&sc, &failed_slug)["status"], "search_failed");
+    assert_eq!(coverage_entry(&sc, &unavailable_slug)["status"], "skipped");
+    assert_eq!(
+        coverage_entry(&sc, &unavailable_slug)["reason"],
+        "cbm_unavailable"
+    );
+    assert_eq!(coverage_entry(&sc, &unregistered_slug)["status"], "skipped");
+    assert_eq!(
+        coverage_entry(&sc, &unregistered_slug)["reason"],
+        "additional_root_not_registered"
+    );
+    assert_eq!(sc["project_coverage_truncated"], false);
+    clear_test_project_search_results();
+}
+
+#[test]
+fn workspace_query_schema_declares_hydration_coverage_metadata() {
+    let tools = crate::mcp::tools::tool_list();
+    let workspace_query = tools
+        .iter()
+        .find(|tool| tool["name"] == "workspace_query")
+        .expect("workspace_query tool");
+    let properties = workspace_query["outputSchema"]["properties"]
+        .as_object()
+        .expect("output properties");
+
+    for field in [
+        "hydration_attempted",
+        "candidates_discovered",
+        "candidates_compiled",
+        "project_coverage",
+        "project_coverage_truncated",
+    ] {
+        assert!(
+            properties.contains_key(field),
+            "missing schema field: {field}"
+        );
+    }
+    assert_eq!(properties["project_coverage"]["type"], "array");
 }

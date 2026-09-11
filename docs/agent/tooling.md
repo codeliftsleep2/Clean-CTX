@@ -86,7 +86,7 @@ as `filePath`.
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
-| `workspace_query` | `type` | `domain`, `entity_type`, `name`, `file_path`, `depth`, `workspaceRoot` | **READ-ONLY** — Query cross-file semantic relationships accumulated from compiled files. Supports `find_entities` (by name), `forward_edges` (outgoing semantic edges from entity), `reverse_edges` (incoming semantic edges to entity), `entities_in_file` (entity occurrences by file), `transitive_dependencies` (BFS dependency traversal with optional `depth` parameter; 0 = unlimited, default 1), and `has_cycle` (cycle detection). Uses the existing `(domain, entity_type, name)` identity model established by WorkspaceIndex. **Bounded hydration:** for `find_entities`, `forward_edges`, `reverse_edges`, and `transitive_dependencies` (query types carrying a searchable entity name), one bounded CBM candidate-file discovery pass runs per request after the initial WorkspaceIndex query — regardless of whether the initial result is empty or non-empty. CBM supplies candidate file paths ONLY; those paths are validated through `resolve_file_path_checked` (workspace/additional-root trust boundary), compiled through the normal `compile_file_ir_focused` pipeline, and only resulting Clean-CTX semantic edges populate WorkspaceIndex. At most 5 previously-unindexed candidates are compiled (deterministic lexical order). The original WorkspaceIndex query reruns exactly once after hydration; CBM graph semantics (edges, counts, direction) never enter WorkspaceIndex. `entities_in_file` and `has_cycle` never hydrate (no entity identity for bounded discovery). Responses carry truthful hydration metadata (`hydration_attempted`, `candidates_discovered`, `candidates_compiled`); hydration improves evidence but never establishes repository-wide completeness — coverage remains partial. |
+| `workspace_query` | `type` | `domain`, `entity_type`, `name`, `file_path`, `depth`, `workspaceRoot` | **READ-ONLY** — Query cross-file semantic relationships accumulated from compiled files. Supports `find_entities` (by name), `forward_edges` (outgoing semantic edges from entity), `reverse_edges` (incoming semantic edges to entity), `entities_in_file` (entity occurrences by file), `transitive_dependencies` (BFS dependency traversal with optional `depth` parameter; 0 = unlimited, default 1), and `has_cycle` (cycle detection). Uses the existing `(domain, entity_type, name)` identity model established by WorkspaceIndex. **Bounded hydration:** for `find_entities`, `forward_edges`, `reverse_edges`, and `transitive_dependencies` (query types carrying a searchable entity name), one bounded CBM candidate-file discovery pass runs per request after the initial WorkspaceIndex query — regardless of whether the initial result is empty or non-empty. CBM supplies candidate file paths ONLY; those paths are validated through `resolve_file_path_checked` (workspace/additional-root trust boundary), compiled through the normal `compile_file_ir_focused` pipeline, and only resulting Clean-CTX semantic edges populate WorkspaceIndex. At most 5 previously-unindexed candidates are compiled (deterministic lexical order). The original WorkspaceIndex query reruns exactly once after hydration; CBM graph semantics (edges, counts, direction) never enter WorkspaceIndex. Bridge-local `Ready`/`StillIndexing`/`Failed` state is advisory session bookkeeping: when CBM is available, hydration attempts project-explicit search even if local readiness has not converged, because a persisted graph may already be queryable. Actual unavailability skips the project and actual search failure degrades locally. `entities_in_file` and `has_cycle` never hydrate (no entity identity for bounded discovery). Responses carry truthful hydration metadata (`hydration_attempted`, `candidates_discovered`, `candidates_compiled`) plus deterministic bounded `project_coverage` entries (`searched`, `search_failed`, or `skipped`, with readiness/reason where applicable) and `project_coverage_truncated`; hydration improves evidence but never establishes repository-wide completeness — coverage remains partial. |
 
 ## 2. Tool-Selection Hierarchy
 
@@ -498,30 +498,9 @@ than reading every file.
 
 ## 9. Language Support
 
-Clean-CTX supports these languages (feature-gated at build time):
-
-| Language | Cargo Feature | Default? | Clean-CTX Preferred? |
-|----------|--------------|:--------:|:--------------------:|
-| TypeScript / JavaScript | `typescript` | ✅ Yes | ✅ Yes |
-| C# | `csharp` | ✅ Yes | ✅ Yes |
-| Rust | `rust` | ❌ Opt-in | ✅ Yes |
-| Java | `java` | ❌ Opt-in | ✅ Yes |
-
-The `supportedLanguages` field in every tool schema lists which languages
-the current binary supports (computed from enabled Cargo features).
-
-**For all supported languages:** Use `provide_code_context` for code
-understanding and `apply_edit` for single-unit edits. This applies to both
-investigation and editing workflows.
-
-**Verification still belongs to language-specific tools:**
-- Rust → `run_commands` with `cargo check`, `cargo test`, `cargo clippy`
-- TypeScript → `run_commands` with `tsc --noEmit`, `jest`
-- C# → `run_commands` with `dotnet build`, `dotnet test`
-- Java → `run_commands` with `mvn compile`, `gradle build`
-
-Clean-CTX structural/syntax gating (`apply_edit`'s `syntaxGated: true`) is
-**not** a substitute for compilation or test verification.
+See [`tooling-language-support.md`](tooling-language-support.md) for the
+feature-gated language matrix, preferred Clean-CTX tools, and language-specific
+verification guidance.
 
 ---
 

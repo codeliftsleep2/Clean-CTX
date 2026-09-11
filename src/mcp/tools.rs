@@ -314,6 +314,45 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "depth_used": {
                         "type": "integer",
                         "description": "Actual traversal depth used (transitive_dependencies)."
+                    },
+                    "hydration_attempted": {
+                        "type": "boolean",
+                        "description": "Whether this query type ran one bounded hydration pass."
+                    },
+                    "candidates_discovered": {
+                        "type": "integer",
+                        "description": "Candidate file paths discovered before selection."
+                    },
+                    "candidates_compiled": {
+                        "type": "integer",
+                        "description": "Candidate files compiled after the global bound and trust checks."
+                    },
+                    "project_coverage": {
+                        "type": "array",
+                        "description": "Bounded per-project hydration discovery coverage.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "project": { "type": "string" },
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["searched", "search_failed", "skipped"]
+                                },
+                                "readiness": {
+                                    "type": "string",
+                                    "enum": ["ready", "still_indexing", "failed"]
+                                },
+                                "reason": {
+                                    "type": "string",
+                                    "enum": ["search_failed", "cbm_unavailable", "additional_root_not_registered"]
+                                }
+                            },
+                            "required": ["project", "status"]
+                        }
+                    },
+                    "project_coverage_truncated": {
+                        "type": "boolean",
+                        "description": "Whether project coverage exceeded its diagnostic bound."
                     }
                 }
             }
