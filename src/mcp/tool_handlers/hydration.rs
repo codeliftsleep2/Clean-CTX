@@ -31,7 +31,7 @@ static TEST_PROJECT_SEARCH_RESULTS: Mutex<Option<TestProjectSearchConfig>> = Mut
 #[cfg(test)]
 pub(crate) static TEST_SEARCHED_PROJECTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 pub(crate) fn set_test_project_search_results(results: HashMap<String, TestProjectSearchResult>) {
     *TEST_PROJECT_SEARCH_RESULTS
         .lock()
@@ -45,7 +45,7 @@ pub(crate) fn set_test_project_search_results(results: HashMap<String, TestProje
         .clear();
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 pub(crate) fn clear_test_project_search_results() {
     *TEST_PROJECT_SEARCH_RESULTS
         .lock()
@@ -56,7 +56,7 @@ pub(crate) fn clear_test_project_search_results() {
         .clear();
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 pub(crate) fn searched_projects() -> Vec<String> {
     TEST_SEARCHED_PROJECTS
         .lock()

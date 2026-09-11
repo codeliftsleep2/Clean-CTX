@@ -148,11 +148,9 @@ impl DerefMut for CapturedResponsesGuard<'_> {
 /// [`send_response`] already tolerates poison (`if let Ok`); consumers
 /// get the same courtesy here.
 ///
-/// Gated to the `rust` feature to mirror its consumers: the only drainers
-/// (`phase_a_retirement_tests`, `phase_b_retirement_tests`) compile under
-/// `#[cfg(all(test, feature = "rust"))]` — a bare `cfg(test)` gate would
-/// leave these items dead (and warn) in default-feature test builds.
-#[cfg(all(test, feature = "rust"))]
+/// Available in every test configuration because the protocol-level
+/// concurrency regression is feature-independent.
+#[cfg(test)]
 pub(crate) fn captured_responses() -> CapturedResponsesGuard<'static> {
     match CAPTURED_RESPONSES.lock() {
         Ok(guard) => guard,
@@ -164,7 +162,7 @@ pub(crate) fn captured_responses() -> CapturedResponsesGuard<'static> {
 /// process-global test state. Response capture itself is thread-isolated, but
 /// the established gate remains available to its existing Phase A/B callers.
 ///
-/// Feature-gated to mirror its consumers (see `captured_responses`).
+/// Feature-gated to mirror its Phase A/B consumers.
 #[cfg(all(test, feature = "rust"))]
 pub(crate) static HANDLER_RESPONSE_SERIAL: Mutex<()> = Mutex::new(());
 
