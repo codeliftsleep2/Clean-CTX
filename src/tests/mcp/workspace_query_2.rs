@@ -50,7 +50,7 @@ fn pop_response() -> serde_json::Value {
 
 /// Set the test-injected CBM candidate file paths (test-only injection).
 fn set_test_hydration_candidates(paths: &[String]) {
-    let mut guard = crate::mcp::tool_handlers::query::TEST_HYDRATION_CANDIDATES
+    let mut guard = crate::mcp::tool_handlers::hydration::TEST_HYDRATION_CANDIDATES
         .lock()
         .expect("TEST_HYDRATION_CANDIDATES lock poisoned");
     *guard = Some(paths.to_vec());
@@ -58,7 +58,7 @@ fn set_test_hydration_candidates(paths: &[String]) {
 
 /// Clear the test-injected CBM candidate file paths.
 fn clear_test_hydration_candidates() {
-    let mut guard = crate::mcp::tool_handlers::query::TEST_HYDRATION_CANDIDATES
+    let mut guard = crate::mcp::tool_handlers::hydration::TEST_HYDRATION_CANDIDATES
         .lock()
         .expect("TEST_HYDRATION_CANDIDATES lock poisoned");
     *guard = None;

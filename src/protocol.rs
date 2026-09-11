@@ -10,6 +10,13 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
+#[cfg(test)]
+use std::collections::HashMap;
+#[cfg(test)]
+use std::ops::{Deref, DerefMut};
+#[cfg(test)]
+use std::sync::{LazyLock, LockResult, MutexGuard, PoisonError};
+
 /// Global stdout mutex to prevent interleaved JSON-RPC responses
 /// from concurrent worker threads.
 static STDOUT_MUTEX: Mutex<()> = Mutex::new(());
@@ -69,9 +76,68 @@ pub fn send_response(val: &serde_json::Value) {
 }
 
 /// Test-only response capture sink (Phase A retirement regression work).
-/// Pushed by [`send_response`] under `cfg(test)`; drained by handler tests.
+///
+/// Each test thread gets its own queue. This preserves the established
+/// `.lock().clear()` / `.lock().pop()` API while preventing parallel handler
+/// tests from erasing or stealing one another's responses.
 #[cfg(test)]
-pub(crate) static CAPTURED_RESPONSES: Mutex<Vec<serde_json::Value>> = Mutex::new(Vec::new());
+pub(crate) static CAPTURED_RESPONSES: LazyLock<CapturedResponses> =
+    LazyLock::new(CapturedResponses::new);
+
+#[cfg(test)]
+pub(crate) struct CapturedResponses {
+    queues: Mutex<HashMap<std::thread::ThreadId, Vec<serde_json::Value>>>,
+}
+
+#[cfg(test)]
+impl CapturedResponses {
+    fn new() -> Self {
+        Self {
+            queues: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub(crate) fn lock(&self) -> LockResult<CapturedResponsesGuard<'_>> {
+        let thread = std::thread::current().id();
+        match self.queues.lock() {
+            Ok(mut queues) => {
+                queues.entry(thread).or_default();
+                Ok(CapturedResponsesGuard { queues, thread })
+            }
+            Err(poisoned) => {
+                let mut queues = poisoned.into_inner();
+                queues.entry(thread).or_default();
+                Err(PoisonError::new(CapturedResponsesGuard { queues, thread }))
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) struct CapturedResponsesGuard<'a> {
+    queues: MutexGuard<'a, HashMap<std::thread::ThreadId, Vec<serde_json::Value>>>,
+    thread: std::thread::ThreadId,
+}
+
+#[cfg(test)]
+impl Deref for CapturedResponsesGuard<'_> {
+    type Target = Vec<serde_json::Value>;
+
+    fn deref(&self) -> &Self::Target {
+        self.queues
+            .get(&self.thread)
+            .expect("current test thread queue initialized")
+    }
+}
+
+#[cfg(test)]
+impl DerefMut for CapturedResponsesGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.queues
+            .get_mut(&self.thread)
+            .expect("current test thread queue initialized")
+    }
+}
 
 /// Poison-tolerant guard for [`CAPTURED_RESPONSES`].
 ///
@@ -87,23 +153,16 @@ pub(crate) static CAPTURED_RESPONSES: Mutex<Vec<serde_json::Value>> = Mutex::new
 /// `#[cfg(all(test, feature = "rust"))]` — a bare `cfg(test)` gate would
 /// leave these items dead (and warn) in default-feature test builds.
 #[cfg(all(test, feature = "rust"))]
-pub(crate) fn captured_responses() -> std::sync::MutexGuard<'static, Vec<serde_json::Value>> {
+pub(crate) fn captured_responses() -> CapturedResponsesGuard<'static> {
     match CAPTURED_RESPONSES.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
     }
 }
 
-/// Serializes every test that dispatches tool calls and drains
-/// [`CAPTURED_RESPONSES`].
-///
-/// The sink is process-global; concurrent `clear()` → dispatch → `pop()`
-/// sequences from sibling tests race (a sibling's `clear()` erases an
-/// in-flight response, or another test steals it via its own `pop()`),
-/// which surfaced as a spurious "handler must have sent exactly one
-/// response" panic followed by a `PoisonError` cascade. Phase A originally
-/// serialized only its own file; Phase B joined the contract late with no
-/// gate at all — both now share this single lock.
+/// Legacy shared gate for handler suites that also coordinate other
+/// process-global test state. Response capture itself is thread-isolated, but
+/// the established gate remains available to its existing Phase A/B callers.
 ///
 /// Feature-gated to mirror its consumers (see `captured_responses`).
 #[cfg(all(test, feature = "rust"))]
@@ -117,3 +176,7 @@ pub(crate) fn handler_response_serial() -> std::sync::MutexGuard<'static, ()> {
         Err(poisoned) => poisoned.into_inner(),
     }
 }
+
+#[cfg(test)]
+#[path = "tests/protocol.rs"]
+mod tests;

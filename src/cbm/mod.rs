@@ -19,6 +19,7 @@ pub mod client;
 pub mod config;
 pub mod handlers;
 pub mod json_compress;
+pub(crate) mod project_search;
 pub mod proxy;
 pub mod setup;
 pub mod tools;

@@ -7,188 +7,16 @@
 // established in Phases A/B.
 //
 // Bounded hydration: for eligible query types, after the initial WorkspaceIndex
-// query, ONE bounded CBM candidate-file discovery pass may run. CBM supplies
-// ONLY candidate file paths. Those paths flow through resolve_file_path_checked
-// → compile_file_ir_focused → Clean-CTX semantic extraction → WorkspaceIndex.
-// CBM graph semantics (edge counts, relationship types, etc.) never enter
+// query, ONE bounded CBM candidate-file discovery pass may run across the
+// primary root plus configured additional roots. CBM supplies ONLY candidate
+// file paths. Those paths flow through resolve_file_path_checked →
+// compile_file_ir_focused → Clean-CTX semantic extraction → WorkspaceIndex.
+// CBM graph semantics (edge counts, relationship types, etc.) never enter the
 // WorkspaceIndex. The original query reruns exactly once after hydration.
 
 use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
-
-// ── Test-only candidate-path injection ────────────────────────────────
-//
-// Following the TEST_INJECTED_IR_FAILURE pattern: a cfg(test) static that
-// lets tests inject fake CBM candidate file paths WITHOUT requiring a live
-// CBM binary. Production builds never compile this.
-//
-// The static carries ONLY file paths. It must never inject semantic edges,
-// entities, precompiled IR, or query results. The injected paths flow through
-// the full production hydration path.
-
-#[cfg(test)]
-pub(crate) static TEST_HYDRATION_CANDIDATES: std::sync::Mutex<Option<Vec<String>>> =
-    std::sync::Mutex::new(None);
-
-/// Hydration candidate cap — at most this many previously-unindexed candidates
-/// are compiled per request.
-const HYDRATION_MAX_CANDIDATES: usize = 5;
-
-// ── Hydration eligibility ─────────────────────────────────────────────
-//
-// A query type is hydration-eligible when it provides enough entity/symbol
-// identity for bounded CBM candidate-file discovery. Eligibility is based on
-// the request's available identity — NOT on the initial result count.
-
-/// Returns the entity name available for CBM discovery from this query, if any.
-fn hydration_query_name(query_type: &str, args: &Value) -> Option<String> {
-    match query_type {
-        // These types carry a name that CBM can search for candidate files.
-        "find_entities" => required_str(args, "name").map(String::from),
-        "forward_edges" | "reverse_edges" | "transitive_dependencies" => {
-            required_str(args, "name").map(String::from)
-        }
-        // entities_in_file: operates on a specific file — no entity name to search.
-        // has_cycle: workspace-wide property — no entity identity.
-        _ => None,
-    }
-}
-
-/// Whether this query type is hydration-eligible based on available identity.
-fn is_hydration_eligible(query_type: &str, args: &Value) -> bool {
-    hydration_query_name(query_type, args).is_some()
-}
-
-// ── Bounded hydration ─────────────────────────────────────────────────
-//
-// Discovers candidate file paths (from CBM or test injection), compiles
-// at most 5 previously-unindexed ones through the normal Clean-CTX path,
-// and updates WorkspaceIndex. CBM graph semantics are discarded — only
-// Clean-CTX semantic edges populate the index.
-//
-// Returns (candidates_discovered, candidates_compiled) for metadata.
-
-fn hydrate_workspace_index(
-    state: &McpState,
-    query_name: &str,
-    workspace_root: Option<&str>,
-) -> (usize, usize) {
-    // Step 1: Discover candidate file paths.
-    let candidate_paths = discover_candidate_paths(state, query_name);
-    let discovered = candidate_paths.len();
-    if discovered == 0 {
-        return (0, 0);
-    }
-
-    // Step 2: Deduplicate, exclude already-indexed, sort deterministically, cap.
-    let selected = select_candidates(state, candidate_paths, HYDRATION_MAX_CANDIDATES);
-    if selected.is_empty() {
-        return (discovered, 0);
-    }
-
-    // Step 3: Compile each candidate through the Clean-CTX path.
-    let mut compiled = 0;
-    for resolved_path in selected {
-        if compile_candidate(state, &resolved_path, workspace_root) {
-            compiled += 1;
-        }
-    }
-
-    (discovered, compiled)
-}
-
-/// Discover candidate file paths from CBM or test injection.
-/// Returns ONLY file paths — CBM graph semantics are discarded.
-fn discover_candidate_paths(state: &McpState, query_name: &str) -> Vec<String> {
-    // Test injection takes priority (test-only, cfg-gated).
-    #[cfg(test)]
-    {
-        if let Ok(injected) = TEST_HYDRATION_CANDIDATES.lock() {
-            if let Some(paths) = injected.as_ref() {
-                return paths.clone();
-            }
-        }
-    }
-
-    // Production: query CBM for candidate files.
-    let mut bridge_guard = state.graph_bridge_lock();
-    let bridge = match bridge_guard.as_mut() {
-        Some(b) => b,
-        None => return Vec::new(),
-    };
-    if !bridge.is_available() {
-        return Vec::new();
-    }
-    let nodes = bridge.search(query_name);
-    nodes
-        .iter()
-        .filter_map(|n| {
-            let path = &n.file;
-            if path.is_empty() {
-                None
-            } else {
-                Some(path.clone())
-            }
-        })
-        .collect()
-}
-
-/// Select candidates: deduplicate, exclude already-indexed, deterministic order, cap.
-fn select_candidates(state: &McpState, mut candidates: Vec<String>, max: usize) -> Vec<String> {
-    // Deduplicate while preserving first-seen order.
-    let mut seen = std::collections::HashSet::new();
-    candidates.retain(|p| seen.insert(p.clone()));
-
-    // Exclude already-indexed files.
-    let idx = state.workspace_index_read();
-    candidates.retain(|p| {
-        let canonical = crate::dictionary::path::canonical_identity_key(p);
-        !idx.file_map().contains_key(&canonical)
-    });
-    drop(idx);
-
-    // Deterministic lexical ordering (bounding mechanism, not relevance).
-    candidates.sort();
-
-    // Apply hard cap.
-    candidates.truncate(max);
-    candidates
-}
-
-/// Compile a single candidate through the normal Clean-CTX path.
-/// Returns true if compilation succeeded.
-fn compile_candidate(state: &McpState, resolved_path: &str, workspace_root: Option<&str>) -> bool {
-    // Path validation through the existing trust boundary.
-    let validated = match super::super::tool_helpers::resolve_file_path_checked(
-        resolved_path,
-        workspace_root,
-        &[],
-    ) {
-        Ok(p) => p,
-        Err(_) => return false, // reject invalid/out-of-root candidates
-    };
-
-    // Compile through the existing Clean-CTX path. Semantic edges from this
-    // compilation populate WorkspaceIndex.
-    match super::super::tool_helpers::compile_file_ir_focused(
-        &validated,
-        crate::compression::Fidelity::Edit,
-        state,
-        None,
-    ) {
-        Ok((_, semantic_edges, _)) => {
-            if !semantic_edges.is_empty() {
-                let canonical = crate::dictionary::path::canonical_identity_key(&validated);
-                let mut idx = state.workspace_index_lock();
-                idx.remove_file(&canonical);
-                idx.add_edges(&canonical, semantic_edges);
-            }
-            true
-        }
-        Err(_) => false, // graceful degradation: compilation failure is non-fatal
-    }
-}
 
 /// Handle `workspace_query` — read-only cross-file semantic queries.
 pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpState) {
@@ -297,13 +125,17 @@ where
     };
 
     // Step 2: Evaluate hydration eligibility (independent of result count).
-    let eligible = is_hydration_eligible(query_type, &serde_json::json!({ "name": query_name }));
+    let eligible = super::hydration::is_hydration_eligible(
+        query_type,
+        &serde_json::json!({ "name": query_name }),
+    );
     if !eligible {
         return (initial_results, initial_count, false, 0, 0);
     }
 
     // Step 3: One bounded hydration pass.
-    let (discovered, compiled) = hydrate_workspace_index(state, query_name, workspace_root);
+    let (discovered, compiled) =
+        super::hydration::hydrate_workspace_index(state, query_name, workspace_root);
 
     // Step 4: Rerun original query exactly once.
     let (final_results, final_count) = {
@@ -632,3 +464,7 @@ mod tests;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_2.rs"]
 mod tests_hydration;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_3.rs"]
+mod tests_multi_root_hydration;

@@ -16,6 +16,7 @@ pub mod context;
 pub mod core;
 pub mod edit;
 pub mod gitdiff;
+pub(crate) mod hydration;
 pub mod persistence;
 pub mod query;
 pub mod registry;

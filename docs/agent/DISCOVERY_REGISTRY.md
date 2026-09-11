@@ -46,6 +46,33 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-006: workspace_query Hydration Searched Only the Active CBM Project
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-11 |
+| **Environment** | Claude + Clean-CTX v0.6.3 field testing (`workspace_query` against a configured multi-root workspace) |
+| **Repository/context** | Primary workspace plus an already-indexed repository configured through `additional_roots`; the requested entity existed only in the additional repository. |
+| **Symptom** | Hydration reported `hydration_attempted: true` but `candidates_discovered: 0` when the entity existed only in an additional root. Project-aware CBM tools could find the entity in that repository. |
+| **Root cause** | `discover_candidate_paths` called `GraphBridge::search(query_name)`, which resolved its project through `self.project_str()` and therefore searched only the bridge's single active project. Hydration neither enumerated the existing configured project↔root map nor anchored project-relative `GraphNode.file` values to the root that produced them. Its validation call also supplied an empty `additional_roots` list. |
+| **Classification** | Emergent |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query_3.rs` — RED-15 additional-root-only discovery, RED-16 active-project preservation across success/partial-failure/empty/error paths, RED-17 merged-pool global cap/dedup/index exclusion/deterministic order, RED-18 per-project failure isolation; `src/tests/cbm/project_search.rs` — configured-project enumeration and explicit-search state preservation. |
+| **Live scenario required?** | Yes — repeat `workspace_query` against the original configured primary + additional-root workspace and confirm the additional-root-only entity is returned. |
+| **Architectural invariant** | WSC-002 (CBM discovers candidate file identities across configured projects; Clean-CTX alone determines WorkspaceIndex semantics) |
+| **Status** | Fixed |
+
+**Resolution:** hydration now enumerates the bridge's existing primary-root +
+`additional_roots` project map and searches every configured project explicitly,
+without calling `set_project`. Each relative CBM path is joined to the canonical
+root mapped to the project that returned it. The merged pool is normalized,
+deduplicated, filtered against already-indexed files, sorted once, and capped at
+five files total before every selected path passes the unchanged trusted-root
+validation and Clean-CTX compilation boundary. A failure in one project is local
+to that project; coverage remains partial and the original query still reruns once.
+
+---
+
 ## DIS-2026-002: IR Consumptive Pattern Compression Orphaning Method Identities
 
 | Field | Value |
