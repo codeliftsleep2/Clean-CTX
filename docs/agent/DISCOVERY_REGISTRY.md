@@ -46,6 +46,35 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-008: reverse_edges Hydration Compiled the Target Instead of Its Consumers
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-11 |
+| **Environment** | Claude + Clean-CTX v0.6.3 field testing (`workspace_query reverse_edges` across configured roots) |
+| **Repository/context** | Multi-project workspace with a target service declaration in one file and inbound consumers in separate files. |
+| **Symptom** | Hydration discovered and compiled one candidate—the target entity's declaration file—but `reverse_edges` remained empty even though direct CBM graph querying showed inbound consumers. |
+| **Root cause** | Every hydration-eligible query used declaration/name search. That is correct when the target's declaration emits the desired evidence, but reverse semantic edges are emitted while compiling caller/referrer files. Compiling only the target declaration cannot populate those inbound WorkspaceIndex edges. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query_4.rs` RED-23 through RED-28; `src/tests/cbm/project_search.rs::inbound_reference_query_is_path_only_exact_and_escaped` and `explicit_project_inbound_error_preserves_active_project`. |
+| **Live scenario required?** | Yes—repeat the original additional-root `reverse_edges` query and confirm consumer candidates compile and produce authoritative WorkspaceIndex edges. |
+| **Architectural invariant** | WSC-002 |
+| **Status** | Fixed |
+
+**Resolution:** bounded hydration now selects discovery by query semantics.
+`find_entities`, `forward_edges`, and `transitive_dependencies` retain name-based
+declaration discovery. `reverse_edges` performs a project-explicit inbound graph
+query for the existing simple target name and projects caller file paths only;
+known definition-only `DEFINES` and `DEFINES_METHOD` relationships are excluded.
+Each path still crosses the existing trusted-root and Clean-CTX compilation
+boundary. CBM relationship type, direction, identity, and cardinality never enter
+WorkspaceIndex. Multi-project merging, deterministic ordering, the global
+five-file cap, one-cycle hydration, advisory readiness, and coverage metadata are
+unchanged.
+
+---
+
 ## DIS-2026-007: Session-Local CBM Readiness Suppressed Queryable Persisted Graphs
 
 | Field | Value |

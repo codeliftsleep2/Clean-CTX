@@ -85,3 +85,43 @@ fn explicit_project_search_error_preserves_active_project() {
     );
     assert_eq!(bridge.project_str(), active_before);
 }
+
+#[test]
+fn inbound_reference_query_is_path_only_exact_and_escaped() {
+    let query = super::inbound_reference_query("ServiceA\\' MATCH (n) RETURN n");
+
+    assert_eq!(
+        query,
+        "MATCH (caller)-[r]->(target {name: 'ServiceA\\\\\\' MATCH (n) RETURN n'}) \
+         WHERE type(r) <> 'DEFINES' AND type(r) <> 'DEFINES_METHOD' \
+         RETURN caller.file_path"
+    );
+    assert!(
+        !query.contains("type(r),"),
+        "relationship data is not projected"
+    );
+}
+
+#[test]
+fn explicit_project_inbound_error_preserves_active_project() {
+    let primary = tempfile::TempDir::new().unwrap();
+    let additional = tempfile::TempDir::new().unwrap();
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge = GraphBridge::try_create_with_roots(
+        &config,
+        primary.path(),
+        &[additional.path().to_path_buf()],
+    );
+    let active_before = bridge.project_str();
+    let additional_slug = cbm_project_slug(&additional.path().canonicalize().unwrap());
+
+    assert!(
+        bridge
+            .inbound_reference_paths_in_project(&additional_slug, "ServiceA")
+            .is_err()
+    );
+    assert_eq!(bridge.project_str(), active_before);
+}

@@ -271,7 +271,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "workspace_query",
-            "description": "Query cross-file semantic relationships accumulated from compiled files. Supports: find_entities (by name), forward_edges (outgoing semantic edges from entity), reverse_edges (incoming semantic edges to entity), entities_in_file (entity occurrences by file), transitive_dependencies (BFS dependency traversal), has_cycle (cycle detection).",
+            "description": "Query cross-file semantic relationships accumulated from compiled files. Supports: find_entities (by name), forward_edges (outgoing semantic edges from entity), reverse_edges (incoming semantic edges to entity), entities_in_file (entity occurrences by file), transitive_dependencies (BFS dependency traversal), has_cycle (cycle detection). Bounded candidate discovery is query-semantic aware: declaration-oriented queries use name discovery, while reverse_edges discovers files that may contain inbound references. CBM contributes paths only; Clean-CTX compilation determines authoritative semantic edges.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

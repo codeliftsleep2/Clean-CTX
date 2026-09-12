@@ -8,8 +8,9 @@
 //
 // Bounded hydration: for eligible query types, after the initial WorkspaceIndex
 // query, ONE bounded CBM candidate-file discovery pass may run across the
-// primary root plus configured additional roots. CBM supplies ONLY candidate
-// file paths. Those paths flow through resolve_file_path_checked →
+// primary root plus configured additional roots. Declaration-oriented queries
+// use name discovery; reverse_edges uses inbound-reference discovery. CBM
+// supplies ONLY candidate file paths. Those paths flow through resolve_file_path_checked →
 // compile_file_ir_focused → Clean-CTX semantic extraction → WorkspaceIndex.
 // CBM graph semantics (edge counts, relationship types, etc.) never enter the
 // WorkspaceIndex. The original query reruns exactly once after hydration.
@@ -141,7 +142,8 @@ where
     }
 
     // Step 3: One bounded hydration pass.
-    let hydration = super::hydration::hydrate_workspace_index(state, query_name, workspace_root);
+    let hydration =
+        super::hydration::hydrate_workspace_index(state, query_type, query_name, workspace_root);
 
     // Step 4: Rerun original query exactly once.
     let (final_results, final_count) = {
@@ -480,3 +482,7 @@ mod tests_hydration;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_3.rs"]
 mod tests_multi_root_hydration;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_4.rs"]
+mod tests_reverse_hydration;

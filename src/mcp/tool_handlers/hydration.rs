@@ -1,12 +1,13 @@
 // workspace_query bounded-hydration support.
 
-use crate::cbm::GraphNode;
 use crate::mcp::McpState;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+#[cfg(all(test, feature = "rust"))]
+use crate::cbm::GraphNode;
 #[cfg(all(test, feature = "rust"))]
 use std::collections::HashMap;
 #[cfg(all(test, feature = "rust"))]
@@ -37,6 +38,9 @@ pub(super) struct ProjectCoverage {
 pub(crate) static TEST_HYDRATION_CANDIDATES: Mutex<Option<Vec<String>>> = Mutex::new(None);
 
 #[cfg(all(test, feature = "rust"))]
+pub(crate) static TEST_PROJECT_HYDRATION_SERIALIZE: Mutex<()> = Mutex::new(());
+
+#[cfg(all(test, feature = "rust"))]
 pub(crate) type TestProjectSearchResult = Result<Vec<GraphNode>, String>;
 
 #[cfg(all(test, feature = "rust"))]
@@ -49,9 +53,17 @@ pub(crate) enum TestProjectReadiness {
 }
 
 #[cfg(all(test, feature = "rust"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum TestDiscoveryKind {
+    Declaration,
+    InboundReference,
+}
+
+#[cfg(all(test, feature = "rust"))]
 struct TestProjectSearchConfig {
     owner: std::thread::ThreadId,
     results: HashMap<String, TestProjectSearchResult>,
+    inbound_results: HashMap<String, TestProjectSearchResult>,
     readiness: HashMap<String, TestProjectReadiness>,
 }
 
@@ -62,18 +74,38 @@ static TEST_PROJECT_SEARCH_RESULTS: Mutex<Option<TestProjectSearchConfig>> = Mut
 pub(crate) static TEST_SEARCHED_PROJECTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 #[cfg(all(test, feature = "rust"))]
+static TEST_DISCOVERY_CALLS: Mutex<Vec<(String, TestDiscoveryKind)>> = Mutex::new(Vec::new());
+
+#[cfg(all(test, feature = "rust"))]
 pub(crate) fn set_test_project_search_results(results: HashMap<String, TestProjectSearchResult>) {
     *TEST_PROJECT_SEARCH_RESULTS
         .lock()
         .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned") = Some(TestProjectSearchConfig {
         owner: std::thread::current().id(),
         results,
+        inbound_results: HashMap::new(),
         readiness: HashMap::new(),
     });
     TEST_SEARCHED_PROJECTS
         .lock()
         .expect("TEST_SEARCHED_PROJECTS lock poisoned")
         .clear();
+    TEST_DISCOVERY_CALLS
+        .lock()
+        .expect("TEST_DISCOVERY_CALLS lock poisoned")
+        .clear();
+}
+
+#[cfg(all(test, feature = "rust"))]
+pub(crate) fn set_test_inbound_project_search_results(
+    results: HashMap<String, TestProjectSearchResult>,
+) {
+    TEST_PROJECT_SEARCH_RESULTS
+        .lock()
+        .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned")
+        .as_mut()
+        .expect("project search results configured first")
+        .inbound_results = results;
 }
 
 #[cfg(all(test, feature = "rust"))]
@@ -95,6 +127,10 @@ pub(crate) fn clear_test_project_search_results() {
         .lock()
         .expect("TEST_SEARCHED_PROJECTS lock poisoned")
         .clear();
+    TEST_DISCOVERY_CALLS
+        .lock()
+        .expect("TEST_DISCOVERY_CALLS lock poisoned")
+        .clear();
 }
 
 #[cfg(all(test, feature = "rust"))]
@@ -103,6 +139,20 @@ pub(crate) fn searched_projects() -> Vec<String> {
         .lock()
         .expect("TEST_SEARCHED_PROJECTS lock poisoned")
         .clone()
+}
+
+#[cfg(all(test, feature = "rust"))]
+pub(crate) fn discovery_calls() -> Vec<(String, TestDiscoveryKind)> {
+    TEST_DISCOVERY_CALLS
+        .lock()
+        .expect("TEST_DISCOVERY_CALLS lock poisoned")
+        .clone()
+}
+
+#[derive(Clone, Copy)]
+enum DiscoveryKind {
+    Declaration,
+    InboundReference,
 }
 
 pub(super) fn is_hydration_eligible(query_type: &str, args: &Value) -> bool {
@@ -114,10 +164,13 @@ pub(super) fn is_hydration_eligible(query_type: &str, args: &Value) -> bool {
 
 pub(super) fn hydrate_workspace_index(
     state: &McpState,
+    query_type: &str,
     query_name: &str,
     workspace_root: Option<&str>,
 ) -> HydrationReport {
-    let (candidate_paths, mut project_coverage) = discover_candidate_paths(state, query_name);
+    let discovery = discovery_kind(query_type);
+    let (candidate_paths, mut project_coverage) =
+        discover_candidate_paths(state, discovery, query_name);
     let discovered = candidate_paths.len();
     let selected = select_candidates(state, candidate_paths, HYDRATION_MAX_CANDIDATES);
     let compiled = selected
@@ -135,8 +188,16 @@ pub(super) fn hydrate_workspace_index(
     }
 }
 
+fn discovery_kind(query_type: &str) -> DiscoveryKind {
+    match query_type {
+        "reverse_edges" => DiscoveryKind::InboundReference,
+        _ => DiscoveryKind::Declaration,
+    }
+}
+
 fn discover_candidate_paths(
     state: &McpState,
+    discovery: DiscoveryKind,
     query_name: &str,
 ) -> (Vec<String>, Vec<ProjectCoverage>) {
     #[cfg(all(test, feature = "rust"))]
@@ -187,7 +248,8 @@ fn discover_candidate_paths(
                     continue;
                 }
             };
-            let result = test_project_search(&project).expect("configured project search result");
+            let result =
+                test_project_search(&project, discovery).expect("configured project search result");
             match result {
                 Ok(nodes) => {
                     append_project_paths(&mut candidates, &root, nodes);
@@ -222,9 +284,17 @@ fn discover_candidate_paths(
             Ok(crate::cbm::bridge::IndexingStatus::StillIndexing { .. }) => "still_indexing",
             Err(_) => "failed",
         };
-        match bridge.search_in_project(&project, query_name) {
-            Ok(nodes) => {
-                append_project_paths(&mut candidates, &root, nodes);
+        let discovered = match discovery {
+            DiscoveryKind::Declaration => bridge
+                .search_in_project(&project, query_name)
+                .map(|nodes| nodes.into_iter().map(|node| node.file).collect()),
+            DiscoveryKind::InboundReference => {
+                bridge.inbound_reference_paths_in_project(&project, query_name)
+            }
+        };
+        match discovered {
+            Ok(paths) => {
+                append_rooted_paths(&mut candidates, &root, paths);
                 coverage.push(ProjectCoverage {
                     project,
                     status: "searched",
@@ -243,12 +313,21 @@ fn discover_candidate_paths(
     (candidates, coverage)
 }
 
+#[cfg(all(test, feature = "rust"))]
 fn append_project_paths(candidates: &mut Vec<String>, root: &Path, nodes: Vec<GraphNode>) {
-    candidates.extend(nodes.into_iter().filter_map(|node| {
-        if node.file.is_empty() {
+    append_rooted_paths(
+        candidates,
+        root,
+        nodes.into_iter().map(|node| node.file).collect(),
+    );
+}
+
+fn append_rooted_paths(candidates: &mut Vec<String>, root: &Path, paths: Vec<String>) {
+    candidates.extend(paths.into_iter().filter_map(|file| {
+        if file.is_empty() {
             return None;
         }
-        let path = PathBuf::from(node.file);
+        let path = PathBuf::from(file);
         let rooted = if path.is_absolute() {
             path
         } else {
@@ -309,7 +388,7 @@ pub(crate) fn compile_candidate(
 }
 
 #[cfg(all(test, feature = "rust"))]
-fn test_project_search(project: &str) -> Option<TestProjectSearchResult> {
+fn test_project_search(project: &str, discovery: DiscoveryKind) -> Option<TestProjectSearchResult> {
     let results = TEST_PROJECT_SEARCH_RESULTS
         .lock()
         .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned");
@@ -321,9 +400,20 @@ fn test_project_search(project: &str) -> Option<TestProjectSearchResult> {
         .lock()
         .expect("TEST_SEARCHED_PROJECTS lock poisoned")
         .push(project.to_string());
+    let test_discovery = match discovery {
+        DiscoveryKind::Declaration => TestDiscoveryKind::Declaration,
+        DiscoveryKind::InboundReference => TestDiscoveryKind::InboundReference,
+    };
+    TEST_DISCOVERY_CALLS
+        .lock()
+        .expect("TEST_DISCOVERY_CALLS lock poisoned")
+        .push((project.to_string(), test_discovery));
+    let results = match discovery {
+        DiscoveryKind::Declaration => &configured.results,
+        DiscoveryKind::InboundReference => &configured.inbound_results,
+    };
     Some(
-        configured
-            .results
+        results
             .get(project)
             .cloned()
             .unwrap_or_else(|| Ok(Vec::new())),

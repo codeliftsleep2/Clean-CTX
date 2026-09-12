@@ -9,7 +9,8 @@ use crate::mcp::tool_handlers::hydration::{
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-static TEST_SERIALIZE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static TEST_SERIALIZE: &std::sync::Mutex<()> =
+    &crate::mcp::tool_handlers::hydration::TEST_PROJECT_HYDRATION_SERIALIZE;
 
 fn node(file: impl Into<String>) -> GraphNode {
     GraphNode {
