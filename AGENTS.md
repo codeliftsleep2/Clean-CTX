@@ -170,6 +170,24 @@ Use `scripts/check-file-sizes.ps1` for enforcement. Local runs inspect working
 tree and index changes; CI supplies a base revision to include committed
 branch changes.
 
+### 7b. Long-running verification boundary
+
+Agents must not start commands that are expected to run for a long time. This
+includes full test suites, repository-wide Clippy, repository-wide `cargo
+check`, exhaustive benchmarks, and similarly expensive verification commands.
+
+Instead, the agent must:
+
+1. Run only focused, reasonably short checks needed for iterative development.
+2. Provide the exact long-running commands for the user to run manually.
+3. Wait for and accurately report the results supplied by the user.
+4. Never claim an unrun user-owned gate passed.
+
+If a command unexpectedly becomes long-running, stop it promptly, explain what
+was interrupted, and return the command to the user. The user may explicitly
+authorize an agent to run a particular long command for the current task; that
+one-time authorization does not change this default policy.
+
 ### 8. Definition of Done
 
 A task is complete only when the implementation is complete, the architecture

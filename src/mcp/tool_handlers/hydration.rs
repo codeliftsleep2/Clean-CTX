@@ -10,6 +10,9 @@ mod filesystem;
 use filesystem::{configured_roots, deduplicate_roots, root_key, scan};
 
 #[cfg(all(test, feature = "rust"))]
+pub(crate) use filesystem::{TraversalStats, last_test_traversal_stats};
+
+#[cfg(all(test, feature = "rust"))]
 use crate::cbm::GraphNode;
 #[cfg(all(test, feature = "rust"))]
 use std::collections::HashMap;

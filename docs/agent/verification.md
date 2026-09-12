@@ -6,7 +6,14 @@ reference this one.
 
 ## Final Verification Gate
 
-Run on the reported change set before declaring any task complete:
+The complete gate must cover the reported change set before declaring any task
+complete. Under the long-running verification boundary in the engineering
+rules, agents provide these commands for the user to run manually and report
+the user's results accurately. Agents may run focused, reasonably short checks
+during implementation, but must not start the complete gate unless the user
+explicitly authorizes that particular run.
+
+User-run commands:
 
 ```bash
 cargo fmt --all -- --check

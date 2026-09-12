@@ -515,3 +515,7 @@ mod tests_hydration_completeness;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_6.rs"]
 mod tests_filesystem_hydration;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_7.rs"]
+mod tests_filesystem_safety;

@@ -46,6 +46,31 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-011: Filesystem Hydration Had No Safe Default Traversal Scope
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-12 |
+| **Environment** | Clean-CTX v0.6.3 with CBM disabled against a real multi-root workspace |
+| **Repository/context** | Normal source roots containing dependency, VCS metadata, build-output, generated, and cache trees; default empty `exclude_patterns`. |
+| **Symptom** | A `workspace_query reverse_edges` filesystem fallback recursively scanned supported-extension files in heavyweight irrelevant trees and did not return within a practical period, requiring manual interruption. |
+| **Root cause** | The dedicated `WalkDir` fallback pruned entries only through user-configured `is_excluded`; default configuration supplies no patterns. |
+| **Classification** | Emergent |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query_7.rs` RED-S1 through RED-S9. Test-only counters prove 2,048 supported files under `node_modules` are neither considered nor read while legitimate primary/additional-root source remains searchable. |
+| **Live scenario required?** | Yes — with CBM disabled and empty exclusions, repeat `reverse_edges` plus another hydration query against the real multi-root workspace and inspect provider/completion/candidate metadata. |
+| **Architectural invariant** | WSC-001/WSC-002 |
+| **Status** | Fixed locally; live acceptance pending |
+
+**Resolution:** filesystem candidate discovery now prunes an exact, always-on
+set of conventional metadata/dependency/build/cache directories before walking
+their contents, then applies configured exclusions additively. The provider
+contract, trusted candidate-path boundary, exhaustive processing semantics,
+symlink behavior, and partial status on traversal/read failure are unchanged.
+No numeric work budget or timeout was introduced.
+
+---
+
 ## DIS-2026-010: workspace_query Hydration Silently Required CBM
 
 | Field | Value |
