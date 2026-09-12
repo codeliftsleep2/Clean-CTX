@@ -96,6 +96,23 @@ try {
     Assert-Case 'new file at 615-line ceiling passes' ($result.ExitCode -eq 0) ($result | Out-String)
     [System.IO.File]::Delete((Join-Path $repository 'allowed.md'))
 
+    Write-Lines (Join-Path $repository 'Cargo.lock') 700
+    Write-Lines (Join-Path $repository 'package-lock.json') 700
+    $result = Invoke-Validator $repository
+    Assert-Case 'generated dependency lockfiles are exempt' (
+        $result.ExitCode -eq 0 -and
+        ($result.Failures -join "`n") -notmatch 'Cargo.lock|package-lock.json'
+    ) ($result | Out-String)
+    [System.IO.File]::Delete((Join-Path $repository 'Cargo.lock'))
+    [System.IO.File]::Delete((Join-Path $repository 'package-lock.json'))
+
+    Write-Lines (Join-Path $repository 'manual.lock') 616
+    $result = Invoke-Validator $repository
+    Assert-Case 'ordinary lock-suffixed text file remains enforced' (
+        $result.ExitCode -eq 1 -and ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*new.*manual.lock.*616 lines'
+    ) ($result | Out-String)
+    [System.IO.File]::Delete((Join-Path $repository 'manual.lock'))
+
     Write-Lines (Join-Path $repository 'committed.md') 616
     Invoke-Git $repository @('add', 'committed.md')
     Invoke-Git $repository @('commit', '--quiet', '-m', 'oversized active file')

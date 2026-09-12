@@ -165,6 +165,10 @@ file**.
   oversized files.
 - Do not evade the ceiling by moving content into another oversized helper,
   support, or generated-by-hand file.
+- Generated dependency lockfiles (for example `Cargo.lock` and
+  `package-lock.json`) are exempt because their structure is tool-owned and
+  cannot be semantically decomposed. The exemption is filename-specific and
+  does not apply to ordinary hand-maintained `*.lock` files.
 
 Use `scripts/check-file-sizes.ps1` for enforcement. Local runs inspect working
 tree and index changes; CI supplies a base revision to include committed

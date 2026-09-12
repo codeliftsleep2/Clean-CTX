@@ -29,6 +29,19 @@ $TargetLines = 600
 $MaximumLines = 615
 $TextPattern = '\.(rs|toml|json|jsonc|ya?ml|md|markdown|txt|html|css|scss|mjs|cjs|js|jsx|ts|tsx|cs|java|sql|xml|csv|tsv|ps1|psm1|lock|gitattributes|dotsettings|sh)$'
 $DotFiles = '^\.(gitignore|gitattributes|editorconfig)$'
+$GeneratedDependencyLockfiles = @(
+    'Cargo.lock',
+    'Gemfile.lock',
+    'Pipfile.lock',
+    'bun.lock',
+    'composer.lock',
+    'npm-shrinkwrap.json',
+    'package-lock.json',
+    'pnpm-lock.yaml',
+    'poetry.lock',
+    'uv.lock',
+    'yarn.lock'
+)
 
 if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
     $RepositoryRoot = Join-Path $PSScriptRoot '..'
@@ -62,6 +75,8 @@ function Invoke-GitLines {
 
 function Test-NormalTextFile {
     param([string]$RelativePath)
+    $fileName = [System.IO.Path]::GetFileName($RelativePath.Replace('\', '/'))
+    if ($GeneratedDependencyLockfiles -contains $fileName) { return $false }
     return $RelativePath -match $TextPattern -or $RelativePath -match $DotFiles
 }
 

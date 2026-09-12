@@ -81,8 +81,8 @@ tiktoken-rs = "0.12"
 # Parallel iteration for workspace compression passes (F-FULL-15)
 rayon = "1.10"
 
-# Streaming directory walker for F-19 (replaces recursive collect-then-sort)
-walkdir = "2.5"
+# Git-compatible ignore-aware traversal for filesystem hydration fallback
+ignore = "0.4.33"
 
 # Lock-free work queue for A-PRODUCTION dispatcher
 crossbeam-channel = "0.5"
