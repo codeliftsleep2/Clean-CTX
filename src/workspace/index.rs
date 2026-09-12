@@ -28,9 +28,10 @@
 //                     `Injects(A, A)`) remain cycles. Enforced by
 //                     tests::self_defines_edge_is_registration_record_only.
 
-use crate::compression::graph_utils;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::{HashMap, HashSet};
+
+mod traversal;
 
 // ── Key types ─────────────────────────────────────────────────────────
 
@@ -116,6 +117,9 @@ pub struct WorkspaceIndex {
     total_edges_inserted: usize,
     /// Active edge count after dedup.
     edge_count: usize,
+    /// Name buckets examined by the most recent file removal.
+    #[cfg(test)]
+    name_cleanup_buckets_examined: Vec<String>,
 }
 impl WorkspaceIndex {
     /// Create an empty WorkspaceIndex.
@@ -130,6 +134,8 @@ impl WorkspaceIndex {
             name_index: HashMap::new(),
             total_edges_inserted: 0,
             edge_count: 0,
+            #[cfg(test)]
+            name_cleanup_buckets_examined: Vec::new(),
         }
     }
 
@@ -385,6 +391,9 @@ impl WorkspaceIndex {
     /// are inserted) or when a file is deleted from the workspace. Preserves all
     /// other files' edges and entities.
     pub fn remove_file(&mut self, file_path: &str) {
+        #[cfg(test)]
+        self.name_cleanup_buckets_examined.clear();
+
         // Phase 1: Remove edges tracked to this file via file_edges.
         if let Some(edge_keys) = self.file_edges.remove(file_path) {
             for key in edge_keys {
@@ -394,6 +403,9 @@ impl WorkspaceIndex {
 
         // Phase 2: Remove entity keys tracked to this file.
         if let Some(keys) = self.file_map.remove(file_path) {
+            let affected_names: HashSet<String> =
+                keys.iter().map(|(_, _, name)| name.clone()).collect();
+
             // Remove entities that only existed in this file.
             for key in &keys {
                 if let Some(occurrences) = self.entities.get_mut(key) {
@@ -444,13 +456,30 @@ impl WorkspaceIndex {
                     });
                 }
             }
-        }
 
-        // Phase 3: Clean up name_index entries that no longer exist.
-        self.name_index.retain(|_name, keys| {
-            keys.retain(|k| self.entities.contains_key(k));
-            !keys.is_empty()
-        });
+            // Phase 3: Clean only names represented by the removed file.
+            // Unrelated name buckets cannot contain any of `keys`, so visiting
+            // them would make recompilation scale with total workspace size.
+            for name in affected_names {
+                #[cfg(test)]
+                self.name_cleanup_buckets_examined.push(name.clone());
+
+                let remove_bucket = if let Some(name_keys) = self.name_index.get_mut(&name) {
+                    name_keys.retain(|key| self.entities.contains_key(key));
+                    name_keys.is_empty()
+                } else {
+                    false
+                };
+                if remove_bucket {
+                    self.name_index.remove(&name);
+                }
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn name_cleanup_buckets_examined(&self) -> &[String] {
+        &self.name_cleanup_buckets_examined
     }
     // ── Phase 4b queries ─────────────────────────────────────────────
 
@@ -545,135 +574,6 @@ impl WorkspaceIndex {
         }
         results
     }
-
-    // ── Phase 4c: Graph Traversal ──────────────────────────────────
-
-    /// The set of `SemanticRelation` variants that represent dependency
-    /// relationships (not structural/metadata). Used by `transitive_dependencies`
-    /// to determine which forward edges to traverse.
-    const DEPENDENCY_RELATIONS: &'static [SemanticRelation] = &[
-        SemanticRelation::Injects,
-        SemanticRelation::Autowired,
-        SemanticRelation::ImportsModule,
-        SemanticRelation::HandlesAction,
-        SemanticRelation::CallsService,
-        SemanticRelation::HasEntity,
-        SemanticRelation::MapsFrom,
-        SemanticRelation::ConfigurationProperties,
-    ];
-
-    /// Build a deterministic node index from all registered entity identities.
-    ///
-    /// Returns a sorted `Vec<EntityKey>` (the node list) and a
-    /// `HashMap<EntityKey, usize>` mapping each key to its position.
-    /// The sorted order ensures deterministic traversal across calls.
-    fn build_node_index(&self) -> (Vec<EntityKey>, HashMap<EntityKey, usize>) {
-        let mut all_keys: std::collections::HashSet<EntityKey> = std::collections::HashSet::new();
-        all_keys.extend(self.entities.keys().cloned());
-        all_keys.extend(self.forward.keys().cloned());
-        all_keys.extend(self.reverse.keys().cloned());
-        let mut keys: Vec<EntityKey> = all_keys.into_iter().collect();
-        keys.sort();
-        let map: HashMap<EntityKey, usize> = keys
-            .iter()
-            .enumerate()
-            .map(|(i, k)| (k.clone(), i))
-            .collect();
-        (keys, map)
-    }
-
-    /// Check whether the entity graph contains any directed cycles.
-    ///
-    /// Traverses all currently produced semantic relations (both dependency
-    /// and structural). Uses three-color DFS. File provenance is irrelevant
-    /// — operates on `EntityKey` identity only.
-    ///
-    /// Returns `false` for an empty index or a single-node graph with no
-    /// self-loop.
-    pub fn has_cycle(&self) -> bool {
-        let (node_list, index_map) = self.build_node_index();
-        if node_list.is_empty() {
-            return false;
-        }
-
-        let adj_fn = |i: usize| {
-            let key = &node_list[i];
-            self.forward
-                .get(key)
-                .map(|edges| {
-                    edges
-                        .iter()
-                        .filter_map(|e| index_map.get(&entity_key(&e.object)).copied())
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default()
-        };
-
-        graph_utils::has_cycle(node_list.len(), adj_fn)
-    }
-
-    /// Compute transitive dependencies of an entity identity.
-    ///
-    /// Traverses only dependency-like semantic relations:
-    /// `Injects`, `Autowired`, `ImportsModule`, `HandlesAction`,
-    /// `CallsService`, `HasEntity`, `MapsFrom`, `ConfigurationProperties`.
-    ///
-    /// Structural/metadata relations (`HasSelector`, `RouteMapsTo`, etc.)
-    /// are NOT traversed.
-    ///
-    /// # Arguments
-    /// * `domain` - Entity domain
-    /// * `entity_type` - Entity type
-    /// * `name` - Entity name
-    /// * `depth` - Max traversal depth: `0` = unlimited, `1` = direct,
-    ///   `2` = transitive. Negative behaves as `0`.
-    ///
-    /// # Returns
-    /// `Vec<EntityKey>` — reachable entity identities in BFS order
-    /// (insertion-order derived). The starting entity is excluded.
-    /// Each EntityKey appears at most once.
-    pub fn transitive_dependencies(
-        &self,
-        domain: &str,
-        entity_type: &str,
-        name: &str,
-        depth: i32,
-    ) -> Vec<EntityKey> {
-        let start_key = (
-            domain.to_string(),
-            entity_type.to_string(),
-            name.to_string(),
-        );
-        if !self.forward.contains_key(&start_key) {
-            return Vec::new();
-        }
-
-        let (node_list, index_map) = self.build_node_index();
-
-        let start_idx = match index_map.get(&start_key) {
-            Some(&idx) => idx,
-            None => return Vec::new(),
-        };
-
-        let adj_fn = |i: usize| {
-            let key = &node_list[i];
-            self.forward
-                .get(key)
-                .map(|edges| {
-                    edges
-                        .iter()
-                        .filter(|e| WorkspaceIndex::DEPENDENCY_RELATIONS.contains(&e.relation))
-                        .filter_map(|e| index_map.get(&entity_key(&e.object)).copied())
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default()
-        };
-
-        let depth_param = if depth < 0 { 0 } else { depth };
-        let indices =
-            graph_utils::transitive_dependencies(start_idx, depth_param, node_list.len(), adj_fn);
-        indices.into_iter().map(|i| node_list[i].clone()).collect()
-    }
 }
 
 impl Default for WorkspaceIndex {
@@ -685,3 +585,7 @@ impl Default for WorkspaceIndex {
 #[cfg(test)]
 #[path = "../tests/workspace/index.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/workspace/index_performance.rs"]
+mod performance_tests;
