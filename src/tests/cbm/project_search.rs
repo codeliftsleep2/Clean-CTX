@@ -1,6 +1,7 @@
 use crate::cbm::GraphBridge;
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::config::CbmConfig;
+use serde_json::Value;
 
 #[test]
 fn configured_projects_are_complete_deterministic_and_non_mutating() {
@@ -93,12 +94,75 @@ fn inbound_reference_query_is_path_only_exact_and_escaped() {
     assert_eq!(
         query,
         "MATCH (caller)-[r]->(target {name: 'ServiceA\\\\\\' MATCH (n) RETURN n'}) \
-         WHERE type(r) <> 'DEFINES' AND type(r) <> 'DEFINES_METHOD' \
-         RETURN caller.file_path"
+         RETURN caller.file_path, type(r)"
+    );
+    // CBM's Cypher subset rejects `type(r)` inside `WHERE` comparisons;
+    // the query must project type(r) in RETURN and filter client-side.
+    assert!(
+        !query.contains("WHERE type(r)"),
+        "relationship type filtering must be client-side, not in WHERE"
+    );
+}
+
+#[test]
+fn red_r1_inbound_query_is_cbm_compatible() {
+    let query = super::inbound_reference_query("ServiceA");
+
+    // CBM's Cypher subset rejects `type(r)` inside `WHERE` comparisons
+    // (parser error lands on the `type(` expression). The query must
+    // project type(r) in RETURN and filter client-side instead.
+    assert!(
+        !query.contains("WHERE type(r)"),
+        "regression: WHERE type(r) is not supported by CBM's Cypher subset"
     );
     assert!(
-        !query.contains("type(r),"),
-        "relationship data is not projected"
+        query.contains("RETURN caller.file_path, type(r)"),
+        "query must project caller.file_path and type(r) for client-side filtering"
+    );
+    assert!(
+        query.contains("MATCH (caller)-[r]->(target"),
+        "query must match the inbound reference pattern"
+    );
+}
+
+#[test]
+fn red_r2_definition_relationships_are_filtered_client_side() {
+    let usage_row = vec![
+        Value::String("consumer.ts".into()),
+        Value::String("USAGE".into()),
+    ];
+    let defines_row = vec![
+        Value::String("declaration.ts".into()),
+        Value::String("DEFINES".into()),
+    ];
+    let defines_method_row = vec![
+        Value::String("method_decl.ts".into()),
+        Value::String("DEFINES_METHOD".into()),
+    ];
+    let calls_row = vec![
+        Value::String("caller.ts".into()),
+        Value::String("CALLS".into()),
+    ];
+
+    assert_eq!(
+        super::filter_inbound_reference_row(&usage_row),
+        Some("consumer.ts".to_string()),
+        "USAGE relationship must be retained as a valid inbound reference"
+    );
+    assert_eq!(
+        super::filter_inbound_reference_row(&defines_row),
+        None,
+        "DEFINES relationship must be discarded client-side"
+    );
+    assert_eq!(
+        super::filter_inbound_reference_row(&defines_method_row),
+        None,
+        "DEFINES_METHOD relationship must be discarded client-side"
+    );
+    assert_eq!(
+        super::filter_inbound_reference_row(&calls_row),
+        Some("caller.ts".to_string()),
+        "CALLS relationship must be retained as a valid inbound reference"
     );
 }
 

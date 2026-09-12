@@ -4,17 +4,40 @@ use super::bridge::{GraphBridge, GraphNode, map_search_result};
 use super::client::CbmError;
 use std::path::PathBuf;
 
+// Used by filter_inbound_reference_row to decode query_graph cells.
+use serde_json::Value;
+
 fn escape_cypher_string_literal(value: &str) -> String {
     value.replace('\\', "\\\\").replace('\'', "\\'")
 }
 
 fn inbound_reference_query(target_name: &str) -> String {
     let escaped = escape_cypher_string_literal(target_name);
+    // CBM's Cypher subset rejects `type(r)` inside `WHERE` comparisons
+    // (parser error lands on the `type(` expression). Project the
+    // relationship type in RETURN and filter client-side instead.
     format!(
         "MATCH (caller)-[r]->(target {{name: '{escaped}'}}) \
-         WHERE type(r) <> 'DEFINES' AND type(r) <> 'DEFINES_METHOD' \
-         RETURN caller.file_path"
+         RETURN caller.file_path, type(r)"
     )
+}
+
+/// Extract the caller file path from an inbound-reference query row,
+/// returning `None` for definition-only relationships.
+///
+/// The query projects `[caller.file_path, type(r)]`. `DEFINES` and
+/// `DEFINES_METHOD` relationships do not represent inbound references
+/// and are discarded client-side. The relationship type is used only
+/// to discard irrelevant rows; it never enters WorkspaceIndex as a
+/// semantic edge.
+fn filter_inbound_reference_row(row: &[Value]) -> Option<String> {
+    let rel_type = row.get(1).and_then(|v| v.as_str()).unwrap_or("");
+    if rel_type == "DEFINES" || rel_type == "DEFINES_METHOD" {
+        return None;
+    }
+    row.first()
+        .and_then(|value| value.as_str())
+        .map(String::from)
 }
 
 impl GraphBridge {
@@ -90,11 +113,7 @@ impl GraphBridge {
         Ok(table
             .rows
             .iter()
-            .filter_map(|row| {
-                row.first()
-                    .and_then(|value| value.as_str())
-                    .map(String::from)
-            })
+            .filter_map(|row| filter_inbound_reference_row(row))
             .filter(|path| !path.is_empty())
             .collect())
     }
