@@ -46,6 +46,33 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-010: workspace_query Hydration Silently Required CBM
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-12 |
+| **Environment** | Clean-CTX without an installed or usable CBM bridge |
+| **Repository/context** | Fresh session with relevant source files under the primary workspace root or configured `additional_roots`, but not yet compiled into WorkspaceIndex. |
+| **Symptom** | Hydration-eligible queries ran but discovered and compiled zero candidates whenever CBM was absent. The response was indistinguishable from a successful workspace search that genuinely found nothing. |
+| **Root cause** | Candidate discovery returned an empty vector immediately when `graph_bridge` was `None`; no CBM-independent provider existed and the metadata described counts rather than discovery-provider coverage. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query_6.rs` RED-F1 through RED-F10 (no-CBM primary/additional-root hydration, reverse consumers, authority isolation, truthful zero results, healthy-CBM preservation, degraded fallback, exhaustive candidates, deduplication, and already-indexed exclusion). |
+| **Live scenario required?** | Yes — disable CBM and run `find_entities`, `forward_edges`, and `reverse_edges` without manually compiling targets; repeat for an additional-root-only entity and inspect discovery metadata. |
+| **Architectural invariant** | WSC-001/WSC-002 |
+| **Status** | Fixed locally; live acceptance pending |
+
+**Resolution:** healthy CBM remains the preferred candidate provider. A missing,
+unavailable, failed, or root-incomplete CBM discovery automatically falls back
+for the affected configured roots to deterministic filesystem enumeration.
+Only extensions accepted by Clean-CTX's language registry are read, configured
+exclusions are honored, and literal query-name matches contribute paths only.
+Every candidate still crosses trusted-path validation and the existing
+Clean-CTX compilation pipeline. Provider, completion, and fallback metadata
+distinguish a successful empty scan from discovery that could not run.
+
+---
+
 ## DIS-2026-009: Five-File Hydration Cap Silently Truncated Semantic Results
 
 | Field | Value |

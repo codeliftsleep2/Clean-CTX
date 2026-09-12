@@ -6,6 +6,9 @@ use serde_json::Value;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+mod filesystem;
+use filesystem::{configured_roots, deduplicate_roots, root_key, scan};
+
 #[cfg(all(test, feature = "rust"))]
 use crate::cbm::GraphNode;
 #[cfg(all(test, feature = "rust"))]
@@ -17,6 +20,12 @@ const HYDRATION_MAX_PROJECT_COVERAGE: usize = 16;
 
 #[derive(Default)]
 pub(super) struct HydrationReport {
+    pub(super) hydration_attempted: bool,
+    pub(super) discovery_provider: &'static str,
+    pub(super) discovery_status: &'static str,
+    pub(super) discovery_completed: bool,
+    pub(super) fallback_occurred: bool,
+    pub(super) fallback_reason: Option<&'static str>,
     pub(super) candidates_discovered: usize,
     pub(super) candidates_compiled: usize,
     pub(super) project_coverage: Vec<ProjectCoverage>,
@@ -154,6 +163,17 @@ enum DiscoveryKind {
     InboundReference,
 }
 
+struct DiscoveryOutcome {
+    candidates: Vec<String>,
+    project_coverage: Vec<ProjectCoverage>,
+    provider: &'static str,
+    status: &'static str,
+    completed: bool,
+    attempted: bool,
+    fallback_occurred: bool,
+    fallback_reason: Option<&'static str>,
+}
+
 pub(super) fn is_hydration_eligible(query_type: &str, args: &Value) -> bool {
     matches!(
         query_type,
@@ -168,8 +188,9 @@ pub(super) fn hydrate_workspace_index(
     workspace_root: Option<&str>,
 ) -> HydrationReport {
     let discovery = discovery_kind(query_type);
-    let (candidate_paths, mut project_coverage) =
-        discover_candidate_paths(state, discovery, query_name);
+    let outcome = discover_candidate_paths(state, discovery, query_name, workspace_root);
+    let candidate_paths = outcome.candidates;
+    let mut project_coverage = outcome.project_coverage;
     let discovered = candidate_paths.len();
     let selected = select_candidates(state, candidate_paths);
     let compiled = selected
@@ -180,6 +201,12 @@ pub(super) fn hydrate_workspace_index(
     let project_coverage_truncated = project_coverage.len() > HYDRATION_MAX_PROJECT_COVERAGE;
     project_coverage.truncate(HYDRATION_MAX_PROJECT_COVERAGE);
     HydrationReport {
+        hydration_attempted: outcome.attempted,
+        discovery_provider: outcome.provider,
+        discovery_status: outcome.status,
+        discovery_completed: outcome.completed,
+        fallback_occurred: outcome.fallback_occurred,
+        fallback_reason: outcome.fallback_reason,
         candidates_discovered: discovered,
         candidates_compiled: compiled,
         project_coverage,
@@ -198,25 +225,42 @@ fn discover_candidate_paths(
     state: &McpState,
     discovery: DiscoveryKind,
     query_name: &str,
-) -> (Vec<String>, Vec<ProjectCoverage>) {
+    workspace_root: Option<&str>,
+) -> DiscoveryOutcome {
     #[cfg(all(test, feature = "rust"))]
     {
         if !has_test_project_search() {
             if let Ok(injected) = TEST_HYDRATION_CANDIDATES.lock() {
                 if let Some(paths) = injected.as_ref() {
-                    return (paths.clone(), Vec::new());
+                    return DiscoveryOutcome {
+                        candidates: paths.clone(),
+                        project_coverage: Vec::new(),
+                        provider: "cbm",
+                        status: "completed",
+                        completed: true,
+                        attempted: true,
+                        fallback_occurred: false,
+                        fallback_reason: None,
+                    };
                 }
             }
         }
     }
 
+    let filesystem_roots = configured_roots(state, workspace_root);
     let mut bridge_guard = state.graph_bridge_lock();
     let Some(bridge) = bridge_guard.as_mut() else {
-        return (Vec::new(), Vec::new());
+        drop(bridge_guard);
+        return filesystem_only_discovery(state, filesystem_roots, query_name, "cbm_unavailable");
     };
     let projects = bridge.configured_projects();
     let mut candidates = Vec::new();
     let mut coverage = Vec::new();
+    let mut successful_roots = HashSet::new();
+    let mut fallback_roots = Vec::new();
+    let mut cbm_attempted = false;
+    let mut saw_unavailable = false;
+    let mut saw_search_failure = false;
 
     for configured_root in &state.config.additional_roots {
         let resolved = bridge.resolve_project_id(configured_root);
@@ -227,6 +271,7 @@ fn discover_candidate_paths(
                 readiness: None,
                 reason: Some("additional_root_not_registered"),
             });
+            fallback_roots.push(PathBuf::from(configured_root));
         }
     }
 
@@ -238,6 +283,8 @@ fn discover_candidate_paths(
                 TestProjectReadiness::StillIndexing => "still_indexing",
                 TestProjectReadiness::Failed => "failed",
                 TestProjectReadiness::Unavailable => {
+                    saw_unavailable = true;
+                    fallback_roots.push(root.clone());
                     coverage.push(ProjectCoverage {
                         project,
                         status: "skipped",
@@ -247,11 +294,13 @@ fn discover_candidate_paths(
                     continue;
                 }
             };
+            cbm_attempted = true;
             let result =
                 test_project_search(&project, discovery).expect("configured project search result");
             match result {
                 Ok(nodes) => {
                     append_project_paths(&mut candidates, &root, nodes);
+                    successful_roots.insert(root_key(&root));
                     coverage.push(ProjectCoverage {
                         project,
                         status: "searched",
@@ -259,17 +308,23 @@ fn discover_candidate_paths(
                         reason: None,
                     });
                 }
-                Err(_) => coverage.push(ProjectCoverage {
-                    project,
-                    status: "search_failed",
-                    readiness: Some(readiness),
-                    reason: Some("search_failed"),
-                }),
+                Err(_) => {
+                    saw_search_failure = true;
+                    fallback_roots.push(root);
+                    coverage.push(ProjectCoverage {
+                        project,
+                        status: "search_failed",
+                        readiness: Some(readiness),
+                        reason: Some("search_failed"),
+                    });
+                }
             }
             continue;
         }
 
         if !bridge.is_available() {
+            saw_unavailable = true;
+            fallback_roots.push(root);
             coverage.push(ProjectCoverage {
                 project,
                 status: "skipped",
@@ -283,6 +338,7 @@ fn discover_candidate_paths(
             Ok(crate::cbm::bridge::IndexingStatus::StillIndexing { .. }) => "still_indexing",
             Err(_) => "failed",
         };
+        cbm_attempted = true;
         let discovered = match discovery {
             DiscoveryKind::Declaration => bridge
                 .search_in_project(&project, query_name)
@@ -294,6 +350,7 @@ fn discover_candidate_paths(
         match discovered {
             Ok(paths) => {
                 append_rooted_paths(&mut candidates, &root, paths);
+                successful_roots.insert(root_key(&root));
                 coverage.push(ProjectCoverage {
                     project,
                     status: "searched",
@@ -301,15 +358,101 @@ fn discover_candidate_paths(
                     reason: None,
                 });
             }
-            Err(_) => coverage.push(ProjectCoverage {
-                project,
-                status: "search_failed",
-                readiness: Some(readiness),
-                reason: Some("search_failed"),
-            }),
+            Err(_) => {
+                saw_search_failure = true;
+                fallback_roots.push(root);
+                coverage.push(ProjectCoverage {
+                    project,
+                    status: "search_failed",
+                    readiness: Some(readiness),
+                    reason: Some("search_failed"),
+                });
+            }
         }
     }
-    (candidates, coverage)
+    drop(bridge_guard);
+
+    for root in filesystem_roots {
+        if !successful_roots.contains(&root_key(&root)) {
+            fallback_roots.push(root);
+        }
+    }
+    deduplicate_roots(&mut fallback_roots);
+
+    if fallback_roots.is_empty() {
+        return DiscoveryOutcome {
+            candidates,
+            project_coverage: coverage,
+            provider: "cbm",
+            status: "completed",
+            completed: true,
+            attempted: cbm_attempted,
+            fallback_occurred: false,
+            fallback_reason: None,
+        };
+    }
+
+    let fallback_reason = match (saw_unavailable, saw_search_failure) {
+        (true, true) => "cbm_partial_failure",
+        (true, false) => "cbm_unavailable",
+        (false, true) => "cbm_discovery_failed",
+        (false, false) => "cbm_scope_unavailable",
+    };
+    let scan = scan(state, &fallback_roots, query_name);
+    candidates.extend(scan.candidates);
+    let any_cbm_success = !successful_roots.is_empty();
+    let attempted = cbm_attempted || scan.attempted;
+    let provider = match (any_cbm_success, scan.attempted) {
+        (true, true) => "cbm_and_filesystem",
+        (true, false) => "cbm",
+        (false, true) => "filesystem",
+        (false, false) => "none",
+    };
+    let completed = scan.completed;
+    DiscoveryOutcome {
+        candidates,
+        project_coverage: coverage,
+        provider,
+        status: discovery_status(attempted, completed, any_cbm_success),
+        completed,
+        attempted,
+        fallback_occurred: true,
+        fallback_reason: Some(fallback_reason),
+    }
+}
+
+fn filesystem_only_discovery(
+    state: &McpState,
+    roots: Vec<PathBuf>,
+    query_name: &str,
+    fallback_reason: &'static str,
+) -> DiscoveryOutcome {
+    let scan = scan(state, &roots, query_name);
+    let provider = if scan.attempted { "filesystem" } else { "none" };
+    DiscoveryOutcome {
+        candidates: scan.candidates,
+        project_coverage: Vec::new(),
+        provider,
+        status: discovery_status(scan.attempted, scan.completed, false),
+        completed: scan.completed,
+        attempted: scan.attempted,
+        fallback_occurred: true,
+        fallback_reason: Some(if scan.attempted {
+            fallback_reason
+        } else {
+            "filesystem_unavailable"
+        }),
+    }
+}
+
+fn discovery_status(attempted: bool, completed: bool, has_partial_coverage: bool) -> &'static str {
+    if completed {
+        "completed"
+    } else if attempted || has_partial_coverage {
+        "partial"
+    } else {
+        "failed"
+    }
 }
 
 #[cfg(all(test, feature = "rust"))]

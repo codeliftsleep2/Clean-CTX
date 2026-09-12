@@ -9,7 +9,7 @@
 //   4. Candidate paths flow through resolve_file_path_checked →
 //      compile_file_ir_focused → Clean-CTX semantic extraction → WorkspaceIndex.
 //   5. The original query reruns exactly once after semantic hydration.
-//   6. At most 5 previously-unindexed candidates are compiled per request.
+//   6. Every previously-unindexed candidate is compiled per request.
 //   7. Candidate discovery and semantic truth are separate stages.
 //
 // Test injection: cfg(test) static TEST_HYDRATION_CANDIDATES injects ONLY
@@ -25,11 +25,14 @@ use serde_json::json;
 // The TEST_HYDRATION_CANDIDATES static and the global LayerRegistry are
 // not safe for concurrent access across threads. This mutex serializes
 // the hydration regressions so they don't interfere with each other.
-static TEST_SERIALIZE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static TEST_SERIALIZE: &std::sync::Mutex<()> =
+    &crate::mcp::tool_handlers::hydration::TEST_PROJECT_HYDRATION_SERIALIZE;
 
 /// Acquire the test serialization lock.
 fn acquire_test_lock() -> std::sync::MutexGuard<'static, ()> {
-    TEST_SERIALIZE.lock().expect("TEST_SERIALIZE lock poisoned")
+    TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────

@@ -514,6 +514,11 @@ fn workspace_query_schema_declares_hydration_coverage_metadata() {
 
     for field in [
         "hydration_attempted",
+        "discovery_provider",
+        "discovery_status",
+        "discovery_completed",
+        "fallback_occurred",
+        "fallback_reason",
         "candidates_discovered",
         "candidates_compiled",
         "project_coverage",

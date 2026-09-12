@@ -271,7 +271,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "workspace_query",
-            "description": "Query cross-file semantic relationships accumulated from compiled files. Supports: find_entities (by name), forward_edges (outgoing semantic edges from entity), reverse_edges (incoming semantic edges to entity), entities_in_file (entity occurrences by file), transitive_dependencies (BFS dependency traversal), has_cycle (cycle detection). Bounded candidate discovery is query-semantic aware: declaration-oriented queries use name discovery, while reverse_edges discovers files that may contain inbound references. CBM contributes paths only; Clean-CTX compilation determines authoritative semantic edges.",
+            "description": "Query cross-file semantic relationships accumulated from compiled files. Supports: find_entities (by name), forward_edges (outgoing semantic edges from entity), reverse_edges (incoming semantic edges to entity), entities_in_file (entity occurrences by file), transitive_dependencies (BFS dependency traversal), has_cycle (cycle detection). Candidate discovery is query-semantic aware: healthy CBM is preferred, while unavailable or failed CBM discovery falls back to literal source occurrence scanning. Both providers contribute paths only; Clean-CTX compilation determines authoritative semantic edges.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -280,7 +280,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "entity_type": { "type": "string", "description": "Entity type for entity queries (e.g. 'Component', 'Service', 'Controller'). Required for: forward_edges, reverse_edges, transitive_dependencies." },
                     "name": { "type": "string", "description": "Entity name for entity queries. Required for: find_entities, forward_edges, reverse_edges, transitive_dependencies." },
                     "file_path": { "type": "string", "description": "File path for entities_in_file query." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root used to resolve relative file_path values in entities_in_file (matches the write-side resolve_file_path_checked contract). Defaults to CWD. Not relevant to identity/name-based query types." },
+                    "workspaceRoot": { "type": "string", "description": "Optional. Primary trusted workspace root for path resolution and filesystem hydration discovery. Defaults to the detected project root." },
                     "depth": { "type": "integer", "description": "Traversal depth for transitive_dependencies: 0 = unlimited, 1 = direct, 2 = transitive. Default: 1." }
                 },
                 "required": ["type"]
@@ -318,6 +318,29 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "hydration_attempted": {
                         "type": "boolean",
                         "description": "Whether this query type ran one semantic hydration pass."
+                    },
+                    "discovery_provider": {
+                        "type": "string",
+                        "enum": ["cbm", "filesystem", "cbm_and_filesystem", "none"],
+                        "description": "Candidate discovery provider that supplied this request's coverage."
+                    },
+                    "discovery_status": {
+                        "type": "string",
+                        "enum": ["completed", "partial", "failed"],
+                        "description": "Whether discovery covered all configured roots, only some, or could not run."
+                    },
+                    "discovery_completed": {
+                        "type": "boolean",
+                        "description": "True only when candidate discovery completed across every configured root."
+                    },
+                    "fallback_occurred": {
+                        "type": "boolean",
+                        "description": "Whether filesystem discovery was selected because CBM could not cover at least one root."
+                    },
+                    "fallback_reason": {
+                        "type": ["string", "null"],
+                        "enum": ["cbm_unavailable", "cbm_discovery_failed", "cbm_partial_failure", "cbm_scope_unavailable", "filesystem_unavailable", null],
+                        "description": "Reason filesystem fallback was selected, or null when CBM completed discovery."
                     },
                     "candidates_discovered": {
                         "type": "integer",

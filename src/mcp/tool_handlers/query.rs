@@ -6,11 +6,11 @@
 // tool. It is a thin read boundary over the already-wired write lifecycle
 // established in Phases A/B.
 //
-// Bounded hydration: for eligible query types, after the initial WorkspaceIndex
-// query, ONE bounded CBM candidate-file discovery pass may run across the
-// primary root plus configured additional roots. Declaration-oriented queries
-// use name discovery; reverse_edges uses inbound-reference discovery. CBM
-// supplies ONLY candidate file paths. Those paths flow through resolve_file_path_checked →
+// Semantic hydration: for eligible query types, after the initial WorkspaceIndex
+// query, one exhaustive candidate-file discovery pass runs across the primary
+// root plus configured additional roots. Healthy CBM is preferred; roots CBM
+// cannot cover fall back to literal filesystem discovery. Both providers
+// supply ONLY candidate file paths. Those paths flow through resolve_file_path_checked →
 // compile_file_ir_focused → Clean-CTX semantic extraction → WorkspaceIndex.
 // CBM graph semantics (edge counts, relationship types, etc.) never enter the
 // WorkspaceIndex. The original query reruns exactly once after hydration.
@@ -95,6 +95,11 @@ fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
                 "entities": results,
                 "count": count,
                 "hydration_attempted": hydration_attempted,
+                "discovery_provider": hydration.discovery_provider,
+                "discovery_status": hydration.discovery_status,
+                "discovery_completed": hydration.discovery_completed,
+                "fallback_occurred": hydration.fallback_occurred,
+                "fallback_reason": hydration.fallback_reason,
                 "candidates_discovered": hydration.candidates_discovered,
                 "candidates_compiled": hydration.candidates_compiled,
                 "project_coverage": hydration.project_coverage,
@@ -151,7 +156,8 @@ where
         query_fn(&idx)
     };
 
-    (final_results, final_count, true, hydration)
+    let attempted = hydration.hydration_attempted;
+    (final_results, final_count, attempted, hydration)
 }
 
 /// `forward_edges`: outgoing semantic edges from an entity.
@@ -220,6 +226,11 @@ fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
                 "edges": results,
                 "count": count,
                 "hydration_attempted": hydration_attempted,
+                "discovery_provider": hydration.discovery_provider,
+                "discovery_status": hydration.discovery_status,
+                "discovery_completed": hydration.discovery_completed,
+                "fallback_occurred": hydration.fallback_occurred,
+                "fallback_reason": hydration.fallback_reason,
                 "candidates_discovered": hydration.candidates_discovered,
                 "candidates_compiled": hydration.candidates_compiled,
                 "project_coverage": hydration.project_coverage,
@@ -295,6 +306,11 @@ fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
                 "edges": results,
                 "count": count,
                 "hydration_attempted": hydration_attempted,
+                "discovery_provider": hydration.discovery_provider,
+                "discovery_status": hydration.discovery_status,
+                "discovery_completed": hydration.discovery_completed,
+                "fallback_occurred": hydration.fallback_occurred,
+                "fallback_reason": hydration.fallback_reason,
                 "candidates_discovered": hydration.candidates_discovered,
                 "candidates_compiled": hydration.candidates_compiled,
                 "project_coverage": hydration.project_coverage,
@@ -429,6 +445,11 @@ fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
                 "count": count,
                 "depth_used": depth,
                 "hydration_attempted": hydration_attempted,
+                "discovery_provider": hydration.discovery_provider,
+                "discovery_status": hydration.discovery_status,
+                "discovery_completed": hydration.discovery_completed,
+                "fallback_occurred": hydration.fallback_occurred,
+                "fallback_reason": hydration.fallback_reason,
                 "candidates_discovered": hydration.candidates_discovered,
                 "candidates_compiled": hydration.candidates_compiled,
                 "project_coverage": hydration.project_coverage,
@@ -490,3 +511,7 @@ mod tests_reverse_hydration;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_5.rs"]
 mod tests_hydration_completeness;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_6.rs"]
+mod tests_filesystem_hydration;
