@@ -12,12 +12,20 @@ Run on the reported change set before declaring any task complete:
 cargo fmt --all -- --check
 cargo clippy --all-targets -- -D warnings
 cargo test --workspace --all-targets --all-features
+pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/tests/check-file-sizes.tests.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-file-sizes.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
 cargo test encoding
 ```
 
 A single warning constitutes a build failure. Do not weaken assertions or
 suppress failures merely to obtain green.
+
+The file-size guard enforces the active-file policy from the engineering
+rules. Without `-BaseRef`, it checks working-tree, index, and untracked files.
+CI passes `-BaseRef` so committed changes relative to the target branch are
+also active. Untouched tracked files above 615 lines are reported as legacy
+debt and do not fail the gate.
 
 ## Ordinary-task verification
 
@@ -45,10 +53,11 @@ finalization** (see `incremental-migration.md` for the full procedure):
 1. `cargo fmt --all -- --check`
 2. `cargo clippy --all-targets -- -D warnings`
 3. `cargo test --workspace --all-targets --all-features`
-4. Confirm all checks pass.
-5. If anything fails: investigate, determine whether the migration caused it,
+4. Run the file-size validator tests and active-file validator.
+5. Confirm all checks pass.
+6. If anything fails: investigate, determine whether the migration caused it,
    fix migration-caused failures, never dismiss simply because unexpected.
-6. Perform the required architectural audit before declaring the migration
+7. Perform the required architectural audit before declaring the migration
    complete.
 
 **An architectural migration is NOT complete until the final verification
@@ -63,6 +72,7 @@ push/PR:
 - `cargo clippy --all-targets -- -D warnings`
 - `cargo fmt --all -- --check`
 - `scripts/check-tree-sitter-versions.ps1`
+- `scripts/check-file-sizes.ps1` with the change's base revision
 - `scripts/check-utf8.ps1`
 - `cargo test --workspace --all-targets --all-features`
 - `cargo audit` (with one documented advisory ignore)

@@ -104,6 +104,28 @@ Test files live in `src/tests/`, referenced from source modules via
 `#[path = "..."]` — never inline. A broken `#[path]` reference causes a
 compilation failure.
 
+### 7a. Active-file size enforcement
+
+Normal repository files target **600 lines or fewer**. The target preserves
+readability and encourages decomposition along clean semantic boundaries;
+**615 lines is the absolute ceiling for every new or materially modified
+file**.
+
+- New files may never exceed 615 lines.
+- Existing files already above 615 lines are legacy debt and may remain only
+  while untouched. They are reported without failing validation.
+- Once a task materially edits an oversized legacy file, it becomes active
+  and must be decomposed so every resulting new or modified file is 615 lines
+  or fewer, preferably 600 or fewer.
+- Do not perform repository-wide splitting solely to eliminate historical
+  oversized files.
+- Do not evade the ceiling by moving content into another oversized helper,
+  support, or generated-by-hand file.
+
+Use `scripts/check-file-sizes.ps1` for enforcement. Local runs inspect working
+tree and index changes; CI supplies a base revision to include committed
+branch changes.
+
 ### 8. Definition of Done
 
 A task is complete only when the implementation is complete, the architecture

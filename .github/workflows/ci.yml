@@ -18,6 +18,8 @@ jobs:
       # Pinned to immutable commit SHAs (supply-chain hardening).
       # Mutable tags can be silently moved to malicious commits.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
         with:
           toolchain: stable
@@ -30,6 +32,14 @@ jobs:
       - name: tree-sitter version consistency check
         shell: pwsh
         run: ./scripts/check-tree-sitter-versions.ps1
+      - name: file-size validator behavior tests
+        shell: pwsh
+        run: ./scripts/tests/check-file-sizes.tests.ps1
+      - name: active-file size guard
+        shell: pwsh
+        env:
+          FILE_SIZE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: ./scripts/check-file-sizes.ps1 -BaseRef $env:FILE_SIZE_BASE
       - name: UTF-8 / mojibake guard
         shell: pwsh
         run: ./scripts/check-utf8.ps1
