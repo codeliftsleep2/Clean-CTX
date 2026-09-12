@@ -8,7 +8,7 @@
 //   3. CBM supplies candidate file paths ONLY — never semantic relationships.
 //   4. Candidate paths flow through resolve_file_path_checked →
 //      compile_file_ir_focused → Clean-CTX semantic extraction → WorkspaceIndex.
-//   5. The original query reruns exactly once after bounded hydration.
+//   5. The original query reruns exactly once after semantic hydration.
 //   6. At most 5 previously-unindexed candidates are compiled per request.
 //   7. Candidate discovery and semantic truth are separate stages.
 //
@@ -416,23 +416,30 @@ fn red11_cbm_authority_cardinality_isolation() {
     clear_test_hydration_candidates();
 }
 
-// RED-12
+// RED-12 (superseded by RED-C2: exhaustive declaration hydration)
 #[test]
-fn red12_bound() {
+fn red12_all_discovered_declarations_are_compiled() {
     let _lock = acquire_test_lock();
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     let dir = tempfile::TempDir::new().unwrap();
     let mut paths = Vec::new();
     for i in 0..7 {
         let p = dir.path().join(format!("BC{i}.ts"));
-        std::fs::write(&p, format!("public class BC{i} {{ }}")).unwrap();
+        std::fs::write(&p, "public class BoundCandidate { }").unwrap();
         paths.push(p.to_string_lossy().to_string());
     }
     set_test_hydration_candidates(&paths);
-    let before = state.workspace_index_read().file_count();
-    let _ = query_reverse_edges(&state, "spring", "Service", "BT");
-    let after = state.workspace_index_read().file_count();
-    assert!(after - before <= 5, "cap violated: {} new", after - before);
+    let sc = call_wq_sc(
+        &state,
+        json!({
+            "type": "find_entities",
+            "name": "BoundCandidate",
+            "workspaceRoot": dir.path().to_string_lossy()
+        }),
+    );
+    assert_eq!(candidates_discovered(&sc), 7);
+    assert_eq!(candidates_compiled(&sc), 7);
+    assert_eq!(sc["count"], 7);
     clear_test_hydration_candidates();
 }
 

@@ -317,7 +317,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     },
                     "hydration_attempted": {
                         "type": "boolean",
-                        "description": "Whether this query type ran one bounded hydration pass."
+                        "description": "Whether this query type ran one semantic hydration pass."
                     },
                     "candidates_discovered": {
                         "type": "integer",
@@ -325,7 +325,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     },
                     "candidates_compiled": {
                         "type": "integer",
-                        "description": "Candidate files compiled after the global bound and trust checks."
+                        "description": "Unique, previously-unindexed candidate files compiled after trust checks."
                     },
                     "project_coverage": {
                         "type": "array",

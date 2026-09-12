@@ -1,4 +1,4 @@
-// Multi-root bounded-hydration regressions for workspace_query (RED-15..18).
+// Multi-root hydration regressions for workspace_query (RED-15..22).
 
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
@@ -192,7 +192,7 @@ fn red16_active_project_remains_unchanged_on_every_exit_path() {
 }
 
 #[test]
-fn red17_global_cap_applies_after_merged_dedup_and_index_exclusion() {
+fn red17_merged_candidates_are_exhaustive_after_dedup_and_index_exclusion() {
     let _serial = TEST_SERIALIZE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -282,12 +282,11 @@ fn red17_global_cap_applies_after_merged_dedup_and_index_exclusion() {
         .collect();
     expected.sort();
     expected.dedup();
-    expected.truncate(5);
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
     assert_eq!(sc["candidates_discovered"], 9);
-    assert_eq!(sc["candidates_compiled"], 5);
-    assert_eq!(added.len(), 5, "cap must be global, not per project");
+    assert_eq!(sc["candidates_compiled"], 7);
+    assert_eq!(added.len(), 7, "all unique unindexed candidates compile");
     assert_eq!(added, expected.into_iter().collect());
     clear_test_project_search_results();
 }

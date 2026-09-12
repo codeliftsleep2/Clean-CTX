@@ -65,7 +65,7 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
 
 /// `find_entities`: find entities by name (cross-domain/type).
 ///
-/// Eligible for bounded hydration: has a name for CBM candidate discovery.
+/// Eligible for one-cycle hydration: has a name for CBM candidate discovery.
 fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
     let name = match required_str(args, "name") {
         Some(n) => n,
@@ -104,11 +104,11 @@ fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
     }));
 }
 
-/// Run a WorkspaceIndex query with optional bounded hydration.
+/// Run a WorkspaceIndex query with optional one-cycle semantic hydration.
 ///
 /// 1. Run the initial query against current WorkspaceIndex (authoritative for
 ///    what Clean-CTX currently knows).
-/// 2. If the query is hydration-eligible, perform ONE bounded hydration pass.
+/// 2. If the query is hydration-eligible, perform ONE exhaustive discovery hydration pass.
 /// 3. Rerun the original query exactly once.
 /// 4. Return final results + hydration metadata.
 fn run_query_with_hydration<F>(
@@ -141,7 +141,7 @@ where
         );
     }
 
-    // Step 3: One bounded hydration pass.
+    // Step 3: One exhaustive discovery hydration pass.
     let hydration =
         super::hydration::hydrate_workspace_index(state, query_type, query_name, workspace_root);
 
@@ -156,7 +156,7 @@ where
 
 /// `forward_edges`: outgoing semantic edges from an entity.
 ///
-/// Eligible for bounded hydration: has (domain, entity_type, name) identity.
+/// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
 fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
     let domain = match required_str(args, "domain") {
         Some(d) => d,
@@ -231,7 +231,7 @@ fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
 
 /// `reverse_edges`: incoming semantic edges to an entity.
 ///
-/// Eligible for bounded hydration: has (domain, entity_type, name) identity.
+/// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
 fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
     let domain = match required_str(args, "domain") {
         Some(d) => d,
@@ -362,7 +362,7 @@ fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState) {
 
 /// `transitive_dependencies`: BFS dependency traversal.
 ///
-/// Eligible for bounded hydration: has (domain, entity_type, name) identity.
+/// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
 fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
     let domain = match required_str(args, "domain") {
         Some(d) => d,
@@ -486,3 +486,7 @@ mod tests_multi_root_hydration;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_4.rs"]
 mod tests_reverse_hydration;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_5.rs"]
+mod tests_hydration_completeness;

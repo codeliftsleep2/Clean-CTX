@@ -1,4 +1,4 @@
-// Query-direction-aware bounded-hydration regressions (RED-23..28).
+// Query-direction-aware hydration regressions (RED-23..28).
 
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
@@ -252,7 +252,7 @@ fn red26_zero_inbound_references_is_a_successful_empty_search() {
 }
 
 #[test]
-fn red27_multi_project_inbound_discovery_preserves_global_cap() {
+fn red27_multi_project_inbound_discovery_is_exhaustive() {
     let _serial = TEST_SERIALIZE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -295,7 +295,7 @@ fn red27_multi_project_inbound_discovery_preserves_global_cap() {
     let sc = call_query(&state, "reverse_edges", "ServiceA", primary.path());
 
     assert_eq!(sc["candidates_discovered"], 7);
-    assert_eq!(sc["candidates_compiled"], 5);
+    assert_eq!(sc["candidates_compiled"], 7);
     let indexed: HashSet<_> = state
         .workspace_index_read()
         .file_map()
@@ -313,7 +313,6 @@ fn red27_multi_project_inbound_discovery_preserves_global_cap() {
         .map(|path| crate::dictionary::path::canonical_identity_key(&path.to_string_lossy()))
         .collect();
     expected.sort();
-    expected.truncate(5);
     assert_eq!(indexed, expected.into_iter().collect());
     let calls: HashSet<_> = discovery_calls().into_iter().collect();
     assert_eq!(

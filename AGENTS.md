@@ -25,6 +25,50 @@ depend on `.clinerules/` being present.
 
 ## Core policy (derived from `.clinerules/engineering.md`)
 
+### Architectural Approval Gate
+
+Do not make any architectural decision with **global, cross-cutting,
+repository-wide, or externally observable effects** unless that decision was
+explicitly authorized by the task prompt or approved during the current work.
+
+If implementation reveals that completing the task appears to require such a
+decision, **STOP** and report the decision point before implementing it.
+
+Examples include, but are not limited to:
+
+- introducing or changing global limits, caps, budgets, retries, timeouts, or
+  truncation behavior;
+- changing query completeness or partial-result semantics;
+- changing global caching, indexing, persistence, concurrency, or lifecycle
+  behavior;
+- changing shared circuit-breaker or failure-isolation policy;
+- changing public/tool/API contracts;
+- changing architectural invariants;
+- changing semantic identity or authority boundaries;
+- changing behavior that affects unrelated query types, repositories,
+  projects, languages, or tools;
+- introducing new repository-wide abstractions or policies;
+- changing default behavior globally to solve one local problem.
+
+A local implementation need does **not** authorize a global architectural
+policy.
+
+Do not infer approval from existing implementation behavior, historical code,
+convenience, performance concerns, or a previous local workaround.
+
+When such a decision is discovered, report:
+
+1. the exact architectural decision required;
+2. why the current task appears to require it;
+3. affected systems/query types/contracts;
+4. reasonable alternatives;
+5. your recommended option and tradeoffs.
+
+Then wait for explicit approval before implementing the global decision.
+
+Small implementation choices that remain fully inside the explicitly
+authorized architecture do not require additional approval.
+
 ### 1. Zero-warning policy
 
 **ALL files must compile with zero warnings**, including `src/`

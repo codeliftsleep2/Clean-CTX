@@ -46,6 +46,32 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-009: Five-File Hydration Cap Silently Truncated Semantic Results
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-12 |
+| **Environment** | Clean-CTX deterministic hydration regressions, distilled from the real `reverse_edges` scenario with approximately 13 inbound consumers |
+| **Repository/context** | Hydration-eligible `workspace_query` operations whose relevant semantic evidence spans more than five candidate files, including configured multi-root workspaces. |
+| **Symptom** | Candidate discovery could return every relevant file, but hydration compiled only the first five normalized paths and reran the WorkspaceIndex query as though the resulting semantic subset represented the query. For `reverse_edges`, a target with more than five consumers therefore returned at most five authoritative edges without identifying the result as truncated. |
+| **Root cause** | A defensive automatic-work bound (`HYDRATION_MAX_CANDIDATES = 5`) was applied inside semantic candidate selection. Because the response had no semantic truncation contract, the resource policy silently changed query meaning instead of merely controlling execution. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query_5.rs` RED-C1 through RED-C6; superseded cap assertions RED-12, RED-17, and RED-27 now protect exhaustive processing after deduplication and already-indexed exclusion. |
+| **Live scenario required?** | Yes — rerun `workspace_query reverse_edges` against a target with more than five inbound consumers and confirm all Clean-CTX-authoritative consumers are returned and `candidates_compiled` is not capped at five. |
+| **Architectural invariant** | WSC-001/WSC-002 |
+| **Status** | Fixed locally; live acceptance pending |
+
+**Resolution:** hydration still performs exactly one discovery/compile/rerun cycle,
+but candidate selection now normalizes paths, deduplicates them, excludes files
+already represented in WorkspaceIndex, sorts deterministically, and returns the
+entire remaining set. Every selected path still crosses trusted-root validation
+and the normal Clean-CTX compilation boundary. No replacement numeric cap was
+introduced. Any future resource guard that prevents exhaustive candidate
+processing must expose explicit partial/truncated coverage.
+
+---
+
 ## DIS-2026-008: reverse_edges Hydration Compiled the Target Instead of Its Consumers
 
 | Field | Value |
@@ -72,6 +98,10 @@ boundary. CBM relationship type, direction, identity, and cardinality never ente
 WorkspaceIndex. Multi-project merging, deterministic ordering, the global
 five-file cap, one-cycle hydration, advisory readiness, and coverage metadata are
 unchanged.
+
+**Superseded 2026-09-12 by DIS-2026-009:** the five-file cap was removed because
+it could silently return incomplete semantic results. The remaining one-cycle,
+authority, ordering, readiness, and metadata behavior is unchanged.
 
 ---
 
@@ -126,6 +156,10 @@ deduplicated, filtered against already-indexed files, sorted once, and capped at
 five files total before every selected path passes the unchanged trusted-root
 validation and Clean-CTX compilation boundary. A failure in one project is local
 to that project; coverage remains partial and the original query still reruns once.
+
+**Superseded 2026-09-12 by DIS-2026-009:** cross-project candidate merging remains
+unchanged, but the five-file truncation step was removed. Every unique,
+previously-unindexed discovered candidate is now processed.
 
 ---
 
@@ -193,6 +227,11 @@ rerun ORIGINAL WorkspaceIndex query exactly once → final result`.
 Truthful hydration metadata (`hydration_attempted`, `candidates_discovered`, `candidates_compiled`)
 is returned without implying completeness. If more valid candidates exist than the cap permits,
 coverage necessarily remains partial.
+
+**Superseded 2026-09-12 by DIS-2026-009:** the `max 5` selection step was an
+incorrect semantic truncation mechanism. Selection is now exhaustive after
+normalization, deduplication, and already-indexed exclusion; no replacement
+numeric cap exists.
 
 **Test injection seam:** `TEST_HYDRATION_CANDIDATES` (cfg(test)-only static, following the
 `TEST_INJECTED_IR_FAILURE` pattern) injects ONLY candidate file paths — never semantic edges,

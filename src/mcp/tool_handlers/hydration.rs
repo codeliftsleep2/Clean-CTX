@@ -1,4 +1,4 @@
-// workspace_query bounded-hydration support.
+// workspace_query semantic hydration support.
 
 use crate::mcp::McpState;
 use serde::Serialize;
@@ -13,7 +13,6 @@ use std::collections::HashMap;
 #[cfg(all(test, feature = "rust"))]
 use std::sync::Mutex;
 
-pub(crate) const HYDRATION_MAX_CANDIDATES: usize = 5;
 const HYDRATION_MAX_PROJECT_COVERAGE: usize = 16;
 
 #[derive(Default)]
@@ -172,7 +171,7 @@ pub(super) fn hydrate_workspace_index(
     let (candidate_paths, mut project_coverage) =
         discover_candidate_paths(state, discovery, query_name);
     let discovered = candidate_paths.len();
-    let selected = select_candidates(state, candidate_paths, HYDRATION_MAX_CANDIDATES);
+    let selected = select_candidates(state, candidate_paths);
     let compiled = selected
         .iter()
         .filter(|path| compile_candidate(state, path, workspace_root))
@@ -339,7 +338,7 @@ fn append_rooted_paths(candidates: &mut Vec<String>, root: &Path, paths: Vec<Str
     }));
 }
 
-fn select_candidates(state: &McpState, candidates: Vec<String>, max: usize) -> Vec<String> {
+fn select_candidates(state: &McpState, candidates: Vec<String>) -> Vec<String> {
     let indexed = state.workspace_index_read();
     let mut seen = HashSet::new();
     let mut selected: Vec<_> = candidates
@@ -350,7 +349,6 @@ fn select_candidates(state: &McpState, candidates: Vec<String>, max: usize) -> V
         .collect();
     drop(indexed);
     selected.sort();
-    selected.truncate(max);
     selected
 }
 
