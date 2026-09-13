@@ -382,18 +382,9 @@ fn extract_provider_token(entry: &str) -> Option<String> {
 fn extract_vitest_spies(source: &str) -> Vec<String> {
     let mut spies = BTreeSet::new();
     for start in call_positions(source, "vi.fn(") {
-        let line_start = source[..start]
-            .rfind(['\n', ';'])
-            .map_or(0, |index| index + 1);
-        let Some(lhs) = source[line_start..start].split('=').next() else {
-            continue;
-        };
-        let lhs = lhs.trim();
-        if let Some(name) = lhs
-            .split_whitespace()
-            .last()
-            .filter(|name| identifier_like(name))
-        {
+        let name = enclosing_object_assignment(source, start)
+            .unwrap_or_else(|| assignment_target_before(source, start));
+        if let Some(name) = name {
             spies.insert(name.to_string());
         }
     }
@@ -418,6 +409,33 @@ fn extract_vitest_spies(source: &str) -> Vec<String> {
         }
     }
     spies.into_iter().collect()
+}
+
+fn enclosing_object_assignment(source: &str, call_start: usize) -> Option<Option<&str>> {
+    let open = crate::angular_meta::util::find_enclosing_brace(source, call_start)?;
+    let close = find_matching(source, open, '{', '}')?;
+    if close < call_start {
+        return None;
+    }
+
+    let before_brace = source[..open].trim_end();
+    match before_brace.as_bytes().last() {
+        Some(b'=') => Some(assignment_target_before(source, before_brace.len() - 1)),
+        Some(b':' | b'(' | b',' | b'[') => Some(None),
+        _ => None,
+    }
+}
+
+fn assignment_target_before(source: &str, end: usize) -> Option<&str> {
+    let statement_start = source[..end]
+        .rfind(['\n', ';'])
+        .map_or(0, |index| index + 1);
+    source[statement_start..end]
+        .split('=')
+        .next()?
+        .split_whitespace()
+        .last()
+        .filter(|name| identifier_like(name))
 }
 
 fn create_component_candidates(source: &str) -> BTreeSet<String> {

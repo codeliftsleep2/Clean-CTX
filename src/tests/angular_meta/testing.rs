@@ -14,6 +14,19 @@ describe('foo', () => {
 });
 "#;
 
+fn high_spy_markers(source: &str) -> Vec<String> {
+    extract_testing_shape(source, Fidelity::High)
+        .map(|shape| {
+            shape
+                .render(Fidelity::High)
+                .lines()
+                .filter(|line| line.starts_with("Φspy:"))
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 #[test]
 fn red_a1_spec_path_activates_without_angular_decorators() {
     assert!(is_testing_source(BASIC_SPEC, Path::new("foo.spec.ts")));
@@ -150,6 +163,118 @@ vi.mock('./account.service');
             rendered.contains(expected),
             "missing {expected}: {rendered}"
         );
+    }
+}
+
+#[test]
+fn red_v1_multiline_assigned_object_literal_uses_container_marker() {
+    let source = r#"
+const httpService = {
+  getOrders: vi.fn(),
+  getOrderDetail: vi.fn(),
+  cancelOrder: vi.fn(),
+};
+"#;
+    assert_eq!(high_spy_markers(source), ["Φspy:httpService"]);
+}
+
+#[test]
+fn red_v2_single_line_and_multiline_objects_are_equivalent() {
+    let single_line = "const httpService = { getOrders: vi.fn(), cancelOrder: vi.fn() };";
+    let multiline = r#"
+const httpService = {
+  getOrders: vi.fn(),
+  cancelOrder: vi.fn(),
+};
+"#;
+    assert_eq!(high_spy_markers(single_line), high_spy_markers(multiline));
+    assert_eq!(high_spy_markers(single_line), ["Φspy:httpService"]);
+}
+
+#[test]
+fn red_v3_fluent_vi_fn_chains_use_container_marker() {
+    let source = r#"
+const httpService = {
+  getOrders: vi.fn().mockReturnValue(of([])),
+  getOrderDetail: vi.fn().mockResolvedValue(order),
+};
+"#;
+    assert_eq!(high_spy_markers(source), ["Φspy:httpService"]);
+}
+
+#[test]
+fn red_v4_direct_vi_fn_assignment_is_unchanged() {
+    assert_eq!(
+        high_spy_markers("const callback = vi.fn();"),
+        ["Φspy:callback"]
+    );
+}
+
+#[test]
+fn red_v5_mixed_vi_fn_and_vi_spy_on_remains_sorted() {
+    let source = r#"
+const callback = vi.fn();
+vi.spyOn(service, 'load');
+"#;
+    assert_eq!(
+        high_spy_markers(source),
+        ["Φspy:callback", "Φspy:service.load"]
+    );
+}
+
+#[test]
+fn red_v6_formatter_wrapped_mock_object_is_completely_detected() {
+    let source = r#"
+httpService = {
+  getOrders: vi.fn().mockReturnValue(of([])),
+  getOrderDetail: vi.fn().mockReturnValue(of(ORDER)),
+  updateOrderStatus: vi.fn().mockReturnValue(of(ORDER)),
+  cancelOrder: vi.fn().mockReturnValue(of(true)),
+  createOrder: vi.fn(),
+  retryOrder: vi.fn(),
+  deleteOrder: vi.fn(),
+};
+"#;
+    assert_eq!(high_spy_markers(source), ["Φspy:httpService"]);
+}
+
+#[test]
+fn red_v7_object_spy_marker_is_formatting_independent() {
+    let variants = [
+        "const httpService = { getOrders: vi.fn(), cancelOrder: vi.fn(), };",
+        "const httpService =\n{\n\n    getOrders: vi.fn(),\n    cancelOrder: vi.fn()\n};",
+        "const httpService = {\r\n\tgetOrders: vi.fn(),\r\n\r\n\tcancelOrder: vi.fn(),\r\n};",
+    ];
+    for source in variants {
+        assert_eq!(high_spy_markers(source), ["Φspy:httpService"]);
+    }
+}
+
+#[test]
+fn red_v8_plain_object_properties_are_not_spies() {
+    let source = r#"
+const obj = {
+  name: value,
+  handler: regularFunction,
+};
+"#;
+    assert!(high_spy_markers(source).is_empty());
+}
+
+#[test]
+fn nested_object_literal_without_direct_assignment_is_omitted() {
+    let variants = [
+        "const mocks = { api: { get: vi.fn() } };",
+        r#"
+const mocks = {
+  api: {
+    get: vi.fn(),
+  },
+};
+"#,
+    ];
+    for source in variants {
+        assert!(high_spy_markers(source).is_empty());
     }
 }
 
