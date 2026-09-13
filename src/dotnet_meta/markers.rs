@@ -110,6 +110,13 @@ pub enum PhiLineKind {
     // Logging
     Log,
     Metric,
+    // MSTest + Moq
+    TestClass,
+    Test,
+    Mock,
+    Setup,
+    Verify,
+    Fixture,
     // Graph
     Graph,
     Bundle,
@@ -157,6 +164,12 @@ impl PhiLineKind {
             Self::Job => "Φjob:",
             Self::Log => "Φlog:",
             Self::Metric => "Φmetric:",
+            Self::TestClass => "Φtestcls:",
+            Self::Test => "Φtest:",
+            Self::Mock => "Φmock:",
+            Self::Setup => "Φsetup:",
+            Self::Verify => "Φverify:",
+            Self::Fixture => "Φfixture:",
             Self::Graph => "Φgraph:",
             Self::Bundle => "ΦBUNDLE",
             Self::Map => "ΦMAP",
@@ -203,6 +216,12 @@ impl PhiLineKind {
             Self::Job => "[Job]",
             Self::Log => "[Log]",
             Self::Metric => "[Metric]",
+            Self::TestClass => "[TestClass]",
+            Self::Test => "[TestMethod]",
+            Self::Mock => "[Mock]",
+            Self::Setup => "[Setup]",
+            Self::Verify => "[Verify]",
+            Self::Fixture => "[TestFixture]",
             Self::Graph => "[Graph]",
             Self::Bundle => "[Bundle]",
             Self::Map => "[Map]",
@@ -250,6 +269,12 @@ impl PhiLineKind {
             Self::Job,           // Φjob:     (5 chars)
             Self::Log,           // Φlog:     (5 chars)
             Self::Metric,        // Φmetric:  (8 chars)
+            Self::TestClass,     // Φtestcls: (9 chars)
+            Self::Test,          // Φtest:    (6 chars)
+            Self::Mock,          // Φmock:    (6 chars)
+            Self::Setup,         // Φsetup:   (7 chars)
+            Self::Verify,        // Φverify:  (8 chars)
+            Self::Fixture,       // Φfixture: (9 chars)
             Self::Graph,         // Φgraph:   (7 chars)
             Self::Bundle,        // ΦBUNDLE   (8 chars)
             Self::Map,           // ΦMAP      (5 chars)
@@ -296,6 +321,12 @@ impl PhiLineKind {
             "Φjob" => Some(Self::Job),
             "Φlog" => Some(Self::Log),
             "Φmetric" => Some(Self::Metric),
+            "Φtestcls" => Some(Self::TestClass),
+            "Φtest" => Some(Self::Test),
+            "Φmock" => Some(Self::Mock),
+            "Φsetup" => Some(Self::Setup),
+            "Φverify" => Some(Self::Verify),
+            "Φfixture" => Some(Self::Fixture),
             "Φgraph" => Some(Self::Graph),
             "ΦBUNDLE" => Some(Self::Bundle),
             "ΦMAP" => Some(Self::Map),
@@ -343,6 +374,12 @@ impl PhiLineKind {
             Self::Job => "Φjob",
             Self::Log => "Φlog",
             Self::Metric => "Φmetric",
+            Self::TestClass => "Φtestcls",
+            Self::Test => "Φtest",
+            Self::Mock => "Φmock",
+            Self::Setup => "Φsetup",
+            Self::Verify => "Φverify",
+            Self::Fixture => "Φfixture",
             Self::Graph => "Φgraph",
             Self::Bundle => "ΦBUNDLE",
             Self::Map => "ΦMAP",
@@ -367,218 +404,7 @@ pub trait PhiLine {
     fn render(&self) -> String;
 }
 
-// ---------------------------------------------------------------------------
-// build_* free functions
-// ---------------------------------------------------------------------------
-
-/// Build a `Φctrl:<ClassName> [route]` marker line.
-pub fn build_controller_line(class_name: &str, route: Option<&str>) -> String {
-    match route {
-        Some(r) => format!("Φctrl:{} [{}]", class_name, r),
-        None => format!("Φctrl:{}", class_name),
-    }
-}
-
-/// Build a `Φapi:<ClassName>` marker line.
-pub fn build_api_controller_line(class_name: &str) -> String {
-    format!("Φapi:{}", class_name)
-}
-
-/// Build a `Φaction:<Verb> <Name>(<params>) → <return>` marker line.
-pub fn build_action_line(
-    verb: &str,
-    name: &str,
-    params: &str,
-    return_type: Option<&str>,
-) -> String {
-    match return_type {
-        Some(rt) => format!("Φaction:{} {}({}) → {}", verb, name, params, rt),
-        None => format!("Φaction:{} {}({})", verb, name, params),
-    }
-}
-
-/// Build a `Φmodel:<ModelName>` marker line.
-pub fn build_model_line(model_name: &str) -> String {
-    format!("Φmodel:{}", model_name)
-}
-
-/// Build a `Φauth:<Policy>` marker line.
-pub fn build_auth_line(policy: Option<&str>) -> String {
-    match policy {
-        Some(p) => format!("Φauth:{}", p),
-        None => "Φauth:true".to_string(),
-    }
-}
-
-/// Build a `Φef:<ClassName>` marker line.
-pub fn build_ef_line(class_name: &str) -> String {
-    format!("Φef:{}", class_name)
-}
-
-/// Build a `Φdbset:<Name>` marker line.
-pub fn build_dbset_line(name: &str) -> String {
-    format!("Φdbset:{}", name)
-}
-
-/// Build a `Φentity:<Name> { <fields> }` marker line.
-pub fn build_entity_line(name: &str, fields: &[String]) -> String {
-    if fields.is_empty() {
-        format!("Φentity:{}", name)
-    } else {
-        format!("Φentity:{} {{ {} }}", name, fields.join(", "))
-    }
-}
-
-/// Build a `Φrel:<Name> → <Target>` marker line.
-/// Used by tests (`src/tests/dotnet_meta/markers.rs`).
-#[allow(dead_code)]
-pub fn build_relationship_line(name: &str, target: &str) -> String {
-    format!("Φrel:{} → {}", name, target)
-}
-
-/// Build a `Φcfg:<ClassName>` marker line.
-pub fn build_config_line(class_name: &str) -> String {
-    format!("Φcfg:{}", class_name)
-}
-
-/// Build a `Φmap:<ClassName>` marker line.
-pub fn build_mapper_line(class_name: &str) -> String {
-    format!("Φmap:{}", class_name)
-}
-
-/// Build a `Φmapfrom:<Source> → <Destination>` marker line.
-pub fn build_mapfrom_line(source: &str, dest: &str) -> String {
-    format!("Φmapfrom:{} → {}", source, dest)
-}
-
-/// Build a `Φignore:<Member>` marker line.
-pub fn build_ignore_line(member: &str) -> String {
-    format!("Φignore:{}", member)
-}
-
-/// Build a `Φproj:<Target>` marker line.
-pub fn build_projection_line(target: &str) -> String {
-    format!("Φproj:{}", target)
-}
-
-/// Build a `Φhub:<ClassName>` marker line.
-pub fn build_hub_line(class_name: &str, client_interface: Option<&str>) -> String {
-    match client_interface {
-        Some(ci) => format!("Φhub:{} [{}]", class_name, ci),
-        None => format!("Φhub:{}", class_name),
-    }
-}
-
-/// Build a `Φmethod:<Name>(<params>) → <target>` marker line.
-pub fn build_hub_method_line(name: &str, params: &str, target: &str) -> String {
-    format!("Φmethod:{}({}) → {}", name, params, target)
-}
-
-/// Build a `Φclient:<Interface>.<Method>(<params>)` marker line.
-/// Used by tests (`src/tests/dotnet_meta/markers.rs`).
-#[allow(dead_code)]
-pub fn build_client_line(interface: &str, method: &str, params: &str) -> String {
-    format!("Φclient:{}.{}({})", interface, method, params)
-}
-
-/// Build a `Φgroup:<GroupName>` marker line.
-pub fn build_group_line(group_name: &str) -> String {
-    format!("Φgroup:{}", group_name)
-}
-
-/// Build a `Φuser:<UserId>` marker line.
-pub fn build_user_line(user_id: &str) -> String {
-    format!("Φuser:{}", user_id)
-}
-
-/// Build a `Φstream:<MethodName> → <Type>` marker line.
-pub fn build_stream_line(method_name: &str, stream_type: &str) -> String {
-    format!("Φstream:{} → {}", method_name, stream_type)
-}
-
-/// Build a `Φconn:<Event>` marker line.
-pub fn build_connection_line(event: &str) -> String {
-    format!("Φconn:{}", event)
-}
-
-/// Build a `Φjson:<Config>` marker line.
-pub fn build_json_line(config: &str) -> String {
-    format!("Φjson:{}", config)
-}
-
-/// Build a `Φprop:<Name>` marker line.
-pub fn build_property_line(name: &str) -> String {
-    format!("Φprop:{}", name)
-}
-
-/// Build a `Φsvc:<ClassName>` marker line.
-pub fn build_service_line(class_name: &str) -> String {
-    format!("Φsvc:{}", class_name)
-}
-
-/// Build a `Φdi:<Service> → <Registration>` marker line.
-pub fn build_di_line(service: &str, registration: &str) -> String {
-    format!("Φdi:{} → {}", service, registration)
-}
-
-/// Build a `Φcommon:<Attribute>` marker line.
-pub fn build_common_line(attribute: &str) -> String {
-    format!("Φcommon:{}", attribute)
-}
-
-/// Build a `Φvalid:<ClassName>` marker line.
-pub fn build_validator_line(class_name: &str) -> String {
-    format!("Φvalid:{}", class_name)
-}
-
-/// Build a `Φrule:<Property> → <Rules>` marker line.
-pub fn build_rule_line(property: &str, rules: &[String]) -> String {
-    if rules.is_empty() {
-        format!("Φrule:{}", property)
-    } else {
-        format!("Φrule:{} → {}", property, rules.join(", "))
-    }
-}
-
-/// Build a `Φcustom:<Name>` marker line.
-pub fn build_custom_validator_line(name: &str) -> String {
-    format!("Φcustom:{}", name)
-}
-
-/// Build a `Φidentity:<ClassName>` marker line.
-pub fn build_identity_line(class_name: &str) -> String {
-    format!("Φidentity:{}", class_name)
-}
-
-/// Build a `Φjwt:<Config>` marker line.
-pub fn build_jwt_line(config: &str) -> String {
-    format!("Φjwt:{}", config)
-}
-
-/// Build a `Φcache:<Type>` marker line.
-pub fn build_cache_line(cache_type: &str) -> String {
-    format!("Φcache:{}", cache_type)
-}
-
-/// Build a `Φoutput:<Config>` marker line.
-pub fn build_output_line(config: &str) -> String {
-    format!("Φoutput:{}", config)
-}
-
-/// Build a `Φjob:<Name>` marker line.
-pub fn build_job_line(name: &str) -> String {
-    format!("Φjob:{}", name)
-}
-
-/// Build a `Φlog:<Pattern>` marker line.
-pub fn build_log_line(pattern: &str) -> String {
-    format!("Φlog:{}", pattern)
-}
-
-/// Build a `Φmetric:<Provider>` marker line.
-pub fn build_metric_line(provider: &str) -> String {
-    format!("Φmetric:{}", provider)
-}
+pub use super::marker_builders::*;
 
 // ---------------------------------------------------------------------------
 // Expansion — generic over PhiLineKind (no manual table updates needed)

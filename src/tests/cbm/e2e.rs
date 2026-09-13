@@ -487,7 +487,6 @@ fn e2e_bridge_status_lifecycle() {
 // ── E2E: Intelligence Layer full pipeline (no CBM required) ────
 
 /// Test the full intelligence layer pipeline: PageRank → fidelity → recommendation.
-
 #[path = "e2e_basic.rs"]
 mod basic;
 #[path = "e2e_live_queries.rs"]

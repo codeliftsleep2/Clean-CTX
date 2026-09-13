@@ -134,6 +134,8 @@ pub enum SemanticRelation {
     MapsTo,
     /// A SignalR hub method targets a client method.
     HubMethodTargets,
+    /// An MSTest test class exercises a production class.
+    Tests,
     // ---- Spring ----
     /// A controller autowires a service.
     Autowired,

@@ -25,6 +25,10 @@ use crate::compression::language::safe_csharp_language;
 /// Strong .NET framework signals. A single match anywhere in the source
 /// is enough to consider the file a .NET framework file.
 const STRONG_SIGNALS: &[&str] = &[
+    // MSTest
+    "[TestClass]",
+    "[TestMethod]",
+    "[DataTestMethod]",
     // ASP.NET Core
     "[ApiController]",
     "[Route(",
@@ -87,6 +91,9 @@ const STRONG_SIGNALS: &[&str] = &[
 /// of a .NET framework file. A single match anywhere in the source
 /// is enough to consider the file .NET.
 const STRONG_C_SHARP_ATTRIBUTES: &[&str] = &[
+    "TestClass",
+    "TestMethod",
+    "DataTestMethod",
     "ApiController",
     "Route",
     "HttpGet",

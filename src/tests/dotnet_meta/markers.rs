@@ -47,7 +47,31 @@ mod tests {
         );
         assert_eq!(PhiLineKind::from_token("Φef"), Some(PhiLineKind::DbContext));
         assert_eq!(PhiLineKind::from_token("Φhub"), Some(PhiLineKind::Hub));
+        assert_eq!(
+            PhiLineKind::from_token("Φtestcls"),
+            Some(PhiLineKind::TestClass)
+        );
+        assert_eq!(
+            PhiLineKind::from_token("Φverify"),
+            Some(PhiLineKind::Verify)
+        );
         assert_eq!(PhiLineKind::from_token("Φunknown"), None);
+    }
+
+    #[test]
+    fn testing_marker_vocabulary_round_trips() {
+        for (token, kind, expansion) in [
+            ("Φtestcls", PhiLineKind::TestClass, "[TestClass]"),
+            ("Φtest", PhiLineKind::Test, "[TestMethod]"),
+            ("Φmock", PhiLineKind::Mock, "[Mock]"),
+            ("Φsetup", PhiLineKind::Setup, "[Setup]"),
+            ("Φverify", PhiLineKind::Verify, "[Verify]"),
+            ("Φfixture", PhiLineKind::Fixture, "[TestFixture]"),
+        ] {
+            assert_eq!(PhiLineKind::from_token(token), Some(kind));
+            assert_eq!(kind.token(), token);
+            assert_eq!(kind.expansion(), expansion);
+        }
     }
 
     #[test]

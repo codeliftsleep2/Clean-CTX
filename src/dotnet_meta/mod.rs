@@ -27,10 +27,12 @@ pub mod automapper;
 pub(crate) mod detect;
 pub mod efcore;
 pub mod general;
+mod marker_builders;
 pub(crate) mod markers;
 pub mod semantic;
 pub mod serialization;
 pub mod signalr;
+pub mod testing;
 
 use crate::compression::Fidelity;
 
@@ -93,6 +95,16 @@ pub fn run_meta_layer(
     class_captures: &[String],
     fidelity: Fidelity,
 ) -> Option<MetaBlock> {
+    run_meta_layer_with_config(source_code, class_captures, fidelity, None)
+}
+
+/// Run the .NET meta-layer while honoring per-sub-layer configuration.
+pub fn run_meta_layer_with_config(
+    source_code: &str,
+    class_captures: &[String],
+    fidelity: Fidelity,
+    config: Option<&crate::config::MetaLayerConfig>,
+) -> Option<MetaBlock> {
     // Tier 0 (detection): is this a .NET framework file at all?
     if !detect::is_dotnet_file(source_code) {
         return None;
@@ -128,6 +140,13 @@ pub fn run_meta_layer(
 
         // General DI / validation / identity / caching / logging extraction
         if let Some(result) = general::extract_general(raw_class, fidelity) {
+            block.lines.extend(result.lines);
+        }
+
+        // MSTest + Moq extraction (default-on, independently configurable)
+        if config.map(|value| value.testing.enabled).unwrap_or(true)
+            && let Some(result) = testing::extract_testing(raw_class, fidelity)
+        {
             block.lines.extend(result.lines);
         }
     }
@@ -184,11 +203,12 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         source: &str,
         class_captures: &[String],
         fidelity: crate::compression::Fidelity,
-        _config: Option<&crate::config::CleanCtxConfig>,
+        config: Option<&crate::config::CleanCtxConfig>,
     ) -> Option<crate::layers::meta::MetaLayerOutput> {
         // Run the meta-layer pipeline using the real source code and
         // class captures directly — no DefClass round-trip.
-        let block = run_meta_layer(source, class_captures, fidelity)?;
+        let meta_config = config.and_then(|value| value.meta_layers.get("dotnet"));
+        let block = run_meta_layer_with_config(source, class_captures, fidelity, meta_config)?;
         if block.is_empty() {
             return None;
         }
@@ -206,7 +226,7 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         _source: &str,
         class_captures: &[String],
         fidelity: crate::compression::Fidelity,
-        _config: Option<&crate::config::CleanCtxConfig>,
+        config: Option<&crate::config::CleanCtxConfig>,
     ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
         use crate::layers::meta::semantic::SemanticEdge;
         let mut edges: Vec<SemanticEdge> = Vec::new();
@@ -218,6 +238,17 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
                 edges.extend(crate::dotnet_meta::semantic::extract_dotnet_semantic_edges(
                     raw_class, &name, fidelity,
                 ));
+            }
+
+            let testing_enabled = config
+                .and_then(|value| value.meta_layers.get("dotnet"))
+                .map(|value| value.testing.enabled)
+                .unwrap_or(true);
+            if testing_enabled
+                && let Some(edge) =
+                    crate::dotnet_meta::testing::extract_testing_semantic_edge(raw_class)
+            {
+                edges.push(edge);
             }
         }
 

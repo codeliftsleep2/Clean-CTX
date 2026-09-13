@@ -68,6 +68,18 @@ fn semantic_edge_construction() {
     );
 }
 
+#[test]
+fn tests_relation_serializes_through_shared_semantic_contract() {
+    let edge = SemanticEdge {
+        relation: SemanticRelation::Tests,
+        subject: EntityRef::new("dotnet", "TestClass", "AccountsControllerTests"),
+        object: EntityRef::new("dotnet", "Class", "AccountsController"),
+        layer: "dotnet",
+    };
+    let value = serde_json::to_value(edge).expect("serialize Tests relation");
+    assert_eq!(value["relation"], "Tests");
+}
+
 /// Minimal meta-layer implementing the trait WITHOUT overriding
 /// extract_semantic_edges() -- the default empty impl must be used.
 struct DefaultEdgesLayer;

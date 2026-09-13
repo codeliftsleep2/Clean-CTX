@@ -8,6 +8,12 @@ mod tests {
     use crate::dotnet_meta::detect::is_dotnet_file;
 
     #[test]
+    fn red_t1_detects_pure_mstest_file() {
+        let source = "[TestClass]\npublic class FooTests { [TestMethod] public void Works() {} }";
+        assert!(is_dotnet_file(source));
+    }
+
+    #[test]
     fn test_detects_aspnet_controller() {
         let source = r#"
             [ApiController]

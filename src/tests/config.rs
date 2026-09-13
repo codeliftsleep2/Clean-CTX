@@ -46,6 +46,7 @@ fn test_meta_layer_config_defaults() {
     assert!(config.ngrx.cross_layer_cbm);
     assert!(config.signals.enabled);
     assert!(config.routing.enabled);
+    assert!(config.testing.enabled);
 }
 
 #[test]
@@ -65,6 +66,7 @@ fn test_meta_layer_config_json_round_trip() {
         },
         signals: SignalsConfig { enabled: true },
         routing: RoutingConfig { enabled: false },
+        testing: TestingConfig { enabled: false },
     };
     let json = serde_json::to_string(&config).expect("serialize");
     let parsed: MetaLayerConfig = serde_json::from_str(&json).expect("deserialize");
@@ -72,6 +74,7 @@ fn test_meta_layer_config_json_round_trip() {
     assert!(!parsed.ngrx.include_dispatch_sites);
     assert!(!parsed.ngrx.entity_selectors);
     assert!(!parsed.routing.enabled);
+    assert!(!parsed.testing.enabled);
 }
 
 #[test]
@@ -86,6 +89,14 @@ fn test_meta_layer_config_backward_compatible_partial_json() {
     assert!(parsed.ngrx.enabled);
     assert!(parsed.signals.enabled);
     assert!(parsed.routing.enabled);
+    assert!(parsed.testing.enabled);
+}
+
+#[test]
+fn dotnet_testing_nested_opt_out_deserializes() {
+    let json = r#"{ "meta_layers": { "dotnet": { "testing": { "enabled": false } } } }"#;
+    let parsed: CleanCtxConfig = serde_json::from_str(json).expect("parse dotnet testing config");
+    assert!(!parsed.meta_layers["dotnet"].testing.enabled);
 }
 
 /// F-12 (FAANG audit): the old substring check matched `"dist"` inside
