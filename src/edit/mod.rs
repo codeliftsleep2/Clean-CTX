@@ -36,3 +36,7 @@ mod apply_tests;
 #[cfg(test)]
 #[path = "../tests/edit/spans.rs"]
 mod spans_tests;
+
+#[cfg(test)]
+#[path = "../tests/edit/delete.rs"]
+mod delete_tests;

@@ -10,6 +10,9 @@
 
 use std::collections::HashMap;
 
+use streaming_iterator::StreamingIterator;
+use tree_sitter::{Language, Parser, Query, QueryCursor};
+
 use crate::ir::opcodes::CoreOp;
 
 /// One splice-addressable structural unit derived from compiled IR.
@@ -31,6 +34,9 @@ pub struct UnitRecord {
     pub end_byte: u64,
     /// Byte-exact current text of the body slice.
     pub text: String,
+    /// Full declaration span used only by whole-unit operations such as
+    /// delete. Body-based operations continue to use `start_byte..end_byte`.
+    pub declaration_span: Option<(u64, u64)>,
     /// Structural fingerprint: containing class + ordered parameter types.
     /// Two units may share a bare name; they must not share a fingerprint
     /// within one class unless they are true overloads (both remain valid,
@@ -173,6 +179,7 @@ impl UnitTable {
                 start_byte: *start,
                 end_byte: *end,
                 text: text.clone(),
+                declaration_span: None,
                 fingerprint,
             };
             let slot = table.units.len();
@@ -181,6 +188,51 @@ impl UnitTable {
             table.units.push(record);
         }
         table
+    }
+
+    /// Build a table whose body records are also mapped back to their full
+    /// declaration captures. The existing language query is the authority for
+    /// declaration boundaries; contiguous leading metadata siblings are owned
+    /// by that declaration as well.
+    pub fn from_instructions_with_declarations(
+        instructions: &[CoreOp],
+        source: &str,
+        language: Language,
+        query: &str,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut table = Self::from_instructions(instructions);
+        let mut parser = Parser::new();
+        parser.set_language(&language)?;
+        let tree = parser.parse(source, None).ok_or("AST generation failed")?;
+        let compiled_query = Query::new(&language, query)?;
+        let capture_names = compiled_query.capture_names();
+        let mut cursor = QueryCursor::new();
+        let mut matches = cursor.matches(&compiled_query, tree.root_node(), source.as_bytes());
+        let mut declarations = Vec::new();
+
+        while let Some(query_match) = matches.next() {
+            for capture in query_match.captures {
+                let capture_name = capture_names[capture.index as usize];
+                if !matches!(
+                    capture_name,
+                    "method.root" | "constructor.root" | "func.root" | "arrow.root"
+                ) {
+                    continue;
+                }
+                let end = capture.node.end_byte();
+                let start = declaration_start_with_metadata(capture.node, source);
+                declarations.push((start as u64, end as u64));
+            }
+        }
+
+        for unit in &mut table.units {
+            unit.declaration_span = declarations
+                .iter()
+                .copied()
+                .filter(|(start, end)| *start <= unit.start_byte && *end == unit.end_byte)
+                .min_by_key(|(start, end)| end - start);
+        }
+        Ok(table)
     }
 
     pub fn len(&self) -> usize {
@@ -221,4 +273,32 @@ impl UnitTable {
             }),
         }
     }
+}
+
+fn declaration_start_with_metadata(mut node: tree_sitter::Node<'_>, source: &str) -> usize {
+    let mut start = node.start_byte();
+    while let Some(previous) = node.prev_named_sibling() {
+        if !is_declaration_metadata(previous.kind())
+            || !source[previous.end_byte()..start].trim().is_empty()
+        {
+            break;
+        }
+        start = previous.start_byte();
+        node = previous;
+    }
+    start
+}
+
+fn is_declaration_metadata(kind: &str) -> bool {
+    matches!(
+        kind,
+        "decorator"
+            | "attribute"
+            | "attribute_item"
+            | "attribute_list"
+            | "annotation"
+            | "marker_annotation"
+            | "normal_annotation"
+            | "single_element_annotation"
+    )
 }

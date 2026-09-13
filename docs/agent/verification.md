@@ -17,12 +17,12 @@ User-run commands:
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test --workspace --all-targets --all-features
 pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/tests/check-file-sizes.tests.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-file-sizes.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
-cargo test encoding
+cargo test --all-features encoding
 ```
 
 A single warning constitutes a build failure. Do not weaken assertions or
@@ -58,7 +58,7 @@ The **complete Final Verification Gate is mandatory during migration
 finalization** (see `incremental-migration.md` for the full procedure):
 
 1. `cargo fmt --all -- --check`
-2. `cargo clippy --all-targets -- -D warnings`
+2. `cargo clippy --all-targets --all-features -- -D warnings`
 3. `cargo test --workspace --all-targets --all-features`
 4. Run the file-size validator tests and active-file validator.
 5. Confirm all checks pass.
@@ -95,7 +95,7 @@ Text-file encoding is enforced mechanically (no memory needed):
   `scripts/install-git-hooks.ps1`) runs `scripts/check-utf8.ps1` and aborts the
   commit on failure.
 - **CI** — `.github/workflows/ci.yml` runs the same guard on every push/PR.
-- **`cargo test encoding`** — a Rust-side twin over the repo tree plus a
+- **`cargo test --all-features encoding`** — a Rust-side twin over the repo tree plus a
   Unicode canary fixture.
 
 All three invoke the same `scripts/check-utf8.ps1`; there is exactly one

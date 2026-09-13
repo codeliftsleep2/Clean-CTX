@@ -153,11 +153,16 @@ pub fn apply(
                 expected_old_text,
             } => {
                 verify_expected(target, &record.text, expected_old_text)?;
+                let (start, end) = record.declaration_span.ok_or_else(|| {
+                    EditError::Locate(LocateError::NotFound(format!(
+                        "{target} (full declaration span unavailable for delete)"
+                    )))
+                })?;
                 PlannedEdit {
                     kind: "delete",
                     target: target.clone(),
-                    start: record.start_byte,
-                    end: record.end_byte,
+                    start,
+                    end,
                     new_text: String::new(),
                 }
             }

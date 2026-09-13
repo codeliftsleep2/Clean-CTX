@@ -4,26 +4,32 @@
 // byte-exact replacement/deletion/insertion, overlap rejection, bounded
 // mismatch payloads, and tree-sitter pre-commit rejection.
 
+use crate::compression::Fidelity;
+use crate::compression::language::language_for_extension;
 use crate::edit::apply::{self, EditError};
 use crate::edit::locate::UnitTable;
+use crate::ir::compiler::IRCompiler;
 use crate::ir::opcodes::CoreOp;
 
 /// One method whose body occupies bytes 20..38 of the source.
 fn fixture() -> (String, UnitTable) {
     let source = "class Svc {\n  run() {\n    return 1;\n  }\n}\n";
-    let body_start = source.find("{\n    return 1;").unwrap();
-    let body_end = source.find("\n  }\n}").unwrap() + "\n  }".len();
-    // Real IR shape: DefClass → DefMethod → spanned Body.
-    let units = UnitTable::from_instructions(&[
-        CoreOp::DefClass("C1".into(), "Svc".into()),
-        CoreOp::DefMethod("C1".into(), "M1".into(), "run".into()),
-        CoreOp::Body(
-            "M1".into(),
-            source[body_start..body_end].to_string(),
-            Some(body_start as u64),
-            Some(body_end as u64),
-        ),
-    ]);
+    let (language, query) = language_for_extension("ts").expect("TypeScript enabled");
+    let mut compiler = IRCompiler::new();
+    let ir = compiler
+        .compile(
+            source,
+            "apply_fixture",
+            language,
+            query,
+            Fidelity::Edit,
+            None,
+        )
+        .expect("compile fixture");
+    let (language, query) = language_for_extension("ts").expect("TypeScript enabled");
+    let units =
+        UnitTable::from_instructions_with_declarations(&ir.instructions, source, language, query)
+            .expect("map declaration spans");
     (source.to_string(), units)
 }
 
@@ -82,21 +88,19 @@ fn mismatch_rejects_with_bounded_payload() {
 #[test]
 fn delete_removes_unit_span() {
     let (source, units) = fixture();
-    let old = units.resolve("M1").unwrap().text.clone();
+    let old = units.resolve("Svc.run").unwrap().text.clone();
     let report = apply::apply(
         &source,
         &units,
         &[crate::edit::ops::EditOperation::Delete {
-            target: "M1".into(),
+            target: "Svc.run".into(),
             expected_old_text: old,
         }],
     )
     .unwrap();
     assert_eq!(report.operations[0].kind, "delete");
     assert!(!report.new_source.contains("return 1;"));
-    // Deleting [20..39) leaves the pre-body prefix + the trailing
-    // "\n}\n" — note the space after `run()` is preserved.
-    assert_eq!(report.new_source, "class Svc {\n  run() \n}\n");
+    assert_eq!(report.new_source, "class Svc {\n  \n}\n");
 }
 
 #[test]

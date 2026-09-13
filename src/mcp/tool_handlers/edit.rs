@@ -146,7 +146,35 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         Ok((ir, _, _)) => ir,
         Err(e) => return err_response(id, -32603, e.to_string(), None),
     };
-    let units = UnitTable::from_instructions(&pre_compiled.instructions);
+    let units = if operations
+        .iter()
+        .any(|operation| matches!(operation, EditOperation::Delete { .. }))
+    {
+        let Some((language, query)) =
+            crate::compression::language::language_for_extension(extension)
+        else {
+            let e = EditError::UnsupportedExtension(extension.to_string());
+            return err_response(id, -32602, e.to_string(), Some(e.structured()));
+        };
+        match UnitTable::from_instructions_with_declarations(
+            &pre_compiled.instructions,
+            &source_arc,
+            language,
+            query,
+        ) {
+            Ok(table) => table,
+            Err(error) => {
+                return err_response(
+                    id,
+                    -32603,
+                    format!("Cannot resolve declaration spans: {error}"),
+                    None,
+                );
+            }
+        }
+    } else {
+        UnitTable::from_instructions(&pre_compiled.instructions)
+    };
     if units.is_empty() {
         let e = EditError::Locate(crate::edit::locate::LocateError::NotFound(String::from(
             "no span-addressable units in current compile (file may have changed shape)",

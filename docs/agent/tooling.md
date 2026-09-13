@@ -193,7 +193,7 @@ controls **which** method bodies receive verbatim content at Edit fidelity.
    → If parse succeeds: response includes syntaxGated: true
 
 3. Run compiler/tests
-   → run_commands(cargo check / tsc / dotnet build)
+   → run_commands(cargo check --all-features / tsc / dotnet build)
    → Syntax gating ≠ semantic correctness
 ```
 
@@ -509,8 +509,8 @@ verification guidance.
 | Phase | Tool | What It Confirms |
 |-------|------|------------------|
 | Edit-time | `apply_edit` response `syntaxGated: true` | Tree-sitter parsed the result without syntax errors |
-| Fast syntax | `run_commands(cargo check / tsc --noEmit / dotnet build)` | Compilation succeeds |
-| Tests | `run_commands(cargo test / jest / dotnet test)` | Behavioral correctness |
+| Fast syntax | `run_commands(cargo check --all-features / tsc --noEmit / dotnet build)` | Compilation succeeds |
+| Tests | `run_commands(cargo test --all-features / jest / dotnet test)` | Behavioral correctness |
 | Full gate | See `docs/agent/verification.md` | Formatting, Clippy, full test suite, encoding guards |
 
 ### The Final Verification Gate
@@ -524,10 +524,10 @@ For Rust projects (this repository):
 
 ```
 cargo fmt --all -- --check
-cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test --workspace --all-targets --all-features
 pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
-cargo test encoding
+cargo test --all-features encoding
 ```
 
 For non-Rust projects, use the equivalent language-specific tools.

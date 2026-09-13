@@ -76,12 +76,25 @@ authorized architecture do not require additional approval.
 warning constitutes a build failure:
 
 ```
-cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 Do not suppress warnings unless they are genuinely pre-existing dead code that
 is structurally necessary; in those rare cases use `#[allow(dead_code)]` with a
 comment explaining why.
+
+#### Development Cargo feature mode
+
+Repository-development Cargo commands default to **all features enabled**.
+Cargo's package defaults describe the release-default product configuration,
+not sufficient development coverage. Pass `--all-features` for development
+builds, checks, tests, Clippy runs, examples, and other Cargo work unless the
+task deliberately tests a specific feature combination. State any intentional
+feature restriction explicitly and do not report it as all-feature verification.
+
+This does not authorize agents to start long-running commands. The
+long-running verification boundary still requires agents to hand those
+commands to the user unless that particular run is explicitly authorized.
 
 ### 2. Routing
 
@@ -233,9 +246,9 @@ Run the single authoritative Final Verification Gate from
 ### 9. Encoding
 
 Encoding is authoritative in `.clinerules/encoding.md` and enforced
-mechanically (git pre-commit + CI + `cargo test encoding`). After editing any
-text file, ensure it is strict UTF-8 without a BOM, and never introduce
-mojibake. See `docs/ENCODING_POLICY.md` for rationale.
+mechanically (git pre-commit + CI + `cargo test --all-features encoding`).
+After editing any text file, ensure it is strict UTF-8 without a BOM, and never
+introduce mojibake. See `docs/ENCODING_POLICY.md` for rationale.
 
 ### 11. Production Integration Gate
 

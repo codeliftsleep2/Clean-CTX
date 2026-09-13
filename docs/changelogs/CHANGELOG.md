@@ -8,6 +8,24 @@ Historical releases are archived per version as `CHANGELOG_<version>.md` (`_a`/`
 
 ---
 
+## [0.6.4] - 2026-09-12
+
+### Added
+
+* **All-feature development Cargo policy** — repository-development builds, checks, tests, Clippy runs, and examples now default to `--all-features`; Cargo's package defaults remain the release-default product configuration. Intentional feature-restricted runs must be identified explicitly and cannot be reported as all-feature verification. This policy does not authorize agents to cross the existing long-running-command boundary. (`.clinerules/engineering.md`, `AGENTS.md`, `docs/agent/verification.md`, `docs/agent/tooling.md`)
+
+### Fixed
+
+* **`apply_edit delete` whole-declaration boundaries** — delete previously reused the resolved unit's brace-delimited body span, leaving method signatures and leading metadata behind for the syntax gate to reject. Delete-containing batches now map the unchanged body span to its enclosing declaration capture and include contiguous attributes, annotations, and decorators in the removal range. `replace_body` remains body-scoped; stale-text validation remains mandatory and body-based; IR/wire span contracts and batching semantics are unchanged. Cross-language regressions cover C#, TypeScript, Java, and Rust first/middle/final members, leading metadata, closing-delimiter adjacency with and without blank lines, `replace_body`, and batched deletion. (`src/edit/locate.rs`, `src/edit/apply.rs`, `src/mcp/tool_handlers/edit.rs`, `src/tests/edit/delete.rs`)
+
+### Verification
+
+* Focused all-feature delete regression suite: **8 passed, 0 failed** (`cargo test --all-features delete_tests -- --nocapture`, user-run).
+* Corrected core delete regression (`edit::apply_tests::delete_removes_unit_span`) passed; the live CBM apply-edit E2E also passed when run standalone.
+* The user-run Final Verification Gate was reported green across formatting, all-target/all-feature check, Clippy with warnings denied, the complete all-target/all-feature test suite, file-size validator tests and active-tree validation, UTF-8 validation, the Rust encoding suite, and `git diff --check`.
+
+---
+
 ## [0.6.3] - 2026-09-11
 
 ### Added
