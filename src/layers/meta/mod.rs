@@ -42,7 +42,7 @@ pub struct MetaLayerOutput {
     /// The fully-rendered `Φ` block text (empty when the layer produced
     /// no markers for this file).
     pub rendered: String,
-    /// Structured Angular block (decorators + RxJS/NgRx/Signals/Routing
+    /// Structured Angular block (decorators + RxJS/NgRx/Signals/Routing/Testing
     /// sections). `None` when the file is not Angular.
     pub angular_block: Option<crate::angular_meta::MetaBlock>,
     /// Structured Spring Boot block. `None` when not a Spring file.
@@ -92,6 +92,20 @@ pub trait MetaLayer: Send + Sync {
         config: Option<&CleanCtxConfig>,
     ) -> Option<MetaLayerOutput>;
 
+    /// Path-aware enrichment hook. Existing layers retain their exact
+    /// behavior through default forwarding; layers with authorized filename
+    /// semantics may override this method.
+    fn enrich_with_path(
+        &self,
+        source: &str,
+        _path: &Path,
+        class_captures: &[String],
+        fidelity: Fidelity,
+        config: Option<&CleanCtxConfig>,
+    ) -> Option<MetaLayerOutput> {
+        self.enrich(source, class_captures, fidelity, config)
+    }
+
     /// Extract structured semantic edges for the given source file.
     ///
     /// Legacy text-only contract. Framework meta-layers implement this from
@@ -135,6 +149,19 @@ pub trait MetaLayer: Send + Sync {
             .map(|(_, text)| text.clone())
             .collect();
         self.extract_semantic_edges(source, &texts, fidelity, config)
+    }
+
+    /// Path-aware semantic extraction hook with backward-compatible default
+    /// forwarding for layers whose semantics do not depend on filenames.
+    fn extract_semantic_edges_paired_with_path(
+        &self,
+        source: &str,
+        _path: &Path,
+        class_captures: &[(String, String)],
+        fidelity: Fidelity,
+        config: Option<&CleanCtxConfig>,
+    ) -> Vec<SemanticEdge> {
+        self.extract_semantic_edges_paired(source, class_captures, fidelity, config)
     }
 }
 
@@ -183,11 +210,16 @@ impl MetaLayer for AngularMetaLayer {
         // enriches them. The per-layer extractors apply their own
         // import-gate checks internally, so false positives here are
         // cheap (zero output, zero overhead).
+        let testing_enabled = config
+            .and_then(|c| c.meta_layers.get("angular"))
+            .map(|m| m.testing.enabled)
+            .unwrap_or(true);
         crate::angular_meta::detect::is_angular_file(source)
             || crate::angular_meta::rx::has_rxjs_imports(source)
             || crate::angular_meta::ngrx::has_ngrx_imports(source)
             || crate::angular_meta::signals::has_signal_imports(source)
             || crate::angular_meta::routing::has_router_imports(source)
+            || testing_enabled && crate::angular_meta::testing::is_testing_source(source, _path)
     }
 
     fn enrich(
@@ -197,16 +229,28 @@ impl MetaLayer for AngularMetaLayer {
         fidelity: Fidelity,
         config: Option<&CleanCtxConfig>,
     ) -> Option<MetaLayerOutput> {
+        self.enrich_with_path(source, Path::new(""), class_captures, fidelity, config)
+    }
+
+    fn enrich_with_path(
+        &self,
+        source: &str,
+        path: &Path,
+        class_captures: &[String],
+        fidelity: Fidelity,
+        config: Option<&CleanCtxConfig>,
+    ) -> Option<MetaLayerOutput> {
         // Honor the per-framework meta-layer config (enabled flags,
         // min_pipe_operators, include_dispatch_sites, etc.). When the
         // config is absent or the "angular" entry is missing, all
         // sub-layers run with their defaults.
         let meta_config = config.and_then(|c| c.meta_layers.get("angular"));
-        let block = crate::angular_meta::run_meta_layer_with_config(
+        let block = crate::angular_meta::run_meta_layer_with_config_and_path(
             source,
             class_captures,
             fidelity,
             meta_config,
+            path,
         )?;
         if block.is_empty() {
             return None;
@@ -297,6 +341,39 @@ impl MetaLayer for AngularMetaLayer {
         //    metadata (Φ markers); semantic-edge projection of observables
         //    is deferred to Phase 4 (WorkspaceIndex) if needed.
 
+        let testing_enabled = meta_config.map(|c| c.testing.enabled).unwrap_or(true);
+        if testing_enabled {
+            edges.extend(
+                crate::angular_meta::testing::extract_testing_semantic_edges(source, Path::new("")),
+            );
+        }
+
+        edges
+    }
+
+    fn extract_semantic_edges_paired_with_path(
+        &self,
+        source: &str,
+        path: &Path,
+        class_captures: &[(String, String)],
+        fidelity: Fidelity,
+        config: Option<&CleanCtxConfig>,
+    ) -> Vec<SemanticEdge> {
+        let captures: Vec<String> = class_captures
+            .iter()
+            .map(|(_, text)| text.clone())
+            .collect();
+        let mut edges = self.extract_semantic_edges(source, &captures, fidelity, config);
+        edges
+            .retain(|edge| edge.relation != crate::layers::meta::semantic::SemanticRelation::Tests);
+        let testing_enabled = config
+            .and_then(|value| value.meta_layers.get("angular"))
+            .map(|value| value.testing.enabled)
+            .unwrap_or(true);
+        if testing_enabled {
+            edges
+                .extend(crate::angular_meta::testing::extract_testing_semantic_edges(source, path));
+        }
         edges
     }
 }

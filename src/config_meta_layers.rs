@@ -24,7 +24,8 @@ pub struct MetaLayerConfig {
     /// Routing sub-layer config (Angular Ecosystem Deepening Phase 4).
     #[serde(default)]
     pub routing: RoutingConfig,
-    /// MSTest + Moq sub-layer config for the .NET meta-layer.
+    /// Framework-local testing sub-layer config (MSTest/Moq for .NET,
+    /// Vitest/TestBed for Angular).
     #[serde(default)]
     pub testing: TestingConfig,
 }
@@ -133,7 +134,7 @@ fn default_min_pipe_operators() -> usize {
     2
 }
 
-/// MSTest + Moq sub-layer configuration.
+/// Framework-local testing sub-layer configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TestingConfig {
     /// Master switch for testing markers and semantic edges. Defaults to `true`.

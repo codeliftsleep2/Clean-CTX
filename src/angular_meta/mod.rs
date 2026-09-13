@@ -32,6 +32,7 @@ pub mod signals;
 pub mod style;
 pub mod template;
 pub mod template_compress;
+pub mod testing;
 pub mod util;
 
 use crate::compression::Fidelity;
@@ -64,9 +65,9 @@ pub struct MetaBlock {
     /// surrounding `// --- Φ Angular Meta ---` header.
     ///
     /// **Backward-compat:** this is the Angular decorator section.
-    /// New layers (RxJS, NgRx, Signals, Routing) use `sections`.
+    /// New layers (RxJS, NgRx, Signals, Routing, Testing) use `sections`.
     pub lines: Vec<String>,
-    /// Named sections for additional meta-layers (RxJS, NgRx, etc.).
+    /// Named sections for additional meta-layers (RxJS, NgRx, Testing, etc.).
     /// Each section carries its own header.
     pub sections: Vec<MetaSection>,
 }
@@ -164,6 +165,25 @@ pub fn run_meta_layer_with_config(
     fidelity: Fidelity,
     config: Option<&crate::config::MetaLayerConfig>,
 ) -> Option<MetaBlock> {
+    run_meta_layer_with_config_and_path(
+        source_code,
+        class_captures,
+        fidelity,
+        config,
+        std::path::Path::new(""),
+    )
+}
+
+/// Path-aware variant used by production dispatch. Existing callers keep the
+/// source-only contract above; only detectors with explicit filename evidence
+/// consume `path`.
+pub fn run_meta_layer_with_config_and_path(
+    source_code: &str,
+    class_captures: &[String],
+    fidelity: Fidelity,
+    config: Option<&crate::config::MetaLayerConfig>,
+    path: &std::path::Path,
+) -> Option<MetaBlock> {
     // Tier 0 (detection): is this an Angular file at all?
     let is_angular = detect::is_angular_file(source_code);
 
@@ -172,6 +192,7 @@ pub fn run_meta_layer_with_config(
     let ngrx_enabled = config.map(|c| c.ngrx.enabled).unwrap_or(true);
     let signals_enabled = config.map(|c| c.signals.enabled).unwrap_or(true);
     let routing_enabled = config.map(|c| c.routing.enabled).unwrap_or(true);
+    let testing_enabled = config.map(|c| c.testing.enabled).unwrap_or(true);
 
     // Detect RxJS independently — a file may be RxJS without being
     // Angular (e.g. a standalone RxJS service or utility).
@@ -205,11 +226,20 @@ pub fn run_meta_layer_with_config(
         None
     };
 
+    // Detect testing independently — Vitest specs and TestBed setup do not
+    // require Angular decorators. Path evidence is used only for `.spec.ts`.
+    let testing_shape = if testing_enabled && testing::is_testing_source(source_code, path) {
+        testing::extract_testing_shape(source_code, fidelity)
+    } else {
+        None
+    };
+
     if !is_angular
         && rx_shape.is_none()
         && ngrx_shape.is_none()
         && signal_shape.is_none()
         && route_shape.is_none()
+        && testing_shape.is_none()
     {
         // Neither Angular decorators, RxJS, NgRx, Signals, nor Routing —
         // zero overhead.
@@ -333,6 +363,27 @@ pub fn run_meta_layer_with_config(
             block.sections.push(MetaSection {
                 header,
                 lines: route_lines,
+            });
+        }
+    }
+
+    // Tier 6 (Testing): independent Vitest + Angular TestBed section.
+    if let Some(shape) = testing_shape {
+        let testing_block = shape.render(fidelity);
+        if !testing_block.is_empty() {
+            let mut testing_lines: Vec<String> =
+                testing_block.lines().map(|line| line.to_string()).collect();
+            let header = if testing_lines
+                .first()
+                .is_some_and(|line| line.starts_with("// ---"))
+            {
+                testing_lines.remove(0)
+            } else {
+                "// --- Φ Testing Meta ---".to_string()
+            };
+            block.sections.push(MetaSection {
+                header,
+                lines: testing_lines,
             });
         }
     }

@@ -99,6 +99,13 @@ fn dotnet_testing_nested_opt_out_deserializes() {
     assert!(!parsed.meta_layers["dotnet"].testing.enabled);
 }
 
+#[test]
+fn angular_testing_nested_opt_out_deserializes() {
+    let json = r#"{ "meta_layers": { "angular": { "testing": { "enabled": false } } } }"#;
+    let parsed: CleanCtxConfig = serde_json::from_str(json).expect("parse angular testing config");
+    assert!(!parsed.meta_layers["angular"].testing.enabled);
+}
+
 /// F-12 (FAANG audit): the old substring check matched `"dist"` inside
 /// `"distribute"`. The new glob matcher must NOT do that.
 #[test]

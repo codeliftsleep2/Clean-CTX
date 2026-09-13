@@ -11,6 +11,7 @@ use crate::config::CleanCtxConfig;
 use crate::layers::language::LanguageLayer;
 use crate::layers::meta::semantic::SemanticEdge;
 use crate::layers::meta::{MetaLayer, MetaLayerOutput};
+use std::path::Path;
 use std::sync::OnceLock;
 
 /// Global registry, initialized once per process.
@@ -138,15 +139,36 @@ impl LayerRegistry {
         fidelity: Fidelity,
         config: Option<&CleanCtxConfig>,
     ) -> Vec<MetaLayerOutput> {
+        self.run_meta_layers_pipeline_with_path(
+            source,
+            Path::new(""),
+            class_captures,
+            fidelity,
+            config,
+        )
+    }
+
+    /// Path-aware dispatch. The source-only entry point above remains the
+    /// backward-compatible API for callers without canonical path context.
+    pub fn run_meta_layers_pipeline_with_path(
+        &self,
+        source: &str,
+        path: &Path,
+        class_captures: &[String],
+        fidelity: Fidelity,
+        config: Option<&CleanCtxConfig>,
+    ) -> Vec<MetaLayerOutput> {
         let mut results = Vec::new();
 
         for layer in &self.meta_layers {
             // Use trait-based dispatch: check if this layer applies to the source
-            if layer.is_applicable(source, std::path::Path::new(""), config) {
+            if layer.is_applicable(source, path, config) {
                 // Pass the real source code and class captures directly — no
                 // DefClass round-trip (eliminates the semantic corruption where
                 // DefClass.name carried full source text instead of a class name).
-                if let Some(output) = layer.enrich(source, class_captures, fidelity, config) {
+                if let Some(output) =
+                    layer.enrich_with_path(source, path, class_captures, fidelity, config)
+                {
                     results.push(output);
                 }
             }
@@ -172,11 +194,31 @@ impl LayerRegistry {
         fidelity: Fidelity,
         config: Option<&CleanCtxConfig>,
     ) -> Vec<SemanticEdge> {
+        self.collect_semantic_edges_with_path(
+            source,
+            Path::new(""),
+            class_captures,
+            fidelity,
+            config,
+        )
+    }
+
+    /// Path-aware semantic dispatch with default forwarding for layers that
+    /// do not consume path evidence.
+    pub fn collect_semantic_edges_with_path(
+        &self,
+        source: &str,
+        path: &Path,
+        class_captures: &[(String, String)],
+        fidelity: Fidelity,
+        config: Option<&CleanCtxConfig>,
+    ) -> Vec<SemanticEdge> {
         let mut edges = Vec::new();
         for layer in &self.meta_layers {
-            if layer.is_applicable(source, std::path::Path::new(""), config) {
-                edges.extend(layer.extract_semantic_edges_paired(
+            if layer.is_applicable(source, path, config) {
+                edges.extend(layer.extract_semantic_edges_paired_with_path(
                     source,
+                    path,
                     class_captures,
                     fidelity,
                     config,

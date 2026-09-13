@@ -3,6 +3,7 @@
 // Integration tests for the Angular Meta-Layer Tier 1 entry point.
 
 mod e2e;
+mod testing;
 
 use crate::angular_meta::run_meta_layer;
 use crate::compression::Fidelity;

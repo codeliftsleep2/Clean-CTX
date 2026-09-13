@@ -119,7 +119,7 @@ pub enum SemanticRelation {
     TriggersReducer,
     /// An effect produces/dispatches a success/failure action.
     ProducesAction,
-    // ---- .NET ----
+    // ---- .NET / cross-domain testing ----
     /// A controller exposes an action method.
     ControllerAction,
     /// A controller/action has a route attribute.
@@ -134,7 +134,7 @@ pub enum SemanticRelation {
     MapsTo,
     /// A SignalR hub method targets a client method.
     HubMethodTargets,
-    /// An MSTest test class exercises a production class.
+    /// A test artifact exercises a production class/SUT.
     Tests,
     // ---- Spring ----
     /// A controller autowires a service.

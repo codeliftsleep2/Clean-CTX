@@ -24,25 +24,26 @@
 //   ProgramGraphPass        — on-demand local program graph construction
 //   InferenceLayerPass      — on-demand CBM enrichment + derived analysis
 
-use std::sync::Mutex;
-
-use super::compiler::CompiledIR;
-use super::compiler_methods::resolve_forward_aliases;
 use super::inference_layer::InferenceLayer;
 use super::layers::{LanguageLayer, LayerContext, PatternRecognizer};
 use super::opcodes::*;
-use super::program_graph::{GraphBuilder, ProgramGraph};
-use super::symbol_table::SymbolKind;
-use super::validator::{DefaultValidator, IRValidator};
-use crate::cbm::bridge::GraphBridge;
+use super::program_graph::ProgramGraph;
 use crate::compaction::method::{find_method_params, strip_base_initializer_clause};
 use crate::compaction::modifiers::{MODIFIERS_LOW, strip_csharp_attributes, strip_modifiers};
-use crate::compaction::{
-    extract_class_name, extract_field, extract_method_sig, extract_rust_struct_name,
-};
 use crate::compression::Fidelity;
-use crate::compression::capture_pipeline::{CapEntry, run_capture_pipeline};
+use crate::compression::capture_pipeline::CapEntry;
 use crate::layers::meta::semantic::SemanticEdge;
+
+mod core;
+mod meta_layer;
+mod post;
+
+pub use core::{CoreIRPass, LanguageLayerPass};
+pub use meta_layer::MetaLayerPass;
+pub use post::{
+    AliasResolutionPass, ExecutionSemanticsPass, InferenceLayerPass, PatternRecognitionPass,
+    ProgramGraphPass, ValidationPass,
+};
 
 /// Error type for pass execution.
 #[derive(Debug, Clone)]
@@ -178,7 +179,7 @@ impl PassContext {
     }
 
     /// Flush accumulated method flags into a FLAGS instruction (F-28).
-    fn flush_method_flags(&mut self) {
+    pub(super) fn flush_method_flags(&mut self) {
         if let Some(method_id) = self.current_method.take() {
             if !self.current_method_flags.is_empty() {
                 let flags = std::mem::take(&mut self.current_method_flags);
@@ -191,7 +192,7 @@ impl PassContext {
     /// Push a type-declaration scope. Closed scopes are pruned lazily by
     /// `refresh_type_owner`, so entering a nested type never orphans the
     /// enclosing type's later members.
-    fn push_type_scope(&mut self, class_id: String, end_byte: usize) {
+    pub(super) fn push_type_scope(&mut self, class_id: String, end_byte: usize) {
         self.type_scopes.push(TypeScope {
             class_id: class_id.clone(),
             end_byte,
@@ -204,7 +205,7 @@ impl PassContext {
     /// window contains `at`. Scopes that ended at or before `at` are popped.
     /// `current_class` (and its layer-context mirror) track the result so
     /// every member attaches to its true enclosing type.
-    fn refresh_type_owner(&mut self, at: usize) {
+    pub(super) fn refresh_type_owner(&mut self, at: usize) {
         while let Some(scope) = self.type_scopes.last() {
             if scope.end_byte <= at {
                 self.type_scopes.pop();
@@ -221,7 +222,7 @@ impl PassContext {
     /// (`func.root`/`arrow.root` with no enclosing class). It must remain
     /// the innermost owner for all subsequent top-level functions in this
     /// file, so it sits ABOVE any other scope and is never pruned.
-    fn push_file_scope(&mut self, class_id: String) {
+    pub(super) fn push_file_scope(&mut self, class_id: String) {
         self.type_scopes.push(TypeScope {
             class_id: class_id.clone(),
             end_byte: usize::MAX,
@@ -269,7 +270,12 @@ impl PassContext {
     }
 
     /// Emit a method's IR (DefMethod + Param + Return) and return the method name.
-    fn emit_method_ir(&mut self, class_id: &str, method_id: &str, raw_sig: &str) -> String {
+    pub(super) fn emit_method_ir(
+        &mut self,
+        class_id: &str,
+        method_id: &str,
+        raw_sig: &str,
+    ) -> String {
         let stripped = strip_csharp_attributes(raw_sig);
         let sig_text = match find_body_start_in(stripped) {
             Some(i) => stripped[..i].trim_end().to_string(),
@@ -330,7 +336,7 @@ impl PassContext {
     /// ` from ` separator, never as legacy `$im … .$fm …` text. The
     /// vestigial `$im…$fm` decode/strip branch was removed in Phase C0 as
     /// unreachable — nothing produces that form.
-    fn emit_import_ir(&mut self, raw: &str) {
+    pub(super) fn emit_import_ir(&mut self, raw: &str) {
         let trimmed = raw.trim();
 
         if let Some(from_pos) = trimmed.find(" from ") {
@@ -504,676 +510,6 @@ impl Default for PassPipeline {
 }
 
 // ── Built-in Passes ──────────────────────────────────────────────
-
-/// Pass 1: Core IR emission from tree-sitter captures.
-pub struct CoreIRPass;
-
-impl CoreIRPass {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for CoreIRPass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl IRPass for CoreIRPass {
-    fn name(&self) -> &str {
-        "core_ir"
-    }
-    fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
-        // Empty source is valid — produces an empty instruction stream.
-        if state.source.is_empty() {
-            return Ok(());
-        }
-
-        // Extract immutable state upfront to avoid borrow conflicts with
-        // the mutable `state` operations in the main capture loop.
-        let language = state.language.clone().ok_or_else(|| PassError {
-            pass_name: self.name().to_string(),
-            message: "no tree-sitter language configured".to_string(),
-        })?;
-        let query_string = state.query_string.clone();
-        let source = state.source.clone();
-        let fidelity = state.fidelity;
-        let file_id = state.file_id.clone();
-        let skip_set = state.skip_set.clone();
-        let focus = state.focus.clone();
-
-        let captures = run_capture_pipeline(
-            language,
-            &query_string,
-            &source,
-            fidelity,
-            |capture_name, raw, fidelity| match capture_name {
-                "class.root" => Some(extract_class_name(raw)),
-                // `extract_rust_struct_name` only strips Rust visibility
-                // (`pub `, ...), so a C# `public enum X` routed through it
-                // keeps `public` as its DefClass name. Route by QUERY
-                // vocabulary: the shared CS_QUERY never emits struct/trait/
-                // impl roots, so those stay on the Rust path; enum roots
-                // from C# go through the shared class-name extractor.
-                "struct.root" | "trait.root" | "impl.root" => Some(extract_rust_struct_name(raw)),
-                "enum.root" => {
-                    if query_string == crate::queries::CS_QUERY {
-                        Some(extract_class_name(raw))
-                    } else {
-                        Some(extract_rust_struct_name(raw))
-                    }
-                }
-                "method.root" => Some(extract_method_sig(raw, fidelity)),
-                "field.root" => Some(extract_field(raw, fidelity)),
-                _ => Some(raw.to_string()),
-            },
-        )
-        .map_err(|e| PassError {
-            pass_name: self.name().to_string(),
-            message: format!("capture pipeline error: {}", e),
-        })?;
-
-        // ── Main capture loop: Core IR emission + per-capture language dispatch ──
-        for cap in &captures {
-            // CBM filter-first: skip low-importance symbols
-            if let Some(ref skip) = skip_set {
-                if !skip.is_empty() && crate::compression::pipeline::should_skip_capture(cap, skip)
-                {
-                    continue;
-                }
-            }
-            match cap.name.as_str() {
-                "class.root" | "interface.root" | "struct.root" | "enum.root" | "trait.root"
-                | "record.root" => {
-                    let class_id = state.next_id("C");
-                    state
-                        .instructions
-                        .push(CoreOp::DefClass(class_id.clone(), cap.text.clone()));
-                    state.push_type_scope(class_id.clone(), cap.end_byte);
-                    state.layer_context.current_class_name = Some(cap.raw_text.clone());
-                    state.layer_context.current_class_bare_name = Some(cap.text.clone());
-
-                    state.layer_context.symbol_table_mut().register(
-                        class_id.clone(),
-                        cap.text.clone(),
-                        SymbolKind::Class,
-                        &file_id,
-                    );
-
-                    for ll in state.language_layers.iter_mut() {
-                        let layer_ops =
-                            ll.process_capture(&cap.name, &cap.raw_text, &mut state.layer_context);
-                        state.instructions.extend(layer_ops);
-                    }
-                }
-                "impl.root" => {
-                    // In Rust, `impl Foo { ... }` does NOT define a new type —
-                    // it adds methods to the EXISTING type `Foo`. Two cases:
-                    //
-                    //  (a) struct precedes the impl (`pub struct S; impl S {}`):
-                    //      the struct's scope expired before the impl starts.
-                    //      We must REUSE the struct's class_id (push a scope
-                    //      with the SAME id, emit NO new DefClass) so the impl's
-                    //      methods attach to it and emit their Flags — while
-                    //      keeping the DefClass count at exactly 1.
-                    //  (b) standalone impl (no preceding type): create a
-                    //      DefClass for the self-type (Phase C regression).
-                    //
-                    // Capture the class BEFORE pruning expired scopes so we
-                    // can detect case (a). refresh_type_owner pops the
-                    // expired struct scope; if a class was current a moment
-                    // ago but isn't now, that expired class is the struct
-                    // this impl implements.
-                    let prev_class = state.current_class.clone();
-                    state.refresh_type_owner(cap.start_byte);
-                    match &state.current_class {
-                        Some(cid) => {
-                            // Impl nested inside a still-open scope — reuse it.
-                            state.push_type_scope(cid.clone(), cap.end_byte);
-                        }
-                        None => {
-                            if let Some(class_id) = prev_class {
-                                // Case (a): reuse the struct's class, no new
-                                // DefClass. Re-establish it as owner so member
-                                // captures inside the impl attach and emit Flags.
-                                state.push_type_scope(class_id, cap.end_byte);
-                            } else {
-                                // Case (b): standalone impl — create a
-                                // DefClass for the self-type.
-                                let self_type =
-                                    cap.text.split(':').next().unwrap_or(&cap.text).to_string();
-                                if !self_type.is_empty() {
-                                    let class_id = state.next_id("C");
-                                    state.instructions.push(CoreOp::DefClass(
-                                        class_id.clone(),
-                                        self_type.clone(),
-                                    ));
-                                    state.push_type_scope(class_id, cap.end_byte);
-                                    state.layer_context.current_class_name =
-                                        Some(cap.raw_text.clone());
-                                    state.layer_context.current_class_bare_name = Some(self_type);
-                                }
-                            }
-                        }
-                    }
-
-                    for ll in state.language_layers.iter_mut() {
-                        let layer_ops =
-                            ll.process_capture(&cap.name, &cap.raw_text, &mut state.layer_context);
-                        state.instructions.extend(layer_ops);
-                    }
-                }
-                "method.root" | "constructor.root" | "func.root" | "arrow.root" => {
-                    // Nested-type ownership: a member belongs to the innermost
-                    // type whose source span contains it. A nested type that
-                    // closed before this member starts can never own it.
-                    state.refresh_type_owner(cap.start_byte);
-                    let class_id = match &state.current_class {
-                        Some(cid) => cid.clone(),
-                        None => {
-                            if cap.name == "func.root" || cap.name == "arrow.root" {
-                                let synt_id = state.next_id("C");
-                                state.instructions.push(CoreOp::DefClass(
-                                    synt_id.clone(),
-                                    format!("__file_{}", file_id),
-                                ));
-                                state.push_file_scope(synt_id.clone());
-                                state.layer_context.current_class_name =
-                                    Some(format!("__file_{}", file_id));
-                                state.layer_context.current_class_bare_name =
-                                    Some(format!("__file_{}", file_id));
-                                synt_id
-                            } else {
-                                continue;
-                            }
-                        }
-                    };
-
-                    state.flush_method_flags();
-
-                    let method_id = state.next_id("M");
-                    state.current_method = Some(method_id.clone());
-                    state.layer_context.current_method = Some(method_id.clone());
-                    state.layer_context.current_method_name = Some(cap.text.clone());
-
-                    let method_name = state.emit_method_ir(&class_id, &method_id, &cap.text);
-
-                    if fidelity == Fidelity::Edit
-                        && focus.as_ref().is_none_or(|f| f.contains(&method_name))
-                    {
-                        if let Some((body, body_offset)) = locate_method_body(&cap.raw_text) {
-                            // apply_edit plan Phase 1: thread the absolute
-                            // byte span through the op so the apply_edit
-                            // write path can splice without re-locating the
-                            // unit. The body slice always runs to the end
-                            // of the capture's raw text, so the end offset
-                            // is the capture's own end_byte.
-                            let start_byte = cap.start_byte as u64 + body_offset as u64;
-                            let end_byte = cap.end_byte as u64;
-                            state.instructions.push(CoreOp::Body(
-                                method_id.clone(),
-                                body,
-                                Some(start_byte),
-                                Some(end_byte),
-                            ));
-                        }
-                    }
-
-                    for ll in state.language_layers.iter_mut() {
-                        let layer_ops =
-                            ll.process_capture(&cap.name, &cap.raw_text, &mut state.layer_context);
-                        state.instructions.extend(layer_ops);
-                    }
-                }
-                "field.root" => {
-                    state.refresh_type_owner(cap.start_byte);
-                    let class_id = match &state.current_class {
-                        Some(cid) => cid.clone(),
-                        None => continue,
-                    };
-                    let field_id = state.next_id("F");
-                    state.instructions.push(CoreOp::DefField(
-                        class_id,
-                        field_id.clone(),
-                        cap.text.clone(),
-                    ));
-
-                    for ll in state.language_layers.iter_mut() {
-                        let layer_ops =
-                            ll.process_capture(&cap.name, &cap.text, &mut state.layer_context);
-                        state.instructions.extend(layer_ops);
-                    }
-                }
-                "import.root" | "package.root" => {
-                    state.emit_import_ir(&cap.text);
-
-                    for ll in state.language_layers.iter_mut() {
-                        let layer_ops =
-                            ll.process_capture(&cap.name, &cap.text, &mut state.layer_context);
-                        state.instructions.extend(layer_ops);
-                    }
-                }
-                "type.root" => {
-                    let alias_id = state.next_id("T");
-                    state
-                        .instructions
-                        .push(CoreOp::TypeAlias(alias_id, cap.text.clone()));
-
-                    for ll in state.language_layers.iter_mut() {
-                        let layer_ops =
-                            ll.process_capture(&cap.name, &cap.text, &mut state.layer_context);
-                        state.instructions.extend(layer_ops);
-                    }
-                }
-                "mod.root" => {
-                    for ll in state.language_layers.iter_mut() {
-                        let layer_ops =
-                            ll.process_capture(&cap.name, &cap.text, &mut state.layer_context);
-                        state.instructions.extend(layer_ops);
-                    }
-                }
-                "if.root" => {
-                    if state.current_method.is_some()
-                        && !state.current_method_flags.contains(&FLAG_IF.to_string())
-                    {
-                        state.current_method_flags.push(FLAG_IF.to_string());
-                    }
-                }
-                "for.root" | "while.root" | "loop.root" => {
-                    if state.current_method.is_some()
-                        && !state.current_method_flags.contains(&FLAG_LOOP.to_string())
-                    {
-                        state.current_method_flags.push(FLAG_LOOP.to_string());
-                    }
-                }
-                "return.root" => {
-                    if state.current_method.is_some()
-                        && !state.current_method_flags.contains(&FLAG_RET.to_string())
-                    {
-                        state.current_method_flags.push(FLAG_RET.to_string());
-                    }
-                }
-                "throw.root" => {
-                    if state.current_method.is_some()
-                        && !state.current_method_flags.contains(&FLAG_THROW.to_string())
-                    {
-                        state.current_method_flags.push(FLAG_THROW.to_string());
-                    }
-                }
-                "do.root" | "try.root" | "switch.root" | "match.root" => {
-                    if state.current_method.is_some()
-                        && !state.current_method_flags.contains(&FLAG_IF.to_string())
-                    {
-                        state.current_method_flags.push(FLAG_IF.to_string());
-                    }
-                }
-                _ => {
-                    for ll in state.language_layers.iter_mut() {
-                        let layer_ops =
-                            ll.process_capture(&cap.name, &cap.text, &mut state.layer_context);
-                        state.instructions.extend(layer_ops);
-                    }
-                }
-            }
-        }
-
-        // Flush any remaining method flags (F-28)
-        state.flush_method_flags();
-
-        // C-22: Persist the canonical capture identity for MetaLayerPass.
-        // The loop above borrowed the local `captures` while `state` was
-        // mutated; once the loop ends the owned batch is MOVED into the
-        // existing `PassContext.captures` field (no clone, no parallel
-        // vector). MetaLayerPass derives the meta-layer class sources from
-        // these CapEntry spans.
-        state.captures = captures;
-
-        Ok(())
-    }
-}
-
-/// Pass 2: Language layer finalization.
-pub struct LanguageLayerPass;
-
-impl LanguageLayerPass {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for LanguageLayerPass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl IRPass for LanguageLayerPass {
-    fn name(&self) -> &str {
-        "language_layer"
-    }
-    fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
-        for ll in state.language_layers.iter_mut() {
-            let layer_ops = ll.finalize(&mut state.layer_context);
-            state.instructions.extend(layer_ops);
-        }
-        Ok(())
-    }
-}
-
-/// Pass 3: Meta-layer processing (framework-specific).
-pub struct MetaLayerPass;
-
-impl MetaLayerPass {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for MetaLayerPass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl IRPass for MetaLayerPass {
-    fn name(&self) -> &str {
-        "meta_layer"
-    }
-    fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
-        // C-22: Derive each class capture's canonical SOURCE SPAN from the
-        // persisted capture identity (`state.captures`) — NOT from the
-        // compacted `CoreOp::DefClass.name`. The meta-layer extractors need
-        // the decorator/annotation/attribute-inclusive class text to detect
-        // framework semantics (Angular @Component, Spring @RestController,
-        // .NET [ApiController]).
-        //
-        // Each capture's NAME is paired with its source span so the always-on
-        // BuiltinMetaLayer can classify ordinary declarations (class vs
-        // interface vs struct vs enum vs trait vs record) without re-parsing
-        // the source text.
-        let class_entries: Vec<(String, String)> = state
-            .captures
-            .iter()
-            .filter(|cap| {
-                matches!(
-                    cap.name.as_str(),
-                    "class.root"
-                        | "interface.root"
-                        | "struct.root"
-                        | "enum.root"
-                        | "trait.root"
-                        | "record.root"
-                        | "impl.root"
-                )
-            })
-            .map(|cap| {
-                (
-                    cap.name.clone(),
-                    crate::meta_util::class_source_from_capture(&state.source, cap).to_string(),
-                )
-            })
-            .collect();
-        let class_captures: Vec<String> =
-            class_entries.iter().map(|(_, text)| text.clone()).collect();
-
-        let meta_results = crate::layers::LayerRegistry::global().run_meta_layers_pipeline(
-            &state.source,
-            &class_captures,
-            state.fidelity,
-            None,
-        );
-        for output in &meta_results {
-            for line in output.rendered.lines() {
-                let line = line.trim();
-                if line.is_empty() || !line.starts_with('Φ') {
-                    continue;
-                }
-                let content = line.strip_prefix('Φ').unwrap_or(line);
-                if let Some((prefix, text)) = content.split_once(':') {
-                    let alias = format!("@{}", prefix);
-                    state
-                        .instructions
-                        .push(CoreOp::TypeAlias(alias, text.to_string()));
-                }
-            }
-        }
-
-        // Phase 2: collect semantic edges from applicable meta-layers and
-        // attach the per-file identity anchor. Edges flow:
-        //   MetaLayerPass PRODUCES -> state.semantic_edges (temporary carrier)
-        //   InferenceLayerPass CONSUMES -> InferenceLayer.semantic_edges (permanent)
-        let mut semantic_edges = crate::layers::LayerRegistry::global().collect_semantic_edges(
-            &state.source,
-            &class_entries,
-            state.fidelity,
-            None,
-        );
-        // Attach durable canonical path (or fall back to αN file_id) as
-        // file provenance on every semantic edge. The canonical path is
-        // the authoritative file identity for the WorkspaceIndex; αN is
-        // session-local and presentation-only (File Identity Correction).
-        let file_provenance = state
-            .canonical_path
-            .clone()
-            .unwrap_or_else(|| state.file_id.clone());
-        for edge in &mut semantic_edges {
-            if edge.subject.file.is_none() {
-                edge.subject.file = Some(file_provenance.clone());
-            }
-            if edge.object.file.is_none() {
-                edge.object.file = Some(file_provenance.clone());
-            }
-        }
-        state.semantic_edges.extend(semantic_edges);
-
-        Ok(())
-    }
-}
-
-/// Pass 4: Pattern recognition (consumptive compression).
-pub struct PatternRecognitionPass;
-
-impl PatternRecognitionPass {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for PatternRecognitionPass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl IRPass for PatternRecognitionPass {
-    fn name(&self) -> &str {
-        "pattern_recognition"
-    }
-    fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
-        for pr in state.pattern_recognizers.iter() {
-            let pattern_ops = pr.recognize(&state.instructions);
-            state.instructions = pattern_ops;
-        }
-        Ok(())
-    }
-}
-
-/// Pass 5: Forward-declaration alias resolution.
-pub struct AliasResolutionPass;
-
-impl AliasResolutionPass {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for AliasResolutionPass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl IRPass for AliasResolutionPass {
-    fn name(&self) -> &str {
-        "alias_resolution"
-    }
-    fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
-        resolve_forward_aliases(&mut state.instructions);
-        Ok(())
-    }
-}
-
-/// Pass 6: Execution semantics extraction (optional — NOT in default pipeline).
-pub struct ExecutionSemanticsPass;
-
-impl ExecutionSemanticsPass {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for ExecutionSemanticsPass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl IRPass for ExecutionSemanticsPass {
-    fn name(&self) -> &str {
-        "execution_semantics"
-    }
-    fn run(&self, _state: &mut PassContext) -> Result<(), PassError> {
-        Ok(())
-    }
-}
-
-/// Pass 5 (optional): Program graph construction.
-pub struct ProgramGraphPass;
-
-impl ProgramGraphPass {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for ProgramGraphPass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl IRPass for ProgramGraphPass {
-    fn name(&self) -> &str {
-        "program_graph"
-    }
-    fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
-        let graph = GraphBuilder::build_from_instructions(&state.instructions);
-        state.program_graph = Some(graph);
-        Ok(())
-    }
-}
-
-/// Pass 6 (optional): Inference layer (CBM enrichment + derived analysis).
-pub struct InferenceLayerPass {
-    cbm_bridge: Mutex<Option<GraphBridge>>,
-}
-
-impl InferenceLayerPass {
-    pub fn new() -> Self {
-        Self {
-            cbm_bridge: Mutex::new(None),
-        }
-    }
-
-    pub fn with_cbm(bridge: Option<GraphBridge>) -> Self {
-        Self {
-            cbm_bridge: Mutex::new(bridge),
-        }
-    }
-}
-
-impl Default for InferenceLayerPass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl IRPass for InferenceLayerPass {
-    fn name(&self) -> &str {
-        "inference_layer"
-    }
-    fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
-        let mut layer = InferenceLayer::new();
-        let mut guard = self.cbm_bridge.lock().unwrap_or_else(|p| p.into_inner());
-        match layer.enrich_from_cbm(guard.as_mut()) {
-            Ok(()) => {}
-            // F11: enrichment failures propagate out of the layer and are
-            // owned here. CBM is a strictly-additive enrichment source
-            // (invariant C1/C2): a graph hiccup must never fail compilation,
-            // but it must also never be mistaken for "no enrichment data".
-            // Log loudly and continue with the un-enriched layer.
-            Err(e) => {
-                eprintln!(
-                    "[clean-ctx-ir] CBM inference enrichment failed — continuing without enrichment: {e}"
-                );
-            }
-        }
-
-        // Phase 2: drain semantic edges accumulated by MetaLayerPass (Pass 3)
-        // into the InferenceLayer. Edges flow:
-        //   MetaLayerPass PRODUCES -> state.semantic_edges (temporary carrier)
-        //   InferenceLayerPass CONSUMES -> InferenceLayer.semantic_edges (permanent)
-        for edge in state.semantic_edges.drain(..) {
-            layer.add_semantic_edge(edge);
-        }
-
-        state.inference_layer = Some(layer);
-        Ok(())
-    }
-}
-
-/// Pass 6: Validation (structural + consistency checks).
-pub struct ValidationPass;
-
-impl ValidationPass {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for ValidationPass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl IRPass for ValidationPass {
-    fn name(&self) -> &str {
-        "validation"
-    }
-    fn run(&self, state: &mut PassContext) -> Result<(), PassError> {
-        let validator = DefaultValidator::new();
-        let ir = CompiledIR {
-            file_id: state.file_id.clone(),
-            instructions: state.instructions.clone(),
-            version: 1,
-        };
-        let errors = validator.validate(&ir);
-        if !errors.is_empty() {
-            let summary = errors
-                .iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-                .join("; ");
-            return Err(PassError {
-                pass_name: self.name().to_string(),
-                message: format!("validation failed: {}", summary),
-            });
-        }
-        Ok(())
-    }
-}
 
 #[cfg(test)]
 #[path = "../tests/ir/pipeline.rs"]
