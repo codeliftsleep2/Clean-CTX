@@ -46,6 +46,36 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-012: Live CBM Tests Serialized Bodies but Retained Multiple Subprocesses
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-12 |
+| **Environment** | Clean-CTX v0.6.4 live CBM E2E tests in the complete test binary |
+| **Repository/context** | Process-scoped shared live-CBM fixture plus multi-root and edit/reindex fixture tests. |
+| **Symptom** | Live CBM tests passed alone but intermittently failed with pipe/proxy errors when run in the complete test group. |
+| **Root cause** | `#[serial(cbm_live)]` serialized test bodies, but two fixture tests constructed private CBM-enabled `McpState` values while the static shared state retained its subprocess for the entire test process. After consolidating the subprocess, eight duplicate and unasserted preflight calls in the multi-root test could trip the now-shared circuit before fixture indexing; fallible assertions made while holding `graph_bridge` then poisoned the mutex and cascaded into the next test. |
+| **Classification** | Emergent |
+| **Reproducible locally?** | Yes — source/lifecycle audit; grouped failure was intermittent. |
+| **Local regression** | `src/tests/cbm/e2e.rs` shared-state identity test plus the live tests in `e2e_multiroot.rs` and `e2e_reindex.rs`, which now acquire only `shared_live_state()` and use panic-safe workspace restoration. |
+| **Live scenario required?** | Yes — run the complete live CBM E2E group repeatedly in one test process and confirm the proxy, multi-root, and edit/reindex tests remain green. |
+| **Architectural invariant** | At most one live E2E `McpState` → `GraphBridge` → CBM subprocess at a time; a degraded instance is dropped and reaped before a serial successor launches its replacement. |
+| **Status** | Verified |
+
+**Resolution:** the generated fixture is now a configured additional root owned
+by the shared live state. Both fixture tests index and query that root through
+the shared bridge instead of constructing private CBM-enabled states. Duplicate
+unasserted preflight calls were removed, fallible setup results are asserted only
+after releasing the graph mutex, and a scoped workspace guard restores the prior
+active root during normal return and panic unwinding. A degraded shared process
+is dropped before its serial successor starts a replacement. The oversized E2E
+file was decomposed along test boundaries.
+
+**Verified 2026-09-12:** the complete `cbm::tests::e2e` group passed with
+`--all-features`, including the proxy, multi-root, and edit/reindex scenarios.
+
+---
+
 ## DIS-2026-011: Filesystem Hydration Had No Safe Default Traversal Scope
 
 | Field | Value |

@@ -70,12 +70,9 @@ pub fn bpe_or_init() -> Result<&'static CoreBPE, BpeInitError> {
 /// calling [`bpe_or_init`] *and* a subsequent request beats the startup
 /// check to the punch. The recommended startup path is:
 ///
-/// ```ignore
-//  if let Err(e) = clean_ctx::analytics::bpe_or_init() {
-//      eprintln!("[clean-ctx] {}", e);
-//      std::process::exit(2);
-//  }
-// ```
+/// ```
+/// clean_ctx::analytics::bpe_or_init().expect("BPE data must load during startup");
+/// ```
 pub fn bpe() -> &'static CoreBPE {
     BPE.get_or_init(|| {
         // `cl100k_base` is fallible (it loads BPE merge data from disk or

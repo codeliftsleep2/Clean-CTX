@@ -92,8 +92,10 @@ pub fn init_tracing() {
 /// Convenience macro for creating a tracing span with function name.
 ///
 /// Usage:
-/// ```ignore
-/// let _span = observability_span!("compress_file", fidelity = %fidelity, ext = %extension);
+/// ```
+/// use clean_ctx::observability_span;
+///
+/// let _span = observability_span!("compress_file", fidelity = "low", ext = "rs");
 /// ```
 #[macro_export]
 macro_rules! observability_span {
@@ -105,8 +107,10 @@ macro_rules! observability_span {
 /// Record a structured event at INFO level.
 ///
 /// Usage:
-/// ```ignore
-/// observability_event!("compression_complete", file = %path, savings = savings_pct);
+/// ```
+/// use clean_ctx::observability_event;
+///
+/// observability_event!("compression_complete", file = "src/lib.rs", savings = 42.0);
 /// ```
 #[macro_export]
 macro_rules! observability_event {
