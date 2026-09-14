@@ -63,10 +63,10 @@ fn collect_import(item: &str, imports: &mut ImportedForms) {
         imported
     };
     match imported {
-        "FormBuilder" => push_unique(&mut imports.builders, local),
-        "FormGroup" => push_unique(&mut imports.groups, local),
-        "FormControl" => push_unique(&mut imports.controls, local),
-        "FormArray" => push_unique(&mut imports.arrays, local),
+        "FormBuilder" | "UntypedFormBuilder" => push_unique(&mut imports.builders, local),
+        "FormGroup" | "UntypedFormGroup" => push_unique(&mut imports.groups, local),
+        "FormControl" | "UntypedFormControl" => push_unique(&mut imports.controls, local),
+        "FormArray" | "UntypedFormArray" => push_unique(&mut imports.arrays, local),
         _ => {}
     }
 }

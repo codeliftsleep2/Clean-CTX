@@ -19,6 +19,146 @@ fn builder_source(body: &str) -> String {
     )
 }
 
+fn untyped_builder_source(body: &str) -> String {
+    format!(
+        "import {{ UntypedFormBuilder, Validators }} from '@angular/forms';\n\
+         export class Example {{\n\
+         constructor(private fb: UntypedFormBuilder) {{}}\n{body}\n}}"
+    )
+}
+
+#[test]
+fn red_u1_untyped_form_builder_activates_extraction() {
+    let source = "import {\n\
+                  UntypedFormBuilder,\n\
+                  Validators\n\
+                  } from '@angular/forms';\n\
+                  export class Example {\n\
+                  constructor(private fb: UntypedFormBuilder) {}\n\
+                  init() {\n\
+                  this.form = this.fb.group({\n\
+                  name: this.fb.control('', Validators.required)\n\
+                  });\n\
+                  }\n\
+                  }";
+
+    assert_eq!(
+        render(source, Fidelity::High),
+        concat!(
+            "// --- Φ Forms Meta ---\n",
+            "  Φform:form ctrls=[name]\n",
+            "  Φcontrol:name\n",
+            "  Φvalidator:name → [required]\n",
+        )
+    );
+}
+
+#[test]
+fn red_u2_typed_and_untyped_form_builders_have_identical_metadata() {
+    let body = "form = this.fb.group({ name: this.fb.control('', Validators.required) });";
+    assert_eq!(
+        render(&builder_source(body), Fidelity::High),
+        render(&untyped_builder_source(body), Fidelity::High)
+    );
+}
+
+#[test]
+fn red_u3_untyped_form_group_matches_typed_form_group() {
+    let typed = "import { FormGroup, FormControl } from '@angular/forms';\n\
+                 form = new FormGroup({ name: new FormControl('') });";
+    let untyped = "import { UntypedFormGroup, UntypedFormControl } from '@angular/forms';\n\
+         form = new UntypedFormGroup({ name: new UntypedFormControl('') });";
+
+    assert_eq!(
+        render(typed, Fidelity::High),
+        render(untyped, Fidelity::High)
+    );
+}
+
+#[test]
+fn red_u4_untyped_form_control_matches_typed_form_control() {
+    let typed = "import { FormControl } from '@angular/forms';\n\
+                 name = new FormControl('', Validators.required);";
+    let untyped = "import { UntypedFormControl } from '@angular/forms';\n\
+                   name = new UntypedFormControl('', Validators.required);";
+
+    assert_eq!(
+        render(typed, Fidelity::High),
+        render(untyped, Fidelity::High)
+    );
+    assert!(render(untyped, Fidelity::High).contains("Φcontrol:name"));
+}
+
+#[test]
+fn red_u5_untyped_form_array_matches_typed_form_array() {
+    let typed = "import { FormArray } from '@angular/forms'; items = new FormArray([]);";
+    let untyped =
+        "import { UntypedFormArray } from '@angular/forms'; items = new UntypedFormArray([]);";
+
+    assert_eq!(
+        render(typed, Fidelity::High),
+        render(untyped, Fidelity::High)
+    );
+    assert!(render(untyped, Fidelity::High).contains("Φarray:items"));
+}
+
+#[test]
+fn red_u6_aliased_untyped_form_builder_import_is_supported() {
+    let source = "import { UntypedFormBuilder as LegacyBuilder } from '@angular/forms';\n\
+         constructor(private fb: LegacyBuilder) {}\n\
+         form = this.fb.group({ name: [''] });";
+
+    assert!(render(source, Fidelity::Medium).contains("Φform:form ctrls=[name]"));
+}
+
+#[test]
+fn red_u7_mixed_typed_and_untyped_imports_are_discovered_once() {
+    let source = "import { FormControl, UntypedFormBuilder, UntypedFormArray } from '@angular/forms';\n\
+         constructor(private fb: UntypedFormBuilder) {}\n\
+         form = this.fb.group({\n\
+         name: new FormControl(''),\n\
+         items: new UntypedFormArray([])\n\
+         });";
+
+    assert_eq!(
+        render(source, Fidelity::High),
+        "// --- Φ Forms Meta ---\n  Φform:form ctrls=[name,items]\n  Φcontrol:name\n  Φarray:items\n"
+    );
+}
+
+#[test]
+fn red_u8_untyped_form_builder_preserves_fidelity_gating() {
+    let body = "form = this.fb.group({ name: ['', Validators.required] });";
+    let typed = builder_source(body);
+    let untyped = untyped_builder_source(body);
+
+    for fidelity in [Fidelity::Low, Fidelity::Medium, Fidelity::High] {
+        assert_eq!(render(&typed, fidelity), render(&untyped, fidelity));
+    }
+}
+
+#[test]
+fn red_u9_existing_typed_forms_output_is_unchanged() {
+    let source = "import { FormBuilder, FormGroup, FormControl, FormArray } from '@angular/forms';\n\
+         constructor(private fb: FormBuilder) {}\n\
+         form = new FormGroup({\n\
+         name: new FormControl(''),\n\
+         items: new FormArray([]),\n\
+         alias: this.fb.control('')\n\
+         });";
+
+    assert_eq!(
+        render(source, Fidelity::High),
+        concat!(
+            "// --- Φ Forms Meta ---\n",
+            "  Φform:form ctrls=[name,items,alias]\n",
+            "  Φcontrol:name\n",
+            "  Φarray:items\n",
+            "  Φcontrol:alias\n",
+        )
+    );
+}
+
 #[test]
 fn red_f1_detection_requires_angular_forms() {
     let source = "class Example { form = this.fb.group({ name: [''] }); }";
