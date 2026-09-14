@@ -42,8 +42,9 @@ pub struct MetaLayerOutput {
     /// The fully-rendered `Φ` block text (empty when the layer produced
     /// no markers for this file).
     pub rendered: String,
-    /// Structured Angular block (decorators + RxJS/NgRx/Signals/Routing/Testing
-    /// sections). `None` when the file is not Angular.
+    /// Structured Angular block (decorators plus ecosystem sections including
+    /// RxJS, NgRx, Signals, Routing, Forms, Formly, and Testing). `None` when
+    /// the file is not Angular.
     pub angular_block: Option<crate::angular_meta::MetaBlock>,
     /// Structured Spring Boot block. `None` when not a Spring file.
     pub spring_block: Option<crate::spring_meta::MetaBlock>,
@@ -218,12 +219,17 @@ impl MetaLayer for AngularMetaLayer {
             .and_then(|c| c.meta_layers.get("angular"))
             .map(|m| m.reactive_forms.enabled)
             .unwrap_or(true);
+        let formly_enabled = config
+            .and_then(|c| c.meta_layers.get("angular"))
+            .map(|m| m.formly.enabled)
+            .unwrap_or(true);
         crate::angular_meta::detect::is_angular_file(source)
             || crate::angular_meta::rx::has_rxjs_imports(source)
             || crate::angular_meta::ngrx::has_ngrx_imports(source)
             || crate::angular_meta::signals::has_signal_imports(source)
             || reactive_forms_enabled
                 && crate::angular_meta::reactive_forms::has_reactive_forms(source)
+            || formly_enabled && crate::angular_meta::formly::has_formly(source)
             || crate::angular_meta::routing::has_router_imports(source)
             || testing_enabled && crate::angular_meta::testing::is_testing_source(source, _path)
     }

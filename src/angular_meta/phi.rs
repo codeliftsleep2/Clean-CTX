@@ -1,7 +1,7 @@
 // src/angular_meta/phi.rs
 //
 // Generic `Φ` marker infrastructure shared by all Angular Ecosystem
-// Deepening sub-layers (RxJS, NgRx, Signals, Routing).
+// Deepening sub-layers (RxJS, NgRx, Signals, Routing, Forms, Formly, Testing).
 //
 // # Why this module exists
 //
@@ -78,6 +78,7 @@ pub static PHI_EXPANDERS: &[PhiExpander] = &[
     crate::angular_meta::ngrx::expand_phi_in_line,
     crate::angular_meta::signals::expand_phi_in_line,
     crate::angular_meta::reactive_forms::expand_phi_in_line,
+    crate::angular_meta::formly::expand_phi_in_line,
     crate::angular_meta::routing::expand_phi_in_line,
     crate::angular_meta::testing::expand_phi_in_line,
 ];

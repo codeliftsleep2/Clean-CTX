@@ -22,6 +22,7 @@
 
 pub(crate) mod decorators;
 pub(crate) mod detect;
+pub mod formly;
 pub(crate) mod markers;
 pub mod ngrx;
 pub mod phi;
@@ -66,9 +67,10 @@ pub struct MetaBlock {
     /// surrounding `// --- Φ Angular Meta ---` header.
     ///
     /// **Backward-compat:** this is the Angular decorator section.
-    /// New layers (RxJS, NgRx, Signals, Routing, Testing) use `sections`.
+    /// New layers (RxJS, NgRx, Signals, Routing, Reactive Forms, Formly,
+    /// Testing) use `sections`.
     pub lines: Vec<String>,
-    /// Named sections for additional meta-layers (RxJS, NgRx, Testing, etc.).
+    /// Named sections for additional meta-layers (RxJS, NgRx, Formly, etc.).
     /// Each section carries its own header.
     pub sections: Vec<MetaSection>,
 }
@@ -193,6 +195,7 @@ pub fn run_meta_layer_with_config_and_path(
     let ngrx_enabled = config.map(|c| c.ngrx.enabled).unwrap_or(true);
     let signals_enabled = config.map(|c| c.signals.enabled).unwrap_or(true);
     let reactive_forms_enabled = config.map(|c| c.reactive_forms.enabled).unwrap_or(true);
+    let formly_enabled = config.map(|c| c.formly.enabled).unwrap_or(true);
     let routing_enabled = config.map(|c| c.routing.enabled).unwrap_or(true);
     let testing_enabled = config.map(|c| c.testing.enabled).unwrap_or(true);
 
@@ -236,6 +239,14 @@ pub fn run_meta_layer_with_config_and_path(
         None
     };
 
+    // Detect ngx-formly independently. Formly configuration frequently
+    // appears in undecorated files and remains separate from Reactive Forms.
+    let formly_shape = if formly_enabled {
+        formly::extract_formly_shape(source_code, fidelity)
+    } else {
+        None
+    };
+
     // Detect testing independently — Vitest specs and TestBed setup do not
     // require Angular decorators. Path evidence is used only for `.spec.ts`.
     let testing_shape = if testing_enabled && testing::is_testing_source(source_code, path) {
@@ -249,6 +260,7 @@ pub fn run_meta_layer_with_config_and_path(
         && ngrx_shape.is_none()
         && signal_shape.is_none()
         && reactive_form_shape.is_none()
+        && formly_shape.is_none()
         && route_shape.is_none()
         && testing_shape.is_none()
     {
@@ -396,6 +408,28 @@ pub fn run_meta_layer_with_config_and_path(
             block.sections.push(MetaSection {
                 header,
                 lines: form_lines,
+            });
+        }
+    }
+
+    // ngx-formly owns field configuration shape, grouping, and expression
+    // wiring; it deliberately remains independent from Reactive Forms.
+    if let Some(shape) = formly_shape {
+        let formly_block = shape.render(fidelity);
+        if !formly_block.is_empty() {
+            let mut formly_lines: Vec<String> =
+                formly_block.lines().map(|line| line.to_string()).collect();
+            let header = if formly_lines
+                .first()
+                .is_some_and(|line| line.starts_with("// ---"))
+            {
+                formly_lines.remove(0)
+            } else {
+                "// --- Φ Formly Meta ---".to_string()
+            };
+            block.sections.push(MetaSection {
+                header,
+                lines: formly_lines,
             });
         }
     }

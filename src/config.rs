@@ -18,8 +18,8 @@ pub use config_defaults::{HeuristicsConfig, SmartDefaults};
 #[path = "config_meta_layers.rs"]
 mod config_meta_layers;
 pub use config_meta_layers::{
-    MetaLayerConfig, NgRxConfig, ReactiveFormsConfig, RoutingConfig, RxJsConfig, SignalsConfig,
-    TestingConfig,
+    FormlyConfig, MetaLayerConfig, NgRxConfig, ReactiveFormsConfig, RoutingConfig, RxJsConfig,
+    SignalsConfig, TestingConfig,
 };
 
 // ── Resource limits ───────────────────────────────────────────────

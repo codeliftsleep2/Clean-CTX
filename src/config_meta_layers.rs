@@ -24,6 +24,9 @@ pub struct MetaLayerConfig {
     /// Angular Reactive Forms source-shape sub-layer config.
     #[serde(default)]
     pub reactive_forms: ReactiveFormsConfig,
+    /// ngx-formly source-shape sub-layer config.
+    #[serde(default)]
+    pub formly: FormlyConfig,
     /// Routing sub-layer config (Angular Ecosystem Deepening Phase 4).
     #[serde(default)]
     pub routing: RoutingConfig,
@@ -41,6 +44,7 @@ impl Default for MetaLayerConfig {
             ngrx: NgRxConfig::default(),
             signals: SignalsConfig::default(),
             reactive_forms: ReactiveFormsConfig::default(),
+            formly: FormlyConfig::default(),
             routing: RoutingConfig::default(),
             testing: TestingConfig::default(),
         }
@@ -126,6 +130,20 @@ pub struct ReactiveFormsConfig {
     /// Master switch for the Reactive Forms meta-layer. Defaults to `true`.
     #[serde(default = "default_true")]
     pub enabled: bool,
+}
+
+/// ngx-formly source-shape sub-layer configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FormlyConfig {
+    /// Master switch for the Formly meta-layer. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for FormlyConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 impl Default for ReactiveFormsConfig {
