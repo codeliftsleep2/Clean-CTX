@@ -21,6 +21,10 @@ use imports::{
     ImportedForms, extract_builder_aliases, extract_forms_imports, has_construction_hint,
 };
 
+#[path = "reactive_forms_normalize.rs"]
+mod normalize;
+use normalize::{merge_fields, normalize_artifacts};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReactiveFormKind {
     Form,
@@ -72,18 +76,18 @@ impl PhiMarker for ReactiveFormKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum FieldKind {
     Control,
-    Array,
+    Group(Vec<FieldDecl>),
+    Array(Vec<FieldDecl>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct FieldDecl {
     name: String,
     kind: FieldKind,
     validators: Vec<String>,
-    nested_controls: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -114,7 +118,7 @@ impl ReactiveFormShape {
             match artifact {
                 FormArtifact::Form(form) => render_form(form, fidelity, &mut lines),
                 FormArtifact::Field(field) if fidelity != Fidelity::Low => {
-                    render_field(field, fidelity, &mut lines);
+                    render_field(field, fidelity, 1, &mut lines);
                 }
                 FormArtifact::Field(_) => {}
             }
@@ -143,25 +147,46 @@ fn render_form(form: &FormDecl, fidelity: Fidelity, lines: &mut Vec<String>) {
         lines.push(format!("  Φform:{} ctrls=[{}]", form.name, controls));
     }
     for field in &form.fields {
-        render_field(field, fidelity, lines);
+        render_field(field, fidelity, 1, lines);
     }
 }
 
-fn render_field(field: &FieldDecl, fidelity: Fidelity, lines: &mut Vec<String>) {
-    match field.kind {
-        FieldKind::Control => lines.push(format!("  Φcontrol:{}", field.name)),
-        FieldKind::Array if is_high_detail(fidelity) && !field.nested_controls.is_empty() => {
+fn render_field(field: &FieldDecl, fidelity: Fidelity, depth: usize, lines: &mut Vec<String>) {
+    let indent = "  ".repeat(depth);
+    match &field.kind {
+        FieldKind::Control => lines.push(format!("{indent}Φcontrol:{}", field.name)),
+        FieldKind::Group(fields) if is_high_detail(fidelity) => {
+            let controls = fields
+                .iter()
+                .map(|field| field.name.as_str())
+                .collect::<Vec<_>>()
+                .join(",");
+            if controls.is_empty() {
+                lines.push(format!("{indent}Φform:{}", field.name));
+            } else {
+                lines.push(format!("{indent}Φform:{} ctrls=[{controls}]", field.name));
+            }
+            for child in fields {
+                render_field(child, fidelity, depth + 1, lines);
+            }
+        }
+        FieldKind::Group(_) => {}
+        FieldKind::Array(fields) if is_high_detail(fidelity) && !fields.is_empty() => {
             lines.push(format!(
-                "  Φarray:{} ctrls=[{}]",
+                "{indent}Φarray:{} ctrls=[{}]",
                 field.name,
-                field.nested_controls.join(",")
+                fields
+                    .iter()
+                    .map(|field| field.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(",")
             ));
         }
-        FieldKind::Array => lines.push(format!("  Φarray:{}", field.name)),
+        FieldKind::Array(_) => lines.push(format!("{indent}Φarray:{}", field.name)),
     }
     if is_high_detail(fidelity) && !field.validators.is_empty() {
         lines.push(format!(
-            "  Φvalidator:{} → [{}]",
+            "{indent}Φvalidator:{} → [{}]",
             field.name,
             field.validators.join(",")
         ));
@@ -211,18 +236,17 @@ pub fn extract_reactive_form_shape(source: &str, _fidelity: Fidelity) -> Option<
                 name,
                 kind: FieldKind::Control,
                 validators: validators_from_control_body(&body),
-                nested_controls: Vec::new(),
             })),
             ConstructionKind::Array => artifacts.push(FormArtifact::Field(FieldDecl {
                 name,
-                kind: FieldKind::Array,
+                kind: FieldKind::Array(nested_array_fields(&body, &imports, &builder_aliases)),
                 validators: Vec::new(),
-                nested_controls: nested_array_controls(&body, &imports, &builder_aliases),
             })),
         }
         consumed_until = end;
     }
 
+    normalize_artifacts(&mut artifacts);
     (!artifacts.is_empty()).then_some(ReactiveFormShape { artifacts })
 }
 
@@ -413,26 +437,22 @@ fn extract_group_fields(
         let construction = find_candidates(&value, imports, builder_aliases)
             .first()
             .map(|candidate| candidate.kind);
-        let kind = if construction == Some(ConstructionKind::Array) {
-            FieldKind::Array
-        } else {
-            FieldKind::Control
+        let kind = match construction {
+            Some(ConstructionKind::Group) => {
+                FieldKind::Group(nested_group_fields(&value, imports, builder_aliases))
+            }
+            Some(ConstructionKind::Array) => {
+                FieldKind::Array(nested_array_fields(&value, imports, builder_aliases))
+            }
+            _ => FieldKind::Control,
         };
-        let validators = if kind == FieldKind::Control {
-            validators_from_value(&value, imports, builder_aliases)
-        } else {
-            Vec::new()
-        };
-        let nested_controls = if kind == FieldKind::Array {
-            nested_array_controls(&value, imports, builder_aliases)
-        } else {
-            Vec::new()
-        };
+        let validators = matches!(&kind, FieldKind::Control)
+            .then(|| validators_from_value(&value, imports, builder_aliases))
+            .unwrap_or_default();
         fields.push(FieldDecl {
             name,
             kind,
             validators,
-            nested_controls,
         });
     }
     fields
@@ -460,11 +480,11 @@ fn static_property_name(raw: &str) -> Option<String> {
     is_identifier(key).then(|| key.to_string())
 }
 
-fn nested_array_controls(
+fn nested_group_fields(
     body: &str,
     imports: &ImportedForms,
     builder_aliases: &[String],
-) -> Vec<String> {
+) -> Vec<FieldDecl> {
     let candidates = find_candidates(body, imports, builder_aliases);
     let Some(group) = candidates
         .iter()
@@ -476,9 +496,33 @@ fn nested_array_controls(
         return Vec::new();
     };
     extract_group_fields(&group_body, imports, builder_aliases)
-        .into_iter()
-        .map(|field| field.name)
-        .collect()
+}
+
+fn nested_array_fields(
+    body: &str,
+    imports: &ImportedForms,
+    builder_aliases: &[String],
+) -> Vec<FieldDecl> {
+    let candidates = find_candidates(body, imports, builder_aliases);
+    let mut fields = Vec::new();
+    let mut consumed_until = 0;
+    for group in candidates
+        .iter()
+        .filter(|candidate| candidate.kind == ConstructionKind::Group)
+    {
+        if group.start < consumed_until {
+            continue;
+        }
+        let Some((consumed, group_body)) = consume_call_expression(body, group.open_paren) else {
+            continue;
+        };
+        merge_fields(
+            &mut fields,
+            extract_group_fields(&group_body, imports, builder_aliases),
+        );
+        consumed_until = group.open_paren + consumed;
+    }
+    fields
 }
 
 pub fn expand_phi_in_line(line: &str) -> String {
@@ -492,3 +536,7 @@ pub fn expand_phi(token: &str) -> Option<&'static str> {
 #[cfg(test)]
 #[path = "../tests/angular_meta/reactive_forms.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/angular_meta/reactive_forms_structure.rs"]
+mod structure_tests;
