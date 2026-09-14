@@ -25,6 +25,7 @@ pub(crate) mod detect;
 pub(crate) mod markers;
 pub mod ngrx;
 pub mod phi;
+pub mod reactive_forms;
 pub mod routing;
 pub mod rx;
 pub mod semantic;
@@ -191,6 +192,7 @@ pub fn run_meta_layer_with_config_and_path(
     let rxjs_enabled = config.map(|c| c.rxjs.enabled).unwrap_or(true);
     let ngrx_enabled = config.map(|c| c.ngrx.enabled).unwrap_or(true);
     let signals_enabled = config.map(|c| c.signals.enabled).unwrap_or(true);
+    let reactive_forms_enabled = config.map(|c| c.reactive_forms.enabled).unwrap_or(true);
     let routing_enabled = config.map(|c| c.routing.enabled).unwrap_or(true);
     let testing_enabled = config.map(|c| c.testing.enabled).unwrap_or(true);
 
@@ -226,6 +228,14 @@ pub fn run_meta_layer_with_config_and_path(
         None
     };
 
+    // Detect Reactive Forms independently. Source construction plus the
+    // `@angular/forms` import is sufficient; decorators are not required.
+    let reactive_form_shape = if reactive_forms_enabled {
+        reactive_forms::extract_reactive_form_shape(source_code, fidelity)
+    } else {
+        None
+    };
+
     // Detect testing independently — Vitest specs and TestBed setup do not
     // require Angular decorators. Path evidence is used only for `.spec.ts`.
     let testing_shape = if testing_enabled && testing::is_testing_source(source_code, path) {
@@ -238,6 +248,7 @@ pub fn run_meta_layer_with_config_and_path(
         && rx_shape.is_none()
         && ngrx_shape.is_none()
         && signal_shape.is_none()
+        && reactive_form_shape.is_none()
         && route_shape.is_none()
         && testing_shape.is_none()
     {
@@ -363,6 +374,28 @@ pub fn run_meta_layer_with_config_and_path(
             block.sections.push(MetaSection {
                 header,
                 lines: route_lines,
+            });
+        }
+    }
+
+    // Reactive Forms remains a distinct source-meta section and never emits
+    // template binding markers owned by `template.rs`.
+    if let Some(shape) = reactive_form_shape {
+        let forms_block = shape.render(fidelity);
+        if !forms_block.is_empty() {
+            let mut form_lines: Vec<String> =
+                forms_block.lines().map(|line| line.to_string()).collect();
+            let header = if form_lines
+                .first()
+                .is_some_and(|line| line.starts_with("// ---"))
+            {
+                form_lines.remove(0)
+            } else {
+                "// --- Φ Forms Meta ---".to_string()
+            };
+            block.sections.push(MetaSection {
+                header,
+                lines: form_lines,
             });
         }
     }

@@ -45,6 +45,7 @@ fn test_meta_layer_config_defaults() {
     assert!(config.ngrx.entity_selectors);
     assert!(config.ngrx.cross_layer_cbm);
     assert!(config.signals.enabled);
+    assert!(config.reactive_forms.enabled);
     assert!(config.routing.enabled);
     assert!(config.testing.enabled);
 }
@@ -65,6 +66,7 @@ fn test_meta_layer_config_json_round_trip() {
             cross_layer_cbm: true,
         },
         signals: SignalsConfig { enabled: true },
+        reactive_forms: ReactiveFormsConfig { enabled: true },
         routing: RoutingConfig { enabled: false },
         testing: TestingConfig { enabled: false },
     };
@@ -74,6 +76,7 @@ fn test_meta_layer_config_json_round_trip() {
     assert!(!parsed.ngrx.include_dispatch_sites);
     assert!(!parsed.ngrx.entity_selectors);
     assert!(!parsed.routing.enabled);
+    assert!(parsed.reactive_forms.enabled);
     assert!(!parsed.testing.enabled);
 }
 
@@ -88,6 +91,7 @@ fn test_meta_layer_config_backward_compatible_partial_json() {
     assert_eq!(parsed.rxjs.min_pipe_operators, 2);
     assert!(parsed.ngrx.enabled);
     assert!(parsed.signals.enabled);
+    assert!(parsed.reactive_forms.enabled);
     assert!(parsed.routing.enabled);
     assert!(parsed.testing.enabled);
 }
@@ -104,6 +108,14 @@ fn angular_testing_nested_opt_out_deserializes() {
     let json = r#"{ "meta_layers": { "angular": { "testing": { "enabled": false } } } }"#;
     let parsed: CleanCtxConfig = serde_json::from_str(json).expect("parse angular testing config");
     assert!(!parsed.meta_layers["angular"].testing.enabled);
+}
+
+#[test]
+fn angular_reactive_forms_nested_opt_out_deserializes() {
+    let json = r#"{ "meta_layers": { "angular": { "reactive_forms": { "enabled": false } } } }"#;
+    let parsed: CleanCtxConfig =
+        serde_json::from_str(json).expect("parse Angular Reactive Forms config");
+    assert!(!parsed.meta_layers["angular"].reactive_forms.enabled);
 }
 
 /// F-12 (FAANG audit): the old substring check matched `"dist"` inside

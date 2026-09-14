@@ -214,10 +214,16 @@ impl MetaLayer for AngularMetaLayer {
             .and_then(|c| c.meta_layers.get("angular"))
             .map(|m| m.testing.enabled)
             .unwrap_or(true);
+        let reactive_forms_enabled = config
+            .and_then(|c| c.meta_layers.get("angular"))
+            .map(|m| m.reactive_forms.enabled)
+            .unwrap_or(true);
         crate::angular_meta::detect::is_angular_file(source)
             || crate::angular_meta::rx::has_rxjs_imports(source)
             || crate::angular_meta::ngrx::has_ngrx_imports(source)
             || crate::angular_meta::signals::has_signal_imports(source)
+            || reactive_forms_enabled
+                && crate::angular_meta::reactive_forms::has_reactive_forms(source)
             || crate::angular_meta::routing::has_router_imports(source)
             || testing_enabled && crate::angular_meta::testing::is_testing_source(source, _path)
     }

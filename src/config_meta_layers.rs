@@ -21,6 +21,9 @@ pub struct MetaLayerConfig {
     /// Signals sub-layer config (Angular Ecosystem Deepening Phase 3).
     #[serde(default)]
     pub signals: SignalsConfig,
+    /// Angular Reactive Forms source-shape sub-layer config.
+    #[serde(default)]
+    pub reactive_forms: ReactiveFormsConfig,
     /// Routing sub-layer config (Angular Ecosystem Deepening Phase 4).
     #[serde(default)]
     pub routing: RoutingConfig,
@@ -37,6 +40,7 @@ impl Default for MetaLayerConfig {
             rxjs: RxJsConfig::default(),
             ngrx: NgRxConfig::default(),
             signals: SignalsConfig::default(),
+            reactive_forms: ReactiveFormsConfig::default(),
             routing: RoutingConfig::default(),
             testing: TestingConfig::default(),
         }
@@ -111,6 +115,20 @@ pub struct SignalsConfig {
 }
 
 impl Default for SignalsConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+/// Angular Reactive Forms source-shape sub-layer configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReactiveFormsConfig {
+    /// Master switch for the Reactive Forms meta-layer. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for ReactiveFormsConfig {
     fn default() -> Self {
         Self { enabled: true }
     }

@@ -77,6 +77,7 @@ pub static PHI_EXPANDERS: &[PhiExpander] = &[
     crate::angular_meta::rx::expand_phi_in_line,
     crate::angular_meta::ngrx::expand_phi_in_line,
     crate::angular_meta::signals::expand_phi_in_line,
+    crate::angular_meta::reactive_forms::expand_phi_in_line,
     crate::angular_meta::routing::expand_phi_in_line,
     crate::angular_meta::testing::expand_phi_in_line,
 ];
