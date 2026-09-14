@@ -234,3 +234,69 @@ fn class_source_from_capture_c22_identity() {
         "C-22 identity broken: class_source_from_capture must reconstruct the exact span"
     );
 }
+
+// ── extract_decl_name: TypeScript declaration targets ────────────
+
+#[test]
+fn extract_decl_name_prefers_typed_field_target() {
+    assert_eq!(
+        crate::meta_util::extract_decl_name("confirmForm: UntypedFormGroup =").as_deref(),
+        Some("confirmForm")
+    );
+    assert_eq!(
+        crate::meta_util::extract_decl_name("field: AnyType =").as_deref(),
+        Some("field")
+    );
+}
+
+#[test]
+fn extract_decl_name_supports_typed_locals_and_field_modifiers() {
+    for declaration in [
+        "const control: FormControl =",
+        "let control: FormControl =",
+        "var control: FormControl =",
+        "private readonly form: FormGroup =",
+        "form!: FormGroup =",
+    ] {
+        let expected = if declaration.contains("control") {
+            "control"
+        } else {
+            "form"
+        };
+        assert_eq!(
+            crate::meta_util::extract_decl_name(declaration).as_deref(),
+            Some(expected),
+            "declaration: {declaration}"
+        );
+    }
+}
+
+#[test]
+fn extract_decl_name_ignores_generic_and_union_annotation_tokens() {
+    assert_eq!(
+        crate::meta_util::extract_decl_name("items: FormArray<FormControl<string>> =").as_deref(),
+        Some("items")
+    );
+    assert_eq!(
+        crate::meta_util::extract_decl_name("value: Foo | null =").as_deref(),
+        Some("value")
+    );
+}
+
+#[test]
+fn extract_decl_name_preserves_assignment_property_and_optional_behavior() {
+    for (before, expected) in [
+        ("foo =", Some("foo")),
+        ("this.foo =", Some("foo")),
+        ("foo:", Some("foo")),
+        ("foo?", Some("foo")),
+        ("this.foo?", Some("foo")),
+        ("{", None),
+    ] {
+        assert_eq!(
+            crate::meta_util::extract_decl_name(before).as_deref(),
+            expected,
+            "input: {before}"
+        );
+    }
+}

@@ -266,7 +266,10 @@ fn extract_signal_decls(source: &str, shape: &mut SignalShape, pattern: &str, ki
             continue;
         }
 
-        let before = &source[..abs_idx];
+        // The matched pattern starts with `=`, so include that known
+        // assignment separator. This lets the shared helper distinguish a
+        // typed declaration (`name: Type =`) from a colon-only property.
+        let before = &source[..abs_idx + 1];
         let name = extract_decl_name(before).unwrap_or_else(|| "?".to_string());
 
         // Round-9 audit: the pattern is a partial identifier (`= signal`,

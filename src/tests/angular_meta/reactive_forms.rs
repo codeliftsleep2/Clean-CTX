@@ -103,6 +103,31 @@ fn red_u5_untyped_form_array_matches_typed_form_array() {
 }
 
 #[test]
+fn typed_field_initializers_use_field_names_not_annotation_names() {
+    let source = "import { UntypedFormGroup, UntypedFormControl } from '@angular/forms';\n\
+                  confirmForm: UntypedFormGroup = new UntypedFormGroup({});\n\
+                  queryField: UntypedFormControl = new UntypedFormControl();";
+    let rendered = render(source, Fidelity::High);
+
+    assert!(rendered.contains("Φform:confirmForm"), "{rendered}");
+    assert!(rendered.contains("Φcontrol:queryField"), "{rendered}");
+    assert!(!rendered.contains("Φform:UntypedFormGroup"), "{rendered}");
+    assert!(
+        !rendered.contains("Φcontrol:UntypedFormControl"),
+        "{rendered}"
+    );
+}
+
+#[test]
+fn typed_injected_builder_alias_uses_field_name() {
+    let source = "import { FormBuilder } from '@angular/forms';\n\
+                  private readonly fb: FormBuilder = inject(FormBuilder);\n\
+                  form = this.fb.group({ name: [''] });";
+
+    assert!(render(source, Fidelity::Medium).contains("Φform:form ctrls=[name]"));
+}
+
+#[test]
 fn red_u6_aliased_untyped_form_builder_import_is_supported() {
     let source = "import { UntypedFormBuilder as LegacyBuilder } from '@angular/forms';\n\
          constructor(private fb: LegacyBuilder) {}\n\

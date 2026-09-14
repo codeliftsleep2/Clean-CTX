@@ -62,6 +62,21 @@ export class UserComponent {
 }
 
 #[test]
+fn extracts_typed_signal_field_name() {
+    let src = r#"
+import { signal, WritableSignal } from '@angular/core';
+
+export class UserComponent {
+  count: WritableSignal<number> = signal(0);
+}
+"#;
+    let shape = extract_signal_shape(src, Fidelity::Medium).expect("should detect signals");
+    assert_eq!(shape.signals.len(), 1);
+    assert_eq!(shape.signals[0].name, "count");
+    assert_eq!(shape.signals[0].kind, SignalKind::Signal);
+}
+
+#[test]
 fn extracts_computed_signal() {
     let src = r#"
 import { computed, signal } from '@angular/core';
