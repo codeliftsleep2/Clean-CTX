@@ -33,6 +33,12 @@ rules. Without `-BaseRef`, it checks working-tree, index, and untracked files.
 CI passes `-BaseRef` so committed changes relative to the target branch are
 also active. Untouched tracked files above 615 lines are reported as legacy
 debt and do not fail the gate.
+Activating a legacy oversized file is a correctness decision, not a cost
+decision: when the architecturally correct change belongs in an oversized file,
+that file is decomposed semantically as part of the change (engineering rules,
+§8a) rather than the architecture being weakened to avoid it.
+
+
 
 ## Ordinary-task verification
 

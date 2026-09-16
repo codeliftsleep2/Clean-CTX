@@ -23,6 +23,7 @@ use crate::cbm::caller_verify::{
     CallerVerificationStatus, CallerVerificationSummary, aggregate_resolution,
     caller_evidence_metadata,
 };
+use crate::cbm::caller_verify_arity::ParseMemo;
 use crate::cbm::caller_verify_proxy::{VerificationAttempt, VerificationRequest};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -214,17 +215,24 @@ pub(crate) fn search_targets(payload: &Value, project: Option<&str>) -> Vec<Sear
 /// surfaces use), invoked once per eligible result. Verification stays scoped to
 /// results with `in_degree` plus an identity plus a callable C# symbol:
 /// ineligible results cost no CBM query and no source read.
+///
+/// The batch owns exactly one [`ParseMemo`] and hands it to every attempt, so a
+/// file referenced by several results (overloads declared together, or one
+/// caller file reached from more than one result) is parsed once for the whole
+/// response. The memo is created here and dropped with the response — it is
+/// batch-local reuse, never a cache.
 pub(crate) fn verify_search_results(
     payload: &mut Value,
     targets: &[SearchTarget],
-    verify: &mut dyn FnMut(&VerificationRequest) -> VerificationAttempt,
+    verify: &mut dyn FnMut(&VerificationRequest, &mut ParseMemo) -> VerificationAttempt,
 ) -> SearchAggregate {
     let results_total = payload["results"].as_array().map_or(0, Vec::len);
     let mut aggregate = SearchAggregate::new();
+    let mut memo = ParseMemo::new();
     for target in targets {
         let disposition = match &target.plan {
             SearchPlan::Verify(request) => {
-                let mut attempt = verify(request);
+                let mut attempt = verify(request, &mut memo);
                 if request.raw_candidates > 0 {
                     attempt.summary.raw_candidates = request.raw_candidates;
                 }
@@ -353,6 +361,24 @@ fn annotate_target(payload: &mut Value, target: &SearchTarget, disposition: &Dis
     );
     if let Some(reason) = disposition.reason() {
         object.insert("in_degree_reason".into(), Value::String(reason.to_string()));
+    }
+    if let Disposition::Attempted(attempt) = disposition {
+        // Identity evidence for the symbol this result describes: which candidate
+        // verified, and (when the target stayed ambiguous) which candidates were
+        // compatible but unresolved. Rejected candidates are counted, never
+        // enumerated — a broad search must not inflate the response with them.
+        if !attempt.summary.verified_candidates.is_empty() {
+            object.insert(
+                "verified_candidates".into(),
+                serde_json::to_value(&attempt.summary.verified_candidates).unwrap_or(Value::Null),
+            );
+        }
+        if !attempt.summary.ambiguous_candidates.is_empty() {
+            object.insert(
+                "ambiguous_candidates".into(),
+                serde_json::to_value(&attempt.summary.ambiguous_candidates).unwrap_or(Value::Null),
+            );
+        }
     }
     true
 }

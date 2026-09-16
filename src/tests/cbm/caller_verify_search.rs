@@ -52,6 +52,8 @@ fn summary(
         verified_caller_files: 0,
         compatible_caller_files: 0,
         resolution,
+        verified_candidates: Vec::new(),
+        ambiguous_candidates: Vec::new(),
     }
 }
 
@@ -88,7 +90,7 @@ fn drive(
 ) -> SearchAggregate {
     let targets = search_targets(payload, None);
     let mut pending = table;
-    let aggregate = verify_search_results(payload, &targets, &mut |request| {
+    let aggregate = verify_search_results(payload, &targets, &mut |request, _memo| {
         let target = request.target.clone().unwrap_or_default();
         asked.push(target.clone());
         match pending.iter().position(|(name, _)| *name == target) {

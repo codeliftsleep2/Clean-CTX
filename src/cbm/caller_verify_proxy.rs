@@ -12,10 +12,12 @@
 //!   [`crate::cbm::caller_verify_search`].
 
 use crate::cbm::GraphBridge;
+use crate::cbm::bridge::QueryResult;
 use crate::cbm::caller_verify::{
     CallerVerificationSummary, CandidateSource, CsharpTargetSelector, annotate_caller_evidence,
     verify_csharp_callers,
 };
+use crate::cbm::caller_verify_arity::ParseMemo;
 use crate::cbm::caller_verify_search;
 use crate::mcp::McpState;
 use serde_json::Value;
@@ -71,7 +73,13 @@ fn verify_single_surface(
     let Some(request) = verification_request(tool, args, payload) else {
         return false;
     };
-    let mut attempt = verify_request_sources(bridge, state, &request, workspace_root);
+    let mut attempt = verify_request_sources(
+        bridge,
+        state,
+        &request,
+        workspace_root,
+        &mut ParseMemo::new(),
+    );
     if request.raw_candidates > 0 {
         attempt.summary.raw_candidates = request.raw_candidates;
     }
@@ -97,8 +105,8 @@ fn verify_search_surface(
         return false;
     }
     let aggregate =
-        caller_verify_search::verify_search_results(payload, &targets, &mut |request| {
-            verify_request_sources(bridge, state, request, workspace_root)
+        caller_verify_search::verify_search_results(payload, &targets, &mut |request, memo| {
+            verify_request_sources(bridge, state, request, workspace_root, memo)
         });
     caller_verify_search::annotate_search_evidence(payload, &aggregate);
     true
@@ -212,11 +220,17 @@ fn verification_request(tool: &str, args: &Value, payload: &Value) -> Option<Ver
     }
 }
 
-fn verify_request_sources(
+/// Verify one target's CBM candidates against source.
+///
+/// `memo` is the batch-local parse memo the caller owns (one per response), so a
+/// file reached by several results is parsed once. It carries no cross-request
+/// state: cached *candidate discovery* never makes verification truth stale.
+pub(crate) fn verify_request_sources(
     bridge: &mut GraphBridge,
     state: &McpState,
     request: &VerificationRequest,
     workspace_root: Option<&str>,
+    memo: &mut ParseMemo,
 ) -> VerificationAttempt {
     let Some(target) = request.target.as_deref() else {
         return VerificationAttempt::unverifiable(None, None);
@@ -229,16 +243,24 @@ fn verify_request_sources(
             Some(VerificationGap::NoCallEvidence),
         );
     };
-    let Some(target_source) = read_trusted_source(state, &target_path, workspace_root) else {
+    let Some((target_resolved, target_source)) =
+        read_trusted_source(state, &target_path, workspace_root)
+    else {
         return VerificationAttempt::unverifiable(
             Some(target),
             Some(VerificationGap::TargetSourceUnreadable),
         );
     };
-    let loaded: Vec<(String, String)> = candidate_paths
+    let loaded: Vec<LoadedCandidate> = candidate_paths
         .iter()
-        .filter_map(|path| {
-            read_trusted_source(state, path, workspace_root).map(|source| (path.clone(), source))
+        .filter_map(|cbm_file| {
+            read_trusted_source(state, cbm_file, workspace_root).map(|(resolved, source)| {
+                LoadedCandidate {
+                    cbm_file: cbm_file.clone(),
+                    resolved_file: resolved,
+                    source,
+                }
+            })
         })
         .collect();
     if loaded.is_empty() && request.raw_candidates > 0 {
@@ -248,12 +270,24 @@ fn verify_request_sources(
         );
     }
     let failed_sources = candidate_paths.len().saturating_sub(loaded.len());
+    // Each candidate keeps CBM's proposed caller file beside the path Clean-CTX
+    // actually read, so verification can report the identity it verified instead
+    // of only counting it.
     let views: Vec<CandidateSource<'_>> = loaded
         .iter()
-        .map(|(file, text)| CandidateSource { file, text })
+        .map(|candidate| CandidateSource {
+            file: &candidate.cbm_file,
+            resolved_file: &candidate.resolved_file,
+            text: &candidate.source,
+        })
         .collect();
-    let mut summary =
-        verify_csharp_callers(&target_source, CsharpTargetSelector::new(target), &views);
+    let mut summary = verify_csharp_callers(
+        &target_source,
+        &target_resolved,
+        CsharpTargetSelector::new(target),
+        &views,
+        memo,
+    );
     if failed_sources > 0 {
         summary.unverifiable += failed_sources;
         summary.resolution = crate::cbm::caller_verify::CallerVerificationStatus::Unverifiable;
@@ -265,17 +299,45 @@ fn verify_request_sources(
     VerificationAttempt { summary, gap: None }
 }
 
-fn candidate_paths(
+/// One readable candidate: CBM's proposed caller file, the trusted path Clean-CTX
+/// read, and that file's source.
+struct LoadedCandidate {
+    cbm_file: String,
+    resolved_file: String,
+    source: String,
+}
+
+/// Discover the CBM candidate caller files for one target.
+///
+/// One query, two transports. When the request names a project, the *cached*
+/// project-explicit graph query answers
+/// ([`GraphBridge::query_graph_scoped`]): repeated verification of the same
+/// symbol — a broad search's second pass, a re-issued request — then costs no
+/// CBM round-trip, and the cache key carries the project, so two repositories
+/// that share a symbol name can never serve each other's candidates. The Cypher
+/// carries the remaining discovery semantics: relationship direction
+/// (`[:CALLS]->`), the target symbol (`WHERE target.qualified_name = ...`), and
+/// the projection.
+///
+/// A request that names **no** project keeps the original raw proxy call
+/// unchanged: such a query is answered by CBM's own default project, which the
+/// bridge's active project does not describe, so there is no project to key an
+/// entry by — caching it under any key could serve one project's candidates to
+/// another. Candidate discovery is therefore cached exactly where the cache
+/// contract can express what the query means.
+pub(crate) fn candidate_paths(
     bridge: &mut GraphBridge,
     target: &str,
     project: Option<&str>,
 ) -> Option<(String, Vec<String>)> {
     let query = candidate_path_query(target);
-    let mut query_args = serde_json::json!({"query": query});
     if let Some(project) = project {
-        query_args["project"] = Value::String(project.to_string());
+        let resolved = bridge.resolve_project_id(project);
+        return caller_paths_from_query(&bridge.query_graph_scoped(&query, &resolved));
     }
-    let raw = bridge.proxy_call("query_graph", query_args).ok()?;
+    let raw = bridge
+        .proxy_call("query_graph", serde_json::json!({ "query": query }))
+        .ok()?;
     let payload = inner_payload(&raw)?;
     let rows = payload["rows"].as_array()?;
     let mut target_path = None;
@@ -299,6 +361,27 @@ fn candidate_paths(
     Some((target_path?, callers.into_iter().collect()))
 }
 
+/// Caller/target paths from the cached `query_graph` view of the candidate query.
+///
+/// `convert_query_rows` maps the two-column candidate projection
+/// (`caller.file_path, target.file_path`) to a node whose `id`/`name` is the
+/// caller path and whose `file` is the target path — the same two cells the raw
+/// proxy path above reads positionally, so both transports yield the same
+/// candidate set.
+fn caller_paths_from_query(result: &QueryResult) -> Option<(String, Vec<String>)> {
+    let mut target_path = None;
+    let mut callers = HashSet::new();
+    for node in &result.nodes {
+        if node.id.ends_with(".cs") {
+            callers.insert(node.id.clone());
+        }
+        if target_path.is_none() {
+            target_path = Some(node.file.clone()).filter(|path| path.ends_with(".cs"));
+        }
+    }
+    Some((target_path?, callers.into_iter().collect()))
+}
+
 fn candidate_path_query(target: &str) -> String {
     let escaped = target.replace('\\', "\\\\").replace('\'', "\\'");
     format!(
@@ -308,21 +391,24 @@ fn candidate_path_query(target: &str) -> String {
     )
 }
 
+/// Read a candidate/target source through the trusted-path gate.
+///
+/// Returns the resolved path that was actually read beside the text: verification
+/// reports the file it verified against, uses that same canonical path as its
+/// parse-memo key, and never has to re-derive the identity later.
 fn read_trusted_source(
     state: &McpState,
     path: &str,
     workspace_root: Option<&str>,
-) -> Option<String> {
+) -> Option<(String, String)> {
     let resolved = crate::mcp::tool_helpers::resolve_file_path_checked(
         path,
         workspace_root,
         &state.config.additional_roots,
     )
     .ok()?;
-    state
-        .read_source(&resolved)
-        .ok()
-        .map(|source| source.to_string())
+    let source = state.read_source(&resolved).ok()?;
+    Some((resolved, source.to_string()))
 }
 
 fn inner_payload(raw: &str) -> Option<Value> {

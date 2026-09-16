@@ -2,12 +2,17 @@
 //!
 //! CBM supplies candidate relationships. This module checks the structural
 //! argument shape in candidate C# source without changing CBM's graph or
-//! inserting any relationship into `WorkspaceIndex`.
+//! inserting any relationship into `WorkspaceIndex`, and it *retains* the
+//! identity of every candidate it verified so a consumer never has to ask CBM
+//! again which candidate passed. Arity extraction and the request-local parse
+//! memo live in [`crate::cbm::caller_verify_arity`].
 
+use crate::cbm::caller_verify_arity::{
+    Declaration, ParseMemo, arities_overlap, declarations_of, invocation_arities_of,
+};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashSet;
-use tree_sitter::{Node, Parser};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -39,10 +44,39 @@ impl<'a> CsharpTargetSelector<'a> {
     }
 }
 
+/// One candidate under verification.
+///
+/// Carries CBM's proposed caller file (the advisory candidate identity), the
+/// path Clean-CTX actually read after the trusted-path gate, and that file's
+/// text. The CBM identity travels *through* verification instead of being
+/// re-derived from source afterwards, so a verified result can name the
+/// candidate it verified without a second CBM lookup. Authority is unchanged:
+/// CBM proposed the candidate, and the verdict is computed from `text` alone.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct CandidateSource<'a> {
     pub(crate) file: &'a str,
+    pub(crate) resolved_file: &'a str,
     pub(crate) text: &'a str,
+}
+
+/// A candidate whose identity survived verification, with the evidence the
+/// verifier established for it.
+///
+/// Retained beside the summary counters (which are unchanged) so a consumer
+/// learns *which* candidate passed, and with what call-site shape, instead of
+/// only how many did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub(crate) struct VerifiedCallerCandidate {
+    /// Caller file exactly as CBM projected it — an advisory candidate
+    /// identity, never promoted to a Clean-CTX semantic fact.
+    pub(crate) cbm_file: String,
+    /// Path Clean-CTX read for verification (post trusted-path gate).
+    pub(crate) file: String,
+    /// Distinct explicit argument counts Clean-CTX observed and accepted,
+    /// ascending.
+    pub(crate) argument_counts: Vec<usize>,
+    /// Verdict this candidate received.
+    pub(crate) status: CallerVerificationStatus,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -57,6 +91,14 @@ pub(crate) struct CallerVerificationSummary {
     pub(crate) verified_caller_files: usize,
     pub(crate) compatible_caller_files: usize,
     pub(crate) resolution: CallerVerificationStatus,
+    /// Identity evidence for every candidate that verified. The counters above
+    /// remain the compatibility contract; this is the structured evidence
+    /// beside them, and it is what removes the consumer's second CBM lookup.
+    pub(crate) verified_candidates: Vec<VerifiedCallerCandidate>,
+    /// Identity evidence for candidates whose call sites are compatible with a
+    /// target that stayed ambiguous — proof that no unique resolution was
+    /// claimed for them.
+    pub(crate) ambiguous_candidates: Vec<VerifiedCallerCandidate>,
 }
 
 impl CallerVerificationSummary {
@@ -72,6 +114,8 @@ impl CallerVerificationSummary {
             verified_caller_files: 0,
             compatible_caller_files: 0,
             resolution: CallerVerificationStatus::Unverifiable,
+            verified_candidates: Vec::new(),
+            ambiguous_candidates: Vec::new(),
         }
     }
 
@@ -89,12 +133,16 @@ impl CallerVerificationSummary {
             verified_caller_files: 0,
             compatible_caller_files: 0,
             resolution: CallerVerificationStatus::Unverifiable,
+            verified_candidates: Vec::new(),
+            ambiguous_candidates: Vec::new(),
         }
     }
 
     /// Fold one independently verified target into a surface-level aggregate.
     ///
-    /// Counters (including the per-target file counts) are summed. The first
+    /// Counters (including the per-target file counts) are summed, and the
+    /// retained candidate evidence accumulates across targets — every verified
+    /// candidate in the response is reported once. The first
     /// folded target is adopted — so a batch of one keeps its target identity
     /// exactly like the single-target surfaces report it — and identity and
     /// arity then survive only while every following target agrees; a plural
@@ -121,6 +169,10 @@ impl CallerVerificationSummary {
         self.unverifiable += other.unverifiable;
         self.verified_caller_files += other.verified_caller_files;
         self.compatible_caller_files += other.compatible_caller_files;
+        self.verified_candidates
+            .extend(other.verified_candidates.iter().cloned());
+        self.ambiguous_candidates
+            .extend(other.ambiguous_candidates.iter().cloned());
     }
 }
 
@@ -148,39 +200,25 @@ pub(crate) fn aggregate_resolution(
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct ArityShape {
-    declared: usize,
-    minimum_explicit: usize,
-    maximum_explicit: Option<usize>,
-    flexible: bool,
-}
-
-impl ArityShape {
-    fn accepts(self, observed: usize) -> bool {
-        observed >= self.minimum_explicit
-            && self
-                .maximum_explicit
-                .is_none_or(|maximum| observed <= maximum)
-    }
-
-    fn exact_explicit(self) -> Option<usize> {
-        match self.maximum_explicit {
-            Some(maximum) if maximum == self.minimum_explicit && !self.flexible => Some(maximum),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Declaration {
-    arity: ArityShape,
-}
-
+/// Verify CBM's proposed callers against the target's declaration and their own
+/// call sites.
+///
+/// `target_key` and every candidate's `resolved_file` are the canonical paths
+/// the sources were read from: the [`ParseMemo`] keys, so one batch parses a
+/// file once however many symbols reference it. `memo` is request-local (no
+/// cross-request verification state exists) and carries nothing between
+/// requests.
+///
+/// Counters keep their established meaning; the retained
+/// [`VerifiedCallerCandidate`] evidence is added *beside* them, exactly as the
+/// verifier established it — a candidate CBM proposed that source verification
+/// contradicted is never reported as verified.
 pub(crate) fn verify_csharp_callers(
     target_source: &str,
+    target_key: &str,
     selector: CsharpTargetSelector<'_>,
     candidates: &[CandidateSource<'_>],
+    memo: &mut ParseMemo,
 ) -> CallerVerificationSummary {
     let method_name = selector
         .qualified_name
@@ -188,10 +226,10 @@ pub(crate) fn verify_csharp_callers(
         .next()
         .unwrap_or(selector.qualified_name);
     let type_name = selector.qualified_name.rsplit('.').nth(1);
-    let declarations = match parse_declarations(target_source, method_name, type_name) {
-        Some(found) => found,
-        None => return CallerVerificationSummary::unverifiable(Some(selector.qualified_name)),
+    let Some(target_tree) = memo.tree(target_key, target_source) else {
+        return CallerVerificationSummary::unverifiable(Some(selector.qualified_name));
     };
+    let declarations = declarations_of(&target_tree, target_source, method_name, type_name);
     let selected: Vec<Declaration> = declarations
         .iter()
         .copied()
@@ -208,11 +246,18 @@ pub(crate) fn verify_csharp_callers(
         let mut ambiguous = 0;
         let mut files = HashSet::new();
         let mut unverifiable = 0;
+        let mut ambiguous_candidates = Vec::new();
         for candidate in candidates {
-            match parse_invocation_arities(candidate.text, method_name) {
-                Some(invocations) => {
+            match memo.tree(candidate.resolved_file, candidate.text) {
+                Some(tree) => {
+                    let invocations = invocation_arities_of(&tree, candidate.text, method_name);
                     if !invocations.is_empty() {
                         files.insert(candidate.file);
+                        ambiguous_candidates.push(candidate_evidence(
+                            candidate,
+                            &invocations,
+                            CallerVerificationStatus::Ambiguous,
+                        ));
                     }
                     ambiguous += invocations.len();
                 }
@@ -234,6 +279,8 @@ pub(crate) fn verify_csharp_callers(
             } else {
                 CallerVerificationStatus::Ambiguous
             },
+            verified_candidates: Vec::new(),
+            ambiguous_candidates,
         };
     }
 
@@ -255,30 +302,46 @@ pub(crate) fn verify_csharp_callers(
         verified_caller_files: 0,
         compatible_caller_files: 0,
         resolution: CallerVerificationStatus::Unverifiable,
+        verified_candidates: Vec::new(),
+        ambiguous_candidates: Vec::new(),
     };
     let mut verified_files = HashSet::new();
     let mut compatible_files = HashSet::new();
 
     for candidate in candidates {
-        let invocations = match parse_invocation_arities(candidate.text, method_name) {
-            Some(found) => found,
-            None => {
-                summary.unverifiable += 1;
-                continue;
-            }
+        let Some(tree) = memo.tree(candidate.resolved_file, candidate.text) else {
+            summary.unverifiable += 1;
+            continue;
         };
-        for observed in invocations {
+        let mut accepted = Vec::new();
+        let mut compatible_but_ambiguous = Vec::new();
+        for observed in invocation_arities_of(&tree, candidate.text, method_name) {
             summary.raw_candidates += 1;
             if !target.accepts(observed) {
                 summary.rejected_arity += 1;
             } else if target.flexible || same_shape_ambiguity {
                 summary.ambiguous += 1;
                 compatible_files.insert(candidate.file);
+                compatible_but_ambiguous.push(observed);
             } else {
                 summary.verified += 1;
                 compatible_files.insert(candidate.file);
                 verified_files.insert(candidate.file);
+                accepted.push(observed);
             }
+        }
+        if !accepted.is_empty() {
+            summary.verified_candidates.push(candidate_evidence(
+                candidate,
+                &accepted,
+                CallerVerificationStatus::VerifiedCompatible,
+            ));
+        } else if !compatible_but_ambiguous.is_empty() {
+            summary.ambiguous_candidates.push(candidate_evidence(
+                candidate,
+                &compatible_but_ambiguous,
+                CallerVerificationStatus::Ambiguous,
+            ));
         }
     }
     summary.verified_caller_files = verified_files.len();
@@ -295,6 +358,28 @@ pub(crate) fn verify_csharp_callers(
         CallerVerificationStatus::Unverifiable
     };
     summary
+}
+
+/// Retain one candidate's identity beside the verdict it earned.
+///
+/// The observed counts are deduplicated and sorted, so the evidence is the
+/// deterministic *set* of accepted call-site shapes rather than a repetition of
+/// every call site. No count is invented and none is lost: what a call site
+/// actually passed is exactly what is reported.
+fn candidate_evidence(
+    candidate: &CandidateSource<'_>,
+    observed: &[usize],
+    status: CallerVerificationStatus,
+) -> VerifiedCallerCandidate {
+    let mut argument_counts = observed.to_vec();
+    argument_counts.sort_unstable();
+    argument_counts.dedup();
+    VerifiedCallerCandidate {
+        cbm_file: candidate.file.to_string(),
+        file: candidate.resolved_file.to_string(),
+        argument_counts,
+        status,
+    }
 }
 
 /// Build the surface-level verification metadata object for one summary.
@@ -327,132 +412,6 @@ pub(crate) fn annotate_caller_evidence(
     let metadata = caller_evidence_metadata(surface, summary);
     if let Some(object) = payload.as_object_mut() {
         object.insert("clean_ctx_caller_verification".into(), metadata);
-    }
-}
-
-fn parse_tree(source: &str) -> Option<tree_sitter::Tree> {
-    let mut parser = Parser::new();
-    let language = crate::compression::language::safe_csharp_language()?;
-    parser.set_language(&language).ok()?;
-    let tree = parser.parse(source, None)?;
-    (!tree.root_node().has_error()).then_some(tree)
-}
-
-fn parse_declarations(
-    source: &str,
-    method_name: &str,
-    type_name: Option<&str>,
-) -> Option<Vec<Declaration>> {
-    let tree = parse_tree(source)?;
-    let mut nodes = Vec::new();
-    collect_kind(tree.root_node(), "method_declaration", &mut nodes);
-    let declarations = nodes
-        .into_iter()
-        .filter(|node| node_text(node.child_by_field_name("name"), source) == Some(method_name))
-        .filter(|node| {
-            type_name.is_none_or(|name| enclosing_type_name(*node, source) == Some(name))
-        })
-        .filter_map(|node| declaration_arity(node, source).map(|arity| Declaration { arity }))
-        .collect();
-    Some(declarations)
-}
-
-fn parse_invocation_arities(source: &str, method_name: &str) -> Option<Vec<usize>> {
-    let tree = parse_tree(source)?;
-    let mut nodes = Vec::new();
-    collect_kind(tree.root_node(), "invocation_expression", &mut nodes);
-    Some(
-        nodes
-            .into_iter()
-            .filter(|node| invocation_name(*node, source) == Some(method_name))
-            .filter_map(|node| node.child_by_field_name("arguments"))
-            .map(|arguments| arguments.named_child_count())
-            .collect(),
-    )
-}
-
-fn declaration_arity(node: Node<'_>, source: &str) -> Option<ArityShape> {
-    let parameters = node.child_by_field_name("parameters")?;
-    let mut cursor = parameters.walk();
-    let parameter_nodes: Vec<Node<'_>> = parameters
-        .named_children(&mut cursor)
-        .filter(|parameter| parameter.kind() == "parameter")
-        .collect();
-    let parameter_list_text = parameters.utf8_text(source.as_bytes()).ok()?;
-    let has_params = has_word(parameter_list_text, "params");
-    let declared = parameter_nodes.len() + usize::from(has_params);
-    let texts: Vec<&str> = parameter_nodes
-        .iter()
-        .filter_map(|parameter| parameter.utf8_text(source.as_bytes()).ok())
-        .collect();
-    if texts.len() != parameter_nodes.len() {
-        return None;
-    }
-    let extension_receiver = texts.first().is_some_and(|text| has_word(text, "this"));
-    let receiver_adjustment = usize::from(extension_receiver);
-    let optional = texts.iter().filter(|text| text.contains('=')).count();
-    let minimum_explicit = declared
-        .saturating_sub(receiver_adjustment)
-        .saturating_sub(optional)
-        .saturating_sub(usize::from(has_params));
-    let maximum_explicit = (!has_params).then_some(declared.saturating_sub(receiver_adjustment));
-    Some(ArityShape {
-        declared,
-        minimum_explicit,
-        maximum_explicit,
-        flexible: optional > 0 || has_params,
-    })
-}
-
-fn invocation_name<'a>(node: Node<'_>, source: &'a str) -> Option<&'a str> {
-    let function = node.child_by_field_name("function")?;
-    if function.kind() == "member_access_expression" {
-        node_text(function.child_by_field_name("name"), source)
-    } else {
-        let text = function.utf8_text(source.as_bytes()).ok()?;
-        Some(text.rsplit('.').next().unwrap_or(text))
-    }
-}
-
-fn enclosing_type_name<'a>(mut node: Node<'_>, source: &'a str) -> Option<&'a str> {
-    while let Some(parent) = node.parent() {
-        if matches!(
-            parent.kind(),
-            "class_declaration" | "struct_declaration" | "record_declaration"
-        ) {
-            return node_text(parent.child_by_field_name("name"), source);
-        }
-        node = parent;
-    }
-    None
-}
-
-fn collect_kind<'tree>(node: Node<'tree>, kind: &str, output: &mut Vec<Node<'tree>>) {
-    if node.kind() == kind {
-        output.push(node);
-    }
-    let mut cursor = node.walk();
-    for child in node.named_children(&mut cursor) {
-        collect_kind(child, kind, output);
-    }
-}
-
-fn node_text<'a>(node: Option<Node<'_>>, source: &'a str) -> Option<&'a str> {
-    node?.utf8_text(source.as_bytes()).ok()
-}
-
-fn has_word(text: &str, needle: &str) -> bool {
-    text.split(|character: char| !character.is_alphanumeric() && character != '_')
-        .any(|word| word == needle)
-}
-
-fn arities_overlap(left: ArityShape, right: ArityShape) -> bool {
-    let lower = left.minimum_explicit.max(right.minimum_explicit);
-    match (left.maximum_explicit, right.maximum_explicit) {
-        (Some(left_max), Some(right_max)) => lower <= left_max.min(right_max),
-        (Some(left_max), None) => lower <= left_max,
-        (None, Some(right_max)) => lower <= right_max,
-        (None, None) => true,
     }
 }
 
