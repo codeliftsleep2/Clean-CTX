@@ -31,10 +31,12 @@ fn compress(instructions: &[CoreOp]) -> Vec<CoreOp> {
 
 fn ctor_stream(call: Option<CoreOp>) -> Vec<CoreOp> {
     // Production shape of a constructor-injection region:
-    //   DEF_M(ctor) + SIG(type) + RET + INJECTS(class, [S1])
-    // The pattern's `deps` payload comes ONLY from the INJECTS op, which is why
-    // the fixture carries one (a param alone contributes arity, not deps).
+    //   DEF_C + DEF_M(ctor) + SIG(type) + RET + INJECTS(class, [S1])
+    // The pattern's `deps` payload comes ONLY from the INJECTS op (a param alone
+    // contributes arity, not deps), and INJECTS requires a declared class
+    // (validator E006), so the fixture carries both.
     let mut ops = vec![
+        CoreOp::DefClass("C1".into(), "Example".into()),
         CoreOp::DefMethod("C1".into(), "M1".into(), "ctor".into()),
         CoreOp::Param("M1".into(), "P1".into(), "S1".into(), "dep".into()),
         CoreOp::Return("M1".into(), "void".into()),
@@ -45,6 +47,11 @@ fn ctor_stream(call: Option<CoreOp>) -> Vec<CoreOp> {
     }
     ops.push(CoreOp::Flags("M1".into(), vec!["CTOR".into()]));
     ops
+}
+
+/// The leading class declaration of every `ctor_stream` fixture.
+fn ctor_class() -> CoreOp {
+    CoreOp::DefClass("C1".into(), "Example".into())
 }
 
 fn promise_stream(call: Option<CoreOp>) -> Vec<CoreOp> {
@@ -92,10 +99,10 @@ fn red_call21_ctor_control_still_compresses_without_a_call() {
     let compressed = compress(&ctor_stream(None));
     assert_eq!(
         compressed,
-        vec![CoreOp::Pattern(
-            "CTOR".into(),
-            vec!["C1".into(), "M1".into(), "S1".into()],
-        )],
+        vec![
+            ctor_class(),
+            CoreOp::Pattern("CTOR".into(), vec!["C1".into(), "M1".into(), "S1".into()]),
+        ],
         "a ctor region with no call fact must keep compressing exactly as before"
     );
 }
@@ -135,7 +142,7 @@ fn red_call21_a_call_for_another_method_does_not_block_compression() {
     let compressed = compress(&ops);
 
     assert_eq!(
-        compressed.first(),
+        compressed.get(1),
         Some(&CoreOp::Pattern(
             "CTOR".into(),
             vec!["C1".into(), "M1".into(), "S1".into()],

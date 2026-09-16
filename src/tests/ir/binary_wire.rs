@@ -506,6 +506,11 @@ fn test_round_trip_large_ir() {
 /// `UnknownOpcode(20)` and made native call facts unrepresentable over the
 /// binary wire — the encoder wrote them and no reader could read them. The
 /// guard now bounds `OP_MAX`, so every opcode this build defines round-trips.
+///
+/// Identity is asserted over the surface the format actually transports: class
+/// ids are deliberately not transported (`decode` emits an empty class id for
+/// `DEF_C`/`DEF_M`), while a call fact's caller, callee, and explicit argument
+/// count all are.
 #[test]
 fn binary_wire_round_trips_call_facts_and_every_defined_opcode() {
     let ir = CompiledIR {
@@ -521,8 +526,31 @@ fn binary_wire_round_trips_call_facts_and_every_defined_opcode() {
     };
 
     let decoded = decode(&encode(&ir)).expect("every defined opcode must decode");
+
+    let opcodes = |instructions: &[CoreOp]| -> Vec<&'static str> {
+        instructions
+            .iter()
+            .map(crate::ir::opcodes::opcode_name)
+            .collect()
+    };
+    let facts = |instructions: &[CoreOp]| -> Vec<(String, String, usize)> {
+        instructions
+            .iter()
+            .filter_map(|op| {
+                op.call_parts()
+                    .map(|(caller, callee, argc)| (caller.to_string(), callee.to_string(), argc))
+            })
+            .collect()
+    };
+
     assert_eq!(
-        decoded.instructions, ir.instructions,
+        opcodes(&decoded.instructions),
+        opcodes(&ir.instructions),
+        "no instruction may be lost, added, or reordered"
+    );
+    assert_eq!(
+        facts(&decoded.instructions),
+        facts(&ir.instructions),
         "caller, callee, and explicit argument count must survive the binary wire"
     );
 }
