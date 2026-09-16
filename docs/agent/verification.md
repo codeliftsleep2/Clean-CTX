@@ -7,7 +7,7 @@ reference this one.
 ## Final Verification Gate
 
 The complete gate must cover the reported change set before declaring any task
-complete. Under the long-running verification boundary in the engineering
+complete. Under Rule #1 (§1, long-running process boundary) in the engineering
 rules, agents provide these commands for the user to run manually and report
 the user's results accurately. Agents may run focused, reasonably short checks
 during implementation, but must not start the complete gate unless the user
@@ -43,7 +43,7 @@ iteration, then run the complete gate at the end.
 **Windows performance note:** `cargo test` recompiles even on no-change runs.
 On this machine the compile step can exceed the agent's 30-second command
 timeout. After the test binary is built, prefer direct invocation (see
-`.clinerules/engineering.md` §7b for the exact PowerShell incantation). Use
+`.clinerules/engineering.md` §8b for the exact PowerShell incantation). Use
 `cargo test` only when a rebuild is actually required.
 
 ## Migration-finalization verification

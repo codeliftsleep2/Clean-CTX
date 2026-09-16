@@ -2,6 +2,11 @@
 
 **Status:** Tracked, portable projection of the repository's live agent rules.
 
+> **RULE #1 - NO AGENT-INITIATED LONG-RUNNING PROCESSES.** Never start tests,
+> builds, checks, Clippy, `cargo audit`, benchmarks, binaries, or servers. Hand
+> the exact command to the user instead, without being asked and without being
+> reminded. Full text: §1.
+
 ## Purpose and authority
 
 `AGENTS.md` is a **portable entry point** for automated agents (for example
@@ -69,7 +74,53 @@ Then wait for explicit approval before implementing the global decision.
 Small implementation choices that remain fully inside the explicitly
 authorized architecture do not require additional approval.
 
-### 1. Zero-warning policy
+### 1. Long-running process boundary (highest-priority operating rule)
+
+**Agents must NEVER start a command that is expected to run for a long time.
+Every such command is handed off to the user. This is not optional, and the
+user must not have to restate it: it is always in force.**
+
+Long-running by default - hand off, do not run:
+
+- test suites and test binaries: `cargo test`, `cargo nextest`, direct
+  execution of an already-built `target/**/deps/*.exe`, and MSBuild / VSTest /
+  Gradle / Maven test runners;
+- builds, checks, and lints: `cargo build`, `cargo check`, `cargo clippy`,
+  `cargo fmt --all -- --check`, `cargo audit`;
+- benchmarks, fuzzing, coverage runs, and profiling;
+- starting any runtime: the Clean-CTX binary/server, MCP servers, dev servers;
+- any other command expected to exceed a few seconds, or whose duration is
+  unknown and potentially unbounded.
+
+Still allowed: fast, bounded, non-compiling commands - listing files,
+searching, reading files, `git status`, `git log`, `git diff`.
+
+Required behavior:
+
+1. Do the implementation work and run only focused, fast, clearly bounded
+   checks needed for iterative development.
+2. Hand the user the exact command(s) to run, complete and copy-pasteable.
+3. State plainly what was handed off and what, if anything, was run.
+4. Wait for the user's results and report them accurately.
+5. **Never claim an unrun user-owned gate passed.**
+
+If a command unexpectedly becomes long-running, stop it promptly, explain what
+was interrupted, and return the command to the user.
+
+Authorization is narrow and per-run: the user may explicitly authorize one
+specific long-running command for the current task. That does not generalize to
+other commands, other tasks, or later sessions, and it is never inferred from
+existing behavior, historical practice, convenience, or performance concerns.
+
+In the automated runner there is no interactive user to hand off to: its
+verification step is authorized by the maintainer's `/agent run` +
+`/agent approve` and the workflow contract at the end of this file, never by
+the model itself.
+
+The complete, user-run verification command list lives in
+`docs/agent/verification.md` (Final Verification Gate).
+
+### 2. Zero-warning policy
 
 **ALL files must compile with zero warnings**, including `src/`
 (production), `src/tests/` (test code), `proxy/`, and `examples/`. A single
@@ -92,11 +143,11 @@ builds, checks, tests, Clippy runs, examples, and other Cargo work unless the
 task deliberately tests a specific feature combination. State any intentional
 feature restriction explicitly and do not report it as all-feature verification.
 
-This does not authorize agents to start long-running commands. The
-long-running verification boundary still requires agents to hand those
-commands to the user unless that particular run is explicitly authorized.
+This does not authorize agents to start long-running commands. Rule #1 (§1)
+governs: those commands are handed off to the user unless that particular run
+is explicitly authorized.
 
-### 2. Routing
+### 3. Routing
 
 Detailed procedures are NOT injected as always-on text. Route to them when the
 task type applies:
@@ -109,7 +160,7 @@ task type applies:
   tools are unavailable in the GitHub Actions runner)
 - Durable architectural facts -> `docs/ARCHITECTURAL_INVARIANTS.md`
 
-### 3. Behavioral preservation
+### 4. Behavioral preservation
 
 Preserve existing behavior during any migration unless a deliberate change has
 been explicitly approved. Treat the existing production implementation as the
@@ -117,7 +168,7 @@ behavioral reference until the replacement is fully integrated. Prefer
 **existing behavior -> relocate -> establish new boundary -> remove old
 implementation -> verify equivalence** over rewriting.
 
-### 4. Architectural change discipline
+### 5. Architectural change discipline
 
 1. Understand the existing architecture first.
 2. Identify the actual production behavior and the intended boundary.
@@ -129,7 +180,7 @@ implementation -> verify equivalence** over rewriting.
 Implementation determines current behavior; documentation determines intended
 architecture only when explicitly authoritative.
 
-### 5. Invariant discipline
+### 6. Invariant discipline
 
 Enforce invariants via the simplest reliable mechanism:
 
@@ -139,7 +190,9 @@ Enforce invariants via the simplest reliable mechanism:
 4. Only then add a dedicated architectural test.
 
 Do not create a generic fitness-function framework, invariant registry, or gate
-### 6. Avoid premature abstraction
+abstraction merely to formalize rules.
+
+### 7. Avoid premature abstraction
 
 Do not introduce abstractions merely because they might be useful later: no new
 trait when an existing one suffices, no registry when direct composition works,
@@ -148,10 +201,7 @@ relationship, no framework around a single use case. Prefer
 **simple -> explicit -> composable -> enforceable** over generic ->
 configurable -> abstract -> framework-heavy.
 
-
-abstraction merely to formalize rules.
-
-### 7. Test discipline and test-file convention
+### 8. Test discipline and test-file convention
 
 Tests are architectural assets. Add a regression test when a bug or failure is
 discovered; prefer tests that capture the invariant that must remain true. Do
@@ -161,7 +211,7 @@ Test files live in `src/tests/`, referenced from source modules via
 `#[path = "..."]` — never inline. A broken `#[path]` reference causes a
 compilation failure.
 
-### 7a. Active-file size enforcement
+### 8a. Active-file size enforcement
 
 Normal repository files target **600 lines or fewer**. The target preserves
 readability and encourages decomposition along clean semantic boundaries;
@@ -187,25 +237,7 @@ Use `scripts/check-file-sizes.ps1` for enforcement. Local runs inspect working
 tree and index changes; CI supplies a base revision to include committed
 branch changes.
 
-### 7b. Long-running verification boundary
-
-Agents must not start commands that are expected to run for a long time. This
-includes full test suites, repository-wide Clippy, repository-wide `cargo
-check`, exhaustive benchmarks, and similarly expensive verification commands.
-
-Instead, the agent must:
-
-1. Run only focused, reasonably short checks needed for iterative development.
-2. Provide the exact long-running commands for the user to run manually.
-3. Wait for and accurately report the results supplied by the user.
-4. Never claim an unrun user-owned gate passed.
-
-If a command unexpectedly becomes long-running, stop it promptly, explain what
-was interrupted, and return the command to the user. The user may explicitly
-authorize an agent to run a particular long command for the current task; that
-one-time authorization does not change this default policy.
-
-### 8. Definition of Done
+### 9. Definition of Done
 
 A task is complete only when the implementation is complete, the architecture
 is coherent, and the repository is consistent with these rules: architecturally
@@ -243,7 +275,7 @@ Cline + Rust + samples    Claude + real repositories
 Run the single authoritative Final Verification Gate from
 `docs/agent/verification.md`; do not re-derive command lists here.
 
-### 9. Encoding
+### 10. Encoding
 
 Encoding is authoritative in `.clinerules/encoding.md` and enforced
 mechanically (git pre-commit + CI + `cargo test --all-features encoding`).
