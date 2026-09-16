@@ -46,6 +46,26 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-017: Broad `search_graph` Searches Skipped C# Caller Verification Entirely
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-16 |
+| **Environment** | Claude + Clean-CTX (live C# workspace with a custom `OrderBy` extension overload) |
+| **Repository/context** | Real C# workspace (size not recorded) queried through `cbm_proxy`; the workspace contains a custom `OrderBy` extension method that overload-conflicts with the framework `OrderBy` |
+| **Symptom** | `search_graph(name_pattern = "^OrderBy$")` (one result) returned verified caller evidence (`raw_in_degree`, `verified_in_degree`, `in_degree_evidence`, `clean_ctx_caller_verification`) for the custom overload, while `search_graph(name_pattern = "OrderBy")` (four results) returned the same symbol with **no** per-result verification fields at all — the custom overload surfaced CBM's raw, known-incorrect `in_degree` with nothing marking it as unverified. |
+| **Root cause** | `src/cbm/caller_verify_proxy.rs` derived one verification target for the whole response and gated it on `results.len() == 1` (`(results.len() == 1).then(|| results[0]["qualified_name"]…)`). With more than one result the request was built with `target: None` and `raw_candidates: 0`, so `verify_request_sources` returned an unverifiable summary and `annotate_surface_counts` skipped the per-result annotation branch entirely: verification was never attempted, and no result carried a status saying so. The arity algorithm itself was correct — only the orchestration was single-result. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes — deterministic per-result orchestration fixtures with the shared verifier injected as a canned closure (no CBM needed). |
+| **Local regression** | `src/tests/cbm/caller_verify_search.rs` (`RED-SG1`–`RED-SG8`: single-result control, one-eligible-among-many, several verifiable methods, verified+ambiguous, verified+unverifiable, the unanchored `OrderBy` reproduction, anchored/unanchored parity for the same symbol, and the no-bare-raw-`in_degree` invariant) plus `src/tests/cbm/caller_verify_proxy.rs` (single-target request/count pins). |
+| **Live scenario required?** | Yes — re-run the confirmed field case: `name_pattern = "OrderBy"` must attach the same verified caller count to the custom overload as `name_pattern = "^OrderBy$"`. |
+| **Architectural invariant** | `CBM-VERIFY-001` |
+| **Status** | Fixed (live re-verification pending) |
+
+**Resolution:** caller verification for `search_graph` is now per result. `src/cbm/caller_verify_search.rs` plans one verification target per result carrying `in_degree` and orchestrates one `VerificationRequest` per eligible result through the unchanged shared verifier; every `in_degree` result is annotated with its own truth (`raw_in_degree`, `verified_in_degree`, `in_degree_evidence`, `in_degree_resolution`, plus `in_degree_reason` whenever it is not verified), and the top-level `clean_ctx_caller_verification` block keeps its existing field set while adding per-response disposition counters. Eligible results are limited to callable C# symbols (non-callable labels, non-C# targets, and duplicated identities are annotated instead of guessed), so no candidate narrowing, caching, or arity semantics changed, and `trace_path` / `query_graph` keep their single-target behavior.
+
+---
+
 ## DIS-2026-016: WorkspaceIndex Collapsed Same-Name Entity Edges Across Files
 
 | Field | Value |

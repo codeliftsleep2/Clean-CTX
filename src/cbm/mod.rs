@@ -17,6 +17,7 @@ pub mod bridge;
 pub mod cache_store;
 pub(crate) mod caller_verify;
 pub(crate) mod caller_verify_proxy;
+pub(crate) mod caller_verify_search;
 pub mod client;
 pub mod config;
 pub mod handlers;

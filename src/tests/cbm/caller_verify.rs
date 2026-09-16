@@ -1,6 +1,6 @@
 use crate::cbm::caller_verify::{
-    CallerVerificationStatus, CandidateSource, CsharpTargetSelector, annotate_caller_evidence,
-    verify_csharp_callers,
+    CallerVerificationStatus, CallerVerificationSummary, CandidateSource, CsharpTargetSelector,
+    aggregate_resolution, annotate_caller_evidence, verify_csharp_callers,
 };
 use serde_json::json;
 
@@ -152,4 +152,69 @@ fn red_s1_through_s4_all_surfaces_use_the_same_summary() {
         assert_eq!(value["clean_ctx_caller_verification"]["evidence"], "arity");
         assert_eq!(value["clean_ctx_caller_verification"]["surface"], tool);
     }
+}
+
+fn summary(target: &str, verified: usize, rejected_arity: usize) -> CallerVerificationSummary {
+    CallerVerificationSummary {
+        target_qualified_name: Some(target.to_string()),
+        target_explicit_arity: None,
+        raw_candidates: verified + rejected_arity,
+        verified,
+        rejected_arity,
+        ambiguous: 0,
+        unverifiable: 0,
+        verified_caller_files: 0,
+        compatible_caller_files: 0,
+        resolution: CallerVerificationStatus::VerifiedCompatible,
+    }
+}
+
+/// Aggregation pins (invariant `CBM-VERIFY-001`): counters fold, target
+/// identity and arity survive only while every folded target agrees, and the
+/// surface resolution is the weakest link across independently verified targets.
+#[test]
+fn aggregate_folds_targets_without_inventing_identity() {
+    let mut first = summary("A.First", 3, 4);
+    first.target_explicit_arity = Some(2);
+    let mut second = summary("B.Second", 1, 2);
+    second.target_explicit_arity = Some(3);
+
+    let mut folded = CallerVerificationSummary::empty();
+    folded.fold(&first);
+    assert_eq!(
+        folded.target_qualified_name.as_deref(),
+        Some("A.First"),
+        "a batch of one keeps its target identity"
+    );
+    assert_eq!(folded.target_explicit_arity, Some(2));
+    assert_eq!(folded.raw_candidates, 7);
+
+    folded.fold(&second);
+    assert_eq!(folded.target_qualified_name, None);
+    assert_eq!(folded.target_explicit_arity, None);
+    assert_eq!(folded.verified, 4);
+    assert_eq!(folded.rejected_arity, 6);
+
+    assert_eq!(
+        aggregate_resolution(&[
+            CallerVerificationStatus::VerifiedCompatible,
+            CallerVerificationStatus::RejectedArityMismatch
+        ]),
+        CallerVerificationStatus::VerifiedCompatible
+    );
+    assert_eq!(
+        aggregate_resolution(&[
+            CallerVerificationStatus::VerifiedCompatible,
+            CallerVerificationStatus::Unverifiable
+        ]),
+        CallerVerificationStatus::Unverifiable
+    );
+    assert_eq!(
+        aggregate_resolution(&[CallerVerificationStatus::Ambiguous]),
+        CallerVerificationStatus::Ambiguous
+    );
+    assert_eq!(
+        aggregate_resolution(&[]),
+        CallerVerificationStatus::Unverifiable
+    );
 }

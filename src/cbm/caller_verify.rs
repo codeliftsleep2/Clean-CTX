@@ -74,6 +74,78 @@ impl CallerVerificationSummary {
             resolution: CallerVerificationStatus::Unverifiable,
         }
     }
+
+    /// Neutral zero summary — the starting point when a surface aggregates
+    /// several independently verified targets into one summary.
+    pub(crate) fn empty() -> Self {
+        Self {
+            target_qualified_name: None,
+            target_explicit_arity: None,
+            raw_candidates: 0,
+            verified: 0,
+            rejected_arity: 0,
+            ambiguous: 0,
+            unverifiable: 0,
+            verified_caller_files: 0,
+            compatible_caller_files: 0,
+            resolution: CallerVerificationStatus::Unverifiable,
+        }
+    }
+
+    /// Fold one independently verified target into a surface-level aggregate.
+    ///
+    /// Counters (including the per-target file counts) are summed. Target
+    /// identity and arity survive only while every folded target agrees, so a
+    /// plural aggregate never reports one target's identity for a batch.
+    /// `resolution` is **not** derived here: aggregating surfaces assign it
+    /// once from every folded status via [`aggregate_resolution`].
+    pub(crate) fn fold(&mut self, other: &CallerVerificationSummary) {
+        self.target_qualified_name = match (
+            self.target_qualified_name.as_deref(),
+            &other.target_qualified_name,
+        ) {
+            (Some(current), Some(added)) if current == added => Some(added.clone()),
+            (None, Some(added)) => Some(added.clone()),
+            _ => None,
+        };
+        self.target_explicit_arity = match (self.target_explicit_arity, other.target_explicit_arity)
+        {
+            (Some(current), Some(added)) if current == added => Some(added),
+            (current, added) if current == added => current,
+            _ => None,
+        };
+        self.raw_candidates += other.raw_candidates;
+        self.verified += other.verified;
+        self.rejected_arity += other.rejected_arity;
+        self.ambiguous += other.ambiguous;
+        self.unverifiable += other.unverifiable;
+        self.verified_caller_files += other.verified_caller_files;
+        self.compatible_caller_files += other.compatible_caller_files;
+    }
+}
+
+/// Weakest-link status across independently verified targets.
+///
+/// The aggregate is reported as verified only when every folded target is
+/// verified; incomplete, ambiguous, and purely arity-rejected targets pull the
+/// surface-level verdict down in that order — the same precedence the per-run
+/// verifier uses. A batch with nothing verified stays `Unverifiable`. Applied to
+/// a batch of one this reproduces that single target's status exactly, so a
+/// single-result surface keeps its existing verdict.
+pub(crate) fn aggregate_resolution(
+    statuses: &[CallerVerificationStatus],
+) -> CallerVerificationStatus {
+    if statuses.contains(&CallerVerificationStatus::Unverifiable) || statuses.is_empty() {
+        CallerVerificationStatus::Unverifiable
+    } else if statuses.contains(&CallerVerificationStatus::Ambiguous) {
+        CallerVerificationStatus::Ambiguous
+    } else if statuses.contains(&CallerVerificationStatus::VerifiedCompatible) {
+        CallerVerificationStatus::VerifiedCompatible
+    } else if statuses.contains(&CallerVerificationStatus::RejectedArityMismatch) {
+        CallerVerificationStatus::RejectedArityMismatch
+    } else {
+        CallerVerificationStatus::Unverifiable
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -225,11 +297,16 @@ pub(crate) fn verify_csharp_callers(
     summary
 }
 
-pub(crate) fn annotate_caller_evidence(
-    payload: &mut Value,
+/// Build the surface-level verification metadata object for one summary.
+///
+/// This is the single definition of the `clean_ctx_caller_verification` shape:
+/// every serialized summary field plus the surface/evidence provenance keys.
+/// Surfaces that verify several targets extend the returned object with their
+/// own aggregate counters instead of re-deriving these keys.
+pub(crate) fn caller_evidence_metadata(
     surface: &str,
     summary: &CallerVerificationSummary,
-) {
+) -> Value {
     let mut metadata = serde_json::to_value(summary).unwrap_or(Value::Null);
     if let Some(object) = metadata.as_object_mut() {
         object.insert("surface".into(), Value::String(surface.to_string()));
@@ -239,6 +316,15 @@ pub(crate) fn annotate_caller_evidence(
             Value::String("raw_candidates_only".into()),
         );
     }
+    metadata
+}
+
+pub(crate) fn annotate_caller_evidence(
+    payload: &mut Value,
+    surface: &str,
+    summary: &CallerVerificationSummary,
+) {
+    let metadata = caller_evidence_metadata(surface, summary);
     if let Some(object) = payload.as_object_mut() {
         object.insert("clean_ctx_caller_verification".into(), metadata);
     }
