@@ -14,6 +14,26 @@
 
 use super::*;
 
+/// Convert a flat `CompiledIR` instruction stream into a `HierarchicalIR`.
+///
+/// The converter scans instructions in order, collecting:
+/// - DefClass → creates a ClassNode (subsequent ops scoped to this class)
+/// - DefMethod → creates a MethodNode inside current class
+/// - DefField → creates a FieldNode inside current class
+/// - Param → added to current method's params
+/// - Return → set as current method's return_type
+/// - FieldType → set as current field's field_type
+/// - Flags → set as current method's flags
+/// - ClassFlags → set as current class's class_flags
+/// - Extends → set as current class's extends
+/// - Implements → added to current class's implements
+/// - Injects → added to current class's injects
+/// - DefInterface → creates a ClassNode with synthetic=false and name
+/// - Import → added to top-level imports
+/// - TypeAlias → added to top-level type_aliases
+/// - Call → appended to the top-level calls table (the caller is carried
+///   explicitly, so no scope derivation is needed)
+/// - Pattern → added to current scope (class or method), storing args as-is
 pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
     let mut classes: Vec<ClassNode> = Vec::new();
     let mut imports: Vec<Vec<String>> = Vec::new();
