@@ -14,6 +14,15 @@ use super::wire::DecodeError;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+mod decode;
+mod encode;
+
+// Re-exported so the established public paths (`crate::ir::hierarchical::
+// ir_to_hierarchical`, `::hierarchical_to_ir`) are unchanged by the split
+// into `hierarchical/encode.rs` and `hierarchical/decode.rs`.
+pub use decode::hierarchical_to_ir;
+pub use encode::ir_to_hierarchical;
+
 /// Top-level hierarchical IR container.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HierarchicalIR {
@@ -28,6 +37,34 @@ pub struct HierarchicalIR {
     /// Type aliases — flat array of [alias, original]
     #[serde(rename = "t", default, skip_serializing_if = "Vec::is_empty")]
     pub type_aliases: Vec<Vec<String>>,
+
+    /// Structural invocations (native call graph).
+    ///
+    /// Flat, like `imports` and `type_aliases`: the caller is already an
+    /// explicit method id, so the class→method nesting adds no shared
+    /// context to compress, and the flat triple mirrors `CoreOp::Call`
+    /// losslessly (caller, callee NAME, explicit argument count). Typed
+    /// (not a string tuple) so a malformed document fails decoding loudly
+    /// instead of silently defaulting an argument count.
+    #[serde(rename = "ca", default, skip_serializing_if = "Vec::is_empty")]
+    pub calls: Vec<HierarchicalCall>,
+}
+
+/// One structural invocation in the flat hierarchical call table.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HierarchicalCall {
+    /// Caller method alias id (e.g. "M1").
+    #[serde(rename = "c")]
+    pub caller: String,
+
+    /// Callee textual name as written at the call site (never a resolved
+    /// declaration identity).
+    #[serde(rename = "n")]
+    pub callee: String,
+
+    /// Explicit argument count written at the call site.
+    #[serde(rename = "a")]
+    pub explicit_arg_count: usize,
 }
 
 /// A single class node — the top-level structural container.
@@ -192,506 +229,6 @@ pub struct PatternEntry {
 /// - Import → added to top-level imports
 /// - TypeAlias → added to top-level type_aliases
 /// - Pattern → added to current scope (class or method), storing args as-is
-pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
-    let mut classes: Vec<ClassNode> = Vec::new();
-    let mut imports: Vec<Vec<String>> = Vec::new();
-    let mut type_aliases: Vec<Vec<String>> = Vec::new();
-
-    // Track current scope
-    let mut current_class_idx: Option<usize> = None;
-    let mut current_method_idx: Option<usize> = None;
-
-    for op in &ir.instructions {
-        match op {
-            CoreOp::DefClass(id, name) => {
-                classes.push(ClassNode {
-                    id: id.clone(),
-                    name: name.clone(),
-                    methods: Vec::new(),
-                    fields: Vec::new(),
-                    class_flags: None,
-                    extends: None,
-                    implements: Vec::new(),
-                    injects: Vec::new(),
-                    patterns: Vec::new(),
-                    synthetic: false,
-                });
-                current_class_idx = Some(classes.len() - 1);
-                current_method_idx = None;
-            }
-
-            CoreOp::DefMethod(cid, mid, name) => {
-                if let Some(class_idx) = find_class_by_id(&classes, cid) {
-                    classes[class_idx].methods.push(MethodNode {
-                        id: mid.clone(),
-                        name: name.clone(),
-                        params: Vec::new(),
-                        return_type: None,
-                        flags: None,
-                        patterns: Vec::new(),
-                        body: None,
-                        body_start: None,
-                        body_end: None,
-                        control_flow: Vec::new(),
-                        data_flow: Vec::new(),
-                        side_effect: None,
-                        execution_context: None,
-                    });
-                    current_class_idx = Some(class_idx);
-                    current_method_idx = Some(classes[class_idx].methods.len() - 1);
-                } else {
-                    // Method with no matching class — create a synthetic class
-                    classes.push(ClassNode {
-                        id: cid.clone(),
-                        name: format!("__synthetic_{}", cid),
-                        methods: vec![MethodNode {
-                            id: mid.clone(),
-                            name: name.clone(),
-                            params: Vec::new(),
-                            return_type: None,
-                            flags: None,
-                            patterns: Vec::new(),
-                            body: None,
-                            body_start: None,
-                            body_end: None,
-                            control_flow: Vec::new(),
-                            data_flow: Vec::new(),
-                            side_effect: None,
-                            execution_context: None,
-                        }],
-                        fields: Vec::new(),
-                        class_flags: None,
-                        extends: None,
-                        implements: Vec::new(),
-                        injects: Vec::new(),
-                        patterns: Vec::new(),
-                        synthetic: true,
-                    });
-                    current_class_idx = Some(classes.len() - 1);
-                    current_method_idx = Some(0);
-                }
-            }
-
-            CoreOp::DefField(cid, fid, name) => {
-                if let Some(class_idx) = find_class_by_id(&classes, cid) {
-                    classes[class_idx].fields.push(FieldNode {
-                        id: fid.clone(),
-                        name: name.clone(),
-                        field_type: None,
-                    });
-                    current_class_idx = Some(class_idx);
-                } else {
-                    // Field with no matching class — create synthetic class
-                    classes.push(ClassNode {
-                        id: cid.clone(),
-                        name: format!("__synthetic_{}", cid),
-                        methods: Vec::new(),
-                        fields: vec![FieldNode {
-                            id: fid.clone(),
-                            name: name.clone(),
-                            field_type: None,
-                        }],
-                        class_flags: None,
-                        extends: None,
-                        implements: Vec::new(),
-                        injects: Vec::new(),
-                        patterns: Vec::new(),
-                        synthetic: true,
-                    });
-                    current_class_idx = Some(classes.len() - 1);
-                }
-            }
-
-            CoreOp::Param(mid, pid, ty, name) => {
-                if let (Some(c_idx), Some(m_idx)) = (current_class_idx, current_method_idx) {
-                    if classes[c_idx].methods[m_idx].id == *mid {
-                        classes[c_idx].methods[m_idx].params.push(vec![
-                            pid.clone(),
-                            ty.clone(),
-                            name.clone(),
-                        ]);
-                    } else {
-                        // Method ID mismatch — search
-                        for mi in 0..classes[c_idx].methods.len() {
-                            if classes[c_idx].methods[mi].id == *mid {
-                                classes[c_idx].methods[mi].params.push(vec![
-                                    pid.clone(),
-                                    ty.clone(),
-                                    name.clone(),
-                                ]);
-                                current_method_idx = Some(mi);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            CoreOp::Return(mid, ty) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].return_type = Some(ty.clone());
-                            current_method_idx = Some(mi);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            CoreOp::FieldType(fid, ty) => {
-                if let Some(c_idx) = current_class_idx {
-                    for fi in 0..classes[c_idx].fields.len() {
-                        if classes[c_idx].fields[fi].id == *fid {
-                            classes[c_idx].fields[fi].field_type = Some(ty.clone());
-                            break;
-                        }
-                    }
-                }
-            }
-
-            CoreOp::Flags(tid, flags) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *tid {
-                            classes[c_idx].methods[mi].flags = Some(flags.clone());
-                            current_method_idx = Some(mi);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            CoreOp::ClassFlags(cid, flags) => {
-                if let Some(c_idx) = find_class_by_id(&classes, cid) {
-                    classes[c_idx].class_flags = Some(flags.clone());
-                    current_class_idx = Some(c_idx);
-                }
-            }
-
-            CoreOp::Extends(child, parent) => {
-                if let Some(c_idx) = find_class_by_id(&classes, child) {
-                    classes[c_idx].extends = Some(parent.clone());
-                    current_class_idx = Some(c_idx);
-                }
-            }
-
-            CoreOp::Implements(cid, iid) => {
-                if let Some(c_idx) = find_class_by_id(&classes, cid) {
-                    classes[c_idx].implements.push(iid.clone());
-                    current_class_idx = Some(c_idx);
-                }
-            }
-
-            CoreOp::Injects(cid, deps) => {
-                if let Some(c_idx) = find_class_by_id(&classes, cid) {
-                    classes[c_idx].injects.extend(deps.clone());
-                    current_class_idx = Some(c_idx);
-                }
-            }
-
-            CoreOp::DefInterface(id, name) => {
-                classes.push(ClassNode {
-                    id: id.clone(),
-                    name: name.clone(),
-                    methods: Vec::new(),
-                    fields: Vec::new(),
-                    class_flags: None,
-                    extends: None,
-                    implements: Vec::new(),
-                    injects: Vec::new(),
-                    patterns: Vec::new(),
-                    synthetic: false,
-                });
-                current_class_idx = Some(classes.len() - 1);
-                current_method_idx = None;
-            }
-
-            CoreOp::Import(alias, module, named) => {
-                imports.push(vec![alias.clone(), module.clone(), named.clone()]);
-            }
-
-            CoreOp::TypeAlias(alias, original) => {
-                type_aliases.push(vec![alias.clone(), original.clone()]);
-            }
-
-            // Edit Mode: verbatim method body
-            CoreOp::Body(mid, text, start, end) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].body = Some(text.clone());
-                            // Span pairing invariant: producer guarantees
-                            // both-or-neither, so assignment preserves it.
-                            classes[c_idx].methods[mi].body_start = *start;
-                            classes[c_idx].methods[mi].body_end = *end;
-                            current_method_idx = Some(mi);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // R-43a: Execution semantics — stored as method-level metadata.
-            CoreOp::ControlFlow(mid, kind, target) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi]
-                                .control_flow
-                                .push(vec![kind.clone(), target.clone()]);
-                            current_method_idx = Some(mi);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            CoreOp::DataFlow(mid, direction, target) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi]
-                                .data_flow
-                                .push(vec![direction.clone(), target.clone()]);
-                            current_method_idx = Some(mi);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            CoreOp::SideEffect(mid, effect_type) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].side_effect = Some(effect_type.clone());
-                            current_method_idx = Some(mi);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            CoreOp::ExecutionContext(mid, context_type) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].execution_context =
-                                Some(context_type.clone());
-                            current_method_idx = Some(mi);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            CoreOp::Pattern(name, args) => {
-                // Parse pattern args to find the correct parent by class/method ID.
-                // PatternOp::to_tuple() format: [class_id, method_id?, ...args]
-                // All method-level patterns have class_id at index 0 and method_id at index 1.
-                // Method IDs always start with "M" (generated by IRCompiler::next_id("M")).
-                // Class-level patterns have class_id at index 0 and no method_id.
-                // If args[1] does not start with "M", it's a class-level pattern argument.
-                let class_id = args.first().cloned();
-                let method_id = args.get(1).filter(|s| s.starts_with('M')).cloned();
-
-                if let Some(cid) = class_id {
-                    if let Some(c_idx) = find_class_by_id(&classes, &cid) {
-                        if let Some(mid) = method_id {
-                            // Method-level pattern: find the method by ID within this class
-                            if let Some(m_idx) =
-                                classes[c_idx].methods.iter().position(|m| m.id == mid)
-                            {
-                                classes[c_idx].methods[m_idx].patterns.push(PatternEntry {
-                                    name: name.clone(),
-                                    args: args.clone(),
-                                });
-                                current_class_idx = Some(c_idx);
-                                current_method_idx = Some(m_idx);
-                            }
-                        } else {
-                            // Class-level pattern (no method_id)
-                            classes[c_idx].patterns.push(PatternEntry {
-                                name: name.clone(),
-                                args: args.clone(),
-                            });
-                            current_class_idx = Some(c_idx);
-                            current_method_idx = None;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    HierarchicalIR {
-        classes,
-        imports,
-        type_aliases,
-    }
-}
-
-/// Convert a `HierarchicalIR` back into a flat `Vec<CoreOp>` instruction stream.
-///
-/// This is the inverse of `ir_to_hierarchical`. The resulting instruction
-/// order is: classes emit DefClass (unless synthetic), then class flags/
-/// extends/implements/injects, then fields, then methods with their
-/// params/return/flags/patterns, then imports, then type aliases.
-///
-/// NOTE: The original interleaving of instructions across methods/fields is
-/// not preserved — the hierarchical format groups all instructions for a
-/// given scope together. This is semantically equivalent because CoreOp
-/// semantics don't depend on instruction ordering across scopes.
-pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
-    let mut instructions = Vec::new();
-
-    for class in &hir.classes {
-        // Skip synthetic classes — they represent orphans that had no DefClass
-        // in the original stream. Their methods/fields are emitted directly.
-        if !class.synthetic {
-            instructions.push(CoreOp::DefClass(class.id.clone(), class.name.clone()));
-
-            // Class-level flags
-            if let Some(flags) = &class.class_flags {
-                instructions.push(CoreOp::ClassFlags(class.id.clone(), flags.clone()));
-            }
-
-            // Extends
-            if let Some(parent) = &class.extends {
-                instructions.push(CoreOp::Extends(class.id.clone(), parent.clone()));
-            }
-
-            // Implements
-            for iid in &class.implements {
-                instructions.push(CoreOp::Implements(class.id.clone(), iid.clone()));
-            }
-
-            // Injects
-            if !class.injects.is_empty() {
-                instructions.push(CoreOp::Injects(class.id.clone(), class.injects.clone()));
-            }
-        }
-
-        // Fields (emitted for both synthetic and non-synthetic classes)
-        for field in &class.fields {
-            instructions.push(CoreOp::DefField(
-                class.id.clone(),
-                field.id.clone(),
-                field.name.clone(),
-            ));
-            if let Some(ft) = &field.field_type {
-                instructions.push(CoreOp::FieldType(field.id.clone(), ft.clone()));
-            }
-        }
-
-        // Methods (emitted for both synthetic and non-synthetic classes)
-        for method in &class.methods {
-            instructions.push(CoreOp::DefMethod(
-                class.id.clone(),
-                method.id.clone(),
-                method.name.clone(),
-            ));
-
-            // Params
-            for param in &method.params {
-                if param.len() >= 3 {
-                    instructions.push(CoreOp::Param(
-                        method.id.clone(),
-                        param[0].clone(),
-                        param[1].clone(),
-                        param[2].clone(),
-                    ));
-                }
-            }
-
-            // Return type
-            if let Some(rt) = &method.return_type {
-                instructions.push(CoreOp::Return(method.id.clone(), rt.clone()));
-            }
-
-            // Method flags
-            if let Some(flags) = &method.flags {
-                instructions.push(CoreOp::Flags(method.id.clone(), flags.clone()));
-            }
-
-            // Verbatim body
-            if let Some(body) = &method.body {
-                instructions.push(CoreOp::Body(
-                    method.id.clone(),
-                    body.clone(),
-                    method.body_start,
-                    method.body_end,
-                ));
-            }
-
-            // Control-flow metadata
-            for cf in &method.control_flow {
-                if cf.len() >= 2 {
-                    instructions.push(CoreOp::ControlFlow(
-                        method.id.clone(),
-                        cf[0].clone(),
-                        cf[1].clone(),
-                    ));
-                }
-            }
-
-            // Data-flow metadata
-            for df in &method.data_flow {
-                if df.len() >= 2 {
-                    instructions.push(CoreOp::DataFlow(
-                        method.id.clone(),
-                        df[0].clone(),
-                        df[1].clone(),
-                    ));
-                }
-            }
-
-            // Side-effect annotation
-            if let Some(se) = &method.side_effect {
-                instructions.push(CoreOp::SideEffect(method.id.clone(), se.clone()));
-            }
-
-            // Execution context annotation
-            if let Some(ec) = &method.execution_context {
-                instructions.push(CoreOp::ExecutionContext(method.id.clone(), ec.clone()));
-            }
-
-            // Method-level patterns (args stored as-is)
-            for pat in &method.patterns {
-                instructions.push(CoreOp::Pattern(pat.name.clone(), pat.args.clone()));
-            }
-        }
-
-        // Class-level patterns (only for non-synthetic classes)
-        if !class.synthetic {
-            for pat in &class.patterns {
-                instructions.push(CoreOp::Pattern(pat.name.clone(), pat.args.clone()));
-            }
-        }
-    }
-
-    // Imports
-    for imp in &hir.imports {
-        if imp.len() >= 3 {
-            instructions.push(CoreOp::Import(
-                imp[0].clone(),
-                imp[1].clone(),
-                imp[2].clone(),
-            ));
-        }
-    }
-
-    // Type aliases
-    for ta in &hir.type_aliases {
-        if ta.len() >= 2 {
-            instructions.push(CoreOp::TypeAlias(ta[0].clone(), ta[1].clone()));
-        }
-    }
-
-    instructions
-}
-
 /// Encode a compiled IR into the hierarchical wire format (JSON).
 ///
 /// Example output:

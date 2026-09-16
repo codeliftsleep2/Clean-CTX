@@ -43,6 +43,7 @@ fn selector_edge(component: &str, selector: &str) -> SemanticEdge {
         subject: EntityRef::new("angular", "Component", component),
         object: EntityRef::new("angular", "Component", selector),
         layer: "angular",
+        call_evidence: None,
     }
 }
 

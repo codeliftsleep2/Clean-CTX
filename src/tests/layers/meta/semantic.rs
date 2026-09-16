@@ -58,6 +58,7 @@ fn semantic_edge_construction() {
         subject: EntityRef::new("angular", "Route", "/users"),
         object: EntityRef::new("angular", "Component", "UserComponent"),
         layer: "angular",
+        call_evidence: None,
     };
     assert_eq!(edge.relation, SemanticRelation::RouteMapsTo);
     assert_eq!(edge.layer, "angular");
@@ -75,6 +76,7 @@ fn tests_relation_serializes_through_shared_semantic_contract() {
         subject: EntityRef::new("dotnet", "TestClass", "AccountsControllerTests"),
         object: EntityRef::new("dotnet", "Class", "AccountsController"),
         layer: "dotnet",
+        call_evidence: None,
     };
     let value = serde_json::to_value(edge).expect("serialize Tests relation");
     assert_eq!(value["relation"], "Tests");

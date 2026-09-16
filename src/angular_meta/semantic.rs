@@ -53,6 +53,7 @@ pub fn class_to_semantic_edges(
                 subject: subject.clone(),
                 object: EntityRef::new("angular", "PipeName", pn),
                 layer: "angular",
+                call_evidence: None,
             });
         }
     }
@@ -65,6 +66,7 @@ pub fn class_to_semantic_edges(
                 subject: subject.clone(),
                 object: EntityRef::new("angular", "Component", sel),
                 layer: "angular",
+                call_evidence: None,
             });
         }
     }
@@ -77,6 +79,7 @@ pub fn class_to_semantic_edges(
                 subject: subject.clone(),
                 object: EntityRef::new("angular", "Service", injected),
                 layer: "angular",
+                call_evidence: None,
             });
         }
     }
@@ -96,6 +99,7 @@ pub fn class_to_semantic_edges(
                 subject: subject.clone(),
                 object: EntityRef::new("angular", decl_type, decl),
                 layer: "angular",
+                call_evidence: None,
             });
         }
         // Module → ImportsModule → Module for each import
@@ -105,6 +109,7 @@ pub fn class_to_semantic_edges(
                 subject: subject.clone(),
                 object: EntityRef::new("angular", "Module", imp),
                 layer: "angular",
+                call_evidence: None,
             });
         }
         // Module → ExportsFromModule → Component/Directive/Pipe for each export
@@ -118,6 +123,7 @@ pub fn class_to_semantic_edges(
                 subject: subject.clone(),
                 object: EntityRef::new("angular", exp_type, exp),
                 layer: "angular",
+                call_evidence: None,
             });
         }
     }
@@ -142,6 +148,7 @@ pub fn class_to_semantic_edges(
                 subject: subject.clone(),
                 object: EntityRef::new("angular", obj_type, field_name),
                 layer: "angular",
+                call_evidence: None,
             });
         }
     }
@@ -164,6 +171,7 @@ pub fn routes_to_semantic_edges(
                 subject: route_entity.clone(),
                 object: EntityRef::new("angular", "Component", comp),
                 layer: "angular",
+                call_evidence: None,
             });
         }
 
@@ -174,6 +182,7 @@ pub fn routes_to_semantic_edges(
                 subject: route_entity.clone(),
                 object: EntityRef::new("angular", "Guard", guard),
                 layer: "angular",
+                call_evidence: None,
             });
         }
 
@@ -184,6 +193,7 @@ pub fn routes_to_semantic_edges(
                 subject: route_entity.clone(),
                 object: EntityRef::new("angular", "Resolver", resolver),
                 layer: "angular",
+                call_evidence: None,
             });
         }
     }

@@ -190,6 +190,7 @@ pub fn extract_testing_semantic_edges(source: &str, path: &Path) -> Vec<Semantic
             subject: EntityRef::new("angular", "TestArtifact", artifact),
             object: EntityRef::new("angular", "Component", target),
             layer: "angular",
+            call_evidence: None,
         })
         .collect()
 }

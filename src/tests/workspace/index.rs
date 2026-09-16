@@ -138,6 +138,7 @@ fn edge_occurrence_dedup_preserves_cross_file_evidence() {
         subject: subj_a,
         object: obj_a,
         layer: "angular",
+        call_evidence: None,
     };
 
     let mut subj_b = EntityRef::new("angular", "Component", "UserComponent");
@@ -149,6 +150,7 @@ fn edge_occurrence_dedup_preserves_cross_file_evidence() {
         subject: subj_b,
         object: obj_b,
         layer: "angular",
+        call_evidence: None,
     };
 
     idx.add_edges("a.ts", vec![edge_a]);

@@ -122,6 +122,27 @@ pub enum CoreOp {
     /// context_type: "sync" | "async" | "thread_bound" | "transaction_scope" | "realtime"
     /// Extracted from tree-sitter captures (confidence = 1.0).
     ExecutionContext(String, String),
+
+    // ── Structural Invocations (native call graph) ──────
+    ///
+    /// Invocation: ["CALL", caller_method_id, callee_name, explicit_arg_count]
+    ///
+    /// One structural invocation fact extracted from the existing language
+    /// parse. `caller_method_id` is the `DefMethod` id of the innermost
+    /// callable that contains the invocation in the same file;
+    /// `callee_name` is the textual name written at the call site; and
+    /// `explicit_arg_count` is the number of arguments written at the call
+    /// site (structural, from the argument list node — never from text
+    /// splitting).
+    ///
+    /// The callee is deliberately a NAME and not a resolved declaration
+    /// identity: a call site carries no type information, so overload
+    /// resolution is never claimed. Two calls that differ only in argument
+    /// count remain distinguishable; two calls that differ only in argument
+    /// type are honestly indistinguishable. Extension-method receivers are
+    /// NOT added to the count, and optional/`params` compatibility is NOT
+    /// evaluated here (that belongs to later resolution logic, if any).
+    Call(String, String, usize),
 }
 
 impl fmt::Display for CoreOp {
@@ -164,6 +185,9 @@ impl fmt::Display for CoreOp {
             }
             CoreOp::ExecutionContext(mid, context_type) => {
                 write!(f, "CTX {} {}", mid, context_type)
+            }
+            CoreOp::Call(caller, callee, argc) => {
+                write!(f, "CALL {} {} {}", caller, callee, argc)
             }
         }
     }
@@ -244,6 +268,7 @@ pub fn arity(opcode: &str) -> Option<i32> {
         "CTRL" => Some(4),     // method_id, kind, target
         "EFFECT" => Some(3),   // method_id, effect_type
         "CTX" => Some(3),      // method_id, context_type
+        "CALL" => Some(4),     // caller_method_id, callee_name, explicit_arg_count
         _ => None,
     }
 }
@@ -273,6 +298,7 @@ pub fn opcode_name(op: &CoreOp) -> &'static str {
         CoreOp::ControlFlow(..) => "CTRL",
         CoreOp::SideEffect(..) => "EFFECT",
         CoreOp::ExecutionContext(..) => "CTX",
+        CoreOp::Call(..) => "CALL",
     }
 }
 
@@ -284,6 +310,17 @@ impl CoreOp {
     pub fn body_span(&self) -> Option<(u64, u64)> {
         match self {
             CoreOp::Body(_, _, Some(start), Some(end)) => Some((*start, *end)),
+            _ => None,
+        }
+    }
+
+    /// Returns `(caller_method_id, callee_name, explicit_arg_count)` for an
+    /// invocation fact, `None` for every other op. Mirrors `body_span`:
+    /// callers that need to reason about invocations should not re-match
+    /// the variant themselves.
+    pub fn call_parts(&self) -> Option<(&str, &str, usize)> {
+        match self {
+            CoreOp::Call(caller, callee, argc) => Some((caller, callee, *argc)),
             _ => None,
         }
     }

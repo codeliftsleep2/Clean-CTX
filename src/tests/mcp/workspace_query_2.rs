@@ -285,6 +285,7 @@ fn red9_partial_nonzero_hydration() {
         object: EntityRef::new("spring", "Service", "OrderService")
             .with_file(controller_str.clone()),
         layer: "spring",
+        call_evidence: None,
     };
     let canonical = crate::dictionary::path::canonical_identity_key(&controller_str);
     idx.remove_file(&canonical);

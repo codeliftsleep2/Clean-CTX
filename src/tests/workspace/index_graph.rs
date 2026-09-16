@@ -36,6 +36,7 @@ fn has_cycle_self_loop() {
         subject: EntityRef::new("angular", "Component", "A"),
         object: EntityRef::new("angular", "Component", "A"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("a.ts", vec![self_loop]);
     assert!(idx.has_cycle(), "self-loop must be detected as a cycle");
@@ -50,12 +51,14 @@ fn has_cycle_simple_cycle() {
         subject: EntityRef::new("angular", "Service", "A"),
         object: EntityRef::new("angular", "Service", "B"),
         layer: "angular",
+        call_evidence: None,
     };
     let edge2 = SemanticEdge {
         relation: SemanticRelation::Injects,
         subject: EntityRef::new("angular", "Service", "B"),
         object: EntityRef::new("angular", "Service", "A"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("a.ts", vec![edge1, edge2]);
     assert!(idx.has_cycle(), "A → B → A must be detected as a cycle");
@@ -84,18 +87,21 @@ fn has_cycle_structural_cycle() {
         subject: EntityRef::new("angular", "Route", "/home"),
         object: EntityRef::new("angular", "Component", "HomeComponent"),
         layer: "angular",
+        call_evidence: None,
     };
     let edge2 = SemanticEdge {
         relation: SemanticRelation::DeclaresInModule,
         subject: EntityRef::new("angular", "Module", "AppModule"),
         object: EntityRef::new("angular", "Route", "/home"),
         layer: "angular",
+        call_evidence: None,
     };
     let edge3 = SemanticEdge {
         relation: SemanticRelation::Injects,
         subject: EntityRef::new("angular", "Component", "HomeComponent"),
         object: EntityRef::new("angular", "Module", "AppModule"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("a.ts", vec![edge1, edge2, edge3]);
     assert!(
@@ -128,6 +134,7 @@ fn self_defines_edge_is_registration_record_only() {
             subject: EntityRef::new("builtin", "Class", "UserService"),
             object: EntityRef::new("builtin", "Class", "UserService"),
             layer: "builtin",
+            call_evidence: None,
         }],
     );
 
@@ -176,6 +183,7 @@ fn self_defines_recompile_does_not_accumulate() {
         subject: EntityRef::new("builtin", "Class", "Foo"),
         object: EntityRef::new("builtin", "Class", "Foo"),
         layer: "builtin",
+        call_evidence: None,
     };
 
     idx.add_edges("a.ts", vec![registration()]);
@@ -221,6 +229,7 @@ fn framework_defines_edges_still_traversed() {
         subject: EntityRef::new("angular", "Guard", "AuthGuard"),
         object: EntityRef::new("angular", "Guard", "CanActivate"),
         layer: "angular",
+        call_evidence: None,
     };
     // Closing the loop with a dependency edge proves the Defines edge is
     // traversed by graph algorithms.
@@ -229,6 +238,7 @@ fn framework_defines_edges_still_traversed() {
         subject: EntityRef::new("angular", "Guard", "CanActivate"),
         object: EntityRef::new("angular", "Guard", "AuthGuard"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("a.ts", vec![defines, injects]);
 
@@ -277,6 +287,7 @@ fn partial_class_two_files_two_occurrences() {
         subject: EntityRef::new("builtin", "Class", "Foo"),
         object: EntityRef::new("builtin", "Class", "Foo"),
         layer: "builtin",
+        call_evidence: None,
     };
 
     idx.add_edges("a.cs", vec![registration()]);
@@ -354,12 +365,14 @@ fn transitive_deps_depth_2() {
         subject: EntityRef::new("angular", "Service", "A"),
         object: EntityRef::new("angular", "Service", "B"),
         layer: "angular",
+        call_evidence: None,
     };
     let e2 = SemanticEdge {
         relation: SemanticRelation::Injects,
         subject: EntityRef::new("angular", "Service", "B"),
         object: EntityRef::new("angular", "Service", "C"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("a.ts", vec![e1, e2]);
     let deps = idx.transitive_dependencies("angular", "Service", "A", 2);
@@ -374,18 +387,21 @@ fn transitive_deps_unlimited() {
         subject: EntityRef::new("angular", "Service", "A"),
         object: EntityRef::new("angular", "Service", "B"),
         layer: "angular",
+        call_evidence: None,
     };
     let e2 = SemanticEdge {
         relation: SemanticRelation::Injects,
         subject: EntityRef::new("angular", "Service", "B"),
         object: EntityRef::new("angular", "Service", "C"),
         layer: "angular",
+        call_evidence: None,
     };
     let e3 = SemanticEdge {
         relation: SemanticRelation::Injects,
         subject: EntityRef::new("angular", "Service", "C"),
         object: EntityRef::new("angular", "Service", "D"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("a.ts", vec![e1, e2, e3]);
     let deps = idx.transitive_dependencies("angular", "Service", "A", 0);
@@ -400,18 +416,21 @@ fn transitive_deps_with_cycle() {
         subject: EntityRef::new("angular", "Service", "A"),
         object: EntityRef::new("angular", "Service", "B"),
         layer: "angular",
+        call_evidence: None,
     };
     let e2 = SemanticEdge {
         relation: SemanticRelation::Injects,
         subject: EntityRef::new("angular", "Service", "B"),
         object: EntityRef::new("angular", "Service", "C"),
         layer: "angular",
+        call_evidence: None,
     };
     let e3 = SemanticEdge {
         relation: SemanticRelation::Injects,
         subject: EntityRef::new("angular", "Service", "C"),
         object: EntityRef::new("angular", "Service", "A"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("a.ts", vec![e1, e2, e3]);
     let deps = idx.transitive_dependencies("angular", "Service", "A", 0);
@@ -552,6 +571,7 @@ fn transitive_deps_structural_not_traversed_has_selector() {
         subject: EntityRef::new("angular", "Component", "UserCard"),
         object: EntityRef::new("angular", "Component", "app-user-card"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("a.ts", vec![sel_edge]);
     let deps = idx.transitive_dependencies("angular", "Component", "UserCard", 1);

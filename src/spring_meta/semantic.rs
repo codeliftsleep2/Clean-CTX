@@ -115,6 +115,7 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
                 subject: controller.clone(),
                 object: EntityRef::new("spring", "Endpoint", &endpoint_str),
                 layer: "spring",
+                call_evidence: None,
             });
         }
     }
@@ -134,6 +135,7 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
                         subject: controller.clone(),
                         object: EntityRef::new("spring", "Service", &field_name),
                         layer: "spring",
+                        call_evidence: None,
                     });
                 }
             }
@@ -156,6 +158,7 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
                             subject: config.clone(),
                             object: EntityRef::new("spring", "Bean", &method_name),
                             layer: "spring",
+                            call_evidence: None,
                         });
                     }
                 }
@@ -167,6 +170,7 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
                 subject: config.clone(),
                 object: EntityRef::new("spring", "Bean", method),
                 layer: "spring",
+                call_evidence: None,
             });
         }
     }
@@ -178,6 +182,7 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
             subject: EntityRef::new("spring", "Configuration", &class_name),
             object: EntityRef::new("spring", "Properties", &class_name),
             layer: "spring",
+            call_evidence: None,
         });
     }
 

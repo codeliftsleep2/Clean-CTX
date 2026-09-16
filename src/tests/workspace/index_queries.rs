@@ -122,6 +122,7 @@ fn resolve_inject_type_accepts_spring_autowired() {
             file: Some("UserController.java".to_string()),
         },
         layer: "spring",
+        call_evidence: None,
     };
     idx.add_edges("UserController.java", vec![autowired_edge]);
 
@@ -164,6 +165,7 @@ fn resolve_selector_returns_component_with_matching_selector() {
         subject: EntityRef::new("angular", "Component", "UserCardComponent"),
         object: EntityRef::new("angular", "Component", "app-user-card"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("user-card.ts", vec![edge]);
 
@@ -182,6 +184,7 @@ fn resolve_selector_unknown_selector_returns_empty() {
         subject: EntityRef::new("angular", "Route", "/home"),
         object: EntityRef::new("angular", "Component", "HomeComponent"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("routes.ts", vec![edge]);
 
@@ -208,6 +211,7 @@ fn resolve_selector_file_provenance_preserved() {
             file: None,
         },
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("header.component.ts", vec![edge]);
 
@@ -231,18 +235,21 @@ fn resolve_selector_literal_forms_are_distinct() {
         subject: EntityRef::new("angular", "Component", "ElementComp"),
         object: EntityRef::new("angular", "Component", "app-widget"),
         layer: "angular",
+        call_evidence: None,
     };
     let attribute_edge = SemanticEdge {
         relation: SemanticRelation::HasSelector,
         subject: EntityRef::new("angular", "Component", "AttributeComp"),
         object: EntityRef::new("angular", "Component", "[app-widget]"),
         layer: "angular",
+        call_evidence: None,
     };
     let class_edge = SemanticEdge {
         relation: SemanticRelation::HasSelector,
         subject: EntityRef::new("angular", "Component", "ClassComp"),
         object: EntityRef::new("angular", "Component", ".app-widget"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges(
         "selectors.ts",
@@ -494,6 +501,7 @@ fn resolve_selector_unique_despite_subject_multi_edge() {
         subject: EntityRef::new("angular", "Component", "UserCard"),
         object: EntityRef::new("angular", "Component", "app-user-card"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges(
         "user-card.ts",
@@ -527,6 +535,7 @@ fn resolve_selector_unique_despite_cross_file_duplicate_selector() {
             .with_file(file.to_string()),
         object: EntityRef::new("angular", "Component", "app-loading").with_file(file.to_string()),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges(
         "project-a/loading.component.ts",
@@ -580,6 +589,7 @@ fn phase_4b_resolve_selector_unchanged() {
         subject: EntityRef::new("angular", "Component", "C"),
         object: EntityRef::new("angular", "Component", "app-c"),
         layer: "angular",
+        call_evidence: None,
     };
     idx.add_edges("a.ts", vec![sel_edge]);
     assert_eq!(idx.resolve_selector("app-c").len(), 1);

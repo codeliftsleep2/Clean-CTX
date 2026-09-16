@@ -59,6 +59,7 @@ pub fn extract_testing_semantic_edge(class_source: &str) -> Option<SemanticEdge>
         subject: EntityRef::new("dotnet", "TestClass", class_name),
         object: EntityRef::new("dotnet", "Class", sut),
         layer: "dotnet",
+        call_evidence: None,
     })
 }
 

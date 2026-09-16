@@ -108,6 +108,7 @@ impl MetaLayer for BuiltinMetaLayer {
                 subject: entity.clone(),
                 object: entity,
                 layer: "builtin",
+                call_evidence: None,
             });
         }
         edges

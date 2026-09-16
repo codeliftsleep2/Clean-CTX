@@ -37,6 +37,7 @@ pub fn extract_dotnet_semantic_edges(
                 subject: controller.clone(),
                 object: EntityRef::new("dotnet", "Route", &route),
                 layer: "dotnet",
+                call_evidence: None,
             });
         }
 
@@ -49,6 +50,7 @@ pub fn extract_dotnet_semantic_edges(
                     subject: controller.clone(),
                     object: EntityRef::new("dotnet", "Action", method_name),
                     layer: "dotnet",
+                    call_evidence: None,
                 });
             }
         }
@@ -65,6 +67,7 @@ pub fn extract_dotnet_semantic_edges(
                 subject: dbcontext.clone(),
                 object: EntityRef::new("dotnet", "Entity", entity_name),
                 layer: "dotnet",
+                call_evidence: None,
             });
         }
     }
@@ -80,12 +83,14 @@ pub fn extract_dotnet_semantic_edges(
                 subject: profile.clone(),
                 object: EntityRef::new("dotnet", "Entity", source),
                 layer: "dotnet",
+                call_evidence: None,
             });
             edges.push(SemanticEdge {
                 relation: SemanticRelation::MapsTo,
                 subject: profile.clone(),
                 object: EntityRef::new("dotnet", "Entity", dest),
                 layer: "dotnet",
+                call_evidence: None,
             });
         }
     }
@@ -101,6 +106,7 @@ pub fn extract_dotnet_semantic_edges(
                 subject: hub.clone(),
                 object: EntityRef::new("dotnet", "HubMethod", method_name),
                 layer: "dotnet",
+                call_evidence: None,
             });
         }
     }

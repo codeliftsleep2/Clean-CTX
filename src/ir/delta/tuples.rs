@@ -1,0 +1,142 @@
+// src/ir/delta/tuples.rs
+//
+// Tuple-key helpers for external consumers (state replay, etc.): the
+// `Vec<String>` wire-tuple equivalents of the `CoreOp`-based primary-key and
+// key-tuple extraction.
+//
+// Split out of `src/ir/delta.rs` (active-file size policy): the module had
+// exceeded the 615-line ceiling. This is a pure relocation -- the code below
+// is byte-for-byte the previous implementation, and `delta` re-exports both
+// helpers so `crate::ir::delta::{primary_key_from_tuple, key_tuple_from_tuple}`
+// keeps resolving.
+
+// ── Public helpers for external consumers (replay, etc.) ─────────
+
+/// Extract the primary key from an instruction tuple (Vec<String>).
+/// Used by state replay to match instructions by key.
+pub fn primary_key_from_tuple(tuple: &[String]) -> String {
+    if tuple.is_empty() {
+        return String::new();
+    }
+    match tuple[0].as_str() {
+        "DEF_C" => format!("DEF_C:{}", tuple.get(1).unwrap_or(&String::new())),
+        "DEF_M" => format!(
+            "DEF_M:{}:{}",
+            tuple.get(1).unwrap_or(&String::new()),
+            tuple.get(2).unwrap_or(&String::new())
+        ),
+        "DEF_F" => format!(
+            "DEF_F:{}:{}",
+            tuple.get(1).unwrap_or(&String::new()),
+            tuple.get(2).unwrap_or(&String::new())
+        ),
+        "DEF_I" => format!("DEF_I:{}", tuple.get(1).unwrap_or(&String::new())),
+        "SIG" => format!(
+            "SIG:{}:{}",
+            tuple.get(1).unwrap_or(&String::new()),
+            tuple.get(2).unwrap_or(&String::new())
+        ),
+        "RET" => format!("RET:{}", tuple.get(1).unwrap_or(&String::new())),
+        "FIELD_T" => format!("FIELD_T:{}", tuple.get(1).unwrap_or(&String::new())),
+        "FLAGS" => format!("FLAGS:{}", tuple.get(1).unwrap_or(&String::new())),
+        "FLAGS_C" => format!("FLAGS_C:{}", tuple.get(1).unwrap_or(&String::new())),
+        "EXT" => format!("EXT:{}", tuple.get(1).unwrap_or(&String::new())),
+        "IMPL" => format!(
+            "IMPL:{}:{}",
+            tuple.get(1).unwrap_or(&String::new()),
+            tuple.get(2).unwrap_or(&String::new())
+        ),
+        "INJECTS" => format!("INJECTS:{}", tuple.get(1).unwrap_or(&String::new())),
+        "IMP" => format!("IMP:{}", tuple.get(1).unwrap_or(&String::new())),
+        "TYPE" => format!("TYPE:{}", tuple.get(1).unwrap_or(&String::new())),
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => format!("BODY:{}", tuple.get(1).unwrap_or(&String::new())),
+        // R-43a: Execution Semantics
+        "DATAFLOW" => format!("DATAFLOW:{}", tuple.get(1).unwrap_or(&String::new())),
+        "CTRL" => format!("CTRL:{}", tuple.get(1).unwrap_or(&String::new())),
+        "EFFECT" => format!("EFFECT:{}", tuple.get(1).unwrap_or(&String::new())),
+        "CTX" => format!("CTX:{}", tuple.get(1).unwrap_or(&String::new())),
+        // Structural invocations (native call graph): explicit arm so a
+        // known opcode never reaches the unknown-opcode fallback (which
+        // warns in debug builds). Identity is the full call triple.
+        "CALL" => format!(
+            "CALL:{}:{}:{}",
+            tuple.get(1).unwrap_or(&String::new()),
+            tuple.get(2).unwrap_or(&String::new()),
+            tuple.get(3).unwrap_or(&String::new())
+        ),
+        _ => {
+            // F-16: Unknown opcode — fallback produces a key from the full tuple.
+            if cfg!(debug_assertions) {
+                eprintln!(
+                    "[warn] primary_key_from_tuple: unknown opcode '{}'",
+                    tuple[0]
+                );
+            }
+            tuple.join(":")
+        }
+    }
+}
+
+/// Extract the key tuple from an instruction tuple (Vec<String>).
+/// Returns the opcode + identifying operands.
+pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
+    if tuple.is_empty() {
+        return Vec::new();
+    }
+    match tuple[0].as_str() {
+        "DEF_C" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "DEF_M" => vec![
+            tuple[0].clone(),
+            tuple.get(1).cloned().unwrap_or_default(),
+            tuple.get(2).cloned().unwrap_or_default(),
+        ],
+        "DEF_F" => vec![
+            tuple[0].clone(),
+            tuple.get(1).cloned().unwrap_or_default(),
+            tuple.get(2).cloned().unwrap_or_default(),
+        ],
+        "DEF_I" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "SIG" => vec![
+            tuple[0].clone(),
+            tuple.get(1).cloned().unwrap_or_default(),
+            tuple.get(2).cloned().unwrap_or_default(),
+        ],
+        "RET" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "FIELD_T" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "FLAGS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "FLAGS_C" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "EXT" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "IMPL" => vec![
+            tuple[0].clone(),
+            tuple.get(1).cloned().unwrap_or_default(),
+            tuple.get(2).cloned().unwrap_or_default(),
+        ],
+        "INJECTS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "IMP" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "TYPE" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        // Edit Mode: Verbatim Method Bodies
+        "BODY" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        // R-43a: Execution Semantics
+        "DATAFLOW" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "CTRL" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "EFFECT" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "CTX" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        // Structural invocations (native call graph): explicit arm so a
+        // known opcode never reaches the unknown-opcode fallback. The key
+        // keeps all three identifying operands (caller, callee, arity).
+        "CALL" => vec![
+            tuple[0].clone(),
+            tuple.get(1).cloned().unwrap_or_default(),
+            tuple.get(2).cloned().unwrap_or_default(),
+            tuple.get(3).cloned().unwrap_or_default(),
+        ],
+        _ => {
+            // F-17: Unknown opcode — fallback returns the full instruction body.
+            if cfg!(debug_assertions) {
+                eprintln!("[warn] key_tuple_from_tuple: unknown opcode '{}'", tuple[0]);
+            }
+            tuple.to_vec()
+        }
+    }
+}

@@ -25,6 +25,7 @@ pub fn inject_edge(component: &str, service: &str, file: Option<&str>) -> Semant
         subject: subj,
         object: obj,
         layer: "angular",
+        call_evidence: None,
     }
 }
 
@@ -35,6 +36,7 @@ pub fn route_edge(path: &str, component: &str) -> SemanticEdge {
         subject: EntityRef::new("angular", "Route", path),
         object: EntityRef::new("angular", "Component", component),
         layer: "angular",
+        call_evidence: None,
     }
 }
 
@@ -45,6 +47,7 @@ pub fn controller_action_edge(controller: &str, action: &str) -> SemanticEdge {
         subject: EntityRef::new("dotnet", "Controller", controller),
         object: EntityRef::new("dotnet", "Action", action),
         layer: "dotnet",
+        call_evidence: None,
     }
 }
 
@@ -55,6 +58,7 @@ pub fn has_route_edge(controller: &str, route: &str) -> SemanticEdge {
         subject: EntityRef::new("dotnet", "Controller", controller),
         object: EntityRef::new("dotnet", "Route", route),
         layer: "dotnet",
+        call_evidence: None,
     }
 }
 
@@ -65,6 +69,7 @@ pub fn imports_module_edge(from: &str, to: &str) -> SemanticEdge {
         subject: EntityRef::new("angular", "Module", from),
         object: EntityRef::new("angular", "Module", to),
         layer: "angular",
+        call_evidence: None,
     }
 }
 
@@ -75,6 +80,7 @@ pub fn handles_action_edge(effect: &str, action: &str) -> SemanticEdge {
         subject: EntityRef::new("ngrx", "Effect", effect),
         object: EntityRef::new("ngrx", "Action", action),
         layer: "ngrx",
+        call_evidence: None,
     }
 }
 
@@ -85,6 +91,7 @@ pub fn config_props_edge(config: &str, prefix: &str) -> SemanticEdge {
         subject: EntityRef::new("spring", "Configuration", config),
         object: EntityRef::new("spring", "Properties", prefix),
         layer: "spring",
+        call_evidence: None,
     }
 }
 

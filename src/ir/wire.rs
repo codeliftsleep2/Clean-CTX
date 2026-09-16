@@ -128,6 +128,12 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
         CoreOp::ExecutionContext(mid, context_type) => {
             vec!["CTX".into(), mid.clone(), context_type.clone()]
         }
+        CoreOp::Call(caller, callee, argc) => vec![
+            "CALL".into(),
+            caller.clone(),
+            callee.clone(),
+            argc.to_string(),
+        ],
     }
 }
 
@@ -314,6 +320,20 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
         "CTX" => {
             if tuple.len() >= 3 {
                 Some(CoreOp::ExecutionContext(tuple[1].clone(), tuple[2].clone()))
+            } else {
+                None
+            }
+        }
+        "CALL" => {
+            if tuple.len() >= 4 {
+                // The argument count is a typed operand on the op. A tuple
+                // whose count field is not a decimal number is malformed
+                // (not merely short), so it decodes to None like any other
+                // unrepresentable tuple.
+                tuple[3]
+                    .parse::<usize>()
+                    .ok()
+                    .map(|argc| CoreOp::Call(tuple[1].clone(), tuple[2].clone(), argc))
             } else {
                 None
             }

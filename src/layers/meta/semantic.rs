@@ -156,6 +156,26 @@ pub enum SemanticRelation {
     Calls,
 }
 
+/// Call-specific evidence carried by a `Calls` semantic edge.
+///
+/// Arity is EDGE EVIDENCE, never entity identity: it participates in edge
+/// occurrence identity (`WorkspaceIndex`) but never in `EntityKey`, and it is
+/// never encoded into an entity name. The explicit argument count is what the
+/// call site actually wrote — extension-method receivers are excluded and
+/// optional/`params` compatibility is not evaluated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
+pub struct CallEvidence {
+    /// Number of arguments written at the call site.
+    pub explicit_arg_count: usize,
+}
+
+impl CallEvidence {
+    /// Build call evidence from an observed explicit argument count.
+    pub fn new(explicit_arg_count: usize) -> Self {
+        Self { explicit_arg_count }
+    }
+}
+
 /// A structured semantic relationship between two entities.
 ///
 /// Semantic edges are structural facts discovered by meta-layer parsing:
@@ -173,6 +193,15 @@ pub struct SemanticEdge {
     pub object: EntityRef,
     /// Provenance layer (e.g. "angular", "ngrx", "dotnet", "spring").
     pub layer: &'static str,
+    /// Optional relation-specific evidence. `None` for every relation that
+    /// carries none (all framework relations today); `Some` for
+    /// `SemanticRelation::Calls`, whose occurrence identity additionally
+    /// depends on the observed argument count.
+    ///
+    /// Skipped when absent so the serialized shape of existing (non-call)
+    /// edges is unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub call_evidence: Option<CallEvidence>,
 }
 
 #[cfg(test)]

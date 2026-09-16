@@ -9,6 +9,7 @@ fn registration(entity_type: &'static str, name: &str) -> SemanticEdge {
         subject: EntityRef::new("test", entity_type, name),
         object: EntityRef::new("test", entity_type, name),
         layer: "test",
+        call_evidence: None,
     }
 }
 
@@ -18,6 +19,7 @@ fn dependency(subject: &str, object: &str) -> SemanticEdge {
         subject: EntityRef::new("test", "Node", subject),
         object: EntityRef::new("test", "Node", object),
         layer: "test",
+        call_evidence: None,
     }
 }
 
