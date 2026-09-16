@@ -303,6 +303,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### WSC-003 Hydration Discovery Is Session-State Work
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Discovery is the expensive half of hydration: a CBM project search (including its lazy-reindex gate) or a full filesystem walk-and-read of a root. Compilation was already deduplicated by `WorkspaceIndex::file_map()`; discovery must be deduplicated too, or every repeated identical query pays the full discovery cost again only to discard the same candidates as already compiled. |
+| **Invariant** | Within one session/workspace state, when discovery for the same semantic target, discovery scope (provider + canonical root identity), discovery mode (`Declaration` for `find_entities` / `forward_edges` / `transitive_dependencies`, `InboundReference` for `reverse_edges`), and workspace generation has already completed **successfully**, that discovery MUST NOT be repeated until the scope's generation changes. Only successful discovery is recorded — including a successful discovery that found zero candidates; failed, partial, still-indexing, and CBM-unavailable discovery are never recorded and remain retryable. Recorded state is completion only: no candidates, entities, edges, or query answers are cached, and every `workspace_query` answer is still evaluated against the live `WorkspaceIndex`. Each scope (CBM project or filesystem root) is invalidated independently, and the provider is part of the scope identity so a CBM result never suppresses the filesystem fallback for the same root. |
+| **Enforcement** | `src/mcp/discovery_cache.rs` (generation-based scope/entry model; unit regressions in `src/tests/mcp/discovery_cache.rs`); `src/mcp/tool_handlers/hydration/cache.rs` (the single check/mark boundary) and `src/mcp/tool_handlers/hydration/invalidation.rs` + `src/mcp/tool_handlers/edit.rs` (`apply_edit`) + `src/cbm/proxy.rs` (`index_repository`) + `src/mcp/state/source_cache.rs` (source-cache mtime/size staleness invalidates the whole cache); `src/tests/mcp/workspace_query_8.rs` RED-H1…RED-H10 (counted discovery invocations through the cfg(test) project-search injection); `src/tests/mcp/workspace_query_9.rs` RED-FS1…RED-FS5 (thread-local `scan` invocation counter plus `TraversalStats` file counts). |
+| **Authority** | `src/mcp/discovery_cache.rs`, `src/mcp/tool_handlers/hydration.rs`, `src/mcp/tool_handlers/hydration/cache.rs`, `src/mcp/tool_handlers/hydration/invalidation.rs`, `src/mcp/tool_handlers/hydration/filesystem.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
+
 ### ANG-DI-001 Angular Constructor Injection Is Modifier- and Formatting-Independent
 
 | Property | Value |

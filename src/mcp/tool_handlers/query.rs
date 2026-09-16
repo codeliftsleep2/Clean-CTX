@@ -519,3 +519,11 @@ mod tests_filesystem_hydration;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_7.rs"]
 mod tests_filesystem_safety;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_8.rs"]
+mod tests_hydration_discovery_cache;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_9.rs"]
+mod tests_filesystem_discovery_cache;

@@ -55,6 +55,28 @@ pub(crate) fn last_test_traversal_stats() -> TraversalStats {
     TEST_TRAVERSAL_STATS.get()
 }
 
+// Test-only: number of `scan` invocations on this thread.
+//
+// Structural discovery-cost instrumentation. `TraversalStats` describes the
+// last scan only, so it cannot tell "the scan did not run" from "the scan ran
+// and read nothing". The discovery-cache regressions assert on this counter
+// instead of wall-clock timing. Thread-local so that concurrently running test
+// binaries cannot perturb an assertion.
+#[cfg(all(test, feature = "rust"))]
+thread_local! {
+    static TEST_SCAN_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(all(test, feature = "rust"))]
+pub(crate) fn test_scan_calls() -> usize {
+    TEST_SCAN_CALLS.get()
+}
+
+#[cfg(all(test, feature = "rust"))]
+pub(crate) fn reset_test_scan_calls() {
+    TEST_SCAN_CALLS.set(0);
+}
+
 pub(super) fn configured_roots(state: &McpState, workspace_root: Option<&str>) -> Vec<PathBuf> {
     let primary = workspace_root
         .map(PathBuf::from)
@@ -88,6 +110,8 @@ pub(super) fn root_key(root: &Path) -> String {
 }
 
 pub(super) fn scan(state: &McpState, roots: &[PathBuf], query_name: &str) -> FilesystemScan {
+    #[cfg(all(test, feature = "rust"))]
+    TEST_SCAN_CALLS.set(TEST_SCAN_CALLS.get() + 1);
     #[cfg(all(test, feature = "rust"))]
     let total_started = std::time::Instant::now();
     #[cfg(all(test, feature = "rust"))]

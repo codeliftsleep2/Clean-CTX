@@ -95,4 +95,6 @@ mcp__clean-ctx__cbm_proxy(cbm_tool: "trace_path", parameters: { function_name: "
 
 **After external edits** (host write tool, shell, git operation): Clean-CTX cannot observe the mutation. Use `cbm_proxy(cbm_tool: "index_repository", parameters: { repo_path, mode: "fast" })` explicitly if graph freshness is required.
 
+**Repeated identical `workspace_query` calls** (same query type, entity name, workspace root, and unchanged workspace) are answered from the live `WorkspaceIndex` without re-running CBM or filesystem discovery: discovery completion is remembered per project/root for the current workspace generation. Only the *discovery* step is skipped — every answer is still evaluated against the live index. `apply_edit`, an external modification the session re-reads, and an explicit `index_repository` refresh each invalidate the affected root, so the next query rediscovers. This is why `index_repository` is the supported way to force rediscovery after an external edit.
+
 **Before completing any task, verify:** every code file used `provide_code_context`, every CBM query used `cbm_proxy`, and `Read` was only used for non-code files or after `provide_code_context` failed.

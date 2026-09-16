@@ -25,12 +25,18 @@ use crate::layers::LayerRegistry;
 use crate::mcp::buffered_store::BufferedStore;
 use crate::mcp::cache_hints::CacheMetrics;
 use crate::mcp::context_store::InMemoryContextStore;
+use crate::mcp::discovery_cache::HydrationDiscoveryCache;
 use crate::mcp::session_stats::SessionStats;
 use crate::mcp::sqlite_store::SqliteStore;
+use crate::mcp::state::source_cache::CacheEntry;
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use std::sync::{Mutex, RwLock};
-use std::time::SystemTime;
+
+// The session's shared file-content cache and its read boundary
+// (`CacheEntry`, `source_cache` reads, metadata-based invalidation), split
+// out of this file into one semantic module when `hydration_discovery` was
+// added below.
+mod source_cache;
 
 /// P1-5: Lock recovery macro — replaces 20+ identical 4-line match patterns.
 ///
@@ -80,18 +86,6 @@ macro_rules! lock_or_recover {
 pub struct CbmFilterState {
     /// Symbol names to skip, keyed by file path.
     pub skip_sets: HashMap<String, HashSet<String>>,
-}
-
-/// P0-3: Cache entry with metadata for invalidation.
-///
-/// Tracks file modification time and size to detect when a cached
-/// file has changed on disk. This prevents serving stale content
-/// after the user edits a file.
-#[derive(Debug, Clone)]
-pub struct CacheEntry {
-    content: Arc<String>,
-    mtime: SystemTime,
-    size: u64,
 }
 
 /// Per-session state shared by all MCP tool handlers.
@@ -197,6 +191,19 @@ pub struct McpState {
     /// MetaLayerPass extraction.
     pub workspace_index: RwLock<crate::workspace::index::WorkspaceIndex>,
 
+    /// Session-scoped hydration discovery completion cache.
+    ///
+    /// Records which `workspace_query` hydration discovery targets have
+    /// already been searched for a project/root under the current workspace
+    /// generation, so a repeated query does not re-run the CBM project search
+    /// or the filesystem fallback scan. It stores no candidates, entities,
+    /// edges, or query answers — the WorkspaceIndex above remains the single
+    /// authority for query evaluation. See `crate::mcp::discovery_cache`.
+    ///
+    /// Crate-visible with its type: this is session-internal state, not part of
+    /// the crate's public API surface.
+    pub(crate) hydration_discovery: Mutex<HydrationDiscoveryCache>,
+
     /// Phase 2: Proxy port for fetching tool-filtering and cache stats.
     /// Defaults to 8787 (the proxy's default port).
     pub proxy_port: u16,
@@ -287,6 +294,7 @@ impl McpState {
             emitted_breakpoints: Mutex::new(HashSet::new()),
             cache_metrics: Mutex::new(CacheMetrics::default()),
             workspace_index: RwLock::new(crate::workspace::index::WorkspaceIndex::new()),
+            hydration_discovery: Mutex::new(HydrationDiscoveryCache::new()),
             cbm_filter: Mutex::new(CbmFilterState::default()),
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,
@@ -506,13 +514,31 @@ impl McpState {
         g.file_version(path_alias)
     }
 
-    /// Drop the cached source snapshot for `path` so the next
-    /// `read_source` re-reads from disk (apply_edit Phase 3: called after
-    /// a successful commit so session reads observe the new bytes even
-    /// when mtime/size granularity hides the change).
-    pub fn invalidate_source_cache(&self, path: &str) {
-        let cache_key = Self::resolve_cache_key(path);
-        lock_or_recover!(self.source_cache.lock(), "source_cache").remove(&cache_key);
+    /// Lock the hydration discovery cache (session-scoped record of
+    /// *completed hydration discovery*).
+    ///
+    /// `workspace_index_read` answers "what is compiled"; this cache answers
+    /// "what has already been searched" for one (project/root, discovery mode,
+    /// entity name) under the current workspace generation — see
+    /// `crate::mcp::discovery_cache`. The guard is held only for the
+    /// check/mark itself, never across CBM calls, filesystem scans, source
+    /// reads, or compilation.
+    ///
+    /// Crate-visible with its type: session-internal state, not public API.
+    pub(crate) fn hydration_discovery_lock(
+        &self,
+    ) -> std::sync::MutexGuard<'_, HydrationDiscoveryCache> {
+        lock_or_recover!(self.hydration_discovery.lock(), "hydration_discovery")
+    }
+
+    /// Drop every completed hydration discovery record.
+    ///
+    /// Used when a workspace change cannot be attributed to one configured
+    /// root (an externally modified file detected through the source-cache
+    /// mtime/size path). Scope-specific invalidation goes through
+    /// `invalidate_root` on the guard instead.
+    pub(crate) fn invalidate_hydration_discovery_all(&self) {
+        self.hydration_discovery_lock().invalidate_all();
     }
 
     /// Access CBM filter skip set for a file (thread-safe convenience method).
@@ -542,160 +568,4 @@ impl McpState {
     pub fn drain_warnings(&self) -> Vec<String> {
         std::mem::take(&mut *lock_or_recover!(self.warnings.lock(), "warnings"))
     }
-
-    /// Resolve a cache key for `source_cache`. On Windows, `canonicalize`
-    /// on TempDir paths can trigger Defender deep-scan hooks (10-30s per
-    /// call). We skip canonicalize when the path has no relative components,
-    /// falling back to the raw string as the key.
-    ///
-    /// P3-18: Uses `Path::components()` for robust detection of relative
-    /// path components instead of simple string contains(), which could
-    /// miss edge cases on Windows with mixed path separators
-    /// (e.g., "C:\foo\.\bar" or "C:\foo\..\bar").
-    fn resolve_cache_key(path: &str) -> String {
-        use std::path::{Component, Path};
-        let p = Path::new(path);
-
-        // Fast path: check if path is absolute and has no relative components
-        // using the robust Path::components() iterator instead of string contains().
-        if p.is_absolute()
-            && p.components().all(|c| {
-                matches!(
-                    c,
-                    Component::Normal(_) | Component::RootDir | Component::Prefix(_)
-                )
-            })
-        {
-            #[cfg(debug_assertions)]
-            eprintln!("[resolve_cache_key] FAST PATH: {}", path);
-            return path.to_string();
-        }
-        #[cfg(debug_assertions)]
-        eprintln!("[resolve_cache_key] SLOW PATH (canonicalize): {}", path);
-        #[cfg(debug_assertions)]
-        let canon_start = std::time::Instant::now();
-        let result = p
-            .canonicalize()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| path.to_string());
-        #[cfg(debug_assertions)]
-        eprintln!(
-            "[resolve_cache_key] canonicalize took {:?} for {}",
-            canon_start.elapsed(),
-            path
-        );
-        result
-    }
-
-    /// F-FULL-01/F-FULL-05: Read file content, using the shared source cache.
-    /// Returns `Arc<String>` so the cache can be shared across passes
-    /// without cloning the underlying string data.
-    ///
-    /// **Two-phase locking:** The Mutex is held only during cache lookup
-    /// and update, NOT during `read_to_string`. This prevents I/O from
-    /// blocking concurrent readers.
-    ///
-    /// P0-3: Cache entries include mtime and size for invalidation.
-    /// If the file has changed since it was cached, we re-read it.
-    pub fn read_source(&self, path: &str) -> Result<Arc<String>, std::io::Error> {
-        let cache_key = Self::resolve_cache_key(path);
-        #[cfg(debug_assertions)]
-        let overall_start = std::time::Instant::now();
-
-        // Get file metadata for cache invalidation
-        let metadata = std::fs::metadata(path)?;
-        let current_mtime = metadata.modified()?;
-        let current_size = metadata.len();
-
-        // Phase 1: Check cache (brief lock, release before I/O)
-        {
-            #[cfg(debug_assertions)]
-            let lock_start = std::time::Instant::now();
-            let cache = lock_or_recover!(self.source_cache.lock(), "source_cache");
-            #[cfg(debug_assertions)]
-            eprintln!(
-                "[read_source] Phase 1 lock acquire took {:?} for {}",
-                lock_start.elapsed(),
-                path
-            );
-            if let Some(cached) = cache.get(&cache_key) {
-                // P0-3: Check if file has changed using mtime and size
-                if cached.mtime == current_mtime && cached.size == current_size {
-                    #[cfg(debug_assertions)]
-                    eprintln!(
-                        "[read_source] CACHE HIT for {} (total: {:?})",
-                        path,
-                        overall_start.elapsed()
-                    );
-                    return Ok(Arc::clone(&cached.content));
-                }
-                #[cfg(debug_assertions)]
-                eprintln!(
-                    "[read_source] CACHE STALE for {} (mtime/size changed)",
-                    path
-                );
-            }
-            #[cfg(debug_assertions)]
-            eprintln!("[read_source] CACHE MISS for {}", path);
-        }
-
-        // Phase 2: Read file WITHOUT holding the lock
-        #[cfg(debug_assertions)]
-        let io_start = std::time::Instant::now();
-        let content = Arc::new(std::fs::read_to_string(path)?);
-        #[cfg(debug_assertions)]
-        eprintln!(
-            "[read_source] Phase 2 read_to_string took {:?} for {} ({} bytes)",
-            io_start.elapsed(),
-            path,
-            content.len()
-        );
-
-        // Phase 3: Update cache (brief lock, with double-check)
-        #[cfg(debug_assertions)]
-        let lock2_start = std::time::Instant::now();
-        let mut cache = lock_or_recover!(self.source_cache.lock(), "source_cache");
-        #[cfg(debug_assertions)]
-        eprintln!(
-            "[read_source] Phase 3 lock acquire took {:?} for {}",
-            lock2_start.elapsed(),
-            path
-        );
-
-        // P0-3: Insert or REFRESH the cache entry with current metadata.
-        //
-        // Cache-refresh defect fix (2026-08-25): this previously used
-        // `cache.entry(cache_key).or_insert(...)`, which is a NO-OP
-        // whenever the key already exists — exactly the stale-entry case
-        // Phase 1 just detected. After any external file modification,
-        // the stale entry survived forever: every subsequent read took
-        // the STALE branch and re-read from disk (permanent cache-miss:
-        // stat + full I/O + double lock per read) while pinning the old
-        // content Arc in memory. Plain `insert` overwrites the entry so
-        // the next read converges back to a genuine cache HIT.
-        // Concurrency behavior is unchanged: the map is still mutated
-        // under the single brief Phase-3 lock; outstanding Arc clones
-        // held by other readers remain valid immutable snapshots.
-        cache.insert(
-            cache_key,
-            CacheEntry {
-                content: Arc::clone(&content),
-                mtime: current_mtime,
-                size: current_size,
-            },
-        );
-
-        #[cfg(debug_assertions)]
-        eprintln!(
-            "[read_source] TOTAL for {}: {:?}",
-            path,
-            overall_start.elapsed()
-        );
-
-        Ok(content)
-    }
 }
-
-#[cfg(test)]
-#[path = "../tests/mcp/state.rs"]
-mod tests;

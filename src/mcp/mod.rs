@@ -14,6 +14,7 @@
 pub(crate) mod buffered_store;
 pub(crate) mod cache_hints;
 pub(crate) mod context_store;
+pub(crate) mod discovery_cache;
 pub mod dispatcher;
 mod handlers;
 pub(crate) mod heuristics;

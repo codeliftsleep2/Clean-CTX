@@ -243,6 +243,13 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         }
     }
 
+    // ── Invalidate hydration discovery for the edited root ───────
+    // The edit may have introduced or removed a declaration/consumer that
+    // only a fresh discovery pass can see, so any hydration discovery already
+    // completed for this root in the current generation is no longer valid.
+    // Cheap and unconditional — the next hydration rediscovers.
+    super::hydration::invalidate_discovery_for_edited_path(state, &resolved_path);
+
     // ── Minimal response (plan step 6) ───────────────────────────────
     let mut ops_report: Vec<Value> = report
         .operations

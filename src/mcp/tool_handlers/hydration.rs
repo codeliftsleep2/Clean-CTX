@@ -1,23 +1,49 @@
 // workspace_query semantic hydration support.
+//
+// Responsibilities split across submodules:
+//   cache.rs         — hydration discovery-cache integration (hit/miss/mark)
+//   filesystem.rs    — configured roots + the literal filesystem scan
+//   invalidation.rs  — discovery-cache invalidation entry points
+//   test_support.rs  — test-only discovery instrumentation (cfg(test,rust))
 
 use crate::mcp::McpState;
+use crate::mcp::discovery_cache::{DiscoveryMode, DiscoveryScope};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+mod cache;
+use cache::{
+    discovery_is_complete, mark_discovery_complete, mark_discovery_complete_for_roots,
+    pending_discovery_roots,
+};
+
 mod filesystem;
 use filesystem::{configured_roots, deduplicate_roots, root_key, scan};
 
+mod invalidation;
+pub(crate) use invalidation::{
+    invalidate_discovery_for_edited_path, invalidate_discovery_for_root,
+};
+
 #[cfg(all(test, feature = "rust"))]
-pub(crate) use filesystem::{TraversalStats, last_test_traversal_stats};
+pub(crate) use filesystem::{
+    TraversalStats, last_test_traversal_stats, reset_test_scan_calls, test_scan_calls,
+};
 
 #[cfg(all(test, feature = "rust"))]
 use crate::cbm::GraphNode;
+
+// Test-only discovery instrumentation (project-search injection, traversal
+// counters). Kept in its own module so this file stays inside the active-file
+// ceiling; every name the regressions import from
+// `crate::mcp::tool_handlers::hydration` is re-exported here unchanged.
 #[cfg(all(test, feature = "rust"))]
-use std::collections::HashMap;
+mod test_support;
+
 #[cfg(all(test, feature = "rust"))]
-use std::sync::Mutex;
+pub(crate) use test_support::*;
 
 const HYDRATION_MAX_PROJECT_COVERAGE: usize = 16;
 
@@ -43,127 +69,6 @@ pub(super) struct ProjectCoverage {
     readiness: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<&'static str>,
-}
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) static TEST_HYDRATION_CANDIDATES: Mutex<Option<Vec<String>>> = Mutex::new(None);
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) static TEST_PROJECT_HYDRATION_SERIALIZE: Mutex<()> = Mutex::new(());
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) type TestProjectSearchResult = Result<Vec<GraphNode>, String>;
-
-#[cfg(all(test, feature = "rust"))]
-#[derive(Clone, Copy)]
-pub(crate) enum TestProjectReadiness {
-    Ready,
-    StillIndexing,
-    Failed,
-    Unavailable,
-}
-
-#[cfg(all(test, feature = "rust"))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum TestDiscoveryKind {
-    Declaration,
-    InboundReference,
-}
-
-#[cfg(all(test, feature = "rust"))]
-struct TestProjectSearchConfig {
-    owner: std::thread::ThreadId,
-    results: HashMap<String, TestProjectSearchResult>,
-    inbound_results: HashMap<String, TestProjectSearchResult>,
-    readiness: HashMap<String, TestProjectReadiness>,
-}
-
-#[cfg(all(test, feature = "rust"))]
-static TEST_PROJECT_SEARCH_RESULTS: Mutex<Option<TestProjectSearchConfig>> = Mutex::new(None);
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) static TEST_SEARCHED_PROJECTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
-
-#[cfg(all(test, feature = "rust"))]
-static TEST_DISCOVERY_CALLS: Mutex<Vec<(String, TestDiscoveryKind)>> = Mutex::new(Vec::new());
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) fn set_test_project_search_results(results: HashMap<String, TestProjectSearchResult>) {
-    *TEST_PROJECT_SEARCH_RESULTS
-        .lock()
-        .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned") = Some(TestProjectSearchConfig {
-        owner: std::thread::current().id(),
-        results,
-        inbound_results: HashMap::new(),
-        readiness: HashMap::new(),
-    });
-    TEST_SEARCHED_PROJECTS
-        .lock()
-        .expect("TEST_SEARCHED_PROJECTS lock poisoned")
-        .clear();
-    TEST_DISCOVERY_CALLS
-        .lock()
-        .expect("TEST_DISCOVERY_CALLS lock poisoned")
-        .clear();
-}
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) fn set_test_inbound_project_search_results(
-    results: HashMap<String, TestProjectSearchResult>,
-) {
-    TEST_PROJECT_SEARCH_RESULTS
-        .lock()
-        .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned")
-        .as_mut()
-        .expect("project search results configured first")
-        .inbound_results = results;
-}
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) fn set_test_project_readiness(readiness: HashMap<String, TestProjectReadiness>) {
-    TEST_PROJECT_SEARCH_RESULTS
-        .lock()
-        .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned")
-        .as_mut()
-        .expect("project search results configured first")
-        .readiness = readiness;
-}
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) fn clear_test_project_search_results() {
-    *TEST_PROJECT_SEARCH_RESULTS
-        .lock()
-        .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned") = None;
-    TEST_SEARCHED_PROJECTS
-        .lock()
-        .expect("TEST_SEARCHED_PROJECTS lock poisoned")
-        .clear();
-    TEST_DISCOVERY_CALLS
-        .lock()
-        .expect("TEST_DISCOVERY_CALLS lock poisoned")
-        .clear();
-}
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) fn searched_projects() -> Vec<String> {
-    TEST_SEARCHED_PROJECTS
-        .lock()
-        .expect("TEST_SEARCHED_PROJECTS lock poisoned")
-        .clone()
-}
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) fn discovery_calls() -> Vec<(String, TestDiscoveryKind)> {
-    TEST_DISCOVERY_CALLS
-        .lock()
-        .expect("TEST_DISCOVERY_CALLS lock poisoned")
-        .clone()
-}
-
-#[derive(Clone, Copy)]
-enum DiscoveryKind {
-    Declaration,
-    InboundReference,
 }
 
 struct DiscoveryOutcome {
@@ -217,16 +122,25 @@ pub(super) fn hydrate_workspace_index(
     }
 }
 
-fn discovery_kind(query_type: &str) -> DiscoveryKind {
+/// Map a `workspace_query` type to the discovery operation hydration must run.
+///
+/// Discovery-mode equivalence classes (one shared discovery cache entry per
+/// project/root + name, because the underlying discovery operation is
+/// identical):
+///   - `find_entities`, `forward_edges`, `transitive_dependencies`
+///     → `DiscoveryMode::Declaration` (name/declaration search)
+///   - `reverse_edges` → `DiscoveryMode::InboundReference`
+///     (`MATCH (caller)-[r]->(target)`)
+fn discovery_kind(query_type: &str) -> DiscoveryMode {
     match query_type {
-        "reverse_edges" => DiscoveryKind::InboundReference,
-        _ => DiscoveryKind::Declaration,
+        "reverse_edges" => DiscoveryMode::InboundReference,
+        _ => DiscoveryMode::Declaration,
     }
 }
 
 fn discover_candidate_paths(
     state: &McpState,
-    discovery: DiscoveryKind,
+    discovery: DiscoveryMode,
     query_name: &str,
     workspace_root: Option<&str>,
 ) -> DiscoveryOutcome {
@@ -254,7 +168,13 @@ fn discover_candidate_paths(
     let mut bridge_guard = state.graph_bridge_lock();
     let Some(bridge) = bridge_guard.as_mut() else {
         drop(bridge_guard);
-        return filesystem_only_discovery(state, filesystem_roots, query_name, "cbm_unavailable");
+        return filesystem_only_discovery(
+            state,
+            discovery,
+            filesystem_roots,
+            query_name,
+            "cbm_unavailable",
+        );
     };
     let projects = bridge.configured_projects();
     let mut candidates = Vec::new();
@@ -279,6 +199,29 @@ fn discover_candidate_paths(
     }
 
     for (project, root) in projects {
+        let scope = DiscoveryScope::cbm(root_key(&root));
+        // Discovery completion gate (see `crate::mcp::discovery_cache`).
+        //
+        // A successful discovery for this project/mode/name is not repeated
+        // while the project's discovery generation is unchanged: every
+        // candidate it found was compiled into the WorkspaceIndex by the
+        // hydration that completed it, so this generation is already hydrated
+        // for this target. Skipping here also skips `ensure_indexed_for` — the
+        // only in-session producer of CBM dirty state is `apply_edit`, which
+        // invalidates this scope, and every other CBM consumer resolves its
+        // own indexing gate.
+        if discovery_is_complete(state, &scope, discovery, query_name) {
+            cbm_attempted = true;
+            successful_roots.insert(root_key(&root));
+            coverage.push(ProjectCoverage {
+                project,
+                status: "searched",
+                readiness: Some("ready"),
+                reason: None,
+            });
+            continue;
+        }
+
         #[cfg(all(test, feature = "rust"))]
         if let Some(readiness) = test_project_readiness(&project) {
             let readiness = match readiness {
@@ -310,6 +253,13 @@ fn discover_candidate_paths(
                         readiness: Some(readiness),
                         reason: None,
                     });
+                    // Only a *completed* discovery is recorded: a project that
+                    // is still indexing, or that has not yet finished, may
+                    // return an incomplete candidate set and must stay
+                    // retryable instead of being cached as "searched".
+                    if readiness == "ready" {
+                        mark_discovery_complete(state, &scope, discovery, query_name);
+                    }
                 }
                 Err(_) => {
                     saw_search_failure = true;
@@ -343,10 +293,10 @@ fn discover_candidate_paths(
         };
         cbm_attempted = true;
         let discovered = match discovery {
-            DiscoveryKind::Declaration => bridge
+            DiscoveryMode::Declaration => bridge
                 .search_in_project(&project, query_name)
                 .map(|nodes| nodes.into_iter().map(|node| node.file).collect()),
-            DiscoveryKind::InboundReference => {
+            DiscoveryMode::InboundReference => {
                 bridge.inbound_reference_paths_in_project(&project, query_name)
             }
         };
@@ -360,6 +310,12 @@ fn discover_candidate_paths(
                     readiness: Some(readiness),
                     reason: None,
                 });
+                // Successful discovery only — including discovery that found
+                // zero candidates. Failed or not-yet-ready discovery is never
+                // recorded, so it stays eligible for retry.
+                if readiness == "ready" {
+                    mark_discovery_complete(state, &scope, discovery, query_name);
+                }
             }
             Err(_) => {
                 saw_search_failure = true;
@@ -382,18 +338,13 @@ fn discover_candidate_paths(
     }
     deduplicate_roots(&mut fallback_roots);
 
-    if fallback_roots.is_empty() {
-        return DiscoveryOutcome {
-            candidates,
-            project_coverage: coverage,
-            provider: "cbm",
-            status: "completed",
-            completed: true,
-            attempted: cbm_attempted,
-            fallback_occurred: false,
-            fallback_reason: None,
-        };
-    }
+    // Filesystem fallback discovery, split into roots that still require a
+    // scan and roots whose discovery already completed for this generation.
+    // A cached root contributes no new candidates (its results were compiled
+    // when it completed) but still counts as covered, so it is neither
+    // re-scanned nor reported as un-covered.
+    let (pending_roots, cached_roots) =
+        pending_discovery_roots(state, discovery, query_name, fallback_roots);
 
     let fallback_reason = match (saw_unavailable, saw_search_failure) {
         (true, true) => "cbm_partial_failure",
@@ -401,11 +352,51 @@ fn discover_candidate_paths(
         (false, true) => "cbm_discovery_failed",
         (false, false) => "cbm_scope_unavailable",
     };
-    let scan = scan(state, &fallback_roots, query_name);
+
+    if pending_roots.is_empty() {
+        if cached_roots == 0 {
+            // No root requires filesystem discovery at all: unchanged CBM-only
+            // outcome.
+            return DiscoveryOutcome {
+                candidates,
+                project_coverage: coverage,
+                provider: "cbm",
+                status: "completed",
+                completed: true,
+                attempted: cbm_attempted,
+                fallback_occurred: false,
+                fallback_reason: None,
+            };
+        }
+        // Every fallback root is already discovered for this generation, so no
+        // scan runs: the previously discovered (and compiled) candidates are
+        // still the complete answer for this target.
+        let any_cbm_success = !successful_roots.is_empty();
+        return DiscoveryOutcome {
+            candidates,
+            project_coverage: coverage,
+            provider: if any_cbm_success {
+                "cbm_and_filesystem"
+            } else {
+                "filesystem"
+            },
+            status: "completed",
+            completed: true,
+            attempted: true,
+            fallback_occurred: true,
+            fallback_reason: Some(fallback_reason),
+        };
+    }
+
+    let scan = scan(state, &pending_roots, query_name);
+    if scan.completed {
+        mark_discovery_complete_for_roots(state, discovery, query_name, &pending_roots);
+    }
     candidates.extend(scan.candidates);
     let any_cbm_success = !successful_roots.is_empty();
-    let attempted = cbm_attempted || scan.attempted;
-    let provider = match (any_cbm_success, scan.attempted) {
+    let attempted = cbm_attempted || scan.attempted || cached_roots > 0;
+    let filesystem_covers = scan.attempted || cached_roots > 0;
+    let provider = match (any_cbm_success, filesystem_covers) {
         (true, true) => "cbm_and_filesystem",
         (true, false) => "cbm",
         (false, true) => "filesystem",
@@ -426,21 +417,57 @@ fn discover_candidate_paths(
 
 fn filesystem_only_discovery(
     state: &McpState,
+    discovery: DiscoveryMode,
     roots: Vec<PathBuf>,
     query_name: &str,
     fallback_reason: &'static str,
 ) -> DiscoveryOutcome {
-    let scan = scan(state, &roots, query_name);
-    let provider = if scan.attempted { "filesystem" } else { "none" };
+    let (pending_roots, cached_roots) =
+        pending_discovery_roots(state, discovery, query_name, roots);
+    if pending_roots.is_empty() {
+        if cached_roots == 0 {
+            // No root was configured (or every root was already unusable):
+            // identical to scanning nothing.
+            return DiscoveryOutcome {
+                candidates: Vec::new(),
+                project_coverage: Vec::new(),
+                provider: "none",
+                status: "failed",
+                completed: false,
+                attempted: false,
+                fallback_occurred: true,
+                fallback_reason: Some("filesystem_unavailable"),
+            };
+        }
+        // Nothing left to scan: every configured root's fallback discovery
+        // already completed for this generation (and its candidates were
+        // compiled then), so the full-repo walk is skipped entirely.
+        return DiscoveryOutcome {
+            candidates: Vec::new(),
+            project_coverage: Vec::new(),
+            provider: "filesystem",
+            status: "completed",
+            completed: true,
+            attempted: true,
+            fallback_occurred: true,
+            fallback_reason: Some(fallback_reason),
+        };
+    }
+    let scan = scan(state, &pending_roots, query_name);
+    if scan.completed {
+        mark_discovery_complete_for_roots(state, discovery, query_name, &pending_roots);
+    }
+    let covered = scan.attempted || cached_roots > 0;
+    let provider = if covered { "filesystem" } else { "none" };
     DiscoveryOutcome {
         candidates: scan.candidates,
         project_coverage: Vec::new(),
         provider,
-        status: discovery_status(scan.attempted, scan.completed, false),
+        status: discovery_status(covered, scan.completed, false),
         completed: scan.completed,
-        attempted: scan.attempted,
+        attempted: covered,
         fallback_occurred: true,
-        fallback_reason: Some(if scan.attempted {
+        fallback_reason: Some(if covered {
             fallback_reason
         } else {
             "filesystem_unavailable"
@@ -531,62 +558,6 @@ pub(crate) fn compile_candidate(
     }
 }
 
-#[cfg(all(test, feature = "rust"))]
-fn test_project_search(project: &str, discovery: DiscoveryKind) -> Option<TestProjectSearchResult> {
-    let results = TEST_PROJECT_SEARCH_RESULTS
-        .lock()
-        .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned");
-    let configured = results.as_ref()?;
-    if configured.owner != std::thread::current().id() {
-        return None;
-    }
-    TEST_SEARCHED_PROJECTS
-        .lock()
-        .expect("TEST_SEARCHED_PROJECTS lock poisoned")
-        .push(project.to_string());
-    let test_discovery = match discovery {
-        DiscoveryKind::Declaration => TestDiscoveryKind::Declaration,
-        DiscoveryKind::InboundReference => TestDiscoveryKind::InboundReference,
-    };
-    TEST_DISCOVERY_CALLS
-        .lock()
-        .expect("TEST_DISCOVERY_CALLS lock poisoned")
-        .push((project.to_string(), test_discovery));
-    let results = match discovery {
-        DiscoveryKind::Declaration => &configured.results,
-        DiscoveryKind::InboundReference => &configured.inbound_results,
-    };
-    Some(
-        results
-            .get(project)
-            .cloned()
-            .unwrap_or_else(|| Ok(Vec::new())),
-    )
-}
-
-#[cfg(all(test, feature = "rust"))]
-fn test_project_readiness(project: &str) -> Option<TestProjectReadiness> {
-    let results = TEST_PROJECT_SEARCH_RESULTS
-        .lock()
-        .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned");
-    let configured = results.as_ref()?;
-    if configured.owner != std::thread::current().id() {
-        return None;
-    }
-    Some(
-        configured
-            .readiness
-            .get(project)
-            .copied()
-            .unwrap_or(TestProjectReadiness::Ready),
-    )
-}
-
-#[cfg(all(test, feature = "rust"))]
-fn has_test_project_search() -> bool {
-    TEST_PROJECT_SEARCH_RESULTS
-        .lock()
-        .expect("TEST_PROJECT_SEARCH_RESULTS lock poisoned")
-        .as_ref()
-        .is_some_and(|configured| configured.owner == std::thread::current().id())
-}
+// Discovery-cache invalidation entry points live in `hydration/invalidation.rs`
+// (called by `apply_edit` and explicit repository reindexing), and the cache
+// integration in `hydration/cache.rs`.
