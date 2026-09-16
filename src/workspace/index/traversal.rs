@@ -51,7 +51,7 @@ impl WorkspaceIndex {
                 .map(|edges| {
                     edges
                         .iter()
-                        .filter_map(|edge| index_map.get(&entity_key(&edge.object)).copied())
+                        .filter_map(|e| index_map.get(&entity_key(&e.edge.object)).copied())
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default()
@@ -93,8 +93,8 @@ impl WorkspaceIndex {
                 .map(|edges| {
                     edges
                         .iter()
-                        .filter(|edge| Self::DEPENDENCY_RELATIONS.contains(&edge.relation))
-                        .filter_map(|edge| index_map.get(&entity_key(&edge.object)).copied())
+                        .filter(|e| Self::DEPENDENCY_RELATIONS.contains(&e.edge.relation))
+                        .filter_map(|e| index_map.get(&entity_key(&e.edge.object)).copied())
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default()

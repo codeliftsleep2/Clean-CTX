@@ -251,6 +251,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### IDX-002 Edge Occurrence Identity Is Source-Occurrence Aware
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Two files may contain occurrences of the same semantic entity identity while asserting distinct edge evidence. The generic WorkspaceIndex edge layer must retain all of that evidence instead of collapsing equivalent-looking edges. |
+| **Invariant** | Semantic entity identity remains `(domain, entity_type, name)` with the file excluded (Model C, unchanged). Edge OCCURRENCE identity is `(asserting source occurrence, relation, subject semantic identity, object semantic identity)`. A repeated extraction of the same triple by the same asserting file produces one indexed occurrence; the same triple asserted by a different file is a distinct occurrence and must never suppress or be suppressed. Consequences: `forward_edges` returns every asserting occurrence's evidence; `reverse_edges` counts every real consumer occurrence; `remove_file` drops exactly the occurrences the removed file asserted and never another file's evidence for the same triple; removal work stays proportional to the affected file (`file_edges`), never to the accumulated workspace. The rule is framework-agnostic — Angular, .NET, Spring, and future semantic layers inherit it, and no semantic layer may compensate for it locally. |
+| **Enforcement** | `src/workspace/index/edges.rs` (`EdgeKey` includes the asserting file; occurrence-aware dedup in `add_edges`), `src/workspace/index/remove.rs` (`remove_file` prunes only `file_edges[file]` occurrences), `src/tests/workspace/index_edge_occurrence.rs` (RED-E1…RED-E5: identity, dedup, unique objects, union, forward/reverse evidence), `src/tests/workspace/index_edge_lifecycle.rs` (RED-E6…RED-E11: removal, recompilation, three-project collision, compile-order independence, unrelated names, dotnet-shaped cross-domain case), `src/tests/workspace/index.rs` (`same_edge_inserted_twice_is_indexed_once`, `edge_occurrence_dedup_preserves_cross_file_evidence`, `counters_reflect_insertion_and_dedup`), `src/tests/workspace/index_queries.rs` (`resolve_selector_unique_despite_cross_file_duplicate_selector`), `src/tests/workspace/index_performance.rs` (file-local removal work unchanged). |
+| **Authority** | `src/workspace/index.rs`, `src/workspace/index/edges.rs`, `src/workspace/index/remove.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
+
 ### WSC-001 Authoritative Facts Do Not Imply Authoritative Coverage
 
 | Property | Value |

@@ -46,6 +46,26 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-016: WorkspaceIndex Collapsed Same-Name Entity Edges Across Files
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-15 |
+| **Environment** | Claude + Clean-CTX (live multi-project Angular workspace) |
+| **Repository/context** | Real multi-project Angular workspace; two unrelated classes sharing the semantic name `LoadingComponent` (one per project), each with its own constructor-injected services and its own selector |
+| **Symptom** | `find_entities("LoadingComponent")` correctly returned both file occurrences and the unique `HasSelector` edges survived, but `forward_edges` returned only one project's `Injects` edges (the other project's overlapping injections disappeared), and `reverse_edges` undercounted the real consumers of the shared services. |
+| **Root cause** | `WorkspaceIndex::EdgeKey` identified an edge by `(relation, subject identity, object identity)` only. Both files asserted the same triple, so the second `add_edges` call hit `edge_set.insert == false` and `continue`d before recording `file_edges`, `forward`, or `reverse` — its evidence never entered the index. `remove_file` then deleted the single shared `edge_set` key and pruned the adjacency indexes by entity-reference provenance, so removing or recompiling one file also destroyed the other file's equivalent evidence. The defect lived in generic edge storage, not in Angular extraction. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes — deterministic `WorkspaceIndex` fixtures; no scale dependency. |
+| **Local regression** | `src/tests/workspace/index_edge_occurrence.rs` (`RED-E1`–`RED-E5`) and `src/tests/workspace/index_edge_lifecycle.rs` (`RED-E6`–`RED-E11`, including the three-project collision, compile-order independence, and a dotnet-shaped cross-domain case); `src/tests/workspace/index.rs` (`same_edge_inserted_twice_is_indexed_once`, `edge_occurrence_dedup_preserves_cross_file_evidence`, `counters_reflect_insertion_and_dedup`); `src/tests/workspace/index_queries.rs` (`resolve_selector_unique_despite_cross_file_duplicate_selector`); `src/tests/workspace/index_performance.rs` (file-local removal work unchanged). |
+| **Live scenario required?** | Yes — re-run the multi-project case: both `LoadingComponent` occurrences keep their complete `Injects` evidence through `forward_edges`, shared-service `reverse_edges` counts both consumers with their file provenance, and removing or recompiling one project leaves the other project's overlapping edges intact. |
+| **Architectural invariant** | `IDX-002` |
+| **Status** | Fixed (live re-verification pending) |
+
+**Resolution:** edge identity is now occurrence-aware. `EdgeKey` in `src/workspace/index/edges.rs` adds the asserting source occurrence to the semantic triple, so a repeated extraction within one file still dedups while the same triple asserted by a different file is retained as its own evidence record; forward/reverse now store `StoredEdge { asserting_file, edge }`. `remove_file` (`src/workspace/index/remove.rs`) is driven solely by `file_edges[file]` and drops exactly the occurrences that file asserted, so removal work stays proportional to the affected file (no whole-index scan). Semantic entity identity is unchanged — `EntityKey = (domain, entity_type, name)` (Model C) — and no semantic layer, `SemanticRelation`, or query contract was modified.
+
+---
+
 ## DIS-2026-015: Angular `Injects` Edges Missed Bare Typed Constructor Parameters
 
 | Field | Value |

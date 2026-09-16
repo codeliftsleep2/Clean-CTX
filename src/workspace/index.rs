@@ -3,19 +3,32 @@
 // WorkspaceIndex — core index structure, insertion, and retrieval.
 //
 // Identity model (approved, Phase 4 investigation):
-//   Entity identity: (domain, entity_type, name) — file excluded.
-//   Edge identity:   (relation, subject identity, object identity) — file excluded.
+//   Entity identity: (domain, entity_type, name) — file excluded. UNCHANGED.
+//   Edge identity:   (asserting source occurrence, relation, subject identity,
+//                     object identity) — file excluded from semantic entity
+//                     identity, retained in edge OCCURRENCE identity.
 //
 // Entity ambiguity:  multiple files may contain the same entity identity.
 //                     All occurrences are stored; never silently overwritten.
 // Occurrence identity: (domain, entity_type, name, file) — within one file an
 //                     identity is registered exactly once, no matter how many
 //                     edges mention it.
-// Edge deduplication: identical edges inserted multiple times produce one
-//                     indexed edge. First occurrence wins.
+// Edge deduplication: an identical triple (relation + subject identity +
+//                     object identity) re-extracted by the SAME asserting file
+//                     produces one indexed occurrence. The same triple asserted
+//                     by a DIFFERENT file is a distinct occurrence and is
+//                     preserved: an edge asserted by one source occurrence must
+//                     never suppress an equivalent-looking edge asserted by a
+//                     different source occurrence.
 // File provenance:   file_id is retained for entity disambiguation.
 // Determinism:       HashMap for O(1) lookup; returned collections are
 //                    sorted for deterministic ordering.
+//
+// Module layout:
+//   index.rs          — key types, index state, entity registration, queries.
+//   index/edges.rs    — edge-occurrence identity and insertion (`add_edges`).
+//   index/remove.rs   — file-local, occurrence-exact removal (`remove_file`).
+//   index/traversal.rs— graph traversal (cycles, transitive dependencies).
 //
 // Registration records: a self-referential `Defines` edge (subject identity
 //                     == object identity) is an entity-registration carrier,
@@ -31,40 +44,26 @@
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::{HashMap, HashSet};
 
+mod edges;
+mod remove;
 mod traversal;
+
+use edges::{EdgeKey, StoredEdge};
 
 // ── Key types ─────────────────────────────────────────────────────────
 
 /// Entity identity key — excludes file (matching EntityRef identity model).
 pub type EntityKey = (String, String, String); // (domain, entity_type, name)
 
-/// Edge identity key — deduplicates by (relation, subject identity, object identity).
-/// File is excluded from edge identity.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct EdgeKey {
-    relation: SemanticRelation,
-    subject_domain: String,
-    subject_type: String,
-    subject_name: String,
-    object_domain: String,
-    object_type: String,
-    object_name: String,
-}
+// Edge occurrence identity — `(asserting source occurrence, relation, subject
+// semantic identity, object semantic identity)` — is defined in `edges.rs` next
+// to `add_edges`, together with the stored wrapper (`StoredEdge`) used by the
+// forward/reverse indexes. The asserting source occurrence is part of EDGE
+// occurrence identity only: `EntityKey` deliberately still excludes the file
+// (Model C).
 
-impl EdgeKey {
-    fn from_edge(edge: &SemanticEdge) -> Self {
-        Self {
-            relation: edge.relation,
-            subject_domain: edge.subject.domain.to_string(),
-            subject_type: edge.subject.entity_type.to_string(),
-            subject_name: edge.subject.name.clone(),
-            object_domain: edge.object.domain.to_string(),
-            object_type: edge.object.entity_type.to_string(),
-            object_name: edge.object.name.clone(),
-        }
-    }
-}
-
+/// Entity identity key for one reference — `(domain, entity_type, name)`, with
+/// the file intentionally excluded.
 fn entity_key(entity: &EntityRef) -> EntityKey {
     (
         entity.domain.to_string(),
@@ -99,10 +98,12 @@ fn entity_key(entity: &EntityRef) -> EntityKey {
 pub struct WorkspaceIndex {
     /// Entity identity → all entity occurrences (with file context).
     entities: HashMap<EntityKey, Vec<EntityRef>>,
-    /// Entity identity → outgoing semantic edges.
-    forward: HashMap<EntityKey, Vec<SemanticEdge>>,
-    /// Entity identity → incoming semantic edges.
-    reverse: HashMap<EntityKey, Vec<SemanticEdge>>,
+    /// Entity identity → outgoing edge occurrences (one entry per asserting
+    /// source occurrence).
+    forward: HashMap<EntityKey, Vec<StoredEdge>>,
+    /// Entity identity → incoming edge occurrences (one entry per asserting
+    /// source occurrence).
+    reverse: HashMap<EntityKey, Vec<StoredEdge>>,
     /// Dedup set for edges.
     edge_set: HashSet<EdgeKey>,
     /// File → entity keys in that file (for provenance tracking).
@@ -139,105 +140,8 @@ impl WorkspaceIndex {
         }
     }
 
-    /// Insert semantic edges from a single file.
-    ///
-    /// `file_path` is the canonical file identity (provenance, not identity).
-    /// In production this is the canonical physical path; test code may use
-    /// any stable identifier. This is NOT the αN session-local alias.
-    ///
-    /// Edges are deduplicated by identity: (relation, subject identity,
-    /// object identity). First occurrence wins.
-    ///
-    /// Entity occurrences are deduplicated by occurrence identity:
-    /// (domain, entity_type, name, file). An entity that participates in many
-    /// edges within one file is registered exactly once for that file; the
-    /// same (domain, entity_type, name) in a different file remains a
-    /// distinct occurrence. This is the approved ambiguity model.
-    ///
-    /// Entity registration happens BEFORE the edge dedup check so that
-    /// entity occurrences from all files are tracked even when the edge
-    /// itself is a duplicate (architectural review, Phase 4a).
-    ///
-    /// Registration-record normalization (index write boundary): a
-    /// self-referential `Defines` edge — subject identity == object identity —
-    /// is an entity-registration carrier, not a relationship. It registers the
-    /// entity once with file provenance and is never inserted into `edge_set`,
-    /// `file_edges`, `forward`, or `reverse`.
-    pub fn add_edges(&mut self, file_path: &str, edges: Vec<SemanticEdge>) {
-        let mut file_entity_keys: Vec<EntityKey> = Vec::new();
-
-        for mut edge in edges {
-            self.total_edges_inserted += 1;
-
-            // Attach file provenance to subject/object if not already set.
-            // This happens BEFORE the edge dedup check so entity occurrences
-            // from all files are tracked even when the edge is a duplicate.
-            if edge.subject.file.is_none() {
-                edge.subject.file = Some(file_path.to_string());
-            }
-            if edge.object.file.is_none() {
-                edge.object.file = Some(file_path.to_string());
-            }
-
-            let subj_key = entity_key(&edge.subject);
-            let obj_key = entity_key(&edge.object);
-
-            // Registration-record normalization (index write boundary):
-            // a self-referential `Defines` edge — subject identity == object
-            // identity — is an entity-registration carrier (e.g.
-            // BuiltinMetaLayer declaring an ordinary type), NOT a semantic
-            // relationship. It registers the entity once with file provenance
-            // and never enters the relationship graph (edge_set / file_edges /
-            // forward / reverse), so graph queries (`has_cycle`, forward and
-            // reverse edges) only ever see real relationships. Real
-            // relationships are unaffected: `Defines(A, B)` remains a graph
-            // edge, and a non-Defines self-loop (e.g. `Injects(A, A)`) remains
-            // a detected cycle (tests::has_cycle_self_loop).
-            if edge.relation == SemanticRelation::Defines && subj_key == obj_key {
-                self.register_entity(&subj_key, edge.subject, &mut file_entity_keys);
-                continue;
-            }
-
-            // Register entities (all occurrences retained).
-            self.register_entity(&subj_key, edge.subject.clone(), &mut file_entity_keys);
-            self.register_entity(&obj_key, edge.object.clone(), &mut file_entity_keys);
-
-            // Dedup: skip if this exact edge identity was already inserted.
-            // Forward/reverse indexes are only updated for the first occurrence.
-            let key = EdgeKey::from_edge(&edge);
-            if !self.edge_set.insert(key.clone()) {
-                continue;
-            }
-            self.edge_count += 1;
-
-            // Track this edge key under the originating file for precise
-            // removal on recompilation or file deletion.
-            self.file_edges
-                .entry(file_path.to_string())
-                .or_default()
-                .push(key);
-
-            // Forward index: subject -> outgoing edge.
-            self.forward.entry(subj_key).or_default().push(edge.clone());
-
-            // Reverse index: object -> incoming edge.
-            self.reverse.entry(obj_key).or_default().push(edge);
-        }
-
-        // Track file -> entity keys for provenance. One entry per unique
-        // (entity identity, file) occurrence — the same occurrence identity
-        // rule applied during registration — so `entities_in_file` can never
-        // report the same occurrence twice even if a file is ingested twice
-        // without an intervening `remove_file`.
-        if !file_entity_keys.is_empty() {
-            let entry = self.file_map.entry(file_path.to_string()).or_default();
-            for key in file_entity_keys.iter() {
-                if !entry.contains(key) {
-                    entry.push(key.clone());
-                }
-            }
-        }
-    }
+    // `add_edges` lives in `index/edges.rs` together with the edge-occurrence
+    // identity types it maintains (`EdgeKey`, `StoredEdge`).
 
     /// Register a single entity occurrence.
     ///
@@ -290,9 +194,11 @@ impl WorkspaceIndex {
             .unwrap_or_default()
     }
 
-    /// Get all outgoing semantic edges from the entity matching the given
-    /// identity. If multiple entities share the same identity, edges from
-    /// all occurrences are returned.
+    /// Get all outgoing edge occurrences from the entity matching the given
+    /// identity. If multiple source occurrences share the same identity, the
+    /// complete evidence of every occurrence is returned: an edge asserted by
+    /// one occurrence is never collapsed into an equivalent-looking edge
+    /// asserted by another.
     pub fn forward_edges_by_identity(
         &self,
         domain: &str,
@@ -306,13 +212,14 @@ impl WorkspaceIndex {
         );
         self.forward
             .get(&key)
-            .map(|vec| vec.iter().collect())
+            .map(|vec| vec.iter().map(|stored| &stored.edge).collect())
             .unwrap_or_default()
     }
 
-    /// Get all incoming semantic edges to the entity matching the given
-    /// identity. If multiple entities share the same identity, edges to
-    /// all occurrences are returned.
+    /// Get all incoming edge occurrences to the entity matching the given
+    /// identity. If multiple source occurrences share the same identity, every
+    /// occurrence's evidence is returned and counted separately, so consumer
+    /// counts and blast-radius queries see all real consumers.
     pub fn reverse_edges_by_identity(
         &self,
         domain: &str,
@@ -326,7 +233,7 @@ impl WorkspaceIndex {
         );
         self.reverse
             .get(&key)
-            .map(|vec| vec.iter().collect())
+            .map(|vec| vec.iter().map(|stored| &stored.edge).collect())
             .unwrap_or_default()
     }
 
@@ -370,7 +277,7 @@ impl WorkspaceIndex {
         self.entities.values().map(|v| v.len()).sum()
     }
 
-    /// Get the number of deduplicated edges.
+    /// Get the number of indexed edge occurrences.
     pub fn edge_count(&self) -> usize {
         self.edge_count
     }
@@ -385,102 +292,8 @@ impl WorkspaceIndex {
         self.edge_count == 0
     }
 
-    /// Remove all edges and entity occurrences originating from the given file.
-    ///
-    /// Called when a file is recompiled (stale edges removed before fresh ones
-    /// are inserted) or when a file is deleted from the workspace. Preserves all
-    /// other files' edges and entities.
-    pub fn remove_file(&mut self, file_path: &str) {
-        #[cfg(test)]
-        self.name_cleanup_buckets_examined.clear();
-
-        // Phase 1: Remove edges tracked to this file via file_edges.
-        if let Some(edge_keys) = self.file_edges.remove(file_path) {
-            for key in edge_keys {
-                self.edge_set.remove(&key);
-            }
-        }
-
-        // Phase 2: Remove entity keys tracked to this file.
-        if let Some(keys) = self.file_map.remove(file_path) {
-            let affected_names: HashSet<String> =
-                keys.iter().map(|(_, _, name)| name.clone()).collect();
-
-            // Remove entities that only existed in this file.
-            for key in &keys {
-                if let Some(occurrences) = self.entities.get_mut(key) {
-                    occurrences.retain(|e| e.file.as_deref() != Some(file_path));
-                    if occurrences.is_empty() {
-                        self.entities.remove(key);
-                    }
-                }
-            }
-
-            // Remove forward edges whose subject entity only exists in this file.
-            for key in &keys {
-                if !self.entities.contains_key(key) {
-                    if let Some(edges) = self.forward.remove(key) {
-                        // Adjust edge_count: only decrement for edges that
-                        // were actually removed (not already cleaned via file_edges).
-                        self.edge_count = self.edge_count.saturating_sub(
-                            edges
-                                .iter()
-                                .filter(|e| {
-                                    e.subject.file.as_deref() == Some(file_path)
-                                        || !self.entities.contains_key(&entity_key(&e.object))
-                                })
-                                .count(),
-                        );
-                    }
-                } else {
-                    // Entity still exists (from another file), clean only this file's edges.
-                    if let Some(edges) = self.forward.get_mut(key) {
-                        let before = edges.len();
-                        edges.retain(|e| {
-                            e.subject.file.as_deref() != Some(file_path)
-                                && e.object.file.as_deref() != Some(file_path)
-                        });
-                        // Adjust edge_count for removed edges.
-                        let _removed = before.saturating_sub(edges.len());
-                        self.edge_count = self.edge_count.saturating_sub(_removed);
-                    }
-                }
-            }
-
-            // Same for reverse edges.
-            for key in &keys {
-                if let Some(edges) = self.reverse.get_mut(key) {
-                    edges.retain(|e| {
-                        e.subject.file.as_deref() != Some(file_path)
-                            && e.object.file.as_deref() != Some(file_path)
-                    });
-                }
-            }
-
-            // Phase 3: Clean only names represented by the removed file.
-            // Unrelated name buckets cannot contain any of `keys`, so visiting
-            // them would make recompilation scale with total workspace size.
-            for name in affected_names {
-                #[cfg(test)]
-                self.name_cleanup_buckets_examined.push(name.clone());
-
-                let remove_bucket = if let Some(name_keys) = self.name_index.get_mut(&name) {
-                    name_keys.retain(|key| self.entities.contains_key(key));
-                    name_keys.is_empty()
-                } else {
-                    false
-                };
-                if remove_bucket {
-                    self.name_index.remove(&name);
-                }
-            }
-        }
-    }
-
-    #[cfg(test)]
-    fn name_cleanup_buckets_examined(&self) -> &[String] {
-        &self.name_cleanup_buckets_examined
-    }
+    // `remove_file` lives in `index/remove.rs`: file-local, occurrence-exact
+    // cleanup driven by `file_edges` (plus the test-only observation accessor).
     // ── Phase 4b queries ─────────────────────────────────────────────
 
     /// Find all entity occurrences with the given name across all domains
@@ -526,9 +339,9 @@ impl WorkspaceIndex {
             // Only include entities that are the target of an Injects or
             // Autowired edge (incoming edge on the object side).
             if let Some(incoming) = self.reverse.get(key) {
-                let is_inject_target = incoming.iter().any(|e| {
+                let is_inject_target = incoming.iter().any(|stored| {
                     matches!(
-                        e.relation,
+                        stored.edge.relation,
                         SemanticRelation::Injects | SemanticRelation::Autowired
                     )
                 });
@@ -553,23 +366,34 @@ impl WorkspaceIndex {
     /// applied here.
     ///
     /// Returns all matching entity occurrences. Preserves ambiguity and
-    /// insertion order.
+    /// insertion order. Each occurrence is returned exactly once, no matter how
+    /// many files asserted the selector.
     pub fn resolve_selector(&self, selector: &str) -> Vec<&EntityRef> {
         let marker_keys = match self.name_index.get(selector) {
             Some(k) => k,
             None => return Vec::new(),
         };
-        let mut results: Vec<&EntityRef> = Vec::new();
+        // Occurrence-aware storage may hold several occurrences of the same
+        // `HasSelector` triple (one per asserting file). This resolver answers
+        // with ENTITY occurrences, so each matching subject identity is visited
+        // once regardless of how many files asserted the selector.
+        let mut subject_keys: Vec<EntityKey> = Vec::new();
         for marker_key in marker_keys {
             if let Some(incoming) = self.reverse.get(marker_key) {
-                for edge in incoming {
-                    if edge.relation == SemanticRelation::HasSelector {
-                        let subj_key = entity_key(&edge.subject);
-                        if let Some(occurrences) = self.entities.get(&subj_key) {
-                            results.extend(occurrences.iter());
+                for stored in incoming {
+                    if stored.edge.relation == SemanticRelation::HasSelector {
+                        let subj_key = entity_key(&stored.edge.subject);
+                        if !subject_keys.contains(&subj_key) {
+                            subject_keys.push(subj_key);
                         }
                     }
                 }
+            }
+        }
+        let mut results: Vec<&EntityRef> = Vec::new();
+        for subject_key in subject_keys {
+            if let Some(occurrences) = self.entities.get(&subject_key) {
+                results.extend(occurrences.iter());
             }
         }
         results
@@ -585,6 +409,26 @@ impl Default for WorkspaceIndex {
 #[cfg(test)]
 #[path = "../tests/workspace/index.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/workspace/index_support.rs"]
+mod index_support;
+
+#[cfg(test)]
+#[path = "../tests/workspace/index_queries.rs"]
+mod query_tests;
+
+#[cfg(test)]
+#[path = "../tests/workspace/index_graph.rs"]
+mod graph_tests;
+
+#[cfg(test)]
+#[path = "../tests/workspace/index_edge_occurrence.rs"]
+mod edge_occurrence_tests;
+
+#[cfg(test)]
+#[path = "../tests/workspace/index_edge_lifecycle.rs"]
+mod edge_lifecycle_tests;
 
 #[cfg(test)]
 #[path = "../tests/workspace/index_performance.rs"]
