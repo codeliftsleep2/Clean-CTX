@@ -12,6 +12,8 @@
 // - No duplicate method IDs within a class
 // - Side-effect consistency: EFFECT("async") → ExecutionContext("async")
 // - Side-effect consistency: EFFECT("io") → should have CTX with matching context
+// - E011: CALL's caller callable must exist in the compiled IR (the callee is
+//   a call-site name and is never resolved)
 
 use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
@@ -166,6 +168,21 @@ impl IRValidator for DefaultValidator {
                     errors.push(ValidationError {
                         code: "E010".into(),
                         message: format!("CTX references unknown method '{}'", mid),
+                        instruction_index: Some(i),
+                    });
+                }
+                // E011: a native call fact's CALLER must be a callable that
+                // still exists in the compiled IR (identity preservation).
+                // The CALLEE is deliberately a call-site NAME, not a resolved
+                // declaration identity, so it is never resolved here — an
+                // unresolved callee is a truthful fact, not an error. This rule
+                // is the safety net behind the IRPAT-001 orphan guard: a
+                // consumptive pattern must decline rather than consume a
+                // `DefMethod` while a surviving `CALL` still references it.
+                CoreOp::Call(caller, _, _) if !method_ids.contains(caller) => {
+                    errors.push(ValidationError {
+                        code: "E011".into(),
+                        message: format!("CALL references unknown caller method '{}'", caller),
                         instruction_index: Some(i),
                     });
                 }

@@ -43,8 +43,18 @@ pub struct GraphNode {
 /// All edges have confidence = 1.0 (structural facts from tree-sitter).
 #[derive(Debug, Clone)]
 pub enum GraphEdge {
-    /// Method calls another method
-    Calls { from: String, to: String },
+    /// Method calls another method.
+    ///
+    /// `to` is the callee NAME as written at the call site (not a resolved
+    /// declaration identity) and `explicit_arg_count` is the number of
+    /// arguments written at that site, carried through verbatim from
+    /// `CoreOp::Call` so two calls that differ only in arity stay
+    /// distinguishable in the local graph.
+    Calls {
+        from: String,
+        to: String,
+        explicit_arg_count: usize,
+    },
     /// Class extends another class
     Extends { child: String, parent: String },
     /// Class implements an interface
@@ -124,6 +134,13 @@ impl GraphBuilder {
                                 dependency: dep.clone(),
                             });
                         }
+                    }
+                    CoreOp::Call(caller, callee, explicit_arg_count) => {
+                        graph.edges.push(GraphEdge::Calls {
+                            from: caller.clone(),
+                            to: callee.clone(),
+                            explicit_arg_count: *explicit_arg_count,
+                        });
                     }
                     CoreOp::DataFlow(mid, direction, target) => {
                         if direction == "reads" {
@@ -217,6 +234,15 @@ impl GraphBuilder {
                         });
                     }
                 }
+                // Native call facts: the explicit argument count is preserved
+                // verbatim (never folded into the callee name).
+                CoreOp::Call(caller, callee, explicit_arg_count) => {
+                    graph.edges.push(GraphEdge::Calls {
+                        from: caller.clone(),
+                        to: callee.clone(),
+                        explicit_arg_count: *explicit_arg_count,
+                    });
+                }
                 _ => {}
             }
         }
@@ -245,6 +271,9 @@ impl ProgramGraph {
     }
 
     /// Get fan-in (number of callers) for a method.
+    /// Each `Calls` occurrence counts once, regardless of observed arity (the
+    /// same physical caller invoking the same name with two different arities
+    /// is two distinct call facts).
     pub fn fan_in(&self, method_id: &str) -> usize {
         self.edges
             .iter()

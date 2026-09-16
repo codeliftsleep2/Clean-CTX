@@ -240,6 +240,21 @@ impl IRCompiler {
         // semantic facts survive the production compilation lifecycle.
         self.semantic_edges = std::mem::take(&mut ctx.semantic_edges);
 
+        // Language-agnostic generic facts are projected at the compilation
+        // boundary (never inside a language layer), so every producer —
+        // C# today, TypeScript/Java later — shares one semantic projection.
+        // They are APPENDED so the relative order of meta-layer edges is
+        // unchanged.
+        let provenance = ctx
+            .canonical_path
+            .clone()
+            .unwrap_or_else(|| ctx.file_id.clone());
+        self.semantic_edges
+            .extend(crate::ir::semantic_projection::project_generic_facts(
+                &ctx.instructions,
+                &provenance,
+            ));
+
         // Return ownership of language layers and pattern recognizers
         // back to the compiler for reuse in subsequent compilations.
         self.language_layers = std::mem::take(&mut ctx.language_layers);

@@ -433,3 +433,9 @@ mod edge_lifecycle_tests;
 #[cfg(test)]
 #[path = "../tests/workspace/index_performance.rs"]
 mod performance_tests;
+
+// Native call facts (`SemanticRelation::Calls`) in the workspace index:
+// occurrence identity, per-file lifecycle, and the approved traversal policy.
+#[cfg(test)]
+#[path = "../tests/workspace/index_calls.rs"]
+mod calls_tests;

@@ -18,6 +18,8 @@
 // Phase H: Positional Encoding & Advanced Compression — key stripping + pattern compression.
 
 pub mod binary_wire;
+/// Generic native call facts (`CoreOp::Call`): grammar boundary + producer.
+pub mod calls;
 pub mod compiler;
 pub(crate) mod compiler_methods;
 pub mod delta;
@@ -29,6 +31,8 @@ pub mod positional;
 pub mod render;
 pub mod render_llm;
 pub mod replay;
+/// Language-agnostic IR fact → `SemanticEdge` projection at the compile boundary.
+pub mod semantic_projection;
 pub mod string_table;
 pub mod symbol_table;
 pub mod wire;

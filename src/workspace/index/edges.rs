@@ -22,6 +22,14 @@
 //
 // `layer` remains provenance/classification metadata (established behaviour) and
 // therefore does not participate in the key.
+//
+// Call evidence: `SemanticRelation::Calls` additionally carries the observed
+// explicit argument count as edge evidence, which DOES participate in the key.
+// Two call facts asserted by one file for the same caller/callee pair but a
+// different arity are two different facts and both are retained; identical
+// physical invocations of the same arity collapse to one occurrence (this
+// feature never claims physical call-site counts). Every other relation carries
+// no evidence, so its identity is unchanged.
 
 use super::{EntityKey, WorkspaceIndex, entity_key};
 use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
@@ -34,6 +42,12 @@ use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 /// Same-file duplicates of a triple collapse (one occurrence, one record);
 /// the same triple asserted by a different file is a distinct occurrence and is
 /// retained as separate evidence.
+///
+/// Call evidence participates in the key as well: for `Calls`, the observed
+/// explicit argument count is part of the FACT a file asserted, so
+/// `A --Calls(argc=1)--> Foo` and `A --Calls(argc=2)--> Foo` are two distinct
+/// occurrences. Every other relation carries no evidence (`None`), so their
+/// identity is unchanged. Arity never enters `EntityKey` (Model C).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(super) struct EdgeKey {
     /// The source occurrence that asserted the edge (`add_edges` file identity).
@@ -46,6 +60,9 @@ pub(super) struct EdgeKey {
     object_domain: String,
     object_type: String,
     object_name: String,
+    /// Observed explicit argument count, when the relation carries call
+    /// evidence. `None` for every evidence-free relation.
+    explicit_arg_count: Option<usize>,
 }
 
 impl EdgeKey {
@@ -60,6 +77,9 @@ impl EdgeKey {
             object_domain: edge.object.domain.to_string(),
             object_type: edge.object.entity_type.to_string(),
             object_name: edge.object.name.clone(),
+            explicit_arg_count: edge
+                .call_evidence
+                .map(|evidence| evidence.explicit_arg_count),
         }
     }
 
@@ -90,7 +110,8 @@ impl EdgeKey {
         self.asserting_file == asserting_file && self.same_triple(edge)
     }
 
-    /// Does `edge` assert this key's relation and semantic triple?
+    /// Does `edge` assert this key's relation, semantic triple, and (when the
+    /// relation carries evidence) the same call evidence?
     fn same_triple(&self, edge: &SemanticEdge) -> bool {
         self.relation == edge.relation
             && self.subject_domain == edge.subject.domain
@@ -99,6 +120,7 @@ impl EdgeKey {
             && self.object_domain == edge.object.domain
             && self.object_type == edge.object.entity_type
             && self.object_name == edge.object.name
+            && self.explicit_arg_count == edge.call_evidence.map(|e| e.explicit_arg_count)
     }
 }
 
@@ -135,10 +157,11 @@ impl WorkspaceIndex {
     /// may use any stable identifier. This is NOT the αN session-local alias.
     ///
     /// Edges are deduplicated by OCCURRENCE identity: (asserting file,
-    /// relation, subject semantic identity, object semantic identity). A
-    /// repeated extraction within one file produces one occurrence; the same
-    /// triple asserted by a different file is a distinct occurrence and is
-    /// preserved as its own evidence record.
+    /// relation, subject semantic identity, object semantic identity, and the
+    /// relation's own edge evidence when it carries any — currently the call
+    /// argument count of `Calls`). A repeated extraction within one file
+    /// produces one occurrence; the same triple asserted by a different file is
+    /// a distinct occurrence and is preserved as its own evidence record.
     ///
     /// Entity occurrences are deduplicated by occurrence identity:
     /// (domain, entity_type, name, file). An entity that participates in many

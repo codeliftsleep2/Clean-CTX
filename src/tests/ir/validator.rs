@@ -190,6 +190,56 @@ fn test_ctx_unknown_method() {
     assert!(errors.iter().any(|e| e.code == "E010"));
 }
 
+// ── E011: native call facts (RED-CALL22) ────────────────────────────
+
+#[test]
+fn test_call_with_declared_caller_is_valid() {
+    let ir = CompiledIR {
+        file_id: "Example.cs".to_string(),
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Example".into()),
+            CoreOp::DefMethod("C1".into(), "M1".into(), "Process".into()),
+            // An unresolved CALLEE is a truthful fact: it is a call-site NAME,
+            // never resolved, and must never be reported as an error.
+            CoreOp::Call("M1".into(), "NeverDeclaredHere".into(), 3),
+        ],
+        version: 1,
+    };
+    let errors = DefaultValidator::new().validate(&ir);
+    assert!(
+        errors.is_empty(),
+        "a call whose caller exists must validate: {errors:?}"
+    );
+}
+
+#[test]
+fn test_call_with_unknown_caller_is_e011() {
+    let ir = CompiledIR {
+        file_id: "Example.cs".to_string(),
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Example".into()),
+            CoreOp::DefMethod("C1".into(), "M1".into(), "Process".into()),
+            CoreOp::Call("M99".into(), "Save".into(), 1),
+        ],
+        version: 1,
+    };
+    let errors = DefaultValidator::new().validate(&ir);
+    assert!(
+        errors.iter().any(|e| e.code == "E011"),
+        "an orphaned caller must be reported as E011: {errors:?}"
+    );
+    let e011 = errors
+        .iter()
+        .find(|e| e.code == "E011")
+        .expect("E011 present");
+    assert!(
+        e011.message.contains("M99"),
+        "the diagnostic must name the caller: {}",
+        e011.message
+    );
+    assert_eq!(e011.instruction_index, Some(2));
+}
+
 #[test]
 fn test_empty_ir() {
     let ir = CompiledIR {

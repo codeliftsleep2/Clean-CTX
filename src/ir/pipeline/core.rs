@@ -5,7 +5,8 @@ use crate::compaction::{
     extract_class_name, extract_field, extract_method_sig, extract_rust_struct_name,
 };
 use crate::compression::Fidelity;
-use crate::compression::capture_pipeline::run_capture_pipeline;
+use crate::compression::capture_pipeline::{CapturedNode, run_capture_pipeline_nodes};
+use crate::ir::calls::{CALL_ARGUMENT_CAPTURE, CALL_CALLEE_CAPTURE, capture_query};
 use crate::ir::opcodes::{CoreOp, FLAG_IF, FLAG_LOOP, FLAG_RET, FLAG_THROW};
 use crate::ir::symbol_table::SymbolKind;
 
@@ -45,9 +46,14 @@ impl IRPass for CoreIRPass {
         let skip_set = state.skip_set.clone();
         let focus = state.focus.clone();
 
-        let captures = run_capture_pipeline(
+        // ONE tree-sitter parse: the language's invocation-capture query (when a
+        // native call producer exists) is compiled into the SAME query, so the
+        // call facts are captured by the walk that already parses the file.
+        let capture_query = capture_query(&query_string);
+
+        let captures = run_capture_pipeline_nodes(
             language,
-            &query_string,
+            &capture_query,
             &source,
             fidelity,
             |capture_name, raw, fidelity| match capture_name {
@@ -71,13 +77,33 @@ impl IRPass for CoreIRPass {
         })?;
 
         for cap in &captures {
-            if let Some(ref skip) = skip_set
+            // Callable-scope maintenance is independent of filtering: the walk
+            // has advanced past `cap.start_byte` either way, so scopes whose
+            // region closed are popped and their call facts settled.
+            state.refresh_callable_owner(cap.start_byte);
+
+            // The CBM filter-first skip test is defined on the public
+            // `CapEntry` projection (it reads only the capture name and text),
+            // so the richer node walk projects on demand. The projection is
+            // only built on the skip path.
+            if let Some(skip) = &skip_set
                 && !skip.is_empty()
-                && crate::compression::pipeline::should_skip_capture(cap, skip)
+                && crate::compression::pipeline::should_skip_capture(&cap.to_entry(), skip)
             {
                 continue;
             }
             match cap.name.as_str() {
+                // Native call facts: the generic producer assembles
+                // `CoreOp::Call` from the callee + argument captures of one
+                // query match and settles them when the owning callable's
+                // region closes.
+                CALL_CALLEE_CAPTURE => state.record_call_callee(
+                    cap.match_index,
+                    cap.start_byte,
+                    cap.end_byte,
+                    &cap.text,
+                ),
+                CALL_ARGUMENT_CAPTURE => state.record_call_argument(cap.match_index),
                 "class.root" | "interface.root" | "struct.root" | "enum.root" | "trait.root"
                 | "record.root" => {
                     let class_id = state.next_id("C");
@@ -151,13 +177,17 @@ impl IRPass for CoreIRPass {
             }
         }
 
+        // Settle the last callable's call facts BEFORE flushing its method
+        // flags, so a caller's `CALL` ops stay adjacent to the caller's own
+        // instruction region (the established trailing-Flags contract).
+        state.flush_callable_calls();
         state.flush_method_flags();
-        state.captures = captures;
+        state.captures = captures.iter().map(CapturedNode::to_entry).collect();
         Ok(())
     }
 }
 
-fn process_impl_capture(state: &mut PassContext, cap: &crate::compression::CapEntry) {
+fn process_impl_capture(state: &mut PassContext, cap: &CapturedNode) {
     let previous_class = state.current_class.clone();
     state.refresh_type_owner(cap.start_byte);
     match state.current_class.clone() {
@@ -184,7 +214,7 @@ fn process_impl_capture(state: &mut PassContext, cap: &crate::compression::CapEn
 
 fn process_method_capture(
     state: &mut PassContext,
-    cap: &crate::compression::CapEntry,
+    cap: &CapturedNode,
     file_id: &str,
     fidelity: Fidelity,
     focus: Option<&std::collections::HashSet<String>>,
@@ -209,6 +239,9 @@ fn process_method_capture(
     state.flush_method_flags();
     let method_id = state.next_id("M");
     state.current_method = Some(method_id.clone());
+    // Native call facts: this declaration's source span owns every invocation
+    // inside it (excluding any nested callable, which pushes its own scope).
+    state.push_callable_scope(method_id.clone(), cap.start_byte, cap.end_byte);
     state.layer_context.current_method = Some(method_id.clone());
     state.layer_context.current_method_name = Some(cap.text.clone());
     let method_name = state.emit_method_ir(&class_id, &method_id, &cap.text);
@@ -227,11 +260,7 @@ fn process_method_capture(
     dispatch_capture(state, cap, true);
 }
 
-fn dispatch_capture(
-    state: &mut PassContext,
-    cap: &crate::compression::CapEntry,
-    use_raw_text: bool,
-) {
+fn dispatch_capture(state: &mut PassContext, cap: &CapturedNode, use_raw_text: bool) {
     let text = if use_raw_text {
         &cap.raw_text
     } else {

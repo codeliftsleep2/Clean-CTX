@@ -98,3 +98,65 @@ fn test_graph_node_fields() {
     let class_node = graph.find_node("C1").unwrap();
     assert_eq!(class_node.file_id, "test.ts");
 }
+
+// ── RED-CALL20: native call facts preserve arity ─────────────────────
+
+fn call_ir() -> CompiledIR {
+    CompiledIR {
+        file_id: "Example.cs".to_string(),
+        instructions: vec![
+            CoreOp::DefClass("C1".into(), "Example".into()),
+            CoreOp::DefMethod("C1".into(), "M1".into(), "Process".into()),
+            CoreOp::Call("M1".into(), "OrderBy".into(), 1),
+            CoreOp::Call("M1".into(), "OrderBy".into(), 2),
+        ],
+        version: 1,
+    }
+}
+
+fn calls_of(graph: &crate::ir::program_graph::ProgramGraph) -> Vec<(String, String, usize)> {
+    graph
+        .edges_of_type("calls")
+        .iter()
+        .map(|edge| match edge {
+            crate::ir::program_graph::GraphEdge::Calls {
+                from,
+                to,
+                explicit_arg_count,
+            } => (from.clone(), to.clone(), *explicit_arg_count),
+            other => panic!("unexpected edge type: {other:?}"),
+        })
+        .collect()
+}
+
+#[test]
+fn test_graph_call_edges_preserve_arity_build() {
+    let graph = GraphBuilder::build(&[call_ir()], &GlobalSymbolTable::new());
+    assert_eq!(
+        calls_of(&graph),
+        vec![
+            ("M1".to_string(), "OrderBy".to_string(), 1),
+            ("M1".to_string(), "OrderBy".to_string(), 2),
+        ],
+        "the local graph must carry the explicit argument count verbatim"
+    );
+}
+
+#[test]
+fn test_graph_call_edges_preserve_arity_build_from_instructions() {
+    let graph = GraphBuilder::build_from_instructions(&call_ir().instructions);
+    assert_eq!(
+        calls_of(&graph),
+        vec![
+            ("M1".to_string(), "OrderBy".to_string(), 1),
+            ("M1".to_string(), "OrderBy".to_string(), 2),
+        ],
+        "both builders must map CoreOp::Call identically"
+    );
+    assert_eq!(
+        graph.fan_in("OrderBy"),
+        2,
+        "two arity-distinct facts are two call occurrences"
+    );
+    assert_eq!(graph.fan_out("M1"), 2);
+}

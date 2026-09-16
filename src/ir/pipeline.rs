@@ -24,6 +24,7 @@
 //   ProgramGraphPass        — on-demand local program graph construction
 //   InferenceLayerPass      — on-demand CBM enrichment + derived analysis
 
+use super::calls::{CallProducer, CallableScope};
 use super::inference_layer::InferenceLayer;
 use super::layers::{LanguageLayer, LayerContext, PatternRecognizer};
 use super::opcodes::*;
@@ -124,6 +125,15 @@ pub struct PassContext {
     /// A declaration is owned by the innermost scope whose
     /// `[start_byte, end_byte)` window contains it.
     pub type_scopes: Vec<TypeScope>,
+    /// Open callable-declaration scopes keyed by source span.
+    /// An invocation is owned by the innermost callable whose
+    /// `[start_byte, end_byte)` window contains it (native call facts).
+    pub callable_scopes: Vec<CallableScope>,
+    /// Active callable's `DefMethod` id — the innermost entry of
+    /// `callable_scopes`, or `None` outside every supported callable.
+    pub current_callable: Option<String>,
+    /// Native call-fact producer (invocation captures → `CoreOp::Call`).
+    pub call_producer: CallProducer,
     /// Tree-sitter language for capture pipeline.
     pub language: Option<tree_sitter::Language>,
     /// Query string for capture pipeline.
@@ -155,6 +165,9 @@ impl PassContext {
             current_method_flags: Vec::new(),
             current_class: None,
             type_scopes: Vec::new(),
+            callable_scopes: Vec::new(),
+            current_callable: None,
+            call_producer: CallProducer::new(),
             language: None,
             query_string: String::new(),
             skip_set: None,
@@ -229,6 +242,81 @@ impl PassContext {
         });
         self.current_class = Some(class_id.clone());
         self.layer_context.current_class = Some(class_id);
+    }
+
+    /// Push the callable-declaration scope for `method_id`.
+    ///
+    /// Mirrors `push_type_scope`: the scope carries the declaration's source
+    /// span so a later invocation is attributed by span containment rather
+    /// than by whichever method happened to be processed last.
+    pub(super) fn push_callable_scope(
+        &mut self,
+        method_id: String,
+        start_byte: usize,
+        end_byte: usize,
+    ) {
+        self.callable_scopes.push(CallableScope {
+            method_id: method_id.clone(),
+            start_byte,
+            end_byte,
+        });
+        self.current_callable = Some(method_id);
+    }
+
+    /// Resolve the innermost callable scope whose `[start_byte, end_byte)`
+    /// window contains `at`. Scopes that ended at or before `at` are popped.
+    ///
+    /// When the active callable changes, the previous callable's pending call
+    /// facts are settled into the instruction stream (they are complete: the
+    /// walk is in document order and every invocation inside that callable has
+    /// already been visited).
+    pub(super) fn refresh_callable_owner(&mut self, at: usize) {
+        let previous = self.current_callable.clone();
+        while let Some(scope) = self.callable_scopes.last() {
+            if scope.end_byte <= at {
+                self.callable_scopes.pop();
+            } else {
+                break;
+            }
+        }
+        let owner = self.callable_scopes.last().map(|s| s.method_id.clone());
+        if owner != previous {
+            let emitted = self.call_producer.settle(previous.as_deref());
+            self.instructions.extend(emitted);
+            self.current_callable = owner;
+        }
+    }
+
+    /// Record the callee capture of one invocation query match.
+    pub(super) fn record_call_callee(
+        &mut self,
+        match_index: usize,
+        start_byte: usize,
+        end_byte: usize,
+        callee: &str,
+    ) {
+        let owner = self.current_callable.clone();
+        self.call_producer.record_callee(
+            match_index,
+            start_byte,
+            end_byte,
+            callee,
+            owner.as_deref(),
+        );
+    }
+
+    /// Record one explicitly written argument capture of one query match.
+    pub(super) fn record_call_argument(&mut self, match_index: usize) {
+        self.call_producer.record_argument(match_index);
+    }
+
+    /// Settle every remaining call fact after the capture walk (the last
+    /// callable's region never "closes" during the walk).
+    pub(super) fn flush_callable_calls(&mut self) {
+        let owner = self.current_callable.take();
+        let emitted = self.call_producer.settle(owner.as_deref());
+        self.instructions.extend(emitted);
+        self.callable_scopes.clear();
     }
 
     /// Parse a method signature string into a `MethodSig`.

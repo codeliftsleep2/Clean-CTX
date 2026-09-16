@@ -85,6 +85,61 @@ pub const CS_QUERY: &str = r#"
     (using_directive) @import.root
 "#;
 
+// Generic invocation captures (native call facts) for C#.
+//
+// These patterns are deliberately NOT part of `CS_QUERY`: the compression and
+// diff paths (`compress_file`, `build_snapshot`) consume `CS_QUERY` captures
+// positionally and would otherwise gain unknown capture names. The IR
+// compilation path concatenates this query onto its base query and walks both
+// in ONE tree-sitter parse (see `crate::ir::calls`).
+//
+// Structure, not text: each invocation form binds the NAME node that is
+// written at the call site (`@call.callee`) and, in the second pattern of each
+// pair, every individual `argument` node (`@call.argument`). The explicit
+// argument count is therefore the number of observed argument nodes — never a
+// `split(',')`, regex, or line scan — so nested commas inside generic
+// arguments, object creations, lambdas, and array initializers can never
+// inflate it.
+//
+// Both patterns of a pair are required: the argument-less pattern enumerates
+// invocations with ZERO arguments (`Foo()`), and the argument pattern
+// enumerates their arity. `match_index` groups the captures of one query
+// match so the producer can associate each argument with its callee.
+//
+// `function:` is the invocation's function node and `name:` is a member
+// access's final name node, so `items.OrderBy(a, b)` yields the callee
+// `OrderBy` with argc 2 — the receiver is never part of the argument list.
+// Unsupported function shapes (conditional access `a?.Foo()`, parenthesized
+// and cast expressions) are deliberately not matched: an unmatched form
+// produces no fact rather than a guessed one.
+pub const CS_CALL_QUERY: &str = r#"
+    ; --- Generic invocation captures (native call facts) ---
+    (invocation_expression
+        function: (identifier) @call.callee
+        arguments: (argument_list))
+    (invocation_expression
+        function: (identifier) @call.callee
+        arguments: (argument_list (argument) @call.argument))
+    (invocation_expression
+        function: (member_access_expression name: (identifier) @call.callee)
+        arguments: (argument_list))
+    (invocation_expression
+        function: (member_access_expression name: (identifier) @call.callee)
+        arguments: (argument_list (argument) @call.argument))
+    (invocation_expression
+        function: (generic_name (identifier) @call.callee)
+        arguments: (argument_list))
+    (invocation_expression
+        function: (generic_name (identifier) @call.callee)
+        arguments: (argument_list (argument) @call.argument))
+    (invocation_expression
+        function: (member_access_expression name: (generic_name (identifier) @call.callee))
+        arguments: (argument_list))
+    (invocation_expression
+        function: (member_access_expression name: (generic_name (identifier) @call.callee))
+        arguments: (argument_list (argument) @call.argument))
+"#;
+
 // Rust AST node types: struct_item, enum_item, trait_item, impl_item,
 //   function_item, type_item, field_declaration, use_declaration,
 //   return_expression, if_expression, for_expression, while_expression,

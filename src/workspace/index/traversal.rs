@@ -7,6 +7,11 @@ use std::collections::{HashMap, HashSet};
 
 impl WorkspaceIndex {
     /// The semantic relations treated as dependency relationships.
+    ///
+    /// `SemanticRelation::Calls` is deliberately NOT here (approved traversal
+    /// policy): call relationships are a separate native fact, so
+    /// `transitive_dependencies` remains exactly as it was and direct
+    /// forward/reverse `Calls` queries are the way to consume them.
     const DEPENDENCY_RELATIONS: &'static [SemanticRelation] = &[
         SemanticRelation::Injects,
         SemanticRelation::Autowired,
@@ -38,6 +43,12 @@ impl WorkspaceIndex {
     ///
     /// Traverses every semantic relation with three-color DFS. File provenance
     /// is irrelevant because traversal operates on `EntityKey` identity only.
+    ///
+    /// `SemanticRelation::Calls` is excluded narrowly: native call facts add
+    /// many receiver-independent name-level edges, and treating them as cycle
+    /// edges would silently change the established generic `has_cycle`
+    /// semantics for every workspace that compiles call sites. Cycle semantics
+    /// for every other relation are unchanged.
     pub fn has_cycle(&self) -> bool {
         let (node_list, index_map) = self.build_node_index();
         if node_list.is_empty() {
@@ -51,6 +62,9 @@ impl WorkspaceIndex {
                 .map(|edges| {
                     edges
                         .iter()
+                        // Native call facts are not cycle edges (approved
+                        // traversal policy; see the doc comment above).
+                        .filter(|e| e.edge.relation != SemanticRelation::Calls)
                         .filter_map(|e| index_map.get(&entity_key(&e.edge.object)).copied())
                         .collect::<Vec<_>>()
                 })
