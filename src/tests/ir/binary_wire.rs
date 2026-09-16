@@ -497,6 +497,36 @@ fn test_round_trip_large_ir() {
 
 // ── Zero-State Tests ──────────────────────────────────────────────
 
+/// Regression (RED-CALL23): the decoder's forward-compatibility guard must bound
+/// the **highest defined** opcode, not the last opcode that happened to exist
+/// when the guard was written.
+///
+/// `OP_CALL` (20) is allocated after the edit-mode `OP_BODY` (19), so a guard
+/// written as `op_idx > OP_BODY` reported a *defined* opcode as
+/// `UnknownOpcode(20)` and made native call facts unrepresentable over the
+/// binary wire — the encoder wrote them and no reader could read them. The
+/// guard now bounds `OP_MAX`, so every opcode this build defines round-trips.
+#[test]
+fn binary_wire_round_trips_call_facts_and_every_defined_opcode() {
+    let ir = CompiledIR {
+        file_id: "Example.cs".to_string(),
+        version: 1,
+        instructions: vec![
+            CoreOp::DefClass("C1".to_string(), "Example".to_string()),
+            CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "Process".to_string()),
+            CoreOp::Call("M1".to_string(), "Save".to_string(), 1),
+            CoreOp::Call("M1".to_string(), "OrderBy".to_string(), 2),
+            CoreOp::Call("M1".to_string(), "Reset".to_string(), 0),
+        ],
+    };
+
+    let decoded = decode(&encode(&ir)).expect("every defined opcode must decode");
+    assert_eq!(
+        decoded.instructions, ir.instructions,
+        "caller, callee, and explicit argument count must survive the binary wire"
+    );
+}
+
 #[test]
 fn test_ir_with_only_variadic_ops() {
     let ir = CompiledIR {

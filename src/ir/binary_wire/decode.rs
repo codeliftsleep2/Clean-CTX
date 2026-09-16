@@ -135,7 +135,7 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
         let op_idx = data[pos];
         pos += 1;
 
-        if op_idx > OP_BODY {
+        if op_idx > OP_MAX {
             return Err(BinaryDecodeError::UnknownOpcode(op_idx));
         }
 

@@ -86,6 +86,15 @@ const OP_BODY: u8 = 19;
 // keep their established interpretation.
 const OP_CALL: u8 = 20;
 
+/// Highest defined opcode index.
+///
+/// The decoder's forward-compatibility guard rejects only indices ABOVE this
+/// value, so every opcode this build defines decodes. `OP_CALL` is allocated
+/// after the edit-mode `OP_BODY`, so a guard bounded at `OP_BODY` would report
+/// a defined opcode as unknown and make CALL facts unrepresentable over the
+/// binary wire.
+const OP_MAX: u8 = OP_CALL;
+
 /// Opcodes that have a variable number of operands (beyond the first one).
 fn is_variadic(op_idx: u8) -> bool {
     matches!(op_idx, OP_FLAGS | OP_FLAGS_C | OP_INJECTS | OP_PAT)

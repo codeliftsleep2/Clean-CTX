@@ -272,10 +272,20 @@ fn builtin_entities_in_file_end_to_end() {
         "entities_in_file must report exactly one occurrence per declaration: {}",
         sc["entities"]
     );
+    // The compiled class also declares a callable, which the generic callable
+    // projection registers as a `builtin / Method` occurrence so method-level
+    // identities resolve in find_entities / forward_edges / reverse_edges.
+    let methods = assert_builtin_entity(&sc["entities"], "Method", "getUser");
+    assert_eq!(
+        methods.len(),
+        1,
+        "the callable declaration must be registered exactly once: {}",
+        sc["entities"]
+    );
     assert_eq!(
         sc["count"].as_i64(),
-        Some(1),
-        "file bookkeeping must not duplicate registration records: {}",
+        Some(2),
+        "file bookkeeping must not duplicate registration records (class + callable): {}",
         resp["result"]
     );
 }

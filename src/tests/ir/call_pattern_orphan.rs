@@ -30,10 +30,15 @@ fn compress(instructions: &[CoreOp]) -> Vec<CoreOp> {
 }
 
 fn ctor_stream(call: Option<CoreOp>) -> Vec<CoreOp> {
+    // Production shape of a constructor-injection region:
+    //   DEF_M(ctor) + SIG(type) + RET + INJECTS(class, [S1])
+    // The pattern's `deps` payload comes ONLY from the INJECTS op, which is why
+    // the fixture carries one (a param alone contributes arity, not deps).
     let mut ops = vec![
         CoreOp::DefMethod("C1".into(), "M1".into(), "ctor".into()),
-        CoreOp::Param("M1".into(), "$v".into(), "S1".into(), "dep".into()),
+        CoreOp::Param("M1".into(), "P1".into(), "S1".into(), "dep".into()),
         CoreOp::Return("M1".into(), "void".into()),
+        CoreOp::Injects("C1".into(), vec!["S1".into()]),
     ];
     if let Some(op) = call {
         ops.push(op);
