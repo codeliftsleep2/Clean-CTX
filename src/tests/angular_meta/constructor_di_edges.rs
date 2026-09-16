@@ -319,11 +319,17 @@ export class Consumer {
 "#;
     let expected = vec!["BarService".to_string(), "FooService".to_string()];
     assert_eq!(
-        inject_objects(&compile_edges(single_line, "C:/repo/s.service.ts"), "Consumer"),
+        inject_objects(
+            &compile_edges(single_line, "C:/repo/s.service.ts"),
+            "Consumer"
+        ),
         expected
     );
     assert_eq!(
-        inject_objects(&compile_edges(multiline, "C:/repo/m.service.ts"), "Consumer"),
+        inject_objects(
+            &compile_edges(multiline, "C:/repo/m.service.ts"),
+            "Consumer"
+        ),
         expected
     );
 }
