@@ -20,3 +20,4 @@
 // regardless of domain (angular, dotnet, spring, ngrx).
 
 pub mod index;
+pub mod scope;

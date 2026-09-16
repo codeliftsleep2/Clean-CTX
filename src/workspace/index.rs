@@ -48,6 +48,7 @@ mod edges;
 mod remove;
 mod traversal;
 
+use super::scope::WorkspaceScope;
 use edges::{EdgeKey, StoredEdge};
 
 // ── Key types ─────────────────────────────────────────────────────────
@@ -70,6 +71,42 @@ fn entity_key(entity: &EntityRef) -> EntityKey {
         entity.entity_type.to_string(),
         entity.name.clone(),
     )
+}
+
+/// Identity key for one lookup — Model C: `(domain, entity_type, name)`, with the
+/// file and the call arity deliberately excluded (arity is edge evidence).
+fn identity_key(domain: &str, entity_type: &str, name: &str) -> EntityKey {
+    (
+        domain.to_string(),
+        entity_type.to_string(),
+        name.to_string(),
+    )
+}
+
+/// Select one adjacency bucket's edge occurrences, optionally restricted to the
+/// occurrences asserted from inside the active workspace scope.
+///
+/// Scope filtering happens INSIDE the already-selected bucket: the cost is
+/// proportional to the number of occurrences of that identity, never to the size
+/// of the index, and no full-index scan, rediscovery, recompilation or path cache
+/// is involved. `None` (an unscoped query) returns every occurrence, unchanged.
+fn selected_occurrences<'a>(
+    adjacency: &'a HashMap<EntityKey, Vec<StoredEdge>>,
+    key: &EntityKey,
+    scope: Option<&WorkspaceScope>,
+) -> Vec<&'a SemanticEdge> {
+    adjacency
+        .get(key)
+        .map(|occurrences| {
+            occurrences
+                .iter()
+                .filter(|occurrence| {
+                    scope.is_none_or(|scope| scope.admits(&occurrence.asserting_file))
+                })
+                .map(|occurrence| &occurrence.edge)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 // ── WorkspaceIndex ────────────────────────────────────────────────────
@@ -183,11 +220,7 @@ impl WorkspaceIndex {
         entity_type: &str,
         name: &str,
     ) -> Vec<&EntityRef> {
-        let key = (
-            domain.to_string(),
-            entity_type.to_string(),
-            name.to_string(),
-        );
+        let key = identity_key(domain, entity_type, name);
         self.entities
             .get(&key)
             .map(|vec| vec.iter().collect())
@@ -205,15 +238,34 @@ impl WorkspaceIndex {
         entity_type: &str,
         name: &str,
     ) -> Vec<&SemanticEdge> {
-        let key = (
-            domain.to_string(),
-            entity_type.to_string(),
-            name.to_string(),
-        );
-        self.forward
-            .get(&key)
-            .map(|vec| vec.iter().map(|stored| &stored.edge).collect())
-            .unwrap_or_default()
+        selected_occurrences(
+            &self.forward,
+            &identity_key(domain, entity_type, name),
+            None,
+        )
+    }
+
+    /// Workspace-scoped variant of [`WorkspaceIndex::forward_edges_by_identity`]:
+    /// only the outgoing occurrences whose asserting file lies inside `scope` are
+    /// returned.
+    ///
+    /// Occurrence PROVENANCE is the boundary, never semantic identity: the same
+    /// `(domain, entity_type, name)` may be asserted by several repositories at
+    /// once, and a query issued for one workspace must answer with that
+    /// workspace's evidence. Nothing is removed from the index — the scope is a
+    /// view over it (see `workspace::scope`).
+    pub fn forward_edges_by_identity_in_scope(
+        &self,
+        domain: &str,
+        entity_type: &str,
+        name: &str,
+        scope: &WorkspaceScope,
+    ) -> Vec<&SemanticEdge> {
+        selected_occurrences(
+            &self.forward,
+            &identity_key(domain, entity_type, name),
+            Some(scope),
+        )
     }
 
     /// Get all incoming edge occurrences to the entity matching the given
@@ -226,15 +278,31 @@ impl WorkspaceIndex {
         entity_type: &str,
         name: &str,
     ) -> Vec<&SemanticEdge> {
-        let key = (
-            domain.to_string(),
-            entity_type.to_string(),
-            name.to_string(),
-        );
-        self.reverse
-            .get(&key)
-            .map(|vec| vec.iter().map(|stored| &stored.edge).collect())
-            .unwrap_or_default()
+        selected_occurrences(
+            &self.reverse,
+            &identity_key(domain, entity_type, name),
+            None,
+        )
+    }
+
+    /// Workspace-scoped variant of [`WorkspaceIndex::reverse_edges_by_identity`]:
+    /// only the incoming occurrences asserted from inside `scope` are returned.
+    ///
+    /// For a call fact the asserting file is the CALLER's file, so a caller in
+    /// another repository is excluded while an unresolved/external callee (which
+    /// may have no local declaration at all) never affects the decision.
+    pub fn reverse_edges_by_identity_in_scope(
+        &self,
+        domain: &str,
+        entity_type: &str,
+        name: &str,
+        scope: &WorkspaceScope,
+    ) -> Vec<&SemanticEdge> {
+        selected_occurrences(
+            &self.reverse,
+            &identity_key(domain, entity_type, name),
+            Some(scope),
+        )
     }
 
     /// Get all entities in a specific file.

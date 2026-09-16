@@ -204,6 +204,14 @@ fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
         }
     };
     let workspace_root = args["workspaceRoot"].as_str();
+    // Workspace scope: a query issued FOR a workspace answers with the evidence
+    // asserted from inside that workspace (primary root + its configured
+    // additional roots). `None` when the caller declared no workspace — a
+    // root-less query keeps its previous unfiltered behaviour.
+    let scope = crate::workspace::scope::WorkspaceScope::new(
+        workspace_root,
+        &state.config.additional_roots,
+    );
     let domain_owned = domain.to_string();
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
@@ -213,7 +221,12 @@ fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
             let et = et_owned.clone();
             let name = name_owned.clone();
             move |idx| {
-                let r = idx.forward_edges_by_identity(&domain, &et, &name);
+                let r = match scope.as_ref() {
+                    Some(scope) => {
+                        idx.forward_edges_by_identity_in_scope(&domain, &et, &name, scope)
+                    }
+                    None => idx.forward_edges_by_identity(&domain, &et, &name),
+                };
                 let c = r.len();
                 (serde_json::to_value(&r).unwrap_or_default(), c)
             }
@@ -284,6 +297,14 @@ fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
         }
     };
     let workspace_root = args["workspaceRoot"].as_str();
+    // Workspace scope: the primary defect this closes — `reverse_edges` used to
+    // answer with every occurrence of the identity across the WHOLE session,
+    // including real call facts authored by an unrelated indexed repository.
+    // Occurrence provenance (`asserting_file`) now constrains the answer.
+    let scope = crate::workspace::scope::WorkspaceScope::new(
+        workspace_root,
+        &state.config.additional_roots,
+    );
     let domain_owned = domain.to_string();
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
@@ -293,7 +314,12 @@ fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
             let et = et_owned.clone();
             let name = name_owned.clone();
             move |idx| {
-                let r = idx.reverse_edges_by_identity(&domain, &et, &name);
+                let r = match scope.as_ref() {
+                    Some(scope) => {
+                        idx.reverse_edges_by_identity_in_scope(&domain, &et, &name, scope)
+                    }
+                    None => idx.reverse_edges_by_identity(&domain, &et, &name),
+                };
                 let c = r.len();
                 (serde_json::to_value(&r).unwrap_or_default(), c)
             }

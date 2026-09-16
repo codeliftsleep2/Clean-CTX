@@ -46,6 +46,22 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-018: Workspace-Scoped Edge Queries Returned Another Repository's Occurrences
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-16 |
+| **Environment** | Claude + Clean-CTX (live multi-repository session; native `Calls` already confirmed working) |
+| **Repository/context** | A wanted C# repository queried through `workspace_query` while an unrelated repository was already compiled into the same session `WorkspaceIndex`. |
+| **Symptom** | `workspace_query(type="reverse_edges", domain="builtin", entity_type="Method", name="OrderBy")` returned the wanted repository's real `OrderBy(argc=2)` callers **plus three real `OrderBy(argc=2)` callers from the unrelated repository**. Every returned fact was genuine; the failure was that none of those three belonged to the queried workspace. |
+| **Root cause** | `handle_forward_edges` / `handle_reverse_edges` called `WorkspaceIndex::forward_edges_by_identity` / `reverse_edges_by_identity`, which select the entire adjacency bucket across the whole session and return only `&SemanticEdge` — the stored occurrence's `asserting_file` provenance was discarded before the response, and no workspace-root filter existed anywhere on the query path. Semantic identity `(domain, entity_type, name)` is file-free by design (Model C), so the identity itself could never separate the repositories. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes — deterministic fixtures; no scale dependency. |
+| **Local regression** | `src/tests/mcp/workspace_query_scope.rs` (RED-SCOPE1–RED-SCOPE8: two-repository isolation, additional-root inclusion, third-repository exclusion, identical subject identity, identical name+arity, forward edges, non-Calls relation, repository-name prefix safety) and `src/tests/mcp/workspace_query_scope_provenance.rs` (RED-SCOPE9 canonicalization parity, RED-SCOPE10 removal/recompile, the object-provenance control, and root-less-query preservation). |
+| **Live scenario required?** | Yes — re-run the `OrderBy` query against the wanted repository (only its own callers), then query the other repository explicitly (its three callers appear there), proving the facts were filtered rather than deleted. |
+| **Architectural invariant** | Proposed `WSC-004` (pending maintainer approval). `IDX-002` is unchanged: the index still stores and can return every occurrence. |
+| **Status** | Fixed locally; live re-verification pending |
+
 ## DIS-2026-017: Broad `search_graph` Searches Skipped C# Caller Verification Entirely
 
 | Field | Value |

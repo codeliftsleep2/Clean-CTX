@@ -287,3 +287,14 @@ mod workspace_query_dispatch;
 
 #[path = "workspace_query_builtin.rs"]
 mod workspace_query_builtin;
+
+// Workspace-scope regressions: a query issued FOR a workspace answers with the
+// evidence asserted from inside that workspace only (occurrence provenance, never
+// semantic identity). `workspace_query_scope` owns the fixtures and RED-SCOPE1–8;
+// `workspace_query_scope_provenance` continues with RED-SCOPE9–10 and the
+// provenance/lifecycle controls.
+#[path = "workspace_query_scope.rs"]
+mod workspace_query_scope;
+
+#[path = "workspace_query_scope_provenance.rs"]
+mod workspace_query_scope_provenance;
