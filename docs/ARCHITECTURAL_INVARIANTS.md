@@ -277,6 +277,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### ANG-DI-001 Angular Constructor Injection Is Modifier- and Formatting-Independent
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Angular constructor DI identity is semantic, not syntactic. TypeScript parameter-property modifiers control property generation; they must never gate Angular injection extraction, and source formatting must never alter semantic extraction. |
+| **Invariant** | Within a class already recognized as an Angular DI class (a `@Component` / `@Injectable` / `@Directive` / `@Pipe` / `@NgModule` decorator is required before extraction runs — the class-level gate), a **typed** constructor parameter is a constructor injection regardless of whether it also declares a parameter property. `private foo: FooService`, `public foo: FooService`, `protected foo: FooService`, `readonly foo: FooService`, `private readonly foo: FooService`, and `foo: FooService` are equivalent for DI and MUST each contribute exactly one `SemanticRelation::Injects` edge (`angular`, subject class → `angular`/`Service`/`<parameter type>`). Parameter decorators (`@Inject(...)`, `@Optional()`, …) are DI metadata and must not hide the parameter type; the injection identity remains the parameter type. Type-eligibility rules are unchanged (no primitive filter is added or removed, and generic/qualified type names keep the pre-existing leading-identifier reduction). Formatter layout (single-line, multiline, trailing comma, line breaks between decorator / modifier / name / type) MUST NOT change the resulting edges. Ordinary non-Angular TypeScript constructors MUST NOT gain Angular `Injects` edges. Deduplication remains the `WorkspaceIndex` write-boundary contract — the extraction emits one edge per parameter. |
+| **Enforcement** | `src/tests/angular_meta/constructor_injects.rs` (RED-DI1…RED-DI10 extraction-level parity, decorator preservation, formatting independence, single-injection-per-parameter, Φinjects projection); `src/tests/angular_meta/constructor_di_edges.rs` (RED-DI1…RED-DI10 + RED-W1/W2/W3 through the production path: `IRCompiler` → `MetaLayerPass` → `AngularMetaLayer` → `SemanticRelation::Injects` → `WorkspaceIndex` forward/reverse queries, plus the non-Angular class guard). |
+| **Authority** | `src/angular_meta/constructor_injects.rs` (extraction; single source of truth for the `injects` list consumed by `class_to_semantic_edges` and the `Φinjects:` marker), `src/angular_meta/decorators.rs` (`extract_graph_entries` — the class-level Angular gate), `src/angular_meta/semantic.rs` (`class_to_semantic_edges`) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
+
 ## Architectural Debt
 
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)

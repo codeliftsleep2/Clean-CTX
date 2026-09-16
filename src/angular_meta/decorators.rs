@@ -19,13 +19,20 @@
 // The string walker is O(L) where L is the length of the class
 // capture, which is bounded by the class body length.
 
+use crate::angular_meta::constructor_injects::extract_constructor_injects;
+use crate::angular_meta::decorator_args::{
+    parse_first_string_arg, parse_module_fields, parse_object_literal, parse_pipe_fields,
+    parse_provided_in,
+};
+use crate::angular_meta::decorator_scan::{
+    DecoratorKind, collect_decorators, collect_field_decorators, is_word_byte,
+};
 use crate::angular_meta::markers::{
-    ComponentFields, build_component_line, build_directive_line, build_injects_line,
-    build_input_line, build_model_line, build_module_line, build_output_line, build_pipe_line,
-    build_service_line,
+    build_component_line, build_directive_line, build_injects_line, build_input_line,
+    build_model_line, build_module_line, build_output_line, build_pipe_line, build_service_line,
 };
 use crate::compression::Fidelity;
-use crate::meta_util::{consume_call_expression, split_top_level};
+use crate::meta_util::consume_call_expression;
 
 /// The kind of Angular class that can be extracted from decorators.
 /// Used as a private extraction helper — not a shared architectural type.
@@ -249,28 +256,6 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Decorat
     }
 }
 
-/// A collected decorator token. `name` is populated for potential
-/// future inspection/debug use but the dispatch only consumes `kind`
-/// and `arg` today, so it is kept under `#[allow(dead_code)]`.
-#[allow(dead_code)]
-struct Decorator {
-    name: String,
-    arg: String,
-    kind: DecoratorKind,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DecoratorKind {
-    Component,
-    Injectable,
-    NgModule,
-    Directive,
-    Pipe,
-    Input,
-    Output,
-    Other,
-}
-
 // --- Phase 2.5b: Signal-based function calls ---
 
 /// Kind of signal-based Angular API function call detected in
@@ -372,77 +357,6 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
     out
 }
 
-fn collect_decorators(head: &str) -> Vec<Decorator> {
-    let mut decorators: Vec<Decorator> = Vec::new();
-    let bytes = head.as_bytes();
-    let len = bytes.len();
-    let mut i = 0;
-
-    while i < len {
-        if bytes[i] != b'@' {
-            i += 1;
-            continue;
-        }
-        i += 1;
-        let name_start = i;
-        while i < len {
-            let c = bytes[i];
-            if c.is_ascii_alphanumeric() || c == b'_' || c == b'$' {
-                i += 1;
-            } else {
-                break;
-            }
-        }
-        if i == name_start {
-            continue;
-        }
-        let name = &head[name_start..i];
-        while i < len && (bytes[i] == b' ' || bytes[i] == b'\t' || bytes[i] == b'\n') {
-            i += 1;
-        }
-        let mut arg = String::new();
-        // F-ANG-09: if the decorator call is unterminated, advance
-        // past the `(` to avoid an infinite loop and use an empty
-        // arg. The audit's deferred fix note says callers tolerate
-        // the fallback gracefully.
-        if i < len && bytes[i] == b'(' {
-            if let Some((consumed, arg_str)) = consume_call_expression(head, i) {
-                i += consumed;
-                arg = arg_str;
-            } else {
-                i += 1;
-            }
-        }
-        let kind = classify_decorator(name);
-        decorators.push(Decorator {
-            name: name.to_string(),
-            arg,
-            kind,
-        });
-    }
-
-    decorators
-}
-
-// F-ANG-09: `consume_call_expression` now comes from the shared
-// layer-agnostic `meta_util` primitive set (Round-8 structural audit).
-// It returns `None` if the call expression is unterminated (was
-// returning `i-open_paren` and slicing to end of text — silent EOF
-// behaviour).
-
-fn classify_decorator(name: &str) -> DecoratorKind {
-    match name {
-        "Component" => DecoratorKind::Component,
-        "Injectable" => DecoratorKind::Injectable,
-        "NgModule" => DecoratorKind::NgModule,
-        "Directive" => DecoratorKind::Directive,
-        "Pipe" => DecoratorKind::Pipe,
-        "Input" => DecoratorKind::Input,
-        "Output" => DecoratorKind::Output,
-        _ => DecoratorKind::Other,
-    }
-}
-
 // F-ANG-12: returns `None` if neither `class ` nor `{` is found (was
 // `raw.len()` — silently included the rest of the file as part of
 // the "head").
@@ -514,159 +428,6 @@ fn extract_class_name(raw: &str) -> Option<String> {
     None
 }
 
-fn parse_object_literal(arg: &str) -> ComponentFields {
-    let mut trimmed = arg.trim().to_string();
-    if trimmed.is_empty() {
-        return ComponentFields::default();
-    }
-    if trimmed.starts_with('{') && trimmed.ends_with('}') {
-        trimmed = trimmed[1..trimmed.len() - 1].trim().to_string();
-    }
-    if trimmed.is_empty() {
-        return ComponentFields::default();
-    }
-    let mut fields = ComponentFields::default();
-
-    for part in split_top_level(&trimmed, ',') {
-        let part = part.trim();
-        if part.is_empty() {
-            continue;
-        }
-        let Some(colon) = part.find(':') else {
-            continue;
-        };
-        let key = part[..colon]
-            .trim()
-            .trim_matches(|c: char| c == '"' || c == '\'');
-        let value = part[colon + 1..].trim();
-
-        match key {
-            "selector" => fields.selector = Some(unquote(value).to_string()),
-            "templateUrl" => fields.template_url = Some(unquote(value).to_string()),
-            "template" => {
-                if value.starts_with('`') || value.starts_with('"') || value.starts_with('\'') {
-                    fields.template = Some(unquote(value).to_string());
-                }
-            }
-            "styleUrls" => {
-                if value.starts_with('[') {
-                    let inner = value.trim_start_matches('[').trim_end_matches(']').trim();
-                    let urls: Vec<String> = split_top_level(inner, ',')
-                        .into_iter()
-                        .map(|s| unquote(s.trim()).to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-                    if !urls.is_empty() {
-                        fields.style_urls = Some(urls);
-                    }
-                }
-            }
-            "styles"
-                if (value.starts_with('`')
-                    || value.starts_with('"')
-                    || value.starts_with('\'')) =>
-            {
-                fields.styles = Some(unquote(value).to_string());
-            }
-            _ => {}
-        }
-    }
-    fields
-}
-
-fn parse_provided_in(arg: &str) -> Option<String> {
-    let mut trimmed = arg.trim().to_string();
-    if trimmed.starts_with('{') && trimmed.ends_with('}') {
-        trimmed = trimmed[1..trimmed.len() - 1].trim().to_string();
-    }
-    for part in split_top_level(&trimmed, ',') {
-        let part = part.trim();
-        if let Some(colon) = part.find(':') {
-            let key = part[..colon].trim();
-            if key == "providedIn" {
-                let value = part[colon + 1..].trim();
-                if value.starts_with('"') || value.starts_with('\'') {
-                    return Some(unquote(value).to_string());
-                }
-            }
-        }
-    }
-    None
-}
-
-pub(crate) fn parse_module_fields(arg: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
-    let mut trimmed = arg.trim().to_string();
-    if trimmed.starts_with('{') && trimmed.ends_with('}') {
-        trimmed = trimmed[1..trimmed.len() - 1].trim().to_string();
-    }
-    let mut decl = Vec::new();
-    let mut imp = Vec::new();
-    let mut exp = Vec::new();
-
-    for part in split_top_level(&trimmed, ',') {
-        let part = part.trim();
-        let Some(colon) = part.find(':') else {
-            continue;
-        };
-        let key = part[..colon].trim();
-        let value = part[colon + 1..].trim();
-        match key {
-            "declarations" => decl = parse_identifier_list(value),
-            "imports" => imp = parse_identifier_list(value),
-            "exports" => exp = parse_identifier_list(value),
-            _ => {}
-        }
-    }
-    (decl, imp, exp)
-}
-
-fn parse_identifier_list(value: &str) -> Vec<String> {
-    let trimmed = value.trim();
-    if !trimmed.starts_with('[') {
-        return Vec::new();
-    }
-    let inner = trimmed.trim_start_matches('[').trim_end_matches(']').trim();
-    split_top_level(inner, ',')
-        .into_iter()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect()
-}
-
-fn parse_pipe_fields(arg: &str) -> (Option<String>, bool) {
-    let mut trimmed = arg.trim().to_string();
-    if trimmed.starts_with('{') && trimmed.ends_with('}') {
-        trimmed = trimmed[1..trimmed.len() - 1].trim().to_string();
-    }
-    let mut name: Option<String> = None;
-    for part in split_top_level(&trimmed, ',') {
-        let part = part.trim();
-        let Some(colon) = part.find(':') else {
-            continue;
-        };
-        let key = part[..colon]
-            .trim()
-            .trim_matches(|c: char| c == '"' || c == '\'');
-        let value = part[colon + 1..].trim();
-        if key == "name" && (value.starts_with('"') || value.starts_with('\'')) {
-            name = Some(unquote(value).to_string());
-        }
-    }
-    (name, false)
-}
-
-fn parse_first_string_arg(arg: &str) -> Option<String> {
-    let trimmed = arg.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let unquoted = unquote(trimmed);
-    if unquoted == trimmed {
-        return None;
-    }
-    Some(unquoted.to_string())
-}
-
 /// Extract input/output field names from a class capture for semantic edge
 /// construction.
 ///
@@ -735,162 +496,6 @@ pub(crate) fn extract_module_declarations(
     }
 
     (Vec::new(), Vec::new(), Vec::new())
-}
-
-pub(crate) fn extract_constructor_injects(raw_class: &str) -> Option<Vec<String>> {
-    let body_start = raw_class.find('{')?;
-    let body = &raw_class[body_start..];
-
-    let mut search_from = 0;
-    let mut ctor_paren: Option<usize> = None;
-    while let Some(pos) = body[search_from..].find("constructor") {
-        let abs = search_from + pos;
-        let before_ok = abs == 0 || !is_word_byte(body.as_bytes()[abs - 1]);
-        let after_pos = abs + "constructor".len();
-        let after_ok = after_pos >= body.len() || !is_word_byte(body.as_bytes()[after_pos]);
-        if before_ok && after_ok {
-            let rest = &body[after_pos..];
-            let trimmed = rest.trim_start();
-            if let Some(after_trim) = trimmed.find('(') {
-                let offset = body_start + after_pos + (rest.len() - trimmed.len()) + after_trim;
-                ctor_paren = Some(offset);
-                break;
-            }
-        }
-        search_from = abs + 1;
-    }
-
-    let open = ctor_paren?;
-    // F-ANG-09: an unterminated constructor has no params (no
-    // injects to extract). Fall back to an empty param list.
-    let params = consume_call_expression(raw_class, open)
-        .map(|(_, p)| p)
-        .unwrap_or_default();
-
-    let mut types: Vec<String> = Vec::new();
-    for param in split_top_level(&params, ',') {
-        let param = param.trim();
-        if param.is_empty() {
-            continue;
-        }
-        let has_inject_modifier = param.starts_with("private ")
-            || param.starts_with("protected ")
-            || param.starts_with("public ")
-            || param.starts_with("readonly private ")
-            || param.starts_with("readonly protected ")
-            || param.starts_with("readonly public ");
-        if !has_inject_modifier {
-            continue;
-        }
-        let Some(colon) = param.find(':') else {
-            continue;
-        };
-        let type_part = param[colon + 1..].trim();
-        let type_part = type_part.split('=').next().unwrap_or(type_part).trim();
-        let type_name: String = type_part
-            .chars()
-            .take_while(|c| c.is_alphanumeric() || *c == '_')
-            .collect();
-        if !type_name.is_empty() {
-            types.push(type_name);
-        }
-    }
-
-    if types.is_empty() { None } else { Some(types) }
-}
-
-fn is_word_byte(c: u8) -> bool {
-    c.is_ascii_alphanumeric() || c == b'_'
-}
-
-/// Walk the class body and collect all `@Input(...)` /
-/// `@Output(...)` decorator occurrences, pairing each decorator
-/// with the field declaration line that follows it.
-pub(crate) fn collect_field_decorators(body: &str) -> Vec<(DecoratorKind, Option<String>, String)> {
-    let mut out: Vec<(DecoratorKind, Option<String>, String)> = Vec::new();
-    let bytes = body.as_bytes();
-    let len = bytes.len();
-    let mut i = 0;
-
-    while i < len {
-        if bytes[i] != b'@' {
-            i += 1;
-            continue;
-        }
-        i += 1;
-        let name_start = i;
-        while i < len {
-            let c = bytes[i];
-            if c.is_ascii_alphanumeric() || c == b'_' || c == b'$' {
-                i += 1;
-            } else {
-                break;
-            }
-        }
-        if i == name_start {
-            continue;
-        }
-        let name = &body[name_start..i];
-        while i < len && (bytes[i] == b' ' || bytes[i] == b'\t' || bytes[i] == b'\n') {
-            i += 1;
-        }
-        let mut arg = String::new();
-        // F-ANG-09: same pattern as `collect_decorators` — advance
-        // past `(` on unterminated call, use empty arg.
-        if i < len && bytes[i] == b'(' {
-            if let Some((consumed, arg_str)) = consume_call_expression(body, i) {
-                i += consumed;
-                arg = arg_str;
-            } else {
-                i += 1;
-            }
-        }
-        let kind = match name {
-            "Input" => Some(DecoratorKind::Input),
-            "Output" => Some(DecoratorKind::Output),
-            _ => None,
-        };
-        if let Some(k) = kind {
-            while i < len && (bytes[i] == b' ' || bytes[i] == b'\t') {
-                i += 1;
-            }
-            let field_start = i;
-            while i < len {
-                let c = bytes[i];
-                if c == b'\n' || c == b'{' || c == b'=' || c == b';' || c == b':' {
-                    break;
-                }
-                i += 1;
-            }
-            let field_segment = body[field_start..i].trim();
-            let field_name = field_segment
-                .split_whitespace()
-                .next()
-                .unwrap_or("?")
-                .to_string();
-            let field_name = if field_name.is_empty() {
-                "?".to_string()
-            } else {
-                field_name
-            };
-            let alias = parse_first_string_arg(&arg);
-            out.push((k, alias, field_name));
-        }
-    }
-    out
-}
-
-fn unquote(s: &str) -> &str {
-    let s = s.trim();
-    if s.len() >= 2 {
-        let bytes = s.as_bytes();
-        let first = bytes[0];
-        let last = bytes[bytes.len() - 1];
-        if (first == b'"' && last == b'"') || (first == b'\'' && last == b'\'') {
-            return &s[1..s.len() - 1];
-        }
-    }
-    s
 }
 
 /// Extract graph-compatible metadata from the class capture for the

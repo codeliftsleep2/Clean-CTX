@@ -13,6 +13,9 @@
 // - `detect`     : Angular detection heuristic
 // - `decorators` : `@Component` / `@Injectable` / `@NgModule` /
 //                  `@Directive` / `@Pipe` / `@Input` / `@Output` extractor
+// - `decorator_scan`      : textual `@Decorator(...)` / field-decorator walkers
+// - `decorator_args`      : decorator-argument parsing (`{...}`, `('alias')`)
+// - `constructor_injects` : Angular constructor DI parameter extraction
 // - `markers`    : `Φ` marker construction & expansion
 // - `bundler`    : file-triplet resolver (*.component.ts → .html + .scss)
 // - `template`   : tree-sitter-html Angular-syntax template extractor
@@ -20,6 +23,9 @@
 // - `footer`     : `§ΦMAP` workspace footer formatter
 // - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
 
+pub(crate) mod constructor_injects;
+pub(crate) mod decorator_args;
+pub(crate) mod decorator_scan;
 pub(crate) mod decorators;
 pub(crate) mod detect;
 pub mod formly;
@@ -471,3 +477,7 @@ mod tests;
 #[cfg(all(test, feature = "angular"))]
 #[path = "../tests/angular_meta/semantic.rs"]
 mod semantic_tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../tests/angular_meta/constructor_di_edges.rs"]
+mod constructor_di_edge_tests;

@@ -46,6 +46,66 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-015: Angular `Injects` Edges Missed Bare Typed Constructor Parameters
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-15 |
+| **Environment** | Claude + Clean-CTX v0.6.4 (live Angular workspace) |
+| **Repository/context** | Real Angular workspace; single-service consumer measurement (workspace size and non-Angular languages not recorded) |
+| **Symptom** | `workspace_query(type="reverse_edges", domain="angular")` returned 33 consumers of one service, while independent source inspection found 42 real constructor-injected consumers. All 9 missing consumers (≈21 %) used bare typed constructor parameters without a parameter-property modifier. |
+| **Root cause** | `src/angular_meta/decorators.rs::extract_constructor_injects` gated every parameter on a literal modifier prefix (`private ` / `protected ` / `public ` / `readonly private ` / `readonly protected ` / `readonly public `) *before* splitting the `:` type. `constructor(foo: FooService) {}` and `constructor(readonly foo: FooService) {}` were skipped outright, and `constructor(@Inject(TOKEN) api: ApiClient) {}` was skipped because the modifier test ran before the type was reached. That `injects` list is the sole input to `SemanticRelation::Injects`, so the undercount propagated unchanged into `WorkspaceIndex` and the query layer. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes — deterministic extraction fixture; no scale dependency. |
+| **Local regression** | `src/tests/angular_meta/constructor_injects.rs` (21 extraction-level cases: `RED-DI1`–`RED-DI10` plus parity, decorator-preservation, eligibility, guard, and `Φinjects:` projection cases) and `src/tests/angular_meta/constructor_di_edges.rs` (15 production-path cases through `IRCompiler` → `MetaLayerPass` → `AngularMetaLayer` → `class_to_semantic_edges` → `WorkspaceIndex`, including `RED-W1`–`RED-W3`). |
+| **Live scenario required?** | Yes — re-run the real service-consumer reverse-edge measurement and confirm the 9 bare-parameter consumers appear while the previously reported 33 remain, with no duplicates and no unrelated plain TypeScript classes. |
+| **Architectural invariant** | `ANG-DI-001` |
+| **Status** | Fixed (live re-verification pending — the corrected live count has not yet been measured) |
+
+**Resolution:** constructor-injection extraction now lives in `src/angular_meta/constructor_injects.rs` and is modifier-independent: parameter-property modifiers are stripped as whole words rather than required, parameter decorators are skipped so the declared type stays reachable, and the parse tolerates multiline layouts, trailing commas, and line breaks between decorator / modifier / name / type. One unified extraction feeds both `class_to_semantic_edges` and the `Φinjects:` marker, so no second recognition path can emit a duplicate edge; `WorkspaceIndex` and the query layer were deliberately left untouched (no downstream workaround). Injection identity (parameter type), type eligibility, and the Angular class-level gate are unchanged, so ordinary TypeScript constructors still produce no Angular edges.
+
+---
+
+## DIS-2026-014: CBM Inbound Caller Evidence Was Accepted Without C# Arity Verification
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-15 |
+| **Environment** | Clean-CTX v0.6.4 `cbm_proxy` inbound-caller path (recorded from commit `dc5dff1`; live environment details were not recorded in the commit) |
+| **Repository/context** | C# repository indexed by CBM and queried through the `cbm_proxy` inbound-caller path (size not recorded) |
+| **Symptom** | Not recorded in the commit — the shipped change is a correctness hardening of the inbound caller evidence surfaced through `cbm_proxy`. |
+| **Root cause** | Caller evidence produced by CBM was consumed without checking the candidate C# source's structural argument shape (arity / overload compatibility), so a call site that cannot match the queried declaration's parameter shape could still be surfaced as a verified dependency. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes — structural verification over candidate C# source with deterministic statuses. |
+| **Local regression** | `src/tests/cbm/caller_verify.rs` (verification statuses, arity rejection, ambiguity, unverifiable evidence). |
+| **Live scenario required?** | Not recorded in the commit; a live C# workspace re-query is advisable to confirm the reported rejection/ambiguity counts. |
+| **Architectural invariant** | N/A — CBM remains the candidate provider; Clean-CTX source parsing remains the semantic authority. |
+| **Status** | Fixed (live context and re-verification not recorded) |
+
+**Resolution:** `src/cbm/caller_verify.rs` verifies CBM-derived inbound caller candidates against candidate C# source structure and classifies evidence as `VerifiedCompatible`, `RejectedArityMismatch`, `Ambiguous`, or `Unverifiable`; `src/cbm/caller_verify_proxy.rs` applies it inside `cbm_proxy` after CBM returns candidate evidence and before the response is compressed, recovering candidate file paths only from supplementary CBM queries. Verification annotates the response with deterministic counts and never inserts a relationship into `WorkspaceIndex`.
+
+---
+
+## DIS-2026-013: Angular Reactive Forms Reconstruction Duplicated Artifacts and Dropped Nested Groups
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-14 (recorded from commit `01eb3e4` and its own 0.6.4 changelog entry; no live measurement was recorded) |
+| **Environment** | Clean-CTX v0.6.4 Angular Reactive Forms meta-layer |
+| **Repository/context** | Angular repository using `FormBuilder` / `FormGroup` construction (live context and size not recorded in the commit) |
+| **Symptom** | Not recorded in the commit — the shipped regression class was duplicate logical artifacts for repeated construction of the same form/control/array, and loss of recursive structure for nested `FormGroup` fields. |
+| **Root cause** | Reactive-form reconstruction emitted one artifact per construction site instead of merging compatible structural evidence, and nested group traversal did not recurse into descendant groups/controls/arrays. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes — deterministic structure fixture suite. |
+| **Local regression** | `src/tests/angular_meta/reactive_forms_structure.rs` with `src/angular_meta/reactive_forms_normalize.rs`. |
+| **Live scenario required?** | Not recorded; the commit's own 0.6.4 changelog entry is the acceptance record for that release. |
+| **Architectural invariant** | N/A |
+| **Status** | Fixed (documented in the 0.6.4 changelog section) |
+
+**Provenance:** this entry is included for discovery-log completeness of the commits shipped between the 0.6.4 changelog update and v0.6.5. Unlike `DIS-2026-009`–`DIS-2026-012` and `DIS-2026-015` it was not captured from a recorded live scenario, so its symptom/context fields state only what the commit documents. The fix merges compatible structural evidence in stable source order, preserves recursive nested group/control/array structure with descendant validators, and keeps lower fidelities compact without false control markers.
+
+---
+
 ## DIS-2026-012: Live CBM Tests Serialized Bodies but Retained Multiple Subprocesses
 
 | Field | Value |

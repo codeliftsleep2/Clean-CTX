@@ -76,7 +76,7 @@ You will know Phase 1 is complete when **all** of the following are true:
 - `@Injectable({providedIn: 'root'})` emits a `Φsvc:<ClassName> scope=root` line.
 - `@NgModule({...})` emits a `Φmod:<ClassName> decl=[…] imp=[…] exp=[…]` line.
 - `@Directive` / `@Pipe` emit `Φdir:` / `Φpipe:` lines.
-- Constructor parameters with `private` / `protected` emit `Φinjects:[<Type>]` (unresolved at this phase — class names only  no `α` aliases yet).
+- Constructor parameters with a declared type emit `Φinjects:[<Type>]` (unresolved at this phase — class names only  no `α` aliases yet). Parameter-property modifiers (`private` / `public` / `protected` / `readonly`) are NOT required: they control TypeScript property generation, not Angular injection (corrected 2026-09; see `ANG-DI-001`).
 
 **Non-regression**
 - A non-Angular `.ts` file produces **zero** Φ markers and **zero** newlines of overhead.

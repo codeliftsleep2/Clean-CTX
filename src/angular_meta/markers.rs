@@ -436,8 +436,14 @@ impl PhiLine for ModelLine<'_> {
     }
 }
 
-/// A `Φinjects:[<Type>,…]` marker line for constructor parameters with
-/// `private` / `protected` access modifiers.
+/// A `Φinjects:[<Type>,…]` marker line for constructor-injected parameter
+/// types.
+///
+/// The type list is modifier-independent: a typed constructor parameter is an
+/// Angular injection whether or not it declares a TypeScript parameter
+/// property (`private` / `public` / `protected` / `readonly`). The list is
+/// produced by the single extraction in `constructor_injects.rs`, which the
+/// semantic `Injects` edge also consumes.
 pub struct InjectsLine<'a> {
     pub types: &'a [String],
 }

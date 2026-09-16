@@ -8,6 +8,26 @@ Historical releases are archived per version as `CHANGELOG_<version>.md` (`_a`/`
 
 ---
 
+## [0.6.5] - 2026-09-15
+
+### Fixed
+
+* **Angular constructor-DI modifier independence (`Injects` undercount)** — extraction required a TypeScript parameter-property modifier (`private` / `protected` / `public` / `readonly <access>`), so bare typed parameters (`constructor(foo: FooService) {}`) and `readonly`-only parameters were discarded before `class_to_semantic_edges` built `SemanticRelation::Injects`, undercounting Angular consumers in `workspace_query` (`forward_edges` / `reverse_edges`) — a measured real workspace reported 33 consumers of one service where independent source inspection found 42 (9 consumers ≈ 21 %, all bare typed parameters). Modifiers are now stripped rather than required, parameter decorators (`@Inject(...)`, `@Optional()`, `@Attribute(...)`) no longer hide the parameter type, and formatter layout (multiline parameter lists, trailing commas, line breaks between decorator / modifier / name / type) cannot change the extracted edges. Injection identity (parameter type), type eligibility (no primitive filter added or removed; generic and qualified names keep the pre-existing leading-identifier reduction), and the class-level Angular gate are unchanged — only `@Component` / `@Injectable` / `@Directive` / `@Pipe` / `@NgModule` classes are extracted, so ordinary TypeScript constructors gain no Angular edges — and exactly one edge per parameter is emitted, leaving `WorkspaceIndex` dedup semantics untouched. `Φinjects:` markers project the same single extraction and now include bare-typed parameters. Recorded as invariant `ANG-DI-001` and discovery `DIS-2026-015`. (`src/angular_meta/constructor_injects.rs`, `src/angular_meta/decorators.rs` — decomposed 982 → 587 lines along semantic boundaries, `src/angular_meta/decorator_scan.rs`, `src/angular_meta/decorator_args.rs`, `src/angular_meta/mod.rs`, `src/angular_meta/markers.rs`, `docs/ARCHITECTURAL_INVARIANTS.md`, `docs/ANGULAR_META_LAYER.md`)
+* **C# CBM caller-evidence arity verification** — inbound caller evidence supplied by CBM is now verified against the candidate C# source's structural argument shape before the proxy response is compressed, so overload and arity-mismatched callers are reported rejected or ambiguous instead of being surfaced as verified dependencies. Supplementary CBM queries recover candidate file paths only, source parsing remains the semantic authority, and nothing from verification enters `WorkspaceIndex`. Results carry deterministic counts (`raw_candidates`, `verified`, `rejected_arity`, `ambiguous`, `unverifiable`, `verified_caller_files`, `compatible_caller_files`) and a `VerifiedCompatible` / `RejectedArityMismatch` / `Ambiguous` / `Unverifiable` resolution. Recorded as discovery `DIS-2026-014`. (commit `dc5dff1`; `src/cbm/caller_verify.rs`, `src/cbm/caller_verify_proxy.rs`, `src/cbm/proxy.rs`, `src/mcp/tool_helpers.rs`, `src/tests/cbm/caller_verify.rs`)
+
+### Tests
+
+* **Angular constructor-DI regressions** — `src/tests/angular_meta/constructor_injects.rs` pins 21 extraction-level cases (`RED-DI1` bare typed parameter, `RED-DI2`/`RED-DI3`/`RED-DI4` `private` / `readonly` / `private readonly` / `public` / `protected` controls, `RED-DI5` mixed parameter lists, `RED-DI8` `@Optional` / `@Inject` / stacked-decorator type preservation, `RED-DI9` multiline / trailing-comma / line-break formatting independence, `RED-DI10` exactly one injection per parameter for every modifier form, generic / qualified / primitive-eligibility parity, untyped and unterminated-constructor handling, `constructorLike` word-boundary guard, and `Φinjects:` projection). `src/tests/angular_meta/constructor_di_edges.rs` runs 15 production-path cases (`IRCompiler` → `MetaLayerPass` → `AngularMetaLayer` → `class_to_semantic_edges` → `WorkspaceIndex`): `RED-DI1`–`RED-DI10`, `RED-DI6` component scope, `RED-DI7` non-Angular class guard, `RED-W1` forward edge, `RED-W2` shorthand/bare reverse-edge parity, and `RED-W3` mixed-workspace reverse-edge count (`N + M`).
+* **C# caller-verification regressions** — `src/tests/cbm/caller_verify.rs` covers verification statuses, arity rejection, ambiguity, and unverifiable evidence (commit `dc5dff1`).
+
+### Verification
+
+* Encoding guard: **PASS** — `scripts/check-utf8.ps1` reported 583 text files valid strict UTF-8, 0 BOMs, and 0 unexplained mojibake or letter-substitution signatures (run against the code/test changes of this build, before this section's documentation edits were written; this changelog is an allowlist-carrying file, so both guards are re-run over the documentation edits as part of the gate below).
+* Active-file size validation: **PASS** — `scripts/check-file-sizes.ps1` reported 10 active text files checked (target 600 / ceiling 615) with 50 legacy oversized files reported and untouched; the Angular extraction module was decomposed rather than left oversized (same pre-documentation run).
+* Compile, Clippy, formatting, the focused `RED-DI`/`RED-W` suites, the Angular meta-layer suites, the full all-target/all-feature suite, and a re-run of both guards over the documentation edits are performed by the release owner as the Final Verification Gate; no gate result is claimed here until those results are recorded.
+
+---
+
 ## [0.6.4] - 2026-09-14
 
 ### Added
