@@ -247,7 +247,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
             return;
         }
     }
-    let raw_response = match bridge.proxy_call(cbm_tool, args) {
+    let raw_response = match bridge.proxy_call(cbm_tool, args.clone()) {
         Ok(text) => {
             // Intercept before compression: check for project-not-found CBM
             // errors and enhance them with a recovery hint. CBM-level errors
@@ -265,6 +265,14 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
             return;
         }
     };
+    let raw_response = crate::cbm::caller_verify_proxy::verify_proxy_response(
+        bridge,
+        state,
+        cbm_tool,
+        &args,
+        params["arguments"]["workspaceRoot"].as_str(),
+        &raw_response,
+    );
 
     // RM-1: Single status clone after CBM interaction
     // state.cbm_status is Arc - cannot mutate

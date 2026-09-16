@@ -53,7 +53,7 @@ pub(super) fn resolve_file_path(path: &str, workspace_root: Option<&str>) -> Str
 /// the LLM to read sensitive files outside the project (e.g. `/etc/passwd`,
 /// `~/.ssh/id_rsa`) — the resolved path must remain within the (canonicalized)
 /// root, so escaping via `..` or symlinks is rejected.
-pub(super) fn resolve_file_path_checked(
+pub(crate) fn resolve_file_path_checked(
     path: &str,
     workspace_root: Option<&str>,
     additional_roots: &[String],
