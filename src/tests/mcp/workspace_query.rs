@@ -298,3 +298,9 @@ mod workspace_query_scope;
 
 #[path = "workspace_query_scope_provenance.rs"]
 mod workspace_query_scope_provenance;
+
+#[path = "workspace_query_scope_entities.rs"]
+mod workspace_query_scope_entities;
+
+#[path = "workspace_query_scope_traversal.rs"]
+mod workspace_query_scope_traversal;

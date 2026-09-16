@@ -44,7 +44,7 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
         "reverse_edges" => handle_reverse_edges(id, args, state),
         "entities_in_file" => handle_entities_in_file(id, args, state),
         "transitive_dependencies" => handle_transitive_dependencies(id, args, state),
-        "has_cycle" => handle_has_cycle(id, state),
+        "has_cycle" => handle_has_cycle(id, args, state),
         _ => {
             // ... error handling unchanged
             send_response(&serde_json::json!({
@@ -81,9 +81,18 @@ fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
         }
     };
     let workspace_root = args["workspaceRoot"].as_str();
+    // Workspace scope: a query issued FOR a workspace answers with the entity
+    // occurrences that workspace's own files declare (`None` = the caller
+    // declared no workspace, so the previous unfiltered behaviour stands).
+    // Built once per query, so the initial answer and the post-hydration rerun
+    // share one root set.
+    let scope = query_scope(state, args);
     let (results, count, hydration_attempted, hydration) =
-        run_query_with_hydration(state, "find_entities", name, workspace_root, |idx| {
-            let r = idx.find_entities_by_name(name);
+        run_query_with_hydration(state, "find_entities", name, workspace_root, move |idx| {
+            let r = match scope.as_ref() {
+                Some(scope) => idx.find_entities_by_name_in_scope(name, scope),
+                None => idx.find_entities_by_name(name),
+            };
             let c = r.len();
             (serde_json::to_value(&r).unwrap_or_default(), c)
         });
@@ -208,10 +217,7 @@ fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
     // asserted from inside that workspace (primary root + its configured
     // additional roots). `None` when the caller declared no workspace — a
     // root-less query keeps its previous unfiltered behaviour.
-    let scope = crate::workspace::scope::WorkspaceScope::new(
-        workspace_root,
-        &state.config.additional_roots,
-    );
+    let scope = query_scope(state, args);
     let domain_owned = domain.to_string();
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
@@ -301,10 +307,7 @@ fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
     // answer with every occurrence of the identity across the WHOLE session,
     // including real call facts authored by an unrelated indexed repository.
     // Occurrence provenance (`asserting_file`) now constrains the answer.
-    let scope = crate::workspace::scope::WorkspaceScope::new(
-        workspace_root,
-        &state.config.additional_roots,
-    );
+    let scope = query_scope(state, args);
     let domain_owned = domain.to_string();
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
@@ -447,6 +450,11 @@ fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
     };
     let depth = optional_i32(args, "depth", 1);
     let workspace_root = args["workspaceRoot"].as_str();
+    // Workspace scope: reachability is computed from THIS workspace's evidence
+    // only — filtering the returned list could not achieve that, since the walk
+    // itself must not pass through another repository's edges (see
+    // `WorkspaceIndex::transitive_dependencies_in_scope`).
+    let scope = query_scope(state, args);
     let domain_owned = domain.to_string();
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
@@ -457,7 +465,16 @@ fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
             let et = et_owned.clone();
             let name = name_owned.clone();
             move |idx| {
-                let r = idx.transitive_dependencies(&domain, &et, &name, depth_captured);
+                let r = match scope.as_ref() {
+                    Some(scope) => idx.transitive_dependencies_in_scope(
+                        &domain,
+                        &et,
+                        &name,
+                        depth_captured,
+                        scope,
+                    ),
+                    None => idx.transitive_dependencies(&domain, &et, &name, depth_captured),
+                };
                 let c = r.len();
                 (serde_json::to_value(&r).unwrap_or_default(), c)
             }
@@ -488,9 +505,18 @@ fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
 /// `has_cycle`: detect cycles in the entity graph.
 ///
 /// NOT hydration-eligible: workspace-wide property, no entity identity.
-fn handle_has_cycle(id: &Value, state: &McpState) {
+///
+/// Workspace scope: when a workspace root is declared, only edge occurrences
+/// ASSERTED inside that workspace count as cycle edges, so two repositories that
+/// each contribute one half of a cycle can never be combined into a cycle report
+/// that neither workspace actually contains. Cycle membership itself is
+/// unchanged (`Calls` stays excluded, see `WorkspaceIndex::has_cycle_in_scope`).
+fn handle_has_cycle(id: &Value, args: &Value, state: &McpState) {
     let idx = state.workspace_index_read();
-    let has_cycle = idx.has_cycle();
+    let has_cycle = match query_scope(state, args).as_ref() {
+        Some(scope) => idx.has_cycle_in_scope(scope),
+        None => idx.has_cycle(),
+    };
     let text = if has_cycle {
         "Cycle detected."
     } else {
@@ -516,6 +542,19 @@ fn required_str<'a>(args: &'a Value, name: &str) -> Option<&'a str> {
 /// Extract an optional integer argument; returns `default` if missing.
 fn optional_i32(args: &Value, name: &str, default: i32) -> i32 {
     args[name].as_i64().map(|v| v as i32).unwrap_or(default)
+}
+
+/// The active workspace scope of one `workspace_query` call: the caller's
+/// `workspaceRoot` plus the configured `additional_roots`, canonicalized once by
+/// `WorkspaceScope` (see `workspace::scope`). No query type parses roots itself.
+///
+/// `None` when the caller declared no workspace root: a root-less query stays
+/// unscoped, exactly as before, and no fallback root is ever substituted.
+fn query_scope(state: &McpState, args: &Value) -> Option<crate::workspace::scope::WorkspaceScope> {
+    crate::workspace::scope::WorkspaceScope::new(
+        args["workspaceRoot"].as_str(),
+        &state.config.additional_roots,
+    )
 }
 
 #[cfg(all(test, feature = "rust"))]

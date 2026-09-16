@@ -109,6 +109,63 @@ fn selected_occurrences<'a>(
         .unwrap_or_default()
 }
 
+/// Is this ENTITY occurrence's provenance inside the active workspace scope?
+///
+/// Entity provenance is the occurrence's own file (`EntityRef.file` — the
+/// canonical file it was extracted from). The predicate is deliberately the same
+/// one edge occurrences use (`WorkspaceScope::admits` over the occurrence's own
+/// asserting file), so entity and edge provenance share exactly ONE scope rule
+/// and no query type grows its own root logic.
+///
+/// An occurrence with no file provenance cannot be attributed to a workspace: it
+/// is excluded while a scope is active (provenance is the boundary) and returned
+/// unfiltered when there is none. Production `add_edges` always stamps a file
+/// before registration, so this is a structural guard rather than a live case.
+///
+/// Cost: one comparison per occurrence already selected — no index scan, no disk
+/// access, no path recanonicalization (the scope pre-split its roots once).
+pub(super) fn entity_occurrence_admitted(
+    occurrence: &EntityRef,
+    scope: Option<&WorkspaceScope>,
+) -> bool {
+    scope.is_none_or(|scope| {
+        occurrence
+            .file
+            .as_deref()
+            .is_some_and(|file| scope.admits(file))
+    })
+}
+
+/// Select entity occurrences by name, optionally restricted to the occurrences
+/// whose own file provenance lies inside the active workspace scope.
+///
+/// Scope filtering happens INSIDE the already-selected name bucket: the cost is
+/// proportional to the occurrences of that name, never to the size of the index,
+/// and no whole-index scan, file read, rediscovery or recompilation is involved.
+/// `None` (an unscoped query) returns every occurrence, unchanged.
+fn find_entities_by_name_with_scope<'a>(
+    index: &'a WorkspaceIndex,
+    name: &str,
+    scope: Option<&WorkspaceScope>,
+) -> Vec<&'a EntityRef> {
+    let keys = match index.name_index.get(name) {
+        Some(k) => k,
+        None => return Vec::new(),
+    };
+    let mut results: Vec<&EntityRef> = Vec::new();
+    for key in keys {
+        let Some(occurrences) = index.entities.get(key) else {
+            continue;
+        };
+        for occurrence in occurrences {
+            if entity_occurrence_admitted(occurrence, scope) {
+                results.push(occurrence);
+            }
+        }
+    }
+    results
+}
+
 // ── WorkspaceIndex ────────────────────────────────────────────────────
 
 /// Framework-agnostic cross-file semantic index.
@@ -372,17 +429,29 @@ impl WorkspaceIndex {
     ///
     /// Returns an empty vec when no entity with that name exists.
     pub fn find_entities_by_name(&self, name: &str) -> Vec<&EntityRef> {
-        let keys = match self.name_index.get(name) {
-            Some(k) => k,
-            None => return Vec::new(),
-        };
-        let mut results: Vec<&EntityRef> = Vec::new();
-        for key in keys {
-            if let Some(occurrences) = self.entities.get(key) {
-                results.extend(occurrences.iter());
-            }
-        }
-        results
+        find_entities_by_name_with_scope(self, name, None)
+    }
+
+    /// Workspace-scoped variant of [`WorkspaceIndex::find_entities_by_name`]:
+    /// only the occurrences whose own file provenance lies inside `scope` are
+    /// returned.
+    ///
+    /// The boundary is occurrence PROVENANCE (`EntityRef.file` — the canonical
+    /// file the occurrence was extracted from), exactly as `asserting_file` is for
+    /// edge occurrences, and never semantic identity: the same Model C identity
+    /// may be declared in several repositories at once, and a query issued for one
+    /// workspace answers with that workspace's occurrences only. Nothing is
+    /// removed from the index — the scope is a view over it (see
+    /// `workspace::scope`).
+    ///
+    /// Hydration is unaffected: the scope is built once per query and both the
+    /// initial query and the post-hydration rerun use that same root set.
+    pub fn find_entities_by_name_in_scope(
+        &self,
+        name: &str,
+        scope: &WorkspaceScope,
+    ) -> Vec<&EntityRef> {
+        find_entities_by_name_with_scope(self, name, Some(scope))
     }
 
     /// Resolve an injection reference target by bare type name.

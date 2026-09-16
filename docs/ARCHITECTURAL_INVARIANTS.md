@@ -316,6 +316,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### WSC-004 Workspace Queries Respect Declared Workspace Scope
+
+| Property | Value |
+|----------|-------|
+| **Intent** | `WorkspaceIndex` deliberately retains the evidence of every repository a session has compiled — that retention is what makes entity ambiguity and cross-file edge evidence truthful — so a query must state which workspace it is asking about. Without a declared scope, a query issued FOR one repository answered with real, semantically valid facts authored by another repository that merely happened to share the session (`reverse_edges` returning unrelated `OrderBy` callers; `find_entities` returning a same-named entity of another project; `transitive_dependencies` walking through another repository's edges; `has_cycle` reporting a cycle assembled from two repositories' halves). |
+| **Invariant** | When `workspace_query` explicitly declares a workspace root, occurrence-bearing results MUST be restricted to semantic evidence belonging to that root plus its configured `additional_roots`. Scoping is a query-time VIEW over globally retained facts: it MUST use source/file provenance — `StoredEdge::asserting_file` for edge occurrences, `EntityRef.file` for entity occurrences — decided by the single shared `WorkspaceScope::admits` rule; it MUST NOT alter Model C identity (`(domain, entity_type, name)`), MUST NOT delete or mutate unrelated workspace evidence, MUST NOT introduce query-specific root parsing, per-repository partitioning, new caches or secondary indexes, and MUST NOT let discovery evidence (CBM) become authoritative. One root set is built per query so the initial answer and the post-hydration rerun are scoped identically. For graph traversal the scope MUST be applied DURING traversal, never to the returned list, because reachability and cycle membership are properties of the walk (`A -> X` in the workspace plus `X -> Y` elsewhere must not report `Y`). `entities_in_file` is the exception that proves the rule: its explicit `file_path` is already validated against the trusted-path/root boundary (component-wise containment), so the accepted set is exactly primary root plus configured additional roots and the path itself is the scope — no redundant occurrence filter is added. A query that declares NO workspace root remains unscoped (the global/session view) and no fallback root may be substituted. |
+| **Enforcement** | `src/workspace/scope.rs` (`WorkspaceScope::new` / `admits` — the one root-set authority, canonicalized through `canonical_identity_key`, component-wise containment so `repo` never admits `repo-old`); `src/workspace/index.rs` (`selected_occurrences` for edge occurrences, `entity_occurrence_admitted` + `find_entities_by_name_in_scope` for entity occurrences); `src/workspace/index/traversal.rs` (`has_cycle_in_scope`, `transitive_dependencies_in_scope` — adjacency-level filtering plus the start-occurrence guard); `src/mcp/tool_handlers/query.rs` (`query_scope` is the only root parser; every occurrence-bearing handler dispatches to the scoped variants); regressions `src/tests/mcp/workspace_query_scope.rs` + `workspace_query_scope_provenance.rs` (RED-SCOPE1–RED-SCOPE10: edge isolation, root identity, lifecycle, object-provenance and root-less controls), `src/tests/mcp/workspace_query_scope_entities.rs` (RED-WSC4-1–RED-WSC4-4), `src/tests/mcp/workspace_query_scope_traversal.rs` (RED-WSC4-5–RED-WSC4-12 plus the start-occurrence guard). |
+| **Authority** | `src/workspace/scope.rs`, `src/workspace/index.rs`, `src/workspace/index/traversal.rs`, `src/mcp/tool_handlers/query.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
+
 ### ANG-DI-001 Angular Constructor Injection Is Modifier- and Formatting-Independent
 
 | Property | Value |
