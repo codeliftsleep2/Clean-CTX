@@ -94,25 +94,25 @@ impl CallerVerificationSummary {
 
     /// Fold one independently verified target into a surface-level aggregate.
     ///
-    /// Counters (including the per-target file counts) are summed. Target
-    /// identity and arity survive only while every folded target agrees, so a
-    /// plural aggregate never reports one target's identity for a batch.
-    /// `resolution` is **not** derived here: aggregating surfaces assign it
-    /// once from every folded status via [`aggregate_resolution`].
+    /// Counters (including the per-target file counts) are summed. The first
+    /// folded target is adopted — so a batch of one keeps its target identity
+    /// exactly like the single-target surfaces report it — and identity and
+    /// arity then survive only while every following target agrees; a plural
+    /// aggregate never reports one target's identity for a batch.
+    /// `resolution` is **not** derived here: aggregating surfaces assign it once
+    /// from every folded status via [`aggregate_resolution`].
     pub(crate) fn fold(&mut self, other: &CallerVerificationSummary) {
-        self.target_qualified_name = match (
-            self.target_qualified_name.as_deref(),
-            &other.target_qualified_name,
-        ) {
-            (Some(current), Some(added)) if current == added => Some(added.clone()),
-            (None, Some(added)) => Some(added.clone()),
-            _ => None,
+        self.target_qualified_name = match self.target_qualified_name.take() {
+            None => other.target_qualified_name.clone(),
+            Some(current) if other.target_qualified_name.as_ref() == Some(&current) => {
+                Some(current)
+            }
+            Some(_) => None,
         };
-        self.target_explicit_arity = match (self.target_explicit_arity, other.target_explicit_arity)
-        {
-            (Some(current), Some(added)) if current == added => Some(added),
-            (current, added) if current == added => current,
-            _ => None,
+        self.target_explicit_arity = match self.target_explicit_arity.take() {
+            None => other.target_explicit_arity,
+            Some(current) if other.target_explicit_arity == Some(current) => Some(current),
+            Some(_) => None,
         };
         self.raw_candidates += other.raw_candidates;
         self.verified += other.verified;

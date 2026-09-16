@@ -13,8 +13,9 @@
 //! * search breadth never decides whether verification runs — one result is a
 //!   batch of one;
 //! * one unverifiable result never suppresses verification of its neighbours;
-//! * evidence is attached to the result it was computed for (stable
-//!   `qualified_name` correlation), never to a guessed overload;
+//! * evidence is attached to the result it was computed for (the planned
+//!   position, confirmed by that entry's stable `qualified_name`), never to a
+//!   guessed overload;
 //! * the arity algorithm stays in [`crate::cbm::caller_verify`] — this module is
 //!   orchestration only.
 
@@ -358,27 +359,39 @@ fn annotate_target(payload: &mut Value, target: &SearchTarget, disposition: &Dis
 
 /// Locate the response entry a target belongs to.
 ///
-/// Correlation prefers the stable `qualified_name` identity — unique by
-/// construction, because duplicated identities never enter verification. An
-/// identity that matches nothing, or matches several entries, returns `None`
-/// rather than guessing an overload; only a result that carries no identity at
-/// all is anchored by its recorded position.
+/// The recorded position is the entry the plan was built from — this module
+/// never reorders or removes response entries — and it is confirmed against the
+/// target's stable `qualified_name`, so a reshaped array fails closed instead of
+/// landing evidence on a different symbol. Only when that positional check fails
+/// (defensive: the array was rebuilt underneath us) does a unique identity match
+/// take over; a duplicated identity cannot be attributed to one overload and is
+/// never guessed.
 fn locate<'a>(results: &'a mut [Value], target: &SearchTarget) -> Option<&'a mut Value> {
-    if let Some(name) = target.qualified_name.as_deref() {
-        let matches = results
-            .iter()
-            .enumerate()
-            .filter(|(_, entry)| entry.get("qualified_name").and_then(Value::as_str) == Some(name))
-            .map(|(index, _)| index)
-            .collect::<Vec<usize>>();
-        return match matches.as_slice() {
-            [index] => results.get_mut(*index),
-            _ => None,
-        };
+    let identity = target.qualified_name.as_deref();
+    let anchored = results
+        .get(target.index)
+        .is_some_and(|entry| entry.get("in_degree").is_some() && identity_matches(entry, identity));
+    if anchored {
+        return results.get_mut(target.index);
     }
-    results
-        .get_mut(target.index)
-        .filter(|entry| entry.get("in_degree").is_some())
+    let identity = identity?;
+    let matches = results
+        .iter()
+        .enumerate()
+        .filter(|(_, entry)| {
+            entry.get("in_degree").is_some() && identity_matches(entry, Some(identity))
+        })
+        .map(|(index, _)| index)
+        .collect::<Vec<usize>>();
+    match matches.as_slice() {
+        [index] => results.get_mut(*index),
+        _ => None,
+    }
+}
+
+/// Does the entry still carry the identity its target was planned with?
+fn identity_matches(entry: &Value, identity: Option<&str>) -> bool {
+    entry.get("qualified_name").and_then(Value::as_str) == identity
 }
 
 /// Count `qualified_name` occurrences among the results carrying `in_degree`.
