@@ -49,6 +49,23 @@ pub const CALL_ARGUMENT_CAPTURE: &str = "call.argument";
 /// therefore records them through separate methods and the capture walk stays
 /// the single source of both the count and the qualifier.
 pub const CALL_SPREAD_CAPTURE: &str = "call.spread";
+/// Capture name of the stable written owner name of a BOUND ARROW declaration
+/// (a variable binding or a class property whose value is an arrow function).
+///
+/// It is bound by the same language adapter query that binds the invocation
+/// captures, and it always belongs to ONE query match together with
+/// [`ARROW_ROOT_CAPTURE`], so the two are joined by query-match identity — the
+/// same structural join the argument captures use — never by text scanning.
+/// The name node precedes the arrow node in document order, which is the order
+/// the capture walk visits them.
+pub const ARROW_NAME_CAPTURE: &str = "arrow.name";
+/// Capture name of the BOUND ARROW declaration node itself.
+///
+/// Its `[start_byte, end_byte)` window is the callable span that owns every
+/// invocation inside the arrow body, and it is what opens the arrow's
+/// `CallableScope` — the SAME innermost-span ownership the method/function
+/// declarations already use, so no second ownership algorithm exists.
+pub const ARROW_ROOT_CAPTURE: &str = "arrow.root";
 
 /// Grammar boundary: the invocation-capture query that the IR pass appends to
 /// `base_query` so this producer runs.
@@ -129,6 +146,15 @@ pub struct CallProducer {
     /// argument-less pattern enumerates it, the argument pattern enumerates its
     /// arity); they all bind the SAME callee node, so they share this key.
     match_callee: HashMap<usize, (usize, usize)>,
+    /// Query match → the stable written owner name bound by that match's
+    /// `arrow.name` capture.
+    ///
+    /// Bound-arrow callable identity rides the SAME adapter query and the SAME
+    /// match identity the invocations do. The name is recorded when its capture
+    /// is visited and consumed exactly once, when the arrow declaration capture
+    /// of that match is visited, so a declaration can never take another
+    /// declaration's name (including for nested arrows).
+    arrow_names: HashMap<usize, String>,
     /// Invocation (callee node span) → pending fact, in document order.
     calls: BTreeMap<(usize, usize), PendingCall>,
     /// Invocations dropped because no precise callable owned them.
@@ -196,6 +222,25 @@ impl CallProducer {
         }
     }
 
+    /// Record the stable written owner name of one bound-arrow declaration.
+    ///
+    /// The name is never derived from source text: it is the exact text of the
+    /// captured name node (a variable binding identifier or a class property
+    /// identifier), which the adapter query binds structurally.
+    pub fn record_arrow_name(&mut self, match_index: usize, name: &str) {
+        self.arrow_names.insert(match_index, name.to_string());
+    }
+
+    /// Take the owner name recorded for one arrow declaration match.
+    ///
+    /// `None` means the declaration carries no stable name in this walk (its
+    /// name capture was filtered out or never bound), and the caller must then
+    /// register NO callable — an anonymous arrow is never given an invented
+    /// identity just to avoid an omission.
+    pub fn take_arrow_name(&mut self, match_index: usize) -> Option<String> {
+        self.arrow_names.remove(&match_index)
+    }
+
     /// Emit and drop every pending fact owned by `owner` (in document order),
     /// and drop the pending facts that carry no callable owner.
     ///
@@ -260,6 +305,17 @@ mod csharp_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../tests/ir/calls_typescript.rs"]
 mod typescript_tests;
+
+// Bound-arrow callable identity (TypeScript): the ownership/identity/scope
+// matrix and its callback/realistic-syntax continuation. Both ride the SAME
+// adapter query and the SAME single parse as the invocation captures.
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../tests/ir/calls_arrows.rs"]
+mod arrow_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../tests/ir/calls_arrows_callbacks.rs"]
+mod arrow_callback_tests;
 
 // The Java production capture path for native call facts: the same producer
 // boundary, reached through the Java invocation grammar.

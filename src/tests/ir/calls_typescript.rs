@@ -333,12 +333,26 @@ fn ts_call13_unsupported_contexts_emit_no_call_fact() {
         "a top-level statement must not fabricate a caller"
     );
 
-    // Arrow-function body: not a captured callable declaration.
-    let ir = compile_ts("const f = () => { foo(); };");
+    // Arrow whose binding carries no stable name: an anonymous inline arrow
+    // establishes no callable scope, so nothing owns its body.
+    let ir = compile_ts("items.map(x => { foo(); });");
     assert!(
         call_facts(&ir).is_empty(),
-        "an arrow function must not fabricate a caller"
+        "an unbound arrow function must not fabricate a caller"
     );
+
+    // An object-literal property arrow is deliberately not a callable owner
+    // (its invocations belong to the enclosing recognized callable — see the
+    // object-form `subscribe({ next: ... })` contract), and at top level no
+    // enclosing callable exists, so no fact can be emitted.
+    let ir = compile_ts("const handlers = { save: () => { foo(); } };");
+    assert!(
+        call_facts(&ir).is_empty(),
+        "an object-literal property arrow must not fabricate a caller"
+    );
+    // NOTE: a BOUND arrow (`const f = () => { foo(); }`, a class property
+    // arrow, or a local `const` arrow) now owns its calls — the callable
+    // identity contract is covered by the `calls_arrows` modules.
 }
 
 #[test]

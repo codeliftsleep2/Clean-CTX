@@ -182,9 +182,10 @@ pub const CS_CALL_QUERY: &str = r#"
 //     their `arguments` field — a substitution tuple, not an argument list.
 //     The normalized fact counts explicitly written argument nodes in an
 //     `arguments` list, which such a call does not have.
-//   * an invocation with no precisely identified callable owner (a class
-//     property initializer, a top-level statement): the caller must be a real
-//     callable declaration id, so ownership is never guessed.
+//   * an invocation with no precisely identified callable owner (a PLAIN
+//     property initializer such as `x = foo()`, a top-level statement, an
+//     anonymous arrow body): the caller must be a real callable declaration
+//     id, so ownership is never guessed.
 //
 // CURRENT PRODUCER COVERAGE GAPS — recoverable later; these are NOT claims
 // that the forms are unrepresentable:
@@ -195,10 +196,43 @@ pub const CS_CALL_QUERY: &str = r#"
 //   * `#private` member calls: `this.#save()` names its callee precisely (a
 //     `private_property_identifier`); the patterns above simply do not bind
 //     that node kind yet.
-//   * arrow-function bodies: `const f = () => save();` emits no fact because
-//     no callable declaration is captured for the arrow function, so the
-//     invocation has no stable `builtin` / `Method` caller identity. The exact
-//     limitation is caller identity, not arrow-function syntax.
+//   * an arrow expression whose binding carries NO stable name: an inline
+//     callback argument (`items.map(x => transform(x))`), an object-literal
+//     property (`{ next: tp => save(tp) }`), an IIFE, or a `this.load = () =>
+//     ...` assignment. Such an arrow establishes no callable scope of its own,
+//     so an invocation inside it is owned by the innermost enclosing
+//     RECOGNIZED callable instead — the inheritance that already makes
+//     `load() { source.subscribe({ next: tp => save(tp) }); }` publish
+//     `load --Calls--> save`. That behavior is confirmed and preserved on
+//     purpose, so object-literal property arrows are deliberately NOT
+//     callable owners.
+//
+// Arrow DECLARATIONS whose binding carries a directly recoverable name DO own
+// their calls (the last two patterns of this query; see also
+// `src/ir/calls.rs`, which joins their captures by query-match identity, and
+// `src/ir/pipeline/core.rs`, which registers the callable declaration):
+//
+//   * `const load = () => save();`         -> callable `load`
+//   * `let refresh = () => update();`      -> callable `refresh`
+//   * `class C { load = () => save(); }`   -> callable `load`
+//   * `private handle = () => save();`, `readonly refresh = async () =>
+//     fetchData()`, `load: Handler = (v: Item) => save(v)`, and generic arrows
+//     (`load = <T>(v: T) => save(v)`) are the SAME declaration shape:
+//     modifiers, the type annotation, type parameters and `async` are
+//     siblings of the value, and a concise expression body is a body like any
+//     other, so none of them changes the callable identity.
+//
+// Both captures of one declaration belong to ONE query match, and the name
+// node always precedes the arrow node in document order — the order this walk
+// visits them — so the producer associates them structurally, never by text
+// scanning.
+//
+// `name: (identifier)` and `name: (property_identifier)` are deliberately
+// narrow. Computed (`[key]`), numeric, string and `#private` property names,
+// every destructuring binding (`const { load } = makeHandlers()`,
+// `const [fn] = ...`) and assignment targets (`this.load = () => ...`) have no
+// stable written identifier for this model, so they are structurally EXCLUDED
+// rather than repaired by text extraction.
 pub const TS_CALL_QUERY: &str = r#"
     ; --- Generic invocation captures (native call facts) ---
     (call_expression
@@ -219,6 +253,20 @@ pub const TS_CALL_QUERY: &str = r#"
     (call_expression
         function: (member_expression property: (property_identifier) @call.callee)
         arguments: (arguments (spread_element) @call.spread))
+    ; --- Callable identity for BOUND ARROWS (native call facts) ---
+    ; One pattern per declaration form. `@arrow.name` is the stable written
+    ; owner name, `@arrow.root` is the arrow declaration whose source span owns
+    ; every invocation inside it. Both captures ride ONE query match, so the
+    ; producer joins them by match identity (never by text scanning).
+    ; `value: (arrow_function)` is a concrete subtype of the `value` field's
+    ; `expression` supertype — the same structural idiom the invocation
+    ; patterns above already use for `call_expression.function`.
+    (variable_declarator
+        name: (identifier) @arrow.name
+        value: (arrow_function) @arrow.root)
+    (public_field_definition
+        name: (property_identifier) @arrow.name
+        value: (arrow_function) @arrow.root)
 "#;
 
 // Generic invocation captures (native call facts) for Java.

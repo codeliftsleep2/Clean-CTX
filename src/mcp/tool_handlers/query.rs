@@ -605,3 +605,9 @@ mod tests_native_calls;
 #[cfg(all(test, feature = "rust", feature = "typescript", feature = "java"))]
 #[path = "../../tests/mcp/workspace_query_calls_languages.rs"]
 mod tests_native_calls_languages;
+
+// BOUND-ARROW callers (TypeScript) end-to-end: the arrow's binding name is the
+// caller, the CALLER's file asserts the fact, and WSC-004 scope holds.
+#[cfg(all(test, feature = "rust", feature = "typescript"))]
+#[path = "../../tests/mcp/workspace_query_calls_arrows.rs"]
+mod tests_native_calls_arrows;

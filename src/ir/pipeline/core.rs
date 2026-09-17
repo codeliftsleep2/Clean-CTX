@@ -7,7 +7,8 @@ use crate::compaction::{
 use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::{CapturedNode, run_capture_pipeline_nodes};
 use crate::ir::calls::{
-    CALL_ARGUMENT_CAPTURE, CALL_CALLEE_CAPTURE, CALL_SPREAD_CAPTURE, capture_query,
+    ARROW_NAME_CAPTURE, ARROW_ROOT_CAPTURE, CALL_ARGUMENT_CAPTURE, CALL_CALLEE_CAPTURE,
+    CALL_SPREAD_CAPTURE, capture_query,
 };
 use crate::ir::opcodes::{CoreOp, FLAG_IF, FLAG_LOOP, FLAG_RET, FLAG_THROW};
 use crate::ir::symbol_table::SymbolKind;
@@ -107,6 +108,15 @@ impl IRPass for CoreIRPass {
                 ),
                 CALL_ARGUMENT_CAPTURE => state.record_call_argument(cap.match_index),
                 CALL_SPREAD_CAPTURE => state.record_call_spread(cap.match_index),
+                // Bound-arrow callable identity rides the same adapter query
+                // and the same query-match identity as the invocation captures.
+                // The name is recorded here (the name node precedes the arrow
+                // node in document order) and consumed exactly once, when the
+                // arrow declaration capture of that match is visited.
+                ARROW_NAME_CAPTURE => state
+                    .call_producer
+                    .record_arrow_name(cap.match_index, &cap.text),
+                ARROW_ROOT_CAPTURE => register_arrow_capture(state, cap, &file_id),
                 "class.root" | "interface.root" | "struct.root" | "enum.root" | "trait.root"
                 | "record.root" => {
                     let class_id = state.next_id("C");
@@ -131,7 +141,7 @@ impl IRPass for CoreIRPass {
                     }
                 }
                 "impl.root" => process_impl_capture(state, cap),
-                "method.root" | "constructor.root" | "func.root" | "arrow.root" => {
+                "method.root" | "constructor.root" | "func.root" => {
                     process_method_capture(state, cap, &file_id, fidelity, focus.as_ref());
                 }
                 "field.root" => {
@@ -222,21 +232,8 @@ fn process_method_capture(
     fidelity: Fidelity,
     focus: Option<&std::collections::HashSet<String>>,
 ) {
-    state.refresh_type_owner(cap.start_byte);
-    let class_id = match state.current_class.clone() {
-        Some(class_id) => class_id,
-        None if cap.name == "func.root" || cap.name == "arrow.root" => {
-            let class_id = state.next_id("C");
-            let file_class = format!("__file_{file_id}");
-            state
-                .instructions
-                .push(CoreOp::DefClass(class_id.clone(), file_class.clone()));
-            state.push_file_scope(class_id.clone());
-            state.layer_context.current_class_name = Some(file_class.clone());
-            state.layer_context.current_class_bare_name = Some(file_class);
-            class_id
-        }
-        None => return,
+    let Some(class_id) = resolve_callable_class(state, cap, file_id) else {
+        return;
     };
 
     state.flush_method_flags();
@@ -261,6 +258,72 @@ fn process_method_capture(
         ));
     }
     dispatch_capture(state, cap, true);
+}
+
+/// Resolve the class a callable declaration belongs to: the innermost open type
+/// scope, or the file-wide synthetic class for a top-level callable
+/// (`func.root` / `arrow.root` with no enclosing class).
+///
+/// `None` means the declaration has no home in this compilation (a member
+/// declaration outside every type), and the caller must register nothing.
+fn resolve_callable_class(
+    state: &mut PassContext,
+    cap: &CapturedNode,
+    file_id: &str,
+) -> Option<String> {
+    state.refresh_type_owner(cap.start_byte);
+    match state.current_class.clone() {
+        Some(class_id) => Some(class_id),
+        None if cap.name == "func.root" || cap.name == ARROW_ROOT_CAPTURE => {
+            let class_id = state.next_id("C");
+            let file_class = format!("__file_{file_id}");
+            state
+                .instructions
+                .push(CoreOp::DefClass(class_id.clone(), file_class.clone()));
+            state.push_file_scope(class_id.clone());
+            state.layer_context.current_class_name = Some(file_class.clone());
+            state.layer_context.current_class_bare_name = Some(file_class);
+            Some(class_id)
+        }
+        None => None,
+    }
+}
+
+/// Register one BOUND ARROW declaration as a callable: its written owner name
+/// becomes a `DefMethod` identity (`builtin` / `Method` / `<name>` downstream)
+/// and its own source span becomes the innermost callable scope.
+///
+/// This is the SAME ownership machinery the method/function declarations use —
+/// `push_callable_scope` — so no second ownership algorithm exists: an
+/// invocation inside the arrow body is owned by the arrow, an invocation inside
+/// a nested ANONYMOUS arrow is still owned by this arrow (the anonymous arrow
+/// pushes no scope), and everything after the arrow's span falls back to the
+/// enclosing callable.
+///
+/// Deliberately narrow, so no existing stream changes:
+///   * no `Param` / `Return` / `Body` ops — an arrow declares no signature this
+///     model can recover, and the write path's units stay body-backed as before;
+///   * `current_method`, the accumulated method flags and the layer context are
+///     left untouched — the arrow is an identity plus an ownership scope, never
+///     a method-flag carrier, so flag placement and layer dispatch for the
+///     enclosing declaration are byte-identical to before;
+///   * no layers are dispatched, so no language layer sees an unknown capture.
+///
+/// `take_arrow_name` returns `None` when the declaration carries no stable name
+/// in this walk (its name capture was skipped or never bound). Nothing is then
+/// registered: an anonymous arrow is never given an invented caller identity.
+fn register_arrow_capture(state: &mut PassContext, cap: &CapturedNode, file_id: &str) {
+    let Some(name) = state.call_producer.take_arrow_name(cap.match_index) else {
+        return;
+    };
+    let Some(class_id) = resolve_callable_class(state, cap, file_id) else {
+        return;
+    };
+    let method_id = state.next_id("M");
+    state
+        .instructions
+        .push(CoreOp::DefMethod(class_id, method_id.clone(), name));
+    state.push_callable_scope(method_id, cap.start_byte, cap.end_byte);
 }
 
 fn dispatch_capture(state: &mut PassContext, cap: &CapturedNode, use_raw_text: bool) {
