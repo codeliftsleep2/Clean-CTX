@@ -14,10 +14,40 @@
 // compile_file_ir_focused → Clean-CTX semantic extraction → WorkspaceIndex.
 // CBM graph semantics (edge counts, relationship types, etc.) never enter the
 // WorkspaceIndex. The original query reruns exactly once after hydration.
+//
+// Scope of one query — the ONE rule, computed once per call and shared by the
+// initial answer and the post-hydration rerun:
+//
+//   effective scope = workspaceRoot + configured additional_roots   (WSC-004)
+//                     ∩ optional `withinPath` narrowing
+//
+// `withinPath` (optional string) narrows an ALREADY authorized workspace to a
+// file or directory subtree: a relative path resolves against `workspaceRoot`, an
+// absolute path is used as declared, and the resolved path is canonicalized once
+// per query. It is validated against the authorized root set BEFORE the index is
+// consulted, so a path outside that set — or a `withinPath` supplied without
+// `workspaceRoot` — is refused with `-32602` and can never become an implicit
+// authorization root. Occurrence PROVENANCE is the boundary on every surface
+// (`EntityRef.file` for entity occurrences, `StoredEdge::asserting_file` for edge
+// occurrences), reachability/cycle queries apply it DURING traversal, and Model C
+// identity is untouched. Omitting `withinPath` leaves every query exactly as it
+// was. The rule itself lives in one place — `workspace::scope::WorkspaceScope` —
+// and no handler parses a path of its own.
+//
+// Module layout (handler groups are separate files, mirroring how the index
+// splits its query families):
+//   query.rs          — dispatch, the hydration cycle, the shared scope rule.
+//   query/entities.rs — find_entities, entities_in_file.
+//   query/edges.rs    — forward_edges, reverse_edges.
+//   query/graph.rs    — transitive_dependencies, has_cycle.
 
 use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
+
+mod edges;
+mod entities;
+mod graph;
 
 /// Handle `workspace_query` — read-only cross-file semantic queries.
 pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpState) {
@@ -39,12 +69,12 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
     };
 
     match query_type {
-        "find_entities" => handle_find_entities(id, args, state),
-        "forward_edges" => handle_forward_edges(id, args, state),
-        "reverse_edges" => handle_reverse_edges(id, args, state),
-        "entities_in_file" => handle_entities_in_file(id, args, state),
-        "transitive_dependencies" => handle_transitive_dependencies(id, args, state),
-        "has_cycle" => handle_has_cycle(id, args, state),
+        "find_entities" => entities::handle_find_entities(id, args, state),
+        "forward_edges" => edges::handle_forward_edges(id, args, state),
+        "reverse_edges" => edges::handle_reverse_edges(id, args, state),
+        "entities_in_file" => entities::handle_entities_in_file(id, args, state),
+        "transitive_dependencies" => graph::handle_transitive_dependencies(id, args, state),
+        "has_cycle" => graph::handle_has_cycle(id, args, state),
         _ => {
             // ... error handling unchanged
             send_response(&serde_json::json!({
@@ -61,61 +91,6 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
             }));
         }
     }
-}
-
-/// `find_entities`: find entities by name (cross-domain/type).
-///
-/// Eligible for one-cycle hydration: has a name for CBM candidate discovery.
-fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
-    let name = match required_str(args, "name") {
-        Some(n) => n,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'name' for find_entities query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let workspace_root = args["workspaceRoot"].as_str();
-    // Workspace scope: a query issued FOR a workspace answers with the entity
-    // occurrences that workspace's own files declare (`None` = the caller
-    // declared no workspace, so the previous unfiltered behaviour stands).
-    // Built once per query, so the initial answer and the post-hydration rerun
-    // share one root set.
-    let scope = query_scope(state, args);
-    let (results, count, hydration_attempted, hydration) =
-        run_query_with_hydration(state, "find_entities", name, workspace_root, move |idx| {
-            let r = match scope.as_ref() {
-                Some(scope) => idx.find_entities_by_name_in_scope(name, scope),
-                None => idx.find_entities_by_name(name),
-            };
-            let c = r.len();
-            (serde_json::to_value(&r).unwrap_or_default(), c)
-        });
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} entities.") }],
-            "structuredContent": {
-                "entities": results,
-                "count": count,
-                "hydration_attempted": hydration_attempted,
-                "discovery_provider": hydration.discovery_provider,
-                "discovery_status": hydration.discovery_status,
-                "discovery_completed": hydration.discovery_completed,
-                "fallback_occurred": hydration.fallback_occurred,
-                "fallback_reason": hydration.fallback_reason,
-                "candidates_discovered": hydration.candidates_discovered,
-                "candidates_compiled": hydration.candidates_compiled,
-                "project_coverage": hydration.project_coverage,
-                "project_coverage_truncated": hydration.project_coverage_truncated,
-            }
-        }
-    }));
 }
 
 /// Run a WorkspaceIndex query with optional one-cycle semantic hydration.
@@ -169,371 +144,6 @@ where
     (final_results, final_count, attempted, hydration)
 }
 
-/// `forward_edges`: outgoing semantic edges from an entity.
-///
-/// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
-    let domain = match required_str(args, "domain") {
-        Some(d) => d,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'domain' for forward_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let entity_type = match required_str(args, "entity_type") {
-        Some(t) => t,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'entity_type' for forward_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let name = match required_str(args, "name") {
-        Some(n) => n,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'name' for forward_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let workspace_root = args["workspaceRoot"].as_str();
-    // Workspace scope: a query issued FOR a workspace answers with the evidence
-    // asserted from inside that workspace (primary root + its configured
-    // additional roots). `None` when the caller declared no workspace — a
-    // root-less query keeps its previous unfiltered behaviour.
-    let scope = query_scope(state, args);
-    let domain_owned = domain.to_string();
-    let et_owned = entity_type.to_string();
-    let name_owned = name.to_string();
-    let (results, count, hydration_attempted, hydration) =
-        run_query_with_hydration(state, "forward_edges", name, workspace_root, {
-            let domain = domain_owned.clone();
-            let et = et_owned.clone();
-            let name = name_owned.clone();
-            move |idx| {
-                let r = match scope.as_ref() {
-                    Some(scope) => {
-                        idx.forward_edges_by_identity_in_scope(&domain, &et, &name, scope)
-                    }
-                    None => idx.forward_edges_by_identity(&domain, &et, &name),
-                };
-                let c = r.len();
-                (serde_json::to_value(&r).unwrap_or_default(), c)
-            }
-        });
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} outgoing edges.") }],
-            "structuredContent": {
-                "edges": results,
-                "count": count,
-                "hydration_attempted": hydration_attempted,
-                "discovery_provider": hydration.discovery_provider,
-                "discovery_status": hydration.discovery_status,
-                "discovery_completed": hydration.discovery_completed,
-                "fallback_occurred": hydration.fallback_occurred,
-                "fallback_reason": hydration.fallback_reason,
-                "candidates_discovered": hydration.candidates_discovered,
-                "candidates_compiled": hydration.candidates_compiled,
-                "project_coverage": hydration.project_coverage,
-                "project_coverage_truncated": hydration.project_coverage_truncated,
-            }
-        }
-    }));
-}
-
-/// `reverse_edges`: incoming semantic edges to an entity.
-///
-/// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
-    let domain = match required_str(args, "domain") {
-        Some(d) => d,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'domain' for reverse_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let entity_type = match required_str(args, "entity_type") {
-        Some(t) => t,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'entity_type' for reverse_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let name = match required_str(args, "name") {
-        Some(n) => n,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'name' for reverse_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let workspace_root = args["workspaceRoot"].as_str();
-    // Workspace scope: the primary defect this closes — `reverse_edges` used to
-    // answer with every occurrence of the identity across the WHOLE session,
-    // including real call facts authored by an unrelated indexed repository.
-    // Occurrence provenance (`asserting_file`) now constrains the answer.
-    let scope = query_scope(state, args);
-    let domain_owned = domain.to_string();
-    let et_owned = entity_type.to_string();
-    let name_owned = name.to_string();
-    let (results, count, hydration_attempted, hydration) =
-        run_query_with_hydration(state, "reverse_edges", name, workspace_root, {
-            let domain = domain_owned.clone();
-            let et = et_owned.clone();
-            let name = name_owned.clone();
-            move |idx| {
-                let r = match scope.as_ref() {
-                    Some(scope) => {
-                        idx.reverse_edges_by_identity_in_scope(&domain, &et, &name, scope)
-                    }
-                    None => idx.reverse_edges_by_identity(&domain, &et, &name),
-                };
-                let c = r.len();
-                (serde_json::to_value(&r).unwrap_or_default(), c)
-            }
-        });
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} incoming edges.") }],
-            "structuredContent": {
-                "edges": results,
-                "count": count,
-                "hydration_attempted": hydration_attempted,
-                "discovery_provider": hydration.discovery_provider,
-                "discovery_status": hydration.discovery_status,
-                "discovery_completed": hydration.discovery_completed,
-                "fallback_occurred": hydration.fallback_occurred,
-                "fallback_reason": hydration.fallback_reason,
-                "candidates_discovered": hydration.candidates_discovered,
-                "candidates_compiled": hydration.candidates_compiled,
-                "project_coverage": hydration.project_coverage,
-                "project_coverage_truncated": hydration.project_coverage_truncated,
-            }
-        }
-    }));
-}
-
-/// `entities_in_file`: list all entities defined in a given file.
-fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState) {
-    let file_path = match required_str(args, "file_path") {
-        Some(p) => p,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'file_path' for entities_in_file query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let workspace_root = args["workspaceRoot"].as_str();
-    let resolved_path = match super::super::tool_helpers::resolve_file_path_checked(
-        file_path,
-        workspace_root,
-        &state.config.additional_roots,
-    ) {
-        Ok(p) => p,
-        Err(_msg) => {
-            // File does not exist or is outside workspace boundary —
-            // return empty results (the user asked for a file that
-            // hasn't been compiled). This matches the pre-fix behavior
-            // where a non-existent path produced no entities.
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "result": {
-                    "content": [{ "type": "text", "text": "Found 0 entities in file." }],
-                    "structuredContent": { "entities": [], "count": 0 }
-                }
-            }));
-            return;
-        }
-    };
-    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
-    let idx = state.workspace_index_read();
-    let results = idx.entities_in_file(&canonical_path);
-    let serialized = serde_json::to_value(&results).unwrap_or_default();
-    let count = results.len();
-    // entities_in_file is NOT hydration-eligible (no entity name for CBM search).
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} entities in file.") }],
-            "structuredContent": {
-                "entities": serialized,
-                "count": count,
-                "hydration_attempted": false,
-            }
-        }
-    }));
-}
-
-/// `transitive_dependencies`: BFS dependency traversal.
-///
-/// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
-    let domain = match required_str(args, "domain") {
-        Some(d) => d,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'domain' for transitive_dependencies query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let entity_type = match required_str(args, "entity_type") {
-        Some(t) => t,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'entity_type' for transitive_dependencies query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let name = match required_str(args, "name") {
-        Some(n) => n,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'name' for transitive_dependencies query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let depth = optional_i32(args, "depth", 1);
-    let workspace_root = args["workspaceRoot"].as_str();
-    // Workspace scope: reachability is computed from THIS workspace's evidence
-    // only — filtering the returned list could not achieve that, since the walk
-    // itself must not pass through another repository's edges (see
-    // `WorkspaceIndex::transitive_dependencies_in_scope`).
-    let scope = query_scope(state, args);
-    let domain_owned = domain.to_string();
-    let et_owned = entity_type.to_string();
-    let name_owned = name.to_string();
-    let depth_captured = depth;
-    let (results, count, hydration_attempted, hydration) =
-        run_query_with_hydration(state, "transitive_dependencies", name, workspace_root, {
-            let domain = domain_owned.clone();
-            let et = et_owned.clone();
-            let name = name_owned.clone();
-            move |idx| {
-                let r = match scope.as_ref() {
-                    Some(scope) => idx.transitive_dependencies_in_scope(
-                        &domain,
-                        &et,
-                        &name,
-                        depth_captured,
-                        scope,
-                    ),
-                    None => idx.transitive_dependencies(&domain, &et, &name, depth_captured),
-                };
-                let c = r.len();
-                (serde_json::to_value(&r).unwrap_or_default(), c)
-            }
-        });
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} dependencies (depth {depth}).") }],
-            "structuredContent": {
-                "dependencies": results,
-                "count": count,
-                "depth_used": depth,
-                "hydration_attempted": hydration_attempted,
-                "discovery_provider": hydration.discovery_provider,
-                "discovery_status": hydration.discovery_status,
-                "discovery_completed": hydration.discovery_completed,
-                "fallback_occurred": hydration.fallback_occurred,
-                "fallback_reason": hydration.fallback_reason,
-                "candidates_discovered": hydration.candidates_discovered,
-                "candidates_compiled": hydration.candidates_compiled,
-                "project_coverage": hydration.project_coverage,
-                "project_coverage_truncated": hydration.project_coverage_truncated,
-            }
-        }
-    }));
-}
-
-/// `has_cycle`: detect cycles in the entity graph.
-///
-/// NOT hydration-eligible: workspace-wide property, no entity identity.
-///
-/// Workspace scope: when a workspace root is declared, only edge occurrences
-/// ASSERTED inside that workspace count as cycle edges, so two repositories that
-/// each contribute one half of a cycle can never be combined into a cycle report
-/// that neither workspace actually contains. Cycle membership itself is
-/// unchanged (`Calls` stays excluded, see `WorkspaceIndex::has_cycle_in_scope`).
-fn handle_has_cycle(id: &Value, args: &Value, state: &McpState) {
-    let idx = state.workspace_index_read();
-    let has_cycle = match query_scope(state, args).as_ref() {
-        Some(scope) => idx.has_cycle_in_scope(scope),
-        None => idx.has_cycle(),
-    };
-    let text = if has_cycle {
-        "Cycle detected."
-    } else {
-        "No cycle detected."
-    };
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": text }],
-            "structuredContent": {
-                "has_cycle": has_cycle,
-                "hydration_attempted": false,
-            }
-        }
-    }));
-}
-
 /// Extract a required string argument from the arguments object.
 fn required_str<'a>(args: &'a Value, name: &str) -> Option<&'a str> {
     args[name].as_str().filter(|s| !s.is_empty())
@@ -544,17 +154,55 @@ fn optional_i32(args: &Value, name: &str, default: i32) -> i32 {
     args[name].as_i64().map(|v| v as i32).unwrap_or(default)
 }
 
-/// The active workspace scope of one `workspace_query` call: the caller's
-/// `workspaceRoot` plus the configured `additional_roots`, canonicalized once by
-/// `WorkspaceScope` (see `workspace::scope`). No query type parses roots itself.
+/// The effective scope of one `workspace_query` call: the caller's
+/// `workspaceRoot` plus the configured `additional_roots` (WSC-004), intersected
+/// with the optional `withinPath` narrowing. No handler parses a root or a path
+/// itself — this is the only place that reads either argument, and
+/// `WorkspaceScope` is the only place that decides admission.
 ///
-/// `None` when the caller declared no workspace root: a root-less query stays
-/// unscoped, exactly as before, and no fallback root is ever substituted.
-fn query_scope(state: &McpState, args: &Value) -> Option<crate::workspace::scope::WorkspaceScope> {
-    crate::workspace::scope::WorkspaceScope::new(
-        args["workspaceRoot"].as_str(),
-        &state.config.additional_roots,
-    )
+/// `Ok(None)` — the caller declared no workspace root and no `withinPath`: the
+/// query stays unscoped (the global/session view), exactly as before, and no
+/// fallback root is ever substituted.
+///
+/// `Err(message)` — an invalid `withinPath` argument: it was supplied without an
+/// explicit `workspaceRoot`, or it resolves outside the authorized root set. The
+/// query is refused before the index is consulted, so no unrelated fact is ever
+/// exposed and the narrowing can never widen the authorized workspace.
+fn query_scope(
+    state: &McpState,
+    args: &Value,
+) -> Result<Option<crate::workspace::scope::WorkspaceScope>, String> {
+    let within_path = args["withinPath"]
+        .as_str()
+        .map(str::trim)
+        .filter(|path| !path.is_empty());
+    match within_path {
+        Some(within_path) => crate::workspace::scope::WorkspaceScope::narrowed(
+            args["workspaceRoot"].as_str(),
+            &state.config.additional_roots,
+            within_path,
+        )
+        .map(Some),
+        None => Ok(crate::workspace::scope::WorkspaceScope::new(
+            args["workspaceRoot"].as_str(),
+            &state.config.additional_roots,
+        )),
+    }
+}
+
+/// Refuse one query whose `withinPath` argument is not authorized.
+///
+/// `-32602` (invalid params) with the reason `WorkspaceScope` produced: the
+/// argument is a parameter of the request that cannot be satisfied, not an empty
+/// answer about the workspace.
+fn send_scope_rejection(id: &Value, message: String) {
+    send_response(&serde_json::json!({
+        "jsonrpc": "2.0", "id": id,
+        "error": {
+            "code": -32602,
+            "message": format!("Invalid 'withinPath' argument: {message}")
+        }
+    }));
 }
 
 #[cfg(all(test, feature = "rust"))]

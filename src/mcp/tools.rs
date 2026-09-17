@@ -271,7 +271,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "workspace_query",
-            "description": "Query cross-file semantic relationships accumulated from compiled files. Supports: find_entities (by name), forward_edges (outgoing semantic edges from entity), reverse_edges (incoming semantic edges to entity), entities_in_file (entity occurrences by file), transitive_dependencies (BFS dependency traversal), has_cycle (cycle detection). Candidate discovery is query-semantic aware: healthy CBM is preferred, while unavailable or failed CBM discovery falls back to literal source occurrence scanning. Both providers contribute paths only; Clean-CTX compilation determines authoritative semantic edges.",
+            "description": "Query cross-file semantic relationships accumulated from compiled files. Supports: find_entities (by name), forward_edges (outgoing semantic edges from entity), reverse_edges (incoming semantic edges to entity), entities_in_file (entity occurrences by file), transitive_dependencies (BFS dependency traversal), has_cycle (cycle detection). Candidate discovery is query-semantic aware: healthy CBM is preferred, while unavailable or failed CBM discovery falls back to literal source occurrence scanning. Both providers contribute paths only; Clean-CTX compilation determines authoritative semantic edges. Occurrence-bearing results are scoped to the declared workspaceRoot plus configured additional roots, and optionally narrowed to one file/directory subtree with withinPath (a narrowing can only ever shrink an authorized workspace; task-level workspace scope must be resolved first).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -281,6 +281,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "name": { "type": "string", "description": "Entity name for entity queries. Required for: find_entities, forward_edges, reverse_edges, transitive_dependencies." },
                     "file_path": { "type": "string", "description": "File path for entities_in_file query." },
                     "workspaceRoot": { "type": "string", "description": "Optional. Primary trusted workspace root for path resolution and filesystem hydration discovery. Defaults to the detected project root." },
+                    "withinPath": { "type": "string", "description": "Optional. Narrows an ALREADY authorized workspace to one file or directory subtree: occurrences whose ASSERTING file lies under it, and traversal/cycle evidence likewise. Relative paths resolve against workspaceRoot; absolute paths are used as declared. Rejected (-32602) when the path lies outside workspaceRoot plus configured additional roots, or when no workspaceRoot is given — it never widens a workspace and never becomes a root of its own. Omit to query the whole authorized workspace." },
                     "depth": { "type": "integer", "description": "Traversal depth for transitive_dependencies: 0 = unlimited, 1 = direct, 2 = transitive. Default: 1." }
                 },
                 "required": ["type"]

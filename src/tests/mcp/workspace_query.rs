@@ -304,3 +304,20 @@ mod workspace_query_scope_entities;
 
 #[path = "workspace_query_scope_traversal.rs"]
 mod workspace_query_scope_traversal;
+
+// `withinPath` provenance narrowing — the OPTIONAL second scope layer over an
+// already authorized workspace (`WorkspaceScope ∩ withinPath`). The entity/edge
+// surfaces and the graph surfaces have their own files, and the TypeScript
+// property-arrow case is feature-gated with the arrow producer.
+#[path = "workspace_query_within_path.rs"]
+mod workspace_query_within_path;
+
+#[path = "workspace_query_within_path_edges.rs"]
+mod workspace_query_within_path_edges;
+
+#[path = "workspace_query_within_path_traversal.rs"]
+mod workspace_query_within_path_traversal;
+
+#[cfg(feature = "typescript")]
+#[path = "workspace_query_within_path_arrows.rs"]
+mod workspace_query_within_path_arrows;

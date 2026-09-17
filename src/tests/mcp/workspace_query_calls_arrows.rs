@@ -22,11 +22,17 @@
 //   RED-ARROW29 — caller inside a configured additional root stays in scope.
 //   RED-ARROW30 — same-name arrow callers in several in-scope paths keep
 //                 distinct provenance, and an out-of-scope repository is
-//                 excluded by the WSC-004 root scope (this revision has no
-//                 `withinPath` argument: root scope + occurrence provenance is
-//                 the narrowing surface it offers).
+//                 excluded by the WSC-004 root scope.
 //   plus the spread qualifier on an ARROW caller at the response surface.
+//
+// Every query below applies the PRODUCTION scope rule — the WSC-004 root set
+// (`workspaceRoot` plus configured additional roots) over occurrence provenance
+// — which is what makes RED-ARROW30's exclusion assertion meaningful rather than
+// vacuous. The optional `withinPath` narrowing, a second and finer layer INSIDE
+// an already authorized workspace, has its own suites:
+// `workspace_query_within_path.rs` and its siblings.
 
+use crate::workspace::scope::WorkspaceScope;
 use std::path::{Path, PathBuf};
 
 /// A state with CBM disabled so discovery falls back to the deterministic
@@ -44,21 +50,36 @@ fn state(additional: &[PathBuf]) -> crate::mcp::McpState {
 }
 
 /// Run a `reverse_edges` query for a `builtin / Method` name through the
-/// production hydration cycle.
+/// production hydration cycle, with the SAME workspace scope the handler applies:
+/// the query's `workspaceRoot` plus that workspace's configured
+/// `additional_roots`, over occurrence provenance (`StoredEdge::asserting_file`).
+///
+/// The scoped lookup (`reverse_edges_by_identity_in_scope`) is the production
+/// method, so a fact asserted OUTSIDE the queried workspace is excluded here
+/// exactly as it is in `workspace_query`. An unscoped
+/// `reverse_edges_by_identity` would answer with every occurrence the session
+/// happens to hold, which would make RED-ARROW30's exclusion assertion vacuous.
 fn reverse_edges(
     state: &crate::mcp::McpState,
     name: &str,
     root: &Path,
 ) -> (serde_json::Value, super::super::hydration::HydrationReport) {
+    let root = root.to_string_lossy().into_owned();
+    // The one scope rule (WSC-004) — no handler and no test re-derives it.
+    let scope = WorkspaceScope::new(Some(root.as_str()), &state.config.additional_roots);
     let (result, _, _, report) = super::run_query_with_hydration(
         state,
         "reverse_edges",
         name,
-        Some(&root.to_string_lossy()),
+        Some(root.as_str()),
         |index| {
-            let value =
-                serde_json::to_value(index.reverse_edges_by_identity("builtin", "Method", name))
-                    .unwrap_or_default();
+            let edges = match scope.as_ref() {
+                Some(scope) => {
+                    index.reverse_edges_by_identity_in_scope("builtin", "Method", name, scope)
+                }
+                None => index.reverse_edges_by_identity("builtin", "Method", name),
+            };
+            let value = serde_json::to_value(edges).unwrap_or_default();
             let count = value.as_array().map_or(0, Vec::len);
             (value, count)
         },
