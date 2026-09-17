@@ -69,6 +69,18 @@ mod tests;
 - Do not move tests inline into production source files unless explicitly
   requested.
 
+## Verification artifacts are not tests
+
+- A tracked test under `src/tests/**` is the only artifact that satisfies a test
+  requirement, the CI gate, or any RED→GREEN claim.
+- Untracked hand-off/live harnesses (for example `target/tmp/*.mjs` driving the
+  built binary over MCP stdio) are operator conveniences: they produce live
+  output for a human to read and are never coverage.
+- Never place a real test in `target/`, in generated output, in another ignored
+  path, or anywhere the gate does not compile and run it. Doing so in order to
+  avoid the `#[path]` convention, the active-file ceiling, or the retrieval
+  boundary is a policy violation, not a technique (engineering rules, §8d).
+
 ## Post-Task FAANG-Level Architectural Audit
 
 Before declaring any multi-step architectural task complete, perform a

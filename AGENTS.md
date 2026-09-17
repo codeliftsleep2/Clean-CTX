@@ -203,7 +203,9 @@ configurable -> abstract -> framework-heavy.
 
 ### 8. Test discipline and test-file convention
 
-Tests are architectural assets. Add a regression test when a bug or failure is
+Tests are architectural assets, and a tracked test under `src/tests/**` is the
+only artifact that satisfies one (see §8b below). Add a regression test when a
+bug or failure is
 discovered; prefer tests that capture the invariant that must remain true. Do
 not remove existing regression coverage when relocating functionality.
 
@@ -232,6 +234,13 @@ file**.
   `package-lock.json`) are exempt because their structure is tool-owned and
   cannot be semantically decomposed. The exemption is filename-specific and
   does not apply to ordinary hand-maintained `*.lock` files.
+- One path is additionally exempt by explicit maintainer decision:
+  `docs/agent/DISCOVERY_REGISTRY.md`, the live discovery registry — an
+  append-only chronological ledger whose growth tracks how many discoveries are
+  recorded, so a line ceiling cannot be met by decomposition without fragmenting
+  the record it exists to provide. The exemption is declared inline in the
+  guard's `$ExemptPaths` list with its justification, and adding to it requires
+  maintainer authorization (`scripts/check-file-sizes.ps1`).
 
 **Legacy-file activation is not a reason to choose a weaker architecture.**
 File-size/decomposition cost may influence implementation sequencing, but it
@@ -245,6 +254,35 @@ maintainability, and behavior.
 Use `scripts/check-file-sizes.ps1` for enforcement. Local runs inspect working
 tree and index changes; CI supplies a base revision to include committed
 branch changes.
+
+### 8b. Verification artifacts are not tests
+
+A **tracked test under `src/tests/**` is the only artifact that satisfies a
+test requirement or the CI gate.** Untracked scratch and hand-off artifacts
+(`target/tmp/*.mjs`, `target/tmp/*.ps1`, root-level one-off scripts, ad-hoc
+REPL snippets, or anything else outside `src/tests/**`) exist for exactly ONE
+purpose: driving a freshly built binary so the operator can observe live
+behavior. They are output a human reads, never verification.
+
+- A hand-off/live harness may NEVER be the deliverable that makes a task
+  complete, and may never stand in for a regression test.
+- "PASS" from a harness in `target/` (or any other untracked, generated, or
+  ignored location) is NEVER reportable as a test result, as a gate, as
+  RED→GREEN evidence, or as satisfying a regression requirement.
+- Every required regression MUST be a tracked test in `src/tests/**` that the
+  CI gate compiles and runs. Deliver both when a fix warrants both: the tracked
+  test is the contract, the live harness is optional operator convenience.
+- Writing a real test into `target/`, into generated output, into another
+  ignored path, or into any location the gate does not compile and run it — in
+  order to avoid the `#[path]` convention, the active-file ceiling, the
+  retrieval boundary, or any other rule in this file — is a **policy
+  violation**, not a technique. There is no acceptable variant of it: those
+  limits and the test-tree convention are the work itself, never obstacles to
+  route around.
+- A live harness can never repair a red gate. A failing tracked test stays
+  failing until the tracked test itself is green.
+- Report results by category, never blended: which tracked tests ran and their
+  outcome, versus which untracked artifacts were handed to the user to run.
 
 ### 9. Definition of Done
 

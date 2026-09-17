@@ -29,8 +29,8 @@ use super::inference_layer::InferenceLayer;
 use super::layers::{LanguageLayer, LayerContext, PatternRecognizer};
 use super::opcodes::*;
 use super::program_graph::ProgramGraph;
-use crate::compaction::method::{find_method_params, strip_base_initializer_clause};
 use crate::compaction::modifiers::{MODIFIERS_LOW, strip_csharp_attributes, strip_modifiers};
+use crate::compaction::signature::split_parameters;
 use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::CapEntry;
 use crate::layers::meta::semantic::SemanticEdge;
@@ -38,6 +38,7 @@ use crate::layers::meta::semantic::SemanticEdge;
 mod core;
 mod meta_layer;
 mod post;
+mod signature;
 
 pub use core::{CoreIRPass, LanguageLayerPass};
 pub use meta_layer::MetaLayerPass;
@@ -45,6 +46,13 @@ pub use post::{
     AliasResolutionPass, ExecutionSemanticsPass, InferenceLayerPass, PatternRecognitionPass,
     ProgramGraphPass, ValidationPass,
 };
+// Declaration-level helpers relocated to `pipeline/signature.rs`; the
+// established public paths (`crate::ir::pipeline::{MethodSig,
+// find_body_start_in, locate_method_body}`) are re-exported here so every
+// existing consumer resolves unchanged.
+pub use signature::MethodSig;
+use signature::parse_method_sig;
+pub(crate) use signature::{find_body_start_in, locate_method_body};
 
 /// Error type for pass execution.
 #[derive(Debug, Clone)]
@@ -326,44 +334,6 @@ impl PassContext {
         self.callable_scopes.clear();
     }
 
-    /// Parse a method signature string into a `MethodSig`.
-    fn parse_method_sig(&self, sig: &str) -> MethodSig {
-        let sig = sig.trim();
-        // C# constructor initializers (`: base(...)` / `: this(...)`) are
-        // call sites, never signature content: drop the clause so the name,
-        // params, and return type derive from the bare declaration — a
-        // base/this call must not become a synthesized "return type".
-        let sig = strip_base_initializer_clause(sig);
-
-        let (name, params_str, return_type) = if let Some((ps, pe)) = find_method_params(sig) {
-            let raw_name = sig[..ps].trim();
-            let last_token = raw_name.split_whitespace().last().unwrap_or(raw_name);
-            let name = last_token.trim().to_string();
-            let params = sig[ps + 1..pe].trim().to_string();
-            let rt = sig[pe + 1..].trim();
-            let rt = if let Some(stripped) = rt.strip_prefix(':') {
-                stripped.trim().to_string()
-            } else if rt.is_empty() {
-                TYPE_VOID.to_string()
-            } else {
-                rt.to_string()
-            };
-            (name, params, rt)
-        } else {
-            (sig.to_string(), String::new(), TYPE_VOID.to_string())
-        };
-
-        MethodSig {
-            name,
-            params_str,
-            return_type: if return_type.is_empty() {
-                TYPE_VOID.to_string()
-            } else {
-                return_type
-            },
-        }
-    }
-
     /// Emit a method's IR (DefMethod + Param + Return) and return the method name.
     pub(super) fn emit_method_ir(
         &mut self,
@@ -382,7 +352,7 @@ impl PassContext {
                 }
             }
         };
-        let sig = self.parse_method_sig(&sig_text);
+        let sig = parse_method_sig(&sig_text);
         let name = strip_modifiers(&sig.name, MODIFIERS_LOW);
         let params_str = sig.params_str;
         let return_type = sig.return_type;
@@ -394,7 +364,10 @@ impl PassContext {
         ));
 
         if !params_str.is_empty() {
-            for param in params_str.split(',') {
+            // The formal parameters are the ones the declaration wrote: a
+            // comma inside a generic argument list
+            // (`Expression<Func<A, B>> key`) does not separate parameters.
+            for param in split_parameters(&params_str) {
                 let param = param.trim();
                 if param.is_empty() {
                     continue;
@@ -461,96 +434,6 @@ impl PassContext {
     }
 }
 
-/// Parsed method signature — the result of parsing the string returned
-/// by `compaction::extract_method_sig`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MethodSig {
-    pub name: String,
-    pub params_str: String,
-    pub return_type: String,
-}
-
-/// Locate the byte index of the brace that opens a method body.
-pub(crate) fn find_body_start_in(raw_method: &str) -> Option<usize> {
-    let mut paren_depth = 0i32;
-    let mut brace_depth = 0i32;
-    let mut pending_return_brace = false;
-    for (i, ch) in raw_method.char_indices() {
-        match ch {
-            '(' => paren_depth += 1,
-            ')' => {
-                paren_depth = (paren_depth - 1).max(0);
-                if paren_depth == 0 {
-                    pending_return_brace = false;
-                }
-            }
-            ':' if paren_depth == 0 && brace_depth == 0 => {
-                pending_return_brace = true;
-            }
-            '{' if paren_depth == 0 && brace_depth == 0 && !pending_return_brace => {
-                return Some(i);
-            }
-            '{' if paren_depth == 0 && pending_return_brace => {
-                brace_depth += 1;
-                pending_return_brace = false;
-            }
-            '}' if paren_depth == 0 && brace_depth > 0 => {
-                brace_depth -= 1;
-            }
-            _ if paren_depth == 0 && pending_return_brace && !ch.is_whitespace() => {
-                pending_return_brace = false;
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
-/// Extract the verbatim method body from a raw method capture *and* the
-/// byte offset at which that body slice begins within `raw_method`
-/// (apply_edit plan Phase 1).
-///
-/// The offset lets the IR compiler emit `CoreOp::Body` ops whose span
-/// fields address the exact source bytes the text came from:
-/// `absolute_start = capture.start_byte + offset`, and the slice always
-/// runs to the end of the capture, so `absolute_end = capture.end_byte`.
-///
-/// Block bodies are located within the attribute-stripped view; C#
-/// attribute stripping only removes a leading prefix, so pointer
-/// arithmetic maps the stripped-view index back onto the original bytes.
-/// Expression (`=>`) bodies are located directly on the raw capture,
-/// preserving the historical behavior of `extract_method_body`.
-pub(crate) fn locate_method_body(raw_method: &str) -> Option<(String, usize)> {
-    let stripped = strip_csharp_attributes(raw_method);
-    // strip_csharp_attributes returns a subslice of its input (leading
-    // trim/strip only), so this pointer diff is the byte offset of the
-    // stripped view inside the original capture.
-    let stripped_offset = stripped.as_ptr() as usize - raw_method.as_ptr() as usize;
-
-    if let Some(i) = find_body_start_in(stripped) {
-        // Body units are BRACE-DELIMITED: text and span start AT the
-        // opening `{`, never at the line start. The previous behavior
-        // backed up to the start of the line when `{` sat alone (Allman
-        // style / brace-on-next-line), embedding leading indentation in
-        // the tracked body — so every natural agent extraction (`{`
-        // through `}`) was rejected as a permanent byte-count mismatch.
-        // Regression: src/tests/edit/spans.rs
-        // `lf_csharp_allman_attributes_spans_address_exact_disk_bytes`.
-        return Some((stripped[i..].to_string(), stripped_offset + i));
-    }
-
-    if let Some(arrow_idx) = raw_method.rfind("=>") {
-        let expr_start = arrow_idx + "=>".len();
-        let expr = &raw_method[expr_start..];
-        let trimmed = expr.trim();
-        if !trimmed.is_empty() && trimmed != ";" {
-            return Some((expr.to_string(), expr_start));
-        }
-    }
-
-    None
-}
-
 /// The composable pass pipeline.
 pub struct PassPipeline {
     passes: Vec<Box<dyn IRPass>>,
@@ -609,3 +492,12 @@ impl Default for PassPipeline {
 #[cfg(test)]
 #[path = "../tests/ir/pipeline.rs"]
 mod tests;
+
+// Structural method-identity regressions: a declaration's name, its generic
+// type parameters, its parameters, and its return type are read from
+// structure (`compaction::signature`), never from whitespace-token position.
+// The child module probes the other languages through the same shared
+// boundary, so a shared-regression cannot hide behind the C# fixtures.
+#[cfg(all(test, feature = "csharp"))]
+#[path = "../tests/ir/method_signature_shape.rs"]
+mod signature_shape_tests;

@@ -9,6 +9,10 @@
     Without -BaseRef, active files are taken from the working tree, index, and
     untracked files. With -BaseRef, committed changes from the merge base to
     HEAD are included as active for CI and branch verification.
+
+    Exemptions: generated dependency lockfiles are exempt by filename, and
+    paths listed in $ExemptPaths are excluded from the active set entirely.
+    Every exemption carries its justification next to its declaration.
 .PARAMETER BaseRef
     Optional Git revision used as the comparison base for committed changes.
 .PARAMETER RepositoryRoot
@@ -43,6 +47,24 @@ $GeneratedDependencyLockfiles = @(
     'yarn.lock'
 )
 
+# Path-scoped exemptions from the active-file line-count policy.
+#
+# Each entry is an exact repository-relative path (forward slashes). Exempt
+# paths are excluded from the ACTIVE set entirely, so they are neither failed
+# nor reported as legacy debt.
+#
+#   docs/agent/DISCOVERY_REGISTRY.md — the live discovery registry. It is an
+#     append-only chronological ledger (one entry per significant discovery,
+#     newest first) whose growth is a function of how many discoveries are
+#     recorded and whose individual cells are legitimately long, so a line
+#     ceiling cannot be satisfied by decomposition without fragmenting the
+#     chronological record the registry exists to provide. Exempted by explicit
+#     maintainer decision (2026-09-17); adding a path here requires the same
+#     explicit authorization as expanding an encoding allowlist.
+$ExemptPaths = @(
+    'docs/agent/DISCOVERY_REGISTRY.md'
+)
+
 if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
     $RepositoryRoot = Join-Path $PSScriptRoot '..'
 }
@@ -75,7 +97,9 @@ function Invoke-GitLines {
 
 function Test-NormalTextFile {
     param([string]$RelativePath)
-    $fileName = [System.IO.Path]::GetFileName($RelativePath.Replace('\', '/'))
+    $normalizedPath = $RelativePath.Replace('\', '/')
+    if ($ExemptPaths -contains $normalizedPath) { return $false }
+    $fileName = [System.IO.Path]::GetFileName($normalizedPath)
     if ($GeneratedDependencyLockfiles -contains $fileName) { return $false }
     return $RelativePath -match $TextPattern -or $RelativePath -match $DotFiles
 }

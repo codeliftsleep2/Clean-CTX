@@ -48,3 +48,11 @@ pub(crate) mod phase3_contract_tests;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/envelope_contract.rs"]
 pub(crate) mod envelope_contract_tests;
+
+// End-to-end `provide_code_context` regressions for method-declaration
+// identity: the rendered skeleton must carry the structural method name, and
+// the request must have taken the COMPRESSED path (never `raw_passthrough`,
+// which would return the source verbatim and prove nothing about the IR).
+#[cfg(all(test, feature = "csharp"))]
+#[path = "../../tests/mcp/provider_code_context_signature.rs"]
+pub(crate) mod provider_code_context_signature_tests;

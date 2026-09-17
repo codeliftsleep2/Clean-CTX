@@ -195,6 +195,11 @@ Tests live in `src/tests/` and are referenced from their respective source modul
 mod tests;
 ```
 
+This location is the contract, not a preference: `src/tests/**` is where the CI
+gate compiles and runs the tests. Untracked live/hand-off harnesses (for example
+`target/tmp/*.mjs` driving a built binary) are operator conveniences only — they
+are never a substitute for a tracked test and never count as coverage.
+
 See [Developer Documentation → Testing Conventions](docs/DEVELOPER_DOCUMENTATION.md#testing-conventions) for naming, coverage expectations, and running tests.
 
 ---

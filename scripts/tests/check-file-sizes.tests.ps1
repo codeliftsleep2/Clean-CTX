@@ -113,6 +113,25 @@ try {
     ) ($result | Out-String)
     [System.IO.File]::Delete((Join-Path $repository 'manual.lock'))
 
+    $registryDirectory = Join-Path $repository 'docs/agent'
+    [void][System.IO.Directory]::CreateDirectory($registryDirectory)
+    Write-Lines (Join-Path $registryDirectory 'DISCOVERY_REGISTRY.md') 700
+    $result = Invoke-Validator $repository
+    Assert-Case 'the exempt append-only registry is not enforced' (
+        $result.ExitCode -eq 0 -and
+        ($result.Failures -join "`n") -notmatch 'DISCOVERY_REGISTRY' -and
+        ($result.LegacyDebt -join "`n") -notmatch 'DISCOVERY_REGISTRY'
+    ) ($result | Out-String)
+
+    Write-Lines (Join-Path $registryDirectory 'OTHER.md') 700
+    $result = Invoke-Validator $repository
+    Assert-Case 'a sibling document in the same directory remains enforced' (
+        $result.ExitCode -eq 1 -and
+        ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*new.*docs/agent/OTHER.md.*700 lines'
+    ) ($result | Out-String)
+    [System.IO.File]::Delete((Join-Path $registryDirectory 'OTHER.md'))
+    [System.IO.File]::Delete((Join-Path $registryDirectory 'DISCOVERY_REGISTRY.md'))
+
     Write-Lines (Join-Path $repository 'committed.md') 616
     Invoke-Git $repository @('add', 'committed.md')
     Invoke-Git $repository @('commit', '--quiet', '-m', 'oversized active file')

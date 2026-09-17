@@ -163,3 +163,125 @@ fn generic_projection_orders_declarations_before_calls() {
         "declaration occurrences must precede call facts"
     );
 }
+
+// ── Blast radius: a corrupted declaration identity is not rendering-only ──
+//
+// `CoreOp::DefMethod` names are produced once, by `emit_method_ir`, and are
+// consumed twice: `render_llm` renders them, and THIS projection turns them
+// into `builtin / Method` registration occurrences (and into the subject of
+// every `Calls` edge from that method) which reach WorkspaceIndex and
+// `workspace_query`. A structural identity defect therefore reached the
+// semantic surface as well — and because both consumers read the same
+// upstream value, no projection change was needed to correct it. This pins
+// the corrected names at the projection boundary with a REAL C# compilation.
+
+/// Compile C# with the production compiler configuration, exactly as
+/// `compile_file_ir_focused` does (the declaration identity under test is
+/// produced by that path).
+#[cfg(feature = "csharp")]
+fn compile_csharp(source: &str) -> Vec<CoreOp> {
+    use crate::compression::Fidelity;
+    use crate::ir::compiler::IRCompiler;
+    use crate::ir::layers::csharp::CSharpLayer;
+    use crate::ir::layers::patterns::CodePatternRecognizer;
+    use crate::ir::patterns::CompressingPatternRecognizer;
+    use crate::queries::CS_QUERY;
+
+    let language =
+        crate::compression::language::safe_csharp_language().expect("csharp grammar enabled");
+    let mut compiler = IRCompiler::new();
+    compiler.add_language_layer(Box::new(CSharpLayer::new()));
+    compiler.add_pattern_recognizer(Box::new(CodePatternRecognizer::new()));
+    compiler.add_pattern_recognizer(Box::new(CompressingPatternRecognizer::new()));
+    compiler
+        .compile(
+            source,
+            "Signature.cs",
+            language,
+            CS_QUERY,
+            Fidelity::High,
+            None,
+        )
+        .expect("production compilation must succeed")
+        .instructions
+}
+
+#[cfg(feature = "csharp")]
+#[test]
+fn projected_declaration_names_are_the_structural_method_identities() {
+    const SOURCE: &str = r#"namespace Pairs;
+
+public static class TupleFactory
+{
+    public static (int alpha, int beta) GetPair(int[] values)
+    {
+        return (values[0], values[1]);
+    }
+
+    public static (string name, int count) Tenth(string[] names)
+    {
+        return (names[0], names.Length);
+    }
+}
+"#;
+    let instructions = compile_csharp(SOURCE);
+    let edges = project_method_declarations(&instructions, "C:/repo/Signature.cs");
+    let registered: Vec<&str> = edges
+        .iter()
+        .map(|edge| edge.subject.name.as_str())
+        .collect();
+
+    assert!(registered.contains(&"GetPair"), "{registered:?}");
+    assert!(registered.contains(&"Tenth"), "{registered:?}");
+    assert!(
+        !registered.contains(&"static"),
+        "a modifier must never become a registered entity name: {registered:?}"
+    );
+}
+
+#[cfg(feature = "csharp")]
+#[test]
+fn projected_generic_identity_survives_to_the_call_subject() {
+    const SOURCE: &str = r#"using System.Linq;
+using System.Linq.Expressions;
+
+namespace Ordering;
+
+public static class QueryablePairExtensions
+{
+    public static IOrderedQueryable<TFirst> Pair<TFirst, TSecond>(
+        this IQueryable<TFirst> source,
+        Expression<Func<TFirst, TSecond>> keySelector,
+        ListSortDirection direction)
+    {
+        return source.OrderByDescending(keySelector);
+    }
+}
+"#;
+    let instructions = compile_csharp(SOURCE);
+    let edges = project_method_declarations(&instructions, "C:/repo/Signature.cs");
+    let registered: Vec<&str> = edges
+        .iter()
+        .map(|edge| edge.subject.name.as_str())
+        .collect();
+    assert!(
+        registered.contains(&"Pair<TFirst, TSecond>"),
+        "{registered:?}"
+    );
+    assert!(!registered.contains(&"TSecond>"), "{registered:?}");
+
+    // The callable's own body calls `OrderByDescending`: the caller side of
+    // that `Calls` edge is the corrected declaration identity.
+    let edges = project_calls(&instructions, "C:/repo/Signature.cs");
+    let calls: Vec<(&str, &str)> = edges
+        .iter()
+        .map(|edge| (edge.subject.name.as_str(), edge.object.name.as_str()))
+        .collect();
+    assert!(
+        calls
+            .iter()
+            .any(|(caller, callee)| *caller == "Pair<TFirst, TSecond>"
+                && *callee == "OrderByDescending"),
+        "{calls:?}"
+    );
+}

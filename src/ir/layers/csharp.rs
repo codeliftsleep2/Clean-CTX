@@ -96,9 +96,20 @@ impl CSharpLayer {
         let mut base: Option<String> = None;
         let mut interfaces: Vec<String> = Vec::new();
 
+        // Only the declaration HEAD can carry inheritance: the `:` that
+        // introduces a base list lives between the type name and the body
+        // `{`. Scanning the whole declaration node (head + body) let any `:`
+        // inside a member body — a ternary, a label, a named argument —
+        // become the base class, producing a fabricated `X <body expression>`
+        // edge for a class that has no base list. Attribute groups are
+        // stripped first, so a `{` inside an attribute argument
+        // (`[Route("api/{id}")]`) cannot end the head early.
+        let head = strip_csharp_attributes(class_head);
+        let head = head.split('{').next().unwrap_or(head);
+
         // Find ":" separator (C# uses colon for inheritance)
-        if let Some(colon_pos) = class_head.find(':') {
-            let after_colon = class_head[colon_pos + 1..].trim_start();
+        if let Some(colon_pos) = head.find(':') {
+            let after_colon = head[colon_pos + 1..].trim_start();
             // Split by comma
             let mut current = String::new();
             let mut first = true;

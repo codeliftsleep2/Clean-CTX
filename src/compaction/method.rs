@@ -5,6 +5,7 @@
 use crate::compaction::modifiers::{
     MODIFIERS_LOW, MODIFIERS_MEDIUM, strip_csharp_attributes, strip_modifiers,
 };
+use crate::compaction::signature;
 use crate::compression::Fidelity;
 
 /// Extract a compact method signature from the raw text of a method/function
@@ -112,7 +113,11 @@ fn find_depth_zero_arrow(text: &str) -> Option<usize> {
 /// (`@"..."`) and raw-literal quote-doubling degenerate to scanning for
 /// the next unescaped closer, which can only cause a MISSED `=>` boundary
 /// (never a spurious one — see `find_depth_zero_arrow`).
-fn skip_quoted_literal(bytes: &[u8], open: usize) -> usize {
+///
+/// `pub(super)`: `compaction::signature` shares this literal-skipping
+/// contract for structural parameter splitting, so both consumers agree on
+/// what a quoted literal is.
+pub(super) fn skip_quoted_literal(bytes: &[u8], open: usize) -> usize {
     let mut i = open + 1;
     while i < bytes.len() {
         match bytes[i] {
@@ -171,11 +176,16 @@ fn find_depth_zero_brace(text: &str) -> Option<usize> {
 /// C# tuple return types like
 ///   `Task<(Dictionary<string, Guid> Exact, Dictionary<string, Guid> IgnoreCase)> GetOrgUnitDlc(int id)`
 /// open a top-level `(` for the tuple, but that group is preceded by `<`,
-/// so it is skipped and the method's own group is selected. Constructor
-/// initializers (`Greeter(string prefix) : base(prefix)`) are call sites that
-/// FOLLOW the parameter list; the name anchor selects the declaration's own
-/// group ahead of them. The scan skips string/char literals so a default
-/// value such as `void M(string s = "a (", int n)` cannot break it.
+/// so it is skipped and the method's own group is selected. A tuple return
+/// type that is NOT wrapped in a generic type is a depth-0 group of its own
+/// (`public static (int alpha, int beta) GetPair(int[] values)`): it is
+/// name-anchored (the `(` follows `static`), so it is skipped on the
+/// structural test `signature::is_return_type_group` — the declared name and
+/// the declaration's parameter list follow it. Constructor initializers
+/// (`Greeter(string prefix) : base(prefix)`) are call sites that FOLLOW the
+/// parameter list; the name anchor selects the declaration's own group ahead
+/// of them. The scan skips string/char literals so a default value such as
+/// `void M(string s = "a (", int n)` cannot break it.
 ///
 /// Returns `Some((start, end))` byte indices of the `(` and matching `)`, or
 /// `None` when no name-anchored balanced group exists (or the parens are
@@ -205,10 +215,11 @@ pub(crate) fn find_method_params(sig: &str) -> Option<(usize, usize)> {
             b')' | b']' => {
                 depth = (depth - 1).max(0);
                 if depth == 0 {
-                    if let Some(s) = start {
-                        if s < i {
-                            return Some((s, i));
-                        }
+                    if let Some(s) = start
+                        && s < i
+                        && !(bytes[i] == b')' && signature::is_return_type_group(sig, i))
+                    {
+                        return Some((s, i));
                     }
                     start = None;
                 }
@@ -315,10 +326,11 @@ pub(crate) fn strip_base_initializer_clause(sig: &str) -> &str {
 /// not a type). We distinguish by: primitive C# keyword, generic `<`, or
 /// capitalized type name (C# convention).
 ///
-/// `pub(crate)` so `src/diff/keys.rs` can reuse it for C#-aware method
-/// key extraction (F-02 diff audit: `method_key` was taking the return
-/// type as the key for C# return-type-first signatures, producing
-/// doubled tokens like `+ method bool bool Resolve(...)`).
+/// `pub(crate)` because `compaction::signature` — the shared structural
+/// head/return-type extraction behind method labels, the IR's
+/// `parse_method_sig`, and the diff key deriver — classifies a return-type
+/// prefix with this same vocabulary, so all three consumers agree on what a
+/// "type-looking" token is.
 pub(crate) fn is_csharp_return_type(token: &str) -> bool {
     let t = token.trim();
     if t.is_empty() {
@@ -371,46 +383,21 @@ fn compact_method_low(sig: &str) -> String {
     // in `modifiers.rs`.
     let s = strip_modifiers(sig, MODIFIERS_LOW);
 
-    // s is now "name(params...): ReturnType" or "name<T>(params): ReturnType"
+    // `s` is now "name(params...): ReturnType" or "name<T>(params): ReturnType"
     // or C# "ActionResult<UserDto> GetAll(params)".
-    // Extract name: for C# return-type-first, take the last whitespace
-    // token before the method's own `(` (the name-anchored first depth-0
-    // group from `find_method_params`, so a C# tuple return type is not
-    // mis-tokenized); otherwise take up to the first `(` or `<`.
-    let before_paren = match find_method_params(&s) {
-        Some((open, _)) => &s[..open],
-        None => &s,
-    };
-    let has_param_group = before_paren.len() != s.len() || s.contains('(');
-    let tokens: Vec<&str> = before_paren.split_whitespace().collect();
-    let name = if tokens.len() >= 2 && is_csharp_return_type(tokens[tokens.len() - 2]) {
-        tokens
-            .last()
-            .unwrap()
-            .split('<')
-            .next()
-            .unwrap_or(tokens.last().unwrap())
-    } else if has_param_group && !tokens.is_empty() {
-        // Non-CBM audit 2026-08-25 #2: when the parameter list was located
-        // STRUCTURALLY, the identifier is simply the last whitespace token
-        // before it — regardless of naming convention and regardless of
-        // whether a named-tuple return type defeats the
-        // `is_csharp_return_type` heuristic (e.g.
-        // `Task<(A section, Guid requestId)> CreateRecordWithDefaults(...)`
-        // previously fell into the split-at-first-`<` fallback and yielded
-        // the whole type prefix `Task` / `internal static async Task` as
-        // the "name"). Splitting only the final token keeps generic names
-        // (`Foo<T>` → `Foo`) identical to the detected branch above.
-        tokens
-            .last()
-            .unwrap()
-            .split(['(', '<'])
-            .next()
-            .unwrap_or(tokens.last().unwrap())
-    } else {
-        // No parameter list at all — keep the legacy split behavior.
-        s.split(['(', '<']).next().unwrap_or(&s)
-    };
+    //
+    // The name is the identifier that OWNS the parameter list, read from
+    // structure (`signature::split_head_parts`). A generic method's
+    // type-parameter list can itself contain `, ` (`Pair<TFirst, TSecond>`), so
+    // "the last whitespace token before the `(`" yields `TSecond>`, and a C#
+    // tuple return type makes that token a modifier (`static`) — both destroy
+    // the method's identity.
+    let name =
+        match find_method_params(&s).and_then(|(open, _)| signature::split_head_parts(&s, open)) {
+            Some(parts) => parts.bare_name.to_string(),
+            // No name-anchored parameter list at all — keep the legacy split.
+            None => s.split(['(', '<']).next().unwrap_or(&s).to_string(),
+        };
 
     // Extract param block
     let params = extract_param_names(&s);
@@ -434,19 +421,20 @@ fn compact_method_medium(sig: &str) -> String {
     let s = strip_base_initializer_clause(&stripped);
 
     // Detect C# return-type-first and normalize to name-first.
-    // Use the method's own `(` (`find_method_params` — the name-anchored
-    // first depth-0 group) so a C# tuple return type is not mis-tokenized
-    // as the parameter list.
-    let before_paren = match find_method_params(s) {
-        Some((open, _)) => &s[..open],
-        None => s,
-    };
-    let tokens: Vec<&str> = before_paren.split_whitespace().collect();
-    if tokens.len() >= 2 && is_csharp_return_type(tokens[tokens.len() - 2]) {
+    //
+    // The name is the identifier that OWNS the parameter list, read from
+    // structure (`signature::split_head_parts`): `Pair<TFirst, TSecond>` keeps
+    // both type parameters, and a tuple return type no longer shifts the name
+    // onto a modifier. The return-type-first decision stays the established
+    // classification (see `signature::is_return_type_first`), with the
+    // structural tuple case added.
+    if let Some(parts) =
+        find_method_params(s).and_then(|(open, _)| signature::split_head_parts(s, open))
+        && signature::is_return_type_first(parts.prefix)
+    {
         // C#: "ActionResult<UserDto> GetAll(id:int)" → "GetAll(id:int)"
-        let name = tokens.last().unwrap();
         let (params, ret) = split_params_ret(s);
-        let mut out = format!("{}({})", name, params);
+        let mut out = format!("{}({})", parts.name, params);
         if !ret.is_empty() {
             out.push(':');
             out.push_str(&ret);
@@ -477,8 +465,11 @@ fn extract_param_names(sig: &str) -> Vec<String> {
         return Vec::new();
     }
 
-    params_str
-        .split(',')
+    // The parameters are the ones the declaration WROTE: a comma nested in a
+    // generic argument list (`Expression<Func<A, B>> key`) or in a
+    // parenthesized type does not separate them.
+    signature::split_parameters(params_str)
+        .into_iter()
         .map(|p| {
             let p = p.trim();
             // TS/Java name-first: "id: string" → "id" (before the colon).

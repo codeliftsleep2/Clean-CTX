@@ -22,6 +22,7 @@ pub(crate) mod import;
 pub(crate) mod java;
 pub(crate) mod method;
 pub(crate) mod modifiers;
+pub(crate) mod signature;
 
 pub use class::{
     extract_class_meta, extract_class_name, extract_rust_struct_name, format_class_entry,

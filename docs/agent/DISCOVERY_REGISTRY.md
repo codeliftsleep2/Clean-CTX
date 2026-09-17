@@ -46,6 +46,65 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-019: `provide_code_context` Fabricated Method Identities for C# Generic and Tuple-Returning Declarations
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-17 |
+| **Environment** | Live MCP session against real C# LINQ-shaped sources (client not recorded) + local reproduction in the controlled laboratory |
+| **Repository/context** | Real-world C# declarations: an extension method with two method type parameters whose parameter type nests a generic argument list (`Expression<Func<TFirst, TSecond>>`), plus two unrelated methods returning named tuples, in a `static` class with no base list. |
+| **Symptom** | `provide_code_context` returned structurally valid but factually incorrect method signatures, and the compressed schema hid it. `Pair<TFirst, TSecond>` rendered as the method identity `M TSecond>` at every fidelity while single-type-parameter methods in the same source were correct; `public static (int alpha, int beta) GetPair(int[] values)` rendered with name `static`, parameters `int alpha, int beta` and return type `GetPair(int[] values)` — the fields shifted — whereupon two unrelated tuple-returning methods shared the fabricated identity and rendered as `static(+2)`, a false overload group. The same class-level output also acquired a fabricated base-class line `X source.OrderByDescending(keySelector);` although the class declares no base list. |
+
+| **Root cause** | Two token-position rules living at the flatten-then-reparse boundary between `compaction::extract_method_sig` and the IR compiler, each defeated by a legitimate declaration shape. (1) The declared NAME was derived as "the last whitespace token before the declaration's parameter list", which is only accidentally the name: a generic method's type-parameter list itself contains `, `, so the token sequence of `Pair<TFirst, TSecond>(` ends in `TSecond>` and the name became a type parameter at every fidelity; the identical rule in `compact_method_low`, `compact_method_medium` and `diff::keys::method_key` propagated the corrupted identity into the compressed label and the diff grouping key. (2) The PARAMETER LIST was located as "the first depth-0 balanced `(...)` group preceded by an identifier or `>`", and `static` is an identifier, so a parenthesized RETURN type — the C# tuple return — was accepted as the parameter list; every later field then derived from the wrong side of the wrong boundary (name = the prefix's last token `static`, parameters = the tuple members, return type = the real name plus its parameter list). Because `CoreOp::DefMethod` is the canonical identity consumed by the hierarchical wire form, `render_llm` and its overload grouping, `UnitTable`, the `builtin` / `Method` registration occurrences and the caller side of every `Calls` edge, the corruption was never rendering-only — but it was produced ONCE, upstream, so both consumers were corrected by one fix with no projection or renderer change (the renderer is a pure projection and was proven innocent, including by the Java control below). A third defect in the same capture-boundary family has a separate mechanism: `CSharpLayer::extract_class_relationships` scanned the whole class declaration node (head **and** body) for the first `:`, so a ternary in a member body became a base class. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes — deterministic fixtures; no scale dependency. |
+| **Local regression** | `src/tests/compaction/signature.rs` (shared structural boundary, plus the Low/Medium label contract for C#, TypeScript and Rust); `src/tests/ir/method_signature_shape.rs` (RED-SIG1–RED-SIG12 through the production pipeline at Low/Medium/High); `src/tests/ir/signature_cross_language.rs` (TypeScript function and method, Rust `impl` `fn`, and the Java control); `src/tests/mcp/provider_code_context_signature.rs` (the real dispatch path at low/medium/high plus edit fidelity with `focusMethods`, each case asserting `content_kind != "raw_passthrough"`); `src/tests/ir/semantic_projection.rs` (registration occurrences and the `Calls` caller identity at the projection boundary). |
+| **Live scenario required?** | Already exercised and worth re-running: the maintainer's run of `target/tmp/signature_live_acceptance.mjs` against the rebuilt binary printed the corrected identities at all three fidelities with every §Symptom value absent; the driver's own too-coarse probe was corrected afterwards and that re-run is not yet recorded. |
+| **Architectural invariant** | N/A — no catalogued invariant covers declaration-identity derivation (`ARCH-002` and `IRPAT-001` govern other boundaries). The rule is enforced structurally instead: one shared extractor (`src/compaction/signature.rs`), consumed by the label, IR and diff paths, plus its tracked regressions. |
+| **Status** | Fixed (local regressions green; live acceptance exercised the corrected identities — the corrected probe's re-run not yet recorded) |
+
+**Fix (2026-09-17):** `src/compaction/signature.rs` (new) now owns declaration identity: the NAME is the identifier that OWNS the parameter list (balanced angle-bracket scanning, `.`-qualified chains kept whole); a parenthesized RETURN TYPE is recognised structurally, because the declared name and then the declaration's own parameter list follow the group, so it can never be selected as the parameter list; the RETURN TYPE is the trailing TYPE expression of a return-type-first prefix, so modifiers and the declaration's own type-parameter list cannot leak into it; and formal PARAMETERS split at structural depth, so a comma nested inside a generic argument list cannot inflate them. `compaction::method` (Low/Medium labels, `find_method_params`, `extract_param_names`), `ir::pipeline/signature.rs::parse_method_sig` and `diff::keys::method_key` consume that one implementation, and `CSharpLayer::extract_class_relationships` now reads only the attribute-stripped declaration head. Cross-language outcome: the shared rule had also affected **TypeScript** and **Rust** (both corrected and regression-tested); **Java** is structurally immune because its method type-parameter list precedes the return type — the control that isolated the defect to the shared flattening rather than the renderer.
+
+**Distillation note:** neither rule was a C# accident — both were shared-boundary assumptions about flattened text, which is why the fix belongs at the shared boundary and why the audit crossed languages. Neither defect needed scale: each is a one-line declaration shape, so both distilled into cheap tracked regressions on the first attempt.
+
+**Adjacent, unfixed finding (deliberately not part of this fix):** `CoreOp::Flags` has **two** producers writing separate ops for the same method id — the language layer's declaration modifiers (`STATIC`, `ASYNC`, `PRIVATE`, …) and the accumulated control-flow flags (`IF`, `LOOP`, `RET`, `THROW`) flushed at the end of the declaration — while `src/ir/hierarchical/encode.rs` keeps only the LAST op (`methods[mi].flags = Some(flags.clone())`). Consequence: a method whose body contains control flow renders `fl:RET` and its declaration modifiers are never rendered at all. This is pre-existing, language-agnostic, unrelated to the identity defect, and NOT fixed here: correcting it means either merging the two flag families at encode (which changes the inputs `CompressingPatternRecognizer` matches on — `FLAGS(ASYNC)`, `FLAGS(OVERRIDE)`) or splitting the opcode, i.e. a `SCHEMA v2` / pattern-recognition decision that needs its own approval. The new IR test instrumentation unions a method's flag ops, so an assertion about either family stays meaningful meanwhile.
+
+**Minimal trigger:**
+```csharp
+using System.Linq;
+using System.Linq.Expressions;
+
+public static class QueryablePairExtensions
+{
+    public static IOrderedQueryable<TFirst> Pair<TFirst, TSecond>(
+        this IQueryable<TFirst> source,
+        Expression<Func<TFirst, TSecond>> keySelector,
+        ListSortDirection direction)
+    {
+        return source.OrderByDescending(keySelector);
+    }
+
+    public static (int alpha, int beta) GetPair(int[] values)
+    {
+        return (values[0], values[1]);
+    }
+
+    public static (string name, int count) Tenth(string[] names)
+    {
+        return (names[0], names.Length);
+    }
+
+    public static int Pick(int[] values, bool ascending)
+    {
+        // The ternary `:` is what a full-node relationship scan mistook for a
+        // base-class separator, fabricating an `extends` edge.
+        return values.Length == 0 ? 0 : values.OrderByDescending(v => v).First();
+    }
+}
+```
+
+---
+
 ## DIS-2026-018: Workspace-Scoped Edge Queries Returned Another Repository's Occurrences
 
 | Field | Value |

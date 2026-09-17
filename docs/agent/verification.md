@@ -32,7 +32,10 @@ The file-size guard enforces the active-file policy from the engineering
 rules. Without `-BaseRef`, it checks working-tree, index, and untracked files.
 CI passes `-BaseRef` so committed changes relative to the target branch are
 also active. Untouched tracked files above 615 lines are reported as legacy
-debt and do not fail the gate.
+debt and do not fail the gate. Path-scoped exemptions declared inline in the
+guard (`$ExemptPaths`, each carrying its justification and the maintainer
+decision that added it) are excluded from the active set entirely, so they are
+neither failed nor reported as legacy debt.
 Activating a legacy oversized file is a correctness decision, not a cost
 decision: when the architecturally correct change belongs in an oversized file,
 that file is decomposed semantically as part of the change (engineering rules,
@@ -93,6 +96,23 @@ push/PR:
 The local gate above mirrors CI; local verification is belt-and-braces, CI is
 the authoritative release-time enforcement.
 
+## Live acceptance harnesses are not tests
+
+Untracked operator harnesses (for example `target/tmp/*.mjs` or
+`target/tmp/*.ps1`) that drive the built binary over MCP stdio are permitted and
+often useful: they let the operator observe real output from a real binary. They
+are hand-off convenience, and that is their entire role.
+
+- A harness result is NEVER part of this gate, never a substitute for a tracked
+  test, and never a completion criterion.
+- Every required regression MUST be a tracked test under `src/tests/**` (see
+  `architecture.md`, Test-file convention) that
+  `cargo test --workspace --all-targets --all-features` compiles and runs.
+- Reporting a harness PASS as coverage, or placing a test where the gate does
+  not compile and run it, is a policy violation (engineering rules, §8d).
+- A harness cannot repair a red gate. The failing tracked test stays failing
+  until the tracked test itself is green.
+
 ## Encoding verification
 
 Text-file encoding is enforced mechanically (no memory needed):
@@ -115,6 +135,8 @@ A task is complete only when:
 - the requested implementation is complete,
 - the resulting architecture is coherent,
 - the repository is left in a state consistent with the engineering rules,
+- every required regression is a tracked test in `src/tests/**` that this gate
+  compiles and runs (an untracked live harness outside it is never coverage),
 - the final verification gate passes.
 
 The final state must not merely work; it must also be architecturally

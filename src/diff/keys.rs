@@ -4,7 +4,8 @@
 
 use std::collections::BTreeMap;
 
-use crate::compaction::method::{find_method_params, is_csharp_return_type};
+use crate::compaction::method::find_method_params;
+use crate::compaction::signature;
 
 use super::snapshot::CapturedClass;
 
@@ -45,42 +46,25 @@ pub(crate) fn group_strings_by_key(
 /// (`+ method bool bool Resolve(...)`) and incorrect grouping of
 /// methods that share a return type. F-02 diff audit.
 pub(crate) fn method_key(sig: &str) -> String {
-    // Use the method's own `(` (`find_method_params` — the name-anchored
-    // first depth-0 group) so a C# tuple return type is not mis-tokenized
-    // as the parameter list.
-    let before_paren = match find_method_params(sig) {
-        Some((open, _)) => &sig[..open],
-        None => sig,
-    };
-    let tokens: Vec<&str> = before_paren.split_whitespace().collect();
-    if tokens.len() >= 2 && is_csharp_return_type(tokens[tokens.len() - 2]) {
-        // C# return-type-first: the method name is the last token.
-        tokens
-            .last()
-            .unwrap()
-            .split('<')
-            .next()
-            .unwrap_or(tokens.last().unwrap())
-            .to_string()
-    } else if tokens.is_empty() {
-        // Defensive: the signature begins with `(`/`<` — no name prefix.
-        String::new()
-    } else {
-        // TS/Java name-first: the method name is the LAST whitespace token
-        // before the `(`/`<`. Leading declarator keywords like
-        // `export function foo`, `export async function foo`, or
-        // `async function foo` are NOT stripped by `strip_modifiers`
-        // (MODIFIERS_MEDIUM has no `export`/`function`), so taking the
-        // FIRST token mis-keyed every top-level function as "export" or
-        // "async" — all top-level functions in a file grouped under the
-        // same key and the rendered label was wrong. G3-5 diff audit.
-        tokens
-            .last()
-            .unwrap()
-            .split('<')
-            .next()
-            .unwrap_or(tokens.last().unwrap())
-            .to_string()
+    // The method's own `(` (`find_method_params` — the name-anchored first
+    // depth-0 group that is NOT a parenthesized return type) and the
+    // identifier that OWNS it (`compaction::signature`) are the authority for
+    // the name — never token position.
+    //
+    // The previous "last whitespace token before the `(`" rule destroyed the
+    // identity of a generic method whose type-parameter list contains `, `
+    // (`Pair<TFirst, TSecond>` keyed as `TSecond>`) and of a tuple-returning
+    // method (`public static (int alpha, int beta) GetPair(...)` keyed as
+    // `static`): distinct methods then grouped under one fabricated key.
+    if let Some(parts) =
+        find_method_params(sig).and_then(|(open, _)| signature::split_head_parts(sig, open))
+    {
+        return parts.bare_name.to_string();
+    }
+    // No name-anchored parameter list — keep the legacy reading.
+    match sig.split_whitespace().last() {
+        Some(last) => last.split('<').next().unwrap_or(last).to_string(),
+        None => String::new(),
     }
 }
 
