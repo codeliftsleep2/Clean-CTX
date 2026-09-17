@@ -9,7 +9,8 @@
 // narrowing — may neither extend a path nor close a cycle.
 
 use super::{
-    optional_i32, query_scope, required_str, run_query_with_hydration, send_scope_rejection,
+    discovery_field, optional_i32, query_scope, required_str, run_query_with_hydration,
+    send_scope_rejection,
 };
 use crate::mcp::McpState;
 use crate::protocol::send_response;
@@ -76,7 +77,7 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
     let depth_captured = depth;
-    let (results, count, hydration_attempted, hydration) =
+    let (results, count, hydration) =
         run_query_with_hydration(state, "transitive_dependencies", name, workspace_root, {
             let domain = domain_owned.clone();
             let et = et_owned.clone();
@@ -96,25 +97,21 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
                 (serde_json::to_value(&r).unwrap_or_default(), c)
             }
         });
+    // The semantic answer is `dependencies` + `count` (+ `depth_used`); discovery
+    // diagnostics are attached only when discovery deviated from its expected path.
+    let mut structured = serde_json::json!({
+        "dependencies": results,
+        "count": count,
+        "depth_used": depth,
+    });
+    if let Some(discovery) = discovery_field(&hydration) {
+        structured["discovery"] = discovery;
+    }
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": format!("Found {count} dependencies (depth {depth}).") }],
-            "structuredContent": {
-                "dependencies": results,
-                "count": count,
-                "depth_used": depth,
-                "hydration_attempted": hydration_attempted,
-                "discovery_provider": hydration.discovery_provider,
-                "discovery_status": hydration.discovery_status,
-                "discovery_completed": hydration.discovery_completed,
-                "fallback_occurred": hydration.fallback_occurred,
-                "fallback_reason": hydration.fallback_reason,
-                "candidates_discovered": hydration.candidates_discovered,
-                "candidates_compiled": hydration.candidates_compiled,
-                "project_coverage": hydration.project_coverage,
-                "project_coverage_truncated": hydration.project_coverage_truncated,
-            }
+            "structuredContent": structured,
         }
     }));
 }
@@ -152,9 +149,10 @@ pub(super) fn handle_has_cycle(id: &Value, args: &Value, state: &McpState) {
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": text }],
+            // NOT hydration-eligible, so the response carries no discovery
+            // diagnostics at all — absence means "nothing noteworthy happened".
             "structuredContent": {
                 "has_cycle": has_cycle,
-                "hydration_attempted": false,
             }
         }
     }));

@@ -45,40 +45,61 @@ mod test_support;
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use test_support::*;
 
-const HYDRATION_MAX_PROJECT_COVERAGE: usize = 16;
+/// Diagnostic bound for the LLM-facing project-coverage projection.
+///
+/// The bound belongs to the RESPONSE projection (`query::diagnostics`), not to
+/// the internal record: [HydrationReport] keeps every coverage entry so internal
+/// debugging, telemetry and the discovery regressions can inspect the complete
+/// result, while only the exceptional entries the caller actually sees count
+/// against this cap. Exceeding it is reported structurally (`projects_truncated`)
+/// rather than by dropping information silently.
+pub(super) const HYDRATION_MAX_PROJECT_COVERAGE: usize = 16;
 
+/// The complete result of one hydration discovery/compile cycle.
+///
+/// This is the INTERNAL record: it deliberately keeps the full provider,
+/// completion, candidate and per-project coverage detail. What an LLM-facing
+/// response serializes is a sparse projection of it
+/// (`crate::mcp::tool_handlers::query::diagnostics`), which omits expected state
+/// and surfaces only decision-relevant deviation.
 #[derive(Default)]
 pub(super) struct HydrationReport {
     pub(super) hydration_attempted: bool,
     pub(super) discovery_provider: &'static str,
+    /// The single completion source of truth: `"completed"` iff discovery
+    /// completed across every configured root. The former separate
+    /// `discovery_completed` boolean encoded exactly this state (it was `true`
+    /// iff this was `"completed"` on every return path, verified against the
+    /// tree), and two encodings of one state are not retained — neither in the
+    /// response nor in the internal record.
     pub(super) discovery_status: &'static str,
-    pub(super) discovery_completed: bool,
-    pub(super) fallback_occurred: bool,
+    /// The ONE encoding of "the filesystem fallback was engaged": when this is
+    /// `Some`, fallback ran. The former `fallback_occurred` boolean was `true` on
+    /// exactly the return paths that carry a reason and `false` on exactly the
+    /// paths that carry none, so it encoded nothing this does not.
     pub(super) fallback_reason: Option<&'static str>,
     pub(super) candidates_discovered: usize,
     pub(super) candidates_compiled: usize,
     pub(super) project_coverage: Vec<ProjectCoverage>,
-    pub(super) project_coverage_truncated: bool,
 }
 
 #[derive(Serialize)]
 pub(super) struct ProjectCoverage {
-    project: String,
-    status: &'static str,
+    pub(super) project: String,
+    pub(super) status: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    readiness: Option<&'static str>,
+    pub(super) readiness: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    reason: Option<&'static str>,
+    pub(super) reason: Option<&'static str>,
 }
 
 struct DiscoveryOutcome {
     candidates: Vec<String>,
     project_coverage: Vec<ProjectCoverage>,
     provider: &'static str,
+    /// `"completed"` / `"partial"` / `"failed"` — the one completion encoding.
     status: &'static str,
-    completed: bool,
     attempted: bool,
-    fallback_occurred: bool,
     fallback_reason: Option<&'static str>,
 }
 
@@ -106,19 +127,17 @@ pub(super) fn hydrate_workspace_index(
         .filter(|path| compile_candidate(state, path, workspace_root))
         .count();
     project_coverage.sort_by(|left, right| left.project.cmp(&right.project));
-    let project_coverage_truncated = project_coverage.len() > HYDRATION_MAX_PROJECT_COVERAGE;
-    project_coverage.truncate(HYDRATION_MAX_PROJECT_COVERAGE);
+    // The complete coverage set is retained here; the diagnostic bound is applied
+    // by the LLM-facing projection (`query::diagnostics`), which also drops the
+    // healthy entries so they cannot consume the bound.
     HydrationReport {
         hydration_attempted: outcome.attempted,
         discovery_provider: outcome.provider,
         discovery_status: outcome.status,
-        discovery_completed: outcome.completed,
-        fallback_occurred: outcome.fallback_occurred,
         fallback_reason: outcome.fallback_reason,
         candidates_discovered: discovered,
         candidates_compiled: compiled,
         project_coverage,
-        project_coverage_truncated,
     }
 }
 
@@ -154,9 +173,7 @@ fn discover_candidate_paths(
                         project_coverage: Vec::new(),
                         provider: "cbm",
                         status: "completed",
-                        completed: true,
                         attempted: true,
-                        fallback_occurred: false,
                         fallback_reason: None,
                     };
                 }
@@ -362,9 +379,7 @@ fn discover_candidate_paths(
                 project_coverage: coverage,
                 provider: "cbm",
                 status: "completed",
-                completed: true,
                 attempted: cbm_attempted,
-                fallback_occurred: false,
                 fallback_reason: None,
             };
         }
@@ -381,9 +396,7 @@ fn discover_candidate_paths(
                 "filesystem"
             },
             status: "completed",
-            completed: true,
             attempted: true,
-            fallback_occurred: true,
             fallback_reason: Some(fallback_reason),
         };
     }
@@ -408,9 +421,7 @@ fn discover_candidate_paths(
         project_coverage: coverage,
         provider,
         status: discovery_status(attempted, completed, any_cbm_success),
-        completed,
         attempted,
-        fallback_occurred: true,
         fallback_reason: Some(fallback_reason),
     }
 }
@@ -433,9 +444,7 @@ fn filesystem_only_discovery(
                 project_coverage: Vec::new(),
                 provider: "none",
                 status: "failed",
-                completed: false,
                 attempted: false,
-                fallback_occurred: true,
                 fallback_reason: Some("filesystem_unavailable"),
             };
         }
@@ -447,9 +456,7 @@ fn filesystem_only_discovery(
             project_coverage: Vec::new(),
             provider: "filesystem",
             status: "completed",
-            completed: true,
             attempted: true,
-            fallback_occurred: true,
             fallback_reason: Some(fallback_reason),
         };
     }
@@ -464,9 +471,7 @@ fn filesystem_only_discovery(
         project_coverage: Vec::new(),
         provider,
         status: discovery_status(covered, scan.completed, false),
-        completed: scan.completed,
         attempted: covered,
-        fallback_occurred: true,
         fallback_reason: Some(if covered {
             fallback_reason
         } else {

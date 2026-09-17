@@ -15,7 +15,9 @@
 // With no `withinPath` the accepted set is unchanged, so no redundant occurrence
 // filter is added.
 
-use super::{query_scope, required_str, run_query_with_hydration, send_scope_rejection};
+use super::{
+    discovery_field, query_scope, required_str, run_query_with_hydration, send_scope_rejection,
+};
 use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
@@ -51,7 +53,7 @@ pub(super) fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
             return;
         }
     };
-    let (results, count, hydration_attempted, hydration) =
+    let (results, count, hydration) =
         run_query_with_hydration(state, "find_entities", name, workspace_root, move |idx| {
             let r = match scope.as_ref() {
                 Some(scope) => idx.find_entities_by_name_in_scope(name, scope),
@@ -60,24 +62,20 @@ pub(super) fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
             let c = r.len();
             (serde_json::to_value(&r).unwrap_or_default(), c)
         });
+    // The semantic answer is `entities` + `count`; discovery diagnostics are
+    // attached only when discovery deviated from its expected path.
+    let mut structured = serde_json::json!({
+        "entities": results,
+        "count": count,
+    });
+    if let Some(discovery) = discovery_field(&hydration) {
+        structured["discovery"] = discovery;
+    }
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": format!("Found {count} entities.") }],
-            "structuredContent": {
-                "entities": results,
-                "count": count,
-                "hydration_attempted": hydration_attempted,
-                "discovery_provider": hydration.discovery_provider,
-                "discovery_status": hydration.discovery_status,
-                "discovery_completed": hydration.discovery_completed,
-                "fallback_occurred": hydration.fallback_occurred,
-                "fallback_reason": hydration.fallback_reason,
-                "candidates_discovered": hydration.candidates_discovered,
-                "candidates_compiled": hydration.candidates_compiled,
-                "project_coverage": hydration.project_coverage,
-                "project_coverage_truncated": hydration.project_coverage_truncated,
-            }
+            "structuredContent": structured,
         }
     }));
 }
@@ -140,7 +138,10 @@ pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState
     let results = idx.entities_in_file(&canonical_path);
     let serialized = serde_json::to_value(&results).unwrap_or_default();
     let count = results.len();
-    // entities_in_file is NOT hydration-eligible (no entity name for CBM search).
+    // entities_in_file is NOT hydration-eligible (no entity name for CBM search),
+    // so its response carries no discovery diagnostics at all: a constant
+    // "attempted: false" says nothing a caller can act on, and absence is the
+    // documented meaning of "nothing noteworthy happened".
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
@@ -148,7 +149,6 @@ pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState
             "structuredContent": {
                 "entities": serialized,
                 "count": count,
-                "hydration_attempted": false,
             }
         }
     }));

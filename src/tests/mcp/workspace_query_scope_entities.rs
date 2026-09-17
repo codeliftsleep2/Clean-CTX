@@ -112,12 +112,11 @@ pub(super) fn entities_in_file(
     );
     let sc = structured(state, arguments);
     // A path outside the declared roots is answered with the handler's minimal
-    // zero-result shape (no hydration metadata at all), so the field is asserted
-    // as "never true" rather than "always present".
-    assert_ne!(
-        sc["hydration_attempted"].as_bool(),
-        Some(true),
-        "entities_in_file must never hydrate"
+    // zero-result shape; either way, `entities_in_file` is not
+    // hydration-eligible, so it carries no discovery diagnostic at all.
+    assert!(
+        sc.get("discovery").is_none() && sc.get("hydration_attempted").is_none(),
+        "entities_in_file must never hydrate: {sc:?}"
     );
     entity_occurrences(&sc)
 }
@@ -158,10 +157,9 @@ pub(super) fn dependencies(
 pub(super) fn cycle(state: &McpState, root: Option<&str>) -> bool {
     let arguments = with_root(json!({ "type": "has_cycle" }), root);
     let sc = structured(state, arguments);
-    assert_eq!(
-        sc["hydration_attempted"].as_bool(),
-        Some(false),
-        "has_cycle must stay non-hydration-eligible"
+    assert!(
+        sc.get("discovery").is_none() && sc.get("hydration_attempted").is_none(),
+        "has_cycle must stay non-hydration-eligible: {sc:?}"
     );
     sc["has_cycle"].as_bool().expect("has_cycle boolean")
 }

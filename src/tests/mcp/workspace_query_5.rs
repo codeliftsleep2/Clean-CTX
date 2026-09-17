@@ -60,7 +60,7 @@ fn call_query(
     name: &str,
     root: &Path,
 ) -> serde_json::Map<String, serde_json::Value> {
-    let (result, count, attempted, hydration) = super::run_query_with_hydration(
+    let (result, count, hydration) = super::run_query_with_hydration(
         state,
         query_type,
         name,
@@ -78,16 +78,16 @@ fn call_query(
             (values, count)
         },
     );
-    serde_json::json!({
-        "result": result,
-        "count": count,
-        "hydration_attempted": attempted,
-        "candidates_discovered": hydration.candidates_discovered,
-        "candidates_compiled": hydration.candidates_compiled,
-    })
-    .as_object()
-    .expect("structured result")
-    .clone()
+    // The response projection itself, so these regressions assert the contract
+    // the handler actually produces and cannot drift from it.
+    let mut structured = serde_json::json!({ "result": result, "count": count })
+        .as_object()
+        .cloned()
+        .expect("structured result");
+    if let Some(discovery) = super::discovery_field(&hydration) {
+        structured.insert("discovery".to_string(), discovery);
+    }
+    structured
 }
 
 fn write_consumer(root: &Path, file: &str, class_name: &str) {
@@ -129,8 +129,8 @@ fn red_c1_reverse_edges_returns_all_inbound_consumers() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["candidates_discovered"], 9);
-    assert_eq!(sc["candidates_compiled"], 9);
+    assert_eq!(sc["discovery"]["discovered"], 9);
+    assert_eq!(sc["discovery"]["compiled"], 9);
     assert_eq!(sc["count"], 9);
     assert_eq!(consumer_names(&sc).len(), 9);
     clear_test_project_search_results();
@@ -159,8 +159,8 @@ fn red_c2_find_entities_is_not_silently_truncated() {
 
     let sc = call_query(&state, "find_entities", "SharedDeclaration", root.path());
 
-    assert_eq!(sc["candidates_discovered"], 7);
-    assert_eq!(sc["candidates_compiled"], 7);
+    assert_eq!(sc["discovery"]["discovered"], 7);
+    assert_eq!(sc["discovery"]["compiled"], 7);
     assert_eq!(sc["count"], 7);
     clear_test_project_search_results();
 }
@@ -199,8 +199,8 @@ fn red_c3_multi_project_reverse_edges_is_complete() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", primary.path());
 
-    assert_eq!(sc["candidates_discovered"], 8);
-    assert_eq!(sc["candidates_compiled"], 8);
+    assert_eq!(sc["discovery"]["discovered"], 8);
+    assert_eq!(sc["discovery"]["compiled"], 8);
     assert_eq!(sc["count"], 8);
     assert_eq!(consumer_names(&sc).len(), 8);
     clear_test_project_search_results();
@@ -234,8 +234,8 @@ fn red_c4_duplicate_candidates_compile_once() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["candidates_discovered"], 3);
-    assert_eq!(sc["candidates_compiled"], 1);
+    assert_eq!(sc["discovery"]["discovered"], 3);
+    assert_eq!(sc["discovery"]["compiled"], 1);
     assert_eq!(sc["count"], 1);
     clear_test_project_search_results();
 }
@@ -265,8 +265,8 @@ fn red_c5_already_indexed_candidates_are_excluded_without_losing_results() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["candidates_discovered"], 7);
-    assert_eq!(sc["candidates_compiled"], 6);
+    assert_eq!(sc["discovery"]["discovered"], 7);
+    assert_eq!(sc["discovery"]["compiled"], 6);
     assert_eq!(sc["count"], 7);
     clear_test_project_search_results();
 }
@@ -297,8 +297,8 @@ fn red_c6_candidate_count_is_not_semantic_result_count() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["candidates_discovered"], 8);
-    assert_eq!(sc["candidates_compiled"], 8);
+    assert_eq!(sc["discovery"]["discovered"], 8);
+    assert_eq!(sc["discovery"]["compiled"], 8);
     assert_eq!(sc["count"], 1);
     assert_eq!(consumer_names(&sc), HashSet::from(["RealConsumer"]));
     clear_test_project_search_results();

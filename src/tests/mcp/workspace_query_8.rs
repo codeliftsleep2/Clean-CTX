@@ -90,7 +90,7 @@ fn call_query(
     name: &str,
     root: &Path,
 ) -> serde_json::Map<String, serde_json::Value> {
-    let (result, count, attempted, hydration) = super::run_query_with_hydration(
+    let (result, count, hydration) = super::run_query_with_hydration(
         state,
         query_type,
         name,
@@ -114,19 +114,16 @@ fn call_query(
             (values, count)
         },
     );
-    serde_json::json!({
-        "result": result,
-        "count": count,
-        "hydration_attempted": attempted,
-        "candidates_discovered": hydration.candidates_discovered,
-        "candidates_compiled": hydration.candidates_compiled,
-        "discovery_completed": hydration.discovery_completed,
-        "discovery_provider": hydration.discovery_provider,
-        "project_coverage": hydration.project_coverage,
-    })
-    .as_object()
-    .expect("structured result")
-    .clone()
+    // The response projection itself, so these regressions assert the contract
+    // the handler actually produces and cannot drift from it.
+    let mut structured = serde_json::json!({ "result": result, "count": count })
+        .as_object()
+        .cloned()
+        .expect("structured result");
+    if let Some(discovery) = super::discovery_field(&hydration) {
+        structured.insert("discovery".to_string(), discovery);
+    }
+    structured
 }
 
 fn write_service(root: &Path) {
@@ -164,8 +161,8 @@ fn red_h1_repeated_identical_query_does_not_repeat_discovery() {
 
     let first = call_query(&state, "reverse_edges", "ServiceA", root.path());
     assert_eq!(calls_for(&slug), 1, "first call must discover");
-    assert_eq!(first["candidates_discovered"], 1);
-    assert_eq!(first["candidates_compiled"], 1);
+    assert_eq!(first["discovery"]["discovered"], 1);
+    assert_eq!(first["discovery"]["compiled"], 1);
     assert_eq!(
         first["count"], 1,
         "the live WorkspaceIndex answers the query"
@@ -182,13 +179,14 @@ fn red_h1_repeated_identical_query_does_not_repeat_discovery() {
         1,
         "an unchanged session must not re-run discovery for the same target"
     );
-    assert_eq!(second["candidates_discovered"], 0);
-    assert_eq!(second["candidates_compiled"], 0);
+    assert!(
+        second.get("discovery").is_none(),
+        "a cached repeat discovers nothing and completes as expected, so it reports nothing: {second:?}"
+    );
     assert_eq!(
         second["count"], 1,
         "the WorkspaceIndex query itself still executes"
     );
-    assert_eq!(second["hydration_attempted"], true);
 
     clear_test_project_search_results();
 }
@@ -224,7 +222,10 @@ fn red_h2_second_call_skips_discovery_not_only_compilation() {
     // discovery.
     let other = call_query(&state, "reverse_edges", "ServiceB", root.path());
     assert_eq!(calls_for(&slug), 2, "a new target must still discover");
-    assert_eq!(other["hydration_attempted"], true);
+    assert_eq!(
+        other["discovery"]["discovered"], 1,
+        "a new target's discovery must still be reported: {other:?}"
+    );
 
     clear_test_project_search_results();
 }
@@ -244,8 +245,10 @@ fn red_h3_successful_zero_result_discovery_is_cached() {
 
     let first = call_query(&state, "reverse_edges", "AbsentService", root.path());
     assert_eq!(calls_for(&slug), 1);
-    assert_eq!(first["candidates_discovered"], 0);
-    assert_eq!(first["discovery_completed"], true);
+    assert!(
+        first.get("discovery").is_none(),
+        "a completed CBM pass with zero candidates and a healthy project reports nothing: {first:?}"
+    );
 
     let _ = call_query(&state, "reverse_edges", "AbsentService", root.path());
     assert_eq!(
@@ -279,10 +282,10 @@ fn red_h4_failed_discovery_is_retried() {
     // is why the overall discovery reports `completed` — it did complete, via
     // the fallback provider).
     assert_eq!(
-        first["project_coverage"][0]["status"], "search_failed",
+        first["discovery"]["projects"][0]["status"], "search_failed",
         "a failed CBM discovery must be reported, never presented as absence"
     );
-    assert_eq!(first["discovery_provider"], "filesystem");
+    assert_eq!(first["discovery"]["provider"], "filesystem");
     assert_eq!(test_scan_calls(), 1, "the fallback scan ran once");
 
     let second = call_query(&state, "reverse_edges", "ServiceA", root.path());
@@ -292,7 +295,7 @@ fn red_h4_failed_discovery_is_retried() {
         "a transient discovery failure must never be cached as absence"
     );
     assert_eq!(
-        second["project_coverage"][0]["status"], "search_failed",
+        second["discovery"]["projects"][0]["status"], "search_failed",
         "the retry must re-attempt the failed project search and re-report it"
     );
     assert_eq!(
@@ -487,9 +490,14 @@ fn red_h8_declaration_oriented_queries_share_one_discovery_entry() {
     let second = call_query(&state, "forward_edges", "ServiceA", root.path());
     let third = call_query(&state, "transitive_dependencies", "ServiceA", root.path());
 
-    assert_eq!(first["hydration_attempted"], true);
-    assert_eq!(second["hydration_attempted"], true);
-    assert_eq!(third["hydration_attempted"], true);
+    assert_eq!(
+        first["discovery"]["discovered"], 1,
+        "the shared declaration discovery is performed and reported once: {first:?}"
+    );
+    assert!(
+        second.get("discovery").is_none() && third.get("discovery").is_none(),
+        "the second and third call reuse the same discovery and report nothing: {second:?} / {third:?}"
+    );
     assert_eq!(
         discovery_calls(),
         vec![(slug.clone(), TestDiscoveryKind::Declaration)],

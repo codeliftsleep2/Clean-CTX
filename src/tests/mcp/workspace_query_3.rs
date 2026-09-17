@@ -48,7 +48,7 @@ fn call_find(
     name: &str,
     workspace_root: &Path,
 ) -> serde_json::Map<String, serde_json::Value> {
-    let (entities, count, hydration_attempted, hydration) = super::run_query_with_hydration(
+    let (entities, count, hydration) = super::run_query_with_hydration(
         state,
         "find_entities",
         name,
@@ -59,18 +59,16 @@ fn call_find(
             (serde_json::to_value(entities).unwrap_or_default(), count)
         },
     );
-    serde_json::json!({
-        "entities": entities,
-        "count": count,
-        "hydration_attempted": hydration_attempted,
-        "candidates_discovered": hydration.candidates_discovered,
-        "candidates_compiled": hydration.candidates_compiled,
-        "project_coverage": hydration.project_coverage,
-        "project_coverage_truncated": hydration.project_coverage_truncated,
-    })
-    .as_object()
-    .expect("structured result")
-    .clone()
+    // The response projection itself, so these regressions assert the contract
+    // the handler actually produces and cannot drift from it.
+    let mut structured = serde_json::json!({ "entities": entities, "count": count })
+        .as_object()
+        .cloned()
+        .expect("structured result");
+    if let Some(discovery) = super::discovery_field(&hydration) {
+        structured.insert("discovery".to_string(), discovery);
+    }
+    structured
 }
 
 fn configure_results(
@@ -92,16 +90,29 @@ fn configure_readiness(entries: &[(&str, TestProjectReadiness)]) {
     );
 }
 
+/// The optional `discovery` diagnostic of a response, when one was emitted.
+fn discovery(sc: &serde_json::Map<String, serde_json::Value>) -> Option<&serde_json::Value> {
+    sc.get("discovery")
+}
+
+/// One reported exceptional project entry, looked up by project identity.
 fn coverage_entry<'a>(
     sc: &'a serde_json::Map<String, serde_json::Value>,
     project: &str,
 ) -> &'a serde_json::Value {
-    sc["project_coverage"]
+    discovery(sc).unwrap_or_else(|| panic!("expected a discovery diagnostic: {sc:?}"))["projects"]
         .as_array()
-        .expect("coverage array")
+        .expect("reported project entries")
         .iter()
         .find(|entry| entry["project"] == project)
         .expect("project coverage entry")
+}
+
+/// Whether the response reports this project as an exceptional entry.
+fn reports_project(sc: &serde_json::Map<String, serde_json::Value>, project: &str) -> bool {
+    discovery(sc)
+        .and_then(|discovery| discovery["projects"].as_array())
+        .is_some_and(|entries| entries.iter().any(|entry| entry["project"] == project))
 }
 
 fn assert_both_projects_searched(primary: &str, additional: &str) {
@@ -135,8 +146,8 @@ fn red15_additional_root_only_discovery() {
     let sc = call_find(&state, "AdditionalOnly", primary.path());
     let entities = sc["entities"].as_array().expect("entities array");
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["candidates_discovered"], 1);
-    assert_eq!(sc["candidates_compiled"], 1);
+    assert_eq!(sc["discovery"]["discovered"], 1);
+    assert_eq!(sc["discovery"]["compiled"], 1);
     assert!(
         entities.iter().any(|entity| {
             entity["entity_type"] == "Class" && entity["name"] == "AdditionalOnly"
@@ -284,8 +295,8 @@ fn red17_merged_candidates_are_exhaustive_after_dedup_and_index_exclusion() {
     expected.dedup();
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["candidates_discovered"], 9);
-    assert_eq!(sc["candidates_compiled"], 7);
+    assert_eq!(sc["discovery"]["discovered"], 9);
+    assert_eq!(sc["discovery"]["compiled"], 7);
     assert_eq!(added.len(), 7, "all unique unindexed candidates compile");
     assert_eq!(added, expected.into_iter().collect());
     clear_test_project_search_results();
@@ -314,8 +325,8 @@ fn red18_per_project_failure_degrades_locally() {
     let sc = call_find(&state, "Survivor", primary.path());
     let entities = sc["entities"].as_array().expect("entities array");
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["candidates_discovered"], 1);
-    assert_eq!(sc["candidates_compiled"], 1);
+    assert_eq!(sc["discovery"]["discovered"], 1);
+    assert_eq!(sc["discovery"]["compiled"], 1);
     assert!(entities.iter().any(|entity| entity["name"] == "Survivor"));
     clear_test_project_search_results();
 }
@@ -337,21 +348,14 @@ fn additional_root_registration_is_reached_by_hydration_discovery() {
 
     let sc = call_find(&state, "Absent", primary.path());
 
-    assert_eq!(sc["candidates_discovered"], 0);
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    let coverage = sc["project_coverage"].as_array().expect("coverage array");
-    assert_eq!(coverage.len(), 2);
     assert!(
-        coverage
-            .iter()
-            .any(|entry| { entry["project"] == primary_slug && entry["status"] == "searched" })
+        discovery(&sc).is_none(),
+        "both projects were searched while ready and nothing was discovered, so there is no \
+         diagnostic to report: {sc:?}"
     );
-    assert!(
-        coverage
-            .iter()
-            .any(|entry| { entry["project"] == additional_slug && entry["status"] == "searched" })
-    );
-    assert_eq!(sc["project_coverage_truncated"], false);
+    assert!(!reports_project(&sc, &primary_slug));
+    assert!(!reports_project(&sc, &additional_slug));
     clear_test_project_search_results();
 }
 
@@ -379,8 +383,8 @@ fn red19_still_indexing_project_with_queryable_graph_is_searched() {
     let sc = call_find(&state, "Persisted", primary.path());
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["candidates_discovered"], 1);
-    assert_eq!(sc["candidates_compiled"], 1);
+    assert_eq!(sc["discovery"]["discovered"], 1);
+    assert_eq!(sc["discovery"]["compiled"], 1);
     assert_eq!(sc["count"], 1);
     assert_eq!(coverage_entry(&sc, &additional_slug)["status"], "searched");
     assert_eq!(
@@ -414,8 +418,8 @@ fn red20_failed_readiness_with_queryable_graph_is_searched() {
     let sc = call_find(&state, "PersistedAfterFailure", primary.path());
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["candidates_discovered"], 1);
-    assert_eq!(sc["candidates_compiled"], 1);
+    assert_eq!(sc["discovery"]["discovered"], 1);
+    assert_eq!(sc["discovery"]["compiled"], 1);
     assert_eq!(sc["count"], 1);
     assert_eq!(coverage_entry(&sc, &additional_slug)["status"], "searched");
     assert_eq!(coverage_entry(&sc, &additional_slug)["readiness"], "failed");
@@ -449,9 +453,9 @@ fn red21_search_failure_is_local_and_other_project_still_hydrates() {
         coverage_entry(&sc, &primary_slug)["status"],
         "search_failed"
     );
-    assert_eq!(
-        coverage_entry(&sc, &primary_slug)["reason"],
-        "search_failed"
+    assert!(
+        coverage_entry(&sc, &primary_slug).get("reason").is_none(),
+        "a failed search reports its status once, never twice as a synonymous reason"
     );
     assert_eq!(sc["count"], 1);
     clear_test_project_search_results();
@@ -485,7 +489,11 @@ fn red22_project_coverage_distinguishes_every_discovery_outcome() {
 
     let sc = call_find(&state, "Absent", primary.path());
 
-    assert_eq!(coverage_entry(&sc, &primary_slug)["status"], "searched");
+    assert!(
+        !reports_project(&sc, &primary_slug),
+        "the primary project was searched while ready: it is expected coverage and is not \
+         reported: {sc:?}"
+    );
     assert_eq!(coverage_entry(&sc, &failed_slug)["status"], "search_failed");
     assert_eq!(coverage_entry(&sc, &unavailable_slug)["status"], "skipped");
     assert_eq!(
@@ -497,12 +505,18 @@ fn red22_project_coverage_distinguishes_every_discovery_outcome() {
         coverage_entry(&sc, &unregistered_slug)["reason"],
         "additional_root_not_registered"
     );
-    assert_eq!(sc["project_coverage_truncated"], false);
+    assert!(
+        discovery(&sc)
+            .unwrap_or_else(|| panic!("expected a diagnostic: {sc:?}"))
+            .get("projects_truncated")
+            .is_none(),
+        "nothing was truncated, and a zero would restate absence"
+    );
     clear_test_project_search_results();
 }
 
 #[test]
-fn workspace_query_schema_declares_hydration_coverage_metadata() {
+fn workspace_query_schema_declares_sparse_discovery_diagnostics() {
     let tools = crate::mcp::tools::tool_list();
     let workspace_query = tools
         .iter()
@@ -512,7 +526,8 @@ fn workspace_query_schema_declares_hydration_coverage_metadata() {
         .as_object()
         .expect("output properties");
 
-    for field in [
+    // One optional sparse object replaced the ten flat diagnostic fields.
+    for removed in [
         "hydration_attempted",
         "discovery_provider",
         "discovery_status",
@@ -525,9 +540,35 @@ fn workspace_query_schema_declares_hydration_coverage_metadata() {
         "project_coverage_truncated",
     ] {
         assert!(
-            properties.contains_key(field),
-            "missing schema field: {field}"
+            !properties.contains_key(removed),
+            "the flat diagnostic '{removed}' must not be advertised any more"
         );
     }
-    assert_eq!(properties["project_coverage"]["type"], "array");
+    let discovery = properties["discovery"]
+        .as_object()
+        .expect("the sparse discovery property");
+    assert_eq!(discovery["type"], "object");
+    let fields = discovery["properties"]
+        .as_object()
+        .expect("discovery properties");
+    for field in [
+        "provider",
+        "status",
+        "fallback_reason",
+        "discovered",
+        "compiled",
+        "projects",
+        "projects_truncated",
+    ] {
+        assert!(fields.contains_key(field), "missing schema field: {field}");
+    }
+    assert!(
+        !fields.contains_key("attempted") && !fields.contains_key("fallback"),
+        "the schema must not advertise redundant booleans"
+    );
+    assert_eq!(fields["projects"]["type"], "array");
+    assert_eq!(
+        fields["projects"]["items"]["properties"]["status"]["enum"],
+        serde_json::json!(["searched", "search_failed", "skipped"])
+    );
 }

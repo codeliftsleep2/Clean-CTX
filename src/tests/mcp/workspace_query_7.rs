@@ -39,7 +39,7 @@ fn call(
     name: &str,
     root: &Path,
 ) -> (serde_json::Value, super::super::hydration::HydrationReport) {
-    let (result, _, _, report) = super::run_query_with_hydration(
+    let (result, _, report) = super::run_query_with_hydration(
         state,
         query_type,
         name,
@@ -303,7 +303,7 @@ fn red_s9_no_cbm_multi_root_reverse_edges_completes_authoritatively() {
 
     assert_eq!(result.as_array().unwrap().len(), 1);
     assert_eq!(report.discovery_provider, "filesystem");
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
     assert_eq!(report.candidates_discovered, 2);
     assert_eq!(report.candidates_compiled, 2);
     assert_eq!(last_test_traversal_stats().files_read, 2);

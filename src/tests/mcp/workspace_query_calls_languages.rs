@@ -37,7 +37,7 @@ fn reverse_edges(
     name: &str,
     root: &Path,
 ) -> (serde_json::Value, super::super::hydration::HydrationReport) {
-    let (result, _, _, report) = super::run_query_with_hydration(
+    let (result, _, report) = super::run_query_with_hydration(
         state,
         "reverse_edges",
         name,
@@ -159,7 +159,7 @@ fn typescript_cross_file_reverse_edges_returns_the_native_caller() {
     let (result, report) = reverse_edges(&state, "orderBy", root.path());
 
     assert!(report.hydration_attempted);
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
     assert_eq!(report.discovery_provider, "filesystem");
     assert_eq!(
         call_facts(&result),
@@ -192,7 +192,7 @@ fn java_cross_file_reverse_edges_returns_the_native_caller() {
     let (result, report) = reverse_edges(&state, "orderBy", root.path());
 
     assert!(report.hydration_attempted);
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
     assert_eq!(report.discovery_provider, "filesystem");
     assert_eq!(
         call_facts(&result),
@@ -269,7 +269,7 @@ fn red_spread8_response_labels_spread_evidence() {
     let state = state(&[]);
 
     let (result, report) = reverse_edges(&state, "save", root.path());
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
 
     assert_eq!(
         call_evidence_shape(&result),

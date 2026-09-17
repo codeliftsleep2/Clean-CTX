@@ -67,7 +67,7 @@ fn reverse_edges(
     let root = root.to_string_lossy().into_owned();
     // The one scope rule (WSC-004) — no handler and no test re-derives it.
     let scope = WorkspaceScope::new(Some(root.as_str()), &state.config.additional_roots);
-    let (result, _, _, report) = super::run_query_with_hydration(
+    let (result, _, report) = super::run_query_with_hydration(
         state,
         "reverse_edges",
         name,
@@ -160,7 +160,7 @@ fn red_arrow27_property_arrow_caller_is_queryable() {
 
     let (result, report) = reverse_edges(&state, "save", root.path());
 
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
     assert_eq!(
         report.discovery_provider, "filesystem",
         "no CBM relationship may author this fact"
@@ -207,7 +207,7 @@ fn red_arrow28_cross_file_arrow_caller_is_attributed_to_its_own_file() {
 
     let (result, report) = reverse_edges(&state, "save", root.path());
 
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
     assert!(
         report.candidates_compiled > 0,
         "hydration must compile the discovered candidates (discovered={}, compiled={})",
@@ -247,7 +247,7 @@ fn red_arrow29_arrow_caller_in_an_additional_root_stays_in_scope() {
 
     let (result, report) = reverse_edges(&state, "save", primary.path());
 
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
     assert_eq!(
         callers(&result),
         vec![("load".to_string(), "remote.component.ts".to_string())],

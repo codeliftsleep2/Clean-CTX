@@ -68,7 +68,7 @@ fn call_query(
     name: &str,
     root: &Path,
 ) -> serde_json::Map<String, serde_json::Value> {
-    let (result, count, attempted, hydration) = super::run_query_with_hydration(
+    let (result, count, hydration) = super::run_query_with_hydration(
         state,
         query_type,
         name,
@@ -86,20 +86,16 @@ fn call_query(
             (values, count)
         },
     );
-    serde_json::json!({
-        "result": result,
-        "count": count,
-        "hydration_attempted": attempted,
-        "candidates_discovered": hydration.candidates_discovered,
-        "candidates_compiled": hydration.candidates_compiled,
-        "discovery_completed": hydration.discovery_completed,
-        "discovery_provider": hydration.discovery_provider,
-        "fallback_occurred": hydration.fallback_occurred,
-        "fallback_reason": hydration.fallback_reason,
-    })
-    .as_object()
-    .expect("structured result")
-    .clone()
+    // The response projection itself, so these regressions assert the contract
+    // the handler actually produces and cannot drift from it.
+    let mut structured = serde_json::json!({ "result": result, "count": count })
+        .as_object()
+        .cloned()
+        .expect("structured result");
+    if let Some(discovery) = super::discovery_field(&hydration) {
+        structured.insert("discovery".to_string(), discovery);
+    }
+    structured
 }
 
 fn write_source(path: &Path, contents: &str) {
@@ -117,9 +113,9 @@ fn red_fs1_repeated_query_does_not_repeat_the_filesystem_scan() {
     let state = filesystem_only_state(&[]);
 
     let first = call_query(&state, "find_entities", "Target", root.path());
-    assert_eq!(first["discovery_provider"], "filesystem");
-    assert_eq!(first["candidates_discovered"], 1);
-    assert_eq!(first["candidates_compiled"], 1);
+    assert_eq!(first["discovery"]["provider"], "filesystem");
+    assert_eq!(first["discovery"]["discovered"], 1);
+    assert_eq!(first["discovery"]["compiled"], 1);
     assert_eq!(test_scan_calls(), 1, "the first call walks the root");
 
     let second = call_query(&state, "find_entities", "Target", root.path());
@@ -128,11 +124,16 @@ fn red_fs1_repeated_query_does_not_repeat_the_filesystem_scan() {
         1,
         "an unchanged repeated query must not walk or read the root again"
     );
-    assert_eq!(second["candidates_discovered"], 0);
-    assert_eq!(second["candidates_compiled"], 0);
+    assert!(
+        second["discovery"].get("discovered").is_none()
+            && second["discovery"].get("compiled").is_none(),
+        "a cached repeat discovers and compiles nothing, and a zero is the expected value: {second:?}"
+    );
     assert_eq!(second["count"], 1, "the WorkspaceIndex still answers");
-    assert_eq!(second["discovery_completed"], true);
-    assert_eq!(second["hydration_attempted"], true);
+    assert!(
+        second["discovery"].get("status").is_none(),
+        "the cached repeat completed discovery, so no status is reported: {second:?}"
+    );
 }
 
 // ── RED-FS2: degraded CBM falls back once, not on every query ───────────
@@ -152,9 +153,8 @@ fn red_fs2_degraded_cbm_fallback_scan_runs_once() {
     set_test_project_readiness(HashMap::from([(slug, TestProjectReadiness::Unavailable)]));
 
     let first = call_query(&state, "find_entities", "Fallback", root.path());
-    assert_eq!(first["discovery_provider"], "filesystem");
-    assert_eq!(first["fallback_reason"], "cbm_unavailable");
-    assert_eq!(first["fallback_occurred"], true);
+    assert_eq!(first["discovery"]["provider"], "filesystem");
+    assert_eq!(first["discovery"]["fallback_reason"], "cbm_unavailable");
     assert_eq!(first["count"], 1);
     assert_eq!(test_scan_calls(), 1);
 
@@ -164,8 +164,11 @@ fn red_fs2_degraded_cbm_fallback_scan_runs_once() {
         1,
         "the fallback scan for an already-discovered root must not repeat"
     );
-    assert_eq!(second["discovery_provider"], "filesystem");
-    assert_eq!(second["discovery_completed"], true);
+    assert_eq!(second["discovery"]["provider"], "filesystem");
+    assert!(
+        second["discovery"].get("status").is_none(),
+        "the cached repeat completed discovery: {second:?}"
+    );
     assert_eq!(second["count"], 1);
 
     clear_test_project_search_results();
@@ -201,7 +204,10 @@ fn red_fs3_detected_external_modification_invalidates_discovery() {
         2,
         "a detected external change must force rediscovery"
     );
-    assert_eq!(third["discovery_completed"], true);
+    assert_eq!(
+        third["discovery"]["discovered"], 1,
+        "the external change must be observable as rediscovery: {third:?}"
+    );
 }
 
 // ── RED-FS4: partial / failed filesystem discovery is not cached ────────
@@ -215,7 +221,11 @@ fn red_fs4_partial_filesystem_discovery_is_not_cached() {
     let state = filesystem_only_state(&[]);
 
     let first = call_query(&state, "find_entities", "Target", &missing);
-    assert_eq!(first["discovery_completed"], false);
+    assert_eq!(
+        first["discovery"]["status"], "unavailable",
+        "nothing could be walked, so no discovery ran at all: {first:?}"
+    );
+    assert_eq!(first["discovery"]["provider"], "none");
     assert_eq!(test_scan_calls(), 1);
 
     let _ = call_query(&state, "find_entities", "Target", &missing);
@@ -246,7 +256,10 @@ fn red_fs5_fallback_scan_skips_only_already_discovered_roots() {
 
     let first = call_query(&state, "find_entities", "Target", primary.path());
     assert_eq!(test_scan_calls(), 1);
-    assert_eq!(first["candidates_discovered"], 2, "both roots are scanned");
+    assert_eq!(
+        first["discovery"]["discovered"], 2,
+        "both roots are scanned"
+    );
     assert_eq!(last_test_traversal_stats().files_read, 2);
 
     // Invalidate one root only, as an edit inside that root would.
@@ -262,5 +275,8 @@ fn red_fs5_fallback_scan_skips_only_already_discovered_roots() {
         1,
         "only the invalidated root is walked; the cached root is skipped"
     );
-    assert_eq!(second["hydration_attempted"], true);
+    assert!(
+        second["discovery"]["discovered"].as_u64().unwrap_or(0) >= 1,
+        "the re-walked root must report its rediscovery: {second:?}"
+    );
 }

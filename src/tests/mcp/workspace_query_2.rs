@@ -228,22 +228,25 @@ fn edges_contain_to(
         })
 }
 
-/// Extract metadata hydration fields from structuredContent.
-fn hydration_attempted(sc: &serde_json::Map<String, serde_json::Value>) -> bool {
-    sc["hydration_attempted"].as_bool().unwrap_or(false)
+/// The optional `discovery` diagnostic of a response, when one was emitted.
+fn discovery(sc: &serde_json::Map<String, serde_json::Value>) -> Option<&serde_json::Value> {
+    sc.get("discovery")
 }
 
+/// Candidates this query's hydration cycle discovered, read from the sparse
+/// diagnostic: an absent value is the expected zero.
 fn candidates_discovered(sc: &serde_json::Map<String, serde_json::Value>) -> usize {
-    sc["candidates_discovered"].as_u64().unwrap_or(0) as usize
+    discovery(sc)
+        .and_then(|discovery| discovery["discovered"].as_u64())
+        .unwrap_or(0) as usize
 }
 
-/// Helper to read `candidates_compiled` from structuredContent.
-/// Currently unused by regressions but retained as part of the hydration
-/// metadata assertion API (companion to `hydration_attempted` /
-/// `candidates_discovered`). Structurally necessary for completeness.
-#[allow(dead_code)]
+/// Candidates this query's hydration cycle compiled, read from the sparse
+/// diagnostic: an absent value is the expected zero.
 fn candidates_compiled(sc: &serde_json::Map<String, serde_json::Value>) -> usize {
-    sc["candidates_compiled"].as_u64().unwrap_or(0) as usize
+    discovery(sc)
+        .and_then(|discovery| discovery["compiled"].as_u64())
+        .unwrap_or(0) as usize
 }
 
 /// Helper for RED-14: dispatch workspace_query and return structuredContent.
@@ -341,8 +344,10 @@ fn red9_partial_nonzero_hydration() {
     dispatch_tools_call(&json!(1), "workspace_query", &params, &state);
     let resp = pop_response();
     let sc = resp["result"]["structuredContent"].as_object().unwrap();
-    assert!(hydration_attempted(sc), "hydration_attempted must be true");
-    assert!(candidates_discovered(sc) >= 1);
+    assert!(
+        candidates_discovered(sc) >= 1,
+        "a hydration-eligible query that discovered a candidate must report it: {sc:?}"
+    );
 
     clear_test_hydration_candidates();
 }
@@ -480,7 +485,10 @@ fn red14_eligibility() {
     // find_entities: eligible
     set_test_hydration_candidates(std::slice::from_ref(&ps));
     let sc = call_wq_sc(&state, json!({ "type": "find_entities", "name": "EC" }));
-    assert!(hydration_attempted(&sc), "find_entities eligible");
+    assert!(
+        candidates_discovered(&sc) >= 1 && discovery(&sc).is_some(),
+        "find_entities is hydration-eligible: {sc:?}"
+    );
     clear_test_hydration_candidates();
 
     // forward_edges: eligible
@@ -490,7 +498,10 @@ fn red14_eligibility() {
         &state,
         json!({ "type": "forward_edges", "domain": "builtin", "entity_type": "Class", "name": "EC" }),
     );
-    assert!(hydration_attempted(&sc), "forward_edges eligible");
+    assert!(
+        candidates_discovered(&sc) >= 1,
+        "forward_edges is hydration-eligible: {sc:?}"
+    );
     clear_test_hydration_candidates();
 
     // reverse_edges: eligible
@@ -499,7 +510,10 @@ fn red14_eligibility() {
         &state,
         json!({ "type": "reverse_edges", "domain": "builtin", "entity_type": "Class", "name": "EC" }),
     );
-    assert!(hydration_attempted(&sc), "reverse_edges eligible");
+    assert!(
+        candidates_discovered(&sc) >= 1,
+        "reverse_edges is hydration-eligible: {sc:?}"
+    );
     clear_test_hydration_candidates();
 
     // transitive_dependencies: eligible
@@ -508,7 +522,10 @@ fn red14_eligibility() {
         &state,
         json!({ "type": "transitive_dependencies", "domain": "builtin", "entity_type": "Class", "name": "EC", "depth": 1 }),
     );
-    assert!(hydration_attempted(&sc), "transitive_deps eligible");
+    assert!(
+        candidates_discovered(&sc) >= 1,
+        "transitive_dependencies is hydration-eligible: {sc:?}"
+    );
     clear_test_hydration_candidates();
 
     // entities_in_file: NOT eligible
@@ -516,9 +533,15 @@ fn red14_eligibility() {
         &state,
         json!({ "type": "entities_in_file", "file_path": "EC.ts", "workspaceRoot": dir.path().to_string_lossy().to_string() }),
     );
-    assert!(!hydration_attempted(&sc), "entities_in_file NOT eligible");
+    assert!(
+        discovery(&sc).is_none() && sc.get("hydration_attempted").is_none(),
+        "entities_in_file never hydrates, so it carries no discovery diagnostics: {sc:?}"
+    );
 
     // has_cycle: NOT eligible
     let sc = call_wq_sc(&state, json!({ "type": "has_cycle" }));
-    assert!(!hydration_attempted(&sc), "has_cycle NOT eligible");
+    assert!(
+        discovery(&sc).is_none() && sc.get("hydration_attempted").is_none(),
+        "has_cycle never hydrates, so it carries no discovery diagnostics: {sc:?}"
+    );
 }

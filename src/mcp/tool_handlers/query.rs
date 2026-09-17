@@ -36,18 +36,28 @@
 //
 // Module layout (handler groups are separate files, mirroring how the index
 // splits its query families):
-//   query.rs          — dispatch, the hydration cycle, the shared scope rule.
-//   query/entities.rs — find_entities, entities_in_file.
-//   query/edges.rs    — forward_edges, reverse_edges.
-//   query/graph.rs    — transitive_dependencies, has_cycle.
+//   query.rs             — dispatch, the hydration cycle, the shared scope rule.
+//   query/diagnostics.rs — the sparse LLM-facing discovery-diagnostic projection.
+//   query/entities.rs    — find_entities, entities_in_file.
+//   query/edges.rs       — forward_edges, reverse_edges.
+//   query/graph.rs       — transitive_dependencies, has_cycle.
+//
+// Hydration diagnostics reach the caller through ONE shared projection
+// (`diagnostics::discovery_field`): expected state is omitted and only
+// decision-relevant deviation is serialized, as an optional `discovery` object.
+// The internal `HydrationReport` stays complete; nothing about discovery,
+// provider selection, or the semantic answer changes here.
 
 use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+mod diagnostics;
 mod edges;
 mod entities;
 mod graph;
+
+pub(super) use diagnostics::discovery_field;
 
 /// Handle `workspace_query` — read-only cross-file semantic queries.
 pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpState) {
@@ -99,14 +109,16 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
 ///    what Clean-CTX currently knows).
 /// 2. If the query is hydration-eligible, perform ONE exhaustive discovery hydration pass.
 /// 3. Rerun the original query exactly once.
-/// 4. Return final results + hydration metadata.
+/// 4. Return final results + the complete internal hydration report. The
+///    LLM-facing projection of that report is `diagnostics::discovery_field`,
+///    applied by the handler that serializes the response.
 fn run_query_with_hydration<F>(
     state: &McpState,
     query_type: &str,
     query_name: &str,
     workspace_root: Option<&str>,
     query_fn: F,
-) -> (Value, usize, bool, super::hydration::HydrationReport)
+) -> (Value, usize, super::hydration::HydrationReport)
 where
     F: Fn(&crate::workspace::index::WorkspaceIndex) -> (Value, usize),
 {
@@ -125,7 +137,6 @@ where
         return (
             initial_results,
             initial_count,
-            false,
             super::hydration::HydrationReport::default(),
         );
     }
@@ -140,8 +151,7 @@ where
         query_fn(&idx)
     };
 
-    let attempted = hydration.hydration_attempted;
-    (final_results, final_count, attempted, hydration)
+    (final_results, final_count, hydration)
 }
 
 /// Extract a required string argument from the arguments object.

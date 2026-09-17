@@ -10,7 +10,9 @@
 // CALLER's file, so narrowing selects provenance and never the callee's
 // declaration file.
 
-use super::{query_scope, required_str, run_query_with_hydration, send_scope_rejection};
+use super::{
+    discovery_field, query_scope, required_str, run_query_with_hydration, send_scope_rejection,
+};
 use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
@@ -74,7 +76,7 @@ pub(super) fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
     let domain_owned = domain.to_string();
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
-    let (results, count, hydration_attempted, hydration) =
+    let (results, count, hydration) =
         run_query_with_hydration(state, "forward_edges", name, workspace_root, {
             let domain = domain_owned.clone();
             let et = et_owned.clone();
@@ -90,24 +92,20 @@ pub(super) fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
                 (serde_json::to_value(&r).unwrap_or_default(), c)
             }
         });
+    // The semantic answer is `edges` + `count`; discovery diagnostics are
+    // attached only when discovery deviated from its expected path.
+    let mut structured = serde_json::json!({
+        "edges": results,
+        "count": count,
+    });
+    if let Some(discovery) = discovery_field(&hydration) {
+        structured["discovery"] = discovery;
+    }
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": format!("Found {count} outgoing edges.") }],
-            "structuredContent": {
-                "edges": results,
-                "count": count,
-                "hydration_attempted": hydration_attempted,
-                "discovery_provider": hydration.discovery_provider,
-                "discovery_status": hydration.discovery_status,
-                "discovery_completed": hydration.discovery_completed,
-                "fallback_occurred": hydration.fallback_occurred,
-                "fallback_reason": hydration.fallback_reason,
-                "candidates_discovered": hydration.candidates_discovered,
-                "candidates_compiled": hydration.candidates_compiled,
-                "project_coverage": hydration.project_coverage,
-                "project_coverage_truncated": hydration.project_coverage_truncated,
-            }
+            "structuredContent": structured,
         }
     }));
 }
@@ -171,7 +169,7 @@ pub(super) fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
     let domain_owned = domain.to_string();
     let et_owned = entity_type.to_string();
     let name_owned = name.to_string();
-    let (results, count, hydration_attempted, hydration) =
+    let (results, count, hydration) =
         run_query_with_hydration(state, "reverse_edges", name, workspace_root, {
             let domain = domain_owned.clone();
             let et = et_owned.clone();
@@ -187,24 +185,20 @@ pub(super) fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
                 (serde_json::to_value(&r).unwrap_or_default(), c)
             }
         });
+    // The semantic answer is `edges` + `count`; discovery diagnostics are
+    // attached only when discovery deviated from its expected path.
+    let mut structured = serde_json::json!({
+        "edges": results,
+        "count": count,
+    });
+    if let Some(discovery) = discovery_field(&hydration) {
+        structured["discovery"] = discovery;
+    }
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": format!("Found {count} incoming edges.") }],
-            "structuredContent": {
-                "edges": results,
-                "count": count,
-                "hydration_attempted": hydration_attempted,
-                "discovery_provider": hydration.discovery_provider,
-                "discovery_status": hydration.discovery_status,
-                "discovery_completed": hydration.discovery_completed,
-                "fallback_occurred": hydration.fallback_occurred,
-                "fallback_reason": hydration.fallback_reason,
-                "candidates_discovered": hydration.candidates_discovered,
-                "candidates_compiled": hydration.candidates_compiled,
-                "project_coverage": hydration.project_coverage,
-                "project_coverage_truncated": hydration.project_coverage_truncated,
-            }
+            "structuredContent": structured,
         }
     }));
 }

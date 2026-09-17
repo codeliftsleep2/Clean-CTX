@@ -58,10 +58,9 @@ fn dependencies(
 /// `has_cycle` → the boolean the handler reported.
 fn cycle(state: &McpState, root: Option<&str>, within: Option<&str>) -> bool {
     let sc = structured(state, scoped(json!({ "type": "has_cycle" }), root, within));
-    assert_eq!(
-        sc["hydration_attempted"].as_bool(),
-        Some(false),
-        "has_cycle must stay non-hydration-eligible"
+    assert!(
+        sc.get("discovery").is_none() && sc.get("hydration_attempted").is_none(),
+        "has_cycle must stay non-hydration-eligible: {sc:?}"
     );
     sc["has_cycle"].as_bool().expect("has_cycle boolean")
 }

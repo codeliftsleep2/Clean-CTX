@@ -36,12 +36,8 @@ fn call(
     query_type: &str,
     name: &str,
     root: &Path,
-) -> (
-    serde_json::Value,
-    super::super::hydration::HydrationReport,
-    bool,
-) {
-    let (result, _, attempted, report) = super::run_query_with_hydration(
+) -> (serde_json::Value, super::super::hydration::HydrationReport) {
+    let (result, _, report) = super::run_query_with_hydration(
         state,
         query_type,
         name,
@@ -59,7 +55,7 @@ fn call(
             (value, count)
         },
     );
-    (result, report, attempted)
+    (result, report)
 }
 
 fn write_service(root: &Path) {
@@ -87,11 +83,11 @@ fn red_f1_cbm_absent_still_hydrates_uncompiled_file() {
     std::fs::write(root.path().join("Target.ts"), "export class Target {}\n").unwrap();
     let state = state(&[]);
 
-    let (result, report, attempted) = call(&state, "find_entities", "Target", root.path());
+    let (result, report) = call(&state, "find_entities", "Target", root.path());
 
-    assert!(attempted);
+    assert!(report.hydration_attempted);
     assert_eq!(report.discovery_provider, "filesystem");
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
     assert_eq!(report.candidates_compiled, 1);
     assert_eq!(result.as_array().unwrap().len(), 1);
 }
@@ -108,7 +104,7 @@ fn red_f2_additional_root_is_scanned_without_cbm() {
     .unwrap();
     let state = state(&[additional.path().to_path_buf()]);
 
-    let (result, report, _) = call(&state, "find_entities", "AdditionalOnly", primary.path());
+    let (result, report) = call(&state, "find_entities", "AdditionalOnly", primary.path());
 
     assert_eq!(report.candidates_compiled, 1);
     assert_eq!(result.as_array().unwrap().len(), 1);
@@ -123,7 +119,7 @@ fn red_f3_reverse_edges_discovers_every_consumer() {
     write_consumer(root.path(), "B.ts", "B");
     let state = state(&[]);
 
-    let (result, report, _) = call(&state, "reverse_edges", "ServiceA", root.path());
+    let (result, report) = call(&state, "reverse_edges", "ServiceA", root.path());
 
     assert_eq!(report.candidates_discovered, 3);
     assert_eq!(result.as_array().unwrap().len(), 2);
@@ -140,7 +136,7 @@ fn red_f4_textual_false_positive_does_not_fabricate_facts() {
     .unwrap();
     let state = state(&[]);
 
-    let (result, report, _) = call(&state, "find_entities", "Phantom", root.path());
+    let (result, report) = call(&state, "find_entities", "Phantom", root.path());
 
     assert_eq!(report.candidates_discovered, 1);
     assert!(result.as_array().unwrap().is_empty());
@@ -152,11 +148,10 @@ fn red_f5_successful_empty_filesystem_discovery_is_truthful() {
     let root = tempfile::TempDir::new().unwrap();
     let state = state(&[]);
 
-    let (_, report, attempted) = call(&state, "find_entities", "Absent", root.path());
+    let (_, report) = call(&state, "find_entities", "Absent", root.path());
 
-    assert!(attempted);
+    assert!(report.hydration_attempted);
     assert_eq!(report.discovery_provider, "filesystem");
-    assert!(report.discovery_completed);
     assert_eq!(report.discovery_status, "completed");
     assert_eq!(report.candidates_discovered, 0);
 }
@@ -175,10 +170,13 @@ fn red_f6_healthy_cbm_zero_is_distinct_from_filesystem_zero() {
     *state.graph_bridge_lock() = Some(bridge);
     set_test_project_search_results(HashMap::from([(slug, Ok(Vec::new()))]));
 
-    let (_, report, _) = call(&state, "find_entities", "Absent", root.path());
+    let (_, report) = call(&state, "find_entities", "Absent", root.path());
 
     assert_eq!(report.discovery_provider, "cbm");
-    assert!(!report.fallback_occurred);
+    assert!(
+        report.fallback_reason.is_none(),
+        "healthy CBM discovery engages no fallback, and its absence of a reason IS that fact"
+    );
     clear_test_project_search_results();
 }
 
@@ -200,7 +198,7 @@ fn red_f7_healthy_cbm_does_not_run_filesystem_fallback() {
     let slug = crate::cbm::bridge::cbm_project_slug(&root.path().canonicalize().unwrap());
     set_test_project_search_results(HashMap::from([(slug, Ok(Vec::new()))]));
 
-    let (result, report, _) = call(&state, "find_entities", "Hidden", root.path());
+    let (result, report) = call(&state, "find_entities", "Hidden", root.path());
 
     assert_eq!(report.discovery_provider, "cbm");
     assert_eq!(report.candidates_compiled, 0);
@@ -231,11 +229,14 @@ fn red_f8_degraded_cbm_falls_back_to_filesystem() {
     set_test_project_search_results(HashMap::from([(slug.clone(), Ok(Vec::new()))]));
     set_test_project_readiness(HashMap::from([(slug, TestProjectReadiness::Unavailable)]));
 
-    let (result, report, _) = call(&state, "find_entities", "Fallback", root.path());
+    let (result, report) = call(&state, "find_entities", "Fallback", root.path());
 
     assert_eq!(report.discovery_provider, "filesystem");
-    assert!(report.fallback_occurred);
-    assert_eq!(report.fallback_reason, Some("cbm_unavailable"));
+    assert_eq!(
+        report.fallback_reason,
+        Some("cbm_unavailable"),
+        "the reason is the one encoding of the fallback event"
+    );
     assert_eq!(result.as_array().unwrap().len(), 1);
     clear_test_project_search_results();
 }
@@ -253,7 +254,7 @@ fn red_f9_filesystem_discovery_is_exhaustive() {
     }
     let state = state(&[]);
 
-    let (result, report, _) = call(&state, "find_entities", "RepeatedTarget", root.path());
+    let (result, report) = call(&state, "find_entities", "RepeatedTarget", root.path());
 
     assert_eq!(report.candidates_discovered, 7);
     assert_eq!(report.candidates_compiled, 7);
@@ -274,7 +275,7 @@ fn red_f10_duplicate_hits_and_already_indexed_files_compile_once() {
         Some(&root.path().to_string_lossy()),
     ));
 
-    let (result, report, _) = call(&state, "find_entities", "Target", root.path());
+    let (result, report) = call(&state, "find_entities", "Target", root.path());
 
     assert_eq!(report.candidates_discovered, 2);
     assert_eq!(report.candidates_compiled, 1);

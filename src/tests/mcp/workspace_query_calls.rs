@@ -43,7 +43,7 @@ fn reverse_edges(
     name: &str,
     root: &Path,
 ) -> (serde_json::Value, super::super::hydration::HydrationReport) {
-    let (result, _, _, report) = super::run_query_with_hydration(
+    let (result, _, report) = super::run_query_with_hydration(
         state,
         "reverse_edges",
         name,
@@ -127,7 +127,7 @@ fn red_call13_cross_file_reverse_edges_returns_the_native_caller() {
     let (result, report) = reverse_edges(&state, "OrderBy", root.path());
 
     assert!(report.hydration_attempted);
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
     assert_eq!(report.discovery_provider, "filesystem");
     assert_eq!(
         call_facts(&result),
@@ -151,7 +151,7 @@ fn red_call14_additional_root_caller_is_hydrated_and_retained() {
 
     let (result, report) = reverse_edges(&state, "OrderBy", primary.path());
 
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
     assert_eq!(
         call_facts(&result),
         vec![

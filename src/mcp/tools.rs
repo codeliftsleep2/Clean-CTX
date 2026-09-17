@@ -316,67 +316,63 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                         "type": "integer",
                         "description": "Actual traversal depth used (transitive_dependencies)."
                     },
-                    "hydration_attempted": {
-                        "type": "boolean",
-                        "description": "Whether this query type ran one semantic hydration pass."
-                    },
-                    "discovery_provider": {
-                        "type": "string",
-                        "enum": ["cbm", "filesystem", "cbm_and_filesystem", "none"],
-                        "description": "Candidate discovery provider that supplied this request's coverage."
-                    },
-                    "discovery_status": {
-                        "type": "string",
-                        "enum": ["completed", "partial", "failed"],
-                        "description": "Whether discovery covered all configured roots, only some, or could not run."
-                    },
-                    "discovery_completed": {
-                        "type": "boolean",
-                        "description": "True only when candidate discovery completed across every configured root."
-                    },
-                    "fallback_occurred": {
-                        "type": "boolean",
-                        "description": "Whether filesystem discovery was selected because CBM could not cover at least one root."
-                    },
-                    "fallback_reason": {
-                        "type": ["string", "null"],
-                        "enum": ["cbm_unavailable", "cbm_discovery_failed", "cbm_partial_failure", "cbm_scope_unavailable", "filesystem_unavailable", null],
-                        "description": "Reason filesystem fallback was selected, or null when CBM completed discovery."
-                    },
-                    "candidates_discovered": {
-                        "type": "integer",
-                        "description": "Candidate file paths discovered before selection."
-                    },
-                    "candidates_compiled": {
-                        "type": "integer",
-                        "description": "Unique, previously-unindexed candidate files compiled after trust checks."
-                    },
-                    "project_coverage": {
-                        "type": "array",
-                        "description": "Bounded per-project hydration discovery coverage.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "project": { "type": "string" },
-                                "status": {
-                                    "type": "string",
-                                    "enum": ["searched", "search_failed", "skipped"]
-                                },
-                                "readiness": {
-                                    "type": "string",
-                                    "enum": ["ready", "still_indexing", "failed"]
-                                },
-                                "reason": {
-                                    "type": "string",
-                                    "enum": ["search_failed", "cbm_unavailable", "additional_root_not_registered"]
+                    "discovery": {
+                        "type": "object",
+                        "description": "Optional. Present ONLY when discovery deviated from its expected path (healthy CBM, completed across every configured root, ready projects, no candidates); absent when nothing noteworthy happened. Every field is omitted while it holds its expected value, and no field restates another.",
+                        "properties": {
+                            "provider": {
+                                "type": "string",
+                                "enum": ["filesystem", "cbm_and_filesystem", "none"],
+                                "description": "Present only when a provider other than CBM supplied this query's coverage."
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": ["partial", "unavailable"],
+                                "description": "Present only when discovery was not complete: 'partial' = it ran but did not cover every configured root; 'unavailable' = nothing could run, so the answer rests only on what the index already held."
+                            },
+                            "fallback_reason": {
+                                "type": "string",
+                                "enum": ["cbm_unavailable", "cbm_discovery_failed", "cbm_partial_failure", "cbm_scope_unavailable", "filesystem_unavailable"],
+                                "description": "Present only when filesystem fallback was engaged for at least one root; its presence IS that fact."
+                            },
+                            "discovered": {
+                                "type": "integer",
+                                "description": "Present only when > 0 - candidate file paths discovered by this query."
+                            },
+                            "compiled": {
+                                "type": "integer",
+                                "description": "Present only when > 0 - unique, previously-unindexed candidate files compiled into the WorkspaceIndex by this query."
+                            },
+                            "projects": {
+                                "type": "array",
+                                "description": "Present only when a configured project's coverage was exceptional; healthy searched/ready projects are omitted and do not consume the diagnostic bound.",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "project": { "type": "string" },
+                                        "status": {
+                                            "type": "string",
+                                            "enum": ["searched", "search_failed", "skipped"]
+                                        },
+                                        "readiness": {
+                                            "type": "string",
+                                            "enum": ["still_indexing", "failed"],
+                                            "description": "Only for an exceptional 'searched' entry: the project was not ready, so its contribution may be incomplete."
+                                        },
+                                        "reason": {
+                                            "type": "string",
+                                            "enum": ["cbm_unavailable", "additional_root_not_registered"],
+                                            "description": "Only when it adds a distinction the status does not already carry."
+                                        }
+                                    },
+                                    "required": ["project", "status"]
                                 }
                             },
-                            "required": ["project", "status"]
+                            "projects_truncated": {
+                                "type": "integer",
+                                "description": "Present only when > 0 - exceptional project entries dropped by the diagnostic bound."
+                            }
                         }
-                    },
-                    "project_coverage_truncated": {
-                        "type": "boolean",
-                        "description": "Whether project coverage exceeded its diagnostic bound."
                     }
                 }
             }

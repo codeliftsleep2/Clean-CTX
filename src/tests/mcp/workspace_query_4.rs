@@ -60,7 +60,7 @@ fn call_query(
     name: &str,
     root: &Path,
 ) -> serde_json::Map<String, serde_json::Value> {
-    let (result, count, attempted, hydration) = super::run_query_with_hydration(
+    let (result, count, hydration) = super::run_query_with_hydration(
         state,
         query_type,
         name,
@@ -84,17 +84,16 @@ fn call_query(
             (values, count)
         },
     );
-    serde_json::json!({
-        "result": result,
-        "count": count,
-        "hydration_attempted": attempted,
-        "candidates_discovered": hydration.candidates_discovered,
-        "candidates_compiled": hydration.candidates_compiled,
-        "project_coverage": hydration.project_coverage,
-    })
-    .as_object()
-    .expect("structured result")
-    .clone()
+    // The response projection itself, so these regressions assert the contract
+    // the handler actually produces and cannot drift from it.
+    let mut structured = serde_json::json!({ "result": result, "count": count })
+        .as_object()
+        .cloned()
+        .expect("structured result");
+    if let Some(discovery) = super::discovery_field(&hydration) {
+        structured.insert("discovery".to_string(), discovery);
+    }
+    structured
 }
 
 fn write_service(root: &Path) {
@@ -155,8 +154,8 @@ fn red23_reverse_edges_discovers_consumer_files_in_additional_root() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", primary.path());
 
-    assert_eq!(sc["candidates_discovered"], 2);
-    assert_eq!(sc["candidates_compiled"], 2);
+    assert_eq!(sc["discovery"]["discovered"], 2);
+    assert_eq!(sc["discovery"]["compiled"], 2);
     assert_injecting_consumers(&sc, &["ComponentA", "ComponentB"]);
     clear_test_project_search_results();
 }
@@ -194,7 +193,7 @@ fn red24_compiled_declaration_is_not_sufficient_for_reverse_edges() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["candidates_compiled"], 1);
+    assert_eq!(sc["discovery"]["compiled"], 1);
     assert_injecting_consumers(&sc, &["OnlyConsumer"]);
     clear_test_project_search_results();
 }
@@ -241,9 +240,10 @@ fn red26_zero_inbound_references_is_a_successful_empty_search() {
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
     assert_eq!(sc["count"], 0);
-    assert_eq!(sc["candidates_discovered"], 0);
-    assert_eq!(sc["candidates_compiled"], 0);
-    assert_eq!(sc["project_coverage"][0]["status"], "searched");
+    assert!(
+        sc.get("discovery").is_none(),
+        "a completed CBM pass whose only project was searched while ready reports nothing: {sc:?}"
+    );
     assert_eq!(
         discovery_calls(),
         vec![(slug, TestDiscoveryKind::InboundReference)]
@@ -294,8 +294,8 @@ fn red27_multi_project_inbound_discovery_is_exhaustive() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", primary.path());
 
-    assert_eq!(sc["candidates_discovered"], 7);
-    assert_eq!(sc["candidates_compiled"], 7);
+    assert_eq!(sc["discovery"]["discovered"], 7);
+    assert_eq!(sc["discovery"]["compiled"], 7);
     let indexed: HashSet<_> = state
         .workspace_index_read()
         .file_map()
@@ -357,7 +357,7 @@ fn red28_cbm_relationship_cardinality_never_becomes_semantic_count() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["candidates_discovered"], 3);
+    assert_eq!(sc["discovery"]["discovered"], 3);
     assert_eq!(sc["count"], 1, "only Clean-CTX semantic edges count");
     assert_injecting_consumers(&sc, &["RealConsumer"]);
     clear_test_project_search_results();

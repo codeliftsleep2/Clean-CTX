@@ -351,7 +351,7 @@ fn red_r5_no_cbm_reverse_edges_remain_authoritative() {
     let index = hydration_state.workspace_index_read();
 
     assert_eq!(report.discovery_provider, "filesystem");
-    assert!(report.discovery_completed);
+    assert_eq!(report.discovery_status, "completed");
     assert_eq!(report.candidates_discovered, 2);
     assert_eq!(report.candidates_compiled, 2);
     assert_eq!(
