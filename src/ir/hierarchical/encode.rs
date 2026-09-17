@@ -332,11 +332,12 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
             // Structural invocations (native call graph). Flat table: the
             // caller is carried explicitly, so no class/method scope is
             // needed to place the fact.
-            CoreOp::Call(caller, callee, argc) => {
+            CoreOp::Call(caller, callee, argc, has_spread) => {
                 calls.push(HierarchicalCall {
                     caller: caller.clone(),
                     callee: callee.clone(),
                     explicit_arg_count: *argc,
+                    has_spread: *has_spread,
                 });
             }
 

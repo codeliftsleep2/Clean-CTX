@@ -598,3 +598,10 @@ mod tests_filesystem_discovery_cache;
 #[cfg(all(test, feature = "rust", feature = "csharp"))]
 #[path = "../../tests/mcp/workspace_query_calls.rs"]
 mod tests_native_calls;
+
+// Native call facts for the additional language producers (TypeScript, Java)
+// end-to-end: cross-file `reverse_edges` returns Clean-CTX-authored callers for
+// either language, without any CBM-supplied call relationship.
+#[cfg(all(test, feature = "rust", feature = "typescript", feature = "java"))]
+#[path = "../../tests/mcp/workspace_query_calls_languages.rs"]
+mod tests_native_calls_languages;

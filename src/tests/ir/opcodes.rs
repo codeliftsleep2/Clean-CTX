@@ -138,7 +138,7 @@ fn wire_rejects_malformed_body_tuples() {
 fn arity_table_covers_all_opcodes() {
     let all_opcodes = [
         "DEF_C", "DEF_M", "DEF_F", "DEF_I", "SIG", "RET", "FIELD_T", "FLAGS", "FLAGS_C", "EXT",
-        "IMPL", "INJECTS", "IMP", "TYPE", "BODY", "DATAFLOW", "CTRL", "EFFECT", "CTX",
+        "IMPL", "INJECTS", "IMP", "TYPE", "BODY", "DATAFLOW", "CTRL", "EFFECT", "CTX", "CALL",
     ];
     for opcode in &all_opcodes {
         assert!(
@@ -157,6 +157,10 @@ fn arity_table_variadic_opcodes() {
     // apply_edit Phase 1: BODY has a dual shape (legacy 3-tuple or
     // spanned 5-tuple), so its arity is variadic.
     assert_eq!(arity("BODY"), Some(-1));
+    // Native call facts have a dual shape too (a 4-tuple for an exact call and
+    // a 5-tuple when the spread qualifier is present), so the table reports
+    // variadic and the tuple decoder performs the strict shape check.
+    assert_eq!(arity("CALL"), Some(-1));
 }
 
 #[test]

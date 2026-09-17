@@ -129,7 +129,10 @@ pub(super) fn call_edge(
         subject: EntityRef::new(DOMAIN, "Method", caller).with_file(asserting_file.to_string()),
         object: EntityRef::new(DOMAIN, "Method", callee).with_file(callee_file.to_string()),
         layer: DOMAIN,
-        call_evidence: Some(CallEvidence::new(argc)),
+        // These scope fixtures model exact calls only: the spread qualifier is
+        // exercised by `src/tests/workspace/index_calls.rs` (RED-SPREAD6) and by
+        // the end-to-end language regressions.
+        call_evidence: Some(CallEvidence::new(argc, false)),
     }
 }
 

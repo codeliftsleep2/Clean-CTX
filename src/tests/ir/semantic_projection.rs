@@ -19,9 +19,9 @@ fn stream() -> Vec<CoreOp> {
     vec![
         CoreOp::DefClass("C1".into(), "Example".into()),
         CoreOp::DefMethod("C1".into(), "M1".into(), "Process".into()),
-        CoreOp::Call("M1".into(), "Save".into(), 1),
-        CoreOp::Call("M1".into(), "Save".into(), 2),
-        CoreOp::Call("M1".into(), "OrderBy".into(), 2),
+        CoreOp::Call("M1".into(), "Save".into(), 1, false),
+        CoreOp::Call("M1".into(), "Save".into(), 2, false),
+        CoreOp::Call("M1".into(), "OrderBy".into(), 2, false),
     ]
 }
 
@@ -60,18 +60,40 @@ fn calls_project_method_level_subject_and_object_with_evidence() {
     assert_eq!(save_one.object.domain, BUILTIN_DOMAIN);
     assert_eq!(save_one.object.entity_type, METHOD_ENTITY_TYPE);
     assert_eq!(save_one.object.name, "Save");
-    assert_eq!(
-        save_one
-            .call_evidence
-            .map(|evidence| evidence.explicit_arg_count),
-        Some(1)
+    let save_one_evidence = save_one.call_evidence.expect("call evidence");
+    assert_eq!(save_one_evidence.explicit_arg_count, 1);
+    assert!(
+        !save_one_evidence.has_spread,
+        "a call with no expanding argument is exact written-arity evidence"
     );
+    let save_two_evidence = edges[1].call_evidence.expect("call evidence");
     assert_eq!(
-        edges[1]
-            .call_evidence
-            .map(|evidence| evidence.explicit_arg_count),
-        Some(2),
+        save_two_evidence.explicit_arg_count, 2,
         "same caller/callee with a different arity is a different fact"
+    );
+    assert!(!save_two_evidence.has_spread);
+}
+
+#[test]
+fn spread_call_projects_the_qualifier_into_evidence() {
+    let instructions = vec![
+        CoreOp::DefMethod("C1".into(), "M1".into(), "Process".into()),
+        CoreOp::Call("M1".into(), "Save".into(), 1, false),
+        CoreOp::Call("M1".into(), "Save".into(), 1, true),
+    ];
+    let edges = project_calls(&instructions, "C:/repo/Example.ts");
+    assert_eq!(edges.len(), 2, "both facts must project");
+    let exact = edges[0].call_evidence.expect("exact evidence");
+    let spread = edges[1].call_evidence.expect("spread evidence");
+    assert_eq!(
+        exact.explicit_arg_count, spread.explicit_arg_count,
+        "both calls write one argument node"
+    );
+    assert!(!exact.has_spread);
+    assert!(spread.has_spread, "the expanding fact must be qualified");
+    assert_ne!(
+        exact, spread,
+        "one written argument is not the same evidence in both cases"
     );
 }
 
@@ -106,7 +128,7 @@ fn unresolved_callee_still_projects_as_the_edge_object() {
 
 #[test]
 fn unknown_caller_projects_no_edge() {
-    let instructions = vec![CoreOp::Call("M404".into(), "Save".into(), 1)];
+    let instructions = vec![CoreOp::Call("M404".into(), "Save".into(), 1, false)];
     assert!(
         project_calls(&instructions, "C:/repo/Example.cs").is_empty(),
         "a caller that does not exist in the compiled IR projects nothing \
@@ -118,8 +140,8 @@ fn unknown_caller_projects_no_edge() {
 fn duplicate_identical_facts_project_equal_edges() {
     let instructions = vec![
         CoreOp::DefMethod("C1".into(), "M1".into(), "Process".into()),
-        CoreOp::Call("M1".into(), "Save".into(), 1),
-        CoreOp::Call("M1".into(), "Save".into(), 1),
+        CoreOp::Call("M1".into(), "Save".into(), 1, false),
+        CoreOp::Call("M1".into(), "Save".into(), 1, false),
     ];
     let edges = project_calls(&instructions, "C:/repo/Example.cs");
     assert_eq!(edges.len(), 2);

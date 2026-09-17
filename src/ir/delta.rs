@@ -432,10 +432,18 @@ fn primary_key(op: &CoreOp) -> String {
         CoreOp::SideEffect(mid, _) => format!("EFFECT:{}", mid),
         CoreOp::ExecutionContext(mid, _) => format!("CTX:{}", mid),
         // Structural invocations (native call graph): identity carries the
-        // caller, the callee name AND the explicit argument count, so two
-        // invocations that differ only in arity are distinct instructions.
-        CoreOp::Call(caller, callee, argc) => {
-            format!("CALL:{}:{}:{}", caller, callee, argc)
+        // caller, the callee name, the explicit argument count AND the spread
+        // qualifier, so two invocations that differ only in arity — or only in
+        // whether a written argument expands — are distinct instructions.
+        // Without the qualifier, `A.foo(a)` and `A.foo(...args)` (both written
+        // as argc 1) would collapse into one delta entry, reproducing the
+        // evidence loss the workspace index already refuses to make.
+        CoreOp::Call(caller, callee, argc, has_spread) => {
+            if *has_spread {
+                format!("CALL:{}:{}:{}:spread", caller, callee, argc)
+            } else {
+                format!("CALL:{}:{}:{}", caller, callee, argc)
+            }
         }
     }
 }
@@ -472,14 +480,22 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
         CoreOp::ControlFlow(mid, _, _) => vec!["CTRL".into(), mid.clone()],
         CoreOp::SideEffect(mid, _) => vec!["EFFECT".into(), mid.clone()],
         CoreOp::ExecutionContext(mid, _) => vec!["CTX".into(), mid.clone()],
-        // Structural invocations: all three operands are identifying (the
-        // argument count is what keeps arity-distinct calls apart).
-        CoreOp::Call(caller, callee, argc) => vec![
-            "CALL".into(),
-            caller.clone(),
-            callee.clone(),
-            argc.to_string(),
-        ],
+        // Structural invocations: every identifying operand is part of the key
+        // (the argument count keeps arity-distinct calls apart, and the spread
+        // qualifier keeps an exact call apart from a call whose count is a
+        // written-only count).
+        CoreOp::Call(caller, callee, argc, has_spread) => {
+            let mut tuple = vec![
+                "CALL".into(),
+                caller.clone(),
+                callee.clone(),
+                argc.to_string(),
+            ];
+            if *has_spread {
+                tuple.push("spread".into());
+            }
+            tuple
+        }
     }
 }
 

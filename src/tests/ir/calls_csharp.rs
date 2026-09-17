@@ -41,13 +41,15 @@ fn compile_cs(source: &str) -> CompiledIR {
         .expect("production compilation must succeed")
 }
 
-/// Every native call fact in the stream as `(caller_id, callee_name, argc)`.
-fn call_facts(ir: &CompiledIR) -> Vec<(String, String, usize)> {
+/// Every native call fact in the stream as
+/// `(caller_id, callee_name, argc, has_spread)`.
+fn call_facts(ir: &CompiledIR) -> Vec<(String, String, usize, bool)> {
     ir.instructions
         .iter()
         .filter_map(|op| {
-            op.call_parts()
-                .map(|(caller, callee, argc)| (caller.to_string(), callee.to_string(), argc))
+            op.call_parts().map(|(caller, callee, argc, has_spread)| {
+                (caller.to_string(), callee.to_string(), argc, has_spread)
+            })
         })
         .collect()
 }
@@ -74,8 +76,9 @@ fn declared_method_ids(ir: &CompiledIR) -> Vec<String> {
         .collect()
 }
 
-/// Call facts asserted by one named caller as `(callee, argc)`, in order.
-fn calls_by(ir: &CompiledIR, caller_name: &str) -> Vec<(String, usize)> {
+/// Call facts asserted by one named caller as `(callee, argc, has_spread)`, in
+/// order — the full-evidence projection of one caller's invocations.
+fn calls_shape_by(ir: &CompiledIR, caller_name: &str) -> Vec<(String, usize, bool)> {
     let caller_id = ir
         .instructions
         .iter()
@@ -86,8 +89,18 @@ fn calls_by(ir: &CompiledIR, caller_name: &str) -> Vec<(String, usize)> {
         .unwrap_or_else(|| panic!("caller {caller_name} was not declared"));
     call_facts(ir)
         .into_iter()
-        .filter(|(caller, _, _)| *caller == caller_id)
-        .map(|(_, callee, argc)| (callee, argc))
+        .filter(|(caller, _, _, _)| *caller == caller_id)
+        .map(|(_, callee, argc, has_spread)| (callee, argc, has_spread))
+        .collect()
+}
+
+/// The written-arity projection of one caller's call facts. The spread
+/// qualifier is deliberately dropped HERE only, in a named projection; every
+/// assertion that depends on the shape uses `calls_shape_by`.
+fn calls_by(ir: &CompiledIR, caller_name: &str) -> Vec<(String, usize)> {
+    calls_shape_by(ir, caller_name)
+        .into_iter()
+        .map(|(callee, argc, _)| (callee, argc))
         .collect()
 }
 
@@ -142,12 +155,13 @@ fn red_call4_two_callers_produce_two_caller_relationships() {
     assert_eq!(facts.len(), 2);
     let caller_names: Vec<String> = facts
         .iter()
-        .map(|(caller, _, _)| method_name(&ir, caller))
+        .map(|(caller, ..)| method_name(&ir, caller))
         .collect();
     assert_eq!(caller_names, vec!["A".to_string(), "B".to_string()]);
-    for (_, callee, argc) in &facts {
+    for (_, callee, argc, has_spread) in &facts {
         assert_eq!(callee, "Foo");
         assert_eq!(*argc, 0);
+        assert!(!has_spread, "a C# call fact is always exact");
     }
 }
 
@@ -249,7 +263,7 @@ fn red_call11_call_belongs_to_its_innermost_callable() {
     );
     assert_eq!(calls_by(&ir, "A"), vec![("Foo".to_string(), 0)]);
     assert_eq!(calls_by(&ir, "B"), vec![("Bar".to_string(), 0)]);
-    for (caller, _, _) in call_facts(&ir) {
+    for (caller, ..) in call_facts(&ir) {
         assert!(
             declared_method_ids(&ir).contains(&caller),
             "a caller must be a callable, never the enclosing class or file"
@@ -297,6 +311,34 @@ fn red_call12_unsupported_contexts_emit_no_call_fact() {
     assert!(
         call_facts(&ir).is_empty(),
         "a property accessor must not fabricate a caller"
+    );
+}
+
+// ── Spread qualifier: C# has no caller-side expansion syntax ─────────
+
+#[test]
+fn red_spread_csharp_facts_are_always_exact() {
+    // `params` is a DECLARED parameter shape, not a call-site expansion: a C#
+    // call site writes every argument, so no C# fact may ever be qualified.
+    let ir = compile_cs(
+        "class Example { \
+           void Target(params int[] values) { } \
+           void A() { Target(1, 2, 3); Foo(new Dictionary<string, int>(), x); } \
+         }",
+    );
+    let facts = call_facts(&ir);
+    assert_eq!(facts.len(), 2);
+    assert!(
+        facts.iter().all(|(_, _, _, has_spread)| !has_spread),
+        "no C# fact may carry a spread qualifier: {facts:?}"
+    );
+    assert_eq!(
+        calls_shape_by(&ir, "A"),
+        vec![
+            ("Target".to_string(), 3, false),
+            ("Foo".to_string(), 2, false),
+        ],
+        "the written count stays exact for every C# call"
     );
 }
 

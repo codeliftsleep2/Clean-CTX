@@ -125,14 +125,21 @@ pub enum CoreOp {
 
     // ── Structural Invocations (native call graph) ──────
     ///
-    /// Invocation: ["CALL", caller_method_id, callee_name, explicit_arg_count]
+    /// Invocation: `["CALL", caller_method_id, callee_name, explicit_arg_count]`,
+    /// plus an ADDITIVE fifth operand `"spread"` when the call site expands a
+    /// written argument:
+    ///
+    /// ```text
+    /// exact  (has_spread == false): ["CALL", caller, callee, argc]
+    /// spread (has_spread == true) : ["CALL", caller, callee, argc, "spread"]
+    /// ```
     ///
     /// One structural invocation fact extracted from the existing language
     /// parse. `caller_method_id` is the `DefMethod` id of the innermost
     /// callable that contains the invocation in the same file;
     /// `callee_name` is the textual name written at the call site; and
-    /// `explicit_arg_count` is the number of arguments written at the call
-    /// site (structural, from the argument list node — never from text
+    /// `explicit_arg_count` is the number of argument nodes written at the
+    /// call site (structural, from the argument list node — never from text
     /// splitting).
     ///
     /// The callee is deliberately a NAME and not a resolved declaration
@@ -142,7 +149,17 @@ pub enum CoreOp {
     /// type are honestly indistinguishable. Extension-method receivers are
     /// NOT added to the count, and optional/`params` compatibility is NOT
     /// evaluated here (that belongs to later resolution logic, if any).
-    Call(String, String, usize),
+    ///
+    /// `has_spread` keeps `explicit_arg_count` HONEST as a written-node count.
+    /// When it is `true`, at least one written argument expands at run time
+    /// (TypeScript `foo(...args)`, `foo(a, ...rest)`), so the count is the
+    /// written-argument count and never the runtime/declared arity: a
+    /// consumer must not read it as exact-arity evidence. When it is `false`,
+    /// every written argument is exactly one argument. C# and Java call syntax
+    /// has no caller-side expansion operator, so their facts are always
+    /// `false`; the qualifier is language-neutral evidence, never a
+    /// language-specific opcode.
+    Call(String, String, usize, bool),
 }
 
 impl fmt::Display for CoreOp {
@@ -186,8 +203,16 @@ impl fmt::Display for CoreOp {
             CoreOp::ExecutionContext(mid, context_type) => {
                 write!(f, "CTX {} {}", mid, context_type)
             }
-            CoreOp::Call(caller, callee, argc) => {
-                write!(f, "CALL {} {} {}", caller, callee, argc)
+            // Native call facts. The spread qualifier is ADDITIVE in the
+            // rendered form too: an exact call renders byte-identically to the
+            // pre-qualifier form, and a spread call is labelled so its written
+            // count can never be read as an exact arity.
+            CoreOp::Call(caller, callee, argc, has_spread) => {
+                if *has_spread {
+                    write!(f, "CALL {} {} {} spread", caller, callee, argc)
+                } else {
+                    write!(f, "CALL {} {} {}", caller, callee, argc)
+                }
             }
         }
     }
@@ -268,7 +293,10 @@ pub fn arity(opcode: &str) -> Option<i32> {
         "CTRL" => Some(4),     // method_id, kind, target
         "EFFECT" => Some(3),   // method_id, effect_type
         "CTX" => Some(3),      // method_id, context_type
-        "CALL" => Some(4),     // caller_method_id, callee_name, explicit_arg_count
+        // Dual shape (like BODY below): a 4-tuple for an exact call and a
+        // 5-tuple when the spread qualifier is present, so the table reports
+        // variadic and the tuple decoder performs the strict shape check.
+        "CALL" => Some(-1), // caller_method_id, callee_name, explicit_arg_count [, "spread"]
         _ => None,
     }
 }
@@ -314,13 +342,20 @@ impl CoreOp {
         }
     }
 
-    /// Returns `(caller_method_id, callee_name, explicit_arg_count)` for an
+    /// Returns
+    /// `(caller_method_id, callee_name, explicit_arg_count, has_spread)` for an
     /// invocation fact, `None` for every other op. Mirrors `body_span`:
     /// callers that need to reason about invocations should not re-match
     /// the variant themselves.
-    pub fn call_parts(&self) -> Option<(&str, &str, usize)> {
+    ///
+    /// The qualifier is part of this accessor rather than a second lookup on
+    /// purpose: a consumer can never read the written count while silently
+    /// ignoring whether that count is exact.
+    pub fn call_parts(&self) -> Option<(&str, &str, usize, bool)> {
         match self {
-            CoreOp::Call(caller, callee, argc) => Some((caller, callee, *argc)),
+            CoreOp::Call(caller, callee, argc, has_spread) => {
+                Some((caller, callee, *argc, *has_spread))
+            }
             _ => None,
         }
     }

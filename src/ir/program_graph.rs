@@ -135,7 +135,16 @@ impl GraphBuilder {
                             });
                         }
                     }
-                    CoreOp::Call(caller, callee, explicit_arg_count) => {
+                    // Native call fact. The spread qualifier is deliberately
+                    // NOT carried into `GraphEdge::Calls`: this local graph
+                    // never keys or deduplicates its edges (they are pushed
+                    // into one `Vec`), it performs no arity resolution, and
+                    // `fan_in`/`fan_out` count occurrences — so two calls with
+                    // the same written count are still two edges, and dropping
+                    // the qualifier here cannot collapse or misclassify a fact.
+                    // The authoritative evidence (qualifier included) travels
+                    // on `SemanticEdge::call_evidence`.
+                    CoreOp::Call(caller, callee, explicit_arg_count, _) => {
                         graph.edges.push(GraphEdge::Calls {
                             from: caller.clone(),
                             to: callee.clone(),
@@ -235,8 +244,11 @@ impl GraphBuilder {
                     }
                 }
                 // Native call facts: the explicit argument count is preserved
-                // verbatim (never folded into the callee name).
-                CoreOp::Call(caller, callee, explicit_arg_count) => {
+                // verbatim (never folded into the callee name). The spread
+                // qualifier is dropped here for the same verified reason as in
+                // `build` above: this graph neither keys, deduplicates, nor
+                // arity-resolves its edges, so no fact can be lost or merged.
+                CoreOp::Call(caller, callee, explicit_arg_count, _) => {
                     graph.edges.push(GraphEdge::Calls {
                         from: caller.clone(),
                         to: callee.clone(),

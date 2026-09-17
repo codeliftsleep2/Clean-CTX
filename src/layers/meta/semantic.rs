@@ -163,17 +163,50 @@ pub enum SemanticRelation {
 /// never encoded into an entity name. The explicit argument count is what the
 /// call site actually wrote — extension-method receivers are excluded and
 /// optional/`params` compatibility is not evaluated.
+///
+/// It is a WRITTEN-shape count, never an arity proof, and `has_spread` is what
+/// keeps that distinction visible: `foo(a)` and `foo(...args)` both report
+/// `explicit_arg_count = 1`, but only the first is exact — the second expands
+/// at run time into an unknown number of arguments. The qualifier participates
+/// in edge-occurrence identity too, so those two facts can never collapse into
+/// a single occurrence.
+///
+/// No consumer may treat `explicit_arg_count` as proof of exact
+/// runtime/declaration arity compatibility on its own, and no consumer may
+/// classify an arity resolution as uniquely resolved from this count alone.
+/// Exact-arity reasoning requires `has_spread == false`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
 pub struct CallEvidence {
-    /// Number of arguments written at the call site.
+    /// Number of explicitly written argument nodes at the call site. A spread
+    /// argument (`foo(...args)`) counts once; its expanded count is unknown.
     pub explicit_arg_count: usize,
+
+    /// Whether at least one written argument expands at run time.
+    ///
+    /// `true` means `explicit_arg_count` is a written-node count and never the
+    /// runtime/declared arity, so it must not be read as exact-arity evidence.
+    /// `false` means every written argument is exactly one argument. Skipped
+    /// when `false`, so an exact call edge keeps its byte-identical serialized
+    /// shape and the qualifier appears only where it actually matters.
+    #[serde(skip_serializing_if = "spread_is_absent")]
+    pub has_spread: bool,
 }
 
 impl CallEvidence {
-    /// Build call evidence from an observed explicit argument count.
-    pub fn new(explicit_arg_count: usize) -> Self {
-        Self { explicit_arg_count }
+    /// Build call evidence from an observed written argument count and its
+    /// spread qualifier.
+    pub fn new(explicit_arg_count: usize, has_spread: bool) -> Self {
+        Self {
+            explicit_arg_count,
+            has_spread,
+        }
     }
+}
+
+/// `skip_serializing_if` predicate for [`CallEvidence::has_spread`]: an exact
+/// call edge must serialize exactly as it did before the qualifier existed.
+fn spread_is_absent(has_spread: &bool) -> bool {
+    !has_spread
 }
 
 /// A structured semantic relationship between two entities.
@@ -196,7 +229,8 @@ pub struct SemanticEdge {
     /// Optional relation-specific evidence. `None` for every relation that
     /// carries none (all framework relations today); `Some` for
     /// `SemanticRelation::Calls`, whose occurrence identity additionally
-    /// depends on the observed argument count.
+    /// depends on the observed written argument count AND its spread
+    /// qualifier.
     ///
     /// Skipped when absent so the serialized shape of existing (non-call)
     /// edges is unchanged.

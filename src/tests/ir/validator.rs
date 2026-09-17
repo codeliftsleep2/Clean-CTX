@@ -201,7 +201,7 @@ fn test_call_with_declared_caller_is_valid() {
             CoreOp::DefMethod("C1".into(), "M1".into(), "Process".into()),
             // An unresolved CALLEE is a truthful fact: it is a call-site NAME,
             // never resolved, and must never be reported as an error.
-            CoreOp::Call("M1".into(), "NeverDeclaredHere".into(), 3),
+            CoreOp::Call("M1".into(), "NeverDeclaredHere".into(), 3, false),
         ],
         version: 1,
     };
@@ -219,7 +219,7 @@ fn test_call_with_unknown_caller_is_e011() {
         instructions: vec![
             CoreOp::DefClass("C1".into(), "Example".into()),
             CoreOp::DefMethod("C1".into(), "M1".into(), "Process".into()),
-            CoreOp::Call("M99".into(), "Save".into(), 1),
+            CoreOp::Call("M99".into(), "Save".into(), 1, false),
         ],
         version: 1,
     };

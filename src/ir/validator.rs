@@ -179,7 +179,7 @@ impl IRValidator for DefaultValidator {
                 // is the safety net behind the IRPAT-001 orphan guard: a
                 // consumptive pattern must decline rather than consume a
                 // `DefMethod` while a surviving `CALL` still references it.
-                CoreOp::Call(caller, _, _) if !method_ids.contains(caller) => {
+                CoreOp::Call(caller, _, _, _) if !method_ids.contains(caller) => {
                     errors.push(ValidationError {
                         code: "E011".into(),
                         message: format!("CALL references unknown caller method '{}'", caller),

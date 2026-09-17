@@ -180,6 +180,7 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
             call.caller.clone(),
             call.callee.clone(),
             call.explicit_arg_count,
+            call.has_spread,
         ));
     }
 

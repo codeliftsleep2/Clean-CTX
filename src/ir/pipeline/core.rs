@@ -6,7 +6,9 @@ use crate::compaction::{
 };
 use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::{CapturedNode, run_capture_pipeline_nodes};
-use crate::ir::calls::{CALL_ARGUMENT_CAPTURE, CALL_CALLEE_CAPTURE, capture_query};
+use crate::ir::calls::{
+    CALL_ARGUMENT_CAPTURE, CALL_CALLEE_CAPTURE, CALL_SPREAD_CAPTURE, capture_query,
+};
 use crate::ir::opcodes::{CoreOp, FLAG_IF, FLAG_LOOP, FLAG_RET, FLAG_THROW};
 use crate::ir::symbol_table::SymbolKind;
 
@@ -104,6 +106,7 @@ impl IRPass for CoreIRPass {
                     &cap.text,
                 ),
                 CALL_ARGUMENT_CAPTURE => state.record_call_argument(cap.match_index),
+                CALL_SPREAD_CAPTURE => state.record_call_spread(cap.match_index),
                 "class.root" | "interface.root" | "struct.root" | "enum.root" | "trait.root"
                 | "record.root" => {
                     let class_id = state.next_id("C");

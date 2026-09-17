@@ -15,14 +15,29 @@
 use crate::layers::meta::semantic::{CallEvidence, EntityRef, SemanticEdge, SemanticRelation};
 use crate::workspace::index::WorkspaceIndex;
 
-/// One native call fact: `caller --Calls(argc)--> callee`.
+/// One EXACT native call fact: `caller --Calls(argc)--> callee`, where every
+/// written argument is exactly one argument. `spread_edge` builds the other
+/// shape.
 fn call_edge(caller: &str, callee: &str, argc: usize, file: &str) -> SemanticEdge {
     SemanticEdge {
         relation: SemanticRelation::Calls,
         subject: EntityRef::new("builtin", "Method", caller).with_file(file.to_string()),
         object: EntityRef::new("builtin", "Method", callee).with_file(file.to_string()),
         layer: "builtin",
-        call_evidence: Some(CallEvidence::new(argc)),
+        call_evidence: Some(CallEvidence::new(argc, false)),
+    }
+}
+
+/// One SPREAD native call fact: `caller --Calls(argc, spread)--> callee`, where
+/// at least one written argument expands at run time, so `argc` is a
+/// written-node count and not an exact arity.
+fn spread_edge(caller: &str, callee: &str, argc: usize, file: &str) -> SemanticEdge {
+    SemanticEdge {
+        relation: SemanticRelation::Calls,
+        subject: EntityRef::new("builtin", "Method", caller).with_file(file.to_string()),
+        object: EntityRef::new("builtin", "Method", callee).with_file(file.to_string()),
+        layer: "builtin",
+        call_evidence: Some(CallEvidence::new(argc, true)),
     }
 }
 
@@ -110,12 +125,58 @@ fn non_call_relations_keep_their_evidence_free_identity() {
         subject: EntityRef::new("angular", "Component", "A").with_file("a.ts".to_string()),
         object: EntityRef::new("angular", "Service", "B").with_file("a.ts".to_string()),
         layer: "angular",
-        call_evidence: argc.map(CallEvidence::new),
+        call_evidence: argc.map(|argc| CallEvidence::new(argc, false)),
     };
     // Evidence on a non-call relation is not part of established identity, so
     // the second insert is a duplicate of the first.
     index.add_edges("a.ts", vec![plain(None), plain(None)]);
     assert_eq!(index.edge_count(), 1);
+}
+
+// ── RED-SPREAD6: the spread qualifier is part of occurrence identity ─
+
+#[test]
+fn red_spread6_one_written_argument_keeps_both_occurrences() {
+    // `A --Calls(argc=1)--> Foo` and `A --Calls(argc=1, spread)--> Foo` are
+    // asserted by the SAME file with the SAME written count, but only the first
+    // proves an exact one-argument call. Collapsing them would silently discard
+    // the fact whose count is not an arity, so both must survive.
+    let mut index = WorkspaceIndex::new();
+    index.add_edges("A.ts", vec![spread_edge("A", "Foo", 2, "A.ts")]);
+    index.add_edges(
+        "A.ts",
+        vec![
+            call_edge("A", "Foo", 1, "A.ts"),
+            spread_edge("A", "Foo", 1, "A.ts"),
+        ],
+    );
+
+    assert_eq!(index.edge_count(), 3, "all three occurrences must survive");
+    assert_eq!(
+        callers_of(&index, "Foo"),
+        vec!["A".to_string(), "A".to_string(), "A".to_string()],
+        "one caller asserts three distinct facts"
+    );
+
+    let mut shapes: Vec<(usize, bool)> = index
+        .reverse_edges_by_identity("builtin", "Method", "Foo")
+        .iter()
+        .filter_map(|edge| {
+            edge.call_evidence
+                .map(|evidence| (evidence.explicit_arg_count, evidence.has_spread))
+        })
+        .collect();
+    shapes.sort();
+    assert_eq!(
+        shapes,
+        vec![(1, false), (1, true), (2, true)],
+        "occurrence identity must preserve the spread distinction"
+    );
+
+    // Removing the asserting file removes exactly these occurrences.
+    index.remove_file("A.ts");
+    assert_eq!(callers_of(&index, "Foo"), Vec::<String>::new());
+    assert_eq!(index.edge_count(), 0);
 }
 
 // ── RED-CALL19 / RED-CALL27: per-file occurrences ────────────────────

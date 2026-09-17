@@ -58,13 +58,22 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         "CTX" => format!("CTX:{}", tuple.get(1).unwrap_or(&String::new())),
         // Structural invocations (native call graph): explicit arm so a
         // known opcode never reaches the unknown-opcode fallback (which
-        // warns in debug builds). Identity is the full call triple.
-        "CALL" => format!(
-            "CALL:{}:{}:{}",
-            tuple.get(1).unwrap_or(&String::new()),
-            tuple.get(2).unwrap_or(&String::new()),
-            tuple.get(3).unwrap_or(&String::new())
-        ),
+        // warns in debug builds). Dual shape, and it must agree EXACTLY with
+        // `delta::primary_key`: the exact form keeps its established key, and
+        // the spread form appends the qualifier so `foo(a)` and `foo(...args)`
+        // can never share a delta identity.
+        "CALL" => {
+            let base = format!(
+                "CALL:{}:{}:{}",
+                tuple.get(1).unwrap_or(&String::new()),
+                tuple.get(2).unwrap_or(&String::new()),
+                tuple.get(3).unwrap_or(&String::new())
+            );
+            match tuple.get(4) {
+                Some(qualifier) if !qualifier.is_empty() => format!("{base}:{qualifier}"),
+                _ => base,
+            }
+        }
         _ => {
             // F-16: Unknown opcode — fallback produces a key from the full tuple.
             if cfg!(debug_assertions) {
@@ -124,13 +133,20 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
         "CTX" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         // Structural invocations (native call graph): explicit arm so a
         // known opcode never reaches the unknown-opcode fallback. The key
-        // keeps all three identifying operands (caller, callee, arity).
-        "CALL" => vec![
-            tuple[0].clone(),
-            tuple.get(1).cloned().unwrap_or_default(),
-            tuple.get(2).cloned().unwrap_or_default(),
-            tuple.get(3).cloned().unwrap_or_default(),
-        ],
+        // keeps every identifying operand — caller, callee, written count, and
+        // the spread qualifier when present (matching `delta::key_tuple`).
+        "CALL" => {
+            let mut key = vec![
+                tuple[0].clone(),
+                tuple.get(1).cloned().unwrap_or_default(),
+                tuple.get(2).cloned().unwrap_or_default(),
+                tuple.get(3).cloned().unwrap_or_default(),
+            ];
+            if let Some(qualifier) = tuple.get(4) {
+                key.push(qualifier.clone());
+            }
+            key
+        }
         _ => {
             // F-17: Unknown opcode — fallback returns the full instruction body.
             if cfg!(debug_assertions) {

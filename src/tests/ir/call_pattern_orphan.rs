@@ -79,7 +79,7 @@ fn validate(instructions: &[CoreOp]) -> Vec<String> {
 
 #[test]
 fn red_call21_ctor_pattern_declines_when_a_call_would_be_orphaned() {
-    let ops = ctor_stream(Some(CoreOp::Call("M1".into(), "Save".into(), 1)));
+    let ops = ctor_stream(Some(CoreOp::Call("M1".into(), "Save".into(), 1, false)));
     let compressed = compress(&ops);
 
     assert_eq!(
@@ -111,7 +111,7 @@ fn red_call21_ctor_control_still_compresses_without_a_call() {
 fn red_call21_promise_pattern_declines_when_a_call_would_be_orphaned() {
     // The promise pattern has no orphan guard of its own, so the centralized
     // `trailing_region_references_call` check is what protects the fact.
-    let ops = promise_stream(Some(CoreOp::Call("M1".into(), "Save".into(), 1)));
+    let ops = promise_stream(Some(CoreOp::Call("M1".into(), "Save".into(), 1, false)));
     let compressed = compress(&ops);
 
     assert_eq!(
@@ -138,7 +138,7 @@ fn red_call21_promise_control_still_compresses_without_a_call() {
 fn red_call21_a_call_for_another_method_does_not_block_compression() {
     // The guard is scoped to the method being consumed: an unrelated call fact
     // (different caller id) must not disable compression globally.
-    let ops = ctor_stream(Some(CoreOp::Call("M9".into(), "Save".into(), 1)));
+    let ops = ctor_stream(Some(CoreOp::Call("M9".into(), "Save".into(), 1, false)));
     let compressed = compress(&ops);
 
     assert_eq!(

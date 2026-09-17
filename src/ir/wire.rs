@@ -128,12 +128,23 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
         CoreOp::ExecutionContext(mid, context_type) => {
             vec!["CTX".into(), mid.clone(), context_type.clone()]
         }
-        CoreOp::Call(caller, callee, argc) => vec![
-            "CALL".into(),
-            caller.clone(),
-            callee.clone(),
-            argc.to_string(),
-        ],
+        // Structural invocation. Dual shape: the exact form keeps the
+        // established 4-tuple byte-for-byte, and the spread qualifier is an
+        // ADDITIVE fifth operand — so a reader that predates the qualifier
+        // fails on the call it cannot interpret instead of silently assuming
+        // exact arity.
+        CoreOp::Call(caller, callee, argc, has_spread) => {
+            let mut tuple = vec![
+                "CALL".into(),
+                caller.clone(),
+                callee.clone(),
+                argc.to_string(),
+            ];
+            if *has_spread {
+                tuple.push("spread".into());
+            }
+            tuple
+        }
     }
 }
 
@@ -325,18 +336,24 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
             }
         }
         "CALL" => {
-            if tuple.len() >= 4 {
-                // The argument count is a typed operand on the op. A tuple
-                // whose count field is not a decimal number is malformed
-                // (not merely short), so it decodes to None like any other
-                // unrepresentable tuple.
-                tuple[3]
-                    .parse::<usize>()
-                    .ok()
-                    .map(|argc| CoreOp::Call(tuple[1].clone(), tuple[2].clone(), argc))
-            } else {
-                None
-            }
+            // Shape 1 (exact):  ["CALL", caller, callee, argc]
+            // Shape 2 (spread): ["CALL", caller, callee, argc, "spread"]
+            //
+            // The argument count is a typed operand on the op: a tuple whose
+            // count field is not a decimal number is malformed (not merely
+            // short), so it decodes to None like any other unrepresentable
+            // tuple. The qualifier is equally strict — an unrecognized fifth
+            // operand is malformed rather than silently read as an exact call,
+            // and any other length decodes to None.
+            let has_spread = match tuple.len() {
+                4 => false,
+                5 if tuple[4] == "spread" => true,
+                _ => return None,
+            };
+            tuple[3]
+                .parse::<usize>()
+                .ok()
+                .map(|argc| CoreOp::Call(tuple[1].clone(), tuple[2].clone(), argc, has_spread))
         }
         _ => None,
     }

@@ -30,7 +30,7 @@ fn op_references_method(op: &CoreOp, method_id: &str) -> bool {
         | CoreOp::ExecutionContext(mid, _)
         | CoreOp::ControlFlow(mid, _, _)
         | CoreOp::Body(mid, _, _, _) => mid == method_id,
-        CoreOp::Call(caller, _, _) => caller == method_id,
+        CoreOp::Call(caller, _, _, _) => caller == method_id,
         _ => false,
     }
 }
@@ -52,7 +52,7 @@ fn trailing_region_references_call(slice: &[CoreOp], offset: usize, method_id: &
     let mut idx = offset;
     while idx < slice.len() {
         match &slice[idx] {
-            CoreOp::Call(caller, _, _) if caller == method_id => return true,
+            CoreOp::Call(caller, _, _, _) if caller == method_id => return true,
             op if op_references_method(op, method_id) => idx += 1,
             _ => break,
         }
@@ -109,7 +109,7 @@ fn op_is_unrepresentable_method_ref(op: &CoreOp, method_id: &str) -> bool {
         | CoreOp::ExecutionContext(mid, _)
         | CoreOp::ControlFlow(mid, _, _)
         | CoreOp::Body(mid, _, _, _) => mid == method_id,
-        CoreOp::Call(caller, _, _) => caller == method_id,
+        CoreOp::Call(caller, _, _, _) => caller == method_id,
         _ => false,
     }
 }

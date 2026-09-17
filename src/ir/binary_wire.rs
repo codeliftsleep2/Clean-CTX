@@ -85,15 +85,23 @@ const OP_BODY: u8 = 19;
 // version-byte change is required and previously persisted 0x03 streams
 // keep their established interpretation.
 const OP_CALL: u8 = 20;
+// Structural invocation whose written argument count is NOT exact: at least
+// one written argument expands at run time (`foo(...args)`). It carries the
+// same operand layout as `OP_CALL`, and it exists as a separate opcode — not
+// an extra operand on `OP_CALL` — precisely so a reader that predates the
+// qualifier fails loudly with `UnknownOpcode(21)` instead of decoding a
+// spread call as an exact one. An exact call keeps its byte-identical
+// `OP_CALL` encoding.
+const OP_CALL_SPREAD: u8 = 21;
 
 /// Highest defined opcode index.
 ///
 /// The decoder's forward-compatibility guard rejects only indices ABOVE this
-/// value, so every opcode this build defines decodes. `OP_CALL` is allocated
-/// after the edit-mode `OP_BODY`, so a guard bounded at `OP_BODY` would report
-/// a defined opcode as unknown and make CALL facts unrepresentable over the
-/// binary wire.
-const OP_MAX: u8 = OP_CALL;
+/// value, so every opcode this build defines decodes. `OP_CALL` (and the
+/// additive `OP_CALL_SPREAD`) are allocated after the edit-mode `OP_BODY`, so
+/// a guard bounded at `OP_BODY` would report a defined opcode as unknown and
+/// make CALL facts unrepresentable over the binary wire.
+const OP_MAX: u8 = OP_CALL_SPREAD;
 
 /// Opcodes that have a variable number of operands (beyond the first one).
 fn is_variadic(op_idx: u8) -> bool {
@@ -125,8 +133,11 @@ fn op_to_index(op: &CoreOp) -> u8 {
         CoreOp::ControlFlow(..) => OP_CTRL,
         CoreOp::SideEffect(..) => OP_EFFECT,
         CoreOp::ExecutionContext(..) => OP_CTX,
-        // Structural invocations (native call graph)
-        CoreOp::Call(..) => OP_CALL,
+        // Structural invocations (native call graph). The spread qualifier
+        // selects the additive opcode so a predating reader cannot decode a
+        // spread call as an exact one.
+        CoreOp::Call(_, _, _, false) => OP_CALL,
+        CoreOp::Call(_, _, _, true) => OP_CALL_SPREAD,
     }
 }
 
@@ -368,7 +379,9 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
             // [caller_idx, callee_idx, argc_varint] — the explicit argument
             // count is a raw varint (like BODY spans) rather than a string
             // table entry, so repeated small counts never pollute the table.
-            CoreOp::Call(caller, callee, argc) => {
+            // The spread qualifier is carried by the OPCODE (see
+            // `op_to_index`), so both shapes share this exact layout.
+            CoreOp::Call(caller, callee, argc, _) => {
                 encode_operand(&mut buf, caller);
                 encode_operand(&mut buf, callee);
                 write_varint(&mut buf, *argc as u64);

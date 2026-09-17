@@ -107,8 +107,8 @@ fn call_ir() -> CompiledIR {
         instructions: vec![
             CoreOp::DefClass("C1".into(), "Example".into()),
             CoreOp::DefMethod("C1".into(), "M1".into(), "Process".into()),
-            CoreOp::Call("M1".into(), "OrderBy".into(), 1),
-            CoreOp::Call("M1".into(), "OrderBy".into(), 2),
+            CoreOp::Call("M1".into(), "OrderBy".into(), 1, false),
+            CoreOp::Call("M1".into(), "OrderBy".into(), 2, false),
         ],
         version: 1,
     }

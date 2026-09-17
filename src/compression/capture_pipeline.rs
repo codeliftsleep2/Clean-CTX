@@ -31,21 +31,30 @@ use crate::compression::Fidelity;
 // rides the existing walk.
 //
 // Thread-local so concurrently running tests cannot pollute each other's
-// measurement. Compiled only for C#-enabled test builds, which is exactly
-// where it is consumed.
-#[cfg(all(test, feature = "csharp"))]
+// measurement. Compiled for test builds of every language that has a native
+// call producer (C#, TypeScript, Java), which is exactly where it is consumed.
+#[cfg(all(
+    test,
+    any(feature = "csharp", feature = "typescript", feature = "java")
+))]
 thread_local! {
     static PARSE_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 /// Test-only: parses performed on this thread since the last reset.
-#[cfg(all(test, feature = "csharp"))]
+#[cfg(all(
+    test,
+    any(feature = "csharp", feature = "typescript", feature = "java")
+))]
 pub(crate) fn parse_count() -> usize {
     PARSE_COUNT.with(|count| count.get())
 }
 
 /// Test-only: reset this thread's parse counter.
-#[cfg(all(test, feature = "csharp"))]
+#[cfg(all(
+    test,
+    any(feature = "csharp", feature = "typescript", feature = "java")
+))]
 pub(crate) fn reset_parse_count() {
     PARSE_COUNT.with(|count| count.set(0));
 }
@@ -167,7 +176,10 @@ where
     let mut parser = TSParser::new();
     parser.set_language(&language)?;
     tracing::debug!("[run_capture_pipeline] language set");
-    #[cfg(all(test, feature = "csharp"))]
+    #[cfg(all(
+        test,
+        any(feature = "csharp", feature = "typescript", feature = "java")
+    ))]
     PARSE_COUNT.with(|count| count.set(count.get() + 1));
     let tree = parser.parse(source, None).ok_or("AST Generation Error")?;
     tracing::debug!("[run_capture_pipeline] parsed, {} bytes", source.len());

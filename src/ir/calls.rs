@@ -13,8 +13,9 @@
 //
 // Everything downstream — the normalized `CoreOp::Call` fact, explicit
 // argument-count semantics, callable-span ownership, and the semantic
-// projection — is shared, so a future TypeScript or Java producer adds a query
-// and a mapping entry and nothing else.
+// projection — is shared, so a language producer adds a query plus a
+// `call_capture_query` mapping entry and nothing else. C#, TypeScript, and Java
+// are wired that way today; Rust has no arm and compiles exactly as before.
 //
 // Truthfulness of the fact (established by the approved investigation):
 //   * caller  = the `DefMethod` id of the innermost callable whose source span
@@ -38,17 +39,35 @@ use super::opcodes::CoreOp;
 pub const CALL_CALLEE_CAPTURE: &str = "call.callee";
 /// Capture name of one explicitly written argument node.
 pub const CALL_ARGUMENT_CAPTURE: &str = "call.argument";
+/// Capture name of one explicitly written argument node that EXPANDS at run
+/// time (a TypeScript spread element).
+///
+/// It is a distinct capture name rather than a flag on `call.argument` because
+/// the two carry different facts: an `argument` contributes one written
+/// argument to the count, while a `spread` contributes one written argument to
+/// the count AND marks the whole invocation's count as non-exact. The producer
+/// therefore records them through separate methods and the capture walk stays
+/// the single source of both the count and the qualifier.
+pub const CALL_SPREAD_CAPTURE: &str = "call.spread";
 
 /// Grammar boundary: the invocation-capture query that the IR pass appends to
 /// `base_query` so this producer runs.
 ///
-/// Returns `None` for every language without a native call producer, so those
-/// languages compile exactly as before. C# is the only producer today;
-/// TypeScript and Java are expected to add an arm here (plus their own query
-/// constant) and need no other change.
+/// This is the ONLY language-specific thing a producer supplies. C#,
+/// TypeScript, and Java each map their base query to their own invocation
+/// capture query; the normalized `CoreOp::Call` fact, argument-count semantics,
+/// callable-span ownership, the semantic projection, the graph edge, and every
+/// workspace consumer are shared and untouched.
+///
+/// Returns `None` for every language without a native call producer (Rust
+/// today), so those languages compile exactly as before.
 pub fn call_capture_query(base_query: &str) -> Option<&'static str> {
     if base_query == crate::queries::CS_QUERY {
         Some(crate::queries::CS_CALL_QUERY)
+    } else if base_query == crate::queries::TS_QUERY {
+        Some(crate::queries::TS_CALL_QUERY)
+    } else if base_query == crate::queries::JAVA_QUERY {
+        Some(crate::queries::JAVA_CALL_QUERY)
     } else {
         None
     }
@@ -90,6 +109,9 @@ struct PendingCall {
     callee: String,
     /// Explicit argument count observed so far.
     explicit_arg_count: usize,
+    /// Whether any observed argument expands at run time, making
+    /// `explicit_arg_count` a written-node count rather than an exact arity.
+    has_spread: bool,
     /// Innermost callable that owns the invocation, if any.
     owner: Option<String>,
 }
@@ -138,6 +160,7 @@ impl CallProducer {
         self.calls.entry(key).or_insert_with(|| PendingCall {
             callee: callee.to_string(),
             explicit_arg_count: 0,
+            has_spread: false,
             owner: owner.map(str::to_string),
         });
     }
@@ -157,6 +180,22 @@ impl CallProducer {
         }
     }
 
+    /// Record one explicitly written argument of one query match that EXPANDS
+    /// at run time (a TypeScript spread element).
+    ///
+    /// It contributes exactly one written argument to the count — a spread
+    /// argument is one written node, never a guessed expanded number — and
+    /// marks the invocation's count as NOT exact, so no consumer can read the
+    /// written count as an arity.
+    pub fn record_spread(&mut self, match_index: usize) {
+        if let Some(key) = self.match_callee.get(&match_index)
+            && let Some(call) = self.calls.get_mut(key)
+        {
+            call.explicit_arg_count += 1;
+            call.has_spread = true;
+        }
+    }
+
     /// Emit and drop every pending fact owned by `owner` (in document order),
     /// and drop the pending facts that carry no callable owner.
     ///
@@ -173,6 +212,7 @@ impl CallProducer {
                         call_owner.to_string(),
                         call.callee,
                         call.explicit_arg_count,
+                        call.has_spread,
                     ));
                 }
                 (None, _) => {
@@ -214,3 +254,15 @@ mod tests;
 #[cfg(all(test, feature = "csharp"))]
 #[path = "../tests/ir/calls_csharp.rs"]
 mod csharp_tests;
+
+// The TypeScript production capture path for native call facts: the same
+// producer boundary, reached through the TypeScript invocation grammar.
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../tests/ir/calls_typescript.rs"]
+mod typescript_tests;
+
+// The Java production capture path for native call facts: the same producer
+// boundary, reached through the Java invocation grammar.
+#[cfg(all(test, feature = "java"))]
+#[path = "../tests/ir/calls_java.rs"]
+mod java_tests;

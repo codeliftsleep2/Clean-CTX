@@ -140,6 +140,131 @@ pub const CS_CALL_QUERY: &str = r#"
         arguments: (argument_list (argument) @call.argument))
 "#;
 
+// Generic invocation captures (native call facts) for TypeScript.
+//
+// Exactly the `CS_CALL_QUERY` contract, expressed in TypeScript grammar:
+// deliberately NOT part of `TS_QUERY` (so the compression and diff paths, which
+// consume `TS_QUERY` captures positionally, can never observe a call capture),
+// and structural — the callee NAME node plus one capture per explicitly written
+// argument — so the observed arity is never derived from `split(',')`, a regex,
+// a line scan, or a second parse.
+//
+// TypeScript invocation syntax maps onto the existing normalized fact:
+//   * `foo(...)`      -> callee `foo`   (identifier)
+//   * `this.foo(...)` -> callee `foo`   (member property; the receiver is
+//                        never an argument and never enters the count)
+//   * `foo<T>(...)`   -> callee `foo`   (`type_arguments` is a sibling field of
+//                        the call, never part of the name)
+//   * `foo(...args)`  -> one explicitly written argument (spread element)
+//
+// Both patterns of a pair are required: the argument-less pattern enumerates
+// invocations with ZERO arguments (`foo()`), and the argument patterns
+// enumerate their arity. `match_index` groups the captures of one query match
+// so the producer can associate each argument with its callee.
+//
+// A spread element binds `@call.spread`, not `@call.argument`: it is still ONE
+// written argument, but it also expands at run time, so the invocation's
+// written count is no longer an exact arity. The producer records it as one
+// argument AND qualifies the fact (`has_spread`), which is what keeps
+// `foo(a)` and `foo(...args)` distinguishable even though both write one
+// argument node.
+//
+// Unmatched forms emit NO fact rather than a guessed one, and they belong to
+// two clearly different classes:
+//
+// SEMANTIC / MODEL BOUNDARIES — the current normalized fact cannot express
+// them (not a parsing gap):
+//   * `new Foo(...)` is a `new_expression`: object creation, not an invocation
+//     of a named method. The callee would be the constructed TYPE, and the
+//     `Calls` model is method-name-level (`builtin` / `Method` entities), so
+//     construction is out of scope rather than unmatched.
+//   * tagged template calls (`tag` + backtick) carry a `template_string` in
+//     their `arguments` field — a substitution tuple, not an argument list.
+//     The normalized fact counts explicitly written argument nodes in an
+//     `arguments` list, which such a call does not have.
+//   * an invocation with no precisely identified callable owner (a class
+//     property initializer, a top-level statement): the caller must be a real
+//     callable declaration id, so ownership is never guessed.
+//
+// CURRENT PRODUCER COVERAGE GAPS — recoverable later; these are NOT claims
+// that the forms are unrepresentable:
+//   * computed member calls with a non-literal property: `foo[bar]()` is a
+//     `subscript_expression` and has no statically written callee name. The
+//     literal form `foo["save"]()` IS structurally recoverable — it is a
+//     coverage gap of these patterns, not a property of the model.
+//   * `#private` member calls: `this.#save()` names its callee precisely (a
+//     `private_property_identifier`); the patterns above simply do not bind
+//     that node kind yet.
+//   * arrow-function bodies: `const f = () => save();` emits no fact because
+//     no callable declaration is captured for the arrow function, so the
+//     invocation has no stable `builtin` / `Method` caller identity. The exact
+//     limitation is caller identity, not arrow-function syntax.
+pub const TS_CALL_QUERY: &str = r#"
+    ; --- Generic invocation captures (native call facts) ---
+    (call_expression
+        function: (identifier) @call.callee
+        arguments: (arguments))
+    (call_expression
+        function: (identifier) @call.callee
+        arguments: (arguments (expression) @call.argument))
+    (call_expression
+        function: (identifier) @call.callee
+        arguments: (arguments (spread_element) @call.spread))
+    (call_expression
+        function: (member_expression property: (property_identifier) @call.callee)
+        arguments: (arguments))
+    (call_expression
+        function: (member_expression property: (property_identifier) @call.callee)
+        arguments: (arguments (expression) @call.argument))
+    (call_expression
+        function: (member_expression property: (property_identifier) @call.callee)
+        arguments: (arguments (spread_element) @call.spread))
+"#;
+
+// Generic invocation captures (native call facts) for Java.
+//
+// Exactly the `CS_CALL_QUERY` contract, expressed in Java grammar: deliberately
+// NOT part of `JAVA_QUERY` (so the compression and diff paths can never observe
+// a call capture), and structural — the callee NAME node plus one capture per
+// explicitly written argument — so the observed arity is never derived from
+// `split(',')`, a regex, a line scan, or a second parse.
+//
+// Java's `method_invocation` carries the callee name in its `name` field for
+// BOTH receiver-less (`foo(...)`) and receiver-ful (`obj.foo(...)`,
+// `this.foo(...)`, `super.foo(...)`) forms, so one pair of patterns covers
+// every invocation shape. `type_arguments` is a sibling field, so `foo<T>(...)`
+// yields the callee `foo`.
+//
+// Unmatched forms emit NO fact rather than a guessed one, and they belong to
+// two clearly different classes:
+//
+// SEMANTIC / MODEL BOUNDARIES — the current normalized fact cannot express
+// them (not a parsing gap):
+//   * `new Foo(...)` is an `object_creation_expression`: object creation is not
+//     an invocation of a named method, and the `Calls` model is method-name-
+//     level (`builtin` / `Method` entities), so construction is out of scope.
+//   * `super(...)` / `this(...)` is an `explicit_constructor_invocation`, which
+//     has no `name` field at all — it is a constructor invocation, not a named
+//     method call.
+//   * a method reference (`Foo::bar`) is a method VALUE, never an invocation.
+//   * an invocation with no precisely identified callable owner (a field
+//     initializer, a static initializer): the caller must be a real callable
+//     declaration id, so ownership is never guessed.
+//
+// CURRENT PRODUCER COVERAGE GAPS: none inside `method_invocation` — the callee
+// is always the required `name` identifier, so the pair of patterns above
+// covers every invocation shape (receiver-less, `this.`, `super.`, `obj.`, and
+// explicit type-argument forms alike).
+pub const JAVA_CALL_QUERY: &str = r#"
+    ; --- Generic invocation captures (native call facts) ---
+    (method_invocation
+        name: (identifier) @call.callee
+        arguments: (argument_list))
+    (method_invocation
+        name: (identifier) @call.callee
+        arguments: (argument_list (expression) @call.argument))
+"#;
+
 // Rust AST node types: struct_item, enum_item, trait_item, impl_item,
 //   function_item, type_item, field_declaration, use_declaration,
 //   return_expression, if_expression, for_expression, while_expression,

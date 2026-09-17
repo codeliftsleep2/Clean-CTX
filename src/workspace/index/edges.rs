@@ -24,12 +24,16 @@
 // therefore does not participate in the key.
 //
 // Call evidence: `SemanticRelation::Calls` additionally carries the observed
-// explicit argument count as edge evidence, which DOES participate in the key.
-// Two call facts asserted by one file for the same caller/callee pair but a
-// different arity are two different facts and both are retained; identical
-// physical invocations of the same arity collapse to one occurrence (this
-// feature never claims physical call-site counts). Every other relation carries
-// no evidence, so its identity is unchanged.
+// explicit argument count AND its spread qualifier as edge evidence, both of
+// which participate in the key. Two call facts asserted by one file for the
+// same caller/callee pair but a different written arity are two different
+// facts and both are retained; so are two facts with the SAME written arity
+// where only one of them expands a written argument (`foo(a)` vs
+// `foo(...args)`) — the count is not an exact arity in the second, so the two
+// are materially different evidence. Identical physical invocations of the
+// same shape collapse to one occurrence (this feature never claims physical
+// call-site counts). Every other relation carries no evidence, so its identity
+// is unchanged.
 
 use super::{EntityKey, WorkspaceIndex, entity_key};
 use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
@@ -44,10 +48,11 @@ use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 /// retained as separate evidence.
 ///
 /// Call evidence participates in the key as well: for `Calls`, the observed
-/// explicit argument count is part of the FACT a file asserted, so
-/// `A --Calls(argc=1)--> Foo` and `A --Calls(argc=2)--> Foo` are two distinct
-/// occurrences. Every other relation carries no evidence (`None`), so their
-/// identity is unchanged. Arity never enters `EntityKey` (Model C).
+/// explicit argument count AND its spread qualifier are part of the FACT a file
+/// asserted, so `A --Calls(argc=1)--> Foo`, `A --Calls(argc=2)--> Foo`, and
+/// `A --Calls(argc=1, spread)--> Foo` are three distinct occurrences. Every
+/// other relation carries no evidence (`None`), so their identity is unchanged.
+/// Arity never enters `EntityKey` (Model C).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(super) struct EdgeKey {
     /// The source occurrence that asserted the edge (`add_edges` file identity).
@@ -63,6 +68,13 @@ pub(super) struct EdgeKey {
     /// Observed explicit argument count, when the relation carries call
     /// evidence. `None` for every evidence-free relation.
     explicit_arg_count: Option<usize>,
+    /// Whether a written argument of that call expands at run time, when the
+    /// relation carries call evidence. `None` for every evidence-free relation.
+    ///
+    /// Required for identity: two calls may write the same number of argument
+    /// nodes while only one of them expands one of them, and collapsing those
+    /// would silently drop the fact that discards exact-arity meaning.
+    has_spread: Option<bool>,
 }
 
 impl EdgeKey {
@@ -80,6 +92,7 @@ impl EdgeKey {
             explicit_arg_count: edge
                 .call_evidence
                 .map(|evidence| evidence.explicit_arg_count),
+            has_spread: edge.call_evidence.map(|evidence| evidence.has_spread),
         }
     }
 
@@ -111,7 +124,8 @@ impl EdgeKey {
     }
 
     /// Does `edge` assert this key's relation, semantic triple, and (when the
-    /// relation carries evidence) the same call evidence?
+    /// relation carries evidence) the same call evidence — written argument
+    /// count AND spread qualifier?
     fn same_triple(&self, edge: &SemanticEdge) -> bool {
         self.relation == edge.relation
             && self.subject_domain == edge.subject.domain
@@ -121,6 +135,7 @@ impl EdgeKey {
             && self.object_type == edge.object.entity_type
             && self.object_name == edge.object.name
             && self.explicit_arg_count == edge.call_evidence.map(|e| e.explicit_arg_count)
+            && self.has_spread == edge.call_evidence.map(|e| e.has_spread)
     }
 }
 

@@ -278,15 +278,18 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                 }
                 // Structural invocations (native call graph).
                 // [caller_idx, callee_idx, argc_varint] — the count is a raw
-                // varint following the two string-table operands.
-                OP_CALL => {
+                // varint following the two string-table operands. The spread
+                // qualifier is carried by the OPCODE, not an operand, so an
+                // exact call keeps its established encoding and a spread call
+                // is never decoded as an exact one.
+                OP_CALL | OP_CALL_SPREAD => {
                     let caller = read_operand(&data[pos..], &mut pos)?;
                     let callee = read_operand(&data[pos..], &mut pos)?;
                     let (argc, consumed) = read_varint(&data[pos..]).ok_or_else(|| {
                         BinaryDecodeError::TruncatedData("CALL explicit_arg_count".into())
                     })?;
                     pos += consumed;
-                    CoreOp::Call(caller, callee, argc as usize)
+                    CoreOp::Call(caller, callee, argc as usize, op_idx == OP_CALL_SPREAD)
                 }
                 // R-43a: Execution Semantics
                 OP_DATAFLOW => {

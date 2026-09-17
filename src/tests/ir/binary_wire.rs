@@ -519,9 +519,9 @@ fn binary_wire_round_trips_call_facts_and_every_defined_opcode() {
         instructions: vec![
             CoreOp::DefClass("C1".to_string(), "Example".to_string()),
             CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "Process".to_string()),
-            CoreOp::Call("M1".to_string(), "Save".to_string(), 1),
-            CoreOp::Call("M1".to_string(), "OrderBy".to_string(), 2),
-            CoreOp::Call("M1".to_string(), "Reset".to_string(), 0),
+            CoreOp::Call("M1".to_string(), "Save".to_string(), 1, false),
+            CoreOp::Call("M1".to_string(), "OrderBy".to_string(), 2, false),
+            CoreOp::Call("M1".to_string(), "Reset".to_string(), 0, false),
         ],
     };
 
@@ -533,12 +533,13 @@ fn binary_wire_round_trips_call_facts_and_every_defined_opcode() {
             .map(crate::ir::opcodes::opcode_name)
             .collect()
     };
-    let facts = |instructions: &[CoreOp]| -> Vec<(String, String, usize)> {
+    let facts = |instructions: &[CoreOp]| -> Vec<(String, String, usize, bool)> {
         instructions
             .iter()
             .filter_map(|op| {
-                op.call_parts()
-                    .map(|(caller, callee, argc)| (caller.to_string(), callee.to_string(), argc))
+                op.call_parts().map(|(caller, callee, argc, has_spread)| {
+                    (caller.to_string(), callee.to_string(), argc, has_spread)
+                })
             })
             .collect()
     };
@@ -551,7 +552,8 @@ fn binary_wire_round_trips_call_facts_and_every_defined_opcode() {
     assert_eq!(
         facts(&decoded.instructions),
         facts(&ir.instructions),
-        "caller, callee, and explicit argument count must survive the binary wire"
+        "caller, callee, explicit argument count, and spread qualifier must \
+         survive the binary wire"
     );
 }
 

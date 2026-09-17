@@ -83,25 +83,26 @@ pub fn project_method_declarations(instructions: &[CoreOp], file: &str) -> Vec<S
 ///
 /// The subject is the caller callable's declared name (resolved from the IR by
 /// id, never from source text); the object is the callee name exactly as
-/// written at the call site; the explicit argument count is carried as
-/// `CallEvidence` so arity participates in edge-occurrence identity.
+/// written at the call site; the explicit argument count AND its spread
+/// qualifier are carried as `CallEvidence`, so both the written arity and the
+/// fact that the count is not exact participate in edge-occurrence identity.
 ///
-/// The projection is deliberately structural: it claims a callee NAME and an
-/// observed arity, never overload resolution, receiver typing, or a resolved
-/// declaration identity.
+/// The projection is deliberately structural: it claims a callee NAME, an
+/// observed written arity, and whether that arity is exact — never overload
+/// resolution, receiver typing, or a resolved declaration identity.
 pub fn project_calls(instructions: &[CoreOp], file: &str) -> Vec<SemanticEdge> {
     let callers = declared_method_names(instructions);
     instructions
         .iter()
         .filter_map(|op| match op {
-            CoreOp::Call(caller_id, callee, explicit_arg_count) => {
+            CoreOp::Call(caller_id, callee, explicit_arg_count, has_spread) => {
                 let caller_name = *callers.get(caller_id.as_str())?;
                 Some(SemanticEdge {
                     relation: SemanticRelation::Calls,
                     subject: method_entity(caller_name, file),
                     object: method_entity(callee, file),
                     layer: BUILTIN_LAYER,
-                    call_evidence: Some(CallEvidence::new(*explicit_arg_count)),
+                    call_evidence: Some(CallEvidence::new(*explicit_arg_count, *has_spread)),
                 })
             }
             _ => None,

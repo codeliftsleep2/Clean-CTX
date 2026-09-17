@@ -310,6 +310,13 @@ impl PassContext {
         self.call_producer.record_argument(match_index);
     }
 
+    /// Record one explicitly written argument capture of one query match that
+    /// expands at run time (a TypeScript spread element): it contributes one
+    /// written argument AND marks the invocation's count as non-exact.
+    pub(super) fn record_call_spread(&mut self, match_index: usize) {
+        self.call_producer.record_spread(match_index);
+    }
+
     /// Settle every remaining call fact after the capture walk (the last
     /// callable's region never "closes" during the walk).
     pub(super) fn flush_callable_calls(&mut self) {

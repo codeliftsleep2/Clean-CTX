@@ -42,8 +42,9 @@ pub struct HierarchicalIR {
     ///
     /// Flat, like `imports` and `type_aliases`: the caller is already an
     /// explicit method id, so the class→method nesting adds no shared
-    /// context to compress, and the flat triple mirrors `CoreOp::Call`
-    /// losslessly (caller, callee NAME, explicit argument count). Typed
+    /// context to compress, and the flat entry mirrors `CoreOp::Call`
+    /// losslessly (caller, callee NAME, written argument count, and the
+    /// spread qualifier when the written count is not an exact arity). Typed
     /// (not a string tuple) so a malformed document fails decoding loudly
     /// instead of silently defaulting an argument count.
     #[serde(rename = "ca", default, skip_serializing_if = "Vec::is_empty")]
@@ -62,9 +63,26 @@ pub struct HierarchicalCall {
     #[serde(rename = "n")]
     pub callee: String,
 
-    /// Explicit argument count written at the call site.
+    /// Written argument count at the call site.
     #[serde(rename = "a")]
     pub explicit_arg_count: usize,
+
+    /// Whether at least one written argument expands at run time.
+    ///
+    /// `true` means `explicit_arg_count` counts argument NODES and is never the
+    /// runtime/declared arity, so a consumer must not read it as exact-arity
+    /// evidence. `false` for every exact call (C#, Java, and TypeScript calls
+    /// with no spread argument). Absent in the serialized form when `false`,
+    /// so an exact call keeps the pre-qualifier shape byte-for-byte, and an
+    /// older document that omits the field decodes as exact.
+    #[serde(rename = "s", default, skip_serializing_if = "spread_is_absent")]
+    pub has_spread: bool,
+}
+
+/// `skip_serializing_if` predicate for [`HierarchicalCall::has_spread`]: an
+/// exact call must serialize exactly as it did before the qualifier existed.
+fn spread_is_absent(has_spread: &bool) -> bool {
+    !has_spread
 }
 
 /// A single class node — the top-level structural container.
