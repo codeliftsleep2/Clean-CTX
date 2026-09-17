@@ -162,12 +162,22 @@ pub(crate) fn captured_responses() -> CapturedResponsesGuard<'static> {
 /// process-global test state. Response capture itself is thread-isolated, but
 /// the established gate remains available to its existing Phase A/B callers.
 ///
-/// Feature-gated to mirror its Phase A/B consumers.
-#[cfg(all(test, feature = "rust"))]
+/// Available in every test configuration — like [`captured_responses`] above,
+/// this gate is deliberately NOT gated on a language feature. Its consumers
+/// are registered under different gates: `apply_edit_tests` is compiled in
+/// every test build, `provider_code_context_signature_tests` requires
+/// `feature = "csharp"`, and the Phase A/B, contract and CBM handler suites
+/// require `feature = "rust"`. Gating the gate itself on one of those
+/// features broke every test build that compiled a consumer without it
+/// (E0425: `handler_response_serial` not found in `crate::protocol` under the
+/// default feature set). `src/tests/protocol.rs` is registered
+/// unconditionally and exercises the accessor, so narrowing this gate again
+/// fails the build immediately in the cheapest configuration.
+#[cfg(test)]
 pub(crate) static HANDLER_RESPONSE_SERIAL: Mutex<()> = Mutex::new(());
 
 /// Poison-tolerant guard for [`HANDLER_RESPONSE_SERIAL`] — see its docs.
-#[cfg(all(test, feature = "rust"))]
+#[cfg(test)]
 pub(crate) fn handler_response_serial() -> std::sync::MutexGuard<'static, ()> {
     match HANDLER_RESPONSE_SERIAL.lock() {
         Ok(guard) => guard,
