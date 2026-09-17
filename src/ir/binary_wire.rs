@@ -92,6 +92,11 @@ const OP_CALL: u8 = 20;
 // qualifier fails loudly with `UnknownOpcode(21)` instead of decoding a
 // spread call as an exact one. An exact call keeps its byte-identical
 // `OP_CALL` encoding.
+//
+// The shared string table is derived from the canonical tuple for every
+// transport, so it also interns the qualifier string; no binary operand
+// references that entry, which is why the two opcodes still decouple cleanly
+// even though a qualified stream is not length-identical to an exact one.
 const OP_CALL_SPREAD: u8 = 21;
 
 /// Highest defined opcode index.

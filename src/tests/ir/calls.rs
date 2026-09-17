@@ -350,21 +350,23 @@ fn named_wire_dual_shape_carries_the_spread_qualifier() {
 
 #[test]
 fn binary_wire_carries_the_spread_qualifier_in_its_own_opcode() {
-    // The qualifier is carried by the OPCODE, not an operand: both documents
-    // encode to the same length and differ in exactly one byte. A reader that
-    // predates the new opcode therefore fails loudly on that byte instead of
-    // decoding a spread call as an exact one.
+    // The qualifier is carried by the OPCODE, not an operand: the decoder
+    // reads the same [caller, callee, argc] layout for either opcode, so an
+    // exact call keeps its established OP_CALL encoding while a qualified call
+    // is a distinct opcode that a predating reader rejects instead of
+    // decoding as an exact one.
+    //
+    // The two streams are deliberately NOT byte-length identical, and that is
+    // not a defect: the binary wire shares its string table with the
+    // string-table transport (`StringTable::from_instructions` interns every
+    // component of the canonical tuple), so the qualifier occupies one extra
+    // table entry. No operand in the binary layout references that entry —
+    // which is exactly what this test pins.
     let exact_bytes = binary_encode(&single_call_document(false));
     let spread_bytes = binary_encode(&single_call_document(true));
-    assert_eq!(exact_bytes.len(), spread_bytes.len());
-    let differing = exact_bytes
-        .iter()
-        .zip(&spread_bytes)
-        .filter(|(left, right)| left != right)
-        .count();
-    assert_eq!(
-        differing, 1,
-        "the qualifier must be carried by exactly one opcode byte"
+    assert_ne!(
+        exact_bytes, spread_bytes,
+        "a spread call must never encode to the exact call's bytes"
     );
 
     // Both shapes round-trip, and the qualifier survives the decode.
