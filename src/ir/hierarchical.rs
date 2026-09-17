@@ -321,3 +321,12 @@ fn find_class_by_id(classes: &[ClassNode], id: &str) -> Option<usize> {
 #[cfg(test)]
 #[path = "../tests/ir/hierarchical.rs"]
 mod tests;
+
+// Repeated `CoreOp::Flags` ops for one method id — the language layer's
+// declaration/modifier family and the core pipeline's control-flow family —
+// must accumulate into the single `MethodNode::flags` field instead of the
+// last write winning (RED-FLAG1..RED-FLAG12), including the cross-language
+// pipeline probes and the flat-wire/pattern nonregressions.
+#[cfg(test)]
+#[path = "../tests/ir/hierarchical_flags.rs"]
+mod flags_tests;

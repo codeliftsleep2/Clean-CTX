@@ -23,7 +23,7 @@ use super::*;
 /// - Param → added to current method's params
 /// - Return → set as current method's return_type
 /// - FieldType → set as current field's field_type
-/// - Flags → set as current method's flags
+/// - Flags → accumulated (stable union) into the current method's flags
 /// - ClassFlags → set as current class's class_flags
 /// - Extends → set as current class's extends
 /// - Implements → added to current class's implements
@@ -197,7 +197,16 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                 if let Some(c_idx) = current_class_idx {
                     for mi in 0..classes[c_idx].methods.len() {
                         if classes[c_idx].methods[mi].id == *tid {
-                            classes[c_idx].methods[mi].flags = Some(flags.clone());
+                            // ACCUMULATE, never assign: `CoreOp::Flags` has
+                            // multiple legitimate producers for one method id,
+                            // so the flat stream legitimately carries more
+                            // than one op here (see `accumulate_flags`).
+                            accumulate_flags(
+                                classes[c_idx].methods[mi]
+                                    .flags
+                                    .get_or_insert_with(Vec::new),
+                                flags,
+                            );
                             current_method_idx = Some(mi);
                             break;
                         }
@@ -385,5 +394,41 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
         imports,
         type_aliases,
         calls,
+    }
+}
+
+/// Merge one `CoreOp::Flags` op's values into a method's accumulated flags.
+///
+/// `CoreOp::Flags` has multiple legitimate producers for the SAME method id:
+///
+/// * the language layer's declaration/modifier flags (`STATIC`, `ASYNC`,
+///   `PRIVATE`, `PROTECTED`, `ABSTRACT`, `EXPORT`, …), emitted while the
+///   declaration capture is dispatched, and
+/// * the core pipeline's accumulated control-flow flags (`IF`, `LOOP`, `RET`,
+///   `THROW`), collected by `PassContext::current_method_flags` and flushed
+///   into one op by `flush_method_flags` when the declaration ends
+///   (`src/ir/pipeline.rs`).
+///
+/// The flat stream therefore carries more than one `Flags` op for one method,
+/// while the hierarchical representation has exactly one
+/// [`MethodNode::flags`] field. The projection must ACCUMULATE: assigning the
+/// last op discarded the other producer's entire family, so a method whose
+/// body contains control flow rendered `fl:RET` with none of its declaration
+/// modifiers.
+///
+/// Semantics: **first-seen stable order + deduplication**. A value keeps the
+/// position where the flat stream first mentioned it, and a value already
+/// present is not appended again — the result is deterministic and never
+/// depends on an unordered set's iteration order.
+///
+/// Scope note: this preserves INFORMATION (every value the flat stream named
+/// is present), not flat-op multiplicity. A later hierarchical → flat decode
+/// re-emits the projected form — one combined `Flags` op — which is the
+/// established `MethodNode::flags` semantics.
+fn accumulate_flags(target: &mut Vec<String>, incoming: &[String]) {
+    for flag in incoming {
+        if !target.iter().any(|existing| existing == flag) {
+            target.push(flag.clone());
+        }
     }
 }
