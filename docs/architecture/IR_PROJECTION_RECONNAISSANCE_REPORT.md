@@ -18,8 +18,10 @@ companion plan and operation matrix record the binding details and the one
 binary version-number contradiction discovered during source inspection.
 
 **Implementation update:** The bounded `DefClass`/`DefMethod`/`Param`/`Return`
-projection repair is implemented and awaiting user-run verification. Findings
-for all later operation families remain open exactly as recorded below.
+projection repair was user-verified and checkpointed. The bounded
+`DefField`/`FieldType` repair was user-verified as the Phase 2 checkpoint on
+2026-09-18. Findings for all later operation families remain open exactly as
+recorded below.
 
 ## 1. Executive summary
 

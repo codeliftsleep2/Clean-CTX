@@ -29,6 +29,7 @@ pub use encode::{ir_to_hierarchical, try_ir_to_hierarchical};
 pub enum ProjectionIdentityKind {
     Class,
     Method,
+    Field,
     Parameter,
 }
 
@@ -37,6 +38,7 @@ impl std::fmt::Display for ProjectionIdentityKind {
         match self {
             Self::Class => f.write_str("class"),
             Self::Method => f.write_str("method"),
+            Self::Field => f.write_str("field"),
             Self::Parameter => f.write_str("parameter"),
         }
     }
@@ -79,6 +81,11 @@ pub enum HierarchicalProjectionError {
         first_instruction: usize,
         duplicate_instruction: usize,
     },
+    DuplicateFieldType {
+        field_id: String,
+        first_instruction: usize,
+        duplicate_instruction: usize,
+    },
 }
 
 impl HierarchicalProjectionError {
@@ -90,6 +97,7 @@ impl HierarchicalProjectionError {
             Self::UnresolvedIdentity { .. } => "ir_projection_unresolved_identity",
             Self::KindMismatch { .. } => "ir_projection_kind_mismatch",
             Self::DuplicateReturn { .. } => "ir_projection_duplicate_return",
+            Self::DuplicateFieldType { .. } => "ir_projection_duplicate_field_type",
         }
     }
 }
@@ -107,7 +115,7 @@ impl std::fmt::Display for HierarchicalProjectionError {
             } => {
                 write!(f, "{operation} defines duplicate {kind} identity '{id}'")?;
                 if let Some(owner) = owner {
-                    write!(f, " under method '{owner}'")?;
+                    write!(f, " under owner identity '{owner}'")?;
                 }
                 write!(
                     f,
@@ -127,7 +135,7 @@ impl std::fmt::Display for HierarchicalProjectionError {
                     "{operation} at instruction {instruction} has invalid {kind} identity '{id}'"
                 )?;
                 if let Some(owner) = owner {
-                    write!(f, " under method '{owner}'")?;
+                    write!(f, " under owner identity '{owner}'")?;
                 }
                 write!(f, ": {reason}")
             }
@@ -157,6 +165,14 @@ impl std::fmt::Display for HierarchicalProjectionError {
             } => write!(
                 f,
                 "RET at instruction {duplicate_instruction} duplicates the return fact for method '{method_id}' (first defined at {first_instruction})"
+            ),
+            Self::DuplicateFieldType {
+                field_id,
+                first_instruction,
+                duplicate_instruction,
+            } => write!(
+                f,
+                "FIELD_T at instruction {duplicate_instruction} duplicates the type fact for field '{field_id}' (first defined at {first_instruction})"
             ),
         }
     }
@@ -466,6 +482,10 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/ir/hierarchical_identity.rs"]
 mod identity_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/hierarchical_field_identity.rs"]
+mod field_identity_tests;
 
 // Repeated `CoreOp::Flags` ops for one method id — the language layer's
 // declaration/modifier family and the core pipeline's control-flow family —

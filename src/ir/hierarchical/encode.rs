@@ -11,20 +11,20 @@
 // `HierarchicalCall`, `ClassNode`, `MethodNode`, `FieldNode`, `PatternEntry`)
 // and the shared `find_class_by_id` helper.
 
-use super::identity::{ClassId, MethodId, validate_first_slice};
+use super::identity::{ClassId, FieldId, MethodId, validate_projection_identities};
 use super::*;
 use std::collections::HashMap;
 
 /// Convert a flat `CompiledIR` instruction stream into a `HierarchicalIR`.
 ///
-/// The converter validates the first-slice identity graph, then scans
+/// The converter validates the migrated identity graph, then scans
 /// instructions while collecting:
 /// - DefClass → creates a ClassNode identified by ClassId
 /// - DefMethod → creates a MethodNode under its declared ClassId owner
-/// - DefField → creates a FieldNode inside current class
+/// - DefField → creates a FieldNode under its declared ClassId owner
 /// - Param → attached to its target MethodId after definition placement
 /// - Return → attached to its target MethodId after definition placement
-/// - FieldType → set as current field's field_type
+/// - FieldType → attached to its target FieldId after definition placement
 /// - Flags → accumulated (stable union) into the current method's flags
 /// - ClassFlags → set as current class's class_flags
 /// - Extends → set as current class's extends
@@ -44,21 +44,24 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
 
 /// Checked projection from canonical IR to the hierarchical representation.
 ///
-/// The approved first slice resolves `DefClass`, `DefMethod`, `Param`, and
-/// `Return` through typed stable identities. Their attribution is independent
-/// of instruction order, and invalid identity graphs fail before a partial
-/// hierarchy can be returned.
+/// The migrated slices resolve class, method, parameter, return, field, and
+/// field-type relationships through typed stable identities. Their attribution
+/// is independent of instruction order, and invalid identity graphs fail
+/// before a partial hierarchy can be returned.
 pub fn try_ir_to_hierarchical(
     ir: &CompiledIR,
 ) -> Result<HierarchicalIR, HierarchicalProjectionError> {
-    let identities = validate_first_slice(ir)?;
+    let identities = validate_projection_identities(ir)?;
     let mut classes: Vec<ClassNode> = Vec::with_capacity(identities.classes.len());
     let mut imports: Vec<Vec<String>> = Vec::new();
     let mut type_aliases: Vec<Vec<String>> = Vec::new();
     let mut calls: Vec<HierarchicalCall> = Vec::new();
     let mut method_locations: HashMap<MethodId, (usize, usize)> =
         HashMap::with_capacity(identities.methods.len());
+    let mut field_locations: HashMap<FieldId, (usize, usize)> =
+        HashMap::with_capacity(identities.fields.len());
     let mut pending_methods: HashMap<ClassId, Vec<(MethodId, String)>> = HashMap::new();
+    let mut pending_fields: HashMap<ClassId, Vec<(FieldId, String)>> = HashMap::new();
 
     // Track current scope
     let mut current_class_idx: Option<usize> = None;
@@ -89,6 +92,13 @@ pub fn try_ir_to_hierarchical(
                         method_locations.insert(method_id, (class_idx, method_idx));
                     }
                 }
+                if let Some(fields) = pending_fields.remove(&class_id) {
+                    let class_idx = classes.len() - 1;
+                    for (field_id, field_name) in fields {
+                        let field_idx = push_field(&mut classes[class_idx], &field_id, field_name);
+                        field_locations.insert(field_id, (class_idx, field_idx));
+                    }
+                }
             }
 
             CoreOp::DefMethod(cid, mid, name) => {
@@ -110,48 +120,25 @@ pub fn try_ir_to_hierarchical(
             }
 
             CoreOp::DefField(cid, fid, name) => {
+                let class_id = ClassId::from_serialized(cid);
+                let field_id = FieldId::from_serialized(fid);
                 if let Some(class_idx) = find_class_by_id(&classes, cid) {
-                    classes[class_idx].fields.push(FieldNode {
-                        id: fid.clone(),
-                        name: name.clone(),
-                        field_type: None,
-                    });
+                    let field_idx = push_field(&mut classes[class_idx], &field_id, name.clone());
+                    field_locations.insert(field_id, (class_idx, field_idx));
                     current_class_idx = Some(class_idx);
                 } else {
-                    // Field with no matching class — create synthetic class
-                    classes.push(ClassNode {
-                        id: cid.clone(),
-                        name: format!("__synthetic_{}", cid),
-                        methods: Vec::new(),
-                        fields: vec![FieldNode {
-                            id: fid.clone(),
-                            name: name.clone(),
-                            field_type: None,
-                        }],
-                        class_flags: None,
-                        extends: None,
-                        implements: Vec::new(),
-                        injects: Vec::new(),
-                        patterns: Vec::new(),
-                        synthetic: true,
-                    });
-                    current_class_idx = Some(classes.len() - 1);
+                    // The owner is valid but appears later. Preserve the
+                    // declaration until its class node is materialized.
+                    pending_fields
+                        .entry(class_id)
+                        .or_default()
+                        .push((field_id, name.clone()));
+                    current_class_idx = None;
                 }
             }
 
-            // Attached by stable MethodId after every definition is placed.
-            CoreOp::Param(..) | CoreOp::Return(..) => {}
-
-            CoreOp::FieldType(fid, ty) => {
-                if let Some(c_idx) = current_class_idx {
-                    for fi in 0..classes[c_idx].fields.len() {
-                        if classes[c_idx].fields[fi].id == *fid {
-                            classes[c_idx].fields[fi].field_type = Some(ty.clone());
-                            break;
-                        }
-                    }
-                }
-            }
+            // Attached by stable identity after every definition is placed.
+            CoreOp::Param(..) | CoreOp::Return(..) | CoreOp::FieldType(..) => {}
 
             CoreOp::Flags(tid, flags) => {
                 if let Some(c_idx) = current_class_idx {
@@ -341,36 +328,38 @@ pub fn try_ir_to_hierarchical(
     }
 
     debug_assert!(pending_methods.is_empty());
+    debug_assert!(pending_fields.is_empty());
 
     for (instruction, op) in ir.instructions.iter().enumerate() {
-        let (raw_method, operation) = match op {
-            CoreOp::Param(method, ..) => (method, "SIG"),
-            CoreOp::Return(method, _) => (method, "RET"),
-            _ => continue,
-        };
-        let method_id = MethodId::from_serialized(raw_method);
-        let (class_idx, method_idx) =
-            method_locations.get(&method_id).copied().ok_or_else(|| {
-                HierarchicalProjectionError::UnresolvedIdentity {
-                    operation,
-                    expected: ProjectionIdentityKind::Method,
-                    id: raw_method.clone(),
-                    instruction,
-                }
-            })?;
-
         match op {
-            CoreOp::Param(_, parameter_id, ty, name) => {
+            CoreOp::Param(raw_method, parameter_id, ty, name) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "SIG", instruction)?;
                 classes[class_idx].methods[method_idx].params.push(vec![
                     parameter_id.clone(),
                     ty.clone(),
                     name.clone(),
                 ]);
             }
-            CoreOp::Return(_, ty) => {
+            CoreOp::Return(raw_method, ty) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "RET", instruction)?;
                 classes[class_idx].methods[method_idx].return_type = Some(ty.clone());
             }
-            _ => unreachable!("only Param and Return reach stable attachment"),
+            CoreOp::FieldType(raw_field, ty) => {
+                let field_id = FieldId::from_serialized(raw_field);
+                let (class_idx, field_idx) =
+                    field_locations.get(&field_id).copied().ok_or_else(|| {
+                        HierarchicalProjectionError::UnresolvedIdentity {
+                            operation: "FIELD_T",
+                            expected: ProjectionIdentityKind::Field,
+                            id: raw_field.clone(),
+                            instruction,
+                        }
+                    })?;
+                classes[class_idx].fields[field_idx].field_type = Some(ty.clone());
+            }
+            _ => {}
         }
     }
 
@@ -380,6 +369,23 @@ pub fn try_ir_to_hierarchical(
         type_aliases,
         calls,
     })
+}
+
+fn method_location(
+    method_locations: &HashMap<MethodId, (usize, usize)>,
+    raw_method: &str,
+    operation: &'static str,
+    instruction: usize,
+) -> Result<(usize, usize), HierarchicalProjectionError> {
+    method_locations
+        .get(&MethodId::from_serialized(raw_method))
+        .copied()
+        .ok_or_else(|| HierarchicalProjectionError::UnresolvedIdentity {
+            operation,
+            expected: ProjectionIdentityKind::Method,
+            id: raw_method.to_owned(),
+            instruction,
+        })
 }
 
 fn push_method(class: &mut ClassNode, method_id: &MethodId, name: String) -> usize {
@@ -399,6 +405,15 @@ fn push_method(class: &mut ClassNode, method_id: &MethodId, name: String) -> usi
         execution_context: None,
     });
     class.methods.len() - 1
+}
+
+fn push_field(class: &mut ClassNode, field_id: &FieldId, name: String) -> usize {
+    class.fields.push(FieldNode {
+        id: field_id.as_str().to_owned(),
+        name,
+        field_type: None,
+    });
+    class.fields.len() - 1
 }
 
 /// Merge one `CoreOp::Flags` op's values into a method's accumulated flags.

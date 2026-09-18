@@ -1,14 +1,16 @@
 # CoreOp Architectural Contract Matrix
 
 **Status:** Approved architectural defaults. The `DefClass`, `DefMethod`,
-`Param`, and `Return` rows are normative target architecture. Other
-per-operation rows remain a Phase 0 draft for later review.
+`Param`, `Return`, `DefField`, and `FieldType` rows are normative target
+architecture. Other per-operation rows remain a Phase 0 draft for later
+review.
 
 **Date:** 2026-09-17
 
-**Implementation note:** The four normative rows are implemented in the first
-projection slice and await user-run verification. All other rows remain
-planning targets and were not broadened into this slice.
+**Implementation note:** The first four normative rows were implemented and
+user-verified in the first projection slice. The two field rows were implemented
+and user-verified in the second bounded projection slice. All other rows remain
+planning targets and were not broadened into these slices.
 
 **Related documents:**
 
@@ -288,7 +290,27 @@ These items do not reopen the five defaults:
 None of these items blocks the first typed class/method identity, exhaustive
 validation, or checked projection slice.
 
-## 11. Review checklist
+## 11. Required second-slice tests
+
+The bounded field-identity slice protects `DefField` and `FieldType` with
+tracked tests covering:
+
+1. field definitions before their owner class;
+2. field types before and after their field definition;
+3. two classes with interleaved field facts;
+4. preservation of field-definition order;
+5. unresolved and wrong-kind field owners;
+6. duplicate, empty, and cross-kind field definitions;
+7. unresolved, empty, and wrong-kind field-type targets;
+8. duplicate optional-singular field-type facts;
+9. unchanged serialized string shapes;
+10. MCP mapping of the field projection failure without partial success.
+
+The implementation removes synthetic orphan-field recovery. It does not alter
+the hierarchical schema's retained `synthetic` field because interfaces and
+legacy decoded documents remain outside this bounded slice.
+
+## 12. Review checklist
 
 - [ ] All 21 current `CoreOp` variants appear exactly once in each matrix.
 - [ ] Definition and optional-singular cardinalities are accepted.

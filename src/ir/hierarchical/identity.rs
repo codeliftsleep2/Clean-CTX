@@ -2,8 +2,8 @@
 //
 // `CoreOp` remains the serialized DTO during this migration, so its operands
 // stay strings on the wire. This module is the checked internal boundary that
-// converts the approved first-slice identities into distinct Rust types before
-// projection may use them.
+// converts approved identities into distinct Rust types before projection may
+// use them.
 
 use super::{CompiledIR, CoreOp, HierarchicalProjectionError, ProjectionIdentityKind};
 use std::collections::HashMap;
@@ -31,6 +31,19 @@ impl MethodId {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) struct FieldId(String);
+
+impl FieldId {
+    pub(super) fn from_serialized(value: &str) -> Self {
+        Self(value.to_owned())
+    }
+
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ParameterId(String);
 
 impl ParameterId {
@@ -40,20 +53,23 @@ impl ParameterId {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct FirstSliceIdentities {
+pub(super) struct ProjectionIdentities {
     pub(super) classes: HashMap<ClassId, usize>,
     pub(super) methods: HashMap<MethodId, usize>,
+    pub(super) fields: HashMap<FieldId, usize>,
 }
 
-/// Validate the complete first-slice identity graph without using instruction
-/// position as semantic authority.
-pub(super) fn validate_first_slice(
+/// Validate the migrated identity graph without using instruction position as
+/// semantic authority.
+pub(super) fn validate_projection_identities(
     ir: &CompiledIR,
-) -> Result<FirstSliceIdentities, HierarchicalProjectionError> {
+) -> Result<ProjectionIdentities, HierarchicalProjectionError> {
     let mut classes = HashMap::new();
     let mut methods = HashMap::new();
+    let mut fields = HashMap::new();
     let mut parameters = HashMap::new();
     let mut returns = HashMap::new();
+    let mut field_types = HashMap::new();
 
     for (instruction, op) in ir.instructions.iter().enumerate() {
         match op {
@@ -97,6 +113,33 @@ pub(super) fn validate_first_slice(
                     return Err(HierarchicalProjectionError::DuplicateIdentity {
                         operation: "DEF_M",
                         kind: ProjectionIdentityKind::Method,
+                        id: raw_id.clone(),
+                        owner: Some(raw_owner.clone()),
+                        first_instruction,
+                        duplicate_instruction: instruction,
+                    });
+                }
+            }
+            CoreOp::DefField(raw_owner, raw_id, _) => {
+                require_non_empty(
+                    "DEF_F owner",
+                    ProjectionIdentityKind::Class,
+                    raw_owner,
+                    None,
+                    instruction,
+                )?;
+                require_non_empty(
+                    "DEF_F",
+                    ProjectionIdentityKind::Field,
+                    raw_id,
+                    Some(raw_owner.as_str()),
+                    instruction,
+                )?;
+                let id = FieldId::from_serialized(raw_id);
+                if let Some(first_instruction) = fields.insert(id, instruction) {
+                    return Err(HierarchicalProjectionError::DuplicateIdentity {
+                        operation: "DEF_F",
+                        kind: ProjectionIdentityKind::Field,
                         id: raw_id.clone(),
                         owner: Some(raw_owner.clone()),
                         first_instruction,
@@ -151,9 +194,24 @@ pub(super) fn validate_first_slice(
                     });
                 }
             }
-            CoreOp::DefField(..)
-            | CoreOp::DefInterface(..)
-            | CoreOp::FieldType(..)
+            CoreOp::FieldType(raw_field, _) => {
+                require_non_empty(
+                    "FIELD_T",
+                    ProjectionIdentityKind::Field,
+                    raw_field,
+                    None,
+                    instruction,
+                )?;
+                let field = FieldId::from_serialized(raw_field);
+                if let Some(first_instruction) = field_types.insert(field, instruction) {
+                    return Err(HierarchicalProjectionError::DuplicateFieldType {
+                        field_id: raw_field.clone(),
+                        first_instruction,
+                        duplicate_instruction: instruction,
+                    });
+                }
+            }
+            CoreOp::DefInterface(..)
             | CoreOp::Flags(..)
             | CoreOp::ClassFlags(..)
             | CoreOp::Extends(..)
@@ -185,14 +243,55 @@ pub(super) fn validate_first_slice(
                 instruction,
                 &classes,
                 &methods,
+                &fields,
             ));
         }
-        if classes.contains_key(&ClassId::from_serialized(method_id.as_str())) {
+        if let Some(actual) = conflicting_definition_kind(
+            method_id.as_str(),
+            ProjectionIdentityKind::Method,
+            &classes,
+            &methods,
+            &fields,
+        ) {
             return Err(HierarchicalProjectionError::KindMismatch {
                 operation: "DEF_M identity",
                 id: method_id.as_str().to_owned(),
                 expected: ProjectionIdentityKind::Method,
-                actual: ProjectionIdentityKind::Class,
+                actual,
+                instruction,
+            });
+        }
+    }
+
+    for (instruction, op) in ir.instructions.iter().enumerate() {
+        let CoreOp::DefField(raw_owner, raw_field, _) = op else {
+            continue;
+        };
+        let owner = ClassId::from_serialized(raw_owner);
+        let field_id = FieldId::from_serialized(raw_field);
+        if !classes.contains_key(&owner) {
+            return Err(unresolved_or_wrong_kind(
+                "DEF_F owner",
+                ProjectionIdentityKind::Class,
+                raw_owner,
+                instruction,
+                &classes,
+                &methods,
+                &fields,
+            ));
+        }
+        if let Some(actual) = conflicting_definition_kind(
+            field_id.as_str(),
+            ProjectionIdentityKind::Field,
+            &classes,
+            &methods,
+            &fields,
+        ) {
+            return Err(HierarchicalProjectionError::KindMismatch {
+                operation: "DEF_F identity",
+                id: field_id.as_str().to_owned(),
+                expected: ProjectionIdentityKind::Field,
+                actual,
                 instruction,
             });
         }
@@ -213,11 +312,34 @@ pub(super) fn validate_first_slice(
                 instruction,
                 &classes,
                 &methods,
+                &fields,
             ));
         }
     }
 
-    Ok(FirstSliceIdentities { classes, methods })
+    for (instruction, op) in ir.instructions.iter().enumerate() {
+        let CoreOp::FieldType(raw_field, _) = op else {
+            continue;
+        };
+        let field = FieldId::from_serialized(raw_field);
+        if !fields.contains_key(&field) {
+            return Err(unresolved_or_wrong_kind(
+                "FIELD_T",
+                ProjectionIdentityKind::Field,
+                raw_field,
+                instruction,
+                &classes,
+                &methods,
+                &fields,
+            ));
+        }
+    }
+
+    Ok(ProjectionIdentities {
+        classes,
+        methods,
+        fields,
+    })
 }
 
 fn require_non_empty(
@@ -247,6 +369,7 @@ fn unresolved_or_wrong_kind(
     instruction: usize,
     classes: &HashMap<ClassId, usize>,
     methods: &HashMap<MethodId, usize>,
+    fields: &HashMap<FieldId, usize>,
 ) -> HierarchicalProjectionError {
     let actual = match expected {
         ProjectionIdentityKind::Class
@@ -254,10 +377,28 @@ fn unresolved_or_wrong_kind(
         {
             Some(ProjectionIdentityKind::Method)
         }
+        ProjectionIdentityKind::Class if fields.contains_key(&FieldId::from_serialized(raw_id)) => {
+            Some(ProjectionIdentityKind::Field)
+        }
         ProjectionIdentityKind::Method
             if classes.contains_key(&ClassId::from_serialized(raw_id)) =>
         {
             Some(ProjectionIdentityKind::Class)
+        }
+        ProjectionIdentityKind::Method
+            if fields.contains_key(&FieldId::from_serialized(raw_id)) =>
+        {
+            Some(ProjectionIdentityKind::Field)
+        }
+        ProjectionIdentityKind::Field
+            if classes.contains_key(&ClassId::from_serialized(raw_id)) =>
+        {
+            Some(ProjectionIdentityKind::Class)
+        }
+        ProjectionIdentityKind::Field
+            if methods.contains_key(&MethodId::from_serialized(raw_id)) =>
+        {
+            Some(ProjectionIdentityKind::Method)
         }
         _ => None,
     };
@@ -278,4 +419,29 @@ fn unresolved_or_wrong_kind(
             instruction,
         }
     }
+}
+
+fn conflicting_definition_kind(
+    raw_id: &str,
+    expected: ProjectionIdentityKind,
+    classes: &HashMap<ClassId, usize>,
+    methods: &HashMap<MethodId, usize>,
+    fields: &HashMap<FieldId, usize>,
+) -> Option<ProjectionIdentityKind> {
+    if expected != ProjectionIdentityKind::Class
+        && classes.contains_key(&ClassId::from_serialized(raw_id))
+    {
+        return Some(ProjectionIdentityKind::Class);
+    }
+    if expected != ProjectionIdentityKind::Method
+        && methods.contains_key(&MethodId::from_serialized(raw_id))
+    {
+        return Some(ProjectionIdentityKind::Method);
+    }
+    if expected != ProjectionIdentityKind::Field
+        && fields.contains_key(&FieldId::from_serialized(raw_id))
+    {
+        return Some(ProjectionIdentityKind::Field);
+    }
+    None
 }

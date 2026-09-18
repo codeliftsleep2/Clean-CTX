@@ -7,7 +7,7 @@ use crate::ir::hierarchical::{
     ir_to_hierarchical, try_ir_to_hierarchical,
 };
 use crate::ir::opcodes::CoreOp;
-// ── Synthetic Class and Identity-Failure Tests ─────────────────
+// ── Identity-Failure Tests ─────────────────────────────────────
 
 #[test]
 fn method_without_declared_class_returns_structured_failure() {
@@ -37,7 +37,7 @@ fn method_without_declared_class_returns_structured_failure() {
 }
 
 #[test]
-fn test_field_without_prior_class_creates_synthetic() {
+fn field_without_declared_class_returns_structured_failure() {
     let ir = CompiledIR {
         file_id: "α1".to_string(),
         version: 1,
@@ -50,30 +50,16 @@ fn test_field_without_prior_class_creates_synthetic() {
             CoreOp::FieldType("F1".to_string(), "$n".to_string()),
         ],
     };
-    let hir = ir_to_hierarchical(&ir);
+    let error = try_ir_to_hierarchical(&ir).expect_err("orphan field must be rejected");
 
-    assert!(
-        !hir.classes.is_empty(),
-        "Should create synthetic class for orphan field"
-    );
-    let c99 = hir.classes.iter().find(|c| c.id == "C99").unwrap();
-    assert_eq!(c99.fields.len(), 1);
-    assert_eq!(c99.fields[0].name, "orphanField");
-    assert!(c99.synthetic, "Synthetic class should be marked");
-
-    // Synthetic classes skip DefClass
-    let expected = vec![
-        CoreOp::DefField(
-            "C99".to_string(),
-            "F1".to_string(),
-            "orphanField".to_string(),
-        ),
-        CoreOp::FieldType("F1".to_string(), "$n".to_string()),
-    ];
-    let restored = hierarchical_to_ir(&hir);
     assert_eq!(
-        restored, expected,
-        "Synthetic class field: DefClass omitted"
+        error,
+        HierarchicalProjectionError::UnresolvedIdentity {
+            operation: "DEF_F owner",
+            expected: ProjectionIdentityKind::Class,
+            id: "C99".to_string(),
+            instruction: 0,
+        }
     );
 }
 

@@ -31,3 +31,23 @@ fn projection_identity_failure_uses_existing_ir_error_contract() {
             .is_some_and(|message| message.contains("hierarchical projection failed"))
     );
 }
+
+#[test]
+fn duplicate_field_type_uses_existing_ir_error_contract() {
+    let response = projection_error_response(
+        &serde_json::json!(23),
+        &HierarchicalProjectionError::DuplicateFieldType {
+            field_id: "F1".into(),
+            first_instruction: 2,
+            duplicate_instruction: 3,
+        },
+    );
+
+    assert_eq!(response["error"]["code"], -32602);
+    assert_eq!(response["error"]["data"]["retryable"], false);
+    assert_eq!(
+        response["error"]["data"]["projection_code"],
+        "ir_projection_duplicate_field_type"
+    );
+    assert!(response.get("result").is_none());
+}

@@ -8,7 +8,7 @@ mod provide;
 mod provide_angular;
 mod restore;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 pub(crate) use common::{contract_fields, contract_fields_focused, maybe_economics_fallback};
 pub(crate) use compress::handle_compress_code_context;
 pub(crate) use delta::{handle_apply_delta, handle_delta_code_context, handle_diff_code_context};

@@ -1,8 +1,9 @@
 # IR Architecture Lock-Down Implementation Plan
 
 **Status:** Approved target defaults. The bounded `DefClass`/`DefMethod`/
-`Param`/`Return` slice is implemented and awaiting user-run verification;
-later operation families remain pending.
+`Param`/`Return` slice is user-verified and checkpointed. The bounded
+`DefField`/`FieldType` slice is user-verified as the Phase 2 checkpoint; later
+operation families remain pending.
 
 **Date:** 2026-09-17
 
@@ -488,12 +489,33 @@ The required MCP handler and hierarchical-test decomposition is structural:
 it keeps every materially modified file within the active-file ceiling. It is
 not an alternative architecture or a reason to weaken the projection boundary.
 
-`FieldId`, Flags, Body, control/data flow, side effects, execution contexts,
-patterns, delta/replay, and physical binary version `0x04` remain later slices.
-The implementation must stop for review after the user-run verification for
-this slice.
+Flags, Body, control/data flow, side effects, execution contexts, patterns,
+delta/replay, and physical binary version `0x04` remain later slices. The first
+slice was user-verified and pushed as a checkpoint before the second bounded
+slice began.
 
-## 10. Verification ownership
+## 10. Second bounded implementation slice
+
+The approved field slice implements only these contracts:
+
+1. internal `FieldId` at the projection boundary, with unchanged serialized
+   strings;
+2. globally unique, non-empty `DefField` identities owned by a valid
+   `ClassId`;
+3. optional-singular `FieldType` facts targeting a valid `FieldId`;
+4. stable-ID field placement and type attachment independent of legal
+   instruction ordering;
+5. structured duplicate, unresolved, empty, and wrong-kind failures;
+6. removal of synthetic orphan-field recovery from canonical projection;
+7. production MCP mapping through the existing checked projection error path;
+8. tracked ordering, identity, failure, serialized-shape, and MCP regressions.
+
+The slice does not remove the hierarchical schema's `synthetic` property or
+change hierarchical decoding because interfaces and existing documents remain
+outside its approved scope. User-run verification was reported green on
+2026-09-18 before this checkpoint was committed.
+
+## 11. Verification ownership
 
 Agents must not initiate the repository's long-running build, test, Clippy,
 format, audit, binary, or server commands. During implementation, the agent may
