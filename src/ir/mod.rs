@@ -24,6 +24,7 @@ pub mod compiler;
 pub(crate) mod compiler_methods;
 pub mod delta;
 pub mod hierarchical;
+pub mod identity;
 pub mod layers;
 pub mod opcodes;
 pub mod patterns;

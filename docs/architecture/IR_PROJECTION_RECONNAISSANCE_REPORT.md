@@ -20,8 +20,9 @@ binary version-number contradiction discovered during source inspection.
 **Implementation update:** The bounded `DefClass`/`DefMethod`/`Param`/`Return`
 projection repair was user-verified and checkpointed. The bounded
 `DefField`/`FieldType` repair was user-verified as the Phase 2 checkpoint on
-2026-09-18. Findings for all later operation families remain open exactly as
-recorded below.
+2026-09-18. The shared validation authority for all six normative operations is
+implemented and user-verified as the bounded Phase 3 checkpoint on 2026-09-18.
+Findings for all later operation families remain open exactly as recorded below.
 
 ## 1. Executive summary
 

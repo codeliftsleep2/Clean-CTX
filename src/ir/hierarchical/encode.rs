@@ -11,8 +11,8 @@
 // `HierarchicalCall`, `ClassNode`, `MethodNode`, `FieldNode`, `PatternEntry`)
 // and the shared `find_class_by_id` helper.
 
-use super::identity::{ClassId, FieldId, MethodId, validate_projection_identities};
 use super::*;
+use crate::ir::identity::{ClassId, FieldId, MethodId, validate_identity_graph};
 use std::collections::HashMap;
 
 /// Convert a flat `CompiledIR` instruction stream into a `HierarchicalIR`.
@@ -51,7 +51,7 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
 pub fn try_ir_to_hierarchical(
     ir: &CompiledIR,
 ) -> Result<HierarchicalIR, HierarchicalProjectionError> {
-    let identities = validate_projection_identities(ir)?;
+    let identities = validate_identity_graph(ir)?;
     let mut classes: Vec<ClassNode> = Vec::with_capacity(identities.classes.len());
     let mut imports: Vec<Vec<String>> = Vec::new();
     let mut type_aliases: Vec<Vec<String>> = Vec::new();

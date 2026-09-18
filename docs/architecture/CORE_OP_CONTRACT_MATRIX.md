@@ -9,8 +9,10 @@ review.
 
 **Implementation note:** The first four normative rows were implemented and
 user-verified in the first projection slice. The two field rows were implemented
-and user-verified in the second bounded projection slice. All other rows remain
-planning targets and were not broadened into these slices.
+and user-verified in the second bounded projection slice. The shared typed
+validator for all six normative rows was implemented and user-verified in the
+third bounded slice on 2026-09-18. All other rows remain planning targets and
+were not broadened into these slices.
 
 **Related documents:**
 

@@ -3,7 +3,8 @@
 **Status:** Approved target defaults. The bounded `DefClass`/`DefMethod`/
 `Param`/`Return` slice is user-verified and checkpointed. The bounded
 `DefField`/`FieldType` slice is user-verified as the Phase 2 checkpoint; later
-operation families remain pending.
+operation families remain pending. The bounded shared-validation slice was
+user-verified as the Phase 3 checkpoint on 2026-09-18.
 
 **Date:** 2026-09-17
 
@@ -515,7 +516,29 @@ change hierarchical decoding because interfaces and existing documents remain
 outside its approved scope. User-run verification was reported green on
 2026-09-18 before this checkpoint was committed.
 
-## 11. Verification ownership
+## 11. Third bounded implementation slice
+
+The approved Phase 3 checkpoint centralizes validation for the six normative
+operations without approving the remaining draft operation rows:
+
+1. `ClassId`, `MethodId`, `FieldId`, `ParameterId`, `IdentityKind`, and the
+   structured identity errors move to one shared IR identity module;
+2. `DefaultValidator` and hierarchical projection consume the same typed
+   identity graph and diagnostics;
+3. all definition indexes are collected before owner and target validation;
+4. the production `ValidationPass` rejects invalid approved identity graphs;
+5. every current `CoreOp` has an explicit validator match arm, so a new variant
+   requires a compiler-visible validation decision;
+6. existing E001-E011 behavior is preserved for previously validated paths;
+7. unapproved semantic-family, vocabulary, alias-scope, pattern-schema, and
+   cardinality rules remain explicitly deferred.
+
+This checkpoint does not claim the roadmap's full Phase 3 exit criteria for
+the remaining draft rows. It establishes the single validation authority that
+later approved rows will extend. User-run verification was reported green on
+2026-09-18 before this checkpoint was committed.
+
+## 12. Verification ownership
 
 Agents must not initiate the repository's long-running build, test, Clippy,
 format, audit, binary, or server commands. During implementation, the agent may
