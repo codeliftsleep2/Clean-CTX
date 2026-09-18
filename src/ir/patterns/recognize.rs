@@ -15,9 +15,28 @@
 // guards live here (`op_is_unrepresentable_method_ref`,
 // `trailing_region_references_method`, `trailing_region_references_call`, and
 // the decline check inside `try_compress_pattern`).
+//
+// F2 — IDENTITY PRESERVATION: a recognized pattern CLASSIFIES a method; it
+// never deletes it. Every matcher therefore reports how many of the ops it
+// matched are the declaration's identity-bearing facts (`DefMethod`, its
+// `Param*`, its `Return`) so the caller re-emits them unchanged before the
+// classification op. Only genuinely redundant, non-identity ops — `Injects`
+// for CTOR, `Flags(ASYNC)` for OBSERVABLE, `Flags(OVERRIDE)` for OVERRIDE, and
+// the wrapper's leading/trailing `Flags(M)` runs — are still summarized away.
+// A method must never vanish from the hierarchical projection, the rendered
+// `M` line, the `UnitTable`, the semantic registration, or a caller-side
+// `Calls` subject merely because a pattern recognized it.
 
 use super::PatternOp;
 use crate::ir::opcodes::CoreOp;
+
+/// A matcher's result: `(classification, retained, consumed)`.
+///
+/// `retained` is how many ops at the front of the matcher's slice are the
+/// declaration's identity-bearing facts (`DefMethod`, `Param*`, `Return`) and
+/// must be handed back to be re-emitted unchanged (F2). `consumed` is the full
+/// span the matcher matched. See [`PatternMatch`].
+type MatcherResult = (PatternOp, usize, usize);
 
 /// `CoreOp::Call` first operand: the caller's `DefMethod` id.
 fn op_references_method(op: &CoreOp, method_id: &str) -> bool {
@@ -78,30 +97,33 @@ fn count_trailing_flags(slice: &[CoreOp], offset: usize, method_id: &str) -> usi
 /// True when `op` is one of the annotation ops that reference `method_id`
 /// and have NO equivalent representation inside a compressed `PatternOp`.
 ///
-/// The CTOR patterns consume `DefMethod(M)`, and the validator registers
-/// method identities ONLY from `DefMethod` — a `Pattern` op does not
-/// re-register the identity, and its payload (class id, method id, deps,
-/// return type, property) cannot carry DataFlow / SideEffect /
-/// ExecutionContext / ControlFlow / Body facts. Consuming `DefMethod(M)` while such
-/// an op survives after the consumed span would orphan it (E007/E008/E009/
-/// E010, and E003 for the trailing `Flags` run the Body op detaches from the
-/// consumed span — DIS-2026-003), so the ctor patterns must DECLINE
-/// compression for that region, leaving the original — fully valid and fully
-/// annotated — instruction sequence in place.
+/// The CTOR patterns DECLINE compression for any region whose ops after the
+/// consumed span still carry an M-reference that a `PatternOp` payload cannot
+/// represent (DataFlow / SideEffect / ExecutionContext / ControlFlow / Body /
+/// Call). See the note below for why this conservatism is retained after F2.
 ///
 /// DIS-2026-003: `Body(M, ...)` is emitted by the language layer at
 /// Edit+ fidelity, between a constructor's `Return(M)` and its trailing
 /// `Flags(M, ["PRIVATE"])` (parameter property). The `Body` op breaks the
 /// wrapper's adjacent trailing-Flags run, so `Flags(M)` is no longer
 /// adjacent to the consumed span and cannot be consumed by the wrapper.
-/// Treating `Body(M)` as unrepresentable makes the orphan guard decline
+/// Treating `Body(M)` as unrepresentable makes the guard decline
 /// compression for that region, preserving the full valid sequence.
 ///
 /// Native call facts (`CoreOp::Call`): the FIRST operand is the caller's
 /// `DefMethod` id, so a surviving `CALL(M, ...)` is an M-reference that the
 /// `PatternOp` payload cannot represent and that the validator cannot
-/// re-register (E011 registers identities from `DefMethod` only). It is
-/// therefore unrepresentable in exactly the same sense as the ops above.
+/// re-register (E011 registers identities from `DefMethod` only).
+///
+/// F2 note — why this guard is unchanged: before F2 the decline was the only
+/// thing keeping such an op from being orphaned, because the match consumed
+/// `DefMethod(M)`. F2 now RETAINS `DefMethod`/`Param*`/`Return`, so a surviving
+/// `Body(M)`/`DataFlow(M)`/`Call(M, …)` would keep a registered owner even if
+/// the region compressed. Weakening this guard would therefore newly compress
+/// shapes that have never been compressed, i.e. a compression-policy change
+/// with its own stream, wire and delta consequences — a separate decision. The
+/// guard stays: it is a conservative decline, it keeps every previously
+/// uncompressed region byte-identical, and it cannot orphan anything.
 fn op_is_unrepresentable_method_ref(op: &CoreOp, method_id: &str) -> bool {
     match op {
         CoreOp::DataFlow(mid, _, _)
@@ -131,7 +153,32 @@ fn trailing_region_references_method(slice: &[CoreOp], offset: usize, method_id:
         .is_some_and(|op| op_is_unrepresentable_method_ref(op, method_id))
 }
 
-/// Try to match and consume a pattern at the start of `slice`.
+/// One successful consumptive-pattern match.
+///
+/// `retained`/`retained_start` carry the F2 identity contract: the ops in
+/// `slice[retained_start .. retained_start + retained]` are the matched
+/// declaration's identity-bearing facts — `DefMethod`, then its `Param*`, then
+/// its `Return`, in that order — and the caller re-emits them VERBATIM before
+/// the classification op. `consumed` is the whole matched span, i.e. the
+/// identity ops plus the genuinely redundant ops the recognizer summarizes
+/// into the pattern (`Injects` for CTOR, `Flags(ASYNC)` for OBSERVABLE,
+/// `Flags(OVERRIDE)` for OVERRIDE) plus the wrapper's leading and trailing
+/// `Flags(M)` runs.
+///
+/// `retained <= consumed` always; the two are equal for the recognizers that
+/// summarize nothing but identity (PROMISE, EMPTY_CTOR, GETTER, SETTER).
+pub(super) struct PatternMatch {
+    /// The classification op emitted after the retained declaration facts.
+    pub(super) pattern: PatternOp,
+    /// Offset, within the matched slice, of the first identity-bearing op.
+    pub(super) retained_start: usize,
+    /// How many ops from `retained_start` are re-emitted unchanged.
+    pub(super) retained: usize,
+    /// Total ops consumed from the start of the matched slice.
+    pub(super) consumed: usize,
+}
+
+/// Try to match a pattern at the start of `slice`.
 ///
 /// Centralized wrapper that enforces the invariant:
 /// > A pattern consuming `DefMethod(Mx)` must consume/handle all immediately
@@ -146,7 +193,11 @@ fn trailing_region_references_method(slice: &[CoreOp], offset: usize, method_id:
 /// pattern (ctor, empty ctor, observable, promise, getter, setter, override)
 /// may consume a `DefMethod(M)` while a surviving `CALL(M, ...)` — whose caller
 /// id can never be re-registered from a `PatternOp` — would be orphaned.
-pub(super) fn try_compress_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
+///
+/// F2: the returned match never includes the declaration's identity-bearing
+/// ops in the part it replaces. Each matcher reports them as its `retained`
+/// count, and they are re-emitted unchanged (see [`PatternMatch`]).
+pub(super) fn try_compress_pattern(slice: &[CoreOp]) -> Option<PatternMatch> {
     if slice.is_empty() {
         return None;
     }
@@ -203,13 +254,19 @@ pub(super) fn try_compress_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize
     // IRPAT-001 decline: a surviving CALL for this method (see
     // `trailing_region_references_call`) must never be orphaned by consuming
     // its caller's `DefMethod`.
-    if let Some((pat, inner_consumed)) = result {
+    if let Some((pat, inner_retained, inner_consumed)) = result {
         if trailing_region_references_call(slice, first_non_flags + inner_consumed, &method_id) {
             return None;
         }
         let trailing = count_trailing_flags(slice, first_non_flags + inner_consumed, &method_id);
-        let total_consumed = first_non_flags + inner_consumed + trailing;
-        Some((pat, total_consumed))
+        Some(PatternMatch {
+            pattern: pat,
+            // F2: the declaration facts (DefMethod + Param* + Return) are
+            // never part of what the classification replaces.
+            retained_start: first_non_flags,
+            retained: inner_retained,
+            consumed: first_non_flags + inner_consumed + trailing,
+        })
     } else {
         None
     }
@@ -231,8 +288,11 @@ pub fn is_constructor_name(name: &str) -> bool {
 ///
 /// NOTE: Leading/trailing Flags ops are handled by the centralized
 /// `try_compress_pattern` wrapper. This function receives a slice that
-/// starts at `DefMethod` and returns consumed count for the body only.
-fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
+/// starts at `DefMethod` and returns the identity-bearing prefix
+/// (`DefMethod` + `Param*` + `Return`) unchanged alongside the
+/// classification, so the only op the pattern actually replaces here is
+/// `Injects` — a class-level DI list whose payload the pattern carries.
+fn try_ctor_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     if slice.is_empty() {
         return None;
     }
@@ -265,6 +325,11 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
             _ => break, // unrelated op — stop
         }
     }
+
+    // F2: everything matched so far — `DefMethod`, its `Param*` and its
+    // `Return` — is identity-bearing and is handed back for re-emission.
+    // Only a trailing `Injects` is genuinely replaced by the classification.
+    let identity_end = idx;
 
     // Check for trailing INJECTS
     if idx < slice.len() {
@@ -300,12 +365,16 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
             method_id,
             deps,
         },
+        identity_end,
         idx,
     ))
 }
 
 /// Empty-ctor pattern: `DEF_M(constructor) + Return` (no params, no injects).
-fn try_empty_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
+///
+/// F2: both matched ops are identity-bearing, so this classification is purely
+/// additive — it replaces nothing.
+fn try_empty_ctor_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     if slice.len() < 2 {
         return None;
     }
@@ -328,6 +397,7 @@ fn try_empty_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
                     method_id,
                 },
                 2,
+                2,
             ));
         }
     }
@@ -335,7 +405,11 @@ fn try_empty_ctor_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
 }
 
 /// Observable pattern: `DEF_M + Return($P|$O) + Flags(ASYNC)` → 1 op.
-fn try_observable_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
+///
+/// F2: `DefMethod` and `Return` are retained; the `Flags(ASYNC)` op is the
+/// redundant op the classification replaces (the OBSERVABLE pattern name
+/// already asserts async + promise-like return).
+fn try_observable_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     if slice.len() < 3 {
         return None;
     }
@@ -362,6 +436,7 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
                     method_id,
                     return_type,
                 },
+                2,
                 3,
             ))
         }
@@ -371,7 +446,10 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
 
 /// Promise pattern: `DEF_M + Return($P)` (no ASYNC) → 1 op.
 /// Only triggers if the observable pattern did not match
-fn try_promise_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
+///
+/// F2: both matched ops are identity-bearing, so this classification is purely
+/// additive — it replaces nothing.
+fn try_promise_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     if slice.len() < 2 {
         return None;
     }
@@ -390,6 +468,7 @@ fn try_promise_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
                         return_type: ty.clone(),
                     },
                     2,
+                    2,
                 ))
             } else {
                 None
@@ -400,7 +479,10 @@ fn try_promise_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
 }
 
 /// Getter pattern: `DEF_M(get X) [+ Return]` → 1 op.
-fn try_getter_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
+///
+/// F2: the accessor's `DefMethod` (and its `Return`, when matched) are
+/// identity-bearing and are retained; this classification replaces nothing.
+fn try_getter_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     if slice.is_empty() {
         return None;
     }
@@ -432,11 +514,15 @@ fn try_getter_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
             property,
         },
         consumed,
+        consumed,
     ))
 }
 
 /// Setter pattern: `DEF_M(set X) [+ Param(value)]` → 1 op.
-fn try_setter_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
+///
+/// F2: the setter's `DefMethod` (and the `Param`/`Return` it matched) are
+/// identity-bearing and are retained; this classification replaces nothing.
+fn try_setter_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     if slice.is_empty() {
         return None;
     }
@@ -474,11 +560,15 @@ fn try_setter_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
             property,
         },
         idx,
+        idx,
     ))
 }
 
 /// Override pattern: `DEF_M + Flags(OVERRIDE)` → 1 op.
-fn try_override_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
+///
+/// F2: the `DefMethod` is retained; the `Flags(OVERRIDE)` op is the redundant
+/// op the classification replaces (the OVERRIDE pattern name carries it).
+fn try_override_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     if slice.len() < 2 {
         return None;
     }
@@ -493,6 +583,7 @@ fn try_override_pattern(slice: &[CoreOp]) -> Option<(PatternOp, usize)> {
                     class_id,
                     method_id,
                 },
+                1,
                 2,
             ))
         }

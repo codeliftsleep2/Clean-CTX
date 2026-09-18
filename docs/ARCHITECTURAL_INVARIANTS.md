@@ -252,6 +252,20 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### PATID-001 Method Identity Survives Pattern Recognition (F2)
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Pattern recognition classifies or summarizes a method; it must never erase the declaration identity that every downstream consumer depends on. |
+| **Invariant** | No IR transformation may delete an identity-bearing method declaration while emitting another op that still semantically refers to that method. The identity-bearing method facts are `DefMethod`, its `Param*`, and its `Return`. A consumptive pattern classification is therefore ADDITIVE: it is emitted AFTER the retained declaration ops and reports them to the caller as `PatternMatch::retained` (`src/ir/patterns/recognize.rs`). Only genuinely redundant, non-identity ops may still be summarized (`Injects` for CTOR, `Flags(ASYNC)` for OBSERVABLE, `Flags(OVERRIDE)` for OVERRIDE, and the additive/trailing `Flags(M)` runs the wrapper consumes). Reinventing the declaration downstream — for example teaching the hierarchical encoder to rebuild a method from a `PAT` payload — is explicitly NOT a valid alternative: the canonical declaration already exists upstream. This is language-agnostic and pattern-agnostic: it governs every present and future consumptive recognizer. |
+| **Enforcement** | All seven consumptive recognizers report a `retained` count and `compress_merged` re-emits those ops unchanged before the `Pattern` op (`src/ir/patterns.rs`, `src/ir/patterns/recognize.rs`). Regressions: `src/tests/ir/pattern_identity.rs` (production-shape CTOR/PROMISE/OBSERVABLE/EMPTY_CTOR identity retention, the complete consumptive surface incl. OVERRIDE/GETTER/SETTER, the no-orphan-classification invariant across Low/Medium/High/Edit, and the structural compression-impact report) and `src/tests/ir/pattern_identity_downstream.rs` (hierarchical `MethodNode`, rendered `M` line, `UnitTable` addressing, semantic registration, and `Calls` caller identity). |
+| **Authority** | `src/ir/patterns/recognize.rs` (`PatternMatch`, `MatcherResult`), `src/ir/patterns.rs` (`compress_merged`); regressions `src/tests/ir/pattern_identity.rs`, `src/tests/ir/pattern_identity_downstream.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+| **Relationship to IRPAT-001** | IRPAT-001 is the decline rule that protects M-referencing annotations whose payload a `PatternOp` cannot represent. PATID-001 is the stronger, unconditional property that makes the identity survive regardless; IRPAT-001's conservative decline is retained unchanged (weakening it would newly compress shapes that have never been compressed — a separate compression-policy decision). |
+
+---
+
 ### SEL-001 Selector-Value Invariant
 
 | Property | Value |

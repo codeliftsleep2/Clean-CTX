@@ -34,3 +34,18 @@ mod rust_stats_integration;
 // sequence is preserved.
 #[path = "regression_ctor_pattern_orphan.rs"]
 mod regression_ctor_pattern_orphan;
+
+// F2 (pattern identity preservation): pattern recognition must classify a
+// method, never delete it. `DefMethod` / `Param*` / `Return` survive every
+// consumptive pattern, so the classification is additive at the producer
+// boundary and the declaration is never erased from downstream
+// representations.
+#[path = "pattern_identity.rs"]
+mod pattern_identity;
+
+// F2 downstream contracts: the method that carries a pattern classification
+// must still exist in the hierarchical projection, the rendered `M` line, the
+// `UnitTable`, the semantic registration, and as a `Calls` subject. These read
+// the real production pipeline; they are the reason F2's severity was real.
+#[path = "pattern_identity_downstream.rs"]
+mod pattern_identity_downstream;

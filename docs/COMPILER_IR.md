@@ -159,7 +159,10 @@ The IR compiler (`IRCompiler::compile` in `src/ir/compiler.rs`) reuses the exist
      own source span; the } class-boundary guard prevents backward scans
      from crossing into preceding classes.
 6. Additive pattern recognition (CodePatternRecognizer — CTOR/OBSERVABLE/GETTER/SETTER)
-7. Consumptive pattern compression (CompressingPatternRecognizer — PAT ops)
+7. Consumptive pattern classification (CompressingPatternRecognizer — PAT ops).
+   The classification is ADDITIVE with respect to method identity:
+   `DefMethod` / `Param*` / `Return` are retained and the `PAT` op follows them
+   (F2 — see `docs/ARCHITECTURAL_INVARIANTS.md`).
 8. Forward alias resolution (resolve_forward_aliases)
 ```
 
@@ -464,8 +467,16 @@ The state machine supports:
 - SETTER: setter method pattern
 
 **Consumptive** (`patterns.rs` — `CompressingPatternRecognizer`):
-- Collapses recognized patterns into single `PAT` ops (Phase H)
-- Consumes source instructions to reduce wire size (~30% savings)
+- Classifies recognized patterns as `PAT` ops (Phase H)
+- **Preserves method identity (F2):** `DefMethod`, its `Param*`, and its
+  `Return` are re-emitted unchanged immediately before the `PAT` op, so the
+  method still reaches every downstream consumer (hierarchical `MethodNode`,
+  rendered `M` line, `UnitTable`, semantic registration, `Calls` subject).
+  Only genuinely redundant, non-identity ops are summarized into the pattern
+  (`Injects` for CTOR, `Flags(ASYNC)` for OBSERVABLE, `Flags(OVERRIDE)` for
+  OVERRIDE, and the additive/trailing `Flags(M)` runs). PROMISE, EMPTY_CTOR,
+  GETTER and SETTER match nothing but identity, so those classifications are
+  purely additive.
 
 ---
 

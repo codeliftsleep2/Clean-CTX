@@ -17,7 +17,9 @@
 //
 // Each case has a control proving that the SAME region still compresses when no
 // call fact references the consumed method (no global weakening of the
-// transforms).
+// transforms). Since F2 the ctor/promise controls also pin the identity
+// contract: the classification is produced ALONGSIDE the retained `DefMethod` /
+// `Param*` / `Return`, never instead of them.
 
 use crate::ir::compiler::CompiledIR;
 use crate::ir::layers::PatternRecognizer;
@@ -97,13 +99,20 @@ fn red_call21_ctor_pattern_declines_when_a_call_would_be_orphaned() {
 #[test]
 fn red_call21_ctor_control_still_compresses_without_a_call() {
     let compressed = compress(&ctor_stream(None));
+    // F2: the declaration (DEF_M + SIG + RET) is retained and the CTOR
+    // classification follows it; only the INJECTS op is summarized into the
+    // classification's payload.
     assert_eq!(
         compressed,
         vec![
             ctor_class(),
+            CoreOp::DefMethod("C1".into(), "M1".into(), "ctor".into()),
+            CoreOp::Param("M1".into(), "P1".into(), "S1".into(), "dep".into()),
+            CoreOp::Return("M1".into(), "void".into()),
             CoreOp::Pattern("CTOR".into(), vec!["C1".into(), "M1".into(), "S1".into()]),
         ],
-        "a ctor region with no call fact must keep compressing exactly as before"
+        "a ctor region with no call fact must keep being classified, with its \
+         declaration retained ahead of the classification"
     );
 }
 
@@ -124,13 +133,20 @@ fn red_call21_promise_pattern_declines_when_a_call_would_be_orphaned() {
 #[test]
 fn red_call21_promise_control_still_compresses_without_a_call() {
     let compressed = compress(&promise_stream(None));
+    // F2: PROMISE matches nothing but identity, so the classification is
+    // ADDITIVE — the method must survive ahead of it.
     assert_eq!(
         compressed,
-        vec![CoreOp::Pattern(
-            "PROMISE".into(),
-            vec!["C1".into(), "M1".into(), "Promise".into()],
-        )],
-        "a promise region with no call fact must keep compressing as before"
+        vec![
+            CoreOp::DefMethod("C1".into(), "M1".into(), "load".into()),
+            CoreOp::Return("M1".into(), "Promise".into()),
+            CoreOp::Pattern(
+                "PROMISE".into(),
+                vec!["C1".into(), "M1".into(), "Promise".into()]
+            ),
+        ],
+        "a promise region with no call fact must keep being classified, with its \
+         declaration retained"
     );
 }
 
@@ -141,13 +157,12 @@ fn red_call21_a_call_for_another_method_does_not_block_compression() {
     let ops = ctor_stream(Some(CoreOp::Call("M9".into(), "Save".into(), 1, false)));
     let compressed = compress(&ops);
 
-    assert_eq!(
-        compressed.get(1),
-        Some(&CoreOp::Pattern(
-            "CTOR".into(),
-            vec!["C1".into(), "M1".into(), "S1".into()],
+    assert!(
+        compressed.iter().any(|op| matches!(
+            op,
+            CoreOp::Pattern(name, args) if name == "CTOR" && args.get(1).is_some_and(|m| m == "M1")
         )),
-        "an unrelated call fact must not block the pattern"
+        "an unrelated call fact must not block the classification: {compressed:?}"
     );
     assert_eq!(
         compressed
