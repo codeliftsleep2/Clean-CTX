@@ -3,25 +3,27 @@
 // Hierarchical ENCODING: flat `CompiledIR` instructions -> `HierarchicalIR`.
 //
 // Split out of `src/ir/hierarchical.rs` (active-file size policy): the module
-// had exceeded the 615-line ceiling. This is a pure relocation -- the code
-// below is byte-for-byte the previous implementation, and `hierarchical`
-// re-exports `ir_to_hierarchical` so every existing path keeps resolving.
+// had exceeded the 615-line ceiling. The `hierarchical` module re-exports the
+// projection entry points so every existing path keeps resolving.
 //
 // Child-module access: a private item of an ancestor module is visible in its
 // descendants, so `use super::*` supplies the node types (`HierarchicalIR`,
 // `HierarchicalCall`, `ClassNode`, `MethodNode`, `FieldNode`, `PatternEntry`)
 // and the shared `find_class_by_id` helper.
 
+use super::identity::{ClassId, MethodId, validate_first_slice};
 use super::*;
+use std::collections::HashMap;
 
 /// Convert a flat `CompiledIR` instruction stream into a `HierarchicalIR`.
 ///
-/// The converter scans instructions in order, collecting:
-/// - DefClass → creates a ClassNode (subsequent ops scoped to this class)
-/// - DefMethod → creates a MethodNode inside current class
+/// The converter validates the first-slice identity graph, then scans
+/// instructions while collecting:
+/// - DefClass → creates a ClassNode identified by ClassId
+/// - DefMethod → creates a MethodNode under its declared ClassId owner
 /// - DefField → creates a FieldNode inside current class
-/// - Param → added to current method's params
-/// - Return → set as current method's return_type
+/// - Param → attached to its target MethodId after definition placement
+/// - Return → attached to its target MethodId after definition placement
 /// - FieldType → set as current field's field_type
 /// - Flags → accumulated (stable union) into the current method's flags
 /// - ClassFlags → set as current class's class_flags
@@ -35,14 +37,31 @@ use super::*;
 ///   explicitly, so no scope derivation is needed)
 /// - Pattern → added to current scope (class or method), storing args as-is
 pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
-    let mut classes: Vec<ClassNode> = Vec::new();
+    try_ir_to_hierarchical(ir).unwrap_or_else(|error| {
+        panic!("hierarchical projection requires valid semantic identity: {error}")
+    })
+}
+
+/// Checked projection from canonical IR to the hierarchical representation.
+///
+/// The approved first slice resolves `DefClass`, `DefMethod`, `Param`, and
+/// `Return` through typed stable identities. Their attribution is independent
+/// of instruction order, and invalid identity graphs fail before a partial
+/// hierarchy can be returned.
+pub fn try_ir_to_hierarchical(
+    ir: &CompiledIR,
+) -> Result<HierarchicalIR, HierarchicalProjectionError> {
+    let identities = validate_first_slice(ir)?;
+    let mut classes: Vec<ClassNode> = Vec::with_capacity(identities.classes.len());
     let mut imports: Vec<Vec<String>> = Vec::new();
     let mut type_aliases: Vec<Vec<String>> = Vec::new();
     let mut calls: Vec<HierarchicalCall> = Vec::new();
+    let mut method_locations: HashMap<MethodId, (usize, usize)> =
+        HashMap::with_capacity(identities.methods.len());
+    let mut pending_methods: HashMap<ClassId, Vec<(MethodId, String)>> = HashMap::new();
 
     // Track current scope
     let mut current_class_idx: Option<usize> = None;
-    let mut current_method_idx: Option<usize> = None;
 
     for op in &ir.instructions {
         match op {
@@ -60,58 +79,33 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                     synthetic: false,
                 });
                 current_class_idx = Some(classes.len() - 1);
-                current_method_idx = None;
+
+                let class_id = ClassId::from_serialized(id);
+                if let Some(methods) = pending_methods.remove(&class_id) {
+                    let class_idx = classes.len() - 1;
+                    for (method_id, method_name) in methods {
+                        let method_idx =
+                            push_method(&mut classes[class_idx], &method_id, method_name);
+                        method_locations.insert(method_id, (class_idx, method_idx));
+                    }
+                }
             }
 
             CoreOp::DefMethod(cid, mid, name) => {
+                let class_id = ClassId::from_serialized(cid);
+                let method_id = MethodId::from_serialized(mid);
                 if let Some(class_idx) = find_class_by_id(&classes, cid) {
-                    classes[class_idx].methods.push(MethodNode {
-                        id: mid.clone(),
-                        name: name.clone(),
-                        params: Vec::new(),
-                        return_type: None,
-                        flags: None,
-                        patterns: Vec::new(),
-                        body: None,
-                        body_start: None,
-                        body_end: None,
-                        control_flow: Vec::new(),
-                        data_flow: Vec::new(),
-                        side_effect: None,
-                        execution_context: None,
-                    });
+                    let method_idx = push_method(&mut classes[class_idx], &method_id, name.clone());
+                    method_locations.insert(method_id, (class_idx, method_idx));
                     current_class_idx = Some(class_idx);
-                    current_method_idx = Some(classes[class_idx].methods.len() - 1);
                 } else {
-                    // Method with no matching class — create a synthetic class
-                    classes.push(ClassNode {
-                        id: cid.clone(),
-                        name: format!("__synthetic_{}", cid),
-                        methods: vec![MethodNode {
-                            id: mid.clone(),
-                            name: name.clone(),
-                            params: Vec::new(),
-                            return_type: None,
-                            flags: None,
-                            patterns: Vec::new(),
-                            body: None,
-                            body_start: None,
-                            body_end: None,
-                            control_flow: Vec::new(),
-                            data_flow: Vec::new(),
-                            side_effect: None,
-                            execution_context: None,
-                        }],
-                        fields: Vec::new(),
-                        class_flags: None,
-                        extends: None,
-                        implements: Vec::new(),
-                        injects: Vec::new(),
-                        patterns: Vec::new(),
-                        synthetic: true,
-                    });
-                    current_class_idx = Some(classes.len() - 1);
-                    current_method_idx = Some(0);
+                    // The owner is valid but appears later. Preserve the
+                    // declaration until its class node is materialized.
+                    pending_methods
+                        .entry(class_id)
+                        .or_default()
+                        .push((method_id, name.clone()));
+                    current_class_idx = None;
                 }
             }
 
@@ -145,42 +139,8 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                 }
             }
 
-            CoreOp::Param(mid, pid, ty, name) => {
-                if let (Some(c_idx), Some(m_idx)) = (current_class_idx, current_method_idx) {
-                    if classes[c_idx].methods[m_idx].id == *mid {
-                        classes[c_idx].methods[m_idx].params.push(vec![
-                            pid.clone(),
-                            ty.clone(),
-                            name.clone(),
-                        ]);
-                    } else {
-                        // Method ID mismatch — search
-                        for mi in 0..classes[c_idx].methods.len() {
-                            if classes[c_idx].methods[mi].id == *mid {
-                                classes[c_idx].methods[mi].params.push(vec![
-                                    pid.clone(),
-                                    ty.clone(),
-                                    name.clone(),
-                                ]);
-                                current_method_idx = Some(mi);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            CoreOp::Return(mid, ty) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].return_type = Some(ty.clone());
-                            current_method_idx = Some(mi);
-                            break;
-                        }
-                    }
-                }
-            }
+            // Attached by stable MethodId after every definition is placed.
+            CoreOp::Param(..) | CoreOp::Return(..) => {}
 
             CoreOp::FieldType(fid, ty) => {
                 if let Some(c_idx) = current_class_idx {
@@ -207,7 +167,6 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                                     .get_or_insert_with(Vec::new),
                                 flags,
                             );
-                            current_method_idx = Some(mi);
                             break;
                         }
                     }
@@ -256,7 +215,6 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                     synthetic: false,
                 });
                 current_class_idx = Some(classes.len() - 1);
-                current_method_idx = None;
             }
 
             CoreOp::Import(alias, module, named) => {
@@ -277,7 +235,6 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                             // both-or-neither, so assignment preserves it.
                             classes[c_idx].methods[mi].body_start = *start;
                             classes[c_idx].methods[mi].body_end = *end;
-                            current_method_idx = Some(mi);
                             break;
                         }
                     }
@@ -292,7 +249,6 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                             classes[c_idx].methods[mi]
                                 .control_flow
                                 .push(vec![kind.clone(), target.clone()]);
-                            current_method_idx = Some(mi);
                             break;
                         }
                     }
@@ -306,7 +262,6 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                             classes[c_idx].methods[mi]
                                 .data_flow
                                 .push(vec![direction.clone(), target.clone()]);
-                            current_method_idx = Some(mi);
                             break;
                         }
                     }
@@ -318,7 +273,6 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                     for mi in 0..classes[c_idx].methods.len() {
                         if classes[c_idx].methods[mi].id == *mid {
                             classes[c_idx].methods[mi].side_effect = Some(effect_type.clone());
-                            current_method_idx = Some(mi);
                             break;
                         }
                     }
@@ -331,7 +285,6 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                         if classes[c_idx].methods[mi].id == *mid {
                             classes[c_idx].methods[mi].execution_context =
                                 Some(context_type.clone());
-                            current_method_idx = Some(mi);
                             break;
                         }
                     }
@@ -372,7 +325,6 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                                     args: args.clone(),
                                 });
                                 current_class_idx = Some(c_idx);
-                                current_method_idx = Some(m_idx);
                             }
                         } else {
                             // Class-level pattern (no method_id)
@@ -381,7 +333,6 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
                                 args: args.clone(),
                             });
                             current_class_idx = Some(c_idx);
-                            current_method_idx = None;
                         }
                     }
                 }
@@ -389,12 +340,65 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
         }
     }
 
-    HierarchicalIR {
+    debug_assert!(pending_methods.is_empty());
+
+    for (instruction, op) in ir.instructions.iter().enumerate() {
+        let (raw_method, operation) = match op {
+            CoreOp::Param(method, ..) => (method, "SIG"),
+            CoreOp::Return(method, _) => (method, "RET"),
+            _ => continue,
+        };
+        let method_id = MethodId::from_serialized(raw_method);
+        let (class_idx, method_idx) =
+            method_locations.get(&method_id).copied().ok_or_else(|| {
+                HierarchicalProjectionError::UnresolvedIdentity {
+                    operation,
+                    expected: ProjectionIdentityKind::Method,
+                    id: raw_method.clone(),
+                    instruction,
+                }
+            })?;
+
+        match op {
+            CoreOp::Param(_, parameter_id, ty, name) => {
+                classes[class_idx].methods[method_idx].params.push(vec![
+                    parameter_id.clone(),
+                    ty.clone(),
+                    name.clone(),
+                ]);
+            }
+            CoreOp::Return(_, ty) => {
+                classes[class_idx].methods[method_idx].return_type = Some(ty.clone());
+            }
+            _ => unreachable!("only Param and Return reach stable attachment"),
+        }
+    }
+
+    Ok(HierarchicalIR {
         classes,
         imports,
         type_aliases,
         calls,
-    }
+    })
+}
+
+fn push_method(class: &mut ClassNode, method_id: &MethodId, name: String) -> usize {
+    class.methods.push(MethodNode {
+        id: method_id.as_str().to_owned(),
+        name,
+        params: Vec::new(),
+        return_type: None,
+        flags: None,
+        patterns: Vec::new(),
+        body: None,
+        body_start: None,
+        body_end: None,
+        control_flow: Vec::new(),
+        data_flow: Vec::new(),
+        side_effect: None,
+        execution_context: None,
+    });
+    class.methods.len() - 1
 }
 
 /// Merge one `CoreOp::Flags` op's values into a method's accumulated flags.

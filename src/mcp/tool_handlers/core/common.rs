@@ -1,0 +1,150 @@
+// Shared contracts and helpers for core MCP handlers.
+
+use crate::error::{CleanCtxError, to_jsonrpc_error};
+use crate::ir::compiler::CompiledIR;
+use crate::ir::hierarchical::HierarchicalIR;
+use crate::ir::opcodes::CoreOp;
+use crate::ir::wire::tuple_to_op;
+use crate::mcp::McpState;
+use crate::mcp::tool_helpers::inject_baseline_breakpoint;
+use crate::protocol::send_response;
+use serde_json::Value;
+use std::collections::HashSet;
+pub(super) fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Vec<CoreOp> {
+    tuples.into_iter().filter_map(|t| tuple_to_op(&t)).collect()
+}
+
+/// Run the checked semantic-identity projection and map failures through the
+/// established MCP IR error contract. Callers invoke this before storing or
+/// rendering newly compiled hierarchical state. Existing reset/restore
+/// lifecycle ordering remains unchanged by this projection slice.
+pub(super) fn checked_hierarchy_or_respond(id: &Value, ir: &CompiledIR) -> Option<HierarchicalIR> {
+    match crate::ir::hierarchical::try_ir_to_hierarchical(ir) {
+        Ok(hierarchy) => Some(hierarchy),
+        Err(error) => {
+            send_response(&projection_error_response(id, &error));
+            None
+        }
+    }
+}
+
+pub(super) fn projection_error_response(
+    id: &Value,
+    error: &crate::ir::hierarchical::HierarchicalProjectionError,
+) -> Value {
+    let projection_code = error.code();
+    let mapped = CleanCtxError::Ir(format!("hierarchical projection failed: {error}"));
+    let mut response = to_jsonrpc_error(id, &mapped);
+    response["error"]["data"]["projection_code"] = Value::String(projection_code.to_owned());
+    response
+}
+
+/// Self-reporting contract fields (Gap 5/3/6 fixes).
+///
+/// Returns `(content_kind, byte_exact_regions)` describing what the
+/// response contains so the LLM can tell structural-only output from
+/// body-inclusive output without re-parsing the text.
+///
+/// - `content_kind`: `"skeleton"` (structural-only), `"skeleton_with_verbatim_bodies"`
+///   (Edit — method bodies are byte-exact), or `"verbatim_document"`
+///   (Verbatim — entire document byte-exact).
+/// - `byte_exact`: which regions are safe for `replace_in_file` SEARCH
+///   blocks. Edit → `["method_bodies"]`; Verbatim → `["document"]`;
+///   others → `[]`.
+pub(crate) fn contract_fields(
+    fidelity: crate::compression::Fidelity,
+) -> (&'static str, Vec<&'static str>) {
+    contract_fields_focused(fidelity, None)
+}
+
+/// Self-reporting contract fields for `provide_code_context`, accounting for
+/// symbol targeting via `focusMethods`.
+///
+/// When `focus` is `None` (no `focusMethods` supplied), `Edit` fidelity reports
+/// `"skeleton_with_verbatim_bodies"`/`["method_bodies"]` — every method's body
+/// is byte-exact (legacy behavior).
+///
+/// When `focus` is `Some(_)` (silently ignored unless the effective fidelity is
+/// `Edit`), only the focused method bodies are byte-exact. The contract reports
+/// `"skeleton_with_focused_verbatim_bodies"`/`["focused_method_bodies"]` so the
+/// LLM knows NOT to attempt `replace_in_file` SEARCH on unfocused method bodies.
+pub(crate) fn contract_fields_focused(
+    fidelity: crate::compression::Fidelity,
+    focus: Option<&HashSet<String>>,
+) -> (&'static str, Vec<&'static str>) {
+    match fidelity {
+        crate::compression::Fidelity::Verbatim => ("verbatim_document", vec!["document"]),
+        // No focus set → every method body is byte-exact (legacy behavior).
+        crate::compression::Fidelity::Edit if focus.is_none() => {
+            ("skeleton_with_verbatim_bodies", vec!["method_bodies"])
+        }
+        // Focus set but EMPTY → ZERO method bodies are byte-exact. The
+        // output is effectively all-signatures, so report `"skeleton"`
+        // with no byte-exact regions (otherwise the LLM would attempt
+        // replace_in_file SEARCH on bodies that don't exist).
+        crate::compression::Fidelity::Edit if focus.is_some_and(HashSet::is_empty) => {
+            ("skeleton", Vec::new())
+        }
+        // Focus set with names → only the focused method bodies are
+        // byte-exact. The LLM must NOT attempt SEARCH on unfocused bodies.
+        crate::compression::Fidelity::Edit => (
+            "skeleton_with_focused_verbatim_bodies",
+            vec!["focused_method_bodies"],
+        ),
+        _ => ("skeleton", Vec::new()),
+    }
+}
+
+/// Token-economics post-compression check.
+///
+/// After the compressed/hybrid representation has been rendered, compare its
+/// actual token cost against the raw source. If the candidate is more
+/// expensive, fall back to raw passthrough — returning the raw source with
+/// `content_kind: "raw_passthrough"` and `byte_exact: ["document"]`.
+///
+/// Returns `true` if fallback was triggered (caller should `return`),
+/// `false` if the candidate is economically sound (caller should continue).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn maybe_economics_fallback(
+    id: &Value,
+    source: &str,
+    raw_tokens: usize,
+    comp_tokens: usize,
+    state: &McpState,
+    resolved_path: &str,
+    is_angular: bool,
+    fidelity: crate::compression::Fidelity,
+    decision_summary: &str,
+) -> bool {
+    if comp_tokens <= raw_tokens {
+        // Candidate is cheaper or equal → continue normally.
+        return false;
+    }
+    // Candidate is more expensive → fall back to raw passthrough.
+    let fidelity_str = format!("{:?}", fidelity).to_lowercase();
+    state.record_compression(
+        resolved_path,
+        raw_tokens,
+        raw_tokens,
+        &fidelity_str,
+        is_angular,
+        "full",
+        None,
+        "raw_passthrough",
+    );
+    let mut response = serde_json::json!({
+        "jsonrpc": "2.0", "id": id, "result": {
+            "content": [{ "type": "text", "text": source }],
+            "_meta": {
+                "strategy": "full", "fidelity": fidelity_str,
+                "decision_summary": decision_summary,
+                "content_kind": "raw_passthrough",
+                "byte_exact": ["document"],
+                "degradation": null
+            }
+        }
+    });
+    inject_baseline_breakpoint(&mut response, state, source);
+    send_response(&response);
+    true
+}

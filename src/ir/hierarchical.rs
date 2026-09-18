@@ -16,12 +16,153 @@ use serde_json::{Value, json};
 
 mod decode;
 mod encode;
+mod identity;
 
 // Re-exported so the established public paths (`crate::ir::hierarchical::
 // ir_to_hierarchical`, `::hierarchical_to_ir`) are unchanged by the split
 // into `hierarchical/encode.rs` and `hierarchical/decode.rs`.
 pub use decode::hierarchical_to_ir;
-pub use encode::ir_to_hierarchical;
+pub use encode::{ir_to_hierarchical, try_ir_to_hierarchical};
+
+/// Stable semantic identity kinds enforced by checked hierarchical projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectionIdentityKind {
+    Class,
+    Method,
+    Parameter,
+}
+
+impl std::fmt::Display for ProjectionIdentityKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Class => f.write_str("class"),
+            Self::Method => f.write_str("method"),
+            Self::Parameter => f.write_str("parameter"),
+        }
+    }
+}
+
+/// A structured failure from the stable-identity projection boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HierarchicalProjectionError {
+    DuplicateIdentity {
+        operation: &'static str,
+        kind: ProjectionIdentityKind,
+        id: String,
+        owner: Option<String>,
+        first_instruction: usize,
+        duplicate_instruction: usize,
+    },
+    InvalidIdentity {
+        operation: &'static str,
+        kind: ProjectionIdentityKind,
+        id: String,
+        owner: Option<String>,
+        instruction: usize,
+        reason: &'static str,
+    },
+    UnresolvedIdentity {
+        operation: &'static str,
+        expected: ProjectionIdentityKind,
+        id: String,
+        instruction: usize,
+    },
+    KindMismatch {
+        operation: &'static str,
+        id: String,
+        expected: ProjectionIdentityKind,
+        actual: ProjectionIdentityKind,
+        instruction: usize,
+    },
+    DuplicateReturn {
+        method_id: String,
+        first_instruction: usize,
+        duplicate_instruction: usize,
+    },
+}
+
+impl HierarchicalProjectionError {
+    /// Stable machine-readable classification for logs and MCP error data.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::DuplicateIdentity { .. } => "ir_projection_duplicate_identity",
+            Self::InvalidIdentity { .. } => "ir_projection_invalid_identity",
+            Self::UnresolvedIdentity { .. } => "ir_projection_unresolved_identity",
+            Self::KindMismatch { .. } => "ir_projection_kind_mismatch",
+            Self::DuplicateReturn { .. } => "ir_projection_duplicate_return",
+        }
+    }
+}
+
+impl std::fmt::Display for HierarchicalProjectionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DuplicateIdentity {
+                operation,
+                kind,
+                id,
+                owner,
+                first_instruction,
+                duplicate_instruction,
+            } => {
+                write!(f, "{operation} defines duplicate {kind} identity '{id}'")?;
+                if let Some(owner) = owner {
+                    write!(f, " under method '{owner}'")?;
+                }
+                write!(
+                    f,
+                    " at instruction {duplicate_instruction} (first defined at {first_instruction})"
+                )
+            }
+            Self::InvalidIdentity {
+                operation,
+                kind,
+                id,
+                owner,
+                instruction,
+                reason,
+            } => {
+                write!(
+                    f,
+                    "{operation} at instruction {instruction} has invalid {kind} identity '{id}'"
+                )?;
+                if let Some(owner) = owner {
+                    write!(f, " under method '{owner}'")?;
+                }
+                write!(f, ": {reason}")
+            }
+            Self::UnresolvedIdentity {
+                operation,
+                expected,
+                id,
+                instruction,
+            } => write!(
+                f,
+                "{operation} at instruction {instruction} references unknown {expected} identity '{id}'"
+            ),
+            Self::KindMismatch {
+                operation,
+                id,
+                expected,
+                actual,
+                instruction,
+            } => write!(
+                f,
+                "{operation} at instruction {instruction} requires a {expected} identity, but '{id}' is a {actual} identity"
+            ),
+            Self::DuplicateReturn {
+                method_id,
+                first_instruction,
+                duplicate_instruction,
+            } => write!(
+                f,
+                "RET at instruction {duplicate_instruction} duplicates the return fact for method '{method_id}' (first defined at {first_instruction})"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for HierarchicalProjectionError {}
 
 /// Top-level hierarchical IR container.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -321,6 +462,10 @@ fn find_class_by_id(classes: &[ClassNode], id: &str) -> Option<usize> {
 #[cfg(test)]
 #[path = "../tests/ir/hierarchical.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/hierarchical_identity.rs"]
+mod identity_tests;
 
 // Repeated `CoreOp::Flags` ops for one method id — the language layer's
 // declaration/modifier family and the core pipeline's control-flow family —

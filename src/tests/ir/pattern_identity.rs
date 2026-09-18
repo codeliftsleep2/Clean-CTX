@@ -362,8 +362,8 @@ fn empty_constructor_keeps_its_declaration_and_gains_the_empty_ctor_classificati
 ///   * `GETTER`/`SETTER` need a written method name containing a space, which
 ///     `parse_method_sig` never produces (the additive accessor path is the F4
 ///     lifecycle, deliberately untouched here).
-/// The shapes that DO have production producers are covered by RED-F2-1…5;
-/// these fixtures pin the same identity contract on the remaining recognizers.
+///     The shapes that DO have production producers are covered by RED-F2-1…5;
+///     these fixtures pin the same identity contract on the remaining recognizers.
 fn boundary_class() -> CoreOp {
     CoreOp::DefClass("C1".into(), "Example".into())
 }
