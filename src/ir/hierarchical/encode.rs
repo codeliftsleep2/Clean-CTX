@@ -25,17 +25,17 @@ use std::collections::HashMap;
 /// - Param → attached to its target MethodId after definition placement
 /// - Return → attached to its target MethodId after definition placement
 /// - FieldType → attached to its target FieldId after definition placement
-/// - Flags → accumulated (stable union) into the current method's flags
-/// - ClassFlags → set as current class's class_flags
-/// - Extends → set as current class's extends
-/// - Implements → added to current class's implements
-/// - Injects → added to current class's injects
+/// - Flags → appended to its target MethodId as one preserved occurrence
+/// - ClassFlags → set on the class named by its target ID
+/// - Extends → set on the class named by its child ID
+/// - Implements → added to the class named by its target ID
+/// - Injects → added to the class named by its target ID
 /// - DefInterface → creates a ClassNode with synthetic=false and name
 /// - Import → added to top-level imports
 /// - TypeAlias → added to top-level type_aliases
 /// - Call → appended to the top-level calls table (the caller is carried
 ///   explicitly, so no scope derivation is needed)
-/// - Pattern → added to current scope (class or method), storing args as-is
+/// - Pattern → added to the class or method inferred from its current schema
 pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
     try_ir_to_hierarchical(ir).unwrap_or_else(|error| {
         panic!("hierarchical projection requires valid semantic identity: {error}")
@@ -44,10 +44,10 @@ pub fn ir_to_hierarchical(ir: &CompiledIR) -> HierarchicalIR {
 
 /// Checked projection from canonical IR to the hierarchical representation.
 ///
-/// The migrated slices resolve class, method, parameter, return, field, and
-/// field-type relationships through typed stable identities. Their attribution
-/// is independent of instruction order, and invalid identity graphs fail
-/// before a partial hierarchy can be returned.
+/// The migrated slices resolve class, method, field, signature, body, and
+/// method-metadata relationships through typed stable identities. Their
+/// attribution is independent of instruction order, and invalid identity
+/// graphs fail before a partial hierarchy can be returned.
 pub fn try_ir_to_hierarchical(
     ir: &CompiledIR,
 ) -> Result<HierarchicalIR, HierarchicalProjectionError> {
@@ -62,9 +62,6 @@ pub fn try_ir_to_hierarchical(
         HashMap::with_capacity(identities.fields.len());
     let mut pending_methods: HashMap<ClassId, Vec<(MethodId, String)>> = HashMap::new();
     let mut pending_fields: HashMap<ClassId, Vec<(FieldId, String)>> = HashMap::new();
-
-    // Track current scope
-    let mut current_class_idx: Option<usize> = None;
 
     for op in &ir.instructions {
         match op {
@@ -81,8 +78,6 @@ pub fn try_ir_to_hierarchical(
                     patterns: Vec::new(),
                     synthetic: false,
                 });
-                current_class_idx = Some(classes.len() - 1);
-
                 let class_id = ClassId::from_serialized(id);
                 if let Some(methods) = pending_methods.remove(&class_id) {
                     let class_idx = classes.len() - 1;
@@ -107,7 +102,6 @@ pub fn try_ir_to_hierarchical(
                 if let Some(class_idx) = find_class_by_id(&classes, cid) {
                     let method_idx = push_method(&mut classes[class_idx], &method_id, name.clone());
                     method_locations.insert(method_id, (class_idx, method_idx));
-                    current_class_idx = Some(class_idx);
                 } else {
                     // The owner is valid but appears later. Preserve the
                     // declaration until its class node is materialized.
@@ -115,7 +109,6 @@ pub fn try_ir_to_hierarchical(
                         .entry(class_id)
                         .or_default()
                         .push((method_id, name.clone()));
-                    current_class_idx = None;
                 }
             }
 
@@ -125,7 +118,6 @@ pub fn try_ir_to_hierarchical(
                 if let Some(class_idx) = find_class_by_id(&classes, cid) {
                     let field_idx = push_field(&mut classes[class_idx], &field_id, name.clone());
                     field_locations.insert(field_id, (class_idx, field_idx));
-                    current_class_idx = Some(class_idx);
                 } else {
                     // The owner is valid but appears later. Preserve the
                     // declaration until its class node is materialized.
@@ -133,58 +125,41 @@ pub fn try_ir_to_hierarchical(
                         .entry(class_id)
                         .or_default()
                         .push((field_id, name.clone()));
-                    current_class_idx = None;
                 }
             }
 
             // Attached by stable identity after every definition is placed.
-            CoreOp::Param(..) | CoreOp::Return(..) | CoreOp::FieldType(..) => {}
-
-            CoreOp::Flags(tid, flags) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *tid {
-                            // ACCUMULATE, never assign: `CoreOp::Flags` has
-                            // multiple legitimate producers for one method id,
-                            // so the flat stream legitimately carries more
-                            // than one op here (see `accumulate_flags`).
-                            accumulate_flags(
-                                classes[c_idx].methods[mi]
-                                    .flags
-                                    .get_or_insert_with(Vec::new),
-                                flags,
-                            );
-                            break;
-                        }
-                    }
-                }
-            }
+            CoreOp::Param(..)
+            | CoreOp::Return(..)
+            | CoreOp::FieldType(..)
+            | CoreOp::Flags(..)
+            | CoreOp::Body(..)
+            | CoreOp::ControlFlow(..)
+            | CoreOp::DataFlow(..)
+            | CoreOp::SideEffect(..)
+            | CoreOp::ExecutionContext(..) => {}
 
             CoreOp::ClassFlags(cid, flags) => {
                 if let Some(c_idx) = find_class_by_id(&classes, cid) {
                     classes[c_idx].class_flags = Some(flags.clone());
-                    current_class_idx = Some(c_idx);
                 }
             }
 
             CoreOp::Extends(child, parent) => {
                 if let Some(c_idx) = find_class_by_id(&classes, child) {
                     classes[c_idx].extends = Some(parent.clone());
-                    current_class_idx = Some(c_idx);
                 }
             }
 
             CoreOp::Implements(cid, iid) => {
                 if let Some(c_idx) = find_class_by_id(&classes, cid) {
                     classes[c_idx].implements.push(iid.clone());
-                    current_class_idx = Some(c_idx);
                 }
             }
 
             CoreOp::Injects(cid, deps) => {
                 if let Some(c_idx) = find_class_by_id(&classes, cid) {
                     classes[c_idx].injects.extend(deps.clone());
-                    current_class_idx = Some(c_idx);
                 }
             }
 
@@ -201,7 +176,6 @@ pub fn try_ir_to_hierarchical(
                     patterns: Vec::new(),
                     synthetic: false,
                 });
-                current_class_idx = Some(classes.len() - 1);
             }
 
             CoreOp::Import(alias, module, named) => {
@@ -210,72 +184,6 @@ pub fn try_ir_to_hierarchical(
 
             CoreOp::TypeAlias(alias, original) => {
                 type_aliases.push(vec![alias.clone(), original.clone()]);
-            }
-
-            // Edit Mode: verbatim method body
-            CoreOp::Body(mid, text, start, end) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].body = Some(text.clone());
-                            // Span pairing invariant: producer guarantees
-                            // both-or-neither, so assignment preserves it.
-                            classes[c_idx].methods[mi].body_start = *start;
-                            classes[c_idx].methods[mi].body_end = *end;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // R-43a: Execution semantics — stored as method-level metadata.
-            CoreOp::ControlFlow(mid, kind, target) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi]
-                                .control_flow
-                                .push(vec![kind.clone(), target.clone()]);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            CoreOp::DataFlow(mid, direction, target) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi]
-                                .data_flow
-                                .push(vec![direction.clone(), target.clone()]);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            CoreOp::SideEffect(mid, effect_type) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].side_effect = Some(effect_type.clone());
-                            break;
-                        }
-                    }
-                }
-            }
-
-            CoreOp::ExecutionContext(mid, context_type) => {
-                if let Some(c_idx) = current_class_idx {
-                    for mi in 0..classes[c_idx].methods.len() {
-                        if classes[c_idx].methods[mi].id == *mid {
-                            classes[c_idx].methods[mi].execution_context =
-                                Some(context_type.clone());
-                            break;
-                        }
-                    }
-                }
             }
 
             // Structural invocations (native call graph). Flat table: the
@@ -311,7 +219,6 @@ pub fn try_ir_to_hierarchical(
                                     name: name.clone(),
                                     args: args.clone(),
                                 });
-                                current_class_idx = Some(c_idx);
                             }
                         } else {
                             // Class-level pattern (no method_id)
@@ -319,7 +226,6 @@ pub fn try_ir_to_hierarchical(
                                 name: name.clone(),
                                 args: args.clone(),
                             });
-                            current_class_idx = Some(c_idx);
                         }
                     }
                 }
@@ -359,6 +265,49 @@ pub fn try_ir_to_hierarchical(
                     })?;
                 classes[class_idx].fields[field_idx].field_type = Some(ty.clone());
             }
+            CoreOp::Flags(raw_method, flags) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "FLAGS", instruction)?;
+                classes[class_idx].methods[method_idx]
+                    .flags
+                    .push(flags.clone());
+            }
+            CoreOp::Body(raw_method, text, start, end) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "BODY", instruction)?;
+                let method = &mut classes[class_idx].methods[method_idx];
+                method.body = Some(text.clone());
+                method.body_start = *start;
+                method.body_end = *end;
+            }
+            CoreOp::ControlFlow(raw_method, kind, target) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "CTRL", instruction)?;
+                classes[class_idx].methods[method_idx]
+                    .control_flow
+                    .push(vec![kind.clone(), target.clone()]);
+            }
+            CoreOp::DataFlow(raw_method, direction, target) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "DATAFLOW", instruction)?;
+                classes[class_idx].methods[method_idx]
+                    .data_flow
+                    .push(vec![direction.clone(), target.clone()]);
+            }
+            CoreOp::SideEffect(raw_method, effect) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "EFFECT", instruction)?;
+                classes[class_idx].methods[method_idx]
+                    .side_effect
+                    .push(effect.clone());
+            }
+            CoreOp::ExecutionContext(raw_method, context) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "CTX", instruction)?;
+                classes[class_idx].methods[method_idx]
+                    .execution_context
+                    .push(context.clone());
+            }
             _ => {}
         }
     }
@@ -394,15 +343,15 @@ fn push_method(class: &mut ClassNode, method_id: &MethodId, name: String) -> usi
         name,
         params: Vec::new(),
         return_type: None,
-        flags: None,
+        flags: Vec::new(),
         patterns: Vec::new(),
         body: None,
         body_start: None,
         body_end: None,
         control_flow: Vec::new(),
         data_flow: Vec::new(),
-        side_effect: None,
-        execution_context: None,
+        side_effect: Vec::new(),
+        execution_context: Vec::new(),
     });
     class.methods.len() - 1
 }
@@ -414,40 +363,4 @@ fn push_field(class: &mut ClassNode, field_id: &FieldId, name: String) -> usize 
         field_type: None,
     });
     class.fields.len() - 1
-}
-
-/// Merge one `CoreOp::Flags` op's values into a method's accumulated flags.
-///
-/// `CoreOp::Flags` has multiple legitimate producers for the SAME method id:
-///
-/// * the language layer's declaration/modifier flags (`STATIC`, `ASYNC`,
-///   `PRIVATE`, `PROTECTED`, `ABSTRACT`, `EXPORT`, …), emitted while the
-///   declaration capture is dispatched, and
-/// * the core pipeline's accumulated control-flow flags (`IF`, `LOOP`, `RET`,
-///   `THROW`), collected by `PassContext::current_method_flags` and flushed
-///   into one op by `flush_method_flags` when the declaration ends
-///   (`src/ir/pipeline.rs`).
-///
-/// The flat stream therefore carries more than one `Flags` op for one method,
-/// while the hierarchical representation has exactly one
-/// [`MethodNode::flags`] field. The projection must ACCUMULATE: assigning the
-/// last op discarded the other producer's entire family, so a method whose
-/// body contains control flow rendered `fl:RET` with none of its declaration
-/// modifiers.
-///
-/// Semantics: **first-seen stable order + deduplication**. A value keeps the
-/// position where the flat stream first mentioned it, and a value already
-/// present is not appended again — the result is deterministic and never
-/// depends on an unordered set's iteration order.
-///
-/// Scope note: this preserves INFORMATION (every value the flat stream named
-/// is present), not flat-op multiplicity. A later hierarchical → flat decode
-/// re-emits the projected form — one combined `Flags` op — which is the
-/// established `MethodNode::flags` semantics.
-fn accumulate_flags(target: &mut Vec<String>, incoming: &[String]) {
-    for flag in incoming {
-        if !target.iter().any(|existing| existing == flag) {
-            target.push(flag.clone());
-        }
-    }
 }

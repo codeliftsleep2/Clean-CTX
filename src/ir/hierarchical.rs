@@ -14,6 +14,8 @@ use super::wire::DecodeError;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+const HIERARCHICAL_SCHEMA_VERSION: u64 = 2;
+
 mod decode;
 mod encode;
 
@@ -157,9 +159,12 @@ pub struct MethodNode {
     #[serde(rename = "r", default, skip_serializing_if = "Option::is_none")]
     pub return_type: Option<String>,
 
-    /// Method-level flags (IF, LOOP, RET, etc.)
-    #[serde(rename = "fl", default, skip_serializing_if = "Option::is_none")]
-    pub flags: Option<Vec<String>>,
+    /// Method-level flag occurrences (IF, LOOP, RET, etc.).
+    ///
+    /// Each inner vector is one `CoreOp::Flags` occurrence. The hierarchy
+    /// preserves occurrence order, payload order, and duplicate values.
+    #[serde(rename = "fl", default, skip_serializing_if = "Vec::is_empty")]
+    pub flags: Vec<Vec<String>>,
 
     /// Method-level pattern ops
     #[serde(rename = "pa", default, skip_serializing_if = "Vec::is_empty")]
@@ -192,15 +197,15 @@ pub struct MethodNode {
     #[serde(rename = "df", default, skip_serializing_if = "Vec::is_empty")]
     pub data_flow: Vec<Vec<String>>,
 
-    /// Side-effect annotation (R-43a).
+    /// Side-effect annotations (R-43a), in canonical occurrence order.
     /// effect_type: "pure" | "io" | "mutation" | "async" | "transaction"
-    #[serde(rename = "se", default, skip_serializing_if = "Option::is_none")]
-    pub side_effect: Option<String>,
+    #[serde(rename = "se", default, skip_serializing_if = "Vec::is_empty")]
+    pub side_effect: Vec<String>,
 
-    /// Execution context annotation (R-43a).
+    /// Execution context annotations (R-43a), in canonical occurrence order.
     /// context_type: "sync" | "async" | "thread_bound" | "transaction_scope" | "realtime"
-    #[serde(rename = "ec", default, skip_serializing_if = "Option::is_none")]
-    pub execution_context: Option<String>,
+    #[serde(rename = "ec", default, skip_serializing_if = "Vec::is_empty")]
+    pub execution_context: Vec<String>,
 }
 
 /// A single field node — nested inside a class.
@@ -237,14 +242,14 @@ pub struct PatternEntry {
 /// Example output:
 /// ```json
 /// {
-///   "file": "α1", "v": 1, "encoding": "hierarchical",
+///   "file": "α1", "v": 1, "encoding": "hierarchical", "hs": 2,
 ///   "ir": {
 ///     "c": [{
 ///       "n": "C1", "nm": "SampleService",
 ///       "m": [{
 ///         "n": "M1", "nm": "processComplexData",
 ///         "p": [["P1", "$s", "payload"]],
-///         "r": "$b", "fl": ["IF"]
+///         "r": "$b", "fl": [["IF"]]
 ///       }],
 ///       "f": [{"n": "F1", "nm": "items", "t": "$s[]"}],
 ///       "im": ["IF1"]
@@ -259,6 +264,7 @@ pub fn ir_to_hierarchical_wire(ir: &CompiledIR) -> Value {
         "file": ir.file_id,
         "v": ir.version,
         "encoding": "hierarchical",
+        "hs": HIERARCHICAL_SCHEMA_VERSION,
         "ir": hir
     })
 }
@@ -276,12 +282,28 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         .and_then(|v| v.as_u64())
         .ok_or_else(|| DecodeError::MissingField("v".into()))?;
 
-    let ir_val = value
+    let schema_version = value.get("hs");
+    if let Some(schema_version) = schema_version {
+        let schema_version = schema_version.as_u64().ok_or_else(|| {
+            DecodeError::InvalidInput("hierarchical schema version must be an integer".into())
+        })?;
+        if schema_version != HIERARCHICAL_SCHEMA_VERSION {
+            return Err(DecodeError::InvalidInput(format!(
+                "unsupported hierarchical schema version: {schema_version}"
+            )));
+        }
+    }
+
+    let mut ir_val = value
         .get("ir")
+        .cloned()
         .ok_or_else(|| DecodeError::MissingField("ir".into()))?;
+    if schema_version.is_none() {
+        upgrade_legacy_hierarchy(&mut ir_val)?;
+    }
 
     // Deserialize via serde
-    let hir: HierarchicalIR = serde_json::from_value(ir_val.clone())
+    let hir: HierarchicalIR = serde_json::from_value(ir_val)
         .map_err(|e| DecodeError::InvalidInput(format!("hierarchical decode: {}", e)))?;
 
     let instructions = hierarchical_to_ir(&hir);
@@ -293,9 +315,64 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
     })
 }
 
+/// Upgrade the established unversioned hierarchy shape at the wire boundary.
+///
+/// Revision 2 remains strict: this adapter is invoked only when the envelope
+/// has no `hs` marker. It changes containers, never their string contents.
+fn upgrade_legacy_hierarchy(ir: &mut Value) -> Result<(), DecodeError> {
+    let Some(classes) = ir.get_mut("c").and_then(Value::as_array_mut) else {
+        return Ok(());
+    };
+
+    for class in classes {
+        let Some(methods_value) = class.get_mut("m") else {
+            continue;
+        };
+        let methods = methods_value.as_array_mut().ok_or_else(|| {
+            DecodeError::InvalidInput("legacy hierarchical method list must be an array".into())
+        })?;
+        for method in methods {
+            if let Some(flags) = method.get_mut("fl") {
+                let payload = flags.as_array().ok_or_else(|| {
+                    DecodeError::InvalidInput("legacy hierarchical flags must be an array".into())
+                })?;
+                if !payload.iter().all(Value::is_string) {
+                    return Err(DecodeError::InvalidInput(
+                        "legacy hierarchical flags must contain strings".into(),
+                    ));
+                }
+                let payload = std::mem::take(flags);
+                *flags = Value::Array(vec![payload]);
+            }
+            upgrade_legacy_scalar(method, "se", "side effect")?;
+            upgrade_legacy_scalar(method, "ec", "execution context")?;
+        }
+    }
+    Ok(())
+}
+
+fn upgrade_legacy_scalar(
+    method: &mut Value,
+    field: &str,
+    description: &str,
+) -> Result<(), DecodeError> {
+    let Some(value) = method.get_mut(field) else {
+        return Ok(());
+    };
+    if !value.is_string() {
+        return Err(DecodeError::InvalidInput(format!(
+            "legacy hierarchical {description} must be a string"
+        )));
+    }
+    let legacy_value = std::mem::take(value);
+    *value = Value::Array(vec![legacy_value]);
+    Ok(())
+}
+
 /// Estimate character savings of hierarchical format vs. positional encoding.
 ///
-/// Returns (positional_chars, hierarchical_chars, savings_pct).
+/// Returns `(positional_chars, hierarchical_chars, savings_pct)`. The
+/// percentage is negative when the hierarchical envelope is larger.
 pub fn estimate_savings(ir: &CompiledIR) -> (usize, usize, f64) {
     use super::wire::ir_to_wire;
     let positional = ir_to_wire(ir);
@@ -308,7 +385,7 @@ pub fn estimate_savings(ir: &CompiledIR) -> (usize, usize, f64) {
     let hier_chars = hier_str.len();
 
     let savings = if pos_chars > 0 {
-        ((pos_chars - hier_chars) as f64 / pos_chars as f64) * 100.0
+        ((pos_chars as f64 - hier_chars as f64) / pos_chars as f64) * 100.0
     } else {
         0.0
     };
@@ -335,9 +412,12 @@ mod field_identity_tests;
 
 // Repeated `CoreOp::Flags` ops for one method id — the language layer's
 // declaration/modifier family and the core pipeline's control-flow family —
-// must accumulate into the single `MethodNode::flags` field instead of the
-// last write winning (RED-FLAG1..RED-FLAG12), including the cross-language
-// pipeline probes and the flat-wire/pattern nonregressions.
+// remain distinct ordered occurrences (RED-FLAG1..RED-FLAG12), including the
+// cross-language pipeline probes and the flat-wire/pattern nonregressions.
 #[cfg(test)]
 #[path = "../tests/ir/hierarchical_flags.rs"]
 mod flags_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/hierarchical_method_facts.rs"]
+mod method_fact_tests;

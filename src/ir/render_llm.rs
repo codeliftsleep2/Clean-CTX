@@ -226,7 +226,7 @@ fn render_methods(
         // Method body (params, return type, flags)
         let has_params = !method.params.is_empty();
         let has_return = method.return_type.is_some();
-        let has_flags = method.flags.as_ref().is_some_and(|f| !f.is_empty());
+        let has_flags = !method.flags.is_empty();
 
         if has_params || has_return || has_flags {
             output.push_str("  →");
@@ -255,10 +255,9 @@ fn render_methods(
             }
 
             // Flags
-            if let Some(flags) = &method.flags {
-                if !flags.is_empty() {
-                    output.push_str(&format!(" fl:{}", flags.join(",")));
-                }
+            if has_flags {
+                let flags = method.flags.iter().flatten().cloned().collect::<Vec<_>>();
+                output.push_str(&format!(" fl:{}", flags.join(",")));
             }
         }
 
@@ -299,19 +298,15 @@ fn render_methods(
         // Side-effect annotation at High fidelity (Gap 1 fix).
         // e.g. `se:mutation` — quickly tells the LLM whether a method is
         // pure, performs I/O, mutates state, is async, or is transactional.
-        if fidelity == Fidelity::High {
-            if let Some(se) = &method.side_effect {
-                output.push_str(&format!(" se:{}", se));
-            }
+        if fidelity == Fidelity::High && !method.side_effect.is_empty() {
+            output.push_str(&format!(" se:{}", method.side_effect.join(",")));
         }
 
         // Execution-context annotation at High fidelity (Gap 1 fix).
         // e.g. `ec:async` — tells the agent the runtime context without
         // a full body read.
-        if fidelity == Fidelity::High {
-            if let Some(ec) = &method.execution_context {
-                output.push_str(&format!(" ec:{}", ec));
-            }
+        if fidelity == Fidelity::High && !method.execution_context.is_empty() {
+            output.push_str(&format!(" ec:{}", method.execution_context.join(",")));
         }
 
         // Verbatim method body at Edit fidelity (byte-exact for replace_in_file).

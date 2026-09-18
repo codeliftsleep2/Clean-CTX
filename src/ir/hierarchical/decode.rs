@@ -93,8 +93,8 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
                 instructions.push(CoreOp::Return(method.id.clone(), rt.clone()));
             }
 
-            // Method flags
-            if let Some(flags) = &method.flags {
+            // Method flag occurrences
+            for flags in &method.flags {
                 instructions.push(CoreOp::Flags(method.id.clone(), flags.clone()));
             }
 
@@ -130,13 +130,13 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
                 }
             }
 
-            // Side-effect annotation
-            if let Some(se) = &method.side_effect {
+            // Side-effect annotations
+            for se in &method.side_effect {
                 instructions.push(CoreOp::SideEffect(method.id.clone(), se.clone()));
             }
 
-            // Execution context annotation
-            if let Some(ec) = &method.execution_context {
+            // Execution context annotations
+            for ec in &method.execution_context {
                 instructions.push(CoreOp::ExecutionContext(method.id.clone(), ec.clone()));
             }
 

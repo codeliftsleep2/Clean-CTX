@@ -208,7 +208,7 @@ fn test_hierarchical_structure() {
     assert_eq!(c2.methods.len(), 1);
     assert_eq!(c2.methods[0].id, "M2");
     assert_eq!(c2.methods[0].return_type, Some("$b".to_string()));
-    assert_eq!(c2.methods[0].flags, Some(vec!["ASYNC".to_string()]));
+    assert_eq!(c2.methods[0].flags, vec![vec!["ASYNC".to_string()]]);
 }
 
 #[test]
@@ -313,6 +313,7 @@ fn test_wire_format_json_structure() {
     assert!(wire.get("file").is_some(), "Must have 'file' key");
     assert!(wire.get("v").is_some(), "Must have 'v' key");
     assert!(wire.get("encoding").is_some(), "Must have 'encoding' key");
+    assert_eq!(wire.get("hs").and_then(|v| v.as_u64()), Some(2));
     assert!(wire.get("ir").is_some(), "Must have 'ir' key");
 
     // Check 'ir' contains expected abbreviated fields

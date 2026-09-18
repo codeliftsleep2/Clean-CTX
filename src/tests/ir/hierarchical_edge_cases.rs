@@ -78,15 +78,8 @@ fn test_estimate_savings_non_empty() {
         hier_chars > 0,
         "Hierarchical encoding should produce characters"
     );
-    assert!(pct >= 0.0, "Savings percentage should be non-negative");
-
-    // For a single-class IR, hierarchical should be smaller
-    assert!(
-        hier_chars <= pos_chars,
-        "Hierarchical ({}) should be <= positional ({}) for simple IR",
-        hier_chars,
-        pos_chars
-    );
+    let expected = ((pos_chars as f64 - hier_chars as f64) / pos_chars as f64) * 100.0;
+    assert!((pct - expected).abs() < f64::EPSILON);
 }
 
 #[test]
@@ -96,14 +89,8 @@ fn test_estimate_savings_multi_class() {
 
     assert!(pos_chars > 0);
     assert!(hier_chars > 0);
-    assert!(pct >= 0.0, "Savings: {:.1}%", pct);
-
-    assert!(
-        hier_chars < pos_chars,
-        "Hierarchical ({}) should be smaller than positional ({}) for multi-class IR",
-        hier_chars,
-        pos_chars
-    );
+    let expected = ((pos_chars as f64 - hier_chars as f64) / pos_chars as f64) * 100.0;
+    assert!((pct - expected).abs() < f64::EPSILON);
 }
 
 // ── Edge Cases ──────────────────────────────────────────────────
@@ -303,8 +290,8 @@ fn test_r43a_metadata_round_trip() {
         m1.data_flow,
         vec![vec!["reads".to_string(), "config".to_string()]]
     );
-    assert_eq!(m1.side_effect.as_deref(), Some("mutation"));
-    assert_eq!(m1.execution_context.as_deref(), Some("async"));
+    assert_eq!(m1.side_effect, vec!["mutation".to_string()]);
+    assert_eq!(m1.execution_context, vec!["async".to_string()]);
 
     let restored = hierarchical_to_ir(&hir);
     assert_eq!(

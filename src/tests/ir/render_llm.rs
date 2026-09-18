@@ -41,15 +41,15 @@ fn make_method(name: &str) -> MethodNode {
         name: name.to_string(),
         params: vec![],
         return_type: None,
-        flags: None,
+        flags: Vec::new(),
         patterns: vec![],
         body: None,
         body_start: None,
         body_end: None,
         control_flow: vec![],
         data_flow: vec![],
-        side_effect: None,
-        execution_context: None,
+        side_effect: Vec::new(),
+        execution_context: Vec::new(),
     }
 }
 
@@ -185,7 +185,7 @@ fn test_method_with_params_and_flags() {
         .params
         .push(vec!["P1".into(), "$n".into(), "id".into()]);
     method.return_type = Some("$s".into());
-    method.flags = Some(vec!["ASYNC".into(), "RET".into()]);
+    method.flags = vec![vec!["ASYNC".into(), "RET".into()]];
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -390,7 +390,7 @@ fn test_full_typescript_class() {
     class.fields.push(make_field("selectedUser", Some("$n")));
 
     let mut m1 = make_method("ngOnInit");
-    m1.flags = Some(vec!["IF".into()]);
+    m1.flags = vec![vec!["IF".into()]];
     class.methods.push(m1);
 
     let mut m2 = make_method("trackById");
@@ -398,7 +398,7 @@ fn test_full_typescript_class() {
         .push(vec!["P1".into(), "$n".into(), "index".into()]);
     m2.params
         .push(vec!["P2".into(), "$s".into(), "user".into()]);
-    m2.flags = Some(vec!["RET".into()]);
+    m2.flags = vec![vec!["RET".into()]];
     class.methods.push(m2);
 
     hir.classes.push(class);
@@ -441,12 +441,12 @@ fn test_full_rust_class() {
     svc.fields.push(make_field("cache", Some("RwLock")));
 
     let mut m1 = make_method("new");
-    m1.flags = Some(vec!["CTOR".into()]);
+    m1.flags = vec![vec!["CTOR".into()]];
     svc.methods.push(m1);
 
     let mut m2 = make_method("get_user");
     m2.params.push(vec!["P1".into(), "$n".into(), "id".into()]);
-    m2.flags = Some(vec!["ASYNC".into()]);
+    m2.flags = vec![vec!["ASYNC".into()]];
     svc.methods.push(m2);
 
     hir.classes.push(svc);

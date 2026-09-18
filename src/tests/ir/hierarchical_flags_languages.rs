@@ -16,17 +16,17 @@ use super::*;
 //
 //   1. the flat stream the pattern recognizers consumed — and the encoder
 //      reads — still holds TWO separate `Flags` ops for that method,
-//   2. the hierarchical node accumulated them with no repeats, with the
+//   2. the hierarchical node preserves both occurrences, with the
 //      declaration family FIRST (capture order is deterministic:
 //      `run_capture_pipeline_nodes` sorts captures by start byte, and a
 //      declaration's `method.root` capture precedes every control-flow
 //      capture inside its body), and
-//   3. the rendered line carries the accumulated field verbatim in the
+//   3. the rendered line carries every value in the
 //      established `fl:` form.
 //
 // The intra-family order of the control-flow values is not pinned positionally
 // here (the synthetic regressions above pin first-seen ordering exactly); the
-// probe pins the declaration family's prefix, the exact deduped membership and
+// probe pins the declaration family's prefix, the exact membership and
 // the verbatim rendering.
 
 #[cfg(any(
@@ -55,36 +55,27 @@ fn probe_single_method(ir: &CompiledIR, declaration: &[&str], control_flow: &[&s
          producer: {raw:?}"
     );
 
-    // Accumulation: the declaration family's values come FIRST (capture order
+    // Preservation: the declaration family's values come FIRST (capture order
     // is by start byte, so a declaration's own op precedes every control-flow
-    // capture inside its body), every control-flow value is present, and no
-    // value is repeated or invented. The control-flow family's INTERNAL order
-    // is deliberately not pinned here — the synthetic regressions in
-    // `hierarchical_flags.rs` pin first-seen ordering exactly.
-    let mut expected: Vec<String> = declaration.iter().map(|v| v.to_string()).collect();
-    for value in control_flow {
-        if !expected.iter().any(|seen| seen == value) {
-            expected.push(value.to_string());
-        }
-    }
+    // capture inside its body). The hierarchy must equal the flattened raw
+    // occurrences exactly; no value may be removed or invented.
+    let expected = raw.iter().flatten().cloned().collect::<Vec<_>>();
     assert_eq!(
         merged.len(),
         expected.len(),
-        "{label}: no repeats and no extra values: {merged:?}"
+        "{label}: no occurrences may be removed or invented: {merged:?}"
     );
     assert_eq!(
         &merged[..declaration.len()],
         declaration,
         "{label}: the declaration family must come first: {merged:?}"
     );
-    let mut merged_rest: Vec<String> = merged[declaration.len()..].to_vec();
-    let mut expected_rest: Vec<String> = expected[declaration.len()..].to_vec();
-    merged_rest.sort();
-    expected_rest.sort();
-    assert_eq!(
-        merged_rest, expected_rest,
-        "{label}: the control-flow family must be exactly {expected_rest:?}: {merged:?}"
-    );
+    for value in control_flow {
+        assert!(
+            merged[declaration.len()..].iter().any(|seen| seen == value),
+            "{label}: missing control-flow flag {value}: {merged:?}"
+        );
+    }
 
     // The renderer consumes the field verbatim — no merging in the renderer.
     let rendered = render(&hir, Fidelity::Low);
@@ -171,7 +162,7 @@ fn pattern_recognition_input_holds_two_separate_flag_ops_csharp() {
     assert_eq!(
         merged.len(),
         3,
-        "declaration + control flow, deduped: {merged:?}"
+        "declaration + control flow occurrences: {merged:?}"
     );
 }
 

@@ -6,7 +6,8 @@
 operation families remain pending. The bounded shared-validation slice was
 user-verified as the Phase 3 checkpoint on 2026-09-18. Phase 4A completed the
 shared validation contracts for all current operations and was user-verified
-on 2026-09-18; hierarchical projection replacement remains pending.
+on 2026-09-18. Phase 4B implemented stable-identity method-fact projection and
+hierarchical schema revision 2 and was user-verified on 2026-09-18.
 
 **Date:** 2026-09-17
 
@@ -257,8 +258,8 @@ Exit criteria:
 - adding a new `CoreOp` requires an explicit validator decision.
 
 Implementation status: Phase 4A completes these deliverables for all 21
-current operations through the shared typed validation authority. User-run
-verification remains pending.
+current operations through the shared typed validation authority and was
+user-verified on 2026-09-18.
 
 ### Phase 4: Replace hierarchical projection
 
@@ -278,6 +279,14 @@ Exit criteria:
 - legacy projection paths have no production callers.
 
 This is the first phase that closes the principal demonstrated violation.
+
+Implementation status: Phase 4B moves method-scoped `Flags`, `Body`,
+`ControlFlow`, `DataFlow`, `SideEffect`, and `ExecutionContext` to the typed
+`MethodId` index and preserves occurrences. Hierarchical output emits `"hs":
+2`; unmarked scalar/flat input remains readable and unknown revisions fail.
+The projection cursor is removed. Class multiplicity, typed pattern targeting,
+and interface representation remain later Phase 4 slices. The user-reported
+Phase 4B gate was green on 2026-09-18.
 
 ### Phase 5: Correct producer ownership
 
@@ -438,6 +447,13 @@ history.
 Tradeoff: this keeps the default branch green but does not preserve a standalone
 failing commit in shared history.
 
+### Gate F: Hierarchical schema revision — approved
+
+Approved on 2026-09-18: hierarchical output emits `"hs": 2`; method `fl` is
+an ordered array of operation payloads and `se`/`ec` are ordered occurrence
+arrays. Unmarked flat/scalar input remains readable; unknown revisions fail.
+The binary contract and future physical version `0x04` are unchanged.
+
 ## 8. Review and completion checklist
 
 ### Contract review
@@ -492,14 +508,9 @@ The approved bounded slice implements only these contracts:
 6. tracked interleaving, pre-definition, ordering, duplicate, unresolved,
    wrong-kind, and MCP mapping regressions.
 
-The required MCP handler and hierarchical-test decomposition is structural:
-it keeps every materially modified file within the active-file ceiling. It is
-not an alternative architecture or a reason to weaken the projection boundary.
-
-Flags, Body, control/data flow, side effects, execution contexts, patterns,
-delta/replay, and physical binary version `0x04` remain later slices. The first
-slice was user-verified and pushed as a checkpoint before the second bounded
-slice began.
+That first slice deferred method metadata, patterns, delta/replay, and binary
+`0x04`; Phase 4B now addresses the method-metadata portion. The first slice was
+user-verified and pushed before the second bounded slice began.
 
 ## 10. Second bounded implementation slice
 
@@ -540,11 +551,8 @@ operation rows:
 7. unapproved semantic-family, vocabulary, alias-scope, pattern-schema, and
    cardinality rules remain explicitly deferred.
 
-This checkpoint does not claim the roadmap's full Phase 3 exit criteria for
-the remaining draft rows. It establishes the single validation authority that
-later approved rows will extend. User-run verification was reported green on
-2026-09-18 before this checkpoint was committed. The subsequent Phase 4A
-approval supersedes those row-level deferrals as described below.
+The checkpoint established the single validation authority. Its gates were
+green before commit; Phase 4A subsequently superseded its row-level deferrals.
 
 ## 12. Approved Phase 4A implementation slice
 
@@ -568,14 +576,9 @@ validation prerequisite without changing hierarchical projection shapes:
 9. legacy validation codes E001-E011 remain stable for their existing operation
    families while projection retains structured error classifications.
 
-The ordered-many `TypeAlias` correction was approved on 2026-09-18 after
-user-run tests demonstrated repeated `@describe`, `@action`, and `@dispatch`
-facts in the production pipeline. Producer deduplication was rejected because
-it would discard distinct metadata payloads.
-
-This slice does not change hierarchy field cardinalities, replace positional
-projection, migrate producers, alter delta/replay, or implement binary version
-`0x04`. The complete user-run Phase 4A gate was reported green on 2026-09-18.
+The `TypeAlias` correction followed production evidence of repeated metadata;
+producer deduplication would discard distinct payloads. Phase 4A did not alter
+projection, producers, delta/replay, or binary `0x04`; its gate was green.
 
 ## 13. Verification ownership
 

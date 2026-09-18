@@ -23,8 +23,12 @@ projection repair was user-verified and checkpointed. The bounded
 2026-09-18. The shared validation authority for all six normative operations is
 implemented and user-verified as the bounded Phase 3 checkpoint on 2026-09-18.
 Phase 4A implemented and user-verified the remaining shared operation-validation
-contracts on 2026-09-18. Positional projection findings remain open until the
-subsequent projection-replacement slices. User-run verification also proved that
+contracts on 2026-09-18. Phase 4B implements identity-driven projection for
+method `Flags`, `Body`, `ControlFlow`, `DataFlow`, `SideEffect`, and
+`ExecutionContext`, plus occurrence-preserving hierarchical schema revision 2;
+user-run verification was green on 2026-09-18. The projection cursor is
+removed; later class-multiplicity, pattern-schema, and interface-representation
+findings remain open. User-run verification also proved that
 `TypeAlias` carries repeated `Φ` metadata; its ordered-many correction was
 approved, implemented, and verified on 2026-09-18.
 
@@ -36,13 +40,11 @@ Stable identifiers can survive production in the canonical instruction stream
 and still be ignored, overwritten, or discarded by projection, delta/replay,
 or wire-format code.
 
-The most important active risk is positional attribution in the hierarchical
-projection. Several method-scoped facts are attached using the currently active
-class or method rather than the stable target identifier carried by the fact.
-Moving, sorting, interleaving, or producing a fact before its definition can
-therefore change its meaning without producing an error. This projection is
-used by production MCP handlers, so the issue is not isolated to test-only
-code.
+The original highest-risk defect was positional attribution in the
+hierarchical projection. The bounded method-fact families are migrated in
+Phase 4B and the projection cursor is removed. Later class multiplicity,
+pattern schema, and interface representation work remains production-relevant
+because MCP handlers consume this projection.
 
 Related risks reinforce the same failure mode:
 
@@ -154,9 +156,11 @@ the canonical compiler output is correct.
 
 ### F-01: Projection still uses positional attribution
 
-Several facts carrying method identities are projected through current-scope
-state. The affected family includes parameters, returns, flags, body facts,
-control flow, data flow, side effects, and execution context.
+The original affected family included parameters, returns, flags, body facts,
+control flow, data flow, side effects, and execution context. The first slices
+now resolve all of those facts through stable typed identity. Phase 4B removes
+the obsolete projection cursor; pattern targeting still requires its separate
+typed-schema repair.
 
 Consequences:
 

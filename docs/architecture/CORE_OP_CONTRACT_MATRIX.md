@@ -198,11 +198,19 @@ flattened model.
 
 ### 6.1 Hierarchical destination changes implied by the matrix
 
-The current hierarchy cannot satisfy the matrix without these changes:
+Phase 4B implements the method-scoped subset of these changes:
 
-- `side_effect: Option<String>` becomes an occurrence-preserving collection;
-- `execution_context: Option<String>` becomes an occurrence-preserving
-  collection;
+- method `flags` stores an ordered collection of complete operation payloads;
+- `side_effect` is an occurrence-preserving collection;
+- `execution_context` is an occurrence-preserving collection;
+- `Body`, `DataFlow`, and `ControlFlow` resolve through the complete method-ID
+  index rather than current-scope state;
+- hierarchical wire output declares schema revision `"hs": 2` and its decoder
+  retains the previously supported unmarked flat/scalar shape;
+- unknown explicit hierarchical schema revisions fail decoding;
+
+The remaining hierarchy changes are:
+
 - repeated class flags remain distinguishable until a reducer is authorized;
 - optional-singular fields reject duplicates rather than overwrite them;
 - definitions and facts resolve through complete ID indexes;
@@ -211,9 +219,9 @@ The current hierarchy cannot satisfy the matrix without these changes:
 - interfaces are represented explicitly or rejected as unsupported;
 - patterns use a validated target schema, never prefix inference.
 
-The serialized hierarchical shape may be externally observable. Its migration
-requires the checked projection and MCP error policy already approved, plus a
-separate compatibility review for field-shape changes.
+The serialized hierarchical shape is externally observable. Its revision-2
+method-fact contract was approved on 2026-09-18. It is distinct from the later
+corrected binary physical version `0x04`.
 
 ## 7. Validation requirements
 
@@ -287,13 +295,14 @@ policy.
 
 These items do not reopen the five defaults:
 
-1. Decide whether the hierarchical external schema changes repeated
-   `side_effect` and `execution_context` fields in place or introduces a new
-   hierarchical schema version.
-2. Approve the eventual semantic-family enum members and their language-
+1. Approve the eventual semantic-family enum members and their language-
    specific mappings. Preservation remains mandatory in the meantime.
-3. Decide whether `DefInterface` gains a dedicated typed ID in a later slice;
+2. Decide whether `DefInterface` gains a dedicated typed ID in a later slice;
    the first slice retains its validated string identity.
+
+Resolved on 2026-09-18: method flag occurrences, side effects, and execution
+contexts use hierarchical schema revision `"hs": 2`; unmarked legacy
+documents remain readable through the established compatibility path.
 
 Import aliases are normatively file-wide because no downstream operation
 carries a narrower owner. `TypeAlias` is not a definition identity; production

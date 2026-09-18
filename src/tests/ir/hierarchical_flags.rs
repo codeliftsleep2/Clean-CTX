@@ -2,8 +2,8 @@
 //
 // RED-FLAG1..RED-FLAG6, RED-FLAG11, RED-FLAG12 plus the round-trip, wire and
 // flat-stream nonregressions: repeated `CoreOp::Flags` ops for ONE method id
-// must ACCUMULATE at the hierarchical projection instead of the last write
-// winning.
+// must remain distinct occurrences at the hierarchical projection instead of
+// being overwritten, merged, or deduplicated.
 //
 // `CoreOp::Flags` has multiple legitimate producers for the same method id:
 //
@@ -16,23 +16,13 @@
 //     op by `flush_method_flags` when the declaration ends.
 //
 // The flat stream therefore legitimately carries more than one `Flags` op for
-// one method, while the hierarchical representation has exactly one
-// `MethodNode::flags` field. Assignment (`flags = Some(op)`) kept only the
-// LAST op, so a method whose body contains control flow rendered `fl:RET`
-// and its declaration modifiers were never rendered at all.
+// one method. `MethodNode::flags` therefore stores one inner vector per op.
 //
-// Projection semantics pinned here: **first-seen stable order +
-// deduplication** — the values keep the order the flat stream first mentioned
-// them, and an already-present value is never appended again. The result is
-// deterministic; no unordered set is part of the representation.
+// Projection semantics pinned here: occurrence order, payload order, and
+// duplicate values are all preserved.
 //
 // ── ROUND-TRIP SCOPE (deliberate) ───────────────────────────────────────
-// This fixes INFORMATION LOSS, not flat-op multiplicity. Flat → hierarchical
-// unifies repeated ops into the one field, and hierarchical → flat
-// legitimately re-emits ONE combined `Flags` op. No assertion below requires
-// the original two ops to reappear separately after a hierarchical round
-// trip: true op-family/multiplicity preservation would need a richer
-// representation and is deliberately out of scope for this phase.
+// Flat → hierarchical → flat restores each original `Flags` occurrence.
 //
 // ── NOT changed by this fix (pinned below) ──────────────────────────────
 // The flat instruction stream itself — what pattern recognition and the
@@ -74,7 +64,7 @@ fn methods(hir: &HierarchicalIR) -> Vec<(String, String, Vec<String>)> {
             (
                 method.id.clone(),
                 method.name.clone(),
-                method.flags.clone().unwrap_or_default(),
+                method.flags.iter().flatten().cloned().collect(),
             )
         })
         .collect()
@@ -152,10 +142,10 @@ fn red_flag2_last_write_no_longer_wins() {
     );
 }
 
-// ── RED-FLAG3: stable deduplication ────────────────────────────────────
+// ── RED-FLAG3: duplicates remain semantic occurrences ─────────────────
 
 #[test]
-fn red_flag3_stable_deduplication() {
+fn red_flag3_duplicate_values_are_preserved() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "save".to_string()),
@@ -170,21 +160,25 @@ fn red_flag3_stable_deduplication() {
         vec![
             "PRIVATE".to_string(),
             "STATIC".to_string(),
+            "STATIC".to_string(),
             "RET".to_string()
         ],
-        "first-seen order is kept and a repeated value is not appended again"
+        "payload order and duplicate values must survive"
     );
     assert_eq!(
-        merged.len(),
-        3,
-        "STATIC must appear exactly once: {merged:?}"
+        merged
+            .iter()
+            .filter(|flag| flag.as_str() == "STATIC")
+            .count(),
+        2,
+        "both STATIC occurrences must survive: {merged:?}"
     );
 }
 
 // ── RED-FLAG4: three producer-style writes for one method ──────────────
 
 #[test]
-fn red_flag4_three_producer_style_writes_accumulate() {
+fn red_flag4_three_producer_style_writes_remain_ordered() {
     // Three writes in the order the flat stream can carry them: a
     // declaration modifier, a pattern-additive annotation, then the
     // control-flow family.
@@ -204,9 +198,10 @@ fn red_flag4_three_producer_style_writes_accumulate() {
             "OBSERVABLE".to_string(),
             "IF".to_string(),
             "RET".to_string(),
-            "LOOP".to_string()
+            "LOOP".to_string(),
+            "RET".to_string()
         ],
-        "every write contributes, in first-seen order, with no repeats"
+        "every write contributes in occurrence and payload order"
     );
 }
 
@@ -262,7 +257,7 @@ fn red_flag6_rendered_line_carries_declaration_and_control_flow() {
 
     let hir = ir_to_hierarchical(&ir);
     let out = render(&hir, Fidelity::Medium);
-    // The established `fl:` representation — no new schema.
+    // The established LLM-facing `fl:` representation remains compact.
     assert!(out.contains(" fl:STATIC,IF,RET"), "{out}");
     assert!(out.contains("STATIC"), "{out}");
     assert!(out.contains("RET"), "{out}");
@@ -309,10 +304,10 @@ fn red_flag12_control_flow_only_method_unchanged() {
     assert!(out.contains("fl:RET,IF"), "{out}");
 }
 
-// ── Round trip: information is preserved, op multiplicity is not ────────
+// ── Round trip: information and op multiplicity are preserved ──────────
 
 #[test]
-fn round_trip_preserves_flag_information_not_op_multiplicity() {
+fn round_trip_preserves_flag_occurrences() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "work".to_string()),
@@ -320,24 +315,26 @@ fn round_trip_preserves_flag_information_not_op_multiplicity() {
         flags("M1", &["RET"]),
     ]);
 
-    // flat → hierarchical: ONE field carrying BOTH producers' values.
+    // flat → hierarchical: one ordered entry for each producer occurrence.
     let hir = ir_to_hierarchical(&ir);
     assert_eq!(
         method_flags(&hir, "work"),
         vec!["STATIC".to_string(), "RET".to_string()]
     );
 
-    // hierarchical → flat: the decoder re-emits the PROJECTED form — one
-    // combined op. That is accepted here on purpose: this test pins
-    // INFORMATION preservation (every semantic flag survives), never the
-    // original two-op multiplicity, which the single-field representation
-    // cannot carry.
+    let method = &hir.classes[0].methods[0];
+    assert_eq!(
+        method.flags,
+        vec![vec!["STATIC".to_string()], vec!["RET".to_string()]]
+    );
+
+    // hierarchical → flat: each occurrence is restored independently.
     let restored = hierarchical_to_ir(&hir);
     let projected = flag_ops_for(&flat_ir(restored.clone()), "M1");
     assert_eq!(
         projected,
-        vec![vec!["STATIC".to_string(), "RET".to_string()]],
-        "the projected form is one combined op, not the original two"
+        vec![vec!["STATIC".to_string()], vec!["RET".to_string()]],
+        "the two original occurrences must remain distinct"
     );
 
     // No semantic flag value was lost anywhere in the round trip.
@@ -356,8 +353,8 @@ fn round_trip_preserves_flag_information_not_op_multiplicity() {
     assert_eq!(flag_ops_for(&ir, "M1").len(), 2);
     assert_eq!(
         restored.len(),
-        3,
-        "DefClass + DefMethod + one projected Flags op: {restored:?}"
+        4,
+        "DefClass + DefMethod + two Flags ops: {restored:?}"
     );
 }
 

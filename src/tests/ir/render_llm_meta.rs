@@ -27,12 +27,12 @@ fn test_spring_boot_class_with_meta() {
         .push(make_field("userService", Some("UserService")));
 
     let mut m1 = make_method("getAll");
-    m1.flags = Some(vec!["RET".into()]);
+    m1.flags = vec![vec!["RET".into()]];
     class.methods.push(m1);
 
     let mut m2 = make_method("find");
     m2.params.push(vec!["P1".into(), "$n".into(), "id".into()]);
-    m2.flags = Some(vec!["RET".into()]);
+    m2.flags = vec![vec!["RET".into()]];
     class.methods.push(m2);
 
     let mut m3 = make_method("find");
@@ -41,7 +41,7 @@ fn test_spring_boot_class_with_meta() {
     m3.params.push(vec!["P2".into(), "$n".into(), "age".into()]);
     m3.params
         .push(vec!["P3".into(), "$s".into(), "role".into()]);
-    m3.flags = Some(vec!["RET".into(), "IF".into()]);
+    m3.flags = vec![vec!["RET".into(), "IF".into()]];
     class.methods.push(m3);
 
     hir.classes.push(class);
