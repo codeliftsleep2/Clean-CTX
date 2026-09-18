@@ -1,12 +1,11 @@
 // Structural validation for canonical IR.
 //
-// Approved class/method/field/signature identities are validated by the
-// shared typed identity boundary. Existing rules for later operation families
-// remain behaviorally preserved until their matrix rows become normative.
+// Every `CoreOp` contract is enforced by the shared typed identity boundary.
+// Projection consumes the same authority, so validation and projection cannot
+// disagree about identity, ownership, cardinality, or payload validity.
 
 use super::compiler::CompiledIR;
-use super::identity::{IdentityError, IdentityIndex, validate_identity_graph};
-use super::opcodes::CoreOp;
+use super::identity::{IdentityError, validate_identity_graph};
 
 /// Validates a `CompiledIR` against structural invariants.
 pub trait IRValidator {
@@ -48,164 +47,17 @@ impl DefaultValidator {
 
 impl IRValidator for DefaultValidator {
     fn validate(&self, ir: &CompiledIR) -> Vec<ValidationError> {
-        let identities = match validate_identity_graph(ir) {
-            Ok(identities) => identities,
-            Err(error) => return vec![error.into()],
-        };
-
-        validate_deferred_operation_contracts(ir, &identities)
+        validate_identity_graph(ir)
+            .err()
+            .map(ValidationError::from)
+            .into_iter()
+            .collect()
     }
 }
 
 impl Default for DefaultValidator {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Preserve the established E003-E011 checks for operation families whose
-/// richer identity/cardinality contracts remain deferred. Every `CoreOp` is
-/// named explicitly so a new variant cannot silently bypass validation review.
-fn validate_deferred_operation_contracts(
-    ir: &CompiledIR,
-    identities: &IdentityIndex,
-) -> Vec<ValidationError> {
-    let mut errors = Vec::new();
-
-    for (instruction, op) in ir.instructions.iter().enumerate() {
-        match op {
-            CoreOp::DefClass(..) => {}
-            CoreOp::DefMethod(..) => {}
-            CoreOp::DefField(..) => {}
-            CoreOp::DefInterface(..) => {}
-            CoreOp::Param(..) => {}
-            CoreOp::Return(..) => {}
-            CoreOp::FieldType(..) => {}
-            CoreOp::Flags(method, _) => push_unknown_method(
-                &mut errors,
-                identities,
-                method,
-                instruction,
-                "E003",
-                "FLAGS",
-                "method",
-            ),
-            CoreOp::ClassFlags(..) => {}
-            CoreOp::Extends(class, _) => push_unknown_class(
-                &mut errors,
-                identities,
-                class,
-                instruction,
-                "E004",
-                "EXT",
-                "child class",
-            ),
-            CoreOp::Implements(class, _) => push_unknown_class(
-                &mut errors,
-                identities,
-                class,
-                instruction,
-                "E005",
-                "IMPL",
-                "class",
-            ),
-            CoreOp::Injects(class, _) => push_unknown_class(
-                &mut errors,
-                identities,
-                class,
-                instruction,
-                "E006",
-                "INJECTS",
-                "class",
-            ),
-            CoreOp::Import(..) => {}
-            CoreOp::TypeAlias(..) => {}
-            CoreOp::Pattern(..) => {}
-            CoreOp::Body(..) => {}
-            CoreOp::DataFlow(method, ..) => push_unknown_method(
-                &mut errors,
-                identities,
-                method,
-                instruction,
-                "E007",
-                "DATAFLOW",
-                "method",
-            ),
-            CoreOp::ControlFlow(method, ..) => push_unknown_method(
-                &mut errors,
-                identities,
-                method,
-                instruction,
-                "E008",
-                "CTRL",
-                "method",
-            ),
-            CoreOp::SideEffect(method, _) => push_unknown_method(
-                &mut errors,
-                identities,
-                method,
-                instruction,
-                "E009",
-                "EFFECT",
-                "method",
-            ),
-            CoreOp::ExecutionContext(method, _) => push_unknown_method(
-                &mut errors,
-                identities,
-                method,
-                instruction,
-                "E010",
-                "CTX",
-                "method",
-            ),
-            CoreOp::Call(caller, ..) => push_unknown_method(
-                &mut errors,
-                identities,
-                caller,
-                instruction,
-                "E011",
-                "CALL",
-                "caller method",
-            ),
-        }
-    }
-
-    errors
-}
-
-fn push_unknown_method(
-    errors: &mut Vec<ValidationError>,
-    identities: &IdentityIndex,
-    method: &str,
-    instruction: usize,
-    code: &'static str,
-    operation: &'static str,
-    target_kind: &'static str,
-) {
-    if !identities.contains_method(method) {
-        errors.push(ValidationError {
-            code: code.to_owned(),
-            message: format!("{operation} references unknown {target_kind} '{method}'"),
-            instruction_index: Some(instruction),
-        });
-    }
-}
-
-fn push_unknown_class(
-    errors: &mut Vec<ValidationError>,
-    identities: &IdentityIndex,
-    class: &str,
-    instruction: usize,
-    code: &'static str,
-    operation: &'static str,
-    target_kind: &'static str,
-) {
-    if !identities.contains_class(class) {
-        errors.push(ValidationError {
-            code: code.to_owned(),
-            message: format!("{operation} references unknown {target_kind} '{class}'"),
-            instruction_index: Some(instruction),
-        });
     }
 }
 
@@ -216,3 +68,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/ir/validator_identity.rs"]
 mod identity_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/validator_phase4a.rs"]
+mod phase4a_tests;

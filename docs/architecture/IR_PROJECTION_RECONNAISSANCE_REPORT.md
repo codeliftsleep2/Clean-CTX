@@ -22,7 +22,11 @@ projection repair was user-verified and checkpointed. The bounded
 `DefField`/`FieldType` repair was user-verified as the Phase 2 checkpoint on
 2026-09-18. The shared validation authority for all six normative operations is
 implemented and user-verified as the bounded Phase 3 checkpoint on 2026-09-18.
-Findings for all later operation families remain open exactly as recorded below.
+Phase 4A implemented and user-verified the remaining shared operation-validation
+contracts on 2026-09-18. Positional projection findings remain open until the
+subsequent projection-replacement slices. User-run verification also proved that
+`TypeAlias` carries repeated `Φ` metadata; its ordered-many correction was
+approved, implemented, and verified on 2026-09-18.
 
 ## 1. Executive summary
 

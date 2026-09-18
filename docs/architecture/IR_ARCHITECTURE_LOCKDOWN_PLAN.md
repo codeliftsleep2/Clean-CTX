@@ -4,7 +4,9 @@
 `Param`/`Return` slice is user-verified and checkpointed. The bounded
 `DefField`/`FieldType` slice is user-verified as the Phase 2 checkpoint; later
 operation families remain pending. The bounded shared-validation slice was
-user-verified as the Phase 3 checkpoint on 2026-09-18.
+user-verified as the Phase 3 checkpoint on 2026-09-18. Phase 4A completed the
+shared validation contracts for all current operations and was user-verified
+on 2026-09-18; hierarchical projection replacement remains pending.
 
 **Date:** 2026-09-17
 
@@ -254,6 +256,10 @@ Exit criteria:
   points;
 - adding a new `CoreOp` requires an explicit validator decision.
 
+Implementation status: Phase 4A completes these deliverables for all 21
+current operations through the shared typed validation authority. User-run
+verification remains pending.
+
 ### Phase 4: Replace hierarchical projection
 
 Deliverables:
@@ -385,9 +391,9 @@ Exit criteria:
 Approved: internal `ClassId`, `MethodId`, `FieldId`, and `ParameterId` with
 unchanged initial serialized string shapes.
 
-Remaining review: semantic-family enum members, language mappings, and the
-draft matrix's per-operation cardinalities. Preserve every occurrence while
-those finer contracts are unresolved.
+Remaining review: semantic-family enum members and language mappings. The
+matrix's per-operation cardinalities are normative; preserve every occurrence
+unless its row explicitly declares a singular contract.
 
 Tradeoff: more explicit conversion code in exchange for compiler-enforced
 boundaries.
@@ -404,8 +410,8 @@ incomplete data.
 ### Gate C: Multiplicity default — approved
 
 Preserve every occurrence by default. A per-operation contract must explicitly
-authorize any deduplication, union, replacement, or reduction. The draft
-matrix's singular-cardinality proposals remain reviewable details.
+authorize any deduplication, union, replacement, or reduction. The matrix's
+approved singular cardinalities fail on duplicates rather than replacing them.
 
 Tradeoff: potentially larger IR and deltas in exchange for correctness and
 reversible transformations.
@@ -518,8 +524,9 @@ outside its approved scope. User-run verification was reported green on
 
 ## 11. Third bounded implementation slice
 
-The approved Phase 3 checkpoint centralizes validation for the six normative
-operations without approving the remaining draft operation rows:
+At the time it landed, the approved Phase 3 checkpoint centralized validation
+for the six then-normative operations without approving the remaining draft
+operation rows:
 
 1. `ClassId`, `MethodId`, `FieldId`, `ParameterId`, `IdentityKind`, and the
    structured identity errors move to one shared IR identity module;
@@ -536,9 +543,41 @@ operations without approving the remaining draft operation rows:
 This checkpoint does not claim the roadmap's full Phase 3 exit criteria for
 the remaining draft rows. It establishes the single validation authority that
 later approved rows will extend. User-run verification was reported green on
-2026-09-18 before this checkpoint was committed.
+2026-09-18 before this checkpoint was committed. The subsequent Phase 4A
+approval supersedes those row-level deferrals as described below.
 
-## 12. Verification ownership
+## 12. Approved Phase 4A implementation slice
+
+Phase 4A makes every current operation row normative and completes the
+validation prerequisite without changing hierarchical projection shapes:
+
+1. the shared two-pass validator covers every definition, owner, target kind,
+   duplicate definition, and optional-singular cardinality;
+2. `DefInterface` and import aliases retain their serialized string
+   representation while gaining duplicate and empty-identity checks;
+3. `TypeAlias` retains every ordered occurrence because production uses the
+   operation for both configured type substitutions and repeated `Φ` metadata;
+4. flags reject empty payloads without reducing repeated occurrences;
+5. body spans enforce both-or-neither presence and non-reversed ranges;
+6. data flow, control flow, side effects, and execution contexts enforce their
+   declared vocabularies;
+7. patterns use their declared schema, resolved class and method identities,
+   and verified method ownership rather than ID-prefix inference;
+8. the production `ValidationPass` and checked hierarchical projection consume
+   the same authority;
+9. legacy validation codes E001-E011 remain stable for their existing operation
+   families while projection retains structured error classifications.
+
+The ordered-many `TypeAlias` correction was approved on 2026-09-18 after
+user-run tests demonstrated repeated `@describe`, `@action`, and `@dispatch`
+facts in the production pipeline. Producer deduplication was rejected because
+it would discard distinct metadata payloads.
+
+This slice does not change hierarchy field cardinalities, replace positional
+projection, migrate producers, alter delta/replay, or implement binary version
+`0x04`. The complete user-run Phase 4A gate was reported green on 2026-09-18.
+
+## 13. Verification ownership
 
 Agents must not initiate the repository's long-running build, test, Clippy,
 format, audit, binary, or server commands. During implementation, the agent may

@@ -42,6 +42,24 @@ pub enum IdentityError {
         first_instruction: usize,
         duplicate_instruction: usize,
     },
+    DuplicateFact {
+        operation: &'static str,
+        target_kind: IdentityKind,
+        target_id: String,
+        first_instruction: usize,
+        duplicate_instruction: usize,
+    },
+    InvalidOperation {
+        operation: &'static str,
+        instruction: usize,
+        detail: String,
+    },
+    OwnerMismatch {
+        operation: &'static str,
+        id: String,
+        expected_owner: String,
+        instruction: usize,
+    },
 }
 
 impl IdentityError {
@@ -54,6 +72,9 @@ impl IdentityError {
             Self::KindMismatch { .. } => "ir_projection_kind_mismatch",
             Self::DuplicateReturn { .. } => "ir_projection_duplicate_return",
             Self::DuplicateFieldType { .. } => "ir_projection_duplicate_field_type",
+            Self::DuplicateFact { .. } => "ir_projection_duplicate_fact",
+            Self::InvalidOperation { .. } => "ir_projection_invalid_operation",
+            Self::OwnerMismatch { .. } => "ir_projection_owner_mismatch",
         }
     }
 
@@ -70,21 +91,43 @@ impl IdentityError {
             | Self::DuplicateFieldType {
                 duplicate_instruction,
                 ..
+            }
+            | Self::DuplicateFact {
+                duplicate_instruction,
+                ..
             } => *duplicate_instruction,
             Self::InvalidIdentity { instruction, .. }
             | Self::UnresolvedIdentity { instruction, .. }
-            | Self::KindMismatch { instruction, .. } => *instruction,
+            | Self::KindMismatch { instruction, .. }
+            | Self::InvalidOperation { instruction, .. }
+            | Self::OwnerMismatch { instruction, .. } => *instruction,
         }
     }
 
     pub(crate) fn validation_code(&self) -> &'static str {
-        match self {
-            Self::UnresolvedIdentity {
-                operation: "RET", ..
-            } => "E001",
-            Self::UnresolvedIdentity {
-                operation: "SIG", ..
-            } => "E002",
+        let operation = match self {
+            Self::InvalidIdentity { operation, .. }
+            | Self::UnresolvedIdentity { operation, .. }
+            | Self::KindMismatch { operation, .. }
+            | Self::DuplicateFact { operation, .. }
+            | Self::InvalidOperation { operation, .. }
+            | Self::OwnerMismatch { operation, .. } => Some(*operation),
+            Self::DuplicateIdentity { .. }
+            | Self::DuplicateReturn { .. }
+            | Self::DuplicateFieldType { .. } => None,
+        };
+        match operation {
+            Some("RET") => "E001",
+            Some("SIG") => "E002",
+            Some("FLAGS") => "E003",
+            Some("EXT") => "E004",
+            Some("IMPL") => "E005",
+            Some("INJECTS") => "E006",
+            Some("DATAFLOW") => "E007",
+            Some("CTRL") => "E008",
+            Some("EFFECT") => "E009",
+            Some("CTX") => "E010",
+            Some("CALL") => "E011",
             _ => self.code(),
         }
     }
@@ -161,6 +204,33 @@ impl std::fmt::Display for IdentityError {
             } => write!(
                 f,
                 "FIELD_T at instruction {duplicate_instruction} duplicates the type fact for field '{field_id}' (first defined at {first_instruction})"
+            ),
+            Self::DuplicateFact {
+                operation,
+                target_kind,
+                target_id,
+                first_instruction,
+                duplicate_instruction,
+            } => write!(
+                f,
+                "{operation} at instruction {duplicate_instruction} duplicates the singular fact for {target_kind} '{target_id}' (first defined at {first_instruction})"
+            ),
+            Self::InvalidOperation {
+                operation,
+                instruction,
+                detail,
+            } => write!(
+                f,
+                "{operation} at instruction {instruction} is invalid: {detail}"
+            ),
+            Self::OwnerMismatch {
+                operation,
+                id,
+                expected_owner,
+                instruction,
+            } => write!(
+                f,
+                "{operation} at instruction {instruction} targets identity '{id}' outside declared owner '{expected_owner}'"
             ),
         }
     }

@@ -58,6 +58,7 @@ fn ctor_class() -> CoreOp {
 
 fn promise_stream(call: Option<CoreOp>) -> Vec<CoreOp> {
     let mut ops = vec![
+        CoreOp::DefClass("C1".into(), "Example".into()),
         CoreOp::DefMethod("C1".into(), "M1".into(), "load".into()),
         CoreOp::Return("M1".into(), "Promise".into()),
     ];
@@ -138,6 +139,7 @@ fn red_call21_promise_control_still_compresses_without_a_call() {
     assert_eq!(
         compressed,
         vec![
+            CoreOp::DefClass("C1".into(), "Example".into()),
             CoreOp::DefMethod("C1".into(), "M1".into(), "load".into()),
             CoreOp::Return("M1".into(), "Promise".into()),
             CoreOp::Pattern(

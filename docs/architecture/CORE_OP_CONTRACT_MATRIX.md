@@ -1,9 +1,8 @@
 # CoreOp Architectural Contract Matrix
 
-**Status:** Approved architectural defaults. The `DefClass`, `DefMethod`,
-`Param`, `Return`, `DefField`, and `FieldType` rows are normative target
-architecture. Other per-operation rows remain a Phase 0 draft for later
-review.
+**Status:** Approved target architecture. All 21 current `CoreOp` rows are
+normative. Hierarchical schema-shape decisions identified in Section 10 remain
+separately gated.
 
 **Date:** 2026-09-17
 
@@ -11,8 +10,11 @@ review.
 user-verified in the first projection slice. The two field rows were implemented
 and user-verified in the second bounded projection slice. The shared typed
 validator for all six normative rows was implemented and user-verified in the
-third bounded slice on 2026-09-18. All other rows remain planning targets and
-were not broadened into these slices.
+third bounded slice on 2026-09-18. Phase 4A implemented and user-verified the
+shared validation contracts for the remaining rows on 2026-09-18. During that
+verification, production evidence proved that `TypeAlias` is also the carrier
+for repeated `Φ` metadata. Its ordered-many correction was explicitly approved
+on 2026-09-18 and is recorded below.
 
 **Related documents:**
 
@@ -62,16 +64,20 @@ evidence and architectural review.
   delta shapes. `ParameterId` uniqueness is required within its owning method.
 - Class, method, field, and parameter strings remain unchanged on serialized
   boundaries during the first migration.
-- `DefInterface`, import aliases, and type aliases are real identities but are
-  outside the four approved first-slice newtypes. They remain validated string
-  identities until a separately justified typed migration.
+- `DefInterface` and import aliases are real identities but are outside the four
+  approved first-slice newtypes. They remain validated string identities until
+  a separately justified typed migration.
+- Despite its historical name, `TypeAlias` is an occurrence fact used both for
+  configured type substitutions and repeated `Φ` metadata markers. Its alias
+  operand is not a unique definition identity.
 
 ### 3.2 External symbolic references
 
 The referenced parent in `Extends`, interface in `Implements`, dependency in
 `Injects`, original type in `TypeAlias`, and callee in `Call` can represent
-symbols not defined in the same compiled IR. Their owning source identity must
-resolve locally; the external symbolic operand need not.
+symbols not defined in the same compiled IR. Where an operation has a local
+owning identity, that owner must resolve; external symbolic operands and the
+`TypeAlias` payload need not.
 
 ### 3.3 Binary version-number contradiction
 
@@ -136,7 +142,7 @@ not automatically a semantic serialization of the canonical stream.
 | `Implements(class, interface)` | Language layer; trusted decoder | Targets `ClassId`; class must resolve; interface is an external-capable symbolic reference | Ordered many per class; every occurrence preserved | None |
 | `Injects(class, dependencies)` | Language or pattern layer; trusted decoder | Targets `ClassId`; class must resolve; dependencies are external-capable symbolic references | Ordered many operations; each payload is ordered and duplicate-preserving | None |
 | `Import(alias, module, named)` | Import compiler capture; trusted decoder | Defines import alias in existing string namespace; duplicate alias fails | Unique definition per alias | None |
-| `TypeAlias(alias, original)` | Type-alias compiler/runtime assignment; trusted decoder | Defines type alias in existing string namespace; duplicate alias fails | Unique definition per alias | None |
+| `TypeAlias(alias, original)` | Type-alias and meta-marker producers; trusted decoder | Alias token must be non-empty; `original` is an external-capable payload, not a locally resolved identity | Ordered many; every operation and exact duplicate preserved | None |
 | `Pattern(name, args)` | Approved pattern recognizers; trusted decoder | `args[0]` is `ClassId`; method-level schemas also require `args[1]` as `MethodId` owned by that class; both must resolve; pattern schema determines remaining operands | Ordered many; complete args and duplicate occurrences preserved | None |
 | `Body(method, text, start, end)` | Edit-fidelity compiler capture; trusted decoder | Targets `MethodId`; method must resolve; span fields are both present or both absent; present span must be valid | Optional singular per method; duplicate fails | None |
 | `DataFlow(method, direction, target)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; direction must be from the declared vocabulary | Ordered many; every occurrence preserved | None |
@@ -148,10 +154,13 @@ not automatically a semantic serialization of the canonical stream.
 ### 5.1 Pattern schema restriction
 
 The current pattern representation embeds target identity in untyped arguments.
-The first migration must validate the documented tuple shape and stop using ID
+The named compressed method-pattern schemas validate their documented tuple
+shape and class/method ownership. Other pattern names retain the established
+generic class-pattern contract: `args[0]` is the resolved class target and all
+remaining operands are opaque metadata. No validator or projector may use ID
 prefixes such as `starts_with('M')` to decide target kind. A later typed
-`PatternTarget` representation is desirable but is not part of the four
-approved first-slice identity newtypes.
+`PatternTarget` representation remains desirable but is not part of the four
+approved identity newtypes.
 
 ### 5.2 Flags restriction
 
@@ -178,7 +187,7 @@ flattened model.
 | `Implements` | Repeated interface references under resolved class | `(ClassId, interface, occurrence)` | Lossy: class ID omitted | Encode class and interface |
 | `Injects` | Repeated dependency payloads under resolved class | `(ClassId, complete dependencies, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
 | `Import` | File-level import definition | Import alias | Lossy: alias omitted | Encode alias, module, and named export |
-| `TypeAlias` | File-level type-alias definition | Type alias | Lossy: alias omitted | Encode alias and original type |
+| `TypeAlias` | File-level ordered occurrence fact | `(alias, original, occurrence)` | Lossy: alias omitted | Encode alias, original payload, and occurrence order |
 | `Pattern` | Class or method collection selected by validated schema | `(name, complete args, occurrence)` | Semantic for present operands | Preserve complete schema and occurrences |
 | `Body` | Singular body under resolved method | `MethodId` | Semantic in current `0x03`, including optional spans | Preserve text and paired spans |
 | `DataFlow` | Repeated data-flow facts under resolved method | `(MethodId, direction, target, occurrence)` | Semantic for present operands | Preserve all occurrences |
@@ -274,7 +283,7 @@ The first implementation slice should protect `DefClass`, `DefMethod`,
 The test and corresponding repair land together under the approved rollout
 policy.
 
-## 10. Open review items not covered by the approved defaults
+## 10. Open review items not covered by the approved operation contracts
 
 These items do not reopen the five defaults:
 
@@ -285,12 +294,11 @@ These items do not reopen the five defaults:
    specific mappings. Preservation remains mandatory in the meantime.
 3. Decide whether `DefInterface` gains a dedicated typed ID in a later slice;
    the first slice retains its validated string identity.
-4. Confirm whether import and type-alias identities are globally unique within
-   a compiled file or scoped more narrowly. The draft assumes file-wide
-   uniqueness because downstream operations do not carry a narrower owner.
 
-None of these items blocks the first typed class/method identity, exhaustive
-validation, or checked projection slice.
+Import aliases are normatively file-wide because no downstream operation
+carries a narrower owner. `TypeAlias` is not a definition identity; production
+evidence established its ordered-many occurrence contract. The remaining items
+do not block the approved validation or checked projection work.
 
 ## 11. Required second-slice tests
 
