@@ -7,9 +7,9 @@ operation families remain pending. The bounded shared-validation slice was
 user-verified as the Phase 3 checkpoint on 2026-09-18. Phase 4A completed the
 shared validation contracts for all current operations and was user-verified
 on 2026-09-18. Phase 4B implemented stable-identity method-fact projection and
-hierarchical schema revision 2 and was user-verified on 2026-09-18. Phase 4C
-implements stable-identity class-fact projection and hierarchical schema
-revision 3; user-run verification is pending.
+hierarchical schema revision 2 and was user-verified on 2026-09-18. Phase 4C's
+stable-identity class-fact projection and schema revision 3 were user-verified.
+Phase 4D typed pattern targeting was implemented and user-verified.
 
 **Date:** 2026-09-17
 
@@ -290,9 +290,10 @@ The projection cursor is removed. Phase 4C moves class-scoped `ClassFlags`,
 `Extends`, `Implements`, and `Injects` to the typed `ClassId` index. Revision 3
 preserves repeated class-flag and injection payloads; strict revision 2 and
 unmarked legacy documents remain readable through decode-only adapters. Typed
-pattern targeting and interface representation remain later Phase 4 slices.
-The user-reported Phase 4B gate was green on 2026-09-18; Phase 4C verification
-is pending.
+pattern targeting now uses a shared schema-derived `PatternTarget`, attaches
+after definition indexing, and retains existing serialized shapes. Interface
+representation remains a later Phase 4 slice. The user-reported Phase 4B and
+4C gates were green on 2026-09-18; Phase 4D was also green on that date.
 
 ### Phase 5: Correct producer ownership
 

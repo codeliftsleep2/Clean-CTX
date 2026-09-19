@@ -1,6 +1,9 @@
 use super::cardinality::{insert_definition, insert_singular};
 use super::payload::{require_non_empty_payload, require_vocabulary, validate_body_span};
-use super::{ClassId, FieldId, IdentityError, IdentityIndex, IdentityKind, MethodId, ParameterId};
+use super::{
+    ClassId, FieldId, IdentityError, IdentityIndex, IdentityKind, MethodId, ParameterId,
+    PatternTarget, pattern_target,
+};
 use crate::ir::CompiledIR;
 use crate::ir::opcodes::{
     CTRL_AWAIT, CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTRL_TRY, CTX_ASYNC, CTX_REALTIME,
@@ -404,59 +407,33 @@ fn validate_pattern(
     instruction: usize,
     index: &IdentityIndex,
 ) -> Result<(), IdentityError> {
-    if name.is_empty() {
-        return Err(IdentityError::InvalidOperation {
-            operation: "PAT",
-            instruction,
-            detail: "pattern name must not be empty".into(),
-        });
-    }
-    let method_pattern = matches!(
-        name,
-        "CTOR" | "EMPTY_CTOR" | "OBSERVABLE" | "PROMISE" | "GETTER" | "SETTER" | "OVERRIDE"
-    );
-    let valid_arity = match name {
-        "CTOR" => args.len() >= 2,
-        "EMPTY_CTOR" | "OVERRIDE" => args.len() == 2,
-        "OBSERVABLE" | "PROMISE" | "GETTER" | "SETTER" => args.len() == 3,
-        _ => !args.is_empty(),
+    let target = pattern_target(name, args, instruction)?;
+    let (class, method) = match &target {
+        PatternTarget::Class(class) => (class, None),
+        PatternTarget::Method { class, method } => (class, Some(method)),
     };
-    if !valid_arity {
-        return Err(IdentityError::InvalidOperation {
-            operation: "PAT",
-            instruction,
-            detail: format!("pattern '{name}' has invalid operand count {}", args.len()),
-        });
-    }
-
-    let raw_class = &args[0];
     require_target(
         "PAT class",
-        raw_class,
+        class.as_str(),
         IdentityKind::Class,
         instruction,
         index,
     )?;
-    if !method_pattern {
+    let Some(method) = method else {
         return Ok(());
-    }
-
-    let raw_method = &args[1];
+    };
     require_target(
         "PAT method",
-        raw_method,
+        method.as_str(),
         IdentityKind::Method,
         instruction,
         index,
     )?;
-
-    let method = MethodId::from_serialized(raw_method);
-    let expected_owner = ClassId::from_serialized(raw_class);
-    if index.method_owners.get(&method) != Some(&expected_owner) {
+    if index.method_owners.get(method) != Some(class) {
         return Err(IdentityError::OwnerMismatch {
             operation: "PAT",
-            id: raw_method.clone(),
-            expected_owner: raw_class.clone(),
+            id: method.as_str().to_owned(),
+            expected_owner: class.as_str().to_owned(),
             instruction,
         });
     }

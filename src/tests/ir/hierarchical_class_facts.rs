@@ -123,10 +123,7 @@ fn revision_two_class_shapes_remain_readable() {
         decoded.instructions,
         vec![
             CoreOp::DefClass("C1".into(), "Sample".into()),
-            CoreOp::ClassFlags(
-                "C1".into(),
-                vec!["EXPORT".into(), "ABSTRACT".into()],
-            ),
+            CoreOp::ClassFlags("C1".into(), vec!["EXPORT".into(), "ABSTRACT".into()],),
             CoreOp::Extends("C1".into(), "Base".into()),
             CoreOp::Implements("C1".into(), "Readable".into()),
             CoreOp::Implements("C1".into(), "Readable".into()),

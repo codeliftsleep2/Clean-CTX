@@ -10,9 +10,11 @@ use std::collections::HashMap;
 mod cardinality;
 mod contracts;
 mod error;
+mod pattern;
 mod payload;
 
 pub use error::IdentityError;
+pub(crate) use pattern::{PatternTarget, pattern_target};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IdentityKind {
@@ -45,6 +47,10 @@ pub(crate) struct ClassId(String);
 impl ClassId {
     pub(crate) fn from_serialized(value: &str) -> Self {
         Self(value.to_owned())
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
     }
 }
 

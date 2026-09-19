@@ -14,10 +14,9 @@ third bounded slice on 2026-09-18. Phase 4A implemented and user-verified the
 shared validation contracts for the remaining rows on 2026-09-18. During that
 verification, production evidence proved that `TypeAlias` is also the carrier
 for repeated `Φ` metadata. Its ordered-many correction was explicitly approved
-on 2026-09-18 and is recorded below. Phase 4B implemented and user-verified
-the method-fact hierarchy contracts. Phase 4C implements the class-fact
-hierarchy contracts under approved schema revision 3; user-run verification is
-pending.
+on 2026-09-18 and is recorded below. Phases 4B and 4C implemented and user-
+verified the method- and class-fact hierarchy contracts. Phase 4D implemented
+schema-derived typed pattern targeting and was user-verified on 2026-09-18.
 
 **Related documents:**
 
@@ -161,9 +160,9 @@ The named compressed method-pattern schemas validate their documented tuple
 shape and class/method ownership. Other pattern names retain the established
 generic class-pattern contract: `args[0]` is the resolved class target and all
 remaining operands are opaque metadata. No validator or projector may use ID
-prefixes such as `starts_with('M')` to decide target kind. A later typed
-`PatternTarget` representation remains desirable but is not part of the four
-approved identity newtypes.
+prefixes such as `starts_with('M')` to decide target kind. Phase 4D introduces
+an internal typed `PatternTarget`; it does not alter the four approved identity
+newtypes or either serialized representation.
 
 ### 5.2 Flags restriction
 
@@ -212,7 +211,7 @@ Phase 4B implements the method-scoped subset of these changes:
   retains the previously supported unmarked flat/scalar shape;
 - unknown explicit hierarchical schema revisions fail decoding;
 
-Phase 4C implements the class-scoped subset:
+Phase 4C implements the class-scoped subset and was user-verified:
 
 - `ClassFlags`, `Extends`, `Implements`, and `Injects` resolve through the
   complete typed class-ID index, independent of instruction order;
@@ -223,12 +222,15 @@ Phase 4C implements the class-scoped subset:
 - strict revision-2 flat class containers and unmarked legacy documents remain
   readable through decode-only compatibility adapters.
 
-The remaining hierarchy changes are:
+Phase 4D implements schema-derived typed pattern targeting without changing
+the serialized `CoreOp::Pattern` or hierarchical shapes. Validation and
+projection share the same `PatternTarget` parser; projection attaches patterns
+through complete class and method indexes after definitions are materialized.
+Pattern names, never identifier prefixes, determine target kind. The user-run
+gate was green on 2026-09-18.
 
-- unresolved targets produce structured errors;
-- synthetic classes are not created to hide unresolved owners;
-- interfaces are represented explicitly or rejected as unsupported;
-- patterns use a validated target schema, never prefix inference.
+The remaining hierarchy change is explicit interface representation or
+rejection as unsupported.
 
 The serialized hierarchical shape is externally observable. Its revision-2
 method-fact contract and revision-3 class-fact contract were approved on

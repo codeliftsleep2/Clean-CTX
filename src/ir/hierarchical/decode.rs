@@ -52,10 +52,7 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
 
             // Injection occurrences
             for dependencies in &class.injects {
-                instructions.push(CoreOp::Injects(
-                    class.id.clone(),
-                    dependencies.clone(),
-                ));
+                instructions.push(CoreOp::Injects(class.id.clone(), dependencies.clone()));
             }
         }
 

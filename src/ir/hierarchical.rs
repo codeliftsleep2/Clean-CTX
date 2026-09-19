@@ -293,16 +293,12 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         .get("hs")
         .map(|schema_version| {
             schema_version.as_u64().ok_or_else(|| {
-                DecodeError::InvalidInput(
-                    "hierarchical schema version must be an integer".into(),
-                )
+                DecodeError::InvalidInput("hierarchical schema version must be an integer".into())
             })
         })
         .transpose()?;
     match schema_version {
-        None
-        | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION)
-        | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
+        None | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(unsupported) => {
             return Err(DecodeError::InvalidInput(format!(
                 "unsupported hierarchical schema version: {unsupported}"
@@ -488,3 +484,7 @@ mod method_fact_tests;
 #[cfg(test)]
 #[path = "../tests/ir/hierarchical_class_facts.rs"]
 mod class_fact_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/hierarchical_patterns.rs"]
+mod pattern_tests;
