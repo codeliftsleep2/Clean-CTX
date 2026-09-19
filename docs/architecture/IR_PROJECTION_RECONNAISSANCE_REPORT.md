@@ -37,7 +37,15 @@ Phase 6A separates declaration modifiers into typed method/class operations
 across producers, validation, patterns, projection, rendering, and wire
 formats; it was user-verified on 2026-09-18. Phase 6B implements typed control
 summaries while keeping the LLM-facing `ctl:` projection independently compact;
-the slice is awaiting user-run verification.
+it was user-verified and checkpointed as `3360512` on 2026-09-19.
+
+**Production-integration status:** Phase checkpoints certify bounded
+implementation and applicable gates; they do not certify production completion.
+No migrated family is complete until Phase 9 traces and records its real default
+entry point, production compiler path, result and persistent owner, workspace
+lifecycle, actual consumer, MCP/API exposure, and applicable live reachability.
+The existence of code, fields, or passing isolated tests is not integration
+evidence.
 
 ## 1. Executive summary
 
@@ -99,7 +107,10 @@ The governing architectural principles are:
 7. Tests enforce intended contracts rather than accidental implementation
    shape.
 
-## 3. Current architecture map
+## 3. Original architecture map (reconnaissance baseline)
+
+This map records the architecture observed before the migration checkpoints.
+It is retained as investigation evidence, not as a current integration claim.
 
 ### 3.1 Producers
 

@@ -364,22 +364,22 @@ Exit criteria:
 
 ### Phase 9: Production integration audit
 
-Trace the real lifecycle for each migrated semantic family:
+Earlier phase checkpoints certify bounded implementation and applicable gates;
+they never mark a semantic family complete. Completion requires documented
+Phase 9 evidence tracing the real lifecycle for every migrated family:
 
 ```text
 producer
-  -> production compiler
-  -> validation
-  -> transformations
-  -> result boundary
-  -> persistent workspace owner
-  -> lifecycle updates and deletion
-  -> consumer
-  -> MCP response
+  -> production compiler, validation, and transformations
+  -> result boundary and persistent workspace owner
+  -> recompilation, deletion, reset, and replacement
+  -> actual production consumer
+  -> MCP/API response and applicable live reachability
 ```
 
 Exit criteria:
 
+- the audit records concrete entry points, owners, consumers, and tests;
 - default production entry points invoke the new boundaries;
 - recompilation, deletion, reset, and workspace replacement are covered;
 - externally visible behavior is tested where the change can reach it;

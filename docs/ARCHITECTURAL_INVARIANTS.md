@@ -113,6 +113,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### ARCH-004 Production Integration Is the Completion Boundary
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Prevent implemented but unreachable features from being reported as complete. |
+| **Invariant** | A component or semantic family is not complete until its real default production lifecycle is traced and evidenced: producer, production pipeline, result boundary, persistent owner, workspace/session lifecycle, actual consumer, MCP/API exposure, and applicable live reachability. Code existence, populated test-only state, custom-pipeline tests, and isolated unit tests are implementation evidence only. |
+| **Enforcement** | Every migration phase is a checkpoint until the Phase 9 production-integration audit records concrete entry points, owners, lifecycle behavior, consumers, external exposure, and tracked production-path coverage. Obsolete bypass paths must be removed before completion. |
+| **Authority** | `AGENTS.md` §11 (Production Integration Gate), `docs/architecture/IR_ARCHITECTURE_LOCKDOWN_PLAN.md` Phase 9 and Production review |
+| **Type** | GOVERNANCE and INTEGRATION |
+| **Gate** | Production lifecycle trace, applicable tracked integration tests, and applicable live end-to-end verification |
+
+---
+
 ### PIPELINE-001 Compilation Pipeline Ordering
 
 | Property | Value |
