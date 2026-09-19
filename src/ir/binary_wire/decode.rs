@@ -36,6 +36,8 @@ pub enum BinaryDecodeError {
     InvalidDeclarationModifier(String),
     /// Unknown control summary in the typed summary opcode
     InvalidControlSummary(String),
+    /// Malformed typed pattern-fact payload
+    InvalidPatternFact,
 }
 
 impl std::fmt::Display for BinaryDecodeError {
@@ -57,6 +59,7 @@ impl std::fmt::Display for BinaryDecodeError {
             BinaryDecodeError::InvalidControlSummary(value) => {
                 write!(f, "invalid control summary: {value}")
             }
+            BinaryDecodeError::InvalidPatternFact => f.write_str("invalid pattern fact payload"),
         }
     }
 }
@@ -236,6 +239,17 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                         })
                         .collect::<Result<Vec<_>, _>>()?;
                     CoreOp::ControlSummary(method_id, summaries)
+                }
+                OP_PAT_FACT => {
+                    if operands.len() < 2 {
+                        return Err(BinaryDecodeError::TruncatedData(
+                            "PAT_FACT needs a method_id and at least one fact".into(),
+                        ));
+                    }
+                    let method_id = operands.remove(0);
+                    let facts = PatternFact::parse_all(&operands)
+                        .ok_or(BinaryDecodeError::InvalidPatternFact)?;
+                    CoreOp::PatternFacts(method_id, facts)
                 }
                 _ => unreachable!(),
             }

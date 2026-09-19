@@ -1,4 +1,24 @@
 use super::IdentityError;
+use crate::ir::opcodes::{ControlSummary, DeclarationModifier, PatternFact};
+
+pub(super) fn reject_typed_flag_payload(
+    operation: &'static str,
+    values: &[String],
+    instruction: usize,
+) -> Result<(), IdentityError> {
+    if let Some(value) = values.iter().find(|value| {
+        DeclarationModifier::from_serialized(value).is_some()
+            || ControlSummary::from_serialized(value).is_some()
+            || PatternFact::is_serialized_kind(value)
+    }) {
+        return Err(IdentityError::InvalidOperation {
+            operation,
+            instruction,
+            detail: format!("typed value '{value}' must use its semantic-family operation"),
+        });
+    }
+    Ok(())
+}
 
 pub(super) fn validate_body_span(
     start: Option<u64>,

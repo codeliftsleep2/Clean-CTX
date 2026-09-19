@@ -141,7 +141,8 @@ not automatically a semantic serialization of the canonical stream.
 | `MethodModifiers(method, values)` | Language declaration layer; trusted decoder | Targets `MethodId`; method must resolve; typed non-empty payload | Ordered many operations; payload order and duplicates preserved | None |
 | `ClassModifiers(class, values)` | Language declaration layer; trusted decoder | Targets `ClassId`; class must resolve; typed non-empty payload | Ordered many operations; payload order and duplicates preserved | None |
 | `ControlSummary(method, values)` | Core capture pipeline; trusted decoder | Targets `MethodId`; method must resolve; closed typed non-empty payload (`IF`, `LOOP`, `RET`, `THROW`) | Ordered many operations; payload order and duplicates preserved | None |
-| `Flags(method, values)` | Additive pattern producers; trusted decoder | Targets `MethodId`; method must resolve; empty payload plus modifier and control-summary spellings are invalid | Ordered many operations; payload order and duplicates preserved | None |
+| `PatternFacts(method, values)` | Additive pattern producer; trusted decoder | Targets `MethodId`; method must resolve; closed typed non-empty payload with accessor properties structurally owned by `Getter`/`Setter` | Ordered many operations; fact order and duplicates preserved | None |
+| `Flags(method, values)` | Legacy decoder/manual compatibility only | Targets `MethodId`; method must resolve; empty payload plus every typed semantic-family spelling is invalid | Ordered many legacy operations | None |
 | `ClassFlags(class, values)` | Residual class-metadata producer; trusted decoder | Targets `ClassId`; class must resolve; empty payload and declaration-modifier spellings are invalid | Ordered many operations; payload order and duplicates preserved | None |
 | `Extends(child, parent)` | Language layer; trusted decoder | Targets child `ClassId`; child must resolve; parent is an external-capable symbolic reference | Optional singular per child; duplicate fails | None |
 | `Implements(class, interface)` | Language layer; trusted decoder | Targets `ClassId`; class must resolve; interface is an external-capable symbolic reference | Ordered many per class; every occurrence preserved | None |
@@ -169,9 +170,9 @@ newtypes or either serialized representation.
 
 ### 5.2 Flags restriction
 
-Declaration modifiers and control summaries are closed typed families carried
-by `MethodModifiers`/`ClassModifiers` and `ControlSummary`. Generic `Flags`
-rejects both vocabularies and remains an occurrence-preserving pattern channel;
+Declaration modifiers, control summaries, and method-pattern facts are closed
+typed families carried by their dedicated operations. Generic `Flags` rejects
+all three vocabularies and remains only for legacy unknown payloads;
 `ClassFlags` remains residual class metadata.
 
 ## 6. Projection, delta, and wire matrix
@@ -188,7 +189,8 @@ rejects both vocabularies and remains an occurrence-preserving pattern channel;
 | `MethodModifiers` | Repeated typed modifier occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic via additive opcode 22 under `0x03` | Preserve payload and occurrence order |
 | `ClassModifiers` | Repeated typed modifier occurrences under resolved class | `(ClassId, complete values, occurrence)` | Semantic via additive opcode 23 under `0x03` | Preserve payload and occurrence order |
 | `ControlSummary` | Repeated typed summary occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic via additive opcode 24 under `0x03` | Preserve payload and occurrence order |
-| `Flags` | Repeated residual pattern-fact occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
+| `PatternFacts` | Repeated typed pattern-fact occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic via additive opcode 25 under `0x03` | Preserve payload and occurrence order |
+| `Flags` | Repeated legacy unknown occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic for present operands | Preserve legacy payload and occurrence order |
 | `ClassFlags` | Repeated flag occurrences under resolved class | `(ClassId, complete values, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
 | `Extends` | Singular parent reference under resolved child | `ClassId` | Lossy: child ID omitted | Encode child and parent |
 | `Implements` | Repeated interface references under resolved class | `(ClassId, interface, occurrence)` | Lossy: class ID omitted | Encode class and interface |
@@ -233,6 +235,11 @@ projection share the same `PatternTarget` parser; projection attaches patterns
 through complete class and method indexes after definitions are materialized.
 Pattern names, never identifier prefixes, determine target kind. The user-run
 gate was green on 2026-09-18.
+
+Phase 6C adds ordered typed `pattern_facts` (`pf`) under resolved methods and
+advances the hierarchy to revision 6. This annotation migration never changes
+`Body` text or spans; Edit-fidelity bodies remain byte-exact and continue to
+force conservative pattern-compression decline where required by IRPAT-001.
 
 The remaining hierarchy change is explicit interface representation or
 rejection as unsupported.

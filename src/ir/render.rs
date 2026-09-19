@@ -105,6 +105,13 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                     }
                 }
             }
+            "PAT_FACT" => {
+                let values = &insn[2..];
+                match fidelity {
+                    Fidelity::Low => output.push_str(&format!("§PF({})", values.join(","))),
+                    _ => output.push_str(&format!("pattern facts: {}", values.join(", "))),
+                }
+            }
             "IMP" => {
                 let module = insn.get(2).map(|s| s.as_str()).unwrap_or("?");
                 let named = insn.get(3).map(|s| s.as_str()).unwrap_or("*");

@@ -90,7 +90,9 @@ fn ctor_consumes_all_trailing_flags_through_merged_pipeline() {
     // Verify no FLAGS referencing M6 remain orphaned
     let orphaned_m6_flags: Vec<&CoreOp> = result
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M6"))
+        .filter(
+            |op| matches!(op, CoreOp::Flags(mid, _) | CoreOp::PatternFacts(mid, _) if mid == "M6"),
+        )
         .collect();
     assert!(
         orphaned_m6_flags.is_empty(),
@@ -148,7 +150,7 @@ fn ctor_two_pass_pipeline_no_orphan_e003() {
 
     // Verify that additive recognizer prepended FLAGS(CTOR) before DEF_M(M6)
     let ctor_flag_pos = after_additive.iter().position(|op| {
-        matches!(op, CoreOp::Flags(mid, flags) if mid == "M6" && flags.contains(&"CTOR".to_string()))
+        matches!(op, CoreOp::PatternFacts(mid, facts) if mid == "M6" && facts.contains(&PatternFact::Constructor))
     });
     let def_m_pos = after_additive
         .iter()
@@ -165,7 +167,9 @@ fn ctor_two_pass_pipeline_no_orphan_e003() {
     // Verify no FLAGS referencing M6 remain orphaned
     let orphaned_m6_flags: Vec<&CoreOp> = after_consumptive
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M6"))
+        .filter(
+            |op| matches!(op, CoreOp::Flags(mid, _) | CoreOp::PatternFacts(mid, _) if mid == "M6"),
+        )
         .collect();
     assert!(
         orphaned_m6_flags.is_empty(),
@@ -235,7 +239,7 @@ fn empty_ctor_two_pass_no_orphan_e003() {
 
     // Verify FLAGS(CTOR) appears before DEF_M(M6)
     let ctor_flag_pos = after_additive.iter().position(|op| {
-        matches!(op, CoreOp::Flags(mid, flags) if mid == "M6" && flags.contains(&"CTOR".to_string()))
+        matches!(op, CoreOp::PatternFacts(mid, facts) if mid == "M6" && facts.contains(&PatternFact::Constructor))
     });
     let def_m_pos = after_additive
         .iter()
@@ -252,7 +256,9 @@ fn empty_ctor_two_pass_no_orphan_e003() {
     // Verify no FLAGS referencing M6 remain orphaned
     let orphaned_m6_flags: Vec<&CoreOp> = after_consumptive
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M6"))
+        .filter(
+            |op| matches!(op, CoreOp::Flags(mid, _) | CoreOp::PatternFacts(mid, _) if mid == "M6"),
+        )
         .collect();
     assert!(
         orphaned_m6_flags.is_empty(),
@@ -309,7 +315,7 @@ fn observable_two_pass_no_orphan_e003() {
 
     // Verify FLAGS(OBSERVABLE) appears before DEF_M(M6)
     let obs_flag_pos = after_additive.iter().position(|op| {
-        matches!(op, CoreOp::Flags(mid, flags) if mid == "M6" && flags.contains(&"OBSERVABLE".to_string()))
+        matches!(op, CoreOp::PatternFacts(mid, facts) if mid == "M6" && facts.contains(&PatternFact::Observable))
     });
     let def_m_pos = after_additive
         .iter()
@@ -326,7 +332,9 @@ fn observable_two_pass_no_orphan_e003() {
     // Verify no FLAGS referencing M6 remain orphaned
     let orphaned_m6_flags: Vec<&CoreOp> = after_consumptive
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M6"))
+        .filter(
+            |op| matches!(op, CoreOp::Flags(mid, _) | CoreOp::PatternFacts(mid, _) if mid == "M6"),
+        )
         .collect();
     assert!(
         orphaned_m6_flags.is_empty(),
@@ -392,7 +400,9 @@ fn promise_two_pass_no_orphan_e003() {
     // Verify no FLAGS referencing M6 remain orphaned
     let orphaned_m6_flags: Vec<&CoreOp> = after_consumptive
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M6"))
+        .filter(
+            |op| matches!(op, CoreOp::Flags(mid, _) | CoreOp::PatternFacts(mid, _) if mid == "M6"),
+        )
         .collect();
     assert!(
         orphaned_m6_flags.is_empty(),

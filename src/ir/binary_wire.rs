@@ -12,7 +12,7 @@
 // │ Instructions: [count(varint), instruction*]             │
 // │                                                         │
 // │ Instruction:                                            │
-// │   opcode_idx: u8 (0-24)                                 │
+// │   opcode_idx: u8 (0-25)                                 │
 // │   operands: [varint]* (string table indices)            │
 // │   For variadic ops: operand_count as varint prefix      │
 // └─────────────────────────────────────────────────────────┘
@@ -30,7 +30,7 @@
 // and mixed streams.
 
 use super::compiler::CompiledIR;
-use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
+use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact};
 use super::string_table::StringTable;
 
 mod decode;
@@ -56,7 +56,7 @@ const VERSION_PRE_SPAN: u8 = 0x02;
 /// Legacy version 0x01 (long TYPE op names) — still supported for decode.
 const VERSION_LEGACY: u8 = 0x01;
 
-/// Opcode index assignment (0-24)
+/// Opcode index assignment (0-25)
 const OP_DEF_C: u8 = 0;
 const OP_DEF_M: u8 = 1;
 const OP_DEF_F: u8 = 2;
@@ -104,6 +104,7 @@ const OP_CALL_SPREAD: u8 = 21;
 const OP_MOD_M: u8 = 22;
 const OP_MOD_C: u8 = 23;
 const OP_CTRL_SUM: u8 = 24;
+const OP_PAT_FACT: u8 = 25;
 
 /// Highest defined opcode index.
 ///
@@ -112,13 +113,20 @@ const OP_CTRL_SUM: u8 = 24;
 /// additive `OP_CALL_SPREAD`) are allocated after the edit-mode `OP_BODY`, so
 /// a guard bounded at `OP_BODY` would report a defined opcode as unknown and
 /// make CALL facts unrepresentable over the binary wire.
-const OP_MAX: u8 = OP_CTRL_SUM;
+const OP_MAX: u8 = OP_PAT_FACT;
 
 /// Opcodes that have a variable number of operands (beyond the first one).
 fn is_variadic(op_idx: u8) -> bool {
     matches!(
         op_idx,
-        OP_FLAGS | OP_FLAGS_C | OP_INJECTS | OP_PAT | OP_MOD_M | OP_MOD_C | OP_CTRL_SUM
+        OP_FLAGS
+            | OP_FLAGS_C
+            | OP_INJECTS
+            | OP_PAT
+            | OP_MOD_M
+            | OP_MOD_C
+            | OP_CTRL_SUM
+            | OP_PAT_FACT
     )
 }
 
@@ -135,6 +143,7 @@ fn op_to_index(op: &CoreOp) -> u8 {
         CoreOp::MethodModifiers(..) => OP_MOD_M,
         CoreOp::ClassModifiers(..) => OP_MOD_C,
         CoreOp::ControlSummary(..) => OP_CTRL_SUM,
+        CoreOp::PatternFacts(..) => OP_PAT_FACT,
         CoreOp::Flags(..) => OP_FLAGS,
         CoreOp::ClassFlags(..) => OP_FLAGS_C,
         CoreOp::Extends(..) => OP_EXT,
@@ -238,7 +247,7 @@ fn read_string(data: &[u8]) -> Option<(String, usize)> {
 /// 3. **Instructions**:
 ///    - count: varint — number of instructions
 ///    - for each instruction:
-///      - opcode: u8 — index into opcode table (0-24)
+///      - opcode: u8 — index into opcode table (0-25)
 ///      - [variadic count: varint — only if opcode is variadic]
 ///      - operands: [varint]* — string table indices
 pub fn encode(ir: &CompiledIR) -> Vec<u8> {
@@ -330,6 +339,17 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
                 encode_operand(&mut buf, mid);
                 for summary in summaries {
                     encode_operand(&mut buf, summary.as_str());
+                }
+            }
+            CoreOp::PatternFacts(mid, facts) => {
+                let mut operands = Vec::new();
+                for fact in facts {
+                    fact.append_serialized(&mut operands);
+                }
+                write_varint(&mut buf, (1 + operands.len()) as u64);
+                encode_operand(&mut buf, mid);
+                for operand in operands {
+                    encode_operand(&mut buf, &operand);
                 }
             }
             CoreOp::Flags(tid, flags) => {

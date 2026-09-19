@@ -136,7 +136,7 @@ fn versioned_wire_emits_occurrence_preserving_shapes() {
     ]);
 
     let wire = ir_to_hierarchical_wire(&ir);
-    assert_eq!(wire["hs"], 5);
+    assert_eq!(wire["hs"], 6);
     assert_eq!(
         wire["ir"]["c"][0]["m"][0]["mo"],
         serde_json::json!([["STATIC"]])
@@ -244,7 +244,7 @@ fn unknown_hierarchy_schema_revision_fails_loudly() {
         "file": "alpha-1",
         "v": 7,
         "encoding": "hierarchical",
-        "hs": 6,
+        "hs": 7,
         "ir": { "c": [] }
     }))
     .expect_err("unknown hierarchy schema must not be guessed");
@@ -252,7 +252,7 @@ fn unknown_hierarchy_schema_revision_fails_loudly() {
     assert!(
         error
             .to_string()
-            .contains("unsupported hierarchical schema version: 6"),
+            .contains("unsupported hierarchical schema version: 7"),
         "unexpected error: {error}"
     );
 }

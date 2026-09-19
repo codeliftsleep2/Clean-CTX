@@ -6,7 +6,7 @@
 
 use crate::compression::Fidelity;
 use crate::ir::{ClassNode, FieldNode, HierarchicalIR, MethodNode, PatternEntry};
-use crate::ir::{ControlSummary, DeclarationModifier};
+use crate::ir::{ControlSummary, DeclarationModifier, PatternFact};
 use crate::ir::{render_hierarchical_for_llm, render_hierarchical_for_llm_focused};
 use std::collections::HashSet;
 
@@ -45,6 +45,7 @@ fn make_method(name: &str) -> MethodNode {
         return_type: None,
         modifiers: vec![],
         control_summaries: vec![],
+        pattern_facts: vec![],
         flags: Vec::new(),
         patterns: vec![],
         body: None,
@@ -87,7 +88,7 @@ fn test_empty_hir() {
     let hir = empty_hir();
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Should contain schema header but nothing else
-    assert!(result.starts_with("// SCHEMA v4"));
+    assert!(result.starts_with("// SCHEMA v5"));
     assert!(!result.contains("// ──"));
     assert!(!result.contains("$ "));
     assert!(!result.contains("T "));
@@ -98,7 +99,7 @@ fn test_schema_header_present() {
     let mut hir = empty_hir();
     hir.classes.push(make_class("TestClass"));
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// SCHEMA v4"));
+    assert!(result.contains("// SCHEMA v5"));
     assert!(result.contains("@=meta"));
     assert!(result.contains("X=extends"));
     assert!(result.contains("I=implements"));
@@ -106,7 +107,7 @@ fn test_schema_header_present() {
     assert!(result.contains("M=method"));
     assert!(result.contains("$=import"));
     assert!(result.contains("→=scope"));
-    assert!(result.contains("fl:=flags"));
+    assert!(result.contains("pf:=pattern-facts"));
 }
 
 #[test]
@@ -450,7 +451,7 @@ fn test_full_rust_class() {
     svc.fields.push(make_field("cache", Some("RwLock")));
 
     let mut m1 = make_method("new");
-    m1.flags = vec![vec!["CTOR".into()]];
+    m1.pattern_facts = vec![vec![PatternFact::Constructor]];
     svc.methods.push(m1);
 
     let mut m2 = make_method("get_user");

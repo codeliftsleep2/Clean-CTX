@@ -6,10 +6,10 @@
 pub(crate) const SYSTEM_PROMPT: &str = concat!(
     "# Clean-CTX Notation Guide\n\n",
     "# Clean-CTX Notation Guide\n\n",
-    "You are working with Clean-CTX structured code context. Responses use ONE LLM-facing notation: SCHEMA v4 (below). The separate workspace manifests of `compress_workspace` are legacy compressed text — decode those with `decompress_code_context` instead of by hand.\n\n",
-    "## Response Notation (SCHEMA v4)\n\n",
+    "You are working with Clean-CTX structured code context. Responses use ONE LLM-facing notation: SCHEMA v5 (below). The separate workspace manifests of `compress_workspace` are legacy compressed text — decode those with `decompress_code_context` instead of by hand.\n\n",
+    "## Response Notation (SCHEMA v5)\n\n",
     "Every provide_code_context / compress_code_context / restore_context response starts with this legend:\n\n",
-    "`// SCHEMA v4  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary fl:=pattern-facts cl:=class-metadata P=pattern T=type-alias`\n\n",
+    "`// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias`\n\n",
     "Line grammar:\n",
     "- `// ── <ClassName> ──` opens a class scope\n",
     "- `cmod: <MODIFIERS>` typed class declaration modifiers\n",
@@ -141,7 +141,7 @@ pub(crate) const SYSTEM_PROMPT: &str = concat!(
     "6. For read-only understanding, use `intent=\"overview\"` or\n",
     "   `intent=\"debug\"` — these stay maximally compressed\n\n",
     "## Rules for Using Compressed Notation\n",
-    "1. Interpret tool responses using the SCHEMA v4 notation above; an `ir_unavailable` error means the file could not be compiled — never guess at its structure\n",
+    "1. Interpret tool responses using the SCHEMA v5 notation above; an `ir_unavailable` error means the file could not be compiled — never guess at its structure\n",
     "2. When writing code in compressed form, mirror the notation of the context you received\n",
     "3. NEVER output raw metadata footers (path-map or symbol-table blocks) — those are internal\n",
     "4. When asked to expand, use the decompress_code_context tool\n",
@@ -149,9 +149,9 @@ pub(crate) const SYSTEM_PROMPT: &str = concat!(
     "6. Preserve the semantic meaning — compressed ≠ less accurate\n",
     "7. Use the same fidelity level as the compressed context you received\n",
     "8. When generating Angular code, mirror the Φ vocabulary in your output (e.g. emit `Φcmp:Foo sel=app-foo`) and round-trip via decompress_code_context when the user requests expanded form\n\n",
-    "## Example (SCHEMA v4 response fragment)\n",
+    "## Example (SCHEMA v5 response fragment)\n",
     "```\n",
-    "// SCHEMA v4  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary fl:=pattern-facts cl:=class-metadata P=pattern T=type-alias\n",
+    "// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias\n",
     "// ── UserService ──\n",
     "X BaseService\n",
     "F userRepo:UserRepository\n",
@@ -175,7 +175,7 @@ pub(crate) fn prompt_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "clean-ctx-vocabulary",
-            "description": "Clean-CTX SCHEMA v4 response vocabulary: compact structure, typed mod:/cmod: declarations, ctl: summaries, residual fl:/cl: facts, High-fidelity cf:/df:/se:/ec: metadata, α path aliases and current Φ framework-meta markers.",
+            "description": "Clean-CTX SCHEMA v5 response vocabulary: compact structure, typed mod:/cmod: declarations, ctl: summaries, pf: pattern facts, residual fl:/cl: facts, High-fidelity cf:/df:/se:/ec: metadata, α path aliases and current Φ framework-meta markers.",
             "arguments": []
         }),
     ]

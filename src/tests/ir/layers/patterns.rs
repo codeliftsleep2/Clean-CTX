@@ -5,7 +5,7 @@
 
 use crate::ir::layers::PatternRecognizer;
 use crate::ir::layers::patterns::CodePatternRecognizer;
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{CoreOp, DeclarationModifier, PatternFact};
 
 fn make_defmethod(cid: &str, mid: &str, name: &str) -> CoreOp {
     CoreOp::DefMethod(cid.into(), mid.into(), name.into())
@@ -39,7 +39,7 @@ fn recognize_constructor_injection() {
 
     // Constructor should get a CTOR flag
     let has_ctor = result.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"CTOR".to_string()))
+        matches!(op, CoreOp::PatternFacts(m, facts) if m == "M1" && facts.contains(&PatternFact::Constructor))
     });
     assert!(
         has_ctor,
@@ -50,7 +50,7 @@ fn recognize_constructor_injection() {
     // Original instructions should be preserved too
     assert!(
         result.len() >= instructions.len(),
-        "Pattern should not remove instructions, only add flags. result={}, expected>={}",
+        "Pattern should not remove instructions, only add facts. result={}, expected>={}",
         result.len(),
         instructions.len()
     );
@@ -70,7 +70,7 @@ fn recognize_observable_return() {
     let result = recognizer.recognize(&instructions);
 
     let has_observable = result.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"OBSERVABLE".to_string()))
+        matches!(op, CoreOp::PatternFacts(m, facts) if m == "M1" && facts.contains(&PatternFact::Observable))
     });
     assert!(
         has_observable,
@@ -89,7 +89,7 @@ fn recognize_getter() {
     let result = recognizer.recognize(&instructions);
 
     let has_getter = result.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"GETTER".to_string()))
+        matches!(op, CoreOp::PatternFacts(m, facts) if m == "M1" && matches!(facts.as_slice(), [PatternFact::Getter(_)]))
     });
     assert!(
         has_getter,
@@ -106,7 +106,7 @@ fn recognize_setter() {
     let result = recognizer.recognize(&instructions);
 
     let has_setter = result.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"SETTER".to_string()))
+        matches!(op, CoreOp::PatternFacts(m, facts) if m == "M1" && matches!(facts.as_slice(), [PatternFact::Setter(_)]))
     });
     assert!(
         has_setter,

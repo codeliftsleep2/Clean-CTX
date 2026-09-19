@@ -3,7 +3,7 @@
 // Phase H: Positional Encoding & Advanced Compression — Pattern Compression.
 //
 // The Phase F `layers/patterns::CodePatternRecognizer` is **additive** —
-// it emits a `FLAGS` op (CTOR / OBSERVABLE / GETTER / SETTER) alongside
+// it emits a typed `PatternFacts` op alongside
 // the original instructions. That's useful for context but it does not
 // actually reduce wire size.
 //
@@ -18,17 +18,17 @@
 // rendered `M <name>`, `UnitTable`/`apply_edit` targeting, semantic method
 // registration, caller-side `Calls` identity), so they are re-emitted
 // unchanged and the `PAT` op is added alongside them. Only genuinely
-// redundant, non-identity ops are summarized away (`Injects` for CTOR,
-// `Flags(ASYNC)` for OBSERVABLE, `Flags(OVERRIDE)` for OVERRIDE, and the
-// additive/trailing `Flags(M)` runs the wrapper consumes). For PROMISE,
+// redundant, non-identity ops are summarized away (`Injects` for CTOR and
+// typed pattern annotations represented by the resulting classification).
+// Authoritative declaration modifiers are retained. For PROMISE,
 // EMPTY_CTOR, GETTER and SETTER nothing but identity is matched, so those
 // classifications are purely additive.
 //
 // Recognised patterns:
 //   - **PAT_CTOR**   — `DEF_M(constructor) + SIG*(P:ServiceType) + RET + INJECTS`
-//   - **PAT_OBSERVABLE** — `DEF_M + RET($P) + FLAGS(ASYNC)`
+//   - **PAT_OBSERVABLE** — `DEF_M + RET($P) + MethodModifiers(ASYNC)`
 //   - **PAT_GETTER** / **PAT_SETTER** — `DEF_M(get X)` / `DEF_M(set X)`
-//   - **PAT_OVERRIDE** — `DEF_M + FLAGS(OVERRIDE)`
+//   - **PAT_OVERRIDE** — `DEF_M + PatternFacts(OVERRIDE)`
 //   - **PAT_PROMISE** — `DEF_M + RET($P)` (without ASYNC)
 //
 // A pattern that doesn't match falls through unchanged (zero regression).

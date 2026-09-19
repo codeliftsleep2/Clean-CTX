@@ -8,7 +8,7 @@ use super::*;
 
 /// Generate a random CoreOp for property testing.
 fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
-    let variant = rng() % 23;
+    let variant = rng() % 24;
     match variant {
         0 => CoreOp::DefClass(format!("C{}", rng() % 10), format!("Class{}", rng() % 100)),
         1 => CoreOp::DefMethod(
@@ -167,6 +167,10 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
                 _ => ControlSummary::Throw,
             }],
         ),
+        23 => CoreOp::PatternFacts(
+            format!("M{}", rng() % 10),
+            vec![PatternFact::Constructor, PatternFact::Observable],
+        ),
         _ => unreachable!(),
     }
 }
@@ -283,6 +287,7 @@ fn property_binary_wire_round_trip() {
                 | (CoreOp::MethodModifiers(..), CoreOp::MethodModifiers(..))
                 | (CoreOp::ClassModifiers(..), CoreOp::ClassModifiers(..))
                 | (CoreOp::ControlSummary(..), CoreOp::ControlSummary(..))
+                | (CoreOp::PatternFacts(..), CoreOp::PatternFacts(..))
                 | (CoreOp::Flags(..), CoreOp::Flags(..))
                 | (CoreOp::ClassFlags(..), CoreOp::ClassFlags(..))
                 | (CoreOp::Injects(..), CoreOp::Injects(..))

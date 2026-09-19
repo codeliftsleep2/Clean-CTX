@@ -4,7 +4,7 @@ use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{
     ir_to_hierarchical_wire, try_ir_to_hierarchical, wire_to_ir as hierarchical_wire_to_ir,
 };
-use crate::ir::opcodes::{ControlSummary, CoreOp};
+use crate::ir::opcodes::{ControlSummary, CoreOp, PatternFact};
 use crate::ir::render_llm::render_hierarchical_for_llm;
 use crate::ir::wire::{op_to_tuple, tuple_to_op};
 
@@ -67,7 +67,7 @@ fn canonical_hierarchy_and_compact_llm_projection_are_distinct() {
             "M1".into(),
             vec![ControlSummary::Branch, ControlSummary::Return],
         ),
-        CoreOp::Flags("M1".into(), vec!["OBSERVABLE".into()]),
+        CoreOp::PatternFacts("M1".into(), vec![PatternFact::Observable]),
     ]);
     let hierarchy = try_ir_to_hierarchical(&ir).expect("valid identity graph");
     let method = &hierarchy.classes[0].methods[0];
@@ -75,14 +75,14 @@ fn canonical_hierarchy_and_compact_llm_projection_are_distinct() {
         method.control_summaries,
         vec![vec![ControlSummary::Branch, ControlSummary::Return]]
     );
-    assert_eq!(method.flags, vec![vec!["OBSERVABLE"]]);
+    assert_eq!(method.pattern_facts, vec![vec![PatternFact::Observable]]);
 
     let rendered = render_hierarchical_for_llm(&hierarchy, Fidelity::Low);
     assert!(rendered.contains("ctl:IF,RET"), "{rendered}");
-    assert!(rendered.contains("fl:OBSERVABLE"), "{rendered}");
+    assert!(rendered.contains("pf:OBSERVABLE"), "{rendered}");
 
     let wire = ir_to_hierarchical_wire(&ir);
-    assert_eq!(wire["hs"], 5);
+    assert_eq!(wire["hs"], 6);
     assert_eq!(
         wire["ir"]["c"][0]["m"][0]["cs"],
         serde_json::json!([["IF", "RET"]])
@@ -107,11 +107,10 @@ fn revision_four_moves_only_control_vocabulary_out_of_residual_flags() {
         "M1".into(),
         vec![ControlSummary::Branch, ControlSummary::Return]
     )));
-    assert!(
-        decoded
-            .instructions
-            .contains(&CoreOp::Flags("M1".into(), vec!["CTOR".into()]))
-    );
+    assert!(decoded.instructions.contains(&CoreOp::PatternFacts(
+        "M1".into(),
+        vec![PatternFact::Constructor]
+    )));
 }
 
 #[test]

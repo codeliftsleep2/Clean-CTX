@@ -7,7 +7,8 @@
 //
 // Declaration modifiers and residual flags have distinct typed operations:
 // language layers emit `MethodModifiers`, while the core pipeline emits typed
-// `ControlSummary` facts. Residual `Flags` carry pattern classifications.
+// `ControlSummary` and `PatternFacts` carry their closed semantic families.
+// Residual `Flags` preserve only unknown legacy method metadata.
 //
 // Each family can carry repeated operations. The hierarchy stores one inner
 // vector per occurrence in its distinct `modifiers` and `flags` fields.
@@ -26,7 +27,7 @@ use crate::compression::Fidelity;
 use crate::ir::binary_wire::{decode, encode};
 use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{HierarchicalIR, hierarchical_to_ir, ir_to_hierarchical};
-use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact};
 use crate::ir::render_llm::render_hierarchical_for_llm;
 use crate::ir::wire::{ir_to_wire, op_to_tuple, tuple_to_op, wire_to_ir};
 
@@ -49,10 +50,16 @@ fn flags(mid: &str, values: &[&str]) -> CoreOp {
         .collect::<Option<Vec<_>>>();
     match summaries {
         Some(summaries) => CoreOp::ControlSummary(mid.to_string(), summaries),
-        None => CoreOp::Flags(
-            mid.to_string(),
-            values.iter().map(|value| value.to_string()).collect(),
-        ),
+        None => {
+            let serialized = values
+                .iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>();
+            match PatternFact::parse_all(&serialized) {
+                Some(facts) => CoreOp::PatternFacts(mid.to_string(), facts),
+                None => CoreOp::Flags(mid.to_string(), serialized),
+            }
+        }
     }
 }
 
@@ -80,6 +87,13 @@ fn methods(hir: &HierarchicalIR) -> Vec<(String, String, Vec<String>)> {
                             .iter()
                             .flatten()
                             .map(|summary| summary.as_str().to_string()),
+                    )
+                    .chain(
+                        method
+                            .pattern_facts
+                            .iter()
+                            .flatten()
+                            .map(ToString::to_string),
                     )
                     .chain(method.flags.iter().flatten().cloned())
                     .collect(),
@@ -116,6 +130,9 @@ fn flag_ops_for(ir: &CompiledIR, mid: &str) -> Vec<Vec<String>> {
                     .map(|summary| summary.as_str().to_string())
                     .collect(),
             ),
+            CoreOp::PatternFacts(id, values) if id == mid => {
+                Some(values.iter().map(ToString::to_string).collect())
+            }
             _ => None,
         })
         .collect()

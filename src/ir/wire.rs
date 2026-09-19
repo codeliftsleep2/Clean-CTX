@@ -13,7 +13,7 @@
 //    └── opcode (always first element)
 
 use super::compiler::CompiledIR;
-use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
+use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact};
 use serde_json::{Value, json};
 
 /// Errors during wire format decoding.
@@ -80,6 +80,13 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
         CoreOp::ControlSummary(mid, summaries) => {
             let mut tuple = vec!["CTRL_SUM".into(), mid.clone()];
             tuple.extend(summaries.iter().map(|summary| summary.as_str().into()));
+            tuple
+        }
+        CoreOp::PatternFacts(mid, facts) => {
+            let mut tuple = vec!["PAT_FACT".into(), mid.clone()];
+            for fact in facts {
+                fact.append_serialized(&mut tuple);
+            }
             tuple
         }
         CoreOp::Flags(tid, flags) => {
@@ -261,6 +268,16 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
                     .map(|value| ControlSummary::from_serialized(value))
                     .collect::<Option<Vec<_>>>()?;
                 Some(CoreOp::ControlSummary(tuple[1].clone(), summaries))
+            } else {
+                None
+            }
+        }
+        "PAT_FACT" => {
+            if tuple.len() >= 3 {
+                Some(CoreOp::PatternFacts(
+                    tuple[1].clone(),
+                    PatternFact::parse_all(&tuple[2..])?,
+                ))
             } else {
                 None
             }

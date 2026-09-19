@@ -316,7 +316,7 @@ fn test_wire_format_json_structure() {
     assert!(wire.get("file").is_some(), "Must have 'file' key");
     assert!(wire.get("v").is_some(), "Must have 'v' key");
     assert!(wire.get("encoding").is_some(), "Must have 'encoding' key");
-    assert_eq!(wire.get("hs").and_then(|v| v.as_u64()), Some(4));
+    assert_eq!(wire.get("hs").and_then(|v| v.as_u64()), Some(6));
     assert!(wire.get("ir").is_some(), "Must have 'ir' key");
 
     // Check 'ir' contains expected abbreviated fields

@@ -41,6 +41,7 @@ fn render_hierarchical_for_llm_typescript_class() {
         return_type: None,
         modifiers: vec![],
         control_summaries: vec![vec![ControlSummary::Branch]],
+        pattern_facts: vec![],
         flags: vec![],
         patterns: vec![],
         body: None,
@@ -59,7 +60,7 @@ fn render_hierarchical_for_llm_typescript_class() {
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Phase 6 IR-first format: compact LLM schema with typed semantic families.
-    assert!(result.contains("SCHEMA v4"));
+    assert!(result.contains("SCHEMA v5"));
     assert!(result.contains("// ── UserListComponent ──"));
     assert!(result.contains("X BaseListComponent"));
     assert!(result.contains("I OnInit"));
@@ -97,6 +98,7 @@ fn render_hierarchical_for_llm_spring_boot_class() {
         return_type: None,
         modifiers: vec![],
         control_summaries: vec![vec![ControlSummary::Return]],
+        pattern_facts: vec![],
         flags: vec![],
         patterns: vec![],
         body: None,
@@ -117,6 +119,7 @@ fn render_hierarchical_for_llm_spring_boot_class() {
         return_type: None,
         modifiers: vec![],
         control_summaries: vec![vec![ControlSummary::Return, ControlSummary::Branch]],
+        pattern_facts: vec![],
         flags: vec![],
         patterns: vec![],
         body: None,
@@ -196,7 +199,7 @@ fn render_hierarchical_for_llm_empty_hir_produces_header() {
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Always has schema header even with empty HIR
-    assert!(result.starts_with("// SCHEMA v4"));
+    assert!(result.starts_with("// SCHEMA v5"));
 }
 
 #[test]
@@ -318,12 +321,12 @@ fn mcp_state_llm_text_cache_insert_and_read() {
     // Insert into cache
     state
         .llm_text_cache_lock()
-        .insert("α1".to_string(), "// SCHEMA v4\n// ── Foo ──\n".to_string());
+        .insert("α1".to_string(), "// SCHEMA v5\n// ── Foo ──\n".to_string());
     // Read from cache
     let cache_guard = state.llm_text_cache_lock();
     let cached = cache_guard.get("α1");
     assert!(cached.is_some());
-    assert!(cached.unwrap().contains("SCHEMA v4"));
+    assert!(cached.unwrap().contains("SCHEMA v5"));
     assert!(cached.unwrap().contains("Foo"));
 }
 

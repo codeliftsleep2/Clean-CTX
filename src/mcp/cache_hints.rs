@@ -275,16 +275,16 @@ pub fn render_cache_json(metrics: &CacheMetrics, enabled: bool) -> serde_json::V
 
 /// Generate the response-vocabulary text for the `clean-ctx-vocabulary`
 /// prompt resource. Phase A retirement (2026-08-25): teaches ONLY the
-/// current SCHEMA v4 notation plus the live α / Φ systems — the retired
+/// current SCHEMA v5 notation plus the live α / Φ systems — the retired
 /// `$`-primitive / `⊕`-marker / `§`-micro-code tables are gone.
 ///
 /// This function is used by the `prompts/get` MCP handler.
 pub fn generate_vocabulary_text() -> String {
     let lines = vec![
-        "Clean-CTX Response Vocabulary (SCHEMA v4)",
+        "Clean-CTX Response Vocabulary (SCHEMA v5)",
         "==========================================",
         "",
-        "// SCHEMA v4  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary fl:=pattern-facts cl:=class-metadata P=pattern T=type-alias",
+        "// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias",
         "// ── Name ──   opens a class scope",
         "X Parent      extends          I Iface…   implements",
         "F name:type   field            M name(+N) method (+N = overload param count)",

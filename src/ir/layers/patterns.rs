@@ -5,12 +5,12 @@
 //
 // Patterns detected:
 //   - Constructor injection (DEF_M + SIG for injectable params + INJECTS)
-//   - Observable stream (DEF_M + RET(Promise) + FLAGS(ASYNC))
+//   - Observable stream (DEF_M + RET(Promise) + MethodModifiers(ASYNC))
 //   - Getter/Setter pattern (DEF_M("get/set X"))
-//   - Override pattern (DEF_M + FLAGS(OVERRIDE))
+//   - Override pattern (DEF_M + PatternFacts(OVERRIDE))
 
 use super::PatternRecognizer;
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{CoreOp, DeclarationModifier, PatternFact};
 use crate::ir::patterns::is_constructor_name;
 
 /// Pattern recognizer (Layer 4).
@@ -86,7 +86,7 @@ fn try_recognize_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
 }
 
 /// Pattern: Constructor injection
-/// Matches: DEF_M with name "constructor" or "new" — emits a CTOR flag
+/// Matches: DEF_M with name "constructor" or "new" — emits a CTOR fact
 /// but does NOT consume the instructions (they still need to be emitted).
 fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
     if slice.is_empty() {
@@ -102,17 +102,17 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
         _ => return None,
     };
 
-    // Emit a CTOR flag but do NOT consume instructions — the original
+    // Emit a CTOR fact but do NOT consume instructions — the original
     // DefMethod, Param, and Return instructions must all be preserved.
     Some((
-        CoreOp::Flags(method_id.clone(), vec!["CTOR".to_string()]),
+        CoreOp::PatternFacts(method_id.clone(), vec![PatternFact::Constructor]),
         0, // consumed = 0 means no instructions are consumed
     ))
 }
 
 /// Pattern: Observable/async method
-/// Matches: DEF_M + RET(Promise/Observable) + FLAGS(ASYNC)
-/// Emits an OBSERVABLE flag but does NOT consume instructions.
+/// Matches: DEF_M + RET(Promise/Observable) + MethodModifiers(ASYNC)
+/// Emits an OBSERVABLE fact but does NOT consume instructions.
 fn try_observable_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
     if slice.is_empty() {
         return None;
@@ -146,7 +146,7 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
 
     if has_observable_return || has_async_flag {
         Some((
-            CoreOp::Flags(method_id, vec!["OBSERVABLE".to_string()]),
+            CoreOp::PatternFacts(method_id, vec![PatternFact::Observable]),
             0, // additive — do not consume any instructions
         ))
     } else {
@@ -167,14 +167,14 @@ fn try_accessor_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
             if name_lower.starts_with("get ") {
                 let property = name[4..].trim().to_string();
                 Some((
-                    CoreOp::Flags(method_id.clone(), vec!["GETTER".to_string(), property]),
-                    1,
+                    CoreOp::PatternFacts(method_id.clone(), vec![PatternFact::Getter(property)]),
+                    0,
                 ))
             } else if name_lower.starts_with("set ") {
                 let property = name[4..].trim().to_string();
                 Some((
-                    CoreOp::Flags(method_id.clone(), vec!["SETTER".to_string(), property]),
-                    1,
+                    CoreOp::PatternFacts(method_id.clone(), vec![PatternFact::Setter(property)]),
+                    0,
                 ))
             } else {
                 None

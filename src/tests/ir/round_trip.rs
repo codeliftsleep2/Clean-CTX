@@ -15,12 +15,12 @@ use crate::ir::binary_wire::{decode, encode};
 use crate::ir::compiler::CompiledIR;
 use crate::ir::delta::{DeltaOps, IRDelta, ModOp, compact_decode, compact_encode};
 use crate::ir::hierarchical::{ir_to_hierarchical_wire, wire_to_ir as hierarchical_wire_to_ir};
-use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact};
 use crate::ir::wire::{ir_to_wire, op_to_tuple, tuple_to_op, wire_to_ir};
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-/// Build a CompiledIR containing every CoreOp variant (all 23).
+/// Build a CompiledIR containing every CoreOp variant (all 24).
 fn all_variants_ir() -> CompiledIR {
     CompiledIR {
         file_id: "all.ts".to_string(),
@@ -40,7 +40,8 @@ fn all_variants_ir() -> CompiledIR {
                 "M1".into(),
                 vec![ControlSummary::Branch, ControlSummary::Loop],
             ),
-            CoreOp::Flags("M1".into(), vec!["CTOR".into()]),
+            CoreOp::PatternFacts("M1".into(), vec![PatternFact::Constructor]),
+            CoreOp::Flags("M1".into(), vec!["LEGACY".into()]),
             CoreOp::ClassFlags("C1".into(), vec!["CFG(test)".into()]),
             CoreOp::Extends("C1".into(), "C2".into()),
             CoreOp::Implements("C1".into(), "I1".into()),
@@ -121,7 +122,7 @@ fn round_trip_execution_context() {
     assert_eq!(original, restored);
 }
 
-// ── 2. Named Wire Format: Full IR Round-Trip (All 23 Variants) ──
+// ── 2. Named Wire Format: Full IR Round-Trip (All 24 Variants) ──
 
 #[test]
 fn round_trip_named_wire_all_variants() {
@@ -187,6 +188,7 @@ fn round_trip_binary_wire_all_variants() {
             | (CoreOp::MethodModifiers(..), CoreOp::MethodModifiers(..))
             | (CoreOp::ClassModifiers(..), CoreOp::ClassModifiers(..))
             | (CoreOp::ControlSummary(..), CoreOp::ControlSummary(..))
+            | (CoreOp::PatternFacts(..), CoreOp::PatternFacts(..))
             | (CoreOp::Flags(..), CoreOp::Flags(..))
             | (CoreOp::ClassFlags(..), CoreOp::ClassFlags(..))
             | (CoreOp::Injects(..), CoreOp::Injects(..))

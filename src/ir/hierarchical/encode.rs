@@ -144,6 +144,7 @@ pub fn try_ir_to_hierarchical(
             | CoreOp::MethodModifiers(..)
             | CoreOp::ClassModifiers(..)
             | CoreOp::ControlSummary(..)
+            | CoreOp::PatternFacts(..)
             | CoreOp::Flags(..)
             | CoreOp::ClassFlags(..)
             | CoreOp::Extends(..)
@@ -243,6 +244,13 @@ pub fn try_ir_to_hierarchical(
                 classes[class_idx].methods[method_idx]
                     .control_summaries
                     .push(summaries.clone());
+            }
+            CoreOp::PatternFacts(raw_method, facts) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "PAT_FACT", instruction)?;
+                classes[class_idx].methods[method_idx]
+                    .pattern_facts
+                    .push(facts.clone());
             }
             CoreOp::Flags(raw_method, flags) => {
                 let (class_idx, method_idx) =
@@ -399,6 +407,7 @@ fn push_method(class: &mut ClassNode, method_id: &MethodId, name: String) -> usi
         return_type: None,
         modifiers: Vec::new(),
         control_summaries: Vec::new(),
+        pattern_facts: Vec::new(),
         flags: Vec::new(),
         patterns: Vec::new(),
         body: None,

@@ -38,6 +38,8 @@ across producers, validation, patterns, projection, rendering, and wire
 formats; it was user-verified on 2026-09-18. Phase 6B implements typed control
 summaries while keeping the LLM-facing `ctl:` projection independently compact;
 it was user-verified and checkpointed as `3360512` on 2026-09-19.
+Phase 6C implements typed method-pattern facts with a distinct compact `pf:`
+projection and is awaiting user-run verification.
 
 **Production-integration status:** Phase checkpoints certify bounded
 implementation and applicable gates; they do not certify production completion.
@@ -223,8 +225,9 @@ are different, but string-based consumers can treat them as one category.
 Required boundary: represent distinct semantic families with distinct Rust
 types or enum variants.
 
-Phase 6A resolves declaration modifiers and Phase 6B resolves control
-summaries. Patterns, side effects, and execution contexts remain later slices.
+Phase 6A resolves declaration modifiers, Phase 6B resolves control summaries,
+and Phase 6C implements typed method-pattern facts. Side effects and execution
+contexts remain later slices.
 
 ### F-05: Delta keys lose multiplicity
 

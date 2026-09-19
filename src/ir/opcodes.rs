@@ -14,110 +14,10 @@
 //
 // Edit Mode: Added CoreOp::Body for verbatim method body transport.
 
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Closed declaration-modifier vocabulary shared by language producers.
-///
-/// Serialized spellings intentionally match the established flag payloads;
-/// the distinct `CoreOp` variants provide the semantic-family boundary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum DeclarationModifier {
-    #[serde(rename = "ASYNC")]
-    Async,
-    #[serde(rename = "GEN")]
-    Generator,
-    #[serde(rename = "EXPORT")]
-    Export,
-    #[serde(rename = "STATIC")]
-    Static,
-    #[serde(rename = "PRIVATE")]
-    Private,
-    #[serde(rename = "PROTECTED")]
-    Protected,
-    #[serde(rename = "ABSTRACT")]
-    Abstract,
-    #[serde(rename = "UNSAFE")]
-    Unsafe,
-}
-
-impl DeclarationModifier {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Async => FLAG_ASYNC,
-            Self::Generator => FLAG_GEN,
-            Self::Export => FLAG_EXPORT,
-            Self::Static => FLAG_STATIC,
-            Self::Private => FLAG_PRIVATE,
-            Self::Protected => FLAG_PROTECTED,
-            Self::Abstract => FLAG_ABSTRACT,
-            Self::Unsafe => FLAG_UNSAFE,
-        }
-    }
-
-    pub fn from_serialized(value: &str) -> Option<Self> {
-        match value {
-            FLAG_ASYNC => Some(Self::Async),
-            FLAG_GEN => Some(Self::Generator),
-            FLAG_EXPORT => Some(Self::Export),
-            FLAG_STATIC => Some(Self::Static),
-            FLAG_PRIVATE => Some(Self::Private),
-            FLAG_PROTECTED => Some(Self::Protected),
-            FLAG_ABSTRACT => Some(Self::Abstract),
-            FLAG_UNSAFE => Some(Self::Unsafe),
-            _ => None,
-        }
-    }
-}
-
-impl fmt::Display for DeclarationModifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-/// Closed vocabulary for compact, method-level control summaries.
-///
-/// These facts summarize the presence of control constructs. They are distinct
-/// from detailed `ControlFlow` edges and residual pattern classifications.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ControlSummary {
-    #[serde(rename = "IF")]
-    Branch,
-    #[serde(rename = "LOOP")]
-    Loop,
-    #[serde(rename = "RET")]
-    Return,
-    #[serde(rename = "THROW")]
-    Throw,
-}
-
-impl ControlSummary {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Branch => FLAG_IF,
-            Self::Loop => FLAG_LOOP,
-            Self::Return => FLAG_RET,
-            Self::Throw => FLAG_THROW,
-        }
-    }
-
-    pub fn from_serialized(value: &str) -> Option<Self> {
-        match value {
-            FLAG_IF => Some(Self::Branch),
-            FLAG_LOOP => Some(Self::Loop),
-            FLAG_RET => Some(Self::Return),
-            FLAG_THROW => Some(Self::Throw),
-            _ => None,
-        }
-    }
-}
-
-impl fmt::Display for ControlSummary {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
+mod semantic;
+pub use semantic::{ControlSummary, DeclarationModifier, PatternFact};
 
 /// Core IR opcodes — the universal instruction set.
 /// Every language compiles down to these operations.
@@ -157,8 +57,11 @@ pub enum CoreOp {
     /// ["CTRL_SUM", method_id, summary1, summary2, ...]
     ControlSummary(String, Vec<ControlSummary>),
 
+    /// ["PAT_FACT", method_id, fact1, ...]
+    PatternFacts(String, Vec<PatternFact>),
+
     /// ["FLAGS", target_id, flag1, flag2, ...]
-    /// Residual method pattern facts; modifiers and control summaries are typed.
+    /// Unknown legacy method metadata; known semantic families are typed.
     Flags(String, Vec<String>),
 
     /// ["FLAGS_C", class_id, flag1, flag2, ...]
@@ -314,6 +217,16 @@ impl fmt::Display for CoreOp {
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
+            CoreOp::PatternFacts(mid, facts) => write!(
+                f,
+                "PAT_FACT {} {}",
+                mid,
+                facts
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
             CoreOp::Flags(tid, flags) => write!(f, "FLAGS {} {}", tid, flags.join(" ")),
             CoreOp::ClassFlags(cid, flags) => write!(f, "FLAGS_C {} {}", cid, flags.join(" ")),
             CoreOp::Extends(child, parent) => write!(f, "EXT {} {}", child, parent),
@@ -422,6 +335,7 @@ pub fn arity(opcode: &str) -> Option<i32> {
         "MOD_M" => Some(-1),    // method_id, declaration modifiers...
         "MOD_C" => Some(-1),    // class_id, declaration modifiers...
         "CTRL_SUM" => Some(-1), // method_id, control summaries...
+        "PAT_FACT" => Some(-1), // method_id, typed pattern facts...
         "FLAGS" => Some(-1),    // target_id, flags...
         "FLAGS_C" => Some(-1),  // class_id, flags...
         "EXT" => Some(3),       // child_id, parent_id
@@ -459,6 +373,7 @@ pub fn opcode_name(op: &CoreOp) -> &'static str {
         CoreOp::MethodModifiers(..) => "MOD_M",
         CoreOp::ClassModifiers(..) => "MOD_C",
         CoreOp::ControlSummary(..) => "CTRL_SUM",
+        CoreOp::PatternFacts(..) => "PAT_FACT",
         CoreOp::Flags(..) => "FLAGS",
         CoreOp::ClassFlags(..) => "FLAGS_C",
         CoreOp::Extends(..) => "EXT",
@@ -562,3 +477,7 @@ mod declaration_modifier_tests;
 #[cfg(test)]
 #[path = "../tests/ir/control_summaries.rs"]
 mod control_summary_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/pattern_facts.rs"]
+mod pattern_fact_tests;

@@ -29,7 +29,9 @@ fn override_two_pass_no_orphan_e003() {
     // Verify no FLAGS referencing M6 remain orphaned
     let orphaned_m6_flags: Vec<&CoreOp> = after_consumptive
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M6"))
+        .filter(
+            |op| matches!(op, CoreOp::Flags(mid, _) | CoreOp::PatternFacts(mid, _) if mid == "M6"),
+        )
         .collect();
     assert!(
         orphaned_m6_flags.is_empty(),
@@ -96,7 +98,7 @@ fn rust_pub_new_two_pass_no_orphan_e003() {
 
     // Verify FLAGS(CTOR) appears before DEF_M(M6)
     let ctor_flag_pos = after_additive.iter().position(|op| {
-        matches!(op, CoreOp::Flags(mid, flags) if mid == "M6" && flags.contains(&"CTOR".to_string()))
+        matches!(op, CoreOp::PatternFacts(mid, facts) if mid == "M6" && facts.contains(&PatternFact::Constructor))
     });
     let def_m_pos = after_additive
         .iter()
@@ -113,7 +115,9 @@ fn rust_pub_new_two_pass_no_orphan_e003() {
     // Verify no FLAGS referencing M6 remain orphaned
     let orphaned_m6_flags: Vec<&CoreOp> = after_consumptive
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M6"))
+        .filter(
+            |op| matches!(op, CoreOp::Flags(mid, _) | CoreOp::PatternFacts(mid, _) if mid == "M6"),
+        )
         .collect();
     assert!(
         orphaned_m6_flags.is_empty(),
@@ -178,7 +182,9 @@ fn java_csharp_metadata_two_pass_no_orphan_e003() {
     // Verify no FLAGS referencing M6 remain orphaned
     let orphaned_m6_flags: Vec<&CoreOp> = after_consumptive
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M6"))
+        .filter(
+            |op| matches!(op, CoreOp::Flags(mid, _) | CoreOp::PatternFacts(mid, _) if mid == "M6"),
+        )
         .collect();
     assert!(
         orphaned_m6_flags.is_empty(),
@@ -243,11 +249,15 @@ fn multiple_methods_no_cross_contamination() {
     // Verify no FLAGS referencing M6 or M7 remain orphaned
     let orphaned_m6_flags: Vec<&CoreOp> = after_consumptive
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M6"))
+        .filter(
+            |op| matches!(op, CoreOp::Flags(mid, _) | CoreOp::PatternFacts(mid, _) if mid == "M6"),
+        )
         .collect();
     let orphaned_m7_flags: Vec<&CoreOp> = after_consumptive
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(mid, _) if mid == "M7"))
+        .filter(
+            |op| matches!(op, CoreOp::Flags(mid, _) | CoreOp::PatternFacts(mid, _) if mid == "M7"),
+        )
         .collect();
     assert!(
         orphaned_m6_flags.is_empty(),

@@ -3,7 +3,7 @@
 // Contract tests for SYSTEM_PROMPT notation documentation.
 //
 // Guards against silent drift back to the retired `$`-opcode / `⊕`
-// marker tables: the PRIMARY response notation (SCHEMA v4) must stay
+// marker tables: the PRIMARY response notation (SCHEMA v5) must stay
 // taught first, High/Edit behaviors must stay documented, and the
 // retired text-compressor vocabulary must remain explicitly scoped to
 // the legacy section (compress_workspace).
@@ -11,9 +11,9 @@
 use super::SYSTEM_PROMPT;
 
 #[test]
-fn teaches_schema_v3_legend_as_primary_notation() {
+fn teaches_schema_v5_legend_as_primary_notation() {
     let legend_fragments = [
-        "// SCHEMA v4",
+        "// SCHEMA v5",
         "@=meta",
         "X=extends",
         "I=implements",
@@ -23,19 +23,21 @@ fn teaches_schema_v3_legend_as_primary_notation() {
         "→=scope",
         "mod:=method-modifiers",
         "cmod:=class-modifiers",
-        "fl:=flags",
-        "cl:=class-flags",
+        "ctl:=control-summary",
+        "pf:=pattern-facts",
+        "fl:=legacy-flags",
+        "cl:=class-metadata",
         "P=pattern",
         "T=type-alias",
     ];
     for frag in legend_fragments {
         assert!(
             SYSTEM_PROMPT.contains(frag),
-            "SYSTEM_PROMPT must teach the SCHEMA v4 legend fragment `{frag}`"
+            "SYSTEM_PROMPT must teach the SCHEMA v5 legend fragment `{frag}`"
         );
     }
     assert!(
-        SYSTEM_PROMPT.contains("## Response Notation (SCHEMA v4)"),
+        SYSTEM_PROMPT.contains("## Response Notation (SCHEMA v5)"),
         "primary notation section missing"
     );
 }

@@ -108,7 +108,11 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
                 instructions.push(CoreOp::ControlSummary(method.id.clone(), summaries.clone()));
             }
 
-            // Residual method pattern-fact occurrences
+            for facts in &method.pattern_facts {
+                instructions.push(CoreOp::PatternFacts(method.id.clone(), facts.clone()));
+            }
+
+            // Unknown legacy method metadata retained for compatibility.
             for flags in &method.flags {
                 instructions.push(CoreOp::Flags(method.id.clone(), flags.clone()));
             }

@@ -3,7 +3,7 @@
 // Tests for Phase H: Pattern Compression (Consumptive Recognizer).
 
 use crate::ir::layers::PatternRecognizer;
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{CoreOp, DeclarationModifier, PatternFact};
 use crate::ir::patterns::{CompressingPatternRecognizer, MergeItem, PatternOp};
 
 fn defclass(id: &str, name: &str) -> CoreOp {

@@ -101,7 +101,7 @@ real production lifecycle from producer through MCP exposure.
 
 ## 4. Core architectural contracts
 
-The authoritative per-operation detail lives in [`CORE_OP_CONTRACT_MATRIX.md`](CORE_OP_CONTRACT_MATRIX.md); its 23 rows define
+The authoritative per-operation detail lives in [`CORE_OP_CONTRACT_MATRIX.md`](CORE_OP_CONTRACT_MATRIX.md); its 24 rows define
 identity ownership, cardinality, ordering, delta identity, projection behavior,
 and wire preservation without creating a runtime registry.
 
@@ -314,10 +314,9 @@ makes canonical `ControlSummary` ordered and duplicate-preserving while the
 distinct compact LLM projection uses `ctl:`; hierarchical revision 5 and
 additive `0x03` opcode 24 carry it. Physical `0x04` remains Phase 8.
 
-Remaining families migrate one at a time:
-1. patterns;
-2. side effects;
-3. execution contexts.
+Phase 6C implements typed `PatternFacts`, hierarchical revision 6, binary opcode
+25, and compact `pf:` rendering; it awaits user-run verification.
+Remaining families migrate one at a time: side effects, then execution contexts.
 For each slice, migrate producer, IR representation, validator,
 transformation, projection, wire format, consumer, and tests before beginning
 the next family.

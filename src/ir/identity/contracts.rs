@@ -1,5 +1,7 @@
 use super::cardinality::{insert_definition, insert_singular};
-use super::payload::{require_non_empty_payload, require_vocabulary, validate_body_span};
+use super::payload::{
+    reject_typed_flag_payload, require_non_empty_payload, require_vocabulary, validate_body_span,
+};
 use super::{
     ClassId, FieldId, IdentityError, IdentityIndex, IdentityKind, MethodId, ParameterId,
     PatternTarget, pattern_target,
@@ -7,9 +9,8 @@ use super::{
 use crate::ir::CompiledIR;
 use crate::ir::opcodes::{
     CTRL_AWAIT, CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTRL_TRY, CTX_ASYNC, CTX_REALTIME,
-    CTX_SYNC, CTX_THREAD_BOUND, CTX_TRANSACTION_SCOPE, ControlSummary, CoreOp, DATAFLOW_READ,
-    DATAFLOW_WRITE, DeclarationModifier, EFFECT_ASYNC, EFFECT_IO, EFFECT_MUTATION, EFFECT_PURE,
-    EFFECT_TRANSACTION,
+    CTX_SYNC, CTX_THREAD_BOUND, CTX_TRANSACTION_SCOPE, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE,
+    EFFECT_ASYNC, EFFECT_IO, EFFECT_MUTATION, EFFECT_PURE, EFFECT_TRANSACTION,
 };
 use std::collections::HashMap;
 
@@ -28,7 +29,6 @@ struct SingularFacts {
     bodies: HashMap<MethodId, usize>,
     import_aliases: HashMap<String, usize>,
 }
-
 fn collect_definitions_and_singular_facts(ir: &CompiledIR) -> Result<IdentityIndex, IdentityError> {
     let mut index = IdentityIndex {
         classes: HashMap::new(),
@@ -234,6 +234,7 @@ fn collect_definitions_and_singular_facts(ir: &CompiledIR) -> Result<IdentityInd
             | CoreOp::MethodModifiers(..)
             | CoreOp::ClassModifiers(..)
             | CoreOp::ControlSummary(..)
+            | CoreOp::PatternFacts(..)
             | CoreOp::Implements(..)
             | CoreOp::Injects(..)
             | CoreOp::Pattern(..)
@@ -247,7 +248,6 @@ fn collect_definitions_and_singular_facts(ir: &CompiledIR) -> Result<IdentityInd
 
     Ok(index)
 }
-
 fn validate_references_and_payloads(
     ir: &CompiledIR,
     index: &IdentityIndex,
@@ -310,6 +310,16 @@ fn validate_references_and_payloads(
                     index,
                 )?;
                 require_non_empty_payload("CTRL_SUM", summaries, instruction)?;
+            }
+            CoreOp::PatternFacts(raw_method, facts) => {
+                require_target(
+                    "PAT_FACT",
+                    raw_method,
+                    IdentityKind::Method,
+                    instruction,
+                    index,
+                )?;
+                require_non_empty_payload("PAT_FACT", facts, instruction)?;
             }
             CoreOp::Flags(raw_method, flags) => {
                 require_target(
@@ -430,25 +440,6 @@ fn validate_references_and_payloads(
     }
     Ok(())
 }
-
-fn reject_typed_flag_payload(
-    operation: &'static str,
-    values: &[String],
-    instruction: usize,
-) -> Result<(), IdentityError> {
-    if let Some(value) = values.iter().find(|value| {
-        DeclarationModifier::from_serialized(value).is_some()
-            || ControlSummary::from_serialized(value).is_some()
-    }) {
-        return Err(IdentityError::InvalidOperation {
-            operation,
-            instruction,
-            detail: format!("typed value '{value}' must use its semantic-family operation"),
-        });
-    }
-    Ok(())
-}
-
 fn validate_pattern(
     name: &str,
     args: &[String],
@@ -487,7 +478,6 @@ fn validate_pattern(
     }
     Ok(())
 }
-
 fn require_non_empty(
     operation: &'static str,
     kind: IdentityKind,
@@ -507,7 +497,6 @@ fn require_non_empty(
     }
     Ok(())
 }
-
 fn register_definition_kind(
     definitions: &mut HashMap<String, IdentityKind>,
     operation: &'static str,
@@ -530,7 +519,6 @@ fn register_definition_kind(
     definitions.insert(raw_id.to_owned(), kind);
     Ok(())
 }
-
 fn require_target(
     operation: &'static str,
     raw_id: &str,
@@ -569,7 +557,6 @@ fn require_target(
         instruction,
     })
 }
-
 fn conflicting_kind(
     raw_id: &str,
     expected: IdentityKind,

@@ -9,18 +9,21 @@
 // Estimated savings: 40-60% reduction in wire bytes vs. positional encoding.
 
 use super::compiler::CompiledIR;
-use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
+use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact};
 use super::wire::DecodeError;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 const HIERARCHICAL_SCHEMA_REVISION_2: u64 = 2;
 const HIERARCHICAL_SCHEMA_REVISION_3: u64 = 3;
-const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 4;
-const HIERARCHICAL_SCHEMA_VERSION: u64 = 5;
+const HIERARCHICAL_SCHEMA_REVISION_4: u64 = 4;
+const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 5;
+const HIERARCHICAL_SCHEMA_VERSION: u64 = 6;
 
 mod decode;
 mod encode;
+mod migrate;
+use migrate::upgrade_revision_5_pattern_facts;
 
 // Re-exported so the established public paths (`crate::ir::hierarchical::
 // ir_to_hierarchical`, `::hierarchical_to_ir`) are unchanged by the split
@@ -180,7 +183,11 @@ pub struct MethodNode {
     #[serde(rename = "cs", default, skip_serializing_if = "Vec::is_empty")]
     pub control_summaries: Vec<Vec<ControlSummary>>,
 
-    /// Residual method-level pattern-fact occurrences.
+    /// Ordered typed pattern-fact occurrences.
+    #[serde(rename = "pf", default, skip_serializing_if = "Vec::is_empty")]
+    pub pattern_facts: Vec<Vec<PatternFact>>,
+
+    /// Unknown legacy method-metadata occurrences.
     ///
     /// Each inner vector is one `CoreOp::Flags` occurrence. The hierarchy
     /// preserves occurrence order, payload order, and duplicate values.
@@ -315,6 +322,7 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         None
         | Some(HIERARCHICAL_SCHEMA_REVISION_2)
         | Some(HIERARCHICAL_SCHEMA_REVISION_3)
+        | Some(HIERARCHICAL_SCHEMA_REVISION_4)
         | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION)
         | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(unsupported) => {
@@ -333,9 +341,14 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         Some(HIERARCHICAL_SCHEMA_REVISION_2) => {
             upgrade_revision_2_hierarchy(&mut ir_val)?;
             upgrade_revision_4_control_summaries(&mut ir_val)?;
+            upgrade_revision_5_pattern_facts(&mut ir_val)?;
         }
-        Some(HIERARCHICAL_SCHEMA_REVISION_3) | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) => {
-            upgrade_revision_4_control_summaries(&mut ir_val)?
+        Some(HIERARCHICAL_SCHEMA_REVISION_3) | Some(HIERARCHICAL_SCHEMA_REVISION_4) => {
+            upgrade_revision_4_control_summaries(&mut ir_val)?;
+            upgrade_revision_5_pattern_facts(&mut ir_val)?;
+        }
+        Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) => {
+            upgrade_revision_5_pattern_facts(&mut ir_val)?
         }
         Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(_) => unreachable!("unsupported revisions returned above"),
