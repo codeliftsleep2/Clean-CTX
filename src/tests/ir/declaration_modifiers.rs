@@ -1,7 +1,7 @@
 use crate::ir::binary_wire::{decode, encode};
 use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{hierarchical_to_ir, try_ir_to_hierarchical};
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use crate::ir::wire::{op_to_tuple, tuple_to_op};
 
 fn compiled(instructions: Vec<CoreOp>) -> CompiledIR {
@@ -18,7 +18,10 @@ fn contract_stream() -> CompiledIR {
             "M1".into(),
             vec![DeclarationModifier::Async, DeclarationModifier::Async],
         ),
-        CoreOp::Flags("M1".into(), vec!["IF".into(), "RET".into()]),
+        CoreOp::ControlSummary(
+            "M1".into(),
+            vec![ControlSummary::Branch, ControlSummary::Return],
+        ),
         CoreOp::ClassModifiers(
             "C1".into(),
             vec![DeclarationModifier::Export, DeclarationModifier::Abstract],
@@ -70,7 +73,10 @@ fn checked_projection_preserves_typed_family_boundaries_and_occurrences() {
         method.modifiers,
         vec![vec![DeclarationModifier::Async, DeclarationModifier::Async]]
     );
-    assert_eq!(method.flags, vec![vec!["IF", "RET"]]);
+    assert_eq!(
+        method.control_summaries,
+        vec![vec![ControlSummary::Branch, ControlSummary::Return]]
+    );
     assert_eq!(
         hierarchical_to_ir(&hierarchy),
         vec![
@@ -84,7 +90,10 @@ fn checked_projection_preserves_typed_family_boundaries_and_occurrences() {
                 "M1".into(),
                 vec![DeclarationModifier::Async, DeclarationModifier::Async],
             ),
-            CoreOp::Flags("M1".into(), vec!["IF".into(), "RET".into()]),
+            CoreOp::ControlSummary(
+                "M1".into(),
+                vec![ControlSummary::Branch, ControlSummary::Return],
+            ),
         ]
     );
 }
@@ -102,7 +111,7 @@ fn checked_projection_rejects_declaration_values_in_residual_flags() {
         ]))
         .expect_err("declaration values require typed modifier operations");
         assert!(
-            error.to_string().contains("typed modifier operation"),
+            error.to_string().contains("semantic-family operation"),
             "{error}"
         );
     }

@@ -104,7 +104,11 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
                 ));
             }
 
-            // Method flag occurrences
+            for summaries in &method.control_summaries {
+                instructions.push(CoreOp::ControlSummary(method.id.clone(), summaries.clone()));
+            }
+
+            // Residual method pattern-fact occurrences
             for flags in &method.flags {
                 instructions.push(CoreOp::Flags(method.id.clone(), flags.clone()));
             }

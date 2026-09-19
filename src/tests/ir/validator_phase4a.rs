@@ -2,7 +2,7 @@
 
 use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use crate::ir::pipeline::{IRPass, PassContext, ValidationPass};
 use crate::ir::validator::{DefaultValidator, IRValidator};
 
@@ -36,7 +36,7 @@ fn accepts_all_operation_contracts_in_legal_predefinition_order() {
             "M1".into(),
             vec![DeclarationModifier::Async, DeclarationModifier::Async],
         ),
-        CoreOp::Flags("M1".into(), vec!["RET".into()]),
+        CoreOp::ControlSummary("M1".into(), vec![ControlSummary::Return]),
         CoreOp::ClassModifiers("C1".into(), vec![DeclarationModifier::Export]),
         CoreOp::Extends("C1".into(), "ExternalBase".into()),
         CoreOp::Implements("C1".into(), "ExternalInterface".into()),

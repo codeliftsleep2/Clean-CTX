@@ -1,7 +1,7 @@
 use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{ir_to_hierarchical_wire, try_ir_to_hierarchical, wire_to_ir};
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use crate::ir::render_llm::render_hierarchical_for_llm;
 
 fn compiled(instructions: Vec<CoreOp>) -> CompiledIR {
@@ -72,7 +72,7 @@ fn repeated_method_facts_round_trip_without_union_or_replacement() {
             "M1".into(),
             vec![DeclarationModifier::Static, DeclarationModifier::Static],
         ),
-        CoreOp::Flags("M1".into(), vec!["RET".into()]),
+        CoreOp::ControlSummary("M1".into(), vec![ControlSummary::Return]),
         CoreOp::ControlFlow("M1".into(), "if".into(), "first".into()),
         CoreOp::ControlFlow("M1".into(), "if".into(), "first".into()),
         CoreOp::DataFlow("M1".into(), "reads".into(), "state".into()),
@@ -92,7 +92,7 @@ fn repeated_method_facts_round_trip_without_union_or_replacement() {
             DeclarationModifier::Static
         ]]
     );
-    assert_eq!(method.flags, vec![vec!["RET"]]);
+    assert_eq!(method.control_summaries, vec![vec![ControlSummary::Return]]);
     assert_eq!(
         method.control_flow,
         vec![vec!["if", "first"], vec!["if", "first"]]
@@ -111,7 +111,7 @@ fn repeated_method_facts_round_trip_without_union_or_replacement() {
             matches!(
                 op,
                 CoreOp::MethodModifiers(..)
-                    | CoreOp::Flags(..)
+                    | CoreOp::ControlSummary(..)
                     | CoreOp::ControlFlow(..)
                     | CoreOp::DataFlow(..)
                     | CoreOp::SideEffect(..)
@@ -128,7 +128,7 @@ fn versioned_wire_emits_occurrence_preserving_shapes() {
         CoreOp::DefClass("C1".into(), "Sample".into()),
         CoreOp::DefMethod("C1".into(), "M1".into(), "work".into()),
         CoreOp::MethodModifiers("M1".into(), vec![DeclarationModifier::Static]),
-        CoreOp::Flags("M1".into(), vec!["RET".into()]),
+        CoreOp::ControlSummary("M1".into(), vec![ControlSummary::Return]),
         CoreOp::SideEffect("M1".into(), "io".into()),
         CoreOp::SideEffect("M1".into(), "mutation".into()),
         CoreOp::ExecutionContext("M1".into(), "sync".into()),
@@ -136,13 +136,13 @@ fn versioned_wire_emits_occurrence_preserving_shapes() {
     ]);
 
     let wire = ir_to_hierarchical_wire(&ir);
-    assert_eq!(wire["hs"], 4);
+    assert_eq!(wire["hs"], 5);
     assert_eq!(
         wire["ir"]["c"][0]["m"][0]["mo"],
         serde_json::json!([["STATIC"]])
     );
     assert_eq!(
-        wire["ir"]["c"][0]["m"][0]["fl"],
+        wire["ir"]["c"][0]["m"][0]["cs"],
         serde_json::json!([["RET"]])
     );
     assert_eq!(
@@ -164,7 +164,7 @@ fn renderer_exposes_every_method_fact_occurrence_in_order() {
             "M1".into(),
             vec![DeclarationModifier::Static, DeclarationModifier::Static],
         ),
-        CoreOp::Flags("M1".into(), vec!["RET".into()]),
+        CoreOp::ControlSummary("M1".into(), vec![ControlSummary::Return]),
         CoreOp::SideEffect("M1".into(), "io".into()),
         CoreOp::SideEffect("M1".into(), "mutation".into()),
         CoreOp::ExecutionContext("M1".into(), "sync".into()),
@@ -174,7 +174,7 @@ fn renderer_exposes_every_method_fact_occurrence_in_order() {
 
     let rendered = render_hierarchical_for_llm(&hierarchy, Fidelity::High);
     assert!(rendered.contains("mod:STATIC,STATIC"), "{rendered}");
-    assert!(rendered.contains("fl:RET"), "{rendered}");
+    assert!(rendered.contains("ctl:RET"), "{rendered}");
     assert!(rendered.contains("se:io,mutation"), "{rendered}");
     assert!(rendered.contains("ec:sync,async"), "{rendered}");
 }
@@ -244,7 +244,7 @@ fn unknown_hierarchy_schema_revision_fails_loudly() {
         "file": "alpha-1",
         "v": 7,
         "encoding": "hierarchical",
-        "hs": 5,
+        "hs": 6,
         "ir": { "c": [] }
     }))
     .expect_err("unknown hierarchy schema must not be guessed");
@@ -252,7 +252,7 @@ fn unknown_hierarchy_schema_revision_fails_loudly() {
     assert!(
         error
             .to_string()
-            .contains("unsupported hierarchical schema version: 5"),
+            .contains("unsupported hierarchical schema version: 6"),
         "unexpected error: {error}"
     );
 }

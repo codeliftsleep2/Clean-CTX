@@ -14,7 +14,7 @@ use crate::ir::compiler::{CompiledIR, IRCompiler};
 use crate::ir::layers::typescript::TypeScriptLayer;
 // P0-4: Meta-layers use LayerRegistry::global() instead of manual add_meta_layer().
 // The compiler calls LayerRegistry internally during compile().
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -157,9 +157,9 @@ fn ts_language_layer_extracts_method_flags_via_compiler() {
 }
 
 #[test]
-fn control_flow_flags_emitted_via_compiler() {
-    // Source with if/for/return/throw — verify FLAGS ops are created
-    // via the O(1) current_method_flags accumulator (F-28).
+fn typed_control_summaries_emitted_via_compiler() {
+    // Source with if/for/return/throw — verify typed summaries are created
+    // via the O(1) per-method accumulator (F-28).
     // NOTE: tree-sitter separates for_statement (C-style for(;;)),
     // for_in_statement (for...in), and for_of_statement (for...of).
     // The query only captures for_statement, so use C-style loop.
@@ -180,30 +180,28 @@ fn control_flow_flags_emitted_via_compiler() {
     "#;
     let ir = compile_ts(source);
 
-    // Find the FLAGS op for the processItems method
-    let flags_ops: Vec<_> = ir
+    let summary_ops: Vec<_> = ir
         .instructions
         .iter()
         .filter_map(|op| {
-            if let CoreOp::Flags(mid, flags) = op {
-                Some((mid.clone(), flags.clone()))
+            if let CoreOp::ControlSummary(mid, summaries) = op {
+                Some((mid.clone(), summaries.clone()))
             } else {
                 None
             }
         })
         .collect();
 
-    // Should have at least one FLAGS with IF, LOOP, RET, THROW
-    let process_flags = flags_ops.iter().find(|(_, flags)| {
-        flags.contains(&"IF".to_string())
-            && flags.contains(&"LOOP".to_string())
-            && flags.contains(&"RET".to_string())
-            && flags.contains(&"THROW".to_string())
+    let process_summaries = summary_ops.iter().find(|(_, summaries)| {
+        summaries.contains(&ControlSummary::Branch)
+            && summaries.contains(&ControlSummary::Loop)
+            && summaries.contains(&ControlSummary::Return)
+            && summaries.contains(&ControlSummary::Throw)
     });
     assert!(
-        process_flags.is_some(),
-        "processItems should have IF+LOOP+RET+THROW flags, got: {:?}",
-        flags_ops
+        process_summaries.is_some(),
+        "processItems should have IF+LOOP+RET+THROW summaries, got: {:?}",
+        summary_ops
     );
 }
 
@@ -345,7 +343,7 @@ fn meta_layer_produces_ops_via_compiler() {
 #[test]
 fn compiler_resets_state_between_compilations() {
     // The compiler should reset its internal state (current_method,
-    // current_method_flags, etc.) between compile calls.
+    // current_control_summaries, etc.) between compile calls.
     let source1 = r#"
         class A {
             a(): void {

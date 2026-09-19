@@ -124,8 +124,8 @@ pub struct PassContext {
     pub captures: Vec<CapEntry>,
     /// Current method being processed (F-27: O(1) tracking).
     pub current_method: Option<String>,
-    /// Current method's accumulated flags (F-28).
-    pub current_method_flags: Vec<String>,
+    /// Current method's accumulated typed control summaries (F-28).
+    pub current_control_summaries: Vec<ControlSummary>,
     /// Current class ID (set when processing a class capture).
     /// Nested-type aware: mirrors the innermost entry of `type_scopes`.
     pub current_class: Option<String>,
@@ -170,7 +170,7 @@ impl PassContext {
             pattern_recognizers: Vec::new(),
             captures: Vec::new(),
             current_method: None,
-            current_method_flags: Vec::new(),
+            current_control_summaries: Vec::new(),
             current_class: None,
             type_scopes: Vec::new(),
             callable_scopes: Vec::new(),
@@ -199,15 +199,16 @@ impl PassContext {
         self.pattern_recognizers = recognizers;
     }
 
-    /// Flush accumulated method flags into a FLAGS instruction (F-28).
-    pub(super) fn flush_method_flags(&mut self) {
+    /// Flush accumulated method summaries into a typed instruction (F-28).
+    pub(super) fn flush_control_summaries(&mut self) {
         if let Some(method_id) = self.current_method.take() {
-            if !self.current_method_flags.is_empty() {
-                let flags = std::mem::take(&mut self.current_method_flags);
-                self.instructions.push(CoreOp::Flags(method_id, flags));
+            if !self.current_control_summaries.is_empty() {
+                let summaries = std::mem::take(&mut self.current_control_summaries);
+                self.instructions
+                    .push(CoreOp::ControlSummary(method_id, summaries));
             }
         }
-        self.current_method_flags.clear();
+        self.current_control_summaries.clear();
     }
 
     /// Push a type-declaration scope. Closed scopes are pruned lazily by

@@ -46,6 +46,7 @@ fn op_references_method(op: &CoreOp, method_id: &str) -> bool {
         | CoreOp::Return(mid, _)
         | CoreOp::Flags(mid, _)
         | CoreOp::MethodModifiers(mid, _)
+        | CoreOp::ControlSummary(mid, _)
         | CoreOp::DataFlow(mid, _, _)
         | CoreOp::SideEffect(mid, _)
         | CoreOp::ExecutionContext(mid, _)
@@ -83,13 +84,17 @@ fn trailing_region_references_call(slice: &[CoreOp], offset: usize, method_id: &
 
 // ── Centralized flag consumption helpers ──────────────────────────────
 
-/// Count consecutive pattern flags or authoritative declaration modifiers for
-/// `method_id`. Pattern flags may be summarized; modifiers are re-emitted.
+/// Count consecutive pattern flags or authoritative typed facts for
+/// `method_id`. Pattern flags may be summarized; typed facts are re-emitted.
 fn count_trailing_annotations(slice: &[CoreOp], offset: usize, method_id: &str) -> usize {
     let mut count = 0;
     while offset + count < slice.len() {
         match &slice[offset + count] {
-            CoreOp::Flags(mid, _) | CoreOp::MethodModifiers(mid, _) if mid == method_id => {
+            CoreOp::Flags(mid, _)
+            | CoreOp::MethodModifiers(mid, _)
+            | CoreOp::ControlSummary(mid, _)
+                if mid == method_id =>
+            {
                 count += 1
             }
             _ => break,
@@ -148,7 +153,13 @@ fn trailing_region_references_method(slice: &[CoreOp], offset: usize, method_id:
     let mut idx = offset;
     while idx < slice.len() {
         match &slice[idx] {
-            CoreOp::Flags(mid, _) | CoreOp::MethodModifiers(mid, _) if mid == method_id => idx += 1,
+            CoreOp::Flags(mid, _)
+            | CoreOp::MethodModifiers(mid, _)
+            | CoreOp::ControlSummary(mid, _)
+                if mid == method_id =>
+            {
+                idx += 1
+            }
             _ => break,
         }
     }

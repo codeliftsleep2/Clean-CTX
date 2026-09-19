@@ -40,7 +40,8 @@ fn render_hierarchical_for_llm_typescript_class() {
         params: vec![],
         return_type: None,
         modifiers: vec![],
-        flags: vec![vec!["IF".into()]],
+        control_summaries: vec![vec![ControlSummary::Branch]],
+        flags: vec![],
         patterns: vec![],
         body: None,
         body_start: None,
@@ -57,14 +58,14 @@ fn render_hierarchical_for_llm_typescript_class() {
         calls: vec![],
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    // Phase 6 IR-first format: SCHEMA v3 header with typed modifiers.
-    assert!(result.contains("SCHEMA v3"));
+    // Phase 6 IR-first format: compact LLM schema with typed semantic families.
+    assert!(result.contains("SCHEMA v4"));
     assert!(result.contains("// ── UserListComponent ──"));
     assert!(result.contains("X BaseListComponent"));
     assert!(result.contains("I OnInit"));
     assert!(result.contains("F users:$s[]"));
     assert!(result.contains("M ngOnInit"));
-    assert!(result.contains("fl:IF"));
+    assert!(result.contains("ctl:IF"));
     assert!(result.contains("$ IM1 ./core [OnInit]"));
 }
 
@@ -95,7 +96,8 @@ fn render_hierarchical_for_llm_spring_boot_class() {
         params: vec![vec!["P1".into(), "$n".into(), "id".into()]],
         return_type: None,
         modifiers: vec![],
-        flags: vec![vec!["RET".into()]],
+        control_summaries: vec![vec![ControlSummary::Return]],
+        flags: vec![],
         patterns: vec![],
         body: None,
         body_start: None,
@@ -114,7 +116,8 @@ fn render_hierarchical_for_llm_spring_boot_class() {
         ],
         return_type: None,
         modifiers: vec![],
-        flags: vec![vec!["RET".into(), "IF".into()]],
+        control_summaries: vec![vec![ControlSummary::Return, ControlSummary::Branch]],
+        flags: vec![],
         patterns: vec![],
         body: None,
         body_start: None,
@@ -193,7 +196,7 @@ fn render_hierarchical_for_llm_empty_hir_produces_header() {
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Always has schema header even with empty HIR
-    assert!(result.starts_with("// SCHEMA v3"));
+    assert!(result.starts_with("// SCHEMA v4"));
 }
 
 #[test]
@@ -315,12 +318,12 @@ fn mcp_state_llm_text_cache_insert_and_read() {
     // Insert into cache
     state
         .llm_text_cache_lock()
-        .insert("α1".to_string(), "// SCHEMA v3\n// ── Foo ──\n".to_string());
+        .insert("α1".to_string(), "// SCHEMA v4\n// ── Foo ──\n".to_string());
     // Read from cache
     let cache_guard = state.llm_text_cache_lock();
     let cached = cache_guard.get("α1");
     assert!(cached.is_some());
-    assert!(cached.unwrap().contains("SCHEMA v3"));
+    assert!(cached.unwrap().contains("SCHEMA v4"));
     assert!(cached.unwrap().contains("Foo"));
 }
 

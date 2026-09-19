@@ -103,7 +103,7 @@ fn revision_four_wire_emits_occurrence_preserving_class_shapes() {
     ]);
 
     let wire = ir_to_hierarchical_wire(&ir);
-    assert_eq!(wire["hs"], 4);
+    assert_eq!(wire["hs"], 5);
     assert_eq!(
         wire["ir"]["c"][0]["mo"],
         serde_json::json!([["EXPORT"], ["ABSTRACT"]])

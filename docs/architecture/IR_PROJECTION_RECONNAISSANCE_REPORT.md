@@ -35,7 +35,9 @@ interface-representation findings remain open. User-run verification proved that
 approved, implemented, and verified on 2026-09-18.
 Phase 6A separates declaration modifiers into typed method/class operations
 across producers, validation, patterns, projection, rendering, and wire
-formats; it is implemented and awaiting user-run verification.
+formats; it was user-verified on 2026-09-18. Phase 6B implements typed control
+summaries while keeping the LLM-facing `ctl:` projection independently compact;
+the slice is awaiting user-run verification.
 
 ## 1. Executive summary
 
@@ -210,8 +212,8 @@ are different, but string-based consumers can treat them as one category.
 Required boundary: represent distinct semantic families with distinct Rust
 types or enum variants.
 
-Phase 6A resolves the declaration-modifier portion. Control summaries,
-patterns, side effects, and execution contexts remain later slices.
+Phase 6A resolves declaration modifiers and Phase 6B resolves control
+summaries. Patterns, side effects, and execution contexts remain later slices.
 
 ### F-05: Delta keys lose multiplicity
 

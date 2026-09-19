@@ -34,6 +34,8 @@ pub enum BinaryDecodeError {
     InvalidUtf8(String),
     /// Unknown declaration modifier in a typed modifier opcode
     InvalidDeclarationModifier(String),
+    /// Unknown control summary in the typed summary opcode
+    InvalidControlSummary(String),
 }
 
 impl std::fmt::Display for BinaryDecodeError {
@@ -51,6 +53,9 @@ impl std::fmt::Display for BinaryDecodeError {
             BinaryDecodeError::InvalidUtf8(msg) => write!(f, "invalid UTF-8: {}", msg),
             BinaryDecodeError::InvalidDeclarationModifier(value) => {
                 write!(f, "invalid declaration modifier: {value}")
+            }
+            BinaryDecodeError::InvalidControlSummary(value) => {
+                write!(f, "invalid control summary: {value}")
             }
         }
     }
@@ -214,6 +219,23 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                     } else {
                         CoreOp::ClassModifiers(target, modifiers)
                     }
+                }
+                OP_CTRL_SUM => {
+                    if operands.len() < 2 {
+                        return Err(BinaryDecodeError::TruncatedData(
+                            "CTRL_SUM needs a method_id and at least one summary".into(),
+                        ));
+                    }
+                    let method_id = operands.remove(0);
+                    let summaries = operands
+                        .into_iter()
+                        .map(|value| {
+                            ControlSummary::from_serialized(&value).ok_or_else(|| {
+                                BinaryDecodeError::InvalidControlSummary(value.clone())
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    CoreOp::ControlSummary(method_id, summaries)
                 }
                 _ => unreachable!(),
             }

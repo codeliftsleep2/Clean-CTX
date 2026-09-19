@@ -6,7 +6,7 @@ use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{
     hierarchical_to_ir, ir_to_hierarchical, ir_to_hierarchical_wire, wire_to_ir,
 };
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 
 /// Helper: create a simple compiled IR with one class and one method.
 fn make_single_class_ir() -> CompiledIR {
@@ -27,7 +27,7 @@ fn make_single_class_ir() -> CompiledIR {
                 "payload".to_string(),
             ),
             CoreOp::Return("M1".to_string(), "$b".to_string()),
-            CoreOp::Flags("M1".to_string(), vec!["IF".to_string()]),
+            CoreOp::ControlSummary("M1".to_string(), vec![ControlSummary::Branch]),
         ],
     }
 }

@@ -13,7 +13,7 @@
 //    └── opcode (always first element)
 
 use super::compiler::CompiledIR;
-use super::opcodes::{CoreOp, DeclarationModifier};
+use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use serde_json::{Value, json};
 
 /// Errors during wire format decoding.
@@ -75,6 +75,11 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
         CoreOp::ClassModifiers(cid, modifiers) => {
             let mut tuple = vec!["MOD_C".into(), cid.clone()];
             tuple.extend(modifiers.iter().map(|modifier| modifier.as_str().into()));
+            tuple
+        }
+        CoreOp::ControlSummary(mid, summaries) => {
+            let mut tuple = vec!["CTRL_SUM".into(), mid.clone()];
+            tuple.extend(summaries.iter().map(|summary| summary.as_str().into()));
             tuple
         }
         CoreOp::Flags(tid, flags) => {
@@ -245,6 +250,17 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
                     .map(|value| DeclarationModifier::from_serialized(value))
                     .collect::<Option<Vec<_>>>()?;
                 Some(CoreOp::ClassModifiers(tuple[1].clone(), modifiers))
+            } else {
+                None
+            }
+        }
+        "CTRL_SUM" => {
+            if tuple.len() >= 3 {
+                let summaries = tuple[2..]
+                    .iter()
+                    .map(|value| ControlSummary::from_serialized(value))
+                    .collect::<Option<Vec<_>>>()?;
+                Some(CoreOp::ControlSummary(tuple[1].clone(), summaries))
             } else {
                 None
             }

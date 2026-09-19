@@ -29,6 +29,7 @@ use std::collections::HashMap;
 /// - FieldType → attached to its target FieldId after definition placement
 /// - MethodModifiers → appended to its MethodId as typed occurrences
 /// - ClassModifiers → appended to its ClassId as typed occurrences
+/// - ControlSummary → appended to its MethodId as typed occurrences
 /// - Flags → appended to its target MethodId as one preserved occurrence
 /// - ClassFlags → appended to its target ClassId as one preserved occurrence
 /// - Extends → set on the class named by its child ID
@@ -142,6 +143,7 @@ pub fn try_ir_to_hierarchical(
             | CoreOp::FieldType(..)
             | CoreOp::MethodModifiers(..)
             | CoreOp::ClassModifiers(..)
+            | CoreOp::ControlSummary(..)
             | CoreOp::Flags(..)
             | CoreOp::ClassFlags(..)
             | CoreOp::Extends(..)
@@ -234,6 +236,13 @@ pub fn try_ir_to_hierarchical(
             CoreOp::ClassModifiers(raw_class, modifiers) => {
                 let class_idx = class_location(&class_locations, raw_class, "MOD_C", instruction)?;
                 classes[class_idx].modifiers.push(modifiers.clone());
+            }
+            CoreOp::ControlSummary(raw_method, summaries) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "CTRL_SUM", instruction)?;
+                classes[class_idx].methods[method_idx]
+                    .control_summaries
+                    .push(summaries.clone());
             }
             CoreOp::Flags(raw_method, flags) => {
                 let (class_idx, method_idx) =
@@ -389,6 +398,7 @@ fn push_method(class: &mut ClassNode, method_id: &MethodId, name: String) -> usi
         params: Vec::new(),
         return_type: None,
         modifiers: Vec::new(),
+        control_summaries: Vec::new(),
         flags: Vec::new(),
         patterns: Vec::new(),
         body: None,

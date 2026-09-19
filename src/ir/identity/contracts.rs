@@ -7,8 +7,9 @@ use super::{
 use crate::ir::CompiledIR;
 use crate::ir::opcodes::{
     CTRL_AWAIT, CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTRL_TRY, CTX_ASYNC, CTX_REALTIME,
-    CTX_SYNC, CTX_THREAD_BOUND, CTX_TRANSACTION_SCOPE, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE,
-    DeclarationModifier, EFFECT_ASYNC, EFFECT_IO, EFFECT_MUTATION, EFFECT_PURE, EFFECT_TRANSACTION,
+    CTX_SYNC, CTX_THREAD_BOUND, CTX_TRANSACTION_SCOPE, ControlSummary, CoreOp, DATAFLOW_READ,
+    DATAFLOW_WRITE, DeclarationModifier, EFFECT_ASYNC, EFFECT_IO, EFFECT_MUTATION, EFFECT_PURE,
+    EFFECT_TRANSACTION,
 };
 use std::collections::HashMap;
 
@@ -232,6 +233,7 @@ fn collect_definitions_and_singular_facts(ir: &CompiledIR) -> Result<IdentityInd
             | CoreOp::ClassFlags(..)
             | CoreOp::MethodModifiers(..)
             | CoreOp::ClassModifiers(..)
+            | CoreOp::ControlSummary(..)
             | CoreOp::Implements(..)
             | CoreOp::Injects(..)
             | CoreOp::Pattern(..)
@@ -299,6 +301,16 @@ fn validate_references_and_payloads(
                 require_target("MOD_C", raw_class, IdentityKind::Class, instruction, index)?;
                 require_non_empty_payload("MOD_C", modifiers, instruction)?;
             }
+            CoreOp::ControlSummary(raw_method, summaries) => {
+                require_target(
+                    "CTRL_SUM",
+                    raw_method,
+                    IdentityKind::Method,
+                    instruction,
+                    index,
+                )?;
+                require_non_empty_payload("CTRL_SUM", summaries, instruction)?;
+            }
             CoreOp::Flags(raw_method, flags) => {
                 require_target(
                     "FLAGS",
@@ -308,7 +320,7 @@ fn validate_references_and_payloads(
                     index,
                 )?;
                 require_non_empty_payload("FLAGS", flags, instruction)?;
-                reject_modifier_payload("FLAGS", flags, instruction)?;
+                reject_typed_flag_payload("FLAGS", flags, instruction)?;
             }
             CoreOp::ClassFlags(raw_class, flags) => {
                 require_target(
@@ -319,7 +331,7 @@ fn validate_references_and_payloads(
                     index,
                 )?;
                 require_non_empty_payload("FLAGS_C", flags, instruction)?;
-                reject_modifier_payload("FLAGS_C", flags, instruction)?;
+                reject_typed_flag_payload("FLAGS_C", flags, instruction)?;
             }
             CoreOp::Extends(raw_class, _) => {
                 require_target("EXT", raw_class, IdentityKind::Class, instruction, index)?
@@ -419,19 +431,19 @@ fn validate_references_and_payloads(
     Ok(())
 }
 
-fn reject_modifier_payload(
+fn reject_typed_flag_payload(
     operation: &'static str,
     values: &[String],
     instruction: usize,
 ) -> Result<(), IdentityError> {
-    if let Some(value) = values
-        .iter()
-        .find(|value| DeclarationModifier::from_serialized(value).is_some())
-    {
+    if let Some(value) = values.iter().find(|value| {
+        DeclarationModifier::from_serialized(value).is_some()
+            || ControlSummary::from_serialized(value).is_some()
+    }) {
         return Err(IdentityError::InvalidOperation {
             operation,
             instruction,
-            detail: format!("declaration modifier '{value}' must use the typed modifier operation"),
+            detail: format!("typed value '{value}' must use its semantic-family operation"),
         });
     }
     Ok(())

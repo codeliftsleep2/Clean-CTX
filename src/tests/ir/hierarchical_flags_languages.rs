@@ -14,7 +14,7 @@ use super::*;
 // production path uses (language layer + both production pattern
 // recognizers), and then asserts:
 //
-//   1. the flat stream keeps declaration modifiers and residual flags in
+//   1. the flat stream keeps declaration modifiers and control summaries in
 //      separate typed operations,
 //   2. the hierarchical node preserves both occurrences, with the
 //      declaration family FIRST (capture order is deterministic:
@@ -22,7 +22,7 @@ use super::*;
 //      declaration's `method.root` capture precedes every control-flow
 //      capture inside its body), and
 //   3. the rendered line carries every value in the
-//      established `fl:` form.
+//      compact `ctl:` form.
 //
 // The intra-family order of the control-flow values is not pinned positionally
 // here (the synthetic regressions above pin first-seen ordering exactly); the
@@ -57,7 +57,7 @@ fn probe_single_method(ir: &CompiledIR, declaration: &[&str], control_flow: &[&s
     assert_eq!(
         raw_flags.len(),
         1,
-        "{label}: one residual flag occurrence expected"
+        "{label}: one typed control-summary occurrence expected"
     );
 
     // Preservation: the declaration family's values come FIRST (capture order
@@ -94,8 +94,8 @@ fn probe_single_method(ir: &CompiledIR, declaration: &[&str], control_flow: &[&s
         "{label}: rendered modifiers must mirror the typed field:\n{rendered}"
     );
     assert!(
-        rendered.contains(&format!("fl:{}", control_flow.join(","))),
-        "{label}: rendered flags must mirror the residual field:\n{rendered}"
+        rendered.contains(&format!("ctl:{}", control_flow.join(","))),
+        "{label}: compact summaries must preserve meaning:\n{rendered}"
     );
 }
 
@@ -171,7 +171,7 @@ fn pattern_recognition_input_holds_two_separate_flag_ops_csharp() {
     );
     assert!(
         raw_flags[0].contains(&"IF".to_string()) && raw_flags[0].contains(&"RET".to_string()),
-        "the control-flow family remains a residual flag op: {raw_flags:?}"
+        "the control-flow family has its own typed op: {raw_flags:?}"
     );
     assert_eq!(
         merged.len(),

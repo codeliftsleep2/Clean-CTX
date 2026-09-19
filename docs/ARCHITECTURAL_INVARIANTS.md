@@ -98,6 +98,21 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### ARCH-003 Canonical IR and LLM Projection Are Separate Contracts
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Internal correctness structure must not force a verbose model-facing representation, and token optimization must never weaken canonical guarantees. |
+| **Invariant** | Canonical IR is explicit, typed, ordered, identity-bearing, and occurrence-preserving. LLM text is a separate compact projection that may abbreviate presentation only while preserving complete meaning; it is not the canonical storage or validation model. |
+| **Enforcement** | Distinct canonical types/wire paths and `render_hierarchical_for_llm`; semantic-family renderer contracts under `src/tests/ir/**`. |
+| **Authority** | `src/ir/opcodes.rs`, `src/ir/hierarchical.rs`, `src/ir/render_llm.rs`, `src/tests/ir/control_summaries.rs` |
+| **Type** | STRUCTURAL and ENFORCED |
+| **Gate** | Rust compiler and `cargo test --all-features` |
+
+**Deferred:** After canonical IR repairs, audit token efficiency for LLM views that require whole method bodies. This is presentation work and must preserve complete meaning.
+
+---
+
 ### PIPELINE-001 Compilation Pipeline Ordering
 
 | Property | Value |

@@ -9,14 +9,15 @@
 // Estimated savings: 40-60% reduction in wire bytes vs. positional encoding.
 
 use super::compiler::CompiledIR;
-use super::opcodes::{CoreOp, DeclarationModifier};
+use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use super::wire::DecodeError;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 const HIERARCHICAL_SCHEMA_REVISION_2: u64 = 2;
-const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 3;
-const HIERARCHICAL_SCHEMA_VERSION: u64 = 4;
+const HIERARCHICAL_SCHEMA_REVISION_3: u64 = 3;
+const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 4;
+const HIERARCHICAL_SCHEMA_VERSION: u64 = 5;
 
 mod decode;
 mod encode;
@@ -175,7 +176,11 @@ pub struct MethodNode {
     #[serde(rename = "mo", default, skip_serializing_if = "Vec::is_empty")]
     pub modifiers: Vec<Vec<DeclarationModifier>>,
 
-    /// Method-level flag occurrences (IF, LOOP, RET, etc.).
+    /// Ordered typed control-summary occurrences.
+    #[serde(rename = "cs", default, skip_serializing_if = "Vec::is_empty")]
+    pub control_summaries: Vec<Vec<ControlSummary>>,
+
+    /// Residual method-level pattern-fact occurrences.
     ///
     /// Each inner vector is one `CoreOp::Flags` occurrence. The hierarchy
     /// preserves occurrence order, payload order, and duplicate values.
@@ -309,6 +314,7 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
     match schema_version {
         None
         | Some(HIERARCHICAL_SCHEMA_REVISION_2)
+        | Some(HIERARCHICAL_SCHEMA_REVISION_3)
         | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION)
         | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(unsupported) => {
@@ -324,8 +330,14 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         .ok_or_else(|| DecodeError::MissingField("ir".into()))?;
     match schema_version {
         None => upgrade_legacy_hierarchy(&mut ir_val)?,
-        Some(HIERARCHICAL_SCHEMA_REVISION_2) => upgrade_revision_2_hierarchy(&mut ir_val)?,
-        Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
+        Some(HIERARCHICAL_SCHEMA_REVISION_2) => {
+            upgrade_revision_2_hierarchy(&mut ir_val)?;
+            upgrade_revision_4_control_summaries(&mut ir_val)?;
+        }
+        Some(HIERARCHICAL_SCHEMA_REVISION_3) | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) => {
+            upgrade_revision_4_control_summaries(&mut ir_val)?
+        }
+        Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(_) => unreachable!("unsupported revisions returned above"),
     }
 
@@ -381,7 +393,7 @@ fn upgrade_legacy_hierarchy(ir: &mut Value) -> Result<(), DecodeError> {
 }
 
 /// Upgrade strict revision-2 containers to the occurrence-aware shape used by
-/// revisions 3 and 4. Typed modifier fields are absent and default empty.
+/// later revisions. Typed semantic-family fields are absent and default empty.
 ///
 /// Revision 2 already has occurrence-aware method facts, but its class flags
 /// and injections are flat and therefore cannot represent repeated operation
@@ -393,6 +405,54 @@ fn upgrade_revision_2_hierarchy(ir: &mut Value) -> Result<(), DecodeError> {
     for class in classes {
         upgrade_flat_occurrences(class, "fl", "class flags")?;
         upgrade_flat_occurrences(class, "ij", "injections")?;
+    }
+    Ok(())
+}
+
+/// Revisions 2 through 4 carried control summaries in the residual `fl`
+/// channel. Move only the closed vocabulary into `cs`; patterns remain `fl`.
+fn upgrade_revision_4_control_summaries(ir: &mut Value) -> Result<(), DecodeError> {
+    let Some(classes) = ir.get_mut("c").and_then(Value::as_array_mut) else {
+        return Ok(());
+    };
+    for class in classes {
+        let Some(methods) = class.get_mut("m").and_then(Value::as_array_mut) else {
+            continue;
+        };
+        for method in methods {
+            let Some(flag_occurrences) = method.get_mut("fl").and_then(Value::as_array_mut) else {
+                continue;
+            };
+            let mut summaries = Vec::new();
+            for occurrence in flag_occurrences.iter_mut() {
+                let Some(values) = occurrence.as_array_mut() else {
+                    continue;
+                };
+                let mut typed = Vec::new();
+                values.retain(|value| {
+                    let Some(raw) = value.as_str() else {
+                        return true;
+                    };
+                    if ControlSummary::from_serialized(raw).is_some() {
+                        typed.push(value.clone());
+                        false
+                    } else {
+                        true
+                    }
+                });
+                if !typed.is_empty() {
+                    summaries.push(Value::Array(typed));
+                }
+            }
+            flag_occurrences.retain(|occurrence| {
+                occurrence
+                    .as_array()
+                    .is_none_or(|values| !values.is_empty())
+            });
+            if !summaries.is_empty() {
+                method["cs"] = Value::Array(summaries);
+            }
+        }
     }
     Ok(())
 }

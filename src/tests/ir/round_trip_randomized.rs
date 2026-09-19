@@ -8,7 +8,7 @@ use super::*;
 
 /// Generate a random CoreOp for property testing.
 fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
-    let variant = rng() % 22;
+    let variant = rng() % 23;
     match variant {
         0 => CoreOp::DefClass(format!("C{}", rng() % 10), format!("Class{}", rng() % 100)),
         1 => CoreOp::DefMethod(
@@ -57,25 +57,17 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
         7 => CoreOp::Flags(
             format!("M{}", rng() % 10),
             vec![
-                match rng() % 4 {
-                    0 => "IF",
-                    1 => "LOOP",
-                    2 => "ASYNC",
-                    _ => "RET",
+                match rng() % 3 {
+                    0 => "CTOR",
+                    1 => "OBSERVABLE",
+                    _ => "OVERRIDE",
                 }
                 .to_string(),
             ],
         ),
         8 => CoreOp::ClassFlags(
             format!("C{}", rng() % 10),
-            vec![
-                match rng() % 3 {
-                    0 => "EXPORT",
-                    1 => "ABSTRACT",
-                    _ => "STATIC",
-                }
-                .to_string(),
-            ],
+            vec![format!("CFG(feature_{})", rng() % 4)],
         ),
         9 => CoreOp::Extends(format!("C{}", rng() % 10), format!("C{}", rng() % 10)),
         10 => CoreOp::Implements(format!("C{}", rng() % 10), format!("I{}", rng() % 10)),
@@ -164,6 +156,15 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
                 1 => DeclarationModifier::Private,
                 2 => DeclarationModifier::Protected,
                 _ => DeclarationModifier::Abstract,
+            }],
+        ),
+        22 => CoreOp::ControlSummary(
+            format!("M{}", rng() % 10),
+            vec![match rng() % 4 {
+                0 => ControlSummary::Branch,
+                1 => ControlSummary::Loop,
+                2 => ControlSummary::Return,
+                _ => ControlSummary::Throw,
             }],
         ),
         _ => unreachable!(),
@@ -281,6 +282,7 @@ fn property_binary_wire_round_trip() {
                 | (CoreOp::FieldType(..), CoreOp::FieldType(..))
                 | (CoreOp::MethodModifiers(..), CoreOp::MethodModifiers(..))
                 | (CoreOp::ClassModifiers(..), CoreOp::ClassModifiers(..))
+                | (CoreOp::ControlSummary(..), CoreOp::ControlSummary(..))
                 | (CoreOp::Flags(..), CoreOp::Flags(..))
                 | (CoreOp::ClassFlags(..), CoreOp::ClassFlags(..))
                 | (CoreOp::Injects(..), CoreOp::Injects(..))

@@ -16,7 +16,7 @@
 //   - F-02: MetaLayer::extract is called after the main compile loop.
 //   - F-03: PatternRecognizer::recognize is called after meta extraction.
 //   - F-27: `current_method` is tracked directly (O(1) instead of O(n) via find_last_method).
-//   - F-28: Flags are accumulated in a `current_method_flags` Vec (O(1) per capture).
+//   - F-28: Control summaries accumulate in a typed per-method Vec.
 //   - F-29: Methods/fields without a current_class are skipped (not silently emitted with "").
 //   - F-30: `compile` returns `CompileError` (a typed enum) instead of `Box<dyn Error>`.
 //   - F-31: `id_counter` is `u64` (not `u32`) to avoid arithmetic overflow

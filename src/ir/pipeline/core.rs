@@ -10,7 +10,7 @@ use crate::ir::calls::{
     ARROW_NAME_CAPTURE, ARROW_ROOT_CAPTURE, CALL_ARGUMENT_CAPTURE, CALL_CALLEE_CAPTURE,
     CALL_SPREAD_CAPTURE, capture_query,
 };
-use crate::ir::opcodes::{CoreOp, FLAG_IF, FLAG_LOOP, FLAG_RET, FLAG_THROW};
+use crate::ir::opcodes::{ControlSummary, CoreOp};
 use crate::ir::symbol_table::SymbolKind;
 
 /// Pass 1: Core IR emission from tree-sitter captures.
@@ -179,22 +179,22 @@ impl IRPass for CoreIRPass {
                     dispatch_capture(state, cap, false);
                 }
                 "mod.root" => dispatch_capture(state, cap, false),
-                "if.root" => push_flag(state, FLAG_IF),
-                "for.root" | "while.root" | "loop.root" => push_flag(state, FLAG_LOOP),
-                "return.root" => push_flag(state, FLAG_RET),
-                "throw.root" => push_flag(state, FLAG_THROW),
+                "if.root" => push_control_summary(state, ControlSummary::Branch),
+                "for.root" | "while.root" | "loop.root" => {
+                    push_control_summary(state, ControlSummary::Loop);
+                }
+                "return.root" => push_control_summary(state, ControlSummary::Return),
+                "throw.root" => push_control_summary(state, ControlSummary::Throw),
                 "do.root" | "try.root" | "switch.root" | "match.root" => {
-                    push_flag(state, FLAG_IF);
+                    push_control_summary(state, ControlSummary::Branch);
                 }
                 _ => dispatch_capture(state, cap, false),
             }
         }
 
-        // Settle the last callable's call facts BEFORE flushing its method
-        // flags, so a caller's `CALL` ops stay adjacent to the caller's own
-        // instruction region (the established trailing-Flags contract).
+        // Settle the last callable's call facts before flushing its summaries.
         state.flush_callable_calls();
-        state.flush_method_flags();
+        state.flush_control_summaries();
         state.captures = captures.iter().map(CapturedNode::to_entry).collect();
         Ok(())
     }
@@ -236,7 +236,7 @@ fn process_method_capture(
         return;
     };
 
-    state.flush_method_flags();
+    state.flush_control_summaries();
     let method_id = state.next_id("M");
     state.current_method = Some(method_id.clone());
     // Native call facts: this declaration's source span owns every invocation
@@ -339,10 +339,9 @@ fn dispatch_capture(state: &mut PassContext, cap: &CapturedNode, use_raw_text: b
     }
 }
 
-fn push_flag(state: &mut PassContext, flag: &str) {
-    if state.current_method.is_some() && !state.current_method_flags.iter().any(|item| item == flag)
-    {
-        state.current_method_flags.push(flag.to_string());
+fn push_control_summary(state: &mut PassContext, summary: ControlSummary) {
+    if state.current_method.is_some() {
+        state.current_control_summaries.push(summary);
     }
 }
 

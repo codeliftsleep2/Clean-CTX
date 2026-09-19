@@ -155,21 +155,21 @@ fn phase_a_success_paths_render_schema_v3() {
         // Token-economics gate may select raw_passthrough when the
         // compressed representation costs more tokens than the raw
         // source (tiny files at structural fidelities). Both outcomes
-        // are valid — SCHEMA v3 when compression is economical,
+        // are valid — SCHEMA v4 when compression is economical,
         // raw_passthrough when it is not.
         let content_kind = resp
             .pointer("/result/_meta/content_kind")
             .and_then(|k| k.as_str());
         if content_kind == Some("raw_passthrough") {
-            // raw source returned verbatim — no SCHEMA v3 expected
+            // raw source returned verbatim — no SCHEMA v4 expected
             assert!(
                 text.contains("class Greeter") || text.contains("export class"),
                 "[{tool}] raw_passthrough must contain the class definition: {text}"
             );
         } else {
             assert!(
-                text.contains("// SCHEMA v3"),
-                "[{tool}] successful output must be SCHEMA v3"
+                text.contains("// SCHEMA v4"),
+                "[{tool}] successful output must be SCHEMA v4"
             );
             assert!(
                 text.contains("Greeter"),

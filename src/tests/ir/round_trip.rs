@@ -15,18 +15,18 @@ use crate::ir::binary_wire::{decode, encode};
 use crate::ir::compiler::CompiledIR;
 use crate::ir::delta::{DeltaOps, IRDelta, ModOp, compact_decode, compact_encode};
 use crate::ir::hierarchical::{ir_to_hierarchical_wire, wire_to_ir as hierarchical_wire_to_ir};
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use crate::ir::wire::{ir_to_wire, op_to_tuple, tuple_to_op, wire_to_ir};
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-/// Build a CompiledIR containing every CoreOp variant (all 22).
+/// Build a CompiledIR containing every CoreOp variant (all 23).
 fn all_variants_ir() -> CompiledIR {
     CompiledIR {
         file_id: "all.ts".to_string(),
         version: 1,
         instructions: vec![
-            // Original 15 variants
+            // Complete current operation set
             CoreOp::DefClass("C1".into(), "Foo".into()),
             CoreOp::DefMethod("C1".into(), "M1".into(), "ctor".into()),
             CoreOp::DefField("C1".into(), "F1".into(), "x".into()),
@@ -36,7 +36,11 @@ fn all_variants_ir() -> CompiledIR {
             CoreOp::FieldType("F1".into(), "$n".into()),
             CoreOp::MethodModifiers("M1".into(), vec![DeclarationModifier::Async]),
             CoreOp::ClassModifiers("C1".into(), vec![DeclarationModifier::Export]),
-            CoreOp::Flags("M1".into(), vec!["IF".into(), "LOOP".into()]),
+            CoreOp::ControlSummary(
+                "M1".into(),
+                vec![ControlSummary::Branch, ControlSummary::Loop],
+            ),
+            CoreOp::Flags("M1".into(), vec!["CTOR".into()]),
             CoreOp::ClassFlags("C1".into(), vec!["CFG(test)".into()]),
             CoreOp::Extends("C1".into(), "C2".into()),
             CoreOp::Implements("C1".into(), "I1".into()),
@@ -117,7 +121,7 @@ fn round_trip_execution_context() {
     assert_eq!(original, restored);
 }
 
-// ── 2. Named Wire Format: Full IR Round-Trip (All 22 Variants) ──
+// ── 2. Named Wire Format: Full IR Round-Trip (All 23 Variants) ──
 
 #[test]
 fn round_trip_named_wire_all_variants() {
@@ -182,6 +186,7 @@ fn round_trip_binary_wire_all_variants() {
             | (CoreOp::FieldType(..), CoreOp::FieldType(..))
             | (CoreOp::MethodModifiers(..), CoreOp::MethodModifiers(..))
             | (CoreOp::ClassModifiers(..), CoreOp::ClassModifiers(..))
+            | (CoreOp::ControlSummary(..), CoreOp::ControlSummary(..))
             | (CoreOp::Flags(..), CoreOp::Flags(..))
             | (CoreOp::ClassFlags(..), CoreOp::ClassFlags(..))
             | (CoreOp::Injects(..), CoreOp::Injects(..))

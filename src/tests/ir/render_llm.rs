@@ -5,8 +5,8 @@
 // all fidelity levels, edge cases, overloaded methods, patterns.
 
 use crate::compression::Fidelity;
-use crate::ir::DeclarationModifier;
 use crate::ir::{ClassNode, FieldNode, HierarchicalIR, MethodNode, PatternEntry};
+use crate::ir::{ControlSummary, DeclarationModifier};
 use crate::ir::{render_hierarchical_for_llm, render_hierarchical_for_llm_focused};
 use std::collections::HashSet;
 
@@ -44,6 +44,7 @@ fn make_method(name: &str) -> MethodNode {
         params: vec![],
         return_type: None,
         modifiers: vec![],
+        control_summaries: vec![],
         flags: Vec::new(),
         patterns: vec![],
         body: None,
@@ -86,7 +87,7 @@ fn test_empty_hir() {
     let hir = empty_hir();
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Should contain schema header but nothing else
-    assert!(result.starts_with("// SCHEMA v3"));
+    assert!(result.starts_with("// SCHEMA v4"));
     assert!(!result.contains("// ──"));
     assert!(!result.contains("$ "));
     assert!(!result.contains("T "));
@@ -97,7 +98,7 @@ fn test_schema_header_present() {
     let mut hir = empty_hir();
     hir.classes.push(make_class("TestClass"));
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// SCHEMA v3"));
+    assert!(result.contains("// SCHEMA v4"));
     assert!(result.contains("@=meta"));
     assert!(result.contains("X=extends"));
     assert!(result.contains("I=implements"));
@@ -189,7 +190,7 @@ fn test_method_with_params_and_flags() {
         .push(vec!["P1".into(), "$n".into(), "id".into()]);
     method.return_type = Some("$s".into());
     method.modifiers = vec![vec![DeclarationModifier::Async]];
-    method.flags = vec![vec!["RET".into()]];
+    method.control_summaries = vec![vec![ControlSummary::Return]];
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -198,7 +199,7 @@ fn test_method_with_params_and_flags() {
     assert!(result.contains("p:id:$n"));
     assert!(result.contains("→ $s"));
     assert!(result.contains("mod:ASYNC"));
-    assert!(result.contains("fl:RET"));
+    assert!(result.contains("ctl:RET"));
 }
 
 #[test]
@@ -398,7 +399,7 @@ fn test_full_typescript_class() {
     class.fields.push(make_field("selectedUser", Some("$n")));
 
     let mut m1 = make_method("ngOnInit");
-    m1.flags = vec![vec!["IF".into()]];
+    m1.control_summaries = vec![vec![ControlSummary::Branch]];
     class.methods.push(m1);
 
     let mut m2 = make_method("trackById");
@@ -406,7 +407,7 @@ fn test_full_typescript_class() {
         .push(vec!["P1".into(), "$n".into(), "index".into()]);
     m2.params
         .push(vec!["P2".into(), "$s".into(), "user".into()]);
-    m2.flags = vec![vec!["RET".into()]];
+    m2.control_summaries = vec![vec![ControlSummary::Return]];
     class.methods.push(m2);
 
     hir.classes.push(class);
@@ -424,8 +425,8 @@ fn test_full_typescript_class() {
     assert!(result.contains("M ngOnInit"));
     assert!(result.contains("M trackById"));
     assert!(result.contains("p:index:$n user:$s"));
-    assert!(result.contains("fl:IF"));
-    assert!(result.contains("fl:RET"));
+    assert!(result.contains("ctl:IF"));
+    assert!(result.contains("ctl:RET"));
     assert!(result.contains("$ IM1 ./core [OnInit, OnDestroy]"));
 }
 

@@ -140,7 +140,8 @@ not automatically a semantic serialization of the canonical stream.
 | `FieldType(field, type)` | Field compiler capture; trusted decoder | Targets `FieldId`; field must resolve | Optional singular per field; duplicate fails | None |
 | `MethodModifiers(method, values)` | Language declaration layer; trusted decoder | Targets `MethodId`; method must resolve; typed non-empty payload | Ordered many operations; payload order and duplicates preserved | None |
 | `ClassModifiers(class, values)` | Language declaration layer; trusted decoder | Targets `ClassId`; class must resolve; typed non-empty payload | Ordered many operations; payload order and duplicates preserved | None |
-| `Flags(method, values)` | Control and additive pattern producers; trusted decoder | Targets `MethodId`; method must resolve; empty payload and declaration-modifier spellings are invalid | Ordered many operations; payload order and duplicates preserved | None |
+| `ControlSummary(method, values)` | Core capture pipeline; trusted decoder | Targets `MethodId`; method must resolve; closed typed non-empty payload (`IF`, `LOOP`, `RET`, `THROW`) | Ordered many operations; payload order and duplicates preserved | None |
+| `Flags(method, values)` | Additive pattern producers; trusted decoder | Targets `MethodId`; method must resolve; empty payload plus modifier and control-summary spellings are invalid | Ordered many operations; payload order and duplicates preserved | None |
 | `ClassFlags(class, values)` | Residual class-metadata producer; trusted decoder | Targets `ClassId`; class must resolve; empty payload and declaration-modifier spellings are invalid | Ordered many operations; payload order and duplicates preserved | None |
 | `Extends(child, parent)` | Language layer; trusted decoder | Targets child `ClassId`; child must resolve; parent is an external-capable symbolic reference | Optional singular per child; duplicate fails | None |
 | `Implements(class, interface)` | Language layer; trusted decoder | Targets `ClassId`; class must resolve; interface is an external-capable symbolic reference | Ordered many per class; every occurrence preserved | None |
@@ -168,10 +169,10 @@ newtypes or either serialized representation.
 
 ### 5.2 Flags restriction
 
-Declaration modifiers are now a closed typed family carried by
-`MethodModifiers` and `ClassModifiers`. Generic `Flags` and `ClassFlags` reject
-modifier spellings and remain occurrence-preserving residual channels while
-the remaining semantic families migrate.
+Declaration modifiers and control summaries are closed typed families carried
+by `MethodModifiers`/`ClassModifiers` and `ControlSummary`. Generic `Flags`
+rejects both vocabularies and remains an occurrence-preserving pattern channel;
+`ClassFlags` remains residual class metadata.
 
 ## 6. Projection, delta, and wire matrix
 
@@ -186,7 +187,8 @@ the remaining semantic families migrate.
 | `FieldType` | Singular type under resolved field | `FieldId` | Semantic for present operands | Preserve all operands |
 | `MethodModifiers` | Repeated typed modifier occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic via additive opcode 22 under `0x03` | Preserve payload and occurrence order |
 | `ClassModifiers` | Repeated typed modifier occurrences under resolved class | `(ClassId, complete values, occurrence)` | Semantic via additive opcode 23 under `0x03` | Preserve payload and occurrence order |
-| `Flags` | Repeated flag occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
+| `ControlSummary` | Repeated typed summary occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic via additive opcode 24 under `0x03` | Preserve payload and occurrence order |
+| `Flags` | Repeated residual pattern-fact occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
 | `ClassFlags` | Repeated flag occurrences under resolved class | `(ClassId, complete values, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
 | `Extends` | Singular parent reference under resolved child | `ClassId` | Lossy: child ID omitted | Encode child and parent |
 | `Implements` | Repeated interface references under resolved class | `(ClassId, interface, occurrence)` | Lossy: class ID omitted | Encode class and interface |

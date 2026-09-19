@@ -93,6 +93,18 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                     }
                 }
             }
+            "CTRL_SUM" => {
+                let summaries: Vec<&str> = insn[2..].iter().map(String::as_str).collect();
+                let markers = flags_to_markers(&summaries);
+                match fidelity {
+                    Fidelity::Low | Fidelity::Medium => {
+                        output.push_str(&format!(" {}", markers.join(" ")));
+                    }
+                    Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
+                        output.push_str(&format!(" {{ {} }}", markers.join(" ")));
+                    }
+                }
+            }
             "IMP" => {
                 let module = insn.get(2).map(|s| s.as_str()).unwrap_or("?");
                 let named = insn.get(3).map(|s| s.as_str()).unwrap_or("*");

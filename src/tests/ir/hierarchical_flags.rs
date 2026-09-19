@@ -1,15 +1,13 @@
 // src/tests/ir/hierarchical_flags.rs
 //
 // RED-FLAG1..RED-FLAG6, RED-FLAG11, RED-FLAG12 plus the round-trip, wire and
-// flat-stream nonregressions: repeated `CoreOp::Flags` ops for ONE method id
+// flat-stream nonregressions: repeated typed method facts for ONE method id
 // must remain distinct occurrences at the hierarchical projection instead of
 // being overwritten, merged, or deduplicated.
 //
 // Declaration modifiers and residual flags have distinct typed operations:
-// language layers emit `MethodModifiers`, while the core pipeline emits
-// control-flow flags (`IF`, `LOOP`, `RET`, `THROW`) through `Flags`.
-//     collected by `PassContext::current_method_flags` and flushed into one
-//     op by `flush_method_flags` when the declaration ends.
+// language layers emit `MethodModifiers`, while the core pipeline emits typed
+// `ControlSummary` facts. Residual `Flags` carry pattern classifications.
 //
 // Each family can carry repeated operations. The hierarchy stores one inner
 // vector per occurrence in its distinct `modifiers` and `flags` fields.
@@ -28,7 +26,7 @@ use crate::compression::Fidelity;
 use crate::ir::binary_wire::{decode, encode};
 use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{HierarchicalIR, hierarchical_to_ir, ir_to_hierarchical};
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use crate::ir::render_llm::render_hierarchical_for_llm;
 use crate::ir::wire::{ir_to_wire, op_to_tuple, tuple_to_op, wire_to_ir};
 
@@ -43,12 +41,19 @@ fn flat_ir(instructions: Vec<CoreOp>) -> CompiledIR {
     }
 }
 
-/// One residual `CoreOp::Flags` op for `mid`.
+/// One typed control-summary op, or a residual pattern-fact op.
 fn flags(mid: &str, values: &[&str]) -> CoreOp {
-    CoreOp::Flags(
-        mid.to_string(),
-        values.iter().map(|value| value.to_string()).collect(),
-    )
+    let summaries = values
+        .iter()
+        .map(|value| ControlSummary::from_serialized(value))
+        .collect::<Option<Vec<_>>>();
+    match summaries {
+        Some(summaries) => CoreOp::ControlSummary(mid.to_string(), summaries),
+        None => CoreOp::Flags(
+            mid.to_string(),
+            values.iter().map(|value| value.to_string()).collect(),
+        ),
+    }
 }
 
 fn modifiers(mid: &str, values: &[DeclarationModifier]) -> CoreOp {
@@ -69,6 +74,13 @@ fn methods(hir: &HierarchicalIR) -> Vec<(String, String, Vec<String>)> {
                     .iter()
                     .flatten()
                     .map(|modifier| modifier.as_str().to_string())
+                    .chain(
+                        method
+                            .control_summaries
+                            .iter()
+                            .flatten()
+                            .map(|summary| summary.as_str().to_string()),
+                    )
                     .chain(method.flags.iter().flatten().cloned())
                     .collect(),
             )
@@ -92,12 +104,18 @@ fn method_flags(hir: &HierarchicalIR, name: &str) -> Vec<String> {
         })
 }
 
-/// Every `Flags` op in the FLAT stream that references `mid`, in stream order.
+/// Every method fact in the flat stream that references `mid`, in stream order.
 fn flag_ops_for(ir: &CompiledIR, mid: &str) -> Vec<Vec<String>> {
     ir.instructions
         .iter()
         .filter_map(|op| match op {
             CoreOp::Flags(id, values) if id == mid => Some(values.clone()),
+            CoreOp::ControlSummary(id, values) if id == mid => Some(
+                values
+                    .iter()
+                    .map(|summary| summary.as_str().to_string())
+                    .collect(),
+            ),
             _ => None,
         })
         .collect()
@@ -277,9 +295,9 @@ fn red_flag6_rendered_line_carries_declaration_and_control_flow() {
 
     let hir = ir_to_hierarchical(&ir);
     let out = render(&hir, Fidelity::Medium);
-    // The established LLM-facing `fl:` representation remains compact.
+    // The LLM projection stays compact without mirroring canonical structure.
     assert!(out.contains(" mod:STATIC"), "{out}");
-    assert!(out.contains(" fl:IF,RET"), "{out}");
+    assert!(out.contains(" ctl:IF,RET"), "{out}");
     assert!(out.contains("STATIC"), "{out}");
     assert!(out.contains("RET"), "{out}");
 }
@@ -322,7 +340,7 @@ fn red_flag12_control_flow_only_method_unchanged() {
     );
 
     let out = render(&hir, Fidelity::Low);
-    assert!(out.contains("fl:RET,IF"), "{out}");
+    assert!(out.contains("ctl:RET,IF"), "{out}");
 }
 
 // ── Round trip: information and op multiplicity are preserved ──────────
@@ -345,7 +363,7 @@ fn round_trip_preserves_flag_occurrences() {
 
     let method = &hir.classes[0].methods[0];
     assert_eq!(method.modifiers, vec![vec![DeclarationModifier::Static]]);
-    assert_eq!(method.flags, vec![vec!["RET".to_string()]]);
+    assert_eq!(method.control_summaries, vec![vec![ControlSummary::Return]]);
 
     // hierarchical → flat: each occurrence is restored independently.
     let restored = hierarchical_to_ir(&hir);
@@ -398,12 +416,12 @@ fn hierarchical_encode_does_not_rewrite_the_flat_stream() {
     assert_eq!(
         flag_ops_for(&ir, "M1"),
         vec![vec!["RET".to_string()]],
-        "the residual flag op must remain unchanged"
+        "the typed summary op must remain unchanged"
     );
 }
 
 #[test]
-fn named_wire_pins_separate_modifier_and_flag_ops() {
+fn named_wire_pins_separate_modifier_and_control_summary_ops() {
     // Each semantic family serializes as its own named tuple.
     assert_eq!(
         op_to_tuple(&modifiers("M1", &[DeclarationModifier::Static])),
@@ -411,7 +429,7 @@ fn named_wire_pins_separate_modifier_and_flag_ops() {
     );
     assert_eq!(
         op_to_tuple(&flags("M1", &["RET"])),
-        vec!["FLAGS", "M1", "RET"]
+        vec!["CTRL_SUM", "M1", "RET"]
     );
 
     // ...each tuple still round-trips on its own...
@@ -439,8 +457,8 @@ fn named_wire_pins_separate_modifier_and_flag_ops() {
 }
 
 #[test]
-fn binary_wire_round_trips_separate_modifier_and_flag_ops() {
-    // No opcode, operand-arity or wire-version change accompanies the fix.
+fn binary_wire_round_trips_separate_modifier_and_control_summary_ops() {
+    // The typed family has its own additive opcode under physical 0x03.
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "work".to_string()),

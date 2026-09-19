@@ -76,6 +76,49 @@ impl fmt::Display for DeclarationModifier {
     }
 }
 
+/// Closed vocabulary for compact, method-level control summaries.
+///
+/// These facts summarize the presence of control constructs. They are distinct
+/// from detailed `ControlFlow` edges and residual pattern classifications.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ControlSummary {
+    #[serde(rename = "IF")]
+    Branch,
+    #[serde(rename = "LOOP")]
+    Loop,
+    #[serde(rename = "RET")]
+    Return,
+    #[serde(rename = "THROW")]
+    Throw,
+}
+
+impl ControlSummary {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Branch => FLAG_IF,
+            Self::Loop => FLAG_LOOP,
+            Self::Return => FLAG_RET,
+            Self::Throw => FLAG_THROW,
+        }
+    }
+
+    pub fn from_serialized(value: &str) -> Option<Self> {
+        match value {
+            FLAG_IF => Some(Self::Branch),
+            FLAG_LOOP => Some(Self::Loop),
+            FLAG_RET => Some(Self::Return),
+            FLAG_THROW => Some(Self::Throw),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for ControlSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Core IR opcodes — the universal instruction set.
 /// Every language compiles down to these operations.
 /// Serialized as positional JSON arrays: [opcode, ...operands]
@@ -111,8 +154,11 @@ pub enum CoreOp {
     ClassModifiers(String, Vec<DeclarationModifier>),
 
     // ── Control Flow & Behavior ─────────────────────────
+    /// ["CTRL_SUM", method_id, summary1, summary2, ...]
+    ControlSummary(String, Vec<ControlSummary>),
+
     /// ["FLAGS", target_id, flag1, flag2, ...]
-    /// Residual method control and pattern facts; declaration modifiers use MOD_M.
+    /// Residual method pattern facts; modifiers and control summaries are typed.
     Flags(String, Vec<String>),
 
     /// ["FLAGS_C", class_id, flag1, flag2, ...]
@@ -258,6 +304,16 @@ impl fmt::Display for CoreOp {
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
+            CoreOp::ControlSummary(mid, summaries) => write!(
+                f,
+                "CTRL_SUM {} {}",
+                mid,
+                summaries
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
             CoreOp::Flags(tid, flags) => write!(f, "FLAGS {} {}", tid, flags.join(" ")),
             CoreOp::ClassFlags(cid, flags) => write!(f, "FLAGS_C {} {}", cid, flags.join(" ")),
             CoreOp::Extends(child, parent) => write!(f, "EXT {} {}", child, parent),
@@ -356,23 +412,24 @@ pub const TYPE_UNDEFINED: &str = "$ud";
 /// Used for schema validation and positional decoding.
 pub fn arity(opcode: &str) -> Option<i32> {
     match opcode {
-        "DEF_C" => Some(3),    // id, name
-        "DEF_M" => Some(4),    // class_id, id, name
-        "DEF_F" => Some(4),    // class_id, id, name
-        "DEF_I" => Some(3),    // id, name
-        "SIG" => Some(5),      // method_id, param_id, type, name
-        "RET" => Some(3),      // method_id, type
-        "FIELD_T" => Some(3),  // field_id, type
-        "MOD_M" => Some(-1),   // method_id, declaration modifiers...
-        "MOD_C" => Some(-1),   // class_id, declaration modifiers...
-        "FLAGS" => Some(-1),   // target_id, flags...
-        "FLAGS_C" => Some(-1), // class_id, flags...
-        "EXT" => Some(3),      // child_id, parent_id
-        "IMPL" => Some(3),     // class_id, iface_id
-        "INJECTS" => Some(-1), // class_id, deps...
-        "IMP" => Some(4),      // alias, module, named
-        "TYPE" => Some(3),     // alias, original
-        "PAT" => Some(-1),     // pattern_name, args...
+        "DEF_C" => Some(3),     // id, name
+        "DEF_M" => Some(4),     // class_id, id, name
+        "DEF_F" => Some(4),     // class_id, id, name
+        "DEF_I" => Some(3),     // id, name
+        "SIG" => Some(5),       // method_id, param_id, type, name
+        "RET" => Some(3),       // method_id, type
+        "FIELD_T" => Some(3),   // field_id, type
+        "MOD_M" => Some(-1),    // method_id, declaration modifiers...
+        "MOD_C" => Some(-1),    // class_id, declaration modifiers...
+        "CTRL_SUM" => Some(-1), // method_id, control summaries...
+        "FLAGS" => Some(-1),    // target_id, flags...
+        "FLAGS_C" => Some(-1),  // class_id, flags...
+        "EXT" => Some(3),       // child_id, parent_id
+        "IMPL" => Some(3),      // class_id, iface_id
+        "INJECTS" => Some(-1),  // class_id, deps...
+        "IMP" => Some(4),       // alias, module, named
+        "TYPE" => Some(3),      // alias, original
+        "PAT" => Some(-1),      // pattern_name, args...
         // Edit Mode: Verbatim Method Bodies
         // Dual shape: legacy 3-tuple when span-less, 5-tuple when spanned.
         "BODY" => Some(-1), // method_id, text [, start_byte, end_byte]
@@ -401,6 +458,7 @@ pub fn opcode_name(op: &CoreOp) -> &'static str {
         CoreOp::FieldType(..) => "FIELD_T",
         CoreOp::MethodModifiers(..) => "MOD_M",
         CoreOp::ClassModifiers(..) => "MOD_C",
+        CoreOp::ControlSummary(..) => "CTRL_SUM",
         CoreOp::Flags(..) => "FLAGS",
         CoreOp::ClassFlags(..) => "FLAGS_C",
         CoreOp::Extends(..) => "EXT",
@@ -500,3 +558,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/ir/declaration_modifiers.rs"]
 mod declaration_modifier_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/control_summaries.rs"]
+mod control_summary_tests;

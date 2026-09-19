@@ -305,14 +305,14 @@ fn test_cache_dashboard_json() {
 }
 
 /// Verify that generate_vocabulary_text serves ONLY current vocabulary:
-/// SCHEMA v3 response symbols plus the live α / Φ systems — never the
+/// SCHEMA v4 response symbols plus the live α / Φ systems — never the
 /// retired `$`-opcode / `⊕`-marker tables (Phase A retirement).
 #[test]
 fn test_generate_vocabulary_text() {
     let text = generate_vocabulary_text();
     assert!(
-        text.contains("SCHEMA v3"),
-        "vocabulary prompt must teach the SCHEMA v3 legend"
+        text.contains("SCHEMA v4"),
+        "vocabulary prompt must teach the SCHEMA v4 legend"
     );
     assert!(text.contains("Φcmp"), "Φ Angular markers remain current");
     assert!(text.contains("α"), "path aliases remain current");

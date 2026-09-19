@@ -13,12 +13,12 @@
 //   - Overloaded methods disambiguated with `+N` (parameter count)
 //   - Fidelity controls field layout (Low = space-separated, Medium/High = one-per-line)
 //   - Meta-layer `@` annotations always shown regardless of fidelity
-//   - The `// SCHEMA v3` header opens every output with the legend table
+//   - The `// SCHEMA v4` header opens every output with the legend table
 //
-// Notation reference (also in the SCHEMA v3 header):
+// Notation reference (also in the SCHEMA v4 header):
 //   @=meta  X=extends  I=implements  F=field  M=method
 //   $=import  →=scope  mod:=method-modifiers cmod:=class-modifiers
-//   fl:=flags cl:=class-flags P=pattern T=type-alias
+//   ctl:=control-summary fl:=pattern-facts cl:=class-metadata P=pattern T=type-alias
 
 use super::hierarchical::{ClassNode, HierarchicalIR, PatternEntry};
 use crate::compression::Fidelity;
@@ -67,8 +67,8 @@ pub fn render_hierarchical_for_llm_focused(
 ) -> String {
     let mut output = String::new();
 
-    // ── SCHEMA v3 header ──
-    output.push_str("// SCHEMA v3  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers fl:=flags cl:=class-flags P=pattern T=type-alias\n");
+    // ── SCHEMA v4 header ──
+    output.push_str("// SCHEMA v4  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary fl:=pattern-facts cl:=class-metadata P=pattern T=type-alias\n");
 
     // ── Classes ──
     for class in &hir.classes {
@@ -242,9 +242,10 @@ fn render_methods(
         let has_params = !method.params.is_empty();
         let has_return = method.return_type.is_some();
         let has_modifiers = !method.modifiers.is_empty();
+        let has_control_summaries = !method.control_summaries.is_empty();
         let has_flags = !method.flags.is_empty();
 
-        if has_params || has_return || has_modifiers || has_flags {
+        if has_params || has_return || has_modifiers || has_control_summaries || has_flags {
             output.push_str("  →");
 
             // Params (shown in Medium/High, hidden in Low unless overloaded)
@@ -280,7 +281,17 @@ fn render_methods(
                 output.push_str(&format!(" mod:{}", modifiers.join(",")));
             }
 
-            // Flags
+            if has_control_summaries {
+                let summaries = method
+                    .control_summaries
+                    .iter()
+                    .flatten()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+                output.push_str(&format!(" ctl:{}", summaries.join(",")));
+            }
+
+            // Residual pattern facts
             if has_flags {
                 let flags = method.flags.iter().flatten().cloned().collect::<Vec<_>>();
                 output.push_str(&format!(" fl:{}", flags.join(",")));

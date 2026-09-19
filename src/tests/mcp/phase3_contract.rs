@@ -230,7 +230,7 @@ fn provide_code_context_uses_meta_not_ad_hoc_fields() {
     // Token-economics gate may select raw_passthrough when the
     // compressed representation costs more tokens than the raw
     // source (tiny files at structural fidelities). Both outcomes
-    // are valid — SCHEMA v3 when compression is economical,
+    // are valid — SCHEMA v4 when compression is economical,
     // raw_passthrough when it is not.
     let content_kind = result
         .get("_meta")
@@ -238,7 +238,7 @@ fn provide_code_context_uses_meta_not_ad_hoc_fields() {
         .and_then(|k| k.as_str());
 
     if content_kind == Some("raw_passthrough") {
-        // raw source returned verbatim — no SCHEMA v3 expected.
+        // raw source returned verbatim — no SCHEMA v4 expected.
         // Verbatim document means the raw fixture content.
         assert!(
             text.contains("class Greeter"),
@@ -246,8 +246,8 @@ fn provide_code_context_uses_meta_not_ad_hoc_fields() {
         );
     } else {
         assert!(
-            text.contains("// SCHEMA v3"),
-            "content must be SCHEMA v3: {text}"
+            text.contains("// SCHEMA v4"),
+            "content must be SCHEMA v4: {text}"
         );
     }
 
@@ -325,8 +325,8 @@ fn restore_context_moves_version_and_restored_to_meta() {
 
     let text = result_content_text(result).unwrap();
     assert!(
-        text.contains("// SCHEMA v3"),
-        "restore content must be SCHEMA v3: {text}"
+        text.contains("// SCHEMA v4"),
+        "restore content must be SCHEMA v4: {text}"
     );
 }
 
