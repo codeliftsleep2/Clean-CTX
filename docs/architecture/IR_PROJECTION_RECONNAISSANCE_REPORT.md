@@ -257,7 +257,13 @@ Required boundary: classify tests as contract, migration, compatibility, or
 implementation-shape evidence. A test that captures a known defect must not be
 treated as architectural authority.
 
-## 5. Invariant assessment
+## 5. Original reconnaissance invariant assessment (baseline)
+
+This table records the source state observed at the start of the migration. It
+is not a current-state status dashboard. The implementation updates at the top
+of this report and the phase records in the companion plan supersede baseline
+findings that have since been repaired. Phase 9 will replace this baseline with
+an audited current-state assessment after the production lifecycle is traced.
 
 Classification meanings:
 
@@ -288,8 +294,8 @@ Classification meanings:
 | 17 | Correctness has priority over compression | Partial | Some codecs preserve compactness by omitting semantic operands. |
 | 18 | Invariants are executable | Partial | Valuable tests exist, but enforcement is not lifecycle-complete. |
 
-No invariant is classified as fully green across the complete production
-lifecycle.
+At the original reconnaissance baseline, no invariant was classified as fully
+green across the complete production lifecycle.
 
 ## 6. Existing evidence worth preserving
 
