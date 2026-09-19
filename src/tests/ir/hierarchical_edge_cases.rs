@@ -102,14 +102,20 @@ fn test_class_with_no_methods() {
         version: 1,
         instructions: vec![
             CoreOp::DefClass("C1".to_string(), "EmptyService".to_string()),
-            CoreOp::ClassFlags("C1".to_string(), vec!["EXPORT".to_string()]),
+            CoreOp::ClassModifiers(
+                "C1".to_string(),
+                vec![crate::ir::opcodes::DeclarationModifier::Export],
+            ),
         ],
     };
     let hir = ir_to_hierarchical(&ir);
     let c1 = hir.classes.iter().find(|c| c.id == "C1").unwrap();
     assert!(c1.methods.is_empty(), "Class with no methods");
     assert!(c1.fields.is_empty(), "Class with no fields");
-    assert_eq!(c1.class_flags, vec![vec!["EXPORT".to_string()]]);
+    assert_eq!(
+        c1.modifiers,
+        vec![vec![crate::ir::opcodes::DeclarationModifier::Export]]
+    );
 
     let restored = hierarchical_to_ir(&hir);
     assert_eq!(ir.instructions, restored);

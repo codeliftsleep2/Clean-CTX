@@ -32,6 +32,8 @@ pub enum BinaryDecodeError {
     InvalidStringIndex(u64),
     /// UTF-8 decoding failure
     InvalidUtf8(String),
+    /// Unknown declaration modifier in a typed modifier opcode
+    InvalidDeclarationModifier(String),
 }
 
 impl std::fmt::Display for BinaryDecodeError {
@@ -47,6 +49,9 @@ impl std::fmt::Display for BinaryDecodeError {
                 write!(f, "invalid string table index: {}", idx)
             }
             BinaryDecodeError::InvalidUtf8(msg) => write!(f, "invalid UTF-8: {}", msg),
+            BinaryDecodeError::InvalidDeclarationModifier(value) => {
+                write!(f, "invalid declaration modifier: {value}")
+            }
         }
     }
 }
@@ -187,6 +192,28 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                     }
                     let name = operands.remove(0);
                     CoreOp::Pattern(name, operands)
+                }
+                OP_MOD_M | OP_MOD_C => {
+                    if operands.len() < 2 {
+                        let name = if op_idx == OP_MOD_M { "MOD_M" } else { "MOD_C" };
+                        return Err(BinaryDecodeError::TruncatedData(format!(
+                            "{name} needs a target_id and at least one modifier"
+                        )));
+                    }
+                    let target = operands.remove(0);
+                    let modifiers = operands
+                        .into_iter()
+                        .map(|value| {
+                            DeclarationModifier::from_serialized(&value).ok_or_else(|| {
+                                BinaryDecodeError::InvalidDeclarationModifier(value.clone())
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    if op_idx == OP_MOD_M {
+                        CoreOp::MethodModifiers(target, modifiers)
+                    } else {
+                        CoreOp::ClassModifiers(target, modifiers)
+                    }
                 }
                 _ => unreachable!(),
             }

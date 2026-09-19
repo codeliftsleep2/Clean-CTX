@@ -3,7 +3,7 @@ use crate::ir::hierarchical::{
     HierarchicalProjectionError, ProjectionIdentityKind, hierarchical_to_ir,
     ir_to_hierarchical_wire, try_ir_to_hierarchical, wire_to_ir,
 };
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
 fn compiled(instructions: Vec<CoreOp>) -> CompiledIR {
     CompiledIR {
@@ -16,7 +16,10 @@ fn compiled(instructions: Vec<CoreOp>) -> CompiledIR {
 #[test]
 fn class_facts_resolve_by_identity_before_and_across_definitions() {
     let ir = compiled(vec![
-        CoreOp::ClassFlags("C2".into(), vec!["EXPORT".into(), "EXPORT".into()]),
+        CoreOp::ClassModifiers(
+            "C2".into(),
+            vec![DeclarationModifier::Export, DeclarationModifier::Export],
+        ),
         CoreOp::Injects("C1".into(), vec!["Logger".into(), "Logger".into()]),
         CoreOp::DefClass("C1".into(), "First".into()),
         CoreOp::Implements("C2".into(), "Runnable".into()),
@@ -38,10 +41,16 @@ fn class_facts_resolve_by_identity_before_and_across_definitions() {
 
     assert_eq!(first.extends.as_deref(), Some("Base"));
     assert_eq!(first.injects, vec![vec!["Logger", "Logger"]]);
-    assert!(first.class_flags.is_empty());
+    assert!(first.modifiers.is_empty());
     assert!(first.implements.is_empty());
 
-    assert_eq!(second.class_flags, vec![vec!["EXPORT", "EXPORT"]]);
+    assert_eq!(
+        second.modifiers,
+        vec![vec![
+            DeclarationModifier::Export,
+            DeclarationModifier::Export
+        ]]
+    );
     assert_eq!(second.implements, vec!["Runnable"]);
     assert!(second.extends.is_none());
     assert!(second.injects.is_empty());
@@ -51,8 +60,11 @@ fn class_facts_resolve_by_identity_before_and_across_definitions() {
 fn repeated_class_facts_round_trip_without_union_or_replacement() {
     let ir = compiled(vec![
         CoreOp::DefClass("C1".into(), "Sample".into()),
-        CoreOp::ClassFlags("C1".into(), vec!["EXPORT".into(), "EXPORT".into()]),
-        CoreOp::ClassFlags("C1".into(), vec!["ABSTRACT".into()]),
+        CoreOp::ClassModifiers(
+            "C1".into(),
+            vec![DeclarationModifier::Export, DeclarationModifier::Export],
+        ),
+        CoreOp::ClassModifiers("C1".into(), vec![DeclarationModifier::Abstract]),
         CoreOp::Extends("C1".into(), "Base".into()),
         CoreOp::Implements("C1".into(), "Readable".into()),
         CoreOp::Implements("C1".into(), "Readable".into()),
@@ -64,8 +76,11 @@ fn repeated_class_facts_round_trip_without_union_or_replacement() {
     let hierarchy = try_ir_to_hierarchical(&ir).expect("identity graph is valid");
     let class = &hierarchy.classes[0];
     assert_eq!(
-        class.class_flags,
-        vec![vec!["EXPORT", "EXPORT"], vec!["ABSTRACT"]]
+        class.modifiers,
+        vec![
+            vec![DeclarationModifier::Export, DeclarationModifier::Export],
+            vec![DeclarationModifier::Abstract]
+        ]
     );
     assert_eq!(class.extends.as_deref(), Some("Base"));
     assert_eq!(class.implements, vec!["Readable", "Readable"]);
@@ -78,19 +93,19 @@ fn repeated_class_facts_round_trip_without_union_or_replacement() {
 }
 
 #[test]
-fn revision_three_wire_emits_occurrence_preserving_class_shapes() {
+fn revision_four_wire_emits_occurrence_preserving_class_shapes() {
     let ir = compiled(vec![
         CoreOp::DefClass("C1".into(), "Sample".into()),
-        CoreOp::ClassFlags("C1".into(), vec!["EXPORT".into()]),
-        CoreOp::ClassFlags("C1".into(), vec!["ABSTRACT".into()]),
+        CoreOp::ClassModifiers("C1".into(), vec![DeclarationModifier::Export]),
+        CoreOp::ClassModifiers("C1".into(), vec![DeclarationModifier::Abstract]),
         CoreOp::Injects("C1".into(), vec!["Logger".into(), "Clock".into()]),
         CoreOp::Injects("C1".into(), vec!["Logger".into()]),
     ]);
 
     let wire = ir_to_hierarchical_wire(&ir);
-    assert_eq!(wire["hs"], 3);
+    assert_eq!(wire["hs"], 4);
     assert_eq!(
-        wire["ir"]["c"][0]["fl"],
+        wire["ir"]["c"][0]["mo"],
         serde_json::json!([["EXPORT"], ["ABSTRACT"]])
     );
     assert_eq!(
@@ -184,14 +199,14 @@ fn class_fact_wrong_kind_target_is_a_structured_failure() {
     let error = try_ir_to_hierarchical(&compiled(vec![
         CoreOp::DefClass("C1".into(), "Sample".into()),
         CoreOp::DefMethod("C1".into(), "M1".into(), "work".into()),
-        CoreOp::ClassFlags("M1".into(), vec!["EXPORT".into()]),
+        CoreOp::ClassModifiers("M1".into(), vec![DeclarationModifier::Export]),
     ]))
     .expect_err("method identity must not satisfy a class fact");
 
     assert!(matches!(
         error,
         HierarchicalProjectionError::KindMismatch {
-            operation: "FLAGS_C",
+            operation: "MOD_C",
             ref id,
             expected: ProjectionIdentityKind::Class,
             actual: ProjectionIdentityKind::Method,

@@ -12,7 +12,7 @@
 // │ Instructions: [count(varint), instruction*]             │
 // │                                                         │
 // │ Instruction:                                            │
-// │   opcode_idx: u8 (0-14 for 15 core opcodes + patterns)  │
+// │   opcode_idx: u8 (0-23)                                 │
 // │   operands: [varint]* (string table indices)            │
 // │   For variadic ops: operand_count as varint prefix      │
 // └─────────────────────────────────────────────────────────┘
@@ -30,7 +30,7 @@
 // and mixed streams.
 
 use super::compiler::CompiledIR;
-use super::opcodes::CoreOp;
+use super::opcodes::{CoreOp, DeclarationModifier};
 use super::string_table::StringTable;
 
 mod decode;
@@ -56,7 +56,7 @@ const VERSION_PRE_SPAN: u8 = 0x02;
 /// Legacy version 0x01 (long TYPE op names) — still supported for decode.
 const VERSION_LEGACY: u8 = 0x01;
 
-/// Opcode index assignment (0-19)
+/// Opcode index assignment (0-23)
 const OP_DEF_C: u8 = 0;
 const OP_DEF_M: u8 = 1;
 const OP_DEF_F: u8 = 2;
@@ -98,6 +98,11 @@ const OP_CALL: u8 = 20;
 // references that entry, which is why the two opcodes still decouple cleanly
 // even though a qualified stream is not length-identical to an exact one.
 const OP_CALL_SPREAD: u8 = 21;
+// Phase 6A declaration-modifier families. These are additive under physical
+// 0x03, matching CALL's fail-loud forward-compatibility policy. Physical 0x04
+// remains reserved for the complete corrected-format migration.
+const OP_MOD_M: u8 = 22;
+const OP_MOD_C: u8 = 23;
 
 /// Highest defined opcode index.
 ///
@@ -106,11 +111,14 @@ const OP_CALL_SPREAD: u8 = 21;
 /// additive `OP_CALL_SPREAD`) are allocated after the edit-mode `OP_BODY`, so
 /// a guard bounded at `OP_BODY` would report a defined opcode as unknown and
 /// make CALL facts unrepresentable over the binary wire.
-const OP_MAX: u8 = OP_CALL_SPREAD;
+const OP_MAX: u8 = OP_MOD_C;
 
 /// Opcodes that have a variable number of operands (beyond the first one).
 fn is_variadic(op_idx: u8) -> bool {
-    matches!(op_idx, OP_FLAGS | OP_FLAGS_C | OP_INJECTS | OP_PAT)
+    matches!(
+        op_idx,
+        OP_FLAGS | OP_FLAGS_C | OP_INJECTS | OP_PAT | OP_MOD_M | OP_MOD_C
+    )
 }
 
 /// Convert a CoreOp to its u8 opcode index.
@@ -123,6 +131,8 @@ fn op_to_index(op: &CoreOp) -> u8 {
         CoreOp::Param(..) => OP_SIG,
         CoreOp::Return(..) => OP_RET,
         CoreOp::FieldType(..) => OP_FIELD_T,
+        CoreOp::MethodModifiers(..) => OP_MOD_M,
+        CoreOp::ClassModifiers(..) => OP_MOD_C,
         CoreOp::Flags(..) => OP_FLAGS,
         CoreOp::ClassFlags(..) => OP_FLAGS_C,
         CoreOp::Extends(..) => OP_EXT,
@@ -226,7 +236,7 @@ fn read_string(data: &[u8]) -> Option<(String, usize)> {
 /// 3. **Instructions**:
 ///    - count: varint — number of instructions
 ///    - for each instruction:
-///      - opcode: u8 — index into opcode table (0-14)
+///      - opcode: u8 — index into opcode table (0-23)
 ///      - [variadic count: varint — only if opcode is variadic]
 ///      - operands: [varint]* — string table indices
 pub fn encode(ir: &CompiledIR) -> Vec<u8> {
@@ -298,6 +308,20 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
             CoreOp::FieldType(fid, ty) => {
                 encode_operand(&mut buf, fid);
                 encode_operand(&mut buf, ty);
+            }
+            CoreOp::MethodModifiers(mid, modifiers) => {
+                write_varint(&mut buf, (1 + modifiers.len()) as u64);
+                encode_operand(&mut buf, mid);
+                for modifier in modifiers {
+                    encode_operand(&mut buf, modifier.as_str());
+                }
+            }
+            CoreOp::ClassModifiers(cid, modifiers) => {
+                write_varint(&mut buf, (1 + modifiers.len()) as u64);
+                encode_operand(&mut buf, cid);
+                for modifier in modifiers {
+                    encode_operand(&mut buf, modifier.as_str());
+                }
             }
             CoreOp::Flags(tid, flags) => {
                 // Variadic: write count prefix, then operands

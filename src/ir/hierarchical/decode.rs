@@ -35,6 +35,10 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
         if !class.synthetic {
             instructions.push(CoreOp::DefClass(class.id.clone(), class.name.clone()));
 
+            for modifiers in &class.modifiers {
+                instructions.push(CoreOp::ClassModifiers(class.id.clone(), modifiers.clone()));
+            }
+
             // Class-level flag occurrences
             for flags in &class.class_flags {
                 instructions.push(CoreOp::ClassFlags(class.id.clone(), flags.clone()));
@@ -91,6 +95,13 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
             // Return type
             if let Some(rt) = &method.return_type {
                 instructions.push(CoreOp::Return(method.id.clone(), rt.clone()));
+            }
+
+            for modifiers in &method.modifiers {
+                instructions.push(CoreOp::MethodModifiers(
+                    method.id.clone(),
+                    modifiers.clone(),
+                ));
             }
 
             // Method flag occurrences

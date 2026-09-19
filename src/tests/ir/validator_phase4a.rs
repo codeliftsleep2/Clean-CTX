@@ -2,7 +2,7 @@
 
 use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 use crate::ir::pipeline::{IRPass, PassContext, ValidationPass};
 use crate::ir::validator::{DefaultValidator, IRValidator};
 
@@ -32,9 +32,12 @@ fn one_error(instructions: Vec<CoreOp>) -> crate::ir::validator::ValidationError
 #[test]
 fn accepts_all_operation_contracts_in_legal_predefinition_order() {
     let mut instructions = vec![
-        CoreOp::Flags("M1".into(), vec!["ASYNC".into(), "ASYNC".into()]),
+        CoreOp::MethodModifiers(
+            "M1".into(),
+            vec![DeclarationModifier::Async, DeclarationModifier::Async],
+        ),
         CoreOp::Flags("M1".into(), vec!["RET".into()]),
-        CoreOp::ClassFlags("C1".into(), vec!["EXPORT".into()]),
+        CoreOp::ClassModifiers("C1".into(), vec![DeclarationModifier::Export]),
         CoreOp::Extends("C1".into(), "ExternalBase".into()),
         CoreOp::Implements("C1".into(), "ExternalInterface".into()),
         CoreOp::Implements("C1".into(), "ExternalInterface".into()),
@@ -124,8 +127,8 @@ fn rejects_empty_flag_payloads_and_invalid_body_spans() {
 fn rejects_unresolved_targets_for_newly_covered_families() {
     let cases = [
         (
-            CoreOp::ClassFlags("C404".into(), vec!["EXPORT".into()]),
-            "FLAGS_C",
+            CoreOp::ClassModifiers("C404".into(), vec![DeclarationModifier::Export]),
+            "MOD_C",
         ),
         (
             CoreOp::Pattern("CUSTOM".into(), vec!["C404".into()]),

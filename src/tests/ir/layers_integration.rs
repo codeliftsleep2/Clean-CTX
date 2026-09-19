@@ -14,7 +14,7 @@ use crate::ir::compiler::{CompiledIR, IRCompiler};
 use crate::ir::layers::typescript::TypeScriptLayer;
 // P0-4: Meta-layers use LayerRegistry::global() instead of manual add_meta_layer().
 // The compiler calls LayerRegistry internally during compile().
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -121,14 +121,14 @@ fn ts_language_layer_extracts_method_flags_via_compiler_for_async() {
     "#;
     let ir = compile_ts(source);
 
-    // Verify ASYNC flag exists (proves method flags from raw_text are extracted)
+    // Verify ASYNC modifier exists (proves declaration metadata is extracted)
     let has_async = ir
         .instructions
         .iter()
-        .any(|op| matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"ASYNC".to_string())));
+        .any(|op| matches!(op, CoreOp::MethodModifiers(_, modifiers) if modifiers.contains(&DeclarationModifier::Async)));
     assert!(
         has_async,
-        "TypeScript layer should emit ASYNC flag via IRCompiler"
+        "TypeScript layer should emit ASYNC modifier via IRCompiler"
     );
 }
 
@@ -145,14 +145,14 @@ fn ts_language_layer_extracts_method_flags_via_compiler() {
     "#;
     let ir = compile_ts(source);
 
-    // Verify ASYNC flag exists (proves method flags are extracted)
+    // Verify ASYNC modifier exists (proves declaration modifiers are extracted)
     let has_async = ir
         .instructions
         .iter()
-        .any(|op| matches!(op, CoreOp::Flags(_, flags) if flags.contains(&"ASYNC".to_string())));
+        .any(|op| matches!(op, CoreOp::MethodModifiers(_, modifiers) if modifiers.contains(&DeclarationModifier::Async)));
     assert!(
         has_async,
-        "TypeScript layer should emit ASYNC flag via IRCompiler"
+        "TypeScript layer should emit ASYNC modifier via IRCompiler"
     );
 }
 

@@ -33,6 +33,9 @@ user-verified on 2026-09-18. The projection cursor and ID-prefix inference are r
 interface-representation findings remain open. User-run verification proved that
 `TypeAlias` carries repeated `Φ` metadata; its ordered-many correction was
 approved, implemented, and verified on 2026-09-18.
+Phase 6A separates declaration modifiers into typed method/class operations
+across producers, validation, patterns, projection, rendering, and wire
+formats; it is implemented and awaiting user-run verification.
 
 ## 1. Executive summary
 
@@ -206,6 +209,9 @@ are different, but string-based consumers can treat them as one category.
 
 Required boundary: represent distinct semantic families with distinct Rust
 types or enum variants.
+
+Phase 6A resolves the declaration-modifier portion. Control summaries,
+patterns, side effects, and execution contexts remain later slices.
 
 ### F-05: Delta keys lose multiplicity
 

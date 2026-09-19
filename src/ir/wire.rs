@@ -13,7 +13,7 @@
 //    └── opcode (always first element)
 
 use super::compiler::CompiledIR;
-use super::opcodes::CoreOp;
+use super::opcodes::{CoreOp, DeclarationModifier};
 use serde_json::{Value, json};
 
 /// Errors during wire format decoding.
@@ -67,6 +67,16 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
         }
         CoreOp::Return(mid, ty) => vec!["RET".into(), mid.clone(), ty.clone()],
         CoreOp::FieldType(fid, ty) => vec!["FIELD_T".into(), fid.clone(), ty.clone()],
+        CoreOp::MethodModifiers(mid, modifiers) => {
+            let mut tuple = vec!["MOD_M".into(), mid.clone()];
+            tuple.extend(modifiers.iter().map(|modifier| modifier.as_str().into()));
+            tuple
+        }
+        CoreOp::ClassModifiers(cid, modifiers) => {
+            let mut tuple = vec!["MOD_C".into(), cid.clone()];
+            tuple.extend(modifiers.iter().map(|modifier| modifier.as_str().into()));
+            tuple
+        }
         CoreOp::Flags(tid, flags) => {
             let mut v = vec!["FLAGS".into(), tid.clone()];
             v.extend(flags.iter().cloned());
@@ -213,6 +223,28 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
         "FIELD_T" => {
             if tuple.len() >= 3 {
                 Some(CoreOp::FieldType(tuple[1].clone(), tuple[2].clone()))
+            } else {
+                None
+            }
+        }
+        "MOD_M" => {
+            if tuple.len() >= 3 {
+                let modifiers = tuple[2..]
+                    .iter()
+                    .map(|value| DeclarationModifier::from_serialized(value))
+                    .collect::<Option<Vec<_>>>()?;
+                Some(CoreOp::MethodModifiers(tuple[1].clone(), modifiers))
+            } else {
+                None
+            }
+        }
+        "MOD_C" => {
+            if tuple.len() >= 3 {
+                let modifiers = tuple[2..]
+                    .iter()
+                    .map(|value| DeclarationModifier::from_serialized(value))
+                    .collect::<Option<Vec<_>>>()?;
+                Some(CoreOp::ClassModifiers(tuple[1].clone(), modifiers))
             } else {
                 None
             }

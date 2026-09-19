@@ -117,7 +117,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
                 "error": {
                     "code": -32603,
                     "message": format!(
-                        "IR compilation unavailable for {}: {}. SCHEMA v2 output \
+                        "IR compilation unavailable for {}: {}. SCHEMA v3 output \
                          cannot be produced for this input; retry with fidelity \
                          \"verbatim\" or read the source directly.",
                         resolved_path, reason

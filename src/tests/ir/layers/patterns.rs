@@ -5,7 +5,7 @@
 
 use crate::ir::layers::PatternRecognizer;
 use crate::ir::layers::patterns::CodePatternRecognizer;
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
 fn make_defmethod(cid: &str, mid: &str, name: &str) -> CoreOp {
     CoreOp::DefMethod(cid.into(), mid.into(), name.into())
@@ -19,8 +19,8 @@ fn make_ret(mid: &str, ty: &str) -> CoreOp {
     CoreOp::Return(mid.into(), ty.into())
 }
 
-fn make_flags(tid: &str, flags: Vec<&str>) -> CoreOp {
-    CoreOp::Flags(tid.into(), flags.iter().map(|s| s.to_string()).collect())
+fn make_modifiers(tid: &str, modifiers: Vec<DeclarationModifier>) -> CoreOp {
+    CoreOp::MethodModifiers(tid.into(), modifiers)
 }
 
 // ── Constructor Pattern Tests ─────────────────────────
@@ -63,7 +63,7 @@ fn recognize_observable_return() {
     let instructions = vec![
         make_defmethod("C1", "M1", "fetchData"),
         make_ret("M1", "$P"),
-        make_flags("M1", vec!["ASYNC"]),
+        make_modifiers("M1", vec![DeclarationModifier::Async]),
     ];
 
     let recognizer = CodePatternRecognizer::new();

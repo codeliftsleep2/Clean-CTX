@@ -5,6 +5,7 @@
 // all fidelity levels, edge cases, overloaded methods, patterns.
 
 use crate::compression::Fidelity;
+use crate::ir::DeclarationModifier;
 use crate::ir::{ClassNode, FieldNode, HierarchicalIR, MethodNode, PatternEntry};
 use crate::ir::{render_hierarchical_for_llm, render_hierarchical_for_llm_focused};
 use std::collections::HashSet;
@@ -26,6 +27,7 @@ fn make_class(name: &str) -> ClassNode {
         name: name.to_string(),
         methods: vec![],
         fields: vec![],
+        modifiers: vec![],
         class_flags: vec![],
         extends: None,
         implements: vec![],
@@ -41,6 +43,7 @@ fn make_method(name: &str) -> MethodNode {
         name: name.to_string(),
         params: vec![],
         return_type: None,
+        modifiers: vec![],
         flags: Vec::new(),
         patterns: vec![],
         body: None,
@@ -83,7 +86,7 @@ fn test_empty_hir() {
     let hir = empty_hir();
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Should contain schema header but nothing else
-    assert!(result.starts_with("// SCHEMA v2"));
+    assert!(result.starts_with("// SCHEMA v3"));
     assert!(!result.contains("// ──"));
     assert!(!result.contains("$ "));
     assert!(!result.contains("T "));
@@ -94,7 +97,7 @@ fn test_schema_header_present() {
     let mut hir = empty_hir();
     hir.classes.push(make_class("TestClass"));
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// SCHEMA v2"));
+    assert!(result.contains("// SCHEMA v3"));
     assert!(result.contains("@=meta"));
     assert!(result.contains("X=extends"));
     assert!(result.contains("I=implements"));
@@ -185,7 +188,8 @@ fn test_method_with_params_and_flags() {
         .params
         .push(vec!["P1".into(), "$n".into(), "id".into()]);
     method.return_type = Some("$s".into());
-    method.flags = vec![vec!["ASYNC".into(), "RET".into()]];
+    method.modifiers = vec![vec![DeclarationModifier::Async]];
+    method.flags = vec![vec!["RET".into()]];
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -193,7 +197,8 @@ fn test_method_with_params_and_flags() {
     assert!(result.contains("M getUser"));
     assert!(result.contains("p:id:$n"));
     assert!(result.contains("→ $s"));
-    assert!(result.contains("fl:ASYNC,RET"));
+    assert!(result.contains("mod:ASYNC"));
+    assert!(result.contains("fl:RET"));
 }
 
 #[test]
@@ -300,17 +305,17 @@ fn test_extends_and_implements() {
 }
 
 #[test]
-fn test_class_flags() {
+fn test_class_modifiers() {
     let mut hir = empty_hir();
     let mut class = make_class("AbstractRepo");
-    class.class_flags = vec![
-        vec!["ABSTRACT".into()],
-        vec!["EXPORT".into(), "EXPORT".into()],
+    class.modifiers = vec![
+        vec![DeclarationModifier::Abstract],
+        vec![DeclarationModifier::Export, DeclarationModifier::Export],
     ];
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("cl: ABSTRACT EXPORT EXPORT\n"));
+    assert!(result.contains("cmod: ABSTRACT EXPORT EXPORT\n"));
 }
 
 #[test]
@@ -449,7 +454,7 @@ fn test_full_rust_class() {
 
     let mut m2 = make_method("get_user");
     m2.params.push(vec!["P1".into(), "$n".into(), "id".into()]);
-    m2.flags = vec![vec!["ASYNC".into()]];
+    m2.modifiers = vec![vec![DeclarationModifier::Async]];
     svc.methods.push(m2);
 
     hir.classes.push(svc);

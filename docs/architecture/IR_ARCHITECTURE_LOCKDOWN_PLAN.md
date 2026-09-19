@@ -310,14 +310,16 @@ languages; the user-run gate was green on 2026-09-18.
   accidents.
 
 ### Phase 6: Separate semantic families and cardinalities
+Phase 6A is implemented pending verification: typed modifiers span producers,
+patterns, validation, projection, rendering, hierarchical revision 4, named
+wire, and additive `0x03` opcodes 22/23. Residual flags preserve occurrences;
+physical `0x04` remains Phase 8.
 
-Migrate one family at a time:
-
-1. declaration modifiers;
-2. control summaries;
-3. patterns;
-4. side effects;
-5. execution contexts.
+Remaining families migrate one at a time:
+1. control summaries;
+2. patterns;
+3. side effects;
+4. execution contexts.
 
 For each slice, migrate producer, IR representation, validator,
 transformation, projection, wire format, consumer, and tests before beginning

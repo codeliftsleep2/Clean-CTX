@@ -26,6 +26,7 @@ fn render_hierarchical_for_llm_typescript_class() {
             name: "users".into(),
             field_type: Some("$s[]".into()),
         }],
+        modifiers: vec![],
         class_flags: vec![],
         extends: Some("BaseListComponent".into()),
         implements: vec!["OnInit".into()],
@@ -38,6 +39,7 @@ fn render_hierarchical_for_llm_typescript_class() {
         name: "ngOnInit".into(),
         params: vec![],
         return_type: None,
+        modifiers: vec![],
         flags: vec![vec!["IF".into()]],
         patterns: vec![],
         body: None,
@@ -55,8 +57,8 @@ fn render_hierarchical_for_llm_typescript_class() {
         calls: vec![],
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    // Phase 6 IR-first format: SCHEMA v2 header with structural markers
-    assert!(result.contains("SCHEMA v2"));
+    // Phase 6 IR-first format: SCHEMA v3 header with typed modifiers.
+    assert!(result.contains("SCHEMA v3"));
     assert!(result.contains("// ── UserListComponent ──"));
     assert!(result.contains("X BaseListComponent"));
     assert!(result.contains("I OnInit"));
@@ -78,6 +80,7 @@ fn render_hierarchical_for_llm_spring_boot_class() {
             name: "userService".into(),
             field_type: Some("UserService".into()),
         }],
+        modifiers: vec![],
         class_flags: vec![],
         extends: Some("BaseController".into()),
         implements: vec![],
@@ -91,6 +94,7 @@ fn render_hierarchical_for_llm_spring_boot_class() {
         name: "find".into(),
         params: vec![vec!["P1".into(), "$n".into(), "id".into()]],
         return_type: None,
+        modifiers: vec![],
         flags: vec![vec!["RET".into()]],
         patterns: vec![],
         body: None,
@@ -109,6 +113,7 @@ fn render_hierarchical_for_llm_spring_boot_class() {
             vec!["P2".into(), "$n".into(), "age".into()],
         ],
         return_type: None,
+        modifiers: vec![],
         flags: vec![vec!["RET".into(), "IF".into()]],
         patterns: vec![],
         body: None,
@@ -154,6 +159,7 @@ fn render_hierarchical_for_llm_angular_class() {
         name: "AppComponent".into(),
         methods: vec![],
         fields: vec![],
+        modifiers: vec![],
         class_flags: vec![],
         extends: None,
         implements: vec![],
@@ -187,7 +193,7 @@ fn render_hierarchical_for_llm_empty_hir_produces_header() {
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Always has schema header even with empty HIR
-    assert!(result.starts_with("// SCHEMA v2"));
+    assert!(result.starts_with("// SCHEMA v3"));
 }
 
 #[test]
@@ -214,6 +220,7 @@ fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
                 field_type: Some("$s".into()),
             },
         ],
+        modifiers: vec![],
         class_flags: vec![],
         extends: None,
         implements: vec![],
@@ -252,6 +259,7 @@ fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
                 field_type: Some("$n".into()),
             },
         ],
+        modifiers: vec![],
         class_flags: vec![],
         extends: None,
         implements: vec![],
@@ -280,6 +288,7 @@ fn render_hierarchical_for_llm_injects_do_not_panic() {
         name: "Service".into(),
         methods: vec![],
         fields: vec![],
+        modifiers: vec![],
         class_flags: vec![],
         extends: None,
         implements: vec![],
@@ -306,12 +315,12 @@ fn mcp_state_llm_text_cache_insert_and_read() {
     // Insert into cache
     state
         .llm_text_cache_lock()
-        .insert("α1".to_string(), "// SCHEMA v2\n// ── Foo ──\n".to_string());
+        .insert("α1".to_string(), "// SCHEMA v3\n// ── Foo ──\n".to_string());
     // Read from cache
     let cache_guard = state.llm_text_cache_lock();
     let cached = cache_guard.get("α1");
     assert!(cached.is_some());
-    assert!(cached.unwrap().contains("SCHEMA v2"));
+    assert!(cached.unwrap().contains("SCHEMA v3"));
     assert!(cached.unwrap().contains("Foo"));
 }
 

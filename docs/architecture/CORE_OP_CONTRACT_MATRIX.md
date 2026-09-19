@@ -138,8 +138,10 @@ not automatically a semantic serialization of the canonical stream.
 | `Param(method, parameter, type, name)` | Signature compiler capture; trusted decoder | Defines `(MethodId, ParameterId)`; method must resolve; duplicate parameter ID within method fails | Ordered many per method; source parameter order is semantic | None |
 | `Return(method, type)` | Signature compiler capture; trusted decoder | Targets `MethodId`; method must resolve | Optional singular per method; duplicate fails | None |
 | `FieldType(field, type)` | Field compiler capture; trusted decoder | Targets `FieldId`; field must resolve | Optional singular per field; duplicate fails | None |
-| `Flags(method, values)` | Language layer and additive pattern classifiers; trusted decoder | Targets `MethodId`; method must resolve; empty payload is invalid | Ordered many operations; payload order and duplicates preserved | None until semantic families are separated |
-| `ClassFlags(class, values)` | Language layer; trusted decoder | Targets `ClassId`; class must resolve; empty payload is invalid | Ordered many operations; payload order and duplicates preserved | None |
+| `MethodModifiers(method, values)` | Language declaration layer; trusted decoder | Targets `MethodId`; method must resolve; typed non-empty payload | Ordered many operations; payload order and duplicates preserved | None |
+| `ClassModifiers(class, values)` | Language declaration layer; trusted decoder | Targets `ClassId`; class must resolve; typed non-empty payload | Ordered many operations; payload order and duplicates preserved | None |
+| `Flags(method, values)` | Control and additive pattern producers; trusted decoder | Targets `MethodId`; method must resolve; empty payload and declaration-modifier spellings are invalid | Ordered many operations; payload order and duplicates preserved | None |
+| `ClassFlags(class, values)` | Residual class-metadata producer; trusted decoder | Targets `ClassId`; class must resolve; empty payload and declaration-modifier spellings are invalid | Ordered many operations; payload order and duplicates preserved | None |
 | `Extends(child, parent)` | Language layer; trusted decoder | Targets child `ClassId`; child must resolve; parent is an external-capable symbolic reference | Optional singular per child; duplicate fails | None |
 | `Implements(class, interface)` | Language layer; trusted decoder | Targets `ClassId`; class must resolve; interface is an external-capable symbolic reference | Ordered many per class; every occurrence preserved | None |
 | `Injects(class, dependencies)` | Language or pattern layer; trusted decoder | Targets `ClassId`; class must resolve; dependencies are external-capable symbolic references | Ordered many operations; each payload is ordered and duplicate-preserving | None |
@@ -166,11 +168,10 @@ newtypes or either serialized representation.
 
 ### 5.2 Flags restriction
 
-The current `Flags` payload contains declaration modifiers, control summaries,
-and additive classifications. Until those families are separated, no consumer
-may deduplicate, reorder, reduce, or reinterpret repeated `Flags` operations.
-Preservation is the safe interim contract; it is not an endorsement of the
-flattened model.
+Declaration modifiers are now a closed typed family carried by
+`MethodModifiers` and `ClassModifiers`. Generic `Flags` and `ClassFlags` reject
+modifier spellings and remain occurrence-preserving residual channels while
+the remaining semantic families migrate.
 
 ## 6. Projection, delta, and wire matrix
 
@@ -183,6 +184,8 @@ flattened model.
 | `Param` | Parameter under resolved method, in source order | `(MethodId, ParameterId)` | Semantic for present operands | Preserve all operands |
 | `Return` | Singular return type under resolved method | `MethodId` | Semantic for present operands | Preserve all operands |
 | `FieldType` | Singular type under resolved field | `FieldId` | Semantic for present operands | Preserve all operands |
+| `MethodModifiers` | Repeated typed modifier occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic via additive opcode 22 under `0x03` | Preserve payload and occurrence order |
+| `ClassModifiers` | Repeated typed modifier occurrences under resolved class | `(ClassId, complete values, occurrence)` | Semantic via additive opcode 23 under `0x03` | Preserve payload and occurrence order |
 | `Flags` | Repeated flag occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
 | `ClassFlags` | Repeated flag occurrences under resolved class | `(ClassId, complete values, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
 | `Extends` | Singular parent reference under resolved child | `ClassId` | Lossy: child ID omitted | Encode child and parent |

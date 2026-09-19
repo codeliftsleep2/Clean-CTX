@@ -6,7 +6,7 @@ use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{
     hierarchical_to_ir, ir_to_hierarchical, ir_to_hierarchical_wire, wire_to_ir,
 };
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
 /// Helper: create a simple compiled IR with one class and one method.
 fn make_single_class_ir() -> CompiledIR {
@@ -40,7 +40,7 @@ fn make_multi_class_ir() -> CompiledIR {
         instructions: vec![
             // Class 1
             CoreOp::DefClass("C1".to_string(), "BaseService".to_string()),
-            CoreOp::ClassFlags("C1".to_string(), vec!["EXPORT".to_string()]),
+            CoreOp::ClassModifiers("C1".to_string(), vec![DeclarationModifier::Export]),
             CoreOp::DefField("C1".to_string(), "F1".to_string(), "items".to_string()),
             CoreOp::FieldType("F1".to_string(), "$s[]".to_string()),
             CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "doWork".to_string()),
@@ -65,7 +65,7 @@ fn make_multi_class_ir() -> CompiledIR {
                 "handleEvent".to_string(),
             ),
             CoreOp::Return("M2".to_string(), "$b".to_string()),
-            CoreOp::Flags("M2".to_string(), vec!["ASYNC".to_string()]),
+            CoreOp::MethodModifiers("M2".to_string(), vec![DeclarationModifier::Async]),
             // Interface
             CoreOp::DefInterface("IF1".to_string(), "ServiceInterface".to_string()),
             // Imports
@@ -114,7 +114,7 @@ fn test_round_trip_multi_class() {
     let expected = vec![
         // C1
         CoreOp::DefClass("C1".to_string(), "BaseService".to_string()),
-        CoreOp::ClassFlags("C1".to_string(), vec!["EXPORT".to_string()]),
+        CoreOp::ClassModifiers("C1".to_string(), vec![DeclarationModifier::Export]),
         CoreOp::DefField("C1".to_string(), "F1".to_string(), "items".to_string()),
         CoreOp::FieldType("F1".to_string(), "$s[]".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "doWork".to_string()),
@@ -139,7 +139,7 @@ fn test_round_trip_multi_class() {
             "handleEvent".to_string(),
         ),
         CoreOp::Return("M2".to_string(), "$b".to_string()),
-        CoreOp::Flags("M2".to_string(), vec!["ASYNC".to_string()]),
+        CoreOp::MethodModifiers("M2".to_string(), vec![DeclarationModifier::Async]),
         // IF1
         CoreOp::DefClass("IF1".to_string(), "ServiceInterface".to_string()),
         // Imports
@@ -188,7 +188,7 @@ fn test_hierarchical_structure() {
     // Find C1
     let c1 = hir.classes.iter().find(|c| c.id == "C1").unwrap();
     assert_eq!(c1.name, "BaseService");
-    assert_eq!(c1.class_flags, vec![vec!["EXPORT".to_string()]]);
+    assert_eq!(c1.modifiers, vec![vec![DeclarationModifier::Export]]);
     assert_eq!(c1.fields.len(), 1);
     assert_eq!(c1.fields[0].id, "F1");
     assert_eq!(c1.fields[0].name, "items");
@@ -316,7 +316,7 @@ fn test_wire_format_json_structure() {
     assert!(wire.get("file").is_some(), "Must have 'file' key");
     assert!(wire.get("v").is_some(), "Must have 'v' key");
     assert!(wire.get("encoding").is_some(), "Must have 'encoding' key");
-    assert_eq!(wire.get("hs").and_then(|v| v.as_u64()), Some(3));
+    assert_eq!(wire.get("hs").and_then(|v| v.as_u64()), Some(4));
     assert!(wire.get("ir").is_some(), "Must have 'ir' key");
 
     // Check 'ir' contains expected abbreviated fields

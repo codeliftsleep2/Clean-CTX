@@ -5,18 +5,14 @@
 // must remain distinct occurrences at the hierarchical projection instead of
 // being overwritten, merged, or deduplicated.
 //
-// `CoreOp::Flags` has multiple legitimate producers for the same method id:
-//
-//   * the language layer's declaration/modifier flags (`STATIC`, `ASYNC`,
-//     `PRIVATE`, `PROTECTED`, `ABSTRACT`, `EXPORT`, …), emitted while the
-//     declaration capture is dispatched (`ir::layers::{csharp,java,
-//     typescript,rust}`), and
-//   * the core pipeline's control-flow flags (`IF`, `LOOP`, `RET`, `THROW`),
+// Declaration modifiers and residual flags have distinct typed operations:
+// language layers emit `MethodModifiers`, while the core pipeline emits
+// control-flow flags (`IF`, `LOOP`, `RET`, `THROW`) through `Flags`.
 //     collected by `PassContext::current_method_flags` and flushed into one
 //     op by `flush_method_flags` when the declaration ends.
 //
-// The flat stream therefore legitimately carries more than one `Flags` op for
-// one method. `MethodNode::flags` therefore stores one inner vector per op.
+// Each family can carry repeated operations. The hierarchy stores one inner
+// vector per occurrence in its distinct `modifiers` and `flags` fields.
 //
 // Projection semantics pinned here: occurrence order, payload order, and
 // duplicate values are all preserved.
@@ -26,13 +22,13 @@
 //
 // ── NOT changed by this fix (pinned below) ──────────────────────────────
 // The flat instruction stream itself — what pattern recognition and the
-// named/binary wire consume — keeps one separate `Flags` op per producer.
+// named/binary wire consume — keeps each typed operation separate.
 
 use crate::compression::Fidelity;
 use crate::ir::binary_wire::{decode, encode};
 use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{HierarchicalIR, hierarchical_to_ir, ir_to_hierarchical};
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 use crate::ir::render_llm::render_hierarchical_for_llm;
 use crate::ir::wire::{ir_to_wire, op_to_tuple, tuple_to_op, wire_to_ir};
 
@@ -47,12 +43,16 @@ fn flat_ir(instructions: Vec<CoreOp>) -> CompiledIR {
     }
 }
 
-/// One `CoreOp::Flags` op for `mid`, built the way both producers do it.
+/// One residual `CoreOp::Flags` op for `mid`.
 fn flags(mid: &str, values: &[&str]) -> CoreOp {
     CoreOp::Flags(
         mid.to_string(),
         values.iter().map(|value| value.to_string()).collect(),
     )
+}
+
+fn modifiers(mid: &str, values: &[DeclarationModifier]) -> CoreOp {
+    CoreOp::MethodModifiers(mid.to_string(), values.to_vec())
 }
 
 /// Every method node in the hierarchical IR as `(id, name, flags)`.
@@ -64,7 +64,13 @@ fn methods(hir: &HierarchicalIR) -> Vec<(String, String, Vec<String>)> {
             (
                 method.id.clone(),
                 method.name.clone(),
-                method.flags.iter().flatten().cloned().collect(),
+                method
+                    .modifiers
+                    .iter()
+                    .flatten()
+                    .map(|modifier| modifier.as_str().to_string())
+                    .chain(method.flags.iter().flatten().cloned())
+                    .collect(),
             )
         })
         .collect()
@@ -97,6 +103,16 @@ fn flag_ops_for(ir: &CompiledIR, mid: &str) -> Vec<Vec<String>> {
         .collect()
 }
 
+fn modifier_ops_for(ir: &CompiledIR, mid: &str) -> Vec<Vec<DeclarationModifier>> {
+    ir.instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::MethodModifiers(id, values) if id == mid => Some(values.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
 /// The rendered skeleton of a hierarchical IR.
 fn render(hir: &HierarchicalIR, fidelity: Fidelity) -> String {
     render_hierarchical_for_llm(hir, fidelity)
@@ -111,7 +127,7 @@ fn red_flag1_two_flag_ops_preserve_both_families() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "work".to_string()),
-        flags("M1", &["STATIC"]),
+        modifiers("M1", &[DeclarationModifier::Static]),
         flags("M1", &["RET"]),
     ]);
 
@@ -130,7 +146,7 @@ fn red_flag2_last_write_no_longer_wins() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "load".to_string()),
-        flags("M1", &["ASYNC"]),
+        modifiers("M1", &[DeclarationModifier::Async]),
         flags("M1", &["IF", "RET"]),
     ]);
 
@@ -149,8 +165,12 @@ fn red_flag3_duplicate_values_are_preserved() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "save".to_string()),
-        flags("M1", &["PRIVATE", "STATIC"]),
-        flags("M1", &["STATIC", "RET"]),
+        modifiers(
+            "M1",
+            &[DeclarationModifier::Private, DeclarationModifier::Static],
+        ),
+        modifiers("M1", &[DeclarationModifier::Static]),
+        flags("M1", &["RET"]),
     ]);
 
     let hir = ir_to_hierarchical(&ir);
@@ -185,7 +205,7 @@ fn red_flag4_three_producer_style_writes_remain_ordered() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "stream".to_string()),
-        flags("M1", &["PRIVATE"]),
+        modifiers("M1", &[DeclarationModifier::Private]),
         flags("M1", &["OBSERVABLE"]),
         flags("M1", &["IF", "RET", "LOOP", "RET"]),
     ]);
@@ -215,10 +235,10 @@ fn red_flag5_method_isolation() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Pairing".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "first".to_string()),
-        flags("M1", &["STATIC"]),
+        modifiers("M1", &[DeclarationModifier::Static]),
         flags("M1", &["RET"]),
         CoreOp::DefMethod("C1".to_string(), "M2".to_string(), "second".to_string()),
-        flags("M2", &["ASYNC"]),
+        modifiers("M2", &[DeclarationModifier::Async]),
         flags("M2", &["THROW"]),
     ]);
 
@@ -251,14 +271,15 @@ fn red_flag6_rendered_line_carries_declaration_and_control_flow() {
             "values".to_string(),
         ),
         CoreOp::Return("M1".to_string(), "$n".to_string()),
-        flags("M1", &["STATIC"]),
+        modifiers("M1", &[DeclarationModifier::Static]),
         flags("M1", &["IF", "RET"]),
     ]);
 
     let hir = ir_to_hierarchical(&ir);
     let out = render(&hir, Fidelity::Medium);
     // The established LLM-facing `fl:` representation remains compact.
-    assert!(out.contains(" fl:STATIC,IF,RET"), "{out}");
+    assert!(out.contains(" mod:STATIC"), "{out}");
+    assert!(out.contains(" fl:IF,RET"), "{out}");
     assert!(out.contains("STATIC"), "{out}");
     assert!(out.contains("RET"), "{out}");
 }
@@ -270,16 +291,16 @@ fn red_flag11_declaration_only_method_unchanged() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "getUser".to_string()),
-        flags("M1", &["STATIC"]),
+        modifiers("M1", &[DeclarationModifier::Static]),
     ]);
 
     let hir = ir_to_hierarchical(&ir);
     assert_eq!(method_flags(&hir, "getUser"), vec!["STATIC".to_string()]);
 
     let out = render(&hir, Fidelity::Low);
-    assert!(out.contains("fl:STATIC"), "{out}");
+    assert!(out.contains("mod:STATIC"), "{out}");
     // Accumulation must not invent values: a single op stays a single value.
-    assert!(!out.contains("fl:STATIC,"), "{out}");
+    assert!(!out.contains("mod:STATIC,"), "{out}");
 }
 
 // ── RED-FLAG12: a control-flow-only method is unchanged ────────────────
@@ -311,7 +332,7 @@ fn round_trip_preserves_flag_occurrences() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "work".to_string()),
-        flags("M1", &["STATIC"]),
+        modifiers("M1", &[DeclarationModifier::Static]),
         flags("M1", &["RET"]),
     ]);
 
@@ -323,38 +344,36 @@ fn round_trip_preserves_flag_occurrences() {
     );
 
     let method = &hir.classes[0].methods[0];
-    assert_eq!(
-        method.flags,
-        vec![vec!["STATIC".to_string()], vec!["RET".to_string()]]
-    );
+    assert_eq!(method.modifiers, vec![vec![DeclarationModifier::Static]]);
+    assert_eq!(method.flags, vec![vec!["RET".to_string()]]);
 
     // hierarchical → flat: each occurrence is restored independently.
     let restored = hierarchical_to_ir(&hir);
-    let projected = flag_ops_for(&flat_ir(restored.clone()), "M1");
+    let projected = methods(&ir_to_hierarchical(&flat_ir(restored.clone())))[0]
+        .2
+        .clone();
     assert_eq!(
         projected,
-        vec![vec!["STATIC".to_string()], vec!["RET".to_string()]],
-        "the two original occurrences must remain distinct"
+        vec!["STATIC".to_string(), "RET".to_string()],
+        "both typed families must survive"
     );
 
     // No semantic flag value was lost anywhere in the round trip.
     let mut values: Vec<String> = Vec::new();
-    for op in &projected {
-        for value in op {
-            if !values.iter().any(|seen| seen == value) {
-                values.push(value.clone());
-            }
+    for value in &projected {
+        if !values.iter().any(|seen| seen == value) {
+            values.push(value.clone());
         }
     }
     assert_eq!(values, vec!["STATIC".to_string(), "RET".to_string()]);
 
     // The projection never rewrites the stream it reads: the original flat
     // stream still holds the two separate ops.
-    assert_eq!(flag_ops_for(&ir, "M1").len(), 2);
+    assert_eq!(flag_ops_for(&ir, "M1").len(), 1);
     assert_eq!(
         restored.len(),
         4,
-        "DefClass + DefMethod + two Flags ops: {restored:?}"
+        "DefClass + DefMethod + modifier and flag ops: {restored:?}"
     );
 }
 
@@ -368,7 +387,7 @@ fn hierarchical_encode_does_not_rewrite_the_flat_stream() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "work".to_string()),
-        flags("M1", &["STATIC"]),
+        modifiers("M1", &[DeclarationModifier::Static]),
         flags("M1", &["RET"]),
     ]);
     let before = ir.instructions.clone();
@@ -378,18 +397,17 @@ fn hierarchical_encode_does_not_rewrite_the_flat_stream() {
     assert_eq!(ir.instructions, before, "the flat stream is the input");
     assert_eq!(
         flag_ops_for(&ir, "M1"),
-        vec![vec!["STATIC".to_string()], vec!["RET".to_string()]],
-        "two separate ops must still exist before/after hierarchical encode"
+        vec![vec!["RET".to_string()]],
+        "the residual flag op must remain unchanged"
     );
 }
 
 #[test]
-fn named_wire_pins_the_two_separate_flag_ops() {
-    // The FLAGS opcode, arity and schema are unchanged by this fix: each
-    // producer's op still serializes as its own named tuple...
+fn named_wire_pins_separate_modifier_and_flag_ops() {
+    // Each semantic family serializes as its own named tuple.
     assert_eq!(
-        op_to_tuple(&flags("M1", &["STATIC"])),
-        vec!["FLAGS", "M1", "STATIC"]
+        op_to_tuple(&modifiers("M1", &[DeclarationModifier::Static])),
+        vec!["MOD_M", "M1", "STATIC"]
     );
     assert_eq!(
         op_to_tuple(&flags("M1", &["RET"])),
@@ -397,7 +415,10 @@ fn named_wire_pins_the_two_separate_flag_ops() {
     );
 
     // ...each tuple still round-trips on its own...
-    for op in [flags("M1", &["STATIC"]), flags("M1", &["RET"])] {
+    for op in [
+        modifiers("M1", &[DeclarationModifier::Static]),
+        flags("M1", &["RET"]),
+    ] {
         let tuple = op_to_tuple(&op);
         assert_eq!(tuple_to_op(&tuple), Some(op));
     }
@@ -407,31 +428,33 @@ fn named_wire_pins_the_two_separate_flag_ops() {
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "work".to_string()),
-        flags("M1", &["STATIC"]),
+        modifiers("M1", &[DeclarationModifier::Static]),
         flags("M1", &["RET"]),
     ]);
     let restored = wire_to_ir(&ir_to_wire(&ir)).expect("named wire round trip");
     assert_eq!(
-        flag_ops_for(&restored, "M1"),
-        vec![vec!["STATIC".to_string()], vec!["RET".to_string()]]
+        methods(&ir_to_hierarchical(&restored))[0].2,
+        vec!["STATIC".to_string(), "RET".to_string()]
     );
 }
 
 #[test]
-fn binary_wire_round_trips_two_separate_flag_ops() {
+fn binary_wire_round_trips_separate_modifier_and_flag_ops() {
     // No opcode, operand-arity or wire-version change accompanies the fix.
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "work".to_string()),
-        flags("M1", &["STATIC"]),
+        modifiers("M1", &[DeclarationModifier::Static]),
         flags("M1", &["RET"]),
     ]);
     let bytes = encode(&ir);
     let decoded = decode(&bytes).expect("binary wire round trip");
-    assert_eq!(
-        flag_ops_for(&decoded, "M1"),
-        vec![vec!["STATIC".to_string()], vec!["RET".to_string()]]
+    assert!(
+        decoded
+            .instructions
+            .contains(&modifiers("M1", &[DeclarationModifier::Static]))
     );
+    assert!(decoded.instructions.contains(&flags("M1", &["RET"])));
 }
 
 // ── Cross-language pipeline probes ─────────────────────────────────────

@@ -139,6 +139,12 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                 let type_op = insn.get(2).map(|s| s.as_str()).unwrap_or("$v");
                 output.push_str(&format!(":{}", type_op));
             }
+            "MOD_M" => {
+                output.push_str(&format!(" [mod:{}]", insn[2..].join(",")));
+            }
+            "MOD_C" => {
+                output.push_str(&format!(" [class-mod:{}]", insn[2..].join(",")));
+            }
             "INJECTS" => {
                 let deps: Vec<&str> = insn[2..].iter().map(|s| s.as_str()).collect();
                 output.push_str(&format!(" // injects: {}", deps.join(", ")));
@@ -155,14 +161,7 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                 output.push_str(&format!(" // {{{}}} {}:{}", pat_name, class_id, method_id));
             }
             "FLAGS_C" => {
-                let flags: Vec<&str> = insn[2..].iter().map(|s| s.as_str()).collect();
-                for flag in &flags {
-                    match *flag {
-                        "EXPORT" => output.push_str("$e "),
-                        "ABSTRACT" => output.push_str("abstract "),
-                        _ => {}
-                    }
-                }
+                output.push_str(&format!(" [class-flags:{}]", insn[2..].join(",")));
             }
             _ => {}
         }
@@ -177,7 +176,8 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
 /// ⊕ marker. This is intentional for backward compatibility with the
 /// legacy pipeline. The spec says ASYNC is a keyword preserved, but the
 /// render function produces byte-identical output to the legacy pipeline
-/// for `IF/LOOP/RET/THROW`. `ASYNC` is the exception — it uses `$a`.
+/// for the closed control-flow vocabulary. Declaration modifiers are rendered
+/// by the distinct `MOD_M` and `MOD_C` branches above.
 ///
 /// F-36: Unknown flags are rendered as `⊕{other}`. This is a silent
 /// acceptance of arbitrary strings. A future improvement could log a
@@ -190,8 +190,6 @@ fn flags_to_markers(flags: &[&str]) -> Vec<String> {
             "LOOP" => "⊕loop".to_string(),
             "RET" => "⊕⇒".to_string(),
             "THROW" => "⊕!".to_string(),
-            "ASYNC" => "$a".to_string(),
-            "GEN" => "⊕gen".to_string(),
             other => format!("⊕{}", other),
         })
         .collect()

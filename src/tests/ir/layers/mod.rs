@@ -14,7 +14,7 @@ use crate::ir::layers::typescript::TypeScriptLayer;
 // P0-4: ir::layers::MetaLayer and angular/spring/dotnet modules removed.
 // Meta-layers now use the canonical trait in src/layers/meta/.
 // LanguageLayer tests remain (TypeScript, C#).
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
 // ── TypeScript Layer Tests ────────────────────────────
 
@@ -71,7 +71,7 @@ fn ts_layer_extracts_export_flag() {
     let ops = layer.process_capture("class.root", "export class Foo {}", &mut ctx);
 
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"EXPORT".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(
         has_export,
@@ -89,7 +89,7 @@ fn ts_layer_extracts_async_flag() {
     let ops = layer.process_capture("method.root", "async doWork()", &mut ctx);
 
     let has_async = ops.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"ASYNC".to_string()))
+        matches!(op, CoreOp::MethodModifiers(m, modifiers) if m == "M1" && modifiers.contains(&DeclarationModifier::Async))
     });
     assert!(
         has_async,
@@ -116,7 +116,7 @@ fn ts_layer_extracts_static_flag() {
     let ops = layer.process_capture("method.root", "static doWork()", &mut ctx);
 
     let has_static = ops.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"STATIC".to_string()))
+        matches!(op, CoreOp::MethodModifiers(m, modifiers) if m == "M1" && modifiers.contains(&DeclarationModifier::Static))
     });
     assert!(
         has_static,
@@ -192,7 +192,7 @@ fn cs_layer_extracts_public_flag() {
     let ops = layer.process_capture("class.root", "public class Foo {}", &mut ctx);
 
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"EXPORT".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(
         has_export,
@@ -210,7 +210,7 @@ fn cs_layer_extracts_abstract_flag() {
     let ops = layer.process_capture("class.root", "public abstract class Foo {}", &mut ctx);
 
     let has_abstract = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"ABSTRACT".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Abstract))
     });
     assert!(
         has_abstract,
@@ -233,7 +233,7 @@ fn cs_has_class_flag(raw: &str, flag: &str) -> bool {
         .process_capture("class.root", raw, &mut ctx)
         .iter()
         .any(|op| {
-            matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.iter().any(|f| f == flag))
+            matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.iter().any(|modifier| modifier.as_str() == flag))
         })
 }
 
@@ -246,7 +246,7 @@ fn cs_method_has_flag(raw: &str, flag: &str) -> bool {
         .process_capture("method.root", raw, &mut ctx)
         .iter()
         .any(|op| {
-            matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.iter().any(|f| f == flag))
+            matches!(op, CoreOp::MethodModifiers(m, modifiers) if m == "M1" && modifiers.iter().any(|modifier| modifier.as_str() == flag))
         })
 }
 

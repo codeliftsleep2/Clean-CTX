@@ -13,11 +13,12 @@
 //   - Overloaded methods disambiguated with `+N` (parameter count)
 //   - Fidelity controls field layout (Low = space-separated, Medium/High = one-per-line)
 //   - Meta-layer `@` annotations always shown regardless of fidelity
-//   - The `// SCHEMA v2` header opens every output with the legend table
+//   - The `// SCHEMA v3` header opens every output with the legend table
 //
-// Notation reference (also in the SCHEMA v2 header):
+// Notation reference (also in the SCHEMA v3 header):
 //   @=meta  X=extends  I=implements  F=field  M=method
-//   $=import  →=scope  fl:=flags  cl:=class-flags  P=pattern  T=type-alias
+//   $=import  →=scope  mod:=method-modifiers cmod:=class-modifiers
+//   fl:=flags cl:=class-flags P=pattern T=type-alias
 
 use super::hierarchical::{ClassNode, HierarchicalIR, PatternEntry};
 use crate::compression::Fidelity;
@@ -66,8 +67,8 @@ pub fn render_hierarchical_for_llm_focused(
 ) -> String {
     let mut output = String::new();
 
-    // ── SCHEMA v2 header ──
-    output.push_str("// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias\n");
+    // ── SCHEMA v3 header ──
+    output.push_str("// SCHEMA v3  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers fl:=flags cl:=class-flags P=pattern T=type-alias\n");
 
     // ── Classes ──
     for class in &hir.classes {
@@ -114,6 +115,16 @@ fn render_class(
     // Class-level patterns (e.g., EMPTY_CTOR)
     for pat in &class.patterns {
         render_pattern(output, pat);
+    }
+
+    if !class.modifiers.is_empty() {
+        let modifiers = class
+            .modifiers
+            .iter()
+            .flatten()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        output.push_str(&format!("cmod: {}\n", modifiers.join(" ")));
     }
 
     // Class-level flags
@@ -230,9 +241,10 @@ fn render_methods(
         // Method body (params, return type, flags)
         let has_params = !method.params.is_empty();
         let has_return = method.return_type.is_some();
+        let has_modifiers = !method.modifiers.is_empty();
         let has_flags = !method.flags.is_empty();
 
-        if has_params || has_return || has_flags {
+        if has_params || has_return || has_modifiers || has_flags {
             output.push_str("  →");
 
             // Params (shown in Medium/High, hidden in Low unless overloaded)
@@ -256,6 +268,16 @@ fn render_methods(
             // Return type
             if let Some(rt) = &method.return_type {
                 output.push_str(&format!(" → {}", rt));
+            }
+
+            if has_modifiers {
+                let modifiers = method
+                    .modifiers
+                    .iter()
+                    .flatten()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+                output.push_str(&format!(" mod:{}", modifiers.join(",")));
             }
 
             // Flags

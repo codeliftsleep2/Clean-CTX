@@ -22,9 +22,8 @@
 use super::declaration::{declaration_head, has_modifier};
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{
-    CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, EFFECT_ASYNC,
-    EFFECT_IO, FLAG_ABSTRACT, FLAG_ASYNC, FLAG_EXPORT, FLAG_GEN, FLAG_PRIVATE, FLAG_PROTECTED,
-    FLAG_STATIC,
+    CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, DeclarationModifier,
+    EFFECT_ASYNC, EFFECT_IO,
 };
 
 /// TypeScript language layer (Layer 2).
@@ -97,36 +96,36 @@ impl TypeScriptLayer {
     }
 
     /// Extract class-level flags (export, abstract) from class head.
-    fn extract_class_flags(class_head: &str) -> Vec<String> {
+    fn extract_class_modifiers(class_head: &str) -> Vec<DeclarationModifier> {
         let head = declaration_head(class_head);
         let mut flags = Vec::new();
         if has_modifier(head, "export") {
-            flags.push(FLAG_EXPORT.to_string());
+            flags.push(DeclarationModifier::Export);
         }
         if has_modifier(head, "abstract") {
-            flags.push(FLAG_ABSTRACT.to_string());
+            flags.push(DeclarationModifier::Abstract);
         }
         flags
     }
 
     /// Extract method-level flags (async, generator, visibility) from method signature.
-    fn extract_method_flags(raw_sig: &str) -> Vec<String> {
+    fn extract_method_modifiers(raw_sig: &str) -> Vec<DeclarationModifier> {
         let head = declaration_head(raw_sig);
         let mut flags = Vec::new();
         if has_modifier(head, "async") {
-            flags.push(FLAG_ASYNC.to_string());
+            flags.push(DeclarationModifier::Async);
         }
         if head.contains('*') && has_modifier(head, "function") {
-            flags.push(FLAG_GEN.to_string());
+            flags.push(DeclarationModifier::Generator);
         }
         if has_modifier(head, "private") {
-            flags.push(FLAG_PRIVATE.to_string());
+            flags.push(DeclarationModifier::Private);
         }
         if has_modifier(head, "protected") {
-            flags.push(FLAG_PROTECTED.to_string());
+            flags.push(DeclarationModifier::Protected);
         }
         if has_modifier(head, "static") {
-            flags.push(FLAG_STATIC.to_string());
+            flags.push(DeclarationModifier::Static);
         }
         flags
     }
@@ -257,9 +256,9 @@ impl LanguageLayer for TypeScriptLayer {
                     }
 
                     // Emit class-level flags
-                    let class_flags = Self::extract_class_flags(raw_text);
-                    if !class_flags.is_empty() {
-                        ops.push(CoreOp::ClassFlags(class_id.clone(), class_flags));
+                    let modifiers = Self::extract_class_modifiers(raw_text);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::ClassModifiers(class_id.clone(), modifiers));
                     }
 
                     // R-43a: Detect @Injectable() on class → ExecutionContext("di_scope")
@@ -273,10 +272,10 @@ impl LanguageLayer for TypeScriptLayer {
             }
             "method.root" => {
                 // Extract method-level flags (async, generator, visibility)
-                let method_flags = Self::extract_method_flags(raw_text);
+                let modifiers = Self::extract_method_modifiers(raw_text);
                 if let Some(method_id) = &context.current_method {
-                    if !method_flags.is_empty() {
-                        ops.push(CoreOp::Flags(method_id.clone(), method_flags));
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::MethodModifiers(method_id.clone(), modifiers));
                     }
 
                     // R-43a: Extract execution semantics

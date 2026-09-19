@@ -10,7 +10,7 @@
 //   - Override pattern (DEF_M + FLAGS(OVERRIDE))
 
 use super::PatternRecognizer;
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 use crate::ir::patterns::is_constructor_name;
 
 /// Pattern recognizer (Layer 4).
@@ -134,12 +134,12 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
                     has_observable_return = true;
                 }
             }
-            CoreOp::Flags(tid, flags)
-                if *tid == method_id && flags.contains(&"ASYNC".to_string()) =>
+            CoreOp::MethodModifiers(tid, modifiers)
+                if *tid == method_id && modifiers.contains(&DeclarationModifier::Async) =>
             {
                 has_async_flag = true;
             }
-            CoreOp::Flags(..) => {}
+            CoreOp::Flags(..) | CoreOp::MethodModifiers(..) => {}
             _ => {}
         }
     }

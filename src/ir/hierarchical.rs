@@ -9,13 +9,14 @@
 // Estimated savings: 40-60% reduction in wire bytes vs. positional encoding.
 
 use super::compiler::CompiledIR;
-use super::opcodes::CoreOp;
+use super::opcodes::{CoreOp, DeclarationModifier};
 use super::wire::DecodeError;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 2;
-const HIERARCHICAL_SCHEMA_VERSION: u64 = 3;
+const HIERARCHICAL_SCHEMA_REVISION_2: u64 = 2;
+const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 3;
+const HIERARCHICAL_SCHEMA_VERSION: u64 = 4;
 
 mod decode;
 mod encode;
@@ -110,7 +111,11 @@ pub struct ClassNode {
     #[serde(rename = "f", default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<FieldNode>,
 
-    /// Class-level flag occurrences (EXPORT, ABSTRACT, etc.).
+    /// Ordered class declaration-modifier occurrences.
+    #[serde(rename = "mo", default, skip_serializing_if = "Vec::is_empty")]
+    pub modifiers: Vec<Vec<DeclarationModifier>>,
+
+    /// Residual class-metadata flag occurrences (for example CFG and GP).
     ///
     /// Each inner vector is one `CoreOp::ClassFlags` occurrence. The hierarchy
     /// preserves occurrence order, payload order, and duplicate values.
@@ -165,6 +170,10 @@ pub struct MethodNode {
     /// Return type
     #[serde(rename = "r", default, skip_serializing_if = "Option::is_none")]
     pub return_type: Option<String>,
+
+    /// Ordered method declaration-modifier occurrences.
+    #[serde(rename = "mo", default, skip_serializing_if = "Vec::is_empty")]
+    pub modifiers: Vec<Vec<DeclarationModifier>>,
 
     /// Method-level flag occurrences (IF, LOOP, RET, etc.).
     ///
@@ -298,7 +307,10 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         })
         .transpose()?;
     match schema_version {
-        None | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
+        None
+        | Some(HIERARCHICAL_SCHEMA_REVISION_2)
+        | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION)
+        | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(unsupported) => {
             return Err(DecodeError::InvalidInput(format!(
                 "unsupported hierarchical schema version: {unsupported}"
@@ -312,8 +324,8 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         .ok_or_else(|| DecodeError::MissingField("ir".into()))?;
     match schema_version {
         None => upgrade_legacy_hierarchy(&mut ir_val)?,
-        Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) => upgrade_revision_2_hierarchy(&mut ir_val)?,
-        Some(HIERARCHICAL_SCHEMA_VERSION) => {}
+        Some(HIERARCHICAL_SCHEMA_REVISION_2) => upgrade_revision_2_hierarchy(&mut ir_val)?,
+        Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(_) => unreachable!("unsupported revisions returned above"),
     }
 
@@ -368,7 +380,8 @@ fn upgrade_legacy_hierarchy(ir: &mut Value) -> Result<(), DecodeError> {
     Ok(())
 }
 
-/// Upgrade the strict revision-2 class containers to revision 3.
+/// Upgrade strict revision-2 containers to the occurrence-aware shape used by
+/// revisions 3 and 4. Typed modifier fields are absent and default empty.
 ///
 /// Revision 2 already has occurrence-aware method facts, but its class flags
 /// and injections are flat and therefore cannot represent repeated operation
@@ -469,10 +482,8 @@ mod identity_tests;
 #[path = "../tests/ir/hierarchical_field_identity.rs"]
 mod field_identity_tests;
 
-// Repeated `CoreOp::Flags` ops for one method id — the language layer's
-// declaration/modifier family and the core pipeline's control-flow family —
-// remain distinct ordered occurrences (RED-FLAG1..RED-FLAG12), including the
-// cross-language pipeline probes and the flat-wire/pattern nonregressions.
+// Typed declaration modifiers and residual flags remain separate ordered
+// occurrences, including cross-language and wire/pattern regressions.
 #[cfg(test)]
 #[path = "../tests/ir/hierarchical_flags.rs"]
 mod flags_tests;

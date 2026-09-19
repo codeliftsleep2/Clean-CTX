@@ -275,21 +275,22 @@ pub fn render_cache_json(metrics: &CacheMetrics, enabled: bool) -> serde_json::V
 
 /// Generate the response-vocabulary text for the `clean-ctx-vocabulary`
 /// prompt resource. Phase A retirement (2026-08-25): teaches ONLY the
-/// current SCHEMA v2 notation plus the live α / Φ systems — the retired
+/// current SCHEMA v3 notation plus the live α / Φ systems — the retired
 /// `$`-primitive / `⊕`-marker / `§`-micro-code tables are gone.
 ///
 /// This function is used by the `prompts/get` MCP handler.
 pub fn generate_vocabulary_text() -> String {
     let lines = vec![
-        "Clean-CTX Response Vocabulary (SCHEMA v2)",
+        "Clean-CTX Response Vocabulary (SCHEMA v3)",
         "==========================================",
         "",
-        "// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias",
+        "// SCHEMA v3  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers fl:=flags cl:=class-flags P=pattern T=type-alias",
         "// ── Name ──   opens a class scope",
         "X Parent      extends          I Iface…   implements",
         "F name:type   field            M name(+N) method (+N = overload param count)",
         "→ p:name:type … / → ret       parameters / return type",
-        "fl: IF LOOP RET THROW ASYNC GEN EXPORT STATIC PRIVATE PROTECTED ABSTRACT UNSAFE",
+        "mod:/cmod: ASYNC GEN EXPORT STATIC PRIVATE PROTECTED ABSTRACT UNSAFE",
+        "fl:/cl: residual control, pattern, and class-metadata facts",
         "$ alias module [names]        import",
         "T alias = Type                type alias",
         "P NAME [args]                 structural pattern (CTOR, OBSERVABLE, GETTER, SETTER…)",

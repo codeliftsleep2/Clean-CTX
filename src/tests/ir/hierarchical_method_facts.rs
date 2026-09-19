@@ -1,7 +1,7 @@
 use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{ir_to_hierarchical_wire, try_ir_to_hierarchical, wire_to_ir};
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 use crate::ir::render_llm::render_hierarchical_for_llm;
 
 fn compiled(instructions: Vec<CoreOp>) -> CompiledIR {
@@ -15,7 +15,10 @@ fn compiled(instructions: Vec<CoreOp>) -> CompiledIR {
 #[test]
 fn method_facts_resolve_by_identity_before_and_across_definitions() {
     let ir = compiled(vec![
-        CoreOp::Flags("M2".into(), vec!["ASYNC".into(), "ASYNC".into()]),
+        CoreOp::MethodModifiers(
+            "M2".into(),
+            vec![DeclarationModifier::Async, DeclarationModifier::Async],
+        ),
         CoreOp::SideEffect("M1".into(), "io".into()),
         CoreOp::ExecutionContext("M2".into(), "async".into()),
         CoreOp::ControlFlow("M1".into(), "if".into(), "ready".into()),
@@ -45,11 +48,14 @@ fn method_facts_resolve_by_identity_before_and_across_definitions() {
     assert_eq!(first.control_flow, vec![vec!["if", "ready"]]);
     assert_eq!(first.body.as_deref(), Some("{ work(); }"));
     assert_eq!((first.body_start, first.body_end), (Some(10), Some(21)));
-    assert!(first.flags.is_empty());
+    assert!(first.modifiers.is_empty());
     assert!(first.data_flow.is_empty());
     assert!(first.execution_context.is_empty());
 
-    assert_eq!(second.flags, vec![vec!["ASYNC", "ASYNC"]]);
+    assert_eq!(
+        second.modifiers,
+        vec![vec![DeclarationModifier::Async, DeclarationModifier::Async]]
+    );
     assert_eq!(second.data_flow, vec![vec!["reads", "cache"]]);
     assert_eq!(second.execution_context, vec!["async"]);
     assert!(second.side_effect.is_empty());
@@ -62,7 +68,10 @@ fn repeated_method_facts_round_trip_without_union_or_replacement() {
     let ir = compiled(vec![
         CoreOp::DefClass("C1".into(), "Sample".into()),
         CoreOp::DefMethod("C1".into(), "M1".into(), "work".into()),
-        CoreOp::Flags("M1".into(), vec!["STATIC".into(), "STATIC".into()]),
+        CoreOp::MethodModifiers(
+            "M1".into(),
+            vec![DeclarationModifier::Static, DeclarationModifier::Static],
+        ),
         CoreOp::Flags("M1".into(), vec!["RET".into()]),
         CoreOp::ControlFlow("M1".into(), "if".into(), "first".into()),
         CoreOp::ControlFlow("M1".into(), "if".into(), "first".into()),
@@ -76,7 +85,14 @@ fn repeated_method_facts_round_trip_without_union_or_replacement() {
 
     let hierarchy = try_ir_to_hierarchical(&ir).expect("identity graph is valid");
     let method = &hierarchy.classes[0].methods[0];
-    assert_eq!(method.flags, vec![vec!["STATIC", "STATIC"], vec!["RET"]]);
+    assert_eq!(
+        method.modifiers,
+        vec![vec![
+            DeclarationModifier::Static,
+            DeclarationModifier::Static
+        ]]
+    );
+    assert_eq!(method.flags, vec![vec!["RET"]]);
     assert_eq!(
         method.control_flow,
         vec![vec!["if", "first"], vec!["if", "first"]]
@@ -94,7 +110,8 @@ fn repeated_method_facts_round_trip_without_union_or_replacement() {
         .filter(|op| {
             matches!(
                 op,
-                CoreOp::Flags(..)
+                CoreOp::MethodModifiers(..)
+                    | CoreOp::Flags(..)
                     | CoreOp::ControlFlow(..)
                     | CoreOp::DataFlow(..)
                     | CoreOp::SideEffect(..)
@@ -110,7 +127,7 @@ fn versioned_wire_emits_occurrence_preserving_shapes() {
     let ir = compiled(vec![
         CoreOp::DefClass("C1".into(), "Sample".into()),
         CoreOp::DefMethod("C1".into(), "M1".into(), "work".into()),
-        CoreOp::Flags("M1".into(), vec!["STATIC".into()]),
+        CoreOp::MethodModifiers("M1".into(), vec![DeclarationModifier::Static]),
         CoreOp::Flags("M1".into(), vec!["RET".into()]),
         CoreOp::SideEffect("M1".into(), "io".into()),
         CoreOp::SideEffect("M1".into(), "mutation".into()),
@@ -119,10 +136,14 @@ fn versioned_wire_emits_occurrence_preserving_shapes() {
     ]);
 
     let wire = ir_to_hierarchical_wire(&ir);
-    assert_eq!(wire["hs"], 3);
+    assert_eq!(wire["hs"], 4);
+    assert_eq!(
+        wire["ir"]["c"][0]["m"][0]["mo"],
+        serde_json::json!([["STATIC"]])
+    );
     assert_eq!(
         wire["ir"]["c"][0]["m"][0]["fl"],
-        serde_json::json!([["STATIC"], ["RET"]])
+        serde_json::json!([["RET"]])
     );
     assert_eq!(
         wire["ir"]["c"][0]["m"][0]["se"],
@@ -139,7 +160,10 @@ fn renderer_exposes_every_method_fact_occurrence_in_order() {
     let hierarchy = try_ir_to_hierarchical(&compiled(vec![
         CoreOp::DefClass("C1".into(), "Sample".into()),
         CoreOp::DefMethod("C1".into(), "M1".into(), "work".into()),
-        CoreOp::Flags("M1".into(), vec!["STATIC".into(), "STATIC".into()]),
+        CoreOp::MethodModifiers(
+            "M1".into(),
+            vec![DeclarationModifier::Static, DeclarationModifier::Static],
+        ),
         CoreOp::Flags("M1".into(), vec!["RET".into()]),
         CoreOp::SideEffect("M1".into(), "io".into()),
         CoreOp::SideEffect("M1".into(), "mutation".into()),
@@ -149,7 +173,8 @@ fn renderer_exposes_every_method_fact_occurrence_in_order() {
     .expect("identity graph is valid");
 
     let rendered = render_hierarchical_for_llm(&hierarchy, Fidelity::High);
-    assert!(rendered.contains("fl:STATIC,STATIC,RET"), "{rendered}");
+    assert!(rendered.contains("mod:STATIC,STATIC"), "{rendered}");
+    assert!(rendered.contains("fl:RET"), "{rendered}");
     assert!(rendered.contains("se:io,mutation"), "{rendered}");
     assert!(rendered.contains("ec:sync,async"), "{rendered}");
 }
@@ -219,7 +244,7 @@ fn unknown_hierarchy_schema_revision_fails_loudly() {
         "file": "alpha-1",
         "v": 7,
         "encoding": "hierarchical",
-        "hs": 4,
+        "hs": 5,
         "ir": { "c": [] }
     }))
     .expect_err("unknown hierarchy schema must not be guessed");
@@ -227,7 +252,7 @@ fn unknown_hierarchy_schema_revision_fails_loudly() {
     assert!(
         error
             .to_string()
-            .contains("unsupported hierarchical schema version: 4"),
+            .contains("unsupported hierarchical schema version: 5"),
         "unexpected error: {error}"
     );
 }

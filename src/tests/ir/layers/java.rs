@@ -13,7 +13,7 @@ use crate::compression::Fidelity;
 use crate::ir::layers::LanguageLayer;
 use crate::ir::layers::LayerContext;
 use crate::ir::layers::java::JavaLayer;
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
 // ── Helper ─────────────────────────────────────────
 
@@ -127,7 +127,7 @@ fn java_layer_detects_interface() {
 
     // Interface with no extends should produce flags only
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"EXPORT".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(
         has_export,
@@ -173,7 +173,7 @@ fn java_layer_detects_enum() {
     );
 
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"EXPORT".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(has_export, "Public enum should get EXPORT flag: {:?}", ops);
 }
@@ -193,7 +193,7 @@ fn java_layer_detects_record() {
     );
 
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"EXPORT".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(
         has_export,
@@ -213,7 +213,7 @@ fn java_layer_extracts_public_class_flag() {
     let ops = layer.process_capture("class.root", "public class Foo {}", &mut ctx);
 
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"EXPORT".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(has_export, "Public class should get EXPORT flag: {:?}", ops);
 }
@@ -227,7 +227,7 @@ fn java_layer_extracts_abstract_class_flag() {
     let ops = layer.process_capture("class.root", "public abstract class Foo {}", &mut ctx);
 
     let has_abstract = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"ABSTRACT".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Abstract))
     });
     assert!(
         has_abstract,
@@ -245,7 +245,7 @@ fn java_layer_extracts_static_class_flag() {
     let ops = layer.process_capture("class.root", "public static class Foo {}", &mut ctx);
 
     let has_static = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"STATIC".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Static))
     });
     assert!(has_static, "Static class should get STATIC flag: {:?}", ops);
 }
@@ -276,7 +276,7 @@ fn java_layer_extracts_method_static_flag() {
     let ops = layer.process_capture("method.root", "public static void doWork() {}", &mut ctx);
 
     let has_static = ops.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"STATIC".to_string()))
+        matches!(op, CoreOp::MethodModifiers(m, modifiers) if m == "M1" && modifiers.contains(&DeclarationModifier::Static))
     });
     assert!(
         has_static,
@@ -294,7 +294,7 @@ fn java_layer_extracts_method_abstract_flag() {
     let ops = layer.process_capture("method.root", "public abstract void doWork();", &mut ctx);
 
     let has_abstract = ops.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"ABSTRACT".to_string()))
+        matches!(op, CoreOp::MethodModifiers(m, modifiers) if m == "M1" && modifiers.contains(&DeclarationModifier::Abstract))
     });
     assert!(
         has_abstract,
@@ -312,7 +312,7 @@ fn java_layer_extracts_method_private_flag() {
     let ops = layer.process_capture("method.root", "private void doWork() {}", &mut ctx);
 
     let has_private = ops.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"PRIVATE".to_string()))
+        matches!(op, CoreOp::MethodModifiers(m, modifiers) if m == "M1" && modifiers.contains(&DeclarationModifier::Private))
     });
     assert!(
         has_private,
@@ -330,7 +330,7 @@ fn java_layer_extracts_method_protected_flag() {
     let ops = layer.process_capture("method.root", "protected void doWork() {}", &mut ctx);
 
     let has_protected = ops.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"PROTECTED".to_string()))
+        matches!(op, CoreOp::MethodModifiers(m, modifiers) if m == "M1" && modifiers.contains(&DeclarationModifier::Protected))
     });
     assert!(
         has_protected,
@@ -349,7 +349,7 @@ fn java_layer_native_method_no_export_flag() {
 
     // Native methods have "public" but should NOT get EXPORT flag
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"EXPORT".to_string()))
+        matches!(op, CoreOp::MethodModifiers(m, modifiers) if m == "M1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(
         !has_export,
@@ -369,7 +369,7 @@ fn java_layer_detects_constructor_flags() {
     let ops = layer.process_capture("constructor.root", "public MyService() {}", &mut ctx);
 
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"EXPORT".to_string()))
+        matches!(op, CoreOp::MethodModifiers(m, modifiers) if m == "M1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(
         has_export,
@@ -455,7 +455,7 @@ fn java_layer_detects_spring_rest_controller_pattern() {
     let ops = layer.process_capture("class.root", "public class MyController {}", &mut ctx);
 
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"EXPORT".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(
         has_export,
@@ -473,7 +473,7 @@ fn java_layer_detects_jakarta_annotation_pattern() {
     let ops = layer.process_capture("class.root", "public class MyController {}", &mut ctx);
 
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassFlags(c, flags) if c == "C1" && flags.contains(&"EXPORT".to_string()))
+        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(
         has_export,

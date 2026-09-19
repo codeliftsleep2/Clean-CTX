@@ -383,6 +383,12 @@ impl CompressingPatternRecognizer {
                 for op in &instructions[retained_start..retained_end] {
                     output.push(MergeItem::Passthrough(op.clone()));
                 }
+                let consumed_end = i + matched.consumed;
+                for op in &instructions[i..consumed_end] {
+                    if matches!(op, CoreOp::MethodModifiers(..)) {
+                        output.push(MergeItem::Passthrough(op.clone()));
+                    }
+                }
                 output.push(MergeItem::Pattern(matched.pattern));
                 i += matched.consumed;
             } else {

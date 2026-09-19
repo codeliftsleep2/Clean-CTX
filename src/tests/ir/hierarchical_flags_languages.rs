@@ -14,8 +14,8 @@ use super::*;
 // production path uses (language layer + both production pattern
 // recognizers), and then asserts:
 //
-//   1. the flat stream the pattern recognizers consumed — and the encoder
-//      reads — still holds TWO separate `Flags` ops for that method,
+//   1. the flat stream keeps declaration modifiers and residual flags in
+//      separate typed operations,
 //   2. the hierarchical node preserves both occurrences, with the
 //      declaration family FIRST (capture order is deterministic:
 //      `run_capture_pipeline_nodes` sorts captures by start byte, and a
@@ -47,19 +47,29 @@ fn probe_single_method(ir: &CompiledIR, declaration: &[&str], control_flow: &[&s
 
     // Pattern-recognition protection: the pre-hierarchical flat stream still
     // carries one separate op per producer.
-    let raw = flag_ops_for(ir, mid);
+    let raw_modifiers = modifier_ops_for(ir, mid);
+    let raw_flags = flag_ops_for(ir, mid);
     assert_eq!(
-        raw.len(),
-        2,
-        "{label}: the flat stream must still carry one separate Flags op per \
-         producer: {raw:?}"
+        raw_modifiers.len(),
+        1,
+        "{label}: exactly one declaration-modifier occurrence expected: {raw_modifiers:?}"
+    );
+    assert_eq!(
+        raw_flags.len(),
+        1,
+        "{label}: one residual flag occurrence expected"
     );
 
     // Preservation: the declaration family's values come FIRST (capture order
     // is by start byte, so a declaration's own op precedes every control-flow
     // capture inside its body). The hierarchy must equal the flattened raw
     // occurrences exactly; no value may be removed or invented.
-    let expected = raw.iter().flatten().cloned().collect::<Vec<_>>();
+    let expected = raw_modifiers
+        .iter()
+        .flatten()
+        .map(|modifier| modifier.as_str().to_string())
+        .chain(raw_flags.iter().flatten().cloned())
+        .collect::<Vec<_>>();
     assert_eq!(
         merged.len(),
         expected.len(),
@@ -77,11 +87,15 @@ fn probe_single_method(ir: &CompiledIR, declaration: &[&str], control_flow: &[&s
         );
     }
 
-    // The renderer consumes the field verbatim — no merging in the renderer.
+    // The renderer exposes each semantic family through its distinct key.
     let rendered = render(&hir, Fidelity::Low);
     assert!(
-        rendered.contains(&format!("fl:{}", merged.join(","))),
-        "{label}: rendered flags must mirror the hierarchical field:\n{rendered}"
+        rendered.contains(&format!("mod:{}", declaration.join(","))),
+        "{label}: rendered modifiers must mirror the typed field:\n{rendered}"
+    );
+    assert!(
+        rendered.contains(&format!("fl:{}", control_flow.join(","))),
+        "{label}: rendered flags must mirror the residual field:\n{rendered}"
     );
 }
 
@@ -148,16 +162,16 @@ fn pattern_recognition_input_holds_two_separate_flag_ops_csharp() {
     assert_eq!(all.len(), 1, "exactly one method expected: {all:?}");
     let (mid, _, merged) = &all[0];
 
-    let raw = flag_ops_for(&ir, mid);
-    assert_eq!(raw.len(), 2, "two producers, two ops: {raw:?}");
+    let raw_modifiers = modifier_ops_for(&ir, mid);
+    let raw_flags = flag_ops_for(&ir, mid);
     assert_eq!(
-        raw[0],
-        vec!["STATIC".to_string()],
-        "the declaration family comes first"
+        raw_modifiers,
+        vec![vec![DeclarationModifier::Static]],
+        "the declaration family has its own typed op"
     );
     assert!(
-        raw[1].contains(&"IF".to_string()) && raw[1].contains(&"RET".to_string()),
-        "the control-flow family is the later op: {raw:?}"
+        raw_flags[0].contains(&"IF".to_string()) && raw_flags[0].contains(&"RET".to_string()),
+        "the control-flow family remains a residual flag op: {raw_flags:?}"
     );
     assert_eq!(
         merged.len(),

@@ -65,10 +65,10 @@ export class DataService {
 "#;
 
 /// An `async` Promise-returning, zero-parameter method: the shape the
-/// OBSERVABLE classification recognizes (`DEF_M + Return + Flags(ASYNC)`).
+/// OBSERVABLE classification recognizes (`DEF_M + Return + MethodModifiers(ASYNC)`).
 ///
 /// Requires `Fidelity::Medium` or above for the same reason as `TS_PROMISE`,
-/// plus an `Flags(ASYNC)` op adjacent to the `Return` — which is why at
+/// plus a typed ASYNC modifier adjacent to the `Return` — which is why at
 /// `Fidelity::Edit` (where the `Body` op sits between them) this shape is
 /// classified PROMISE instead.
 const TS_OBSERVABLE: &str = r#"
@@ -280,7 +280,7 @@ fn promise_method_keeps_its_declaration_and_gains_the_promise_classification() {
 #[test]
 fn observable_method_keeps_its_declaration_and_gains_the_observable_classification() {
     // `Fidelity::Medium` again: OBSERVABLE needs the promise-like `Return`
-    // *and* the adjacent `Flags(ASYNC)` the TypeScript layer emits for `async`.
+    // *and* the adjacent typed modifier the TypeScript layer emits for `async`.
     let pre = compile_ts(TS_OBSERVABLE, "observable.ts", Fidelity::Medium, false);
     let load_id = sole_method_id(&pre, "load");
 
@@ -399,7 +399,10 @@ fn boundary_cases() -> Vec<(&'static str, &'static str, Vec<CoreOp>, &'static st
                 boundary_class(),
                 CoreOp::DefMethod("C1".into(), "M1".into(), "load".into()),
                 CoreOp::Return("M1".into(), "$P".into()),
-                CoreOp::Flags("M1".into(), vec!["ASYNC".into()]),
+                CoreOp::MethodModifiers(
+                    "M1".into(),
+                    vec![crate::ir::opcodes::DeclarationModifier::Async],
+                ),
             ],
             "M1",
         ),

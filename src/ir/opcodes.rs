@@ -14,7 +14,67 @@
 //
 // Edit Mode: Added CoreOp::Body for verbatim method body transport.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
+
+/// Closed declaration-modifier vocabulary shared by language producers.
+///
+/// Serialized spellings intentionally match the established flag payloads;
+/// the distinct `CoreOp` variants provide the semantic-family boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DeclarationModifier {
+    #[serde(rename = "ASYNC")]
+    Async,
+    #[serde(rename = "GEN")]
+    Generator,
+    #[serde(rename = "EXPORT")]
+    Export,
+    #[serde(rename = "STATIC")]
+    Static,
+    #[serde(rename = "PRIVATE")]
+    Private,
+    #[serde(rename = "PROTECTED")]
+    Protected,
+    #[serde(rename = "ABSTRACT")]
+    Abstract,
+    #[serde(rename = "UNSAFE")]
+    Unsafe,
+}
+
+impl DeclarationModifier {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Async => FLAG_ASYNC,
+            Self::Generator => FLAG_GEN,
+            Self::Export => FLAG_EXPORT,
+            Self::Static => FLAG_STATIC,
+            Self::Private => FLAG_PRIVATE,
+            Self::Protected => FLAG_PROTECTED,
+            Self::Abstract => FLAG_ABSTRACT,
+            Self::Unsafe => FLAG_UNSAFE,
+        }
+    }
+
+    pub fn from_serialized(value: &str) -> Option<Self> {
+        match value {
+            FLAG_ASYNC => Some(Self::Async),
+            FLAG_GEN => Some(Self::Generator),
+            FLAG_EXPORT => Some(Self::Export),
+            FLAG_STATIC => Some(Self::Static),
+            FLAG_PRIVATE => Some(Self::Private),
+            FLAG_PROTECTED => Some(Self::Protected),
+            FLAG_ABSTRACT => Some(Self::Abstract),
+            FLAG_UNSAFE => Some(Self::Unsafe),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for DeclarationModifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 /// Core IR opcodes — the universal instruction set.
 /// Every language compiles down to these operations.
@@ -44,13 +104,19 @@ pub enum CoreOp {
     /// ["FIELD_T", field_id, type_opcode]
     FieldType(String, String),
 
+    /// ["MOD_M", method_id, modifier1, modifier2, ...]
+    MethodModifiers(String, Vec<DeclarationModifier>),
+
+    /// ["MOD_C", class_id, modifier1, modifier2, ...]
+    ClassModifiers(String, Vec<DeclarationModifier>),
+
     // ── Control Flow & Behavior ─────────────────────────
     /// ["FLAGS", target_id, flag1, flag2, ...]
-    /// Replaces ⊕guard, ⊕loop, ⊕⇒, ⊕! markers
+    /// Residual method control and pattern facts; declaration modifiers use MOD_M.
     Flags(String, Vec<String>),
 
     /// ["FLAGS_C", class_id, flag1, flag2, ...]
-    /// Class-level flags: EXPORT, ABSTRACT, etc.
+    /// Residual class metadata such as Rust CFG and generic-parameter summaries.
     ClassFlags(String, Vec<String>),
 
     // ── Relationships ───────────────────────────────────
@@ -172,6 +238,26 @@ impl fmt::Display for CoreOp {
             CoreOp::Param(mid, pid, ty, name) => write!(f, "SIG {} {} {} {}", mid, pid, ty, name),
             CoreOp::Return(mid, ty) => write!(f, "RET {} {}", mid, ty),
             CoreOp::FieldType(fid, ty) => write!(f, "FIELD_T {} {}", fid, ty),
+            CoreOp::MethodModifiers(mid, modifiers) => write!(
+                f,
+                "MOD_M {} {}",
+                mid,
+                modifiers
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+            CoreOp::ClassModifiers(cid, modifiers) => write!(
+                f,
+                "MOD_C {} {}",
+                cid,
+                modifiers
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
             CoreOp::Flags(tid, flags) => write!(f, "FLAGS {} {}", tid, flags.join(" ")),
             CoreOp::ClassFlags(cid, flags) => write!(f, "FLAGS_C {} {}", cid, flags.join(" ")),
             CoreOp::Extends(child, parent) => write!(f, "EXT {} {}", child, parent),
@@ -277,6 +363,8 @@ pub fn arity(opcode: &str) -> Option<i32> {
         "SIG" => Some(5),      // method_id, param_id, type, name
         "RET" => Some(3),      // method_id, type
         "FIELD_T" => Some(3),  // field_id, type
+        "MOD_M" => Some(-1),   // method_id, declaration modifiers...
+        "MOD_C" => Some(-1),   // class_id, declaration modifiers...
         "FLAGS" => Some(-1),   // target_id, flags...
         "FLAGS_C" => Some(-1), // class_id, flags...
         "EXT" => Some(3),      // child_id, parent_id
@@ -311,6 +399,8 @@ pub fn opcode_name(op: &CoreOp) -> &'static str {
         CoreOp::Param(..) => "SIG",
         CoreOp::Return(..) => "RET",
         CoreOp::FieldType(..) => "FIELD_T",
+        CoreOp::MethodModifiers(..) => "MOD_M",
+        CoreOp::ClassModifiers(..) => "MOD_C",
         CoreOp::Flags(..) => "FLAGS",
         CoreOp::ClassFlags(..) => "FLAGS_C",
         CoreOp::Extends(..) => "EXT",
@@ -406,3 +496,7 @@ pub const CTX_REALTIME: &str = "realtime";
 #[cfg(test)]
 #[path = "../tests/ir/opcodes.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/declaration_modifiers.rs"]
+mod declaration_modifier_tests;

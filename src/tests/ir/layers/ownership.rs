@@ -4,25 +4,25 @@ use crate::ir::layers::java::JavaLayer;
 use crate::ir::layers::rust::RustLayer;
 use crate::ir::layers::typescript::TypeScriptLayer;
 use crate::ir::layers::{LanguageLayer, LayerContext};
-use crate::ir::opcodes::{CoreOp, FLAG_EXPORT, FLAG_PROTECTED};
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
 fn context(source: &str) -> LayerContext {
     LayerContext::new(source, Fidelity::Low)
 }
 
-fn projected_class_flags(ops: &[CoreOp]) -> Vec<Vec<String>> {
+fn projected_class_modifiers(ops: &[CoreOp]) -> Vec<Vec<DeclarationModifier>> {
     ops.iter()
         .filter_map(|op| match op {
-            CoreOp::ClassFlags(_, flags) => Some(flags.clone()),
+            CoreOp::ClassModifiers(_, modifiers) => Some(modifiers.clone()),
             _ => None,
         })
         .collect()
 }
 
-fn projected_method_flags(ops: &[CoreOp]) -> Vec<Vec<String>> {
+fn projected_method_modifiers(ops: &[CoreOp]) -> Vec<Vec<DeclarationModifier>> {
     ops.iter()
         .filter_map(|op| match op {
-            CoreOp::Flags(_, flags) => Some(flags.clone()),
+            CoreOp::MethodModifiers(_, modifiers) => Some(modifiers.clone()),
             _ => None,
         })
         .collect()
@@ -40,8 +40,8 @@ pub struct Outer {
     let class_ops =
         RustLayer::new().process_capture("struct.root", class_source, &mut class_context);
     assert_eq!(
-        projected_class_flags(&class_ops),
-        vec![vec![FLAG_EXPORT.to_string()]]
+        projected_class_modifiers(&class_ops),
+        vec![vec![DeclarationModifier::Export]]
     );
 
     let method_source = r#"
@@ -55,8 +55,8 @@ pub fn work() {
     let method_ops =
         RustLayer::new().process_capture("method.root", method_source, &mut method_context);
     assert_eq!(
-        projected_method_flags(&method_ops),
-        vec![vec![FLAG_EXPORT.to_string()]]
+        projected_method_modifiers(&method_ops),
+        vec![vec![DeclarationModifier::Export]]
     );
 }
 
@@ -72,8 +72,8 @@ export class Outer {
     let class_ops =
         TypeScriptLayer::new().process_capture("class.root", class_source, &mut class_context);
     assert_eq!(
-        projected_class_flags(&class_ops),
-        vec![vec![FLAG_EXPORT.to_string()]]
+        projected_class_modifiers(&class_ops),
+        vec![vec![DeclarationModifier::Export]]
     );
 
     let method_source = r#"
@@ -86,8 +86,8 @@ protected work() {
     let method_ops =
         TypeScriptLayer::new().process_capture("method.root", method_source, &mut method_context);
     assert_eq!(
-        projected_method_flags(&method_ops),
-        vec![vec![FLAG_PROTECTED.to_string()]]
+        projected_method_modifiers(&method_ops),
+        vec![vec![DeclarationModifier::Protected]]
     );
 }
 
@@ -103,8 +103,8 @@ public class Outer {
     let class_ops =
         JavaLayer::new().process_capture("class.root", class_source, &mut class_context);
     assert_eq!(
-        projected_class_flags(&class_ops),
-        vec![vec![FLAG_EXPORT.to_string()]]
+        projected_class_modifiers(&class_ops),
+        vec![vec![DeclarationModifier::Export]]
     );
 
     let method_source = r#"
@@ -117,8 +117,8 @@ public void work() {
     let method_ops =
         JavaLayer::new().process_capture("method.root", method_source, &mut method_context);
     assert_eq!(
-        projected_method_flags(&method_ops),
-        vec![vec![FLAG_EXPORT.to_string()]]
+        projected_method_modifiers(&method_ops),
+        vec![vec![DeclarationModifier::Export]]
     );
 }
 
@@ -134,8 +134,8 @@ public class Outer {
     let class_ops =
         CSharpLayer::new().process_capture("class.root", class_source, &mut class_context);
     assert_eq!(
-        projected_class_flags(&class_ops),
-        vec![vec![FLAG_EXPORT.to_string()]]
+        projected_class_modifiers(&class_ops),
+        vec![vec![DeclarationModifier::Export]]
     );
 
     let method_source = r#"
@@ -148,7 +148,7 @@ protected void Work() {
     let method_ops =
         CSharpLayer::new().process_capture("method.root", method_source, &mut method_context);
     assert_eq!(
-        projected_method_flags(&method_ops),
-        vec![vec![FLAG_PROTECTED.to_string()]]
+        projected_method_modifiers(&method_ops),
+        vec![vec![DeclarationModifier::Protected]]
     );
 }

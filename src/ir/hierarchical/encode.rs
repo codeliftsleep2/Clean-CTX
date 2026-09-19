@@ -27,6 +27,8 @@ use std::collections::HashMap;
 /// - Param → attached to its target MethodId after definition placement
 /// - Return → attached to its target MethodId after definition placement
 /// - FieldType → attached to its target FieldId after definition placement
+/// - MethodModifiers → appended to its MethodId as typed occurrences
+/// - ClassModifiers → appended to its ClassId as typed occurrences
 /// - Flags → appended to its target MethodId as one preserved occurrence
 /// - ClassFlags → appended to its target ClassId as one preserved occurrence
 /// - Extends → set on the class named by its child ID
@@ -75,6 +77,7 @@ pub fn try_ir_to_hierarchical(
                     name: name.clone(),
                     methods: Vec::new(),
                     fields: Vec::new(),
+                    modifiers: Vec::new(),
                     class_flags: Vec::new(),
                     extends: None,
                     implements: Vec::new(),
@@ -137,6 +140,8 @@ pub fn try_ir_to_hierarchical(
             CoreOp::Param(..)
             | CoreOp::Return(..)
             | CoreOp::FieldType(..)
+            | CoreOp::MethodModifiers(..)
+            | CoreOp::ClassModifiers(..)
             | CoreOp::Flags(..)
             | CoreOp::ClassFlags(..)
             | CoreOp::Extends(..)
@@ -155,6 +160,7 @@ pub fn try_ir_to_hierarchical(
                     name: name.clone(),
                     methods: Vec::new(),
                     fields: Vec::new(),
+                    modifiers: Vec::new(),
                     class_flags: Vec::new(),
                     extends: None,
                     implements: Vec::new(),
@@ -217,6 +223,17 @@ pub fn try_ir_to_hierarchical(
                         }
                     })?;
                 classes[class_idx].fields[field_idx].field_type = Some(ty.clone());
+            }
+            CoreOp::MethodModifiers(raw_method, modifiers) => {
+                let (class_idx, method_idx) =
+                    method_location(&method_locations, raw_method, "MOD_M", instruction)?;
+                classes[class_idx].methods[method_idx]
+                    .modifiers
+                    .push(modifiers.clone());
+            }
+            CoreOp::ClassModifiers(raw_class, modifiers) => {
+                let class_idx = class_location(&class_locations, raw_class, "MOD_C", instruction)?;
+                classes[class_idx].modifiers.push(modifiers.clone());
             }
             CoreOp::Flags(raw_method, flags) => {
                 let (class_idx, method_idx) =
@@ -371,6 +388,7 @@ fn push_method(class: &mut ClassNode, method_id: &MethodId, name: String) -> usi
         name,
         params: Vec::new(),
         return_type: None,
+        modifiers: Vec::new(),
         flags: Vec::new(),
         patterns: Vec::new(),
         body: None,

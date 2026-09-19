@@ -21,14 +21,15 @@
 // matched are the declaration's identity-bearing facts (`DefMethod`, its
 // `Param*`, its `Return`) so the caller re-emits them unchanged before the
 // classification op. Only genuinely redundant, non-identity ops — `Injects`
-// for CTOR, `Flags(ASYNC)` for OBSERVABLE, `Flags(OVERRIDE)` for OVERRIDE, and
-// the wrapper's leading/trailing `Flags(M)` runs — are still summarized away.
+// for CTOR and `Flags(OVERRIDE)` for OVERRIDE. OBSERVABLE reads the typed
+// `MethodModifiers(ASYNC)` fact without consuming it. The wrapper's
+// leading/trailing `Flags(M)` runs are still summarized away.
 // A method must never vanish from the hierarchical projection, the rendered
 // `M` line, the `UnitTable`, the semantic registration, or a caller-side
 // `Calls` subject merely because a pattern recognized it.
 
 use super::PatternOp;
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
 /// A matcher's result: `(classification, retained, consumed)`.
 ///
@@ -44,6 +45,7 @@ fn op_references_method(op: &CoreOp, method_id: &str) -> bool {
         CoreOp::Param(mid, _, _, _)
         | CoreOp::Return(mid, _)
         | CoreOp::Flags(mid, _)
+        | CoreOp::MethodModifiers(mid, _)
         | CoreOp::DataFlow(mid, _, _)
         | CoreOp::SideEffect(mid, _)
         | CoreOp::ExecutionContext(mid, _)
@@ -81,13 +83,15 @@ fn trailing_region_references_call(slice: &[CoreOp], offset: usize, method_id: &
 
 // ── Centralized flag consumption helpers ──────────────────────────────
 
-/// Count consecutive `Flags(method_id, _)` ops starting at `offset` in `slice`.
-/// Returns the number of trailing Flags ops that reference `method_id`.
-fn count_trailing_flags(slice: &[CoreOp], offset: usize, method_id: &str) -> usize {
+/// Count consecutive pattern flags or authoritative declaration modifiers for
+/// `method_id`. Pattern flags may be summarized; modifiers are re-emitted.
+fn count_trailing_annotations(slice: &[CoreOp], offset: usize, method_id: &str) -> usize {
     let mut count = 0;
     while offset + count < slice.len() {
         match &slice[offset + count] {
-            CoreOp::Flags(mid, _) if mid == method_id => count += 1,
+            CoreOp::Flags(mid, _) | CoreOp::MethodModifiers(mid, _) if mid == method_id => {
+                count += 1
+            }
             _ => break,
         }
     }
@@ -144,7 +148,7 @@ fn trailing_region_references_method(slice: &[CoreOp], offset: usize, method_id:
     let mut idx = offset;
     while idx < slice.len() {
         match &slice[idx] {
-            CoreOp::Flags(mid, _) if mid == method_id => idx += 1,
+            CoreOp::Flags(mid, _) | CoreOp::MethodModifiers(mid, _) if mid == method_id => idx += 1,
             _ => break,
         }
     }
@@ -161,9 +165,9 @@ fn trailing_region_references_method(slice: &[CoreOp], offset: usize, method_id:
 /// its `Return`, in that order — and the caller re-emits them VERBATIM before
 /// the classification op. `consumed` is the whole matched span, i.e. the
 /// identity ops plus the genuinely redundant ops the recognizer summarizes
-/// into the pattern (`Injects` for CTOR, `Flags(ASYNC)` for OBSERVABLE,
-/// `Flags(OVERRIDE)` for OVERRIDE) plus the wrapper's leading and trailing
-/// `Flags(M)` runs.
+/// into the pattern (`Injects` for CTOR and `Flags(OVERRIDE)` for OVERRIDE)
+/// plus the wrapper's leading and trailing annotation runs. Typed declaration
+/// modifiers inside the consumed span are re-emitted unchanged.
 ///
 /// `retained <= consumed` always; the two are equal for the recognizers that
 /// summarize nothing but identity (PROMISE, EMPTY_CTOR, GETTER, SETTER).
@@ -248,9 +252,9 @@ pub(super) fn try_compress_pattern(slice: &[CoreOp]) -> Option<PatternMatch> {
         .or_else(|| try_setter_pattern(inner_slice))
         .or_else(|| try_override_pattern(inner_slice));
 
-    // Step 4: If a pattern matched, consume trailing Flags ops for the
-    // same method_id. This prevents orphaned Flags (E003) from language-layer
-    // flags (PRIVATE, STATIC, EXPORT, etc.) that follow the method body.
+    // Step 4: If a pattern matched, cover adjacent pattern flags and typed
+    // declaration modifiers for the same method. The merge path re-emits the
+    // authoritative modifiers and summarizes only eligible pattern flags.
     // IRPAT-001 decline: a surviving CALL for this method (see
     // `trailing_region_references_call`) must never be orphaned by consuming
     // its caller's `DefMethod`.
@@ -258,7 +262,8 @@ pub(super) fn try_compress_pattern(slice: &[CoreOp]) -> Option<PatternMatch> {
         if trailing_region_references_call(slice, first_non_flags + inner_consumed, &method_id) {
             return None;
         }
-        let trailing = count_trailing_flags(slice, first_non_flags + inner_consumed, &method_id);
+        let trailing =
+            count_trailing_annotations(slice, first_non_flags + inner_consumed, &method_id);
         Some(PatternMatch {
             pattern: pat,
             // F2: the declaration facts (DefMethod + Param* + Return) are
@@ -404,11 +409,10 @@ fn try_empty_ctor_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     None
 }
 
-/// Observable pattern: `DEF_M + Return($P|$O) + Flags(ASYNC)` → 1 op.
+/// Observable pattern: `DEF_M + Return($P|$O) + MethodModifiers(ASYNC)`.
 ///
-/// F2: `DefMethod` and `Return` are retained; the `Flags(ASYNC)` op is the
-/// redundant op the classification replaces (the OBSERVABLE pattern name
-/// already asserts async + promise-like return).
+/// `DefMethod`, `Return`, and the authoritative modifier fact are retained;
+/// the pattern is additive classification.
 fn try_observable_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     if slice.len() < 3 {
         return None;
@@ -421,7 +425,7 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
         CoreOp::Return(mid, ty) if mid == &method_id => ty.clone(),
         _ => return None,
     };
-    // Must be Promise-like and have an ASYNC flag
+    // Must be Promise-like and have an ASYNC declaration modifier.
     let is_promise_like = return_type == "$P"
         || return_type.contains("Promise")
         || return_type.contains("Observable");
@@ -429,7 +433,9 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
         return None;
     }
     match &slice[2] {
-        CoreOp::Flags(mid, flags) if mid == &method_id && flags.iter().any(|f| f == "ASYNC") => {
+        CoreOp::MethodModifiers(mid, modifiers)
+            if mid == &method_id && modifiers.contains(&DeclarationModifier::Async) =>
+        {
             Some((
                 PatternOp::Observable {
                     class_id,
@@ -437,7 +443,7 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
                     return_type,
                 },
                 2,
-                3,
+                2,
             ))
         }
         _ => None,

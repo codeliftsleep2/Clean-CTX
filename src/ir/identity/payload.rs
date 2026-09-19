@@ -21,9 +21,9 @@ pub(super) fn validate_body_span(
     }
 }
 
-pub(super) fn require_non_empty_payload(
+pub(super) fn require_non_empty_payload<T>(
     operation: &'static str,
-    values: &[String],
+    values: &[T],
     instruction: usize,
 ) -> Result<(), IdentityError> {
     if values.is_empty() {
