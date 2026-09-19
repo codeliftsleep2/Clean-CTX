@@ -16,6 +16,7 @@
 //   - references to fields → DataFlow("reads"/"writes", field_name)
 //   - match/loop/if/return patterns → ControlFlow
 
+use super::declaration::{declaration_head, has_modifier};
 use super::{LanguageLayer, LayerContext};
 use crate::compression::Fidelity;
 use crate::ir::opcodes::{
@@ -90,11 +91,12 @@ impl RustLayer {
 
     /// Extract visibility from a Rust declaration.
     fn extract_visibility(decl: &str) -> RustVisibility {
-        if decl.contains("pub(crate)") {
+        let head = declaration_head(decl);
+        if head.contains("pub(crate)") {
             RustVisibility::Crate
-        } else if decl.contains("pub(super)") {
+        } else if head.contains("pub(super)") {
             RustVisibility::Super
-        } else if decl.contains("pub ") || decl.starts_with("pub ") {
+        } else if has_modifier(head, "pub") {
             RustVisibility::Public
         } else {
             RustVisibility::Private
@@ -164,14 +166,15 @@ impl RustLayer {
 
     /// Extract method-level flags (unsafe, async, visibility).
     fn extract_method_flags(raw_sig: &str) -> Vec<String> {
+        let head = declaration_head(raw_sig);
         let mut flags = Vec::new();
-        if raw_sig.contains("unsafe") {
+        if has_modifier(head, "unsafe") {
             flags.push(FLAG_UNSAFE.to_string());
         }
-        if raw_sig.contains("async") {
+        if has_modifier(head, "async") {
             flags.push(FLAG_ASYNC.to_string());
         }
-        if raw_sig.contains("pub ") || raw_sig.starts_with("pub ") {
+        if has_modifier(head, "pub") {
             flags.push(FLAG_EXPORT.to_string());
         }
         flags
@@ -372,9 +375,8 @@ impl LanguageLayer for RustLayer {
                     }
 
                     // Check for unsafe trait specifically
-                    if raw_text.contains("unsafe trait")
-                        && !flags.contains(&FLAG_UNSAFE.to_string())
-                    {
+                    let head = declaration_head(raw_text);
+                    if head.contains("unsafe trait") && !flags.contains(&FLAG_UNSAFE.to_string()) {
                         flags.push(FLAG_UNSAFE.to_string());
                     }
 
@@ -390,7 +392,7 @@ impl LanguageLayer for RustLayer {
 
                     // ── Phase B (P4): Wire extract_generic_params ─────────
                     if context.fidelity != Fidelity::Low {
-                        if let Some(generic_params) = Self::extract_generic_params(raw_text) {
+                        if let Some(generic_params) = Self::extract_generic_params(head) {
                             let gp_flag = format!("GP{}", generic_params);
                             if !flags.contains(&gp_flag) {
                                 flags.push(gp_flag);
@@ -405,7 +407,8 @@ impl LanguageLayer for RustLayer {
             }
             "impl.root" => {
                 // Distinguish trait impls from inherent impls
-                let (_self_type, traits) = Self::extract_impl_relationships(raw_text);
+                let head = declaration_head(raw_text);
+                let (_self_type, traits) = Self::extract_impl_relationships(head);
                 if let Some(class_id) = &context.current_class {
                     // Emit Implements for trait implementations
                     for trait_name in &traits {
@@ -419,8 +422,7 @@ impl LanguageLayer for RustLayer {
 
                     // Emit class-level flags for unsafe impl
                     let mut flags = Self::extract_method_flags(raw_text);
-                    if raw_text.contains("unsafe impl") && !flags.contains(&FLAG_UNSAFE.to_string())
-                    {
+                    if head.contains("unsafe impl") && !flags.contains(&FLAG_UNSAFE.to_string()) {
                         flags.push(FLAG_UNSAFE.to_string());
                     }
                     if !flags.is_empty() {

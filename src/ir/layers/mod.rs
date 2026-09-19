@@ -18,6 +18,7 @@ use super::symbol_table::GlobalSymbolTable;
 use crate::compression::Fidelity;
 
 pub mod csharp;
+mod declaration;
 pub mod java;
 pub mod patterns;
 pub mod rust;

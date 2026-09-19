@@ -11,6 +11,7 @@
 //   - Method-level flags (async, static, abstract, visibility)
 //   - Constructor injection patterns
 
+use super::declaration::{declaration_head, has_modifier};
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{
     CoreOp, FLAG_ABSTRACT, FLAG_EXPORT, FLAG_PRIVATE, FLAG_PROTECTED, FLAG_STATIC,
@@ -28,6 +29,7 @@ impl JavaLayer {
     /// Extract extends/implements from a Java class/interface/enum head.
     /// Parses: "public class MyService extends BaseService implements Serializable"
     fn extract_class_relationships(class_head: &str) -> (Option<String>, Vec<String>) {
+        let class_head = declaration_head(class_head);
         let mut base: Option<String> = None;
         let mut interfaces: Vec<String> = Vec::new();
 
@@ -94,14 +96,15 @@ impl JavaLayer {
 
     /// Extract class-level flags (public/abstract/static).
     fn extract_class_flags(class_head: &str) -> Vec<String> {
+        let head = declaration_head(class_head);
         let mut flags = Vec::new();
-        if class_head.starts_with("public ") || class_head.contains(" public ") {
+        if has_modifier(head, "public") {
             flags.push(FLAG_EXPORT.to_string());
         }
-        if class_head.contains("abstract ") {
+        if has_modifier(head, "abstract") {
             flags.push(FLAG_ABSTRACT.to_string());
         }
-        if class_head.contains("static ") {
+        if has_modifier(head, "static") {
             flags.push(FLAG_STATIC.to_string());
         }
         flags
@@ -109,20 +112,21 @@ impl JavaLayer {
 
     /// Extract method-level flags (static, abstract, visibility).
     fn extract_method_flags(raw_sig: &str) -> Vec<String> {
+        let head = declaration_head(raw_sig);
         let mut flags = Vec::new();
-        if raw_sig.contains("public") && !raw_sig.contains("native") {
+        if has_modifier(head, "public") && !has_modifier(head, "native") {
             flags.push(FLAG_EXPORT.to_string());
         }
-        if raw_sig.contains("private") {
+        if has_modifier(head, "private") {
             flags.push(FLAG_PRIVATE.to_string());
         }
-        if raw_sig.contains("protected") {
+        if has_modifier(head, "protected") {
             flags.push(FLAG_PROTECTED.to_string());
         }
-        if raw_sig.contains("static") {
+        if has_modifier(head, "static") {
             flags.push(FLAG_STATIC.to_string());
         }
-        if raw_sig.contains("abstract") {
+        if has_modifier(head, "abstract") {
             flags.push(FLAG_ABSTRACT.to_string());
         }
         flags

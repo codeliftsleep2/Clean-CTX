@@ -297,14 +297,14 @@ representation remains a later Phase 4 slice. The user-reported Phase 4B and
 
 ### Phase 5: Correct producer ownership
 
-Deliverables:
+Implementation status: Rust, TypeScript, and Java modifier extraction now uses
+a shared lexical declaration-head boundary. C# retains its established bounded
+head extraction. Equivalent tracked adversarial fixtures cover all four
+languages; the user-run gate was green on 2026-09-18.
 
 - declaration-head or syntax-node extraction for Rust, TypeScript, and Java;
 - confirmation that C# follows the same semantic contract;
 - equivalent adversarial fixtures for every supported language.
-
-Exit criteria:
-
 - descendant source text cannot define a parent's declaration modifiers;
 - language differences are explicit semantic differences, not extraction
   accidents.

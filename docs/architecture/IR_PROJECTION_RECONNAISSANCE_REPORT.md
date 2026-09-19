@@ -230,13 +230,13 @@ the opcode sequence.
 
 ### F-07: Declaration ownership differs by language
 
-C# modifier extraction is bounded to the declaration head. Rust, TypeScript,
-and Java inspect broader raw text in relevant paths. Modifier-like text in a
-method body, comment, or descendant declaration can consequently define a
-parent declaration fact.
+C# modifier extraction was already bounded to the declaration head. Phase 5
+routes Rust, TypeScript, and Java modifier extraction through a shared lexical
+head boundary. Equivalent adversarial fixtures cover all four languages;
+the user-run gate was green on 2026-09-18.
 
-Required boundary: derive ownership from structural syntax nodes or a bounded
-declaration-head span for every supported language.
+Implemented boundary: declaration modifiers derive from a bounded declaration-
+head span for every supported language, never descendant source text.
 
 ### F-08: Some tests protect defects or implementation shape
 

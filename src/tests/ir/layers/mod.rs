@@ -4,6 +4,7 @@
 // Verifies LanguageLayer, MetaLayer, and PatternRecognizer traits.
 
 mod java;
+mod ownership;
 
 use crate::compression::Fidelity;
 use crate::ir::layers::LanguageLayer;

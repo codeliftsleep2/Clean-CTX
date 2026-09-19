@@ -19,6 +19,7 @@
 //   - new Observable() → DataFlow("writes", "observable")
 //   - @Injectable() → ExecutionContext("di_scope")
 
+use super::declaration::{declaration_head, has_modifier};
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{
     CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, EFFECT_ASYNC,
@@ -38,6 +39,7 @@ impl TypeScriptLayer {
     /// Extract extends/implements from a class head string.
     /// Processes text like "class Foo extends Bar implements Baz, Qux"
     fn extract_class_relationships(class_head: &str) -> (Option<String>, Vec<String>) {
+        let class_head = declaration_head(class_head);
         let mut base: Option<String> = None;
         let mut interfaces: Vec<String> = Vec::new();
 
@@ -96,11 +98,12 @@ impl TypeScriptLayer {
 
     /// Extract class-level flags (export, abstract) from class head.
     fn extract_class_flags(class_head: &str) -> Vec<String> {
+        let head = declaration_head(class_head);
         let mut flags = Vec::new();
-        if class_head.contains("export ") || class_head.starts_with("export") {
+        if has_modifier(head, "export") {
             flags.push(FLAG_EXPORT.to_string());
         }
-        if class_head.contains("abstract ") || class_head.starts_with("abstract") {
+        if has_modifier(head, "abstract") {
             flags.push(FLAG_ABSTRACT.to_string());
         }
         flags
@@ -108,20 +111,21 @@ impl TypeScriptLayer {
 
     /// Extract method-level flags (async, generator, visibility) from method signature.
     fn extract_method_flags(raw_sig: &str) -> Vec<String> {
+        let head = declaration_head(raw_sig);
         let mut flags = Vec::new();
-        if raw_sig.contains("async") {
+        if has_modifier(head, "async") {
             flags.push(FLAG_ASYNC.to_string());
         }
-        if raw_sig.contains('*') && raw_sig.contains("function") {
+        if head.contains('*') && has_modifier(head, "function") {
             flags.push(FLAG_GEN.to_string());
         }
-        if raw_sig.contains("private") {
+        if has_modifier(head, "private") {
             flags.push(FLAG_PRIVATE.to_string());
         }
-        if raw_sig.contains("protected") {
+        if has_modifier(head, "protected") {
             flags.push(FLAG_PROTECTED.to_string());
         }
-        if raw_sig.contains("static") {
+        if has_modifier(head, "static") {
             flags.push(FLAG_STATIC.to_string());
         }
         flags
