@@ -7,7 +7,9 @@ operation families remain pending. The bounded shared-validation slice was
 user-verified as the Phase 3 checkpoint on 2026-09-18. Phase 4A completed the
 shared validation contracts for all current operations and was user-verified
 on 2026-09-18. Phase 4B implemented stable-identity method-fact projection and
-hierarchical schema revision 2 and was user-verified on 2026-09-18.
+hierarchical schema revision 2 and was user-verified on 2026-09-18. Phase 4C
+implements stable-identity class-fact projection and hierarchical schema
+revision 3; user-run verification is pending.
 
 **Date:** 2026-09-17
 
@@ -284,9 +286,13 @@ Implementation status: Phase 4B moves method-scoped `Flags`, `Body`,
 `ControlFlow`, `DataFlow`, `SideEffect`, and `ExecutionContext` to the typed
 `MethodId` index and preserves occurrences. Hierarchical output emits `"hs":
 2`; unmarked scalar/flat input remains readable and unknown revisions fail.
-The projection cursor is removed. Class multiplicity, typed pattern targeting,
-and interface representation remain later Phase 4 slices. The user-reported
-Phase 4B gate was green on 2026-09-18.
+The projection cursor is removed. Phase 4C moves class-scoped `ClassFlags`,
+`Extends`, `Implements`, and `Injects` to the typed `ClassId` index. Revision 3
+preserves repeated class-flag and injection payloads; strict revision 2 and
+unmarked legacy documents remain readable through decode-only adapters. Typed
+pattern targeting and interface representation remain later Phase 4 slices.
+The user-reported Phase 4B gate was green on 2026-09-18; Phase 4C verification
+is pending.
 
 ### Phase 5: Correct producer ownership
 
@@ -453,6 +459,14 @@ Approved on 2026-09-18: hierarchical output emits `"hs": 2`; method `fl` is
 an ordered array of operation payloads and `se`/`ec` are ordered occurrence
 arrays. Unmarked flat/scalar input remains readable; unknown revisions fail.
 The binary contract and future physical version `0x04` are unchanged.
+
+### Gate G: Hierarchical class-fact schema revision — approved
+
+Approved on 2026-09-18: hierarchical output advances to `"hs": 3` so class
+`fl` and `ij` store ordered arrays of complete operation payloads. Revision 2
+remains readable with its strict method-fact shapes and flat class containers;
+unmarked legacy documents retain their established compatibility adapter.
+Unknown revisions fail. The LLM text schema and binary contract are unchanged.
 
 ## 8. Review and completion checklist
 

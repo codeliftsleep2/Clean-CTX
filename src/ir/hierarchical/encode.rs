@@ -26,10 +26,10 @@ use std::collections::HashMap;
 /// - Return → attached to its target MethodId after definition placement
 /// - FieldType → attached to its target FieldId after definition placement
 /// - Flags → appended to its target MethodId as one preserved occurrence
-/// - ClassFlags → set on the class named by its target ID
+/// - ClassFlags → appended to its target ClassId as one preserved occurrence
 /// - Extends → set on the class named by its child ID
 /// - Implements → added to the class named by its target ID
-/// - Injects → added to the class named by its target ID
+/// - Injects → appended to its target ClassId as one preserved occurrence
 /// - DefInterface → creates a ClassNode with synthetic=false and name
 /// - Import → added to top-level imports
 /// - TypeAlias → added to top-level type_aliases
@@ -56,6 +56,8 @@ pub fn try_ir_to_hierarchical(
     let mut imports: Vec<Vec<String>> = Vec::new();
     let mut type_aliases: Vec<Vec<String>> = Vec::new();
     let mut calls: Vec<HierarchicalCall> = Vec::new();
+    let mut class_locations: HashMap<ClassId, usize> =
+        HashMap::with_capacity(identities.classes.len());
     let mut method_locations: HashMap<MethodId, (usize, usize)> =
         HashMap::with_capacity(identities.methods.len());
     let mut field_locations: HashMap<FieldId, (usize, usize)> =
@@ -71,7 +73,7 @@ pub fn try_ir_to_hierarchical(
                     name: name.clone(),
                     methods: Vec::new(),
                     fields: Vec::new(),
-                    class_flags: None,
+                    class_flags: Vec::new(),
                     extends: None,
                     implements: Vec::new(),
                     injects: Vec::new(),
@@ -79,6 +81,7 @@ pub fn try_ir_to_hierarchical(
                     synthetic: false,
                 });
                 let class_id = ClassId::from_serialized(id);
+                class_locations.insert(class_id.clone(), classes.len() - 1);
                 if let Some(methods) = pending_methods.remove(&class_id) {
                     let class_idx = classes.len() - 1;
                     for (method_id, method_name) in methods {
@@ -133,35 +136,15 @@ pub fn try_ir_to_hierarchical(
             | CoreOp::Return(..)
             | CoreOp::FieldType(..)
             | CoreOp::Flags(..)
+            | CoreOp::ClassFlags(..)
+            | CoreOp::Extends(..)
+            | CoreOp::Implements(..)
+            | CoreOp::Injects(..)
             | CoreOp::Body(..)
             | CoreOp::ControlFlow(..)
             | CoreOp::DataFlow(..)
             | CoreOp::SideEffect(..)
             | CoreOp::ExecutionContext(..) => {}
-
-            CoreOp::ClassFlags(cid, flags) => {
-                if let Some(c_idx) = find_class_by_id(&classes, cid) {
-                    classes[c_idx].class_flags = Some(flags.clone());
-                }
-            }
-
-            CoreOp::Extends(child, parent) => {
-                if let Some(c_idx) = find_class_by_id(&classes, child) {
-                    classes[c_idx].extends = Some(parent.clone());
-                }
-            }
-
-            CoreOp::Implements(cid, iid) => {
-                if let Some(c_idx) = find_class_by_id(&classes, cid) {
-                    classes[c_idx].implements.push(iid.clone());
-                }
-            }
-
-            CoreOp::Injects(cid, deps) => {
-                if let Some(c_idx) = find_class_by_id(&classes, cid) {
-                    classes[c_idx].injects.extend(deps.clone());
-                }
-            }
 
             CoreOp::DefInterface(id, name) => {
                 classes.push(ClassNode {
@@ -169,7 +152,7 @@ pub fn try_ir_to_hierarchical(
                     name: name.clone(),
                     methods: Vec::new(),
                     fields: Vec::new(),
-                    class_flags: None,
+                    class_flags: Vec::new(),
                     extends: None,
                     implements: Vec::new(),
                     injects: Vec::new(),
@@ -308,6 +291,30 @@ pub fn try_ir_to_hierarchical(
                     .execution_context
                     .push(context.clone());
             }
+            CoreOp::ClassFlags(raw_class, flags) => {
+                let class_idx = class_location(
+                    &class_locations,
+                    raw_class,
+                    "FLAGS_C",
+                    instruction,
+                )?;
+                classes[class_idx].class_flags.push(flags.clone());
+            }
+            CoreOp::Extends(raw_class, parent) => {
+                let class_idx =
+                    class_location(&class_locations, raw_class, "EXT", instruction)?;
+                classes[class_idx].extends = Some(parent.clone());
+            }
+            CoreOp::Implements(raw_class, interface) => {
+                let class_idx =
+                    class_location(&class_locations, raw_class, "IMPL", instruction)?;
+                classes[class_idx].implements.push(interface.clone());
+            }
+            CoreOp::Injects(raw_class, dependencies) => {
+                let class_idx =
+                    class_location(&class_locations, raw_class, "INJECTS", instruction)?;
+                classes[class_idx].injects.push(dependencies.clone());
+            }
             _ => {}
         }
     }
@@ -318,6 +325,23 @@ pub fn try_ir_to_hierarchical(
         type_aliases,
         calls,
     })
+}
+
+fn class_location(
+    class_locations: &HashMap<ClassId, usize>,
+    raw_class: &str,
+    operation: &'static str,
+    instruction: usize,
+) -> Result<usize, HierarchicalProjectionError> {
+    class_locations
+        .get(&ClassId::from_serialized(raw_class))
+        .copied()
+        .ok_or_else(|| HierarchicalProjectionError::UnresolvedIdentity {
+            operation,
+            expected: ProjectionIdentityKind::Class,
+            id: raw_class.to_owned(),
+            instruction,
+        })
 }
 
 fn method_location(

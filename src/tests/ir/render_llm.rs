@@ -26,7 +26,7 @@ fn make_class(name: &str) -> ClassNode {
         name: name.to_string(),
         methods: vec![],
         fields: vec![],
-        class_flags: None,
+        class_flags: vec![],
         extends: None,
         implements: vec![],
         injects: vec![],
@@ -303,11 +303,14 @@ fn test_extends_and_implements() {
 fn test_class_flags() {
     let mut hir = empty_hir();
     let mut class = make_class("AbstractRepo");
-    class.class_flags = Some(vec!["ABSTRACT".into(), "EXPORT".into()]);
+    class.class_flags = vec![
+        vec!["ABSTRACT".into()],
+        vec!["EXPORT".into(), "EXPORT".into()],
+    ];
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("cl: ABSTRACT EXPORT\n"));
+    assert!(result.contains("cl: ABSTRACT EXPORT EXPORT\n"));
 }
 
 #[test]

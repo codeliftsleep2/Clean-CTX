@@ -14,7 +14,8 @@ use super::wire::DecodeError;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-const HIERARCHICAL_SCHEMA_VERSION: u64 = 2;
+const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 2;
+const HIERARCHICAL_SCHEMA_VERSION: u64 = 3;
 
 mod decode;
 mod encode;
@@ -109,9 +110,12 @@ pub struct ClassNode {
     #[serde(rename = "f", default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<FieldNode>,
 
-    /// Class-level flags (EXPORT, ABSTRACT, etc.)
-    #[serde(rename = "fl", default, skip_serializing_if = "Option::is_none")]
-    pub class_flags: Option<Vec<String>>,
+    /// Class-level flag occurrences (EXPORT, ABSTRACT, etc.).
+    ///
+    /// Each inner vector is one `CoreOp::ClassFlags` occurrence. The hierarchy
+    /// preserves occurrence order, payload order, and duplicate values.
+    #[serde(rename = "fl", default, skip_serializing_if = "Vec::is_empty")]
+    pub class_flags: Vec<Vec<String>>,
 
     /// Extends (parent class alias ID)
     #[serde(rename = "x", default, skip_serializing_if = "Option::is_none")]
@@ -121,9 +125,12 @@ pub struct ClassNode {
     #[serde(rename = "im", default, skip_serializing_if = "Vec::is_empty")]
     pub implements: Vec<String>,
 
-    /// Injections (dependency aliases)
+    /// Injection occurrences (dependency aliases).
+    ///
+    /// Each inner vector is one `CoreOp::Injects` occurrence. Operation
+    /// boundaries, payload order, and duplicate values are preserved.
     #[serde(rename = "ij", default, skip_serializing_if = "Vec::is_empty")]
-    pub injects: Vec<String>,
+    pub injects: Vec<Vec<String>>,
 
     /// Class-level pattern ops (e.g., CTOR)
     #[serde(rename = "p", default, skip_serializing_if = "Vec::is_empty")]
@@ -242,7 +249,7 @@ pub struct PatternEntry {
 /// Example output:
 /// ```json
 /// {
-///   "file": "α1", "v": 1, "encoding": "hierarchical", "hs": 2,
+///   "file": "α1", "v": 1, "encoding": "hierarchical", "hs": 3,
 ///   "ir": {
 ///     "c": [{
 ///       "n": "C1", "nm": "SampleService",
@@ -282,14 +289,23 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         .and_then(|v| v.as_u64())
         .ok_or_else(|| DecodeError::MissingField("v".into()))?;
 
-    let schema_version = value.get("hs");
-    if let Some(schema_version) = schema_version {
-        let schema_version = schema_version.as_u64().ok_or_else(|| {
-            DecodeError::InvalidInput("hierarchical schema version must be an integer".into())
-        })?;
-        if schema_version != HIERARCHICAL_SCHEMA_VERSION {
+    let schema_version = value
+        .get("hs")
+        .map(|schema_version| {
+            schema_version.as_u64().ok_or_else(|| {
+                DecodeError::InvalidInput(
+                    "hierarchical schema version must be an integer".into(),
+                )
+            })
+        })
+        .transpose()?;
+    match schema_version {
+        None
+        | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION)
+        | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
+        Some(unsupported) => {
             return Err(DecodeError::InvalidInput(format!(
-                "unsupported hierarchical schema version: {schema_version}"
+                "unsupported hierarchical schema version: {unsupported}"
             )));
         }
     }
@@ -298,8 +314,11 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         .get("ir")
         .cloned()
         .ok_or_else(|| DecodeError::MissingField("ir".into()))?;
-    if schema_version.is_none() {
-        upgrade_legacy_hierarchy(&mut ir_val)?;
+    match schema_version {
+        None => upgrade_legacy_hierarchy(&mut ir_val)?,
+        Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) => upgrade_revision_2_hierarchy(&mut ir_val)?,
+        Some(HIERARCHICAL_SCHEMA_VERSION) => {}
+        Some(_) => unreachable!("unsupported revisions returned above"),
     }
 
     // Deserialize via serde
@@ -317,14 +336,16 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
 
 /// Upgrade the established unversioned hierarchy shape at the wire boundary.
 ///
-/// Revision 2 remains strict: this adapter is invoked only when the envelope
-/// has no `hs` marker. It changes containers, never their string contents.
+/// This adapter is invoked only when the envelope has no `hs` marker. It
+/// changes containers, never their string contents.
 fn upgrade_legacy_hierarchy(ir: &mut Value) -> Result<(), DecodeError> {
     let Some(classes) = ir.get_mut("c").and_then(Value::as_array_mut) else {
         return Ok(());
     };
 
     for class in classes {
+        upgrade_flat_occurrences(class, "fl", "class flags")?;
+        upgrade_flat_occurrences(class, "ij", "injections")?;
         let Some(methods_value) = class.get_mut("m") else {
             continue;
         };
@@ -348,6 +369,48 @@ fn upgrade_legacy_hierarchy(ir: &mut Value) -> Result<(), DecodeError> {
             upgrade_legacy_scalar(method, "ec", "execution context")?;
         }
     }
+    Ok(())
+}
+
+/// Upgrade the strict revision-2 class containers to revision 3.
+///
+/// Revision 2 already has occurrence-aware method facts, but its class flags
+/// and injections are flat and therefore cannot represent repeated operation
+/// boundaries. No other shape is accepted through this compatibility path.
+fn upgrade_revision_2_hierarchy(ir: &mut Value) -> Result<(), DecodeError> {
+    let Some(classes) = ir.get_mut("c").and_then(Value::as_array_mut) else {
+        return Ok(());
+    };
+    for class in classes {
+        upgrade_flat_occurrences(class, "fl", "class flags")?;
+        upgrade_flat_occurrences(class, "ij", "injections")?;
+    }
+    Ok(())
+}
+
+fn upgrade_flat_occurrences(
+    owner: &mut Value,
+    field: &str,
+    description: &str,
+) -> Result<(), DecodeError> {
+    let Some(value) = owner.get_mut(field) else {
+        return Ok(());
+    };
+    let payload = value.as_array().ok_or_else(|| {
+        DecodeError::InvalidInput(format!(
+            "hierarchical revision-2 {description} must be an array"
+        ))
+    })?;
+    if !payload.iter().all(Value::is_string) {
+        return Err(DecodeError::InvalidInput(format!(
+            "hierarchical revision-2 {description} must contain strings"
+        )));
+    }
+    if payload.is_empty() && field == "ij" {
+        return Ok(());
+    }
+    let payload = std::mem::take(value);
+    *value = Value::Array(vec![payload]);
     Ok(())
 }
 
@@ -421,3 +484,7 @@ mod flags_tests;
 #[cfg(test)]
 #[path = "../tests/ir/hierarchical_method_facts.rs"]
 mod method_fact_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/hierarchical_class_facts.rs"]
+mod class_fact_tests;

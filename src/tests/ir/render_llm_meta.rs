@@ -216,8 +216,9 @@ fn test_injects_field_not_rendered_as_separate_line() {
     // This test verifies they don't cause panics.
     let mut hir = empty_hir();
     let mut class = make_class("InjectedService");
-    class.injects.push("Dep1".into());
-    class.injects.push("Dep2".into());
+    class
+        .injects
+        .push(vec!["Dep1".into(), "Dep2".into()]);
     hir.classes.push(class);
 
     // Should render without error, injects are structural (pattern-level)

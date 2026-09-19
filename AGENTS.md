@@ -30,6 +30,17 @@ depend on `.clinerules/` being present.
 
 ## Core policy (derived from `.clinerules/engineering.md`)
 
+### Rule 2 — Minimize tool calls
+
+Use the fewest tool calls reasonably necessary to complete the request correctly.
+
+- Batch related searches, reads, and checks when practical.
+- Do not repeat a tool call unless relevant state changed or the previous result was incomplete.
+- Do not perform optional audits, speculative improvements, broad repository scans, or unrelated validation.
+- Use targeted verification appropriate to the change.
+- The user's implementation request authorizes necessary inspection, editing, and proportionate verification.
+- Ask before materially expanding the requested scope, not before routine task completion.
+
 ### Architectural Approval Gate
 
 Do not make any architectural decision with **global, cross-cutting,

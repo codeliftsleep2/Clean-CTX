@@ -26,9 +26,11 @@ Phase 4A implemented and user-verified the remaining shared operation-validation
 contracts on 2026-09-18. Phase 4B implements identity-driven projection for
 method `Flags`, `Body`, `ControlFlow`, `DataFlow`, `SideEffect`, and
 `ExecutionContext`, plus occurrence-preserving hierarchical schema revision 2;
-user-run verification was green on 2026-09-18. The projection cursor is
-removed; later class-multiplicity, pattern-schema, and interface-representation
-findings remain open. User-run verification also proved that
+user-run verification was green on 2026-09-18. Phase 4C implements typed
+class-fact attribution for `ClassFlags`, `Extends`, `Implements`, and `Injects`
+plus occurrence-preserving hierarchical schema revision 3; verification is
+pending. The projection cursor is removed; later pattern-schema and interface-
+representation findings remain open. User-run verification also proved that
 `TypeAlias` carries repeated `Φ` metadata; its ordered-many correction was
 approved, implemented, and verified on 2026-09-18.
 
@@ -42,9 +44,9 @@ or wire-format code.
 
 The original highest-risk defect was positional attribution in the
 hierarchical projection. The bounded method-fact families are migrated in
-Phase 4B and the projection cursor is removed. Later class multiplicity,
-pattern schema, and interface representation work remains production-relevant
-because MCP handlers consume this projection.
+Phase 4B and the projection cursor is removed. Phase 4C addresses class-fact
+attribution and multiplicity. Pattern schema and interface representation work
+remains production-relevant because MCP handlers consume this projection.
 
 Related risks reinforce the same failure mode:
 
@@ -156,11 +158,12 @@ the canonical compiler output is correct.
 
 ### F-01: Projection still uses positional attribution
 
-The original affected family included parameters, returns, flags, body facts,
-control flow, data flow, side effects, and execution context. The first slices
-now resolve all of those facts through stable typed identity. Phase 4B removes
-the obsolete projection cursor; pattern targeting still requires its separate
-typed-schema repair.
+The original affected family included parameters, returns, method and class
+flags, inheritance, implementations, injections, body facts, control flow,
+data flow, side effects, and execution context. The implemented slices now
+resolve those facts through stable typed identity. Phase 4B removes the
+obsolete projection cursor and Phase 4C completes the class-fact subset;
+pattern targeting still requires its separate typed-schema repair.
 
 Consequences:
 

@@ -117,10 +117,14 @@ fn render_class(
     }
 
     // Class-level flags
-    if let Some(flags) = &class.class_flags {
-        if !flags.is_empty() {
-            output.push_str(&format!("cl: {}\n", flags.join(" ")));
-        }
+    if !class.class_flags.is_empty() {
+        let flags = class
+            .class_flags
+            .iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        output.push_str(&format!("cl: {}\n", flags.join(" ")));
     }
 
     // Extends

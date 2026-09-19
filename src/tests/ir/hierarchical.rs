@@ -188,7 +188,7 @@ fn test_hierarchical_structure() {
     // Find C1
     let c1 = hir.classes.iter().find(|c| c.id == "C1").unwrap();
     assert_eq!(c1.name, "BaseService");
-    assert_eq!(c1.class_flags, Some(vec!["EXPORT".to_string()]));
+    assert_eq!(c1.class_flags, vec![vec!["EXPORT".to_string()]]);
     assert_eq!(c1.fields.len(), 1);
     assert_eq!(c1.fields[0].id, "F1");
     assert_eq!(c1.fields[0].name, "items");
@@ -204,7 +204,10 @@ fn test_hierarchical_structure() {
     assert_eq!(c2.name, "DerivedService");
     assert_eq!(c2.extends, Some("C1".to_string()));
     assert_eq!(c2.implements, vec!["IF1".to_string()]);
-    assert_eq!(c2.injects, vec!["DEP1".to_string(), "DEP2".to_string()]);
+    assert_eq!(
+        c2.injects,
+        vec![vec!["DEP1".to_string(), "DEP2".to_string()]]
+    );
     assert_eq!(c2.methods.len(), 1);
     assert_eq!(c2.methods[0].id, "M2");
     assert_eq!(c2.methods[0].return_type, Some("$b".to_string()));
@@ -313,7 +316,7 @@ fn test_wire_format_json_structure() {
     assert!(wire.get("file").is_some(), "Must have 'file' key");
     assert!(wire.get("v").is_some(), "Must have 'v' key");
     assert!(wire.get("encoding").is_some(), "Must have 'encoding' key");
-    assert_eq!(wire.get("hs").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(wire.get("hs").and_then(|v| v.as_u64()), Some(3));
     assert!(wire.get("ir").is_some(), "Must have 'ir' key");
 
     // Check 'ir' contains expected abbreviated fields

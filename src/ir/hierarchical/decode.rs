@@ -35,8 +35,8 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
         if !class.synthetic {
             instructions.push(CoreOp::DefClass(class.id.clone(), class.name.clone()));
 
-            // Class-level flags
-            if let Some(flags) = &class.class_flags {
+            // Class-level flag occurrences
+            for flags in &class.class_flags {
                 instructions.push(CoreOp::ClassFlags(class.id.clone(), flags.clone()));
             }
 
@@ -50,9 +50,12 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
                 instructions.push(CoreOp::Implements(class.id.clone(), iid.clone()));
             }
 
-            // Injects
-            if !class.injects.is_empty() {
-                instructions.push(CoreOp::Injects(class.id.clone(), class.injects.clone()));
+            // Injection occurrences
+            for dependencies in &class.injects {
+                instructions.push(CoreOp::Injects(
+                    class.id.clone(),
+                    dependencies.clone(),
+                ));
             }
         }
 

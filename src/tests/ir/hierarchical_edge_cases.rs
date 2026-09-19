@@ -109,7 +109,7 @@ fn test_class_with_no_methods() {
     let c1 = hir.classes.iter().find(|c| c.id == "C1").unwrap();
     assert!(c1.methods.is_empty(), "Class with no methods");
     assert!(c1.fields.is_empty(), "Class with no fields");
-    assert_eq!(c1.class_flags, Some(vec!["EXPORT".to_string()]));
+    assert_eq!(c1.class_flags, vec![vec!["EXPORT".to_string()]]);
 
     let restored = hierarchical_to_ir(&hir);
     assert_eq!(ir.instructions, restored);

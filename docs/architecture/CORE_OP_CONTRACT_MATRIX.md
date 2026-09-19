@@ -14,7 +14,10 @@ third bounded slice on 2026-09-18. Phase 4A implemented and user-verified the
 shared validation contracts for the remaining rows on 2026-09-18. During that
 verification, production evidence proved that `TypeAlias` is also the carrier
 for repeated `Φ` metadata. Its ordered-many correction was explicitly approved
-on 2026-09-18 and is recorded below.
+on 2026-09-18 and is recorded below. Phase 4B implemented and user-verified
+the method-fact hierarchy contracts. Phase 4C implements the class-fact
+hierarchy contracts under approved schema revision 3; user-run verification is
+pending.
 
 **Related documents:**
 
@@ -209,19 +212,28 @@ Phase 4B implements the method-scoped subset of these changes:
   retains the previously supported unmarked flat/scalar shape;
 - unknown explicit hierarchical schema revisions fail decoding;
 
+Phase 4C implements the class-scoped subset:
+
+- `ClassFlags`, `Extends`, `Implements`, and `Injects` resolve through the
+  complete typed class-ID index, independent of instruction order;
+- repeated class flags remain separate ordered operation payloads;
+- injection operation boundaries, payload order, and duplicates are preserved;
+- optional-singular `Extends` relies on shared validation to reject duplicates;
+- hierarchical wire output advances to schema revision `"hs": 3`;
+- strict revision-2 flat class containers and unmarked legacy documents remain
+  readable through decode-only compatibility adapters.
+
 The remaining hierarchy changes are:
 
-- repeated class flags remain distinguishable until a reducer is authorized;
-- optional-singular fields reject duplicates rather than overwrite them;
-- definitions and facts resolve through complete ID indexes;
 - unresolved targets produce structured errors;
 - synthetic classes are not created to hide unresolved owners;
 - interfaces are represented explicitly or rejected as unsupported;
 - patterns use a validated target schema, never prefix inference.
 
 The serialized hierarchical shape is externally observable. Its revision-2
-method-fact contract was approved on 2026-09-18. It is distinct from the later
-corrected binary physical version `0x04`.
+method-fact contract and revision-3 class-fact contract were approved on
+2026-09-18. They are distinct from the later corrected binary physical version
+`0x04`.
 
 ## 7. Validation requirements
 
@@ -303,6 +315,10 @@ These items do not reopen the five defaults:
 Resolved on 2026-09-18: method flag occurrences, side effects, and execution
 contexts use hierarchical schema revision `"hs": 2`; unmarked legacy
 documents remain readable through the established compatibility path.
+
+Resolved on 2026-09-18: class flag and injection occurrences use hierarchical
+schema revision `"hs": 3`; strict revision-2 and unmarked legacy documents
+remain readable through decode-only compatibility paths.
 
 Import aliases are normatively file-wide because no downstream operation
 carries a narrower owner. `TypeAlias` is not a definition identity; production
