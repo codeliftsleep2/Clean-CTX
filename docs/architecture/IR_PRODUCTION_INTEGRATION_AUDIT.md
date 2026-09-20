@@ -43,7 +43,13 @@ integration evidence.
 
 Tracked cross-boundary authority is
 `src/tests/mcp/persistence_lifecycle.rs`. Codec-only and store-only tests remain
-supporting evidence rather than production-integration proof.
+supporting evidence rather than production-integration proof. Its registered
+dispatch coverage includes a real producer fixture for migrated modifiers,
+control summaries, pattern facts, side effects, execution contexts, data flow,
+and control flow, followed by physical `0x04` persistence and MCP replay. The
+regression checks compact low-fidelity markers only for families that renderer
+contract exposes at that fidelity; side effects and execution contexts are
+asserted through the structured MCP hierarchy and durable canonical IR.
 
 ## 3. Family evidence
 
@@ -60,7 +66,7 @@ supporting evidence rather than production-integration proof.
 | Bodies and spans | Edit-fidelity compiler | Singular body/span validation; conservative pattern guard | Unit table and `apply_edit` | Production path confirmed |
 | Delta/replay | Canonical before/after streams | Typed occurrence-aware positional sequence edits | Registered delta/apply/replay MCP handlers | Production path confirmed |
 | Binary persistence | Canonical returned IR | Physical `0x04` exact round trip | Buffered SQLite persistence and reload | Production path confirmed |
-| Interfaces | TS/Java/C# roots emit `DefInterface` plus interface-owned members | Typed interface ownership and wrong-kind validation | Distinct `InterfaceNode` and compact `Q` projection | Repair implemented; user verification pending |
+| Interfaces | TS/Java/C# roots emit `DefInterface` plus interface-owned members | Typed interface ownership and wrong-kind validation | Distinct `InterfaceNode` and compact `Q` projection | Production path confirmed; user-verified |
 
 The confirmed rows remain subject to the remainder of the Phase 9 obsolete-
 path and lifecycle audit. They are not final certification.
@@ -127,7 +133,7 @@ The hierarchy-only approval was superseded on 2026-09-20 after this deeper
 canonical finding. The maintainer approved explicit interface-owned canonical
 declarations rather than a class-or-interface owner union.
 
-#### Implemented repair (verification pending)
+#### Implemented and verified repair
 
 - `InterfaceId`, `DefInterfaceMethod`, and `DefInterfaceField` keep interface
   ownership compiler-visible without weakening class contracts.
@@ -142,7 +148,7 @@ declarations rather than a class-or-interface owner union.
 - Compact LLM output adds `Q` only when interfaces exist, leaving class-only
   output byte-for-byte unchanged.
 - Tracked identity, exact-round-trip, persistence/reload, and registered MCP
-  coverage awaits the user-run gate.
+  coverage was user-verified on 2026-09-20.
 
 ## 5. Finding P9-02: buffered deletion transaction composition
 
@@ -156,9 +162,33 @@ identified the equivalent queued-clear path and moved cleanup to a savepoint.
 Existing tracked authority:
 `src/tests/mcp/buffered_store.rs::test_buffered_store_clear` plus registered
 restore/reset lifecycle coverage in `src/tests/mcp/persistence_lifecycle.rs`.
-User-run verification is pending for the Phase 9 repair.
+The Phase 9 repair was user-verified on 2026-09-20.
 
-## 6. Compatibility-path reachability
+## 6. Finding P9-03: duplicate unchecked hierarchy projection
+
+**Severity:** Medium production error-path inconsistency; repaired during audit.
+
+`compress_code_context` first used `try_ir_to_hierarchical` through the shared
+MCP error mapper, but then discarded that checked result when constructing its
+hierarchical wire field and invoked the panic-based convenience projector a
+second time. The response now wraps the already-checked hierarchy in the same
+wire envelope. Production therefore has one projection result and one
+structured failure path; the convenience API remains available to internal
+callers and tests that already possess valid canonical IR.
+
+## 7. Finding P9-04: abstract TypeScript classes absent from production IR
+
+**Severity:** High production reachability defect; repaired during audit.
+
+The TypeScript grammar represents an abstract class with
+`abstract_class_declaration`, while the production query captured only
+`class_declaration`. A valid abstract class therefore produced no canonical
+definition or members. The query now routes both declaration node kinds
+through the same `class.root` production path. The registered lifecycle
+regression protects the abstract class, its typed class modifier, its members,
+and its downstream persistence and MCP exposure.
+
+## 8. Compatibility-path reachability
 
 - Production delta generation uses `SequenceDeltaComputer` only.
 - Legacy `IRDelta` remains readable/applicable solely as the approved
@@ -168,8 +198,95 @@ User-run verification is pending for the Phase 9 repair.
 - `ClassFlags` is not legacy-only: the Rust language layer still produces
   residual class metadata, so its production lifecycle remains in scope.
 
-## 7. Next audit action
+## 9. Finding P9-05: replay restored state without exposing semantics
 
-Phase 9 pauses for user verification of P9-01 and P9-02. Once green, the audit
-continues through obsolete-path removal, family-specific registered MCP
-evidence, and lifecycle gaps before Phase 10 documentation and final gate.
+**Severity:** High production lifecycle defect; repaired during audit.
+
+The registered `replay_history` path decoded and restored canonical IR but
+returned only an instruction-count status sentence. No checked projection or
+semantic response consumed the restored state. Replay now loads the persisted
+fidelity, applies checked projection, refreshes the compact cache, and returns
+both compact semantic content and the current hierarchical envelope. Projection
+failures use the same structured MCP error mapping as compilation paths.
+
+## 10. Finding P9-06: TypeScript export wrappers lose declaration ownership
+
+**Severity:** High producer-ownership gap; repaired pending user verification.
+
+Tree-sitter TypeScript places `export` outside the captured class or interface
+declaration node. The language layer correctly recognizes `export` when given
+the complete declaration head, but the default production query does not give
+it that wrapper. Consequently, direct layer tests can pass while real exported
+classes and interfaces omit their typed `Export` modifier. This is distinct
+from P9-04: abstract declarations now have an explicit structural capture,
+while export ownership still requires wrapper-to-declaration association
+without duplicating the declaration capture.
+
+The production query now captures declaration children directly from export
+wrappers. The core producer joins that marker to the ordinary class/interface
+capture by exact byte span and emits the typed owner-specific `Export`
+modifier. Named/default-exported classes, exported interfaces, non-exported
+declarations, and misleading descendant text have tracked production-compiler
+coverage; no surrounding-text inference was introduced.
+
+## 11. Finding P9-07: deletion evidence bypassed registered production path
+
+**Severity:** Test-authority gap; repaired during audit.
+
+The lifecycle regression deleted the source and then called the persistence
+store directly. That proved SQLite cleanup but not production integration.
+The regression now invokes registered `restore_context` after source deletion.
+That path clears session IR, path ownership, compact cache, workspace-index
+provenance, and persistent state before the expected source-read failure. The
+handler invalidates its source cache before that read so a deleted file cannot
+be resurrected from stale cached content.
+
+## 12. Finding P9-08: `save_context` does not implement its public contract
+
+**Severity:** High externally observable contract contradiction; repaired
+pending user verification.
+
+The registered tool and documentation describe `save_context(filePath)` as an
+explicit checkpoint of the requested in-memory context. Its handler ignores
+`filePath`, calls `BufferedStore::flush()`, ignores the returned flush count,
+and always reports `saved: 1` whenever persistence is enabled. Because normal
+production save paths immediately flush, this commonly reports a successful
+save when no write occurred.
+
+The approved repair implements the original file-scoped contract. Session
+state now owns fidelity alongside canonical IR and source hash. The handler
+resolves the requested session alias and exact durable path, rejects missing or
+mismatched ownership, strictly reconstructs canonical operations, reuses the
+session compact output, encodes durable physical `0x04`, and verifies the
+requested SQLite checkpoint after buffered persistence. An identical existing
+checkpoint reports `saved: 0, already_durable: true`; a newly written and
+verified checkpoint reports `saved: 1`. Registered-dispatch coverage proves
+that another file cannot substitute and that replay restores the exact stream.
+
+## 13. Finding P9-09: malformed session tuples can be silently discarded
+
+**Severity:** High externally observable replay and delta contradiction;
+architectural approval required.
+
+Production delta computation converts session tuples back to `CoreOp` with
+`filter_map`, silently dropping any tuple that `tuple_to_op` rejects. Durable
+replay performs the same lossy conversion after applying persisted deltas.
+Corrected `dv:2` occurrence validation proves positional identity but does not
+fully validate tuple arity or operand syntax; the legacy compatibility path can
+also carry malformed replacements/additions. A malformed stream can therefore
+be accepted into session history and later appear to replay successfully with
+fewer operations.
+
+Recommended repair: make tuple-to-canonical conversion fallible everywhere it
+crosses a production boundary, validate inserted/replacement tuples before a
+delta commits, and fail replay structurally on the first invalid tuple. Do not
+drop, repair, or synthesize operands. This preserves transactional delta
+semantics and the approved exact replay invariant. The narrower alternative is
+to reject only during final reconstruction, but that permits invalid state to
+live in-session until persistence/reload and gives later consumers inconsistent
+behavior.
+
+## 14. Approval gate and next audit action
+
+Phase 9 pauses at P9-09's architectural approval gate. P9-06 and P9-08 remain
+pending user-run verification and are not Phase 9 certification.

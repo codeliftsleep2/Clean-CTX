@@ -6,6 +6,56 @@ use crate::mcp::persistence_ir::PersistedDelta;
 use rusqlite::{OptionalExtension, params};
 
 impl SqliteStore {
+    pub(crate) fn latest_compact_output(
+        &self,
+        file_path: &str,
+    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT pretty_text FROM contexts WHERE file_path = ?1
+                 ORDER BY updated_at DESC LIMIT 1",
+                params![file_path],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten())
+    }
+
+    pub(crate) fn checkpoint_matches(
+        &self,
+        file_path: &str,
+        fidelity: crate::compression::Fidelity,
+        compressed_output: &str,
+        binary: &[u8],
+        source_hash: &str,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        let row = self
+            .conn
+            .query_row(
+                "SELECT fidelity, pretty_text, ir_binary, source_hash FROM contexts
+                 WHERE file_path = ?1 ORDER BY updated_at DESC LIMIT 1",
+                params![file_path],
+                |row| {
+                    Ok((
+                        row.get::<_, i32>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Vec<u8>>(2)?,
+                        row.get::<_, String>(3)?,
+                    ))
+                },
+            )
+            .optional()?;
+        Ok(row.is_some_and(
+            |(stored_fidelity, stored_output, stored_binary, stored_hash)| {
+                stored_fidelity == fidelity as i32
+                    && stored_output.as_deref().unwrap_or_default() == compressed_output
+                    && stored_binary == binary
+                    && stored_hash == source_hash
+            },
+        ))
+    }
+
     pub(crate) fn current_context_id(
         &self,
         file_path: &str,

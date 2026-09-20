@@ -189,6 +189,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
         ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
         None
     };
+    state.remember_context_fidelity(&path_alias, fidelity);
     if let Some(delta) = &delta {
         state.remember_delta_source_hash(&path_alias, delta.to, source_hash.clone());
     } else if prev_version > 0 {

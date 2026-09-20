@@ -16,7 +16,14 @@
 
 pub const TS_QUERY: &str = r#"
     ; --- TypeScript/JavaScript structural captures ---
+    ; Export ownership is represented by the export_statement wrapper while
+    ; the declaration capture remains the canonical declaration node. The IR
+    ; producer joins these captures by the child's exact source span.
+    (export_statement (class_declaration) @export.class)
+    (export_statement (abstract_class_declaration) @export.class)
+    (export_statement (interface_declaration) @export.interface)
     (class_declaration) @class.root
+    (abstract_class_declaration) @class.root
     (method_definition) @method.root
     (function_declaration) @func.root
     (property_signature) @field.root

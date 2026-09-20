@@ -1,5 +1,4 @@
 // provide_code_context MCP handler.
-
 use super::common::{
     checked_hierarchy_or_respond, contract_fields_focused, maybe_economics_fallback,
     tuples_to_coreops,
@@ -229,7 +228,9 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     if checked_hierarchy_or_respond(id, &compiled).is_none() {
                         return;
                     }
+                    let compiled_file = compiled.file_id.clone();
                     state.ir_context_lock().load_ir(compiled, None);
+                    state.remember_context_fidelity(&compiled_file, effective_fidelity);
 
                     // PERSIST-01: Preserve semantic edges extracted during
                     // compilation even though the token-economics gate
@@ -326,6 +327,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
                 None
             };
+            state.remember_context_fidelity(&alias, effective_fidelity);
             if let Some(delta) = &delta {
                 state.remember_delta_source_hash(&alias, delta.to, source_hash);
             }
@@ -394,10 +396,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     let render_ms = render_start.elapsed().as_millis() as u64;
                     raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                     comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
-                    // Post-compression token-economics check: if the
-                    // compressed/hybrid representation costs more tokens than
-                    // the raw source, fall back to raw passthrough. This
-                    // applies to all fidelity levels (Edit, Low, Medium, High).
+                    // Fall back when the compact representation costs more
+                    // tokens than the raw source, at every fidelity level.
                     if maybe_economics_fallback(
                         id,
                         source,
@@ -495,6 +495,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 state
                     .ir_context_lock()
                     .load_ir(ir.clone(), Some(source_hash));
+                state.remember_context_fidelity(&ir.file_id, effective_fidelity);
                 // Update workspace index: remove stale edges, insert fresh ones.
                 {
                     let mut idx = state.workspace_index_lock();

@@ -27,13 +27,27 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     ) {
         Ok(p) => p,
         Err(msg) => {
-            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                id.clone(),
-                -32602,
-                msg,
-                None,
-            ));
-            return;
+            // A deleted file cannot pass the normal existence-based resolver,
+            // but restore still owns removal of its session and durable state.
+            // Permit that cleanup only for an exact, already-owned identity.
+            let owned_path = state.alias_for_path(file_path_str).and_then(|alias| {
+                state.persisted_path(&alias).filter(|durable| {
+                    crate::dictionary::path::canonical_identity_key(durable)
+                        == crate::dictionary::path::canonical_identity_key(file_path_str)
+                })
+            });
+            match owned_path {
+                Some(path) => path,
+                None => {
+                    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                        id.clone(),
+                        -32602,
+                        msg,
+                        None,
+                    ));
+                    return;
+                }
+            }
         }
     };
     let fidelity = match parse_fidelity_arg(id, params, &state.config) {
@@ -68,6 +82,9 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         store.clear_file(&resolved_path);
     }
 
+    // Restore is also the deletion/reset boundary. Revalidate the filesystem
+    // instead of allowing a removed file to be resurrected from source cache.
+    state.invalidate_source_cache(&resolved_path);
     let source_arc = match state.read_source(&resolved_path) {
         Ok(s) => s,
         Err(e) => {

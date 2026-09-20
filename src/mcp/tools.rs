@@ -212,7 +212,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" }
-                }
+                },
+                "required": ["filePath"]
             }
         }),
         serde_json::json!({

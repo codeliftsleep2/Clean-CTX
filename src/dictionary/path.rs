@@ -105,6 +105,15 @@ impl PathDictionary {
         self.forward.get(alias).map(String::as_str)
     }
 
+    /// Resolve an already-registered durable path without creating session
+    /// identity as a side effect.
+    pub fn alias_for_path(&self, absolute_path: &str) -> Option<&str> {
+        self.reverse
+            .get(absolute_path)
+            .or_else(|| self.reverse.get(&canonical_identity_key(absolute_path)))
+            .map(String::as_str)
+    }
+
     /// Format the full session-global PATHMAP as a footer.
     ///
     /// Serializes **every** alias in the session dictionary. Used by tests

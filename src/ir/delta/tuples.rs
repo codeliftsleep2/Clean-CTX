@@ -65,6 +65,11 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         "INJECTS" => format!("INJECTS:{}", tuple.get(1).unwrap_or(&String::new())),
         "IMP" => format!("IMP:{}", tuple.get(1).unwrap_or(&String::new())),
         "TYPE" => format!("TYPE:{}", tuple.get(1).unwrap_or(&String::new())),
+        "PAT" => format!(
+            "PAT:{}:{}",
+            tuple.get(1).map(String::as_str).unwrap_or("?"),
+            tuple.get(2).map(String::as_str).unwrap_or("?")
+        ),
         // Edit Mode: Verbatim Method Bodies
         "BODY" => format!("BODY:{}", tuple.get(1).unwrap_or(&String::new())),
         // R-43a: Execution Semantics
@@ -151,6 +156,11 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
         "INJECTS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "IMP" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "TYPE" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "PAT" => vec![
+            tuple[0].clone(),
+            tuple.get(1).cloned().unwrap_or_default(),
+            tuple.get(2).cloned().unwrap_or_default(),
+        ],
         // Edit Mode: Verbatim Method Bodies
         "BODY" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         // R-43a: Execution Semantics

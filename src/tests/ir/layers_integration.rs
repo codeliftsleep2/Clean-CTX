@@ -77,9 +77,9 @@ fn ts_language_layer_produces_extra_ops_via_compiler() {
 #[test]
 fn ts_language_layer_produces_extra_ops_via_compiler_with_class_flags() {
     // NOTE: tree-sitter's class_declaration node does NOT include the
-    // `export` or `abstract` keywords (they're part of wrapper nodes).
-    // Class-level flags require additional captures (abstract_class_declaration
-    // or export_statement) which are not currently in the query.
+    // `export` keyword because it belongs to an export_statement wrapper.
+    // Abstract classes use the separately captured abstract_class_declaration
+    // node. This fixture remains focused on relationship and import capture.
     // This test verifies extends/implements and the import capture work
     // together through the compiler pipeline.
     let source = r#"

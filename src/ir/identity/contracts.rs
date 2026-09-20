@@ -1,6 +1,7 @@
 use super::cardinality::{insert_definition, insert_singular};
 use super::{
-    ClassId, FieldId, IdentityError, IdentityIndex, IdentityKind, InterfaceId, MethodId, ParameterId,
+    ClassId, FieldId, IdentityError, IdentityIndex, IdentityKind, InterfaceId, MethodId,
+    ParameterId,
 };
 use crate::ir::CompiledIR;
 use crate::ir::opcodes::CoreOp;

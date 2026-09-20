@@ -222,6 +222,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
             state
                 .ir_context_lock()
                 .load_ir(post, Some(new_hash.clone()));
+            state.remember_context_fidelity(&alias, Fidelity::Edit);
             v
         }
         Err(e) => {

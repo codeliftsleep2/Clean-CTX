@@ -192,6 +192,8 @@ impl SqliteStore {
                 0 => "low",
                 1 => "medium",
                 2 => "high",
+                3 => "edit",
+                4 => "verbatim",
                 _ => "low",
             };
             Ok(PersistedContextSummary {
@@ -256,6 +258,8 @@ impl SqliteStore {
                 0 => "low",
                 1 => "medium",
                 2 => "high",
+                3 => "edit",
+                4 => "verbatim",
                 _ => "low",
             };
             stats.record_compression(
@@ -431,6 +435,8 @@ impl ContextStore for SqliteStore {
                 0 => Fidelity::Low,
                 1 => Fidelity::Medium,
                 2 => Fidelity::High,
+                3 => Fidelity::Edit,
+                4 => Fidelity::Verbatim,
                 _ => Fidelity::Low,
             };
 

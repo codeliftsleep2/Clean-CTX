@@ -10,8 +10,9 @@ use crate::ir::calls::{
     ARROW_NAME_CAPTURE, ARROW_ROOT_CAPTURE, CALL_ARGUMENT_CAPTURE, CALL_CALLEE_CAPTURE,
     CALL_SPREAD_CAPTURE, capture_query,
 };
-use crate::ir::opcodes::{ControlSummary, CoreOp};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use crate::ir::symbol_table::SymbolKind;
+use std::collections::HashSet;
 
 /// Pass 1: Core IR emission from tree-sitter captures.
 pub struct CoreIRPass;
@@ -86,6 +87,22 @@ impl IRPass for CoreIRPass {
             message: format!("capture pipeline error: {error}"),
         })?;
 
+        // TypeScript places `export` on an `export_statement` wrapper rather
+        // than inside the declaration node captured as `class.root` or
+        // `interface.root`. Join the structural wrapper capture to its exact
+        // declaration child by source span. This deliberately does not inspect
+        // descendant or surrounding source text.
+        let exported_classes: HashSet<(usize, usize)> = captures
+            .iter()
+            .filter(|cap| cap.name == "export.class")
+            .map(|cap| (cap.start_byte, cap.end_byte))
+            .collect();
+        let exported_interfaces: HashSet<(usize, usize)> = captures
+            .iter()
+            .filter(|cap| cap.name == "export.interface")
+            .map(|cap| (cap.start_byte, cap.end_byte))
+            .collect();
+
         for cap in &captures {
             // Callable-scope maintenance is independent of filtering: the walk
             // has advanced past `cap.start_byte` either way, so scopes whose
@@ -124,11 +141,18 @@ impl IRPass for CoreIRPass {
                     .call_producer
                     .record_arrow_name(cap.match_index, &cap.text),
                 ARROW_ROOT_CAPTURE => register_arrow_capture(state, cap, &file_id),
+                "export.class" | "export.interface" => {}
                 "class.root" | "struct.root" | "enum.root" | "trait.root" | "record.root" => {
                     let class_id = state.next_id("C");
                     state
                         .instructions
                         .push(CoreOp::DefClass(class_id.clone(), cap.text.clone()));
+                    if exported_classes.contains(&(cap.start_byte, cap.end_byte)) {
+                        state.instructions.push(CoreOp::ClassModifiers(
+                            class_id.clone(),
+                            vec![DeclarationModifier::Export],
+                        ));
+                    }
                     state.push_type_scope(class_id.clone(), cap.end_byte);
                     state.layer_context.current_class_name = Some(cap.raw_text.clone());
                     state.layer_context.current_class_bare_name = Some(cap.text.clone());
@@ -151,6 +175,12 @@ impl IRPass for CoreIRPass {
                     state
                         .instructions
                         .push(CoreOp::DefInterface(interface_id.clone(), cap.text.clone()));
+                    if exported_interfaces.contains(&(cap.start_byte, cap.end_byte)) {
+                        state.instructions.push(CoreOp::InterfaceModifiers(
+                            interface_id.clone(),
+                            vec![DeclarationModifier::Export],
+                        ));
+                    }
                     state.push_interface_scope(interface_id.clone(), cap.end_byte);
                     state.layer_context.current_class_name = Some(cap.raw_text.clone());
                     state.layer_context.current_class_bare_name = Some(cap.text.clone());

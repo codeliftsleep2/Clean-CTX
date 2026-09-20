@@ -312,6 +312,15 @@ pub struct PatternEntry {
 /// ```
 pub fn ir_to_hierarchical_wire(ir: &CompiledIR) -> Value {
     let hir = ir_to_hierarchical(ir);
+    hierarchy_to_wire(ir, &hir)
+}
+
+/// Wrap an already-checked hierarchy in the current wire envelope.
+///
+/// Production callers use this after `try_ir_to_hierarchical` so projection
+/// failures remain structured MCP errors rather than entering the panic-based
+/// convenience path above.
+pub(crate) fn hierarchy_to_wire(ir: &CompiledIR, hir: &HierarchicalIR) -> Value {
     json!({
         "file": ir.file_id,
         "v": ir.version,

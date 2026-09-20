@@ -18,6 +18,7 @@
 // is single-threaded by design) and the config is shared immutably.
 
 use crate::cache::LocalStateCache;
+use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
 use crate::ir::replay::ContextState;
@@ -155,6 +156,7 @@ pub struct McpState {
     pub persistence_store: Mutex<Option<BufferedStore>>,
     /// Exact durable persistence path owned by each session-local IR alias.
     persisted_paths: Mutex<HashMap<String, String>>,
+    context_fidelities: Mutex<HashMap<String, Fidelity>>,
     pending_delta_hashes: Mutex<HashMap<(String, u64), String>>,
 
     /// Tracks which cache breakpoints have already been emitted this session.
@@ -178,33 +180,13 @@ pub struct McpState {
     /// it is added here and the capture pipeline drops it during compression.
     pub cbm_filter: Mutex<CbmFilterState>,
 
-    /// Phase 1 (Fix D): Cache of rendered LLM-optimized hierarchical IR text,
-    /// keyed by path alias (e.g., "α1").
-    ///
-    /// Cached on first render after a compile; invalidated when a delta is
-    /// applied to the file or when `restore_context` is called for the file.
-    /// This avoids re-rendering the full HIR on every delta-mode call,
-    /// saving ~O(n) where n is the file size in HIR nodes.
+    /// Rendered LLM hierarchy cache keyed by path alias.
     pub llm_text_cache: Mutex<HashMap<String, String>>,
 
-    /// WorkspaceIndex — cross-file semantic index populated from per-file
-    /// compilation. Updated on every file compilation (provide_code_context,
-    /// compress_code_context, delta_code_context, apply_edit) by draining
-    /// stale edges for that file and inserting fresh ones from the latest
-    /// MetaLayerPass extraction.
+    /// Cross-file semantic index populated by production compilation.
     pub workspace_index: RwLock<crate::workspace::index::WorkspaceIndex>,
 
-    /// Session-scoped hydration discovery completion cache.
-    ///
-    /// Records which `workspace_query` hydration discovery targets have
-    /// already been searched for a project/root under the current workspace
-    /// generation, so a repeated query does not re-run the CBM project search
-    /// or the filesystem fallback scan. It stores no candidates, entities,
-    /// edges, or query answers — the WorkspaceIndex above remains the single
-    /// authority for query evaluation. See `crate::mcp::discovery_cache`.
-    ///
-    /// Crate-visible with its type: this is session-internal state, not part of
-    /// the crate's public API surface.
+    /// Session-scoped record of completed hydration discovery.
     pub(crate) hydration_discovery: Mutex<HydrationDiscoveryCache>,
 
     /// Phase 2: Proxy port for fetching tool-filtering and cache stats.
@@ -294,6 +276,7 @@ impl McpState {
             context_store: InMemoryContextStore::new(),
             persistence_store: Mutex::new(persistence_store),
             persisted_paths: Mutex::new(HashMap::new()),
+            context_fidelities: Mutex::new(HashMap::new()),
             pending_delta_hashes: Mutex::new(HashMap::new()),
             llm_text_cache: Mutex::new(HashMap::new()),
             emitted_breakpoints: Mutex::new(HashSet::new()),
@@ -470,6 +453,21 @@ impl McpState {
         self.dict_lock().path_for_alias(alias).map(str::to_owned)
     }
 
+    pub fn alias_for_path(&self, path: &str) -> Option<String> {
+        self.dict_lock().alias_for_path(path).map(str::to_owned)
+    }
+
+    pub fn remember_context_fidelity(&self, alias: &str, fidelity: Fidelity) {
+        lock_or_recover!(self.context_fidelities.lock(), "context_fidelities")
+            .insert(alias.to_string(), fidelity);
+    }
+
+    pub fn context_fidelity(&self, alias: &str) -> Option<Fidelity> {
+        lock_or_recover!(self.context_fidelities.lock(), "context_fidelities")
+            .get(alias)
+            .copied()
+    }
+
     pub fn remember_persisted_path(&self, alias: &str, file_path: &str) {
         lock_or_recover!(self.persisted_paths.lock(), "persisted_paths")
             .insert(alias.to_string(), file_path.to_string());
@@ -483,6 +481,7 @@ impl McpState {
 
     pub fn forget_persisted_path(&self, alias: &str) {
         lock_or_recover!(self.persisted_paths.lock(), "persisted_paths").remove(alias);
+        lock_or_recover!(self.context_fidelities.lock(), "context_fidelities").remove(alias);
         lock_or_recover!(self.pending_delta_hashes.lock(), "pending_delta_hashes")
             .retain(|(file, _), _| file != alias);
     }

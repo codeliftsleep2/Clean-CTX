@@ -28,7 +28,7 @@ pub(super) fn checked_hierarchy_or_respond(id: &Value, ir: &CompiledIR) -> Optio
     }
 }
 
-pub(super) fn projection_error_response(
+pub(crate) fn projection_error_response(
     id: &Value,
     error: &crate::ir::hierarchical::HierarchicalProjectionError,
 ) -> Value {

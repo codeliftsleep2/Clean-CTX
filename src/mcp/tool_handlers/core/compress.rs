@@ -117,6 +117,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         state
             .ir_context_lock()
             .load_ir(ir.clone(), Some(source_hash.clone()));
+        state.remember_context_fidelity(&ir.file_id, effective_fidelity);
         // Update workspace index: remove stale edges, insert fresh ones.
         {
             let mut idx = state.workspace_index_lock();
@@ -196,7 +197,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             "jsonrpc": "2.0", "id": id,
             "result": {
                 "content": [{ "type": "text", "text": llm_text_with_footer }],
-                "ir": crate::ir::hierarchical::ir_to_hierarchical_wire(&ir),
+                "ir": crate::ir::hierarchical::hierarchy_to_wire(&ir, &hir),
                 "pretty": ir_value, "v": ir.version, "file": ir.file_id,
                 "content_kind": content_kind, "byte_exact": byte_exact,
                 "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()

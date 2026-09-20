@@ -14,16 +14,32 @@ pub(super) fn validate(ir: &CompiledIR, index: &IdentityIndex) -> Result<(), Ide
         match op {
             CoreOp::DefClass(..) | CoreOp::DefInterface(..) => {}
             CoreOp::DefMethod(raw_owner, ..) => require_target(
-                "DEF_M owner", raw_owner, IdentityKind::Class, instruction, index,
+                "DEF_M owner",
+                raw_owner,
+                IdentityKind::Class,
+                instruction,
+                index,
             )?,
             CoreOp::DefField(raw_owner, ..) => require_target(
-                "DEF_F owner", raw_owner, IdentityKind::Class, instruction, index,
+                "DEF_F owner",
+                raw_owner,
+                IdentityKind::Class,
+                instruction,
+                index,
             )?,
             CoreOp::DefInterfaceMethod(raw_owner, ..) => require_target(
-                "DEF_IM owner", raw_owner, IdentityKind::Interface, instruction, index,
+                "DEF_IM owner",
+                raw_owner,
+                IdentityKind::Interface,
+                instruction,
+                index,
             )?,
             CoreOp::DefInterfaceField(raw_owner, ..) => require_target(
-                "DEF_IF owner", raw_owner, IdentityKind::Interface, instruction, index,
+                "DEF_IF owner",
+                raw_owner,
+                IdentityKind::Interface,
+                instruction,
+                index,
             )?,
             CoreOp::Param(raw_method, ..) => {
                 require_target("SIG", raw_method, IdentityKind::Method, instruction, index)?
@@ -32,10 +48,20 @@ pub(super) fn validate(ir: &CompiledIR, index: &IdentityIndex) -> Result<(), Ide
                 require_target("RET", raw_method, IdentityKind::Method, instruction, index)?
             }
             CoreOp::FieldType(raw_field, _) => require_target(
-                "FIELD_T", raw_field, IdentityKind::Field, instruction, index,
+                "FIELD_T",
+                raw_field,
+                IdentityKind::Field,
+                instruction,
+                index,
             )?,
             CoreOp::MethodModifiers(raw_method, modifiers) => {
-                require_target("MOD_M", raw_method, IdentityKind::Method, instruction, index)?;
+                require_target(
+                    "MOD_M",
+                    raw_method,
+                    IdentityKind::Method,
+                    instruction,
+                    index,
+                )?;
                 require_non_empty_payload("MOD_M", modifiers, instruction)?;
             }
             CoreOp::ClassModifiers(raw_class, modifiers) => {
@@ -44,29 +70,53 @@ pub(super) fn validate(ir: &CompiledIR, index: &IdentityIndex) -> Result<(), Ide
             }
             CoreOp::InterfaceModifiers(raw_interface, modifiers) => {
                 require_target(
-                    "MOD_I", raw_interface, IdentityKind::Interface, instruction, index,
+                    "MOD_I",
+                    raw_interface,
+                    IdentityKind::Interface,
+                    instruction,
+                    index,
                 )?;
                 require_non_empty_payload("MOD_I", modifiers, instruction)?;
             }
             CoreOp::ControlSummary(raw_method, summaries) => {
                 require_target(
-                    "CTRL_SUM", raw_method, IdentityKind::Method, instruction, index,
+                    "CTRL_SUM",
+                    raw_method,
+                    IdentityKind::Method,
+                    instruction,
+                    index,
                 )?;
                 require_non_empty_payload("CTRL_SUM", summaries, instruction)?;
             }
             CoreOp::PatternFacts(raw_method, facts) => {
                 require_target(
-                    "PAT_FACT", raw_method, IdentityKind::Method, instruction, index,
+                    "PAT_FACT",
+                    raw_method,
+                    IdentityKind::Method,
+                    instruction,
+                    index,
                 )?;
                 require_non_empty_payload("PAT_FACT", facts, instruction)?;
             }
             CoreOp::Flags(raw_method, flags) => {
-                require_target("FLAGS", raw_method, IdentityKind::Method, instruction, index)?;
+                require_target(
+                    "FLAGS",
+                    raw_method,
+                    IdentityKind::Method,
+                    instruction,
+                    index,
+                )?;
                 require_non_empty_payload("FLAGS", flags, instruction)?;
                 reject_typed_flag_payload("FLAGS", flags, instruction)?;
             }
             CoreOp::ClassFlags(raw_class, flags) => {
-                require_target("FLAGS_C", raw_class, IdentityKind::Class, instruction, index)?;
+                require_target(
+                    "FLAGS_C",
+                    raw_class,
+                    IdentityKind::Class,
+                    instruction,
+                    index,
+                )?;
                 require_non_empty_payload("FLAGS_C", flags, instruction)?;
                 reject_typed_flag_payload("FLAGS_C", flags, instruction)?;
             }
@@ -74,13 +124,21 @@ pub(super) fn validate(ir: &CompiledIR, index: &IdentityIndex) -> Result<(), Ide
                 require_target("EXT", raw_class, IdentityKind::Class, instruction, index)?
             }
             CoreOp::InterfaceExtends(raw_interface, _) => require_target(
-                "EXT_I", raw_interface, IdentityKind::Interface, instruction, index,
+                "EXT_I",
+                raw_interface,
+                IdentityKind::Interface,
+                instruction,
+                index,
             )?,
             CoreOp::Implements(raw_class, _) => {
                 require_target("IMPL", raw_class, IdentityKind::Class, instruction, index)?
             }
             CoreOp::Injects(raw_class, _) => require_target(
-                "INJECTS", raw_class, IdentityKind::Class, instruction, index,
+                "INJECTS",
+                raw_class,
+                IdentityKind::Class,
+                instruction,
+                index,
             )?,
             CoreOp::Import(..) | CoreOp::TypeAlias(..) => {}
             CoreOp::Pattern(name, args) => validate_pattern(name, args, instruction, index)?,
@@ -90,7 +148,11 @@ pub(super) fn validate(ir: &CompiledIR, index: &IdentityIndex) -> Result<(), Ide
             }
             CoreOp::DataFlow(raw_method, direction, _) => {
                 require_target(
-                    "DATAFLOW", raw_method, IdentityKind::Method, instruction, index,
+                    "DATAFLOW",
+                    raw_method,
+                    IdentityKind::Method,
+                    instruction,
+                    index,
                 )?;
                 require_vocabulary(
                     "DATAFLOW",
@@ -106,12 +168,23 @@ pub(super) fn validate(ir: &CompiledIR, index: &IdentityIndex) -> Result<(), Ide
                     "CTRL",
                     "kind",
                     kind,
-                    &[CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_TRY, CTRL_AWAIT, CTRL_RETURN],
+                    &[
+                        CTRL_IF,
+                        CTRL_LOOP,
+                        CTRL_MATCH,
+                        CTRL_TRY,
+                        CTRL_AWAIT,
+                        CTRL_RETURN,
+                    ],
                     instruction,
                 )?;
             }
             CoreOp::SideEffect(raw_method, _) => require_target(
-                "EFFECT", raw_method, IdentityKind::Method, instruction, index,
+                "EFFECT",
+                raw_method,
+                IdentityKind::Method,
+                instruction,
+                index,
             )?,
             CoreOp::ExecutionContext(raw_method, _) => {
                 require_target("CTX", raw_method, IdentityKind::Method, instruction, index)?
@@ -136,13 +209,21 @@ fn validate_pattern(
         PatternTarget::Method { class, method } => (class, Some(method)),
     };
     require_target(
-        "PAT class", class.as_str(), IdentityKind::Class, instruction, index,
+        "PAT class",
+        class.as_str(),
+        IdentityKind::Class,
+        instruction,
+        index,
     )?;
     let Some(method) = method else {
         return Ok(());
     };
     require_target(
-        "PAT method", method.as_str(), IdentityKind::Method, instruction, index,
+        "PAT method",
+        method.as_str(),
+        IdentityKind::Method,
+        instruction,
+        index,
     )?;
     if index.method_owners.get(method) != Some(class) {
         return Err(IdentityError::OwnerMismatch {

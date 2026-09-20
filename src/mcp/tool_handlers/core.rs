@@ -8,6 +8,7 @@ mod provide;
 mod provide_angular;
 mod restore;
 
+pub(crate) use common::projection_error_response;
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use common::{contract_fields, contract_fields_focused, maybe_economics_fallback};
 pub(crate) use compress::handle_compress_code_context;

@@ -280,12 +280,20 @@ fn overwrite_reset_and_delete_replace_persisted_ownership_coherently() {
             .is_none()
     );
     std::fs::remove_file(&path).expect("delete source");
-    if let Some(ref mut store) = *state.persistence_store_lock() {
-        store.clear_file(&file_path);
-    }
+    let deleted = dispatch(&state, 15, "restore_context", args());
+    assert!(
+        deleted.get("error").is_some(),
+        "deleted source cannot be recompiled: {deleted}"
+    );
     let store = state.persistence_store_lock();
     let sqlite = store.as_ref().unwrap().sqlite().unwrap();
     assert!(!sqlite.has_context(&file_path));
+    assert!(
+        sqlite
+            .load_context_with_deltas(&file_path, None)
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -339,6 +347,109 @@ fn registered_replay_rejects_a_mismatched_persisted_file_identity() {
             .as_str()
             .is_some_and(|message| message.contains("persisted binary file identity mismatch"))
     );
+}
+
+#[test]
+fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("semantic.ts");
+    let file_path = path.to_string_lossy().into_owned();
+    let padding = " production semantic-family fixture".repeat(180);
+    std::fs::write(
+        &path,
+        format!(
+            "abstract class SemanticService {{\n  constructor(private repo: Repo) {{}}\n  async run(flag: boolean): Promise<number> {{\n    stream.subscribe(value => console.log(value));\n    if (flag) {{ return await Promise.resolve(1); }}\n    return 0;\n  }}\n}}\n/*{padding} */\n"
+        ),
+    )
+    .expect("semantic source");
+    let state = state_with_persistence(&root);
+    let args = json!({
+        "filePath": file_path.clone(),
+        "workspaceRoot": root.path().to_string_lossy(),
+        "fidelity": "low"
+    });
+
+    let produced = dispatch(&state, 30, "compress_code_context", args);
+    assert!(produced.get("error").is_none(), "{produced}");
+    let compact = produced["result"]["content"][0]["text"]
+        .as_str()
+        .expect("compact MCP text");
+    for marker in ["cmod:", "mod:", "ctl:", "pf:"] {
+        assert!(compact.contains(marker), "missing {marker}: {compact}");
+    }
+    let methods = produced["result"]["ir"]["ir"]["c"][0]["m"]
+        .as_array()
+        .expect("structured MCP methods");
+    let run = methods
+        .iter()
+        .find(|method| method["nm"] == "run")
+        .expect("run method hierarchy");
+    assert_eq!(run["se"], json!(["async"]));
+    assert_eq!(run["ec"], json!(["async"]));
+
+    let persisted = {
+        let store = state.persistence_store_lock();
+        let sqlite = store.as_ref().unwrap().sqlite().unwrap();
+        sqlite
+            .load_context_with_deltas(&file_path, None)
+            .expect("durable replay")
+            .expect("durable semantic context")
+            .0
+    };
+    for present in [
+        persisted
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::ClassModifiers(..))),
+        persisted
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::MethodModifiers(..))),
+        persisted
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::ControlSummary(..))),
+        persisted
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::PatternFacts(..))),
+        persisted
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::SideEffect(..))),
+        persisted
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::ExecutionContext(..))),
+        persisted
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::DataFlow(..))),
+        persisted
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::ControlFlow(..))),
+    ] {
+        assert!(
+            present,
+            "migrated family missing from persisted canonical IR"
+        );
+    }
+
+    let replayed = dispatch(
+        &state,
+        31,
+        "replay_history",
+        json!({ "filePath": file_path }),
+    );
+    assert!(replayed.get("error").is_none(), "{replayed}");
+    let replayed_text = replayed["result"]["content"][0]["text"]
+        .as_str()
+        .expect("replayed MCP text");
+    for marker in ["cmod:", "mod:", "ctl:", "pf:"] {
+        assert!(replayed_text.contains(marker), "missing replayed {marker}");
+    }
 }
 
 #[test]
