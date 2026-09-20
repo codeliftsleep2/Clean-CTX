@@ -453,12 +453,11 @@ impl ContextState {
 
     /// A-08: Check if the source for a file has changed since last compilation.
     ///
-    /// Returns `true` if the file is not tracked (no baseline to compare against),
-    /// or if the provided source hash matches the stored hash (file unchanged).
-    /// Returns `false` if the file is tracked but the hash doesn't match (file changed).
+    /// Returns `true` only when the provided hash matches the stored hash.
+    /// Missing hash ownership forces recompilation rather than trusting stale IR.
     pub fn is_source_unchanged(&self, file_id: &str, source_hash: &str) -> bool {
         match self.source_hashes.get(file_id) {
-            None => true, // No baseline hash - treat as unchanged (first compile)
+            None => false,
             Some(stored_hash) => stored_hash == source_hash, // Compare hashes
         }
     }
@@ -468,6 +467,10 @@ impl ContextState {
     /// Returns `None` if the file is not tracked or no hash was stored.
     pub fn get_source_hash(&self, file_id: &str) -> Option<&String> {
         self.source_hashes.get(file_id)
+    }
+
+    pub fn set_source_hash(&mut self, file_id: &str, source_hash: String) {
+        self.source_hashes.insert(file_id.to_string(), source_hash);
     }
 
     /// Get the version of a specific file.

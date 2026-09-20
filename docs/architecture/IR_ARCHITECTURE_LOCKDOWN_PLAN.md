@@ -345,9 +345,9 @@ Exit criteria:
 - old assumptions about upstream merging are removed or made real contracts.
 
 ### Phase 8: Version and tighten wire formats
-Phase 8A inventories `0x03` and fixes the normative `0x04` layout in
-[`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md). Phase 8B implements the
-semantic codec and tracked coverage; it awaits user verification.
+Phase 8A fixes the normative `0x04` layout in
+[`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md). Phase 8B was user-verified
+on 2026-09-20; Phase 8C connects `0x04`/`dv: 2` to production persistence.
 Deliverables:
 
 - truthful preservation classification per format;
@@ -355,6 +355,8 @@ Deliverables:
 - complete identity operand encoding;
 - compatibility decoder if required;
 - semantic rather than opcode-only round-trip assertions.
+- production baseline, delta-history, replacement, reset, deletion, reload,
+  and registered MCP dispatch coverage.
 
 Exit criteria:
 
@@ -593,23 +595,6 @@ validation prerequisite without changing hierarchical projection shapes:
 9. legacy validation codes E001-E011 remain stable for their existing operation
    families while projection retains structured error classifications.
 
-The `TypeAlias` correction followed production evidence of repeated metadata;
-producer deduplication would discard distinct payloads. Phase 4A did not alter
-projection, producers, delta/replay, or binary `0x04`; its gate was green.
-
 ## 13. Verification ownership
 
-Agents must not initiate the repository's long-running build, test, Clippy,
-format, audit, binary, or server commands. During implementation, the agent may
-perform only fast bounded inspections and must hand the exact applicable
-commands from `docs/agent/verification.md` to the user.
-
-Results must be reported by category:
-
-- tracked Rust tests actually run by the user;
-- compile, Clippy, format, file-size, and encoding gates;
-- optional untracked live harness output;
-- production or field scenarios.
-
-An untracked harness never substitutes for a tracked regression test, and no
-unrun gate may be reported as passing.
+Verification follows [`docs/agent/verification.md`](../agent/verification.md); agents hand off long-running gates, and untracked harnesses never replace tests.

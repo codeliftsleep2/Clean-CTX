@@ -100,6 +100,11 @@ impl PathDictionary {
         }
     }
 
+    /// Resolve a session-local alias back to its durable canonical path.
+    pub fn path_for_alias(&self, alias: &str) -> Option<&str> {
+        self.forward.get(alias).map(String::as_str)
+    }
+
     /// Format the full session-global PATHMAP as a footer.
     ///
     /// Serializes **every** alias in the session dictionary. Used by tests

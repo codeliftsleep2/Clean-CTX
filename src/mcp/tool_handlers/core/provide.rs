@@ -103,6 +103,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     ) {
         return;
     }
+    state.remember_persisted_path(&alias, &resolved_path);
     let explicit_fidelity = params["arguments"]["fidelity"].as_str();
     let explicit_intent = params["arguments"]["intent"].as_str();
 
@@ -278,7 +279,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     match strategy {
         crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
             let compile_start = Instant::now();
-            let (compiled, semantic_edges, _source_hash) = match compile_file_ir_focused(
+            let (compiled, semantic_edges, source_hash) = match compile_file_ir_focused(
                 &resolved_path,
                 effective_fidelity,
                 state,
@@ -322,9 +323,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
                     })
             } else {
-                ir_ctx.load_ir(compiled.clone(), None);
+                ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
                 None
             };
+            if let Some(delta) = &delta {
+                state.remember_delta_source_hash(&alias, delta.to, source_hash);
+            }
             drop(ir_ctx);
             let _delta_ms = delta_start.elapsed().as_millis() as u64;
 
@@ -334,12 +338,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             match delta {
                 Some(ref d) => {
                     let wire_delta = serde_json::to_value(d).unwrap_or_default();
-                    // DASHBOARD FIX (R-02 FAANG): count the delta wire tokens
-                    // (the actual payload sent to the LLM) so the dashboard
-                    // can show delta efficiency. The previous full compression's
-                    // compressed token count is passed as `full_compressed_tokens`
-                    // so `record_compression` can compute CPU savings vs a full
-                    // re-compress.
+                    // Count the actual delta wire tokens for dashboard efficiency.
                     let delta_text = serde_json::to_string(&wire_delta).unwrap_or_default();
                     raw_tokens = count_tokens_with_tokenizer(&delta_text, tokenizer_ref);
                     comp_tokens = raw_tokens; // delta is the payload itself
@@ -482,7 +481,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             );
             let compile_ms = compile_start.elapsed().as_millis() as u64;
 
-            if let Ok((ir, semantic_edges, _source_hash)) = ir_result {
+            if let Ok((ir, semantic_edges, source_hash)) = ir_result {
                 let render_start = Instant::now();
                 // Note: IR error is logged below in the else branch (4.4 audit fix)
                 let hir = match checked_hierarchy_or_respond(id, &ir) {
@@ -493,7 +492,9 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 // Compute canonical file identity for WorkspaceIndex provenance
                 let canonical_path =
                     crate::dictionary::path::canonical_identity_key(&resolved_path);
-                state.ir_context_lock().load_ir(ir.clone(), None);
+                state
+                    .ir_context_lock()
+                    .load_ir(ir.clone(), Some(source_hash));
                 // Update workspace index: remove stale edges, insert fresh ones.
                 {
                     let mut idx = state.workspace_index_lock();

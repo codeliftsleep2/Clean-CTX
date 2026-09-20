@@ -5,7 +5,6 @@ use crate::mcp::tool_helpers::{count_tokens_with_tokenizer, inject_baseline_brea
 use crate::mcp::tools::parse_tokenizer_arg;
 use crate::protocol::send_response;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 
 pub(super) fn try_handle_angular_template(
     id: &Value,
@@ -81,25 +80,10 @@ pub(super) fn try_handle_angular_template(
         "angular_template",
     );
 
-    // Persist to DB so `context_stats` and cross-session dashboards
-    // can report Angular template compression savings.
-    {
-        if let Some(ref store) = *state.persistence_store_lock() {
-            let mut hasher = Sha256::new();
-            hasher.update(source.as_bytes());
-            let source_hash = format!("{:x}", hasher.finalize());
-            store.queue_save_context(
-                resolved_path,
-                fidelity,
-                &body,
-                &[],
-                &source_hash,
-                raw_tokens as u64,
-                comp_tokens as u64,
-            );
-        }
-    }
-    state.flush_persistence();
+    // Angular templates use a separate, non-canonical representation. They
+    // contribute session statistics but must not create an empty canonical-IR
+    // persistence row. A durable template contract requires its own approved
+    // semantic representation.
 
     // The Angular template compressor emits structural markers, never
     // verbatim method bodies — so the self-reporting contract must not

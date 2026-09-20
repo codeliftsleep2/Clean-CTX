@@ -46,7 +46,9 @@ and the compact `ec:` projection and was user-verified on 2026-09-19. Phase 7
 implemented the corrected `dv: 2` positional delta protocol and was user-
 verified on 2026-09-19. Phase 8A inventories physical `0x03` and defines the
 complete semantic `0x04` contract. Phase 8B implements the codec and tracked
-contract coverage and awaits user verification.
+contract coverage and was user-verified on 2026-09-20. Phase 8C connects
+canonical `0x04` baselines and corrected `dv: 2` history to buffered SQLite
+persistence and registered MCP replay; implementation awaits user verification.
 
 **Production-integration status:** Phase checkpoints certify bounded
 implementation and applicable gates; they do not certify production completion.
@@ -175,6 +177,12 @@ Physical `0x03` omits identity operands for eight operations and raw
 Phase 8A records the exact losses, malformed-input gaps, absent compatibility
 evidence, production persistence gap, and normative physical `0x04` layout in
 [`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md).
+
+Phase 8C repairs that persistence gap: canonical production writers persist
+non-empty `0x04` bytes under durable file identity, applied corrected deltas
+are retained and replayed in order, and replacement/reset/deletion own their
+state transitions. The non-canonical Angular template renderer no longer
+creates an empty canonical-IR row.
 
 ### 3.7 Production consumption
 

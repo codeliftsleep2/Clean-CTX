@@ -1,7 +1,8 @@
 # Corrected Binary Format Contract — Physical Version `0x04`
 
 **Status:** Approved Phase 8 target. Phase 8A fixed the normative contract;
-Phase 8B codec and tracked coverage are implemented, awaiting verification.
+Phase 8B was user-verified. Phase 8C production persistence integration is
+implemented and awaiting user verification.
 
 **Date:** 2026-09-20
 
@@ -95,11 +96,12 @@ These are corrected-format requirements, not authority for `0x04` behavior.
 
 ## 4. Compatibility evidence and policy
 
-Source inspection found no tracked `.bin`, database, fixture, or other
-persisted binary artifact. The production `compress_code_context` and Angular
-provider persistence paths currently pass an empty IR blob to `BufferedStore`.
-SQLite can store and decode a supplied blob, but no inspected production writer
-supplies `binary_wire::encode` output.
+Phase 8A source inspection found no tracked `.bin`, database, fixture, or other
+persisted binary artifact. At that baseline, production compression and Angular
+template paths passed an empty IR blob to `BufferedStore`. Phase 8C wires
+canonical compilation to non-empty `binary_wire::encode` output. The separate
+Angular template representation no longer creates an invalid empty canonical-
+IR row; its session statistics and LLM output remain independent.
 
 The current decoder contains branches labelled `0x01`, `0x02`, and `0x03`.
 That code is not evidence of a supported persisted input:
@@ -218,20 +220,23 @@ them green. Required tracked coverage includes:
 9. JSON-wrapper semantic equality and metadata-conflict rejection;
 10. structured rejection of legacy versions and every malformed case in
     Section 7;
-11. a production-path persistence test once a real writer is wired to store
-    non-empty `0x04` bytes.
+11. a registered production-dispatch persistence test storing and reloading
+    non-empty `0x04` bytes and corrected `dv: 2` history.
 
 Opcode-only, instruction-count-only, and selective-field comparisons are not
 semantic round-trip evidence.
 
 ## 9. Production integration boundary
 
-Phase 8B corrects the codec. It is not production-complete merely because its
-codec tests pass. The real persistence lifecycle currently has a missing
-producer: registered compression handlers queue empty IR blobs even though
-SQLite owns an `ir_binary` column and `replay_history` attempts to decode it.
+Phase 8C connects the codec to production persistence. Canonical baselines use
+the durable resolved file path rather than a session-local alias, applied
+`dv: 2` deltas are normalized to that identity, and replay accepts corrected
+sequence deltas plus only the existing structurally applicable legacy input.
+Recompilation transactionally replaces the baseline and stale history;
+deletion/reset clear ownership. Registered-dispatch coverage crosses producer,
+buffer, SQLite, reload, replay, MCP response, and byte-exact `apply_edit`.
 
-Wiring a non-empty `0x04` blob into that lifecycle must preserve the existing
-LLM-facing representation and byte-exact edit behavior. It must be verified
-through producer, queued persistence, SQLite ownership, reload, delta replay,
-and MCP exposure before Phase 9 can certify production integration.
+The Angular template compressor remains a distinct representation without a
+canonical `CompiledIR` producer. Phase 8C therefore removes its empty-IR write
+rather than fabricating canonical semantics. Phase 9 must audit this lifecycle
+evidence before certifying repository-wide production integration.

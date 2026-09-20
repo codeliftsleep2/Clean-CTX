@@ -104,8 +104,13 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
     let guard = state.persistence_store_lock();
     if let Some(ref store) = *guard {
         match store.load_context_with_deltas(file_path, target_seq) {
-            Ok(Some((ir, version))) => {
+            Ok(Some((mut ir, version))) => {
                 drop(guard);
+                let path_alias = state.get_or_create_alias(file_path.to_string());
+                state.forget_persisted_path(&path_alias);
+                state.remember_persisted_path(&path_alias, file_path);
+                ir.file_id = path_alias;
+                state.ir_context_lock().load_ir(ir.clone(), None);
                 send_response(&serde_json::json!({
                     "jsonrpc": "2.0", "id": id,
                     "result": {
@@ -177,3 +182,7 @@ pub(crate) fn handle_purge_old_deltas(id: &Value, params: &Value, state: &McpSta
         ));
     }
 }
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/persistence_lifecycle.rs"]
+mod lifecycle_tests;

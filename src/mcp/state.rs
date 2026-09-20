@@ -153,6 +153,9 @@ pub struct McpState {
     /// Initialized from `config.persistence` — `None` if disabled or
     /// if DB open fails.
     pub persistence_store: Mutex<Option<BufferedStore>>,
+    /// Exact durable persistence path owned by each session-local IR alias.
+    persisted_paths: Mutex<HashMap<String, String>>,
+    pending_delta_hashes: Mutex<HashMap<(String, u64), String>>,
 
     /// Tracks which cache breakpoints have already been emitted this session.
     /// Key format: "{region}::{breaker}" — e.g., "tools::tools-v1".
@@ -290,6 +293,8 @@ impl McpState {
             session_stats: Mutex::new(session_stats),
             context_store: InMemoryContextStore::new(),
             persistence_store: Mutex::new(persistence_store),
+            persisted_paths: Mutex::new(HashMap::new()),
+            pending_delta_hashes: Mutex::new(HashMap::new()),
             llm_text_cache: Mutex::new(HashMap::new()),
             emitted_breakpoints: Mutex::new(HashSet::new()),
             cache_metrics: Mutex::new(CacheMetrics::default()),
@@ -458,6 +463,38 @@ impl McpState {
     /// Get or create a path alias (thread-safe convenience method).
     pub fn get_or_create_alias(&self, path: String) -> String {
         self.dict_lock().get_or_create_alias(path)
+    }
+
+    /// Resolve a session-local file alias to its durable canonical path.
+    pub fn path_for_alias(&self, alias: &str) -> Option<String> {
+        self.dict_lock().path_for_alias(alias).map(str::to_owned)
+    }
+
+    pub fn remember_persisted_path(&self, alias: &str, file_path: &str) {
+        lock_or_recover!(self.persisted_paths.lock(), "persisted_paths")
+            .insert(alias.to_string(), file_path.to_string());
+    }
+
+    pub fn persisted_path(&self, alias: &str) -> Option<String> {
+        lock_or_recover!(self.persisted_paths.lock(), "persisted_paths")
+            .get(alias)
+            .cloned()
+    }
+
+    pub fn forget_persisted_path(&self, alias: &str) {
+        lock_or_recover!(self.persisted_paths.lock(), "persisted_paths").remove(alias);
+        lock_or_recover!(self.pending_delta_hashes.lock(), "pending_delta_hashes")
+            .retain(|(file, _), _| file != alias);
+    }
+
+    pub fn remember_delta_source_hash(&self, alias: &str, version: u64, source_hash: String) {
+        lock_or_recover!(self.pending_delta_hashes.lock(), "pending_delta_hashes")
+            .insert((alias.to_string(), version), source_hash);
+    }
+
+    pub fn take_delta_source_hash(&self, alias: &str, version: u64) -> Option<String> {
+        lock_or_recover!(self.pending_delta_hashes.lock(), "pending_delta_hashes")
+            .remove(&(alias.to_string(), version))
     }
 
     /// Get or create a bundle alias (thread-safe convenience method).

@@ -17,10 +17,12 @@
 //     that the store is used in a multi-threaded context (retry with sleep).
 
 use crate::compression::Fidelity;
-use crate::ir::compiler::CompiledIR;
 use crate::mcp::context_store::{ContextStore, StoredContextMeta};
 use rusqlite::{Connection, params};
+use sha2::{Digest, Sha256};
 use std::path::Path;
+
+mod replay;
 
 /// SQLite-backed implementation of [`ContextStore`].
 pub struct SqliteStore {
@@ -148,86 +150,17 @@ impl SqliteStore {
             )?;
         }
 
+        if current_version < 3 {
+            self.conn.execute_batch(
+                "
+                ALTER TABLE contexts ADD COLUMN source_hash TEXT NOT NULL DEFAULT '';
+                UPDATE contexts SET source_hash = content_hash WHERE source_hash = '';
+                INSERT INTO _schema_version (version) VALUES (3);
+            ",
+            )?;
+        }
+
         Ok(())
-    }
-
-    /// Load a context and replay deltas up to a target version.
-    /// Returns the reconstructed CompiledIR and the final version reached.
-    pub fn load_context_with_deltas(
-        &self,
-        file_path: &str,
-        target_sequence: Option<u32>,
-    ) -> Result<Option<(CompiledIR, u32)>, Box<dyn std::error::Error>> {
-        // 1. Load baseline IR from contexts table
-        let mut stmt = self.conn.prepare(
-            "SELECT ir_binary, content_hash, fidelity FROM contexts WHERE file_path = ?1 ORDER BY updated_at DESC LIMIT 1"
-        )?;
-
-        let row = match stmt.query_row(params![file_path], |row| {
-            let blob: Vec<u8> = row.get(0)?;
-            let hash: String = row.get(1)?;
-            let fid: i32 = row.get(2)?;
-            Ok((blob, hash, fid))
-        }) {
-            Ok(r) => r,
-            Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
-            Err(e) => return Err(e.into()),
-        };
-
-        // 2. Decode baseline IR
-        let ir = crate::ir::binary_wire::decode(&row.0)?;
-        if ir.file_id != file_path {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!(
-                    "persisted binary file identity mismatch: expected {file_path:?}, found {:?}",
-                    ir.file_id
-                ),
-            )
-            .into());
-        }
-
-        // 3. Load deltas up to target_sequence
-        let max_seq = target_sequence.unwrap_or(u32::MAX);
-        let mut delta_stmt = self.conn.prepare(
-            "SELECT edit_sequence, delta_payload FROM deltas
-             WHERE context_id = (SELECT id FROM contexts WHERE file_path = ?1 ORDER BY updated_at DESC LIMIT 1)
-             AND edit_sequence <= ?2
-             ORDER BY edit_sequence"
-        )?;
-
-        let delta_rows = delta_stmt.query_map(params![file_path, max_seq as i32], |row| {
-            let seq: i32 = row.get(0)?;
-            let payload: Vec<u8> = row.get(1)?;
-            Ok((seq, payload))
-        })?;
-
-        // 4. Build a ContextState and replay deltas
-        let mut context_state = crate::ir::replay::ContextState::new();
-        context_state.load_ir(ir, None);
-
-        for delta_result in delta_rows {
-            let (_seq, payload) = delta_result?;
-            let delta: crate::ir::delta::IRDelta = serde_json::from_slice(&payload)?;
-            context_state.apply(delta)?;
-        }
-
-        // 5. Reconstruct CompiledIR from context state
-        let instructions = context_state.get_ir(file_path).cloned().unwrap_or_default();
-        let version = context_state.file_version(file_path).unwrap_or(1);
-
-        let instructions_ops: Vec<crate::ir::opcodes::CoreOp> = instructions
-            .iter()
-            .filter_map(|t| crate::ir::wire::tuple_to_op(t))
-            .collect();
-
-        let final_ir = CompiledIR {
-            file_id: file_path.to_string(),
-            instructions: instructions_ops,
-            version,
-        };
-
-        Ok(Some((final_ir, version as u32)))
     }
 
     /// Enumerate persisted contexts from the DB, most recently updated
@@ -420,22 +353,51 @@ impl ContextStore for SqliteStore {
         raw_tokens: u64,
         compressed_tokens: u64,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        // MED-01: INSERT OR REPLACE is intentional — re-saving the same file
-        // overwrites the previous context. This is by design because:
-        //   1. The context ID is deterministic from the content hash, so
-        //      re-saving the same content is idempotent.
-        //   2. Version history is preserved via delta rows in the deltas table,
-        //      not via multiple context rows.
-        //   3. The `updated_at` timestamp tracks the latest save.
-        let id = format!("ctx-{}", source_hash); // deterministic ID from content hash
+        // One file owns one baseline. Recompilation transactionally removes
+        // the prior baseline and its now-stale delta chain before replacement.
+        let preferred_id = format!("ctx-{source_hash}");
+        let collision_path = self
+            .conn
+            .query_row(
+                "SELECT file_path FROM contexts WHERE id = ?1",
+                params![preferred_id],
+                |row| row.get::<_, String>(0),
+            )
+            .ok();
+        let id = if collision_path
+            .as_deref()
+            .is_some_and(|path| path != file_path)
+        {
+            format!("{preferred_id}-{}", short_path_hash(file_path))
+        } else {
+            preferred_id
+        };
         let fid = fidelity as i32;
         let ir_binary = ir_blobs.unwrap_or(&[]);
+        let storage_key = format!("{source_hash}:{}", short_path_hash(file_path));
 
-        self.conn.execute(
-            "INSERT OR REPLACE INTO contexts (id, file_path, content_hash, fidelity, ir_binary, pretty_text, updated_at, raw_tokens, compressed_tokens)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'), ?7, ?8)",
-            params![id, file_path, source_hash, fid, ir_binary, compressed_output, raw_tokens as i64, compressed_tokens as i64],
+        // A save can run directly or inside BufferedStore's batch transaction.
+        // A savepoint preserves atomic replacement in both contexts without
+        // attempting an invalid nested SQLite transaction.
+        let tx = self.conn.savepoint()?;
+        tx.execute(
+            "DELETE FROM symbols WHERE context_id IN (SELECT id FROM contexts WHERE file_path = ?1)",
+            params![file_path],
         )?;
+        tx.execute(
+            "DELETE FROM deltas WHERE context_id IN (SELECT id FROM contexts WHERE file_path = ?1)",
+            params![file_path],
+        )?;
+        tx.execute(
+            "DELETE FROM contexts WHERE file_path = ?1",
+            params![file_path],
+        )?;
+        tx.execute(
+            "INSERT INTO contexts (id, file_path, content_hash, source_hash, fidelity, ir_binary, pretty_text, updated_at, raw_tokens, compressed_tokens)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'), ?8, ?9)",
+            params![id, file_path, storage_key, source_hash, fid, ir_binary, compressed_output, raw_tokens as i64, compressed_tokens as i64],
+        )?;
+        tx.commit()?;
 
         Ok(id)
     }
@@ -445,7 +407,7 @@ impl ContextStore for SqliteStore {
         file_path: &str,
     ) -> Result<Option<StoredContextMeta>, Box<dyn std::error::Error>> {
         let mut stmt = self.conn.prepare(
-            "SELECT c.id, c.file_path, c.content_hash, c.fidelity, c.pretty_text, c.created_at,
+            "SELECT c.id, c.file_path, COALESCE(NULLIF(c.source_hash, ''), c.content_hash), c.fidelity, c.pretty_text, c.created_at,
                     COALESCE(c.raw_tokens, 0) as raw_tokens,
                     COALESCE(c.compressed_tokens, 0) as compressed_tokens,
                     (SELECT COUNT(*) FROM deltas d WHERE d.context_id = c.id) as delta_count
@@ -509,6 +471,10 @@ impl ContextStore for SqliteStore {
         delta_payload: &[u8],
         edit_type: Option<&str>,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        if self.context_file_path(context_id)?.is_none() {
+            return Err(format!("unknown persisted context: {context_id}").into());
+        }
+
         // Get the next edit_sequence
         let next_seq: i32 = self
             .conn
@@ -545,13 +511,27 @@ impl ContextStore for SqliteStore {
     }
 
     fn clear_file(&mut self, file_path: &str) {
-        if let Err(e) = self.conn.execute(
-            "DELETE FROM contexts WHERE file_path = ?1",
-            params![file_path],
-        ) {
+        let result = self.conn.transaction().and_then(|tx| {
+            tx.execute(
+                "DELETE FROM symbols WHERE context_id IN (SELECT id FROM contexts WHERE file_path = ?1)",
+                params![file_path],
+            )?;
+            tx.execute(
+                "DELETE FROM deltas WHERE context_id IN (SELECT id FROM contexts WHERE file_path = ?1)",
+                params![file_path],
+            )?;
+            tx.execute("DELETE FROM contexts WHERE file_path = ?1", params![file_path])?;
+            tx.commit()
+        });
+        if let Err(e) = result {
             eprintln!("[clean-ctx] Failed to clear file from DB: {e}");
         }
     }
+}
+
+fn short_path_hash(file_path: &str) -> String {
+    let digest = Sha256::digest(file_path.as_bytes());
+    format!("{digest:x}")[..16].to_string()
 }
 
 #[cfg(test)]

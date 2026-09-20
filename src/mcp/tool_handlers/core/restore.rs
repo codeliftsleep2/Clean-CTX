@@ -57,6 +57,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
 
     let path_alias = state.get_or_create_alias(resolved_path.clone());
     state.ir_context_lock().remove_file(&path_alias);
+    state.forget_persisted_path(&path_alias);
     state.llm_text_cache_lock().remove(&path_alias);
     // Clear workspace index for this file (canonical identity, not alias).
     let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);

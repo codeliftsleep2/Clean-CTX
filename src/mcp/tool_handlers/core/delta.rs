@@ -172,12 +172,28 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     version: prev_version,
                     instructions: tuples_to_coreops(prev_instructions),
                 };
+                let previous_hash = ir_ctx
+                    .get_source_hash(&path_alias)
+                    .cloned()
+                    .unwrap_or_else(|| source_hash.clone());
+                ensure_persisted_baseline(
+                    state,
+                    &resolved_path,
+                    fidelity,
+                    &prev_compiled,
+                    &previous_hash,
+                );
                 SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
             })
     } else {
-        ir_ctx.load_ir(compiled.clone(), Some(source_hash));
+        ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
         None
     };
+    if let Some(delta) = &delta {
+        state.remember_delta_source_hash(&path_alias, delta.to, source_hash.clone());
+    } else if prev_version > 0 {
+        ir_ctx.set_source_hash(&path_alias, source_hash.clone());
+    }
     drop(ir_ctx);
 
     match delta {
@@ -199,11 +215,19 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             send_response(&response);
         }
         None => {
+            if prev_version == 0 {
+                persist_baseline(state, &resolved_path, fidelity, &compiled, &source_hash);
+            }
+            let version = if prev_version == 0 {
+                compiled.version
+            } else {
+                prev_version
+            };
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": {
-                    "content": [{ "type": "text", "text": format!("Baseline stored for {} (v{})", compiled.file_id, compiled.version) }],
-                    "version": compiled.version, "instruction_count": compiled.instructions.len(),
+                    "content": [{ "type": "text", "text": format!("Baseline stored for {} (v{})", compiled.file_id, version) }],
+                    "version": version, "instruction_count": compiled.instructions.len(),
                     "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                 }
             });
@@ -262,6 +286,48 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         return;
     }
 
+    let durable_file = state
+        .persisted_path(&file)
+        .or_else(|| state.path_for_alias(&file))
+        .unwrap_or_else(|| file.clone());
+    let persisted_payload = match &delta {
+        IncomingDelta::Sequence(delta) => {
+            crate::mcp::persistence_ir::PersistedDelta::normalize_sequence(delta, &durable_file)
+        }
+        IncomingDelta::Legacy(delta) => {
+            crate::mcp::persistence_ir::PersistedDelta::normalize_legacy(delta, &durable_file)
+        }
+    };
+    let persisted_payload = match persisted_payload {
+        Ok(payload) => payload,
+        Err(error) => {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                format!("Delta persistence encoding failed: {error}"),
+                None,
+            ));
+            return;
+        }
+    };
+    ensure_apply_baseline(state, &file, &durable_file);
+    let persisted_context = match persisted_context_id(state, &durable_file) {
+        Ok(context) => context,
+        Err(error) => {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                error,
+                None,
+            ));
+            return;
+        }
+    };
+
+    let edit_type = match &delta {
+        IncomingDelta::Sequence(_) => "sequence_v2",
+        IncomingDelta::Legacy(_) => "legacy",
+    };
     let mut ir_ctx = state.ir_context_lock();
     let applied = match delta {
         IncomingDelta::Sequence(delta) => ir_ctx.apply_sequence(delta),
@@ -269,7 +335,19 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
     };
     match applied {
         Ok(new_version) => {
+            if edit_type == "sequence_v2"
+                && let Some(source_hash) = state.take_delta_source_hash(&file, new_version)
+            {
+                ir_ctx.set_source_hash(&file, source_hash);
+            }
             let rendered = ir_ctx.render_pretty(&file, crate::compression::Fidelity::Low);
+            drop(ir_ctx);
+            if let Some(context_id) = persisted_context {
+                if let Some(ref store) = *state.persistence_store_lock() {
+                    store.queue_append_delta(&context_id, &persisted_payload, Some(edit_type));
+                }
+                state.flush_persistence();
+            }
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": { "content": [{ "type": "text", "text": rendered.unwrap_or_default() }], "_meta": { "version": new_version } }
@@ -283,6 +361,94 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             "error": { "code": -32603, "message": format!("Apply delta failed: {}", e) }
         })),
     }
+}
+
+fn persist_baseline(
+    state: &McpState,
+    file_path: &str,
+    fidelity: crate::compression::Fidelity,
+    compiled: &CompiledIR,
+    source_hash: &str,
+) {
+    let durable = crate::mcp::persistence_ir::baseline(compiled, file_path);
+    let binary = crate::ir::binary_wire::encode(&durable);
+    if let Some(ref store) = *state.persistence_store_lock() {
+        store.queue_save_context(file_path, fidelity, "", &binary, source_hash, 0, 0);
+        state.remember_persisted_path(&compiled.file_id, file_path);
+    }
+    state.flush_persistence();
+}
+
+fn ensure_persisted_baseline(
+    state: &McpState,
+    file_path: &str,
+    fidelity: crate::compression::Fidelity,
+    compiled: &CompiledIR,
+    source_hash: &str,
+) {
+    let missing = state
+        .persistence_store_lock()
+        .as_ref()
+        .is_some_and(|store| {
+            store.flush();
+            store.sqlite().is_some_and(|sqlite| {
+                sqlite
+                    .baseline_binary(file_path)
+                    .ok()
+                    .flatten()
+                    .and_then(|bytes| crate::ir::binary_wire::decode(&bytes).ok())
+                    .is_none_or(|ir| ir.file_id != file_path)
+            })
+        });
+    if missing {
+        persist_baseline(state, file_path, fidelity, compiled, source_hash);
+    }
+}
+
+fn ensure_apply_baseline(state: &McpState, alias: &str, file_path: &str) {
+    if state.persistence_store_lock().is_none() {
+        return;
+    }
+    let ir_ctx = state.ir_context_read();
+    let Some(instructions) = ir_ctx.get_ir(alias).cloned() else {
+        return;
+    };
+    let Some(version) = ir_ctx.file_version(alias) else {
+        return;
+    };
+    let source_hash = ir_ctx
+        .get_source_hash(alias)
+        .cloned()
+        .unwrap_or_else(|| format!("ir-{alias}-{version}"));
+    drop(ir_ctx);
+    let compiled = CompiledIR {
+        file_id: alias.to_string(),
+        instructions: tuples_to_coreops(instructions),
+        version,
+    };
+    ensure_persisted_baseline(
+        state,
+        file_path,
+        crate::compression::Fidelity::Low,
+        &compiled,
+        &source_hash,
+    );
+}
+
+fn persisted_context_id(state: &McpState, file_path: &str) -> Result<Option<String>, String> {
+    let guard = state.persistence_store_lock();
+    let Some(store) = guard.as_ref() else {
+        return Ok(None);
+    };
+    store.flush();
+    let sqlite = store
+        .sqlite()
+        .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
+    sqlite
+        .current_context_id(file_path)
+        .map_err(|error| format!("Persistence lookup failed: {error}"))?
+        .map(Some)
+        .ok_or_else(|| format!("No persisted baseline for delta file: {file_path}"))
 }
 
 #[cfg(test)]

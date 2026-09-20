@@ -18,6 +18,7 @@ pub(crate) mod discovery_cache;
 pub mod dispatcher;
 mod handlers;
 pub(crate) mod heuristics;
+pub(crate) mod persistence_ir;
 pub(crate) mod prompts;
 pub(crate) mod proxy_stats;
 mod router;

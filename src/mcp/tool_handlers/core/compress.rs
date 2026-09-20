@@ -10,7 +10,6 @@ use crate::mcp::tool_helpers::{
 use crate::mcp::tools::{parse_fidelity_arg, parse_tokenizer_arg};
 use crate::protocol::send_response;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 // ── Handler: compress_code_context ───────────────────────────────
 
 /// P3-2: Main handler for compress_code_context tool.
@@ -108,14 +107,16 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
     // P3-2: Build response using extracted helpers
     // If IR compilation fails, fall back to legacy compression but log
     // the structured error for diagnostics (4.4 audit fix).
-    let mut response = if let Ok((ir, semantic_edges, _source_hash)) = ir_result {
+    let mut response = if let Ok((ir, semantic_edges, source_hash)) = ir_result {
         let hir = match checked_hierarchy_or_respond(id, &ir) {
             Some(hierarchy) => hierarchy,
             None => return,
         };
         // Compute canonical file identity for WorkspaceIndex provenance
         let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
-        state.ir_context_lock().load_ir(ir.clone(), None);
+        state
+            .ir_context_lock()
+            .load_ir(ir.clone(), Some(source_hash.clone()));
         // Update workspace index: remove stale edges, insert fresh ones.
         {
             let mut idx = state.workspace_index_lock();
@@ -151,19 +152,20 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         // Persist to DB
         {
             if let Some(ref store) = *state.persistence_store_lock() {
-                let mut hasher = Sha256::new();
-                hasher.update(source_text.as_bytes());
-                let source_hash = format!("{:x}", hasher.finalize());
+                let mut durable_ir = ir.clone();
+                durable_ir.file_id.clone_from(&resolved_path);
+                let ir_binary = crate::ir::binary_wire::encode(&durable_ir);
 
                 store.queue_save_context(
                     &resolved_path,
                     effective_fidelity,
                     &llm_text_with_footer,
-                    &[],
+                    &ir_binary,
                     &source_hash,
                     raw_tokens as u64,
                     compressed_tokens as u64,
                 );
+                state.remember_persisted_path(&ir.file_id, &resolved_path);
             }
         }
         state.flush_persistence();
