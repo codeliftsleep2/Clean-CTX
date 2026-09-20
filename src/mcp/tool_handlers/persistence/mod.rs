@@ -344,9 +344,16 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
             return;
         }
     };
-    let rendered = restored
-        .compact_output
-        .unwrap_or_else(|| crate::ir::render_hierarchical_for_llm(&hierarchy, restored.fidelity));
+    let rendered = restored.compact_output.unwrap_or_else(|| {
+        let compact = crate::ir::render_hierarchical_for_llm(&hierarchy, restored.fidelity);
+        format!(
+            "{}\n// ── {} ({}) ──\n{}",
+            compact.trim(),
+            path_alias,
+            file_path,
+            state.format_dict_footer_for_aliases(&[&path_alias]).trim()
+        )
+    });
     let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
     state
         .ir_context_lock()
@@ -409,6 +416,10 @@ pub(crate) fn handle_purge_old_deltas(id: &Value, params: &Value, state: &McpSta
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/persistence_lifecycle.rs"]
 mod lifecycle_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/mcp/baseline_publication.rs"]
+mod baseline_publication_tests;
 
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/save_context_contract.rs"]

@@ -381,8 +381,7 @@ supplied edge snapshots remain a separately reviewable future capability.
 
 ## 17. Finding P9-13: deletion/reset has no registered lifecycle owner
 
-**Severity:** High externally visible lifecycle gap; approved and implemented
-pending user verification.
+**Severity:** High externally visible lifecycle gap; repaired and user-verified.
 
 P9-10 correctly removes deletion/reset behavior from `restore_context`, whose
 approved sole meaning is transactional durable restoration. The repository has
@@ -418,9 +417,89 @@ source file is never mutated. Registered-dispatch coverage includes successful
 cascade deletion, peer isolation, mismatched ownership, durable failure
 transactionality, truthful response metadata, and restore-after-delete failure.
 
-## 18. Approval gate and next audit action
+## 18. Exhaustive audit checkpoint
 
-P9-10, P9-11, and P9-12 were user-verified green. P9-13 is implemented and
-awaits user-run verification. Once that gate is green, the exhaustive Phase 9
-production operation/lifecycle and obsolete-path matrix audit resumes. These
-repairs alone are not Phase 9 certification.
+The remaining audit began from registered dispatch and traced the first
+state-producing operations before moving outward to the complete operation and
+semantic-family matrix. The following rows are current production evidence,
+not final certification:
+
+| Registered operation | Canonical/validation path | Live and durable ownership | Consumer/exposure | Current status and bypass review |
+|---|---|---|---|---|
+| `compress_code_context` | Default production compilation followed by checked hierarchy | Installs canonical session state, fidelity, complete semantic edges, and `WorkspaceIndex` ownership; then writes physical `0x04` plus the edge snapshot | Compact renderer plus structured hierarchy in the registered response | Checked projection and non-empty canonical persistence are present. P9-14 blocks certification because live publication precedes durable commit. |
+| `delta_code_context` | Default production compilation; corrected `SequenceDeltaComputer` emits `dv:2` | Existing baselines are checked against durable state; target edges are retained as pending authority. The first baseline installs live ownership before persisting it. | Registered compact delta response | No production legacy-delta emission was found. P9-14 blocks first-baseline transactionality. |
+| `apply_delta` | Strict `dv:2` tuple validation and checked replay; legacy input is compatibility-only | Durable mode requires the exact server-owned pending target-edge snapshot and commits canonical delta plus edges before live installation | Registered response renders the accepted canonical target | Corrected production path confirmed. Durable legacy or standalone `dv:2` input without pending authority fails structurally. |
+| `save_context` | Strict reconstruction of the requested session-owned canonical stream | File-scoped physical `0x04` and complete edge snapshot checkpoint | Truthful registered saved/already-durable response | P9-08 user-verified; no substitute-file or empty-IR path found in the handler. |
+| `restore_context` / `replay_history` | Physical `0x04`, checked `dv:2` replay, semantic-state validation, checked hierarchy | Durable state is validated completely before session and `WorkspaceIndex` installation | Compact and structured registered response | P9-10 through P9-12 user-verified; no source-recompile fallback remains. |
+| `delete_context` | Resolves exact session/durable ownership before deletion | SQLite deletion is the commit boundary; live canonical, edge, alias, hash, fidelity, compact, and pending ownership is removed afterward | Truthful registered deletion response | P9-13 user-verified; source files are not mutated. |
+
+Static bypass inspection also found that MCP production hierarchy call sites use
+the checked projection boundary; production tuple reconstruction is fallible
+rather than `filter_map`-lossy; and corrected production delta generation does
+not emit the legacy delta representation. The generic optional-IR persistence
+trait remains in the storage layer, but no registered production save caller
+was found passing absent IR during this checkpoint. The audit remains
+incomplete and will resume after P9-14 is resolved and user-verified.
+
+## 19. Finding P9-14: baseline handlers publish live state before durable commit
+
+**Severity:** High transactional lifecycle contradiction; approved and
+implemented pending user verification.
+
+When persistence is enabled, `compress_code_context` installs the newly
+compiled canonical IR, source hash, fidelity, complete semantic-edge snapshot,
+and replacement `WorkspaceIndex` edges before calling
+`save_context_with_semantics`. If that atomic write fails, the handler returns
+a persistence error but leaves the new live state installed.
+
+The first-baseline branch of `delta_code_context` has the same ordering. It
+loads canonical IR, replaces index edges, records semantic edges and fidelity,
+and only afterward calls `persist_baseline`. A failed baseline write therefore
+reports failure while the session already owns the candidate state. This is
+inconsistent with the transactional commit boundary already enforced for
+restore, accepted durable deltas, and deletion, and permits live and durable
+owners to describe different semantic versions after an unsuccessful request.
+
+The contradiction affects initial compilation/checkpoint creation through two
+registered operations, source hash and fidelity ownership, framework/meta edge
+ownership, subsequent delta versioning, later explicit save/restore behavior,
+and the truthfulness of the MCP failure response.
+
+Alternatives:
+
+1. Treat durable commit as the publication boundary whenever a registered
+   operation promises to persist its newly compiled baseline. Build the
+   candidate canonical and edge state off-session, commit physical `0x04` plus
+   the edge snapshot, and install all live ownership only after success.
+2. Snapshot and roll back every affected live owner if persistence fails. This
+   can preserve behavior but is more complex and exposes additional race and
+   partial-rollback surfaces.
+3. Define durable persistence as best-effort after successful live publication
+   and return success with explicit non-durable status when it fails. This is a
+   new two-tier public guarantee and conflicts with the handlers' current
+   structural failure response.
+
+Recommendation: option 1. It matches the approved restore, delta-application,
+and deletion transaction model and gives each request one observable commit
+boundary. Session-only operations that do not promise persistence can remain
+separate; this decision need not make every compilation an automatic durable
+checkpoint.
+
+**Implementation update (2026-09-20):** Both registered baseline paths now
+compile and validate candidates without creating session alias ownership. When
+persistence is enabled, physical `0x04` and the complete aligned semantic-edge
+snapshot commit before the candidate receives an alias or changes canonical
+session state, source hash, fidelity, `WorkspaceIndex`, edge, durable-path, or
+compact ownership. The exact committed candidate is then published live.
+Empty durable compact metadata is treated as absent and deterministically
+rendered from the checked restored model, preserving the registered compact
+response while keeping compact presentation separate from the semantic commit.
+Tracked registered-dispatch regressions inject file-specific atomic-save
+failures and assert preservation of prior and peer ownership.
+
+## 20. Approval gate and next audit action
+
+P9-10 through P9-13 were user-verified green. The exhaustive Phase 9
+production operation/lifecycle and obsolete-path matrix audit is paused for
+user-run verification of P9-14. After that gate is green, resume the remaining
+registered-operation and semantic-family matrix. Phase 9 is not certified.

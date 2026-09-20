@@ -5,8 +5,8 @@ use crate::error::to_jsonrpc_error;
 use crate::ir::delta::{IRDelta, SequenceDelta, SequenceDeltaComputer};
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::{
-    compile_file_ir, diff_code_context_handler, inject_baseline_breakpoint, inject_tail_breakpoint,
-    resolve_file_path_checked,
+    compile_file_ir_candidate, diff_code_context_handler, inject_baseline_breakpoint,
+    inject_tail_breakpoint, resolve_file_path_checked,
 };
 use crate::mcp::tools::parse_fidelity_arg;
 use crate::protocol::send_response;
@@ -100,7 +100,9 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     };
 
     // A-08: Check if source has changed before compiling
-    let path_alias = state.get_or_create_alias(resolved_path.clone());
+    let path_alias = state
+        .alias_for_path(&resolved_path)
+        .unwrap_or_else(|| resolved_path.clone());
     let prev_version = state.file_version(&path_alias).unwrap_or(0);
 
     // Try to skip compilation if source is unchanged
@@ -142,8 +144,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     drop(ir_ctx); // Release lock before expensive compile
 
     // Source changed or no baseline - compile
-    let (compiled, semantic_edges, source_hash) =
-        match compile_file_ir(&resolved_path, fidelity, state) {
+    let (mut compiled, semantic_edges, source_hash) =
+        match compile_file_ir_candidate(&resolved_path, fidelity, state) {
             Ok(c) => c,
             Err(e) => {
                 send_response(&to_jsonrpc_error(id, &e));
@@ -191,19 +193,13 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
         }
         SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
     } else {
-        ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
-        let mut idx = state.workspace_index_lock();
-        idx.remove_file(&canonical_path);
-        idx.add_edges(&canonical_path, semantic_edges.clone());
-        drop(idx);
-        state.remember_semantic_edges(&path_alias, semantic_edges.clone());
         None
     };
     if let Some(delta) = &mut delta {
         delta.target_hash = Some(source_hash.clone());
     }
-    state.remember_context_fidelity(&path_alias, fidelity);
     if let Some(delta) = &delta {
+        state.remember_context_fidelity(&path_alias, fidelity);
         if let Err(error) = state.remember_pending_transition(
             &path_alias,
             &resolved_path,
@@ -250,6 +246,24 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 ) {
                     send_response(&invalid_session_ir_response(id, &error));
                     return;
+                }
+
+                // P9-14: the durable baseline commit precedes publication of
+                // every corresponding live owner.
+                let committed_alias = state.get_or_create_alias(resolved_path.clone());
+                compiled.file_id.clone_from(&committed_alias);
+                state
+                    .ir_context_lock()
+                    .load_ir(compiled.clone(), Some(source_hash.clone()));
+                state.remember_context_fidelity(&committed_alias, fidelity);
+                {
+                    let mut idx = state.workspace_index_lock();
+                    idx.remove_file(&canonical_path);
+                    idx.add_edges(&canonical_path, semantic_edges.clone());
+                }
+                state.remember_semantic_edges(&committed_alias, semantic_edges.clone());
+                if state.persistence_store_lock().is_some() {
+                    state.remember_persisted_path(&committed_alias, &resolved_path);
                 }
             }
             let version = if prev_version == 0 {

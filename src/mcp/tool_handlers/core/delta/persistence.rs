@@ -37,7 +37,6 @@ pub(super) fn persist_baseline(
                 "canonical baseline and semantic edges were not persisted atomically".to_string(),
             );
         }
-        state.remember_persisted_path(&compiled.file_id, file_path);
     }
     Ok(())
 }
@@ -90,6 +89,7 @@ pub(super) fn ensure_persisted_baseline(
             source_hash,
             &semantic_edges,
         )?;
+        state.remember_persisted_path(&compiled.file_id, file_path);
     }
     Ok(())
 }

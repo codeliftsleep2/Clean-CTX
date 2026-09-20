@@ -16,10 +16,11 @@ impl SqliteStore {
                 "SELECT pretty_text FROM contexts WHERE file_path = ?1
                  ORDER BY updated_at DESC LIMIT 1",
                 params![file_path],
-                |row| row.get(0),
+                |row| row.get::<_, Option<String>>(0),
             )
             .optional()?
-            .flatten())
+            .flatten()
+            .filter(|text| !text.is_empty()))
     }
 
     pub(crate) fn checkpoint_matches(

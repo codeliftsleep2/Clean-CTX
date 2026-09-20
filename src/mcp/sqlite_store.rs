@@ -25,6 +25,9 @@ use std::path::Path;
 mod replay;
 mod semantic_state;
 
+#[cfg(test)]
+pub(crate) use semantic_state::fail_next_semantic_save;
+
 /// SQLite-backed implementation of [`ContextStore`].
 pub struct SqliteStore {
     conn: Connection,

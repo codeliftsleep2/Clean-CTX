@@ -8,6 +8,16 @@ use crate::mcp::context_store::ContextStore;
 use crate::mcp::state::durable_semantics::DurableSemanticSnapshot;
 use rusqlite::{OptionalExtension, params};
 
+#[cfg(test)]
+static TEST_FAIL_SEMANTIC_SAVE_FOR: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+#[cfg(test)]
+pub(crate) fn fail_next_semantic_save(file_path: &str) {
+    *TEST_FAIL_SEMANTIC_SAVE_FOR
+        .lock()
+        .expect("semantic save failure hook") = Some(file_path.to_string());
+}
+
 pub(crate) struct RestoredDurableContext {
     pub ir: CompiledIR,
     pub semantic_edges: Vec<SemanticEdge>,
@@ -66,6 +76,13 @@ impl SqliteStore {
         raw_tokens: u64,
         compressed_tokens: u64,
     ) -> Result<String, Box<dyn std::error::Error>> {
+        #[cfg(test)]
+        if let Ok(mut target) = TEST_FAIL_SEMANTIC_SAVE_FOR.lock()
+            && target.as_deref() == Some(file_path)
+        {
+            target.take();
+            return Err("injected semantic baseline persistence failure".into());
+        }
         self.begin_transaction()?;
         let result = (|| {
             let context_id = ContextStore::save_context(

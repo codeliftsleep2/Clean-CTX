@@ -4,7 +4,7 @@ use super::common::{checked_hierarchy_or_respond, contract_fields};
 use crate::ir::wire::ir_to_wire;
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::{
-    compile_file_ir, count_tokens_with_tokenizer, inject_baseline_breakpoint,
+    compile_file_ir_candidate, count_tokens_with_tokenizer, inject_baseline_breakpoint,
     resolve_file_path_checked,
 };
 use crate::mcp::tools::{parse_fidelity_arg, parse_tokenizer_arg};
@@ -102,56 +102,22 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         return;
     }
 
-    let ir_result = compile_file_ir(&resolved_path, effective_fidelity, state);
+    let ir_result = compile_file_ir_candidate(&resolved_path, effective_fidelity, state);
 
     // P3-2: Build response using extracted helpers
     // If IR compilation fails, fall back to legacy compression but log
     // the structured error for diagnostics (4.4 audit fix).
-    let mut response = if let Ok((ir, semantic_edges, source_hash)) = ir_result {
+    let mut response = if let Ok((mut ir, semantic_edges, source_hash)) = ir_result {
         let hir = match checked_hierarchy_or_respond(id, &ir) {
             Some(hierarchy) => hierarchy,
             None => return,
         };
-        // Compute canonical file identity for WorkspaceIndex provenance
-        let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
-        state
-            .ir_context_lock()
-            .load_ir(ir.clone(), Some(source_hash.clone()));
-        state.remember_context_fidelity(&ir.file_id, effective_fidelity);
-        // Update workspace index: remove stale edges, insert fresh ones.
-        {
-            let mut idx = state.workspace_index_lock();
-            idx.remove_file(&canonical_path);
-            idx.add_edges(&canonical_path, semantic_edges.clone());
-        }
-        state.remember_semantic_edges(&ir.file_id, semantic_edges.clone());
-        let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
-        let footer = state.format_dict_footer_for_aliases(&[&ir.file_id]);
-        let llm_text_with_footer = format!(
-            "{}\n// ── {} ({}) ──\n{}",
-            llm_text.trim(),
-            ir.file_id,
-            resolved_path,
-            footer.trim()
-        );
-        state
-            .llm_text_cache_lock()
-            .insert(ir.file_id.clone(), llm_text_with_footer.clone());
-
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
-        let compressed_tokens = count_tokens_with_tokenizer(&llm_text_with_footer, tokenizer_ref);
-        state.record_compression(
-            &resolved_path,
-            raw_tokens,
-            compressed_tokens,
-            &format!("{:?}", effective_fidelity).to_lowercase(),
-            false,
-            "full",
-            None,
-            "ir_compression",
-        );
 
-        // Persist to DB
+        // P9-14: durability is the publication boundary. Persist the checked
+        // candidate and its complete edge snapshot before creating aliases or
+        // changing any live owner. Compact output is rendered after the
+        // committed candidate receives its session-local alias.
         {
             if let Some(ref store) = *state.persistence_store_lock() {
                 let mut durable_ir = ir.clone();
@@ -163,13 +129,13 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                         .save_context_with_semantics(
                             &resolved_path,
                             effective_fidelity,
-                            &llm_text_with_footer,
+                            "",
                             &ir_binary,
                             &source_hash,
                             ir.version,
                             &semantic_edges,
                             raw_tokens as u64,
-                            compressed_tokens as u64,
+                            0,
                         )
                         .is_ok()
                 });
@@ -182,9 +148,49 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                     ));
                     return;
                 }
-                state.remember_persisted_path(&ir.file_id, &resolved_path);
             }
         }
+
+        let path_alias = state.get_or_create_alias(resolved_path.clone());
+        ir.file_id.clone_from(&path_alias);
+        let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+        let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
+        let footer = state.format_dict_footer_for_aliases(&[&path_alias]);
+        let llm_text_with_footer = format!(
+            "{}\n// ── {} ({}) ──\n{}",
+            llm_text.trim(),
+            path_alias,
+            resolved_path,
+            footer.trim()
+        );
+        let compressed_tokens = count_tokens_with_tokenizer(&llm_text_with_footer, tokenizer_ref);
+
+        state
+            .ir_context_lock()
+            .load_ir(ir.clone(), Some(source_hash.clone()));
+        state.remember_context_fidelity(&path_alias, effective_fidelity);
+        {
+            let mut idx = state.workspace_index_lock();
+            idx.remove_file(&canonical_path);
+            idx.add_edges(&canonical_path, semantic_edges.clone());
+        }
+        state.remember_semantic_edges(&path_alias, semantic_edges.clone());
+        if state.persistence_store_lock().is_some() {
+            state.remember_persisted_path(&path_alias, &resolved_path);
+        }
+        state
+            .llm_text_cache_lock()
+            .insert(path_alias, llm_text_with_footer.clone());
+        state.record_compression(
+            &resolved_path,
+            raw_tokens,
+            compressed_tokens,
+            &format!("{:?}", effective_fidelity).to_lowercase(),
+            false,
+            "full",
+            None,
+            "ir_compression",
+        );
 
         let ir_value = match encoding {
             "positional" => {

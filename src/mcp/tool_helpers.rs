@@ -251,13 +251,31 @@ pub(crate) fn arg_str_or_empty<'a>(params: &'a serde_json::Value, key: &str) -> 
 ///
 /// A-08: Returns the source hash along with the compiled IR to enable
 /// source change detection in the delta path.
-pub(super) fn compile_file_ir(
+/// Compile a persistence candidate without creating session alias ownership.
+/// Existing aliases and versions are retained; a previously unseen file uses
+/// its durable path as a temporary compiler identity until durable commit.
+pub(super) fn compile_file_ir_candidate(
     file_path: &str,
     fidelity: Fidelity,
     state: &McpState,
 ) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
 {
-    compile_file_ir_focused(file_path, fidelity, state, None)
+    let existing_alias = state.alias_for_path(file_path);
+    let candidate_id = existing_alias
+        .clone()
+        .unwrap_or_else(|| file_path.to_string());
+    let previous_version = existing_alias
+        .as_deref()
+        .and_then(|alias| state.file_version(alias))
+        .unwrap_or(0);
+    compile_file_ir_focused_with_identity(
+        file_path,
+        fidelity,
+        state,
+        None,
+        &candidate_id,
+        previous_version,
+    )
 }
 
 /// Compile a file to IR with symbol targeting (`focus`).
@@ -275,6 +293,27 @@ pub(super) fn compile_file_ir_focused(
     fidelity: Fidelity,
     state: &McpState,
     focus: Option<&std::collections::HashSet<String>>,
+) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
+{
+    let path_alias = state.get_or_create_alias(file_path.to_string());
+    let previous_version = state.file_version(&path_alias).unwrap_or(0);
+    compile_file_ir_focused_with_identity(
+        file_path,
+        fidelity,
+        state,
+        focus,
+        &path_alias,
+        previous_version,
+    )
+}
+
+fn compile_file_ir_focused_with_identity(
+    file_path: &str,
+    fidelity: Fidelity,
+    state: &McpState,
+    focus: Option<&std::collections::HashSet<String>>,
+    path_alias: &str,
+    previous_version: u64,
 ) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
 {
     // Phase A retirement tests: cfg(test)-only fault injection. The
@@ -311,11 +350,6 @@ pub(super) fn compile_file_ir_focused(
         crate::error::CleanCtxError::Ir(format!("Unsupported file extension: .{}", extension))
     })?;
 
-    // F-FULL-10: Use raw path for alias key for deterministic results.
-    // Canonicalize is still performed for the `α alias: <path>` footer
-    // display, but the alias key itself uses the raw path.
-    let path_alias = state.get_or_create_alias(file_path.to_string());
-
     // File Identity Correction: compute the durable canonical identity
     // for EntityRef.file provenance. This is the authoritative file
     // identity for semantic edges and the WorkspaceIndex, distinct from
@@ -323,8 +357,6 @@ pub(super) fn compile_file_ir_focused(
     let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
 
     // NF-02: Determine the next version based on the previous context state
-    let prev_version = state.file_version(&path_alias).unwrap_or(0);
-
     // A-08: Compute source hash for change detection
     let source_hash = {
         let cache = state.cache_read();
@@ -378,7 +410,7 @@ pub(super) fn compile_file_ir_focused(
     let skip_set = state.get_skip_set(file_path);
     let mut compiled = compiler.compile_focused(
         source,
-        &path_alias,
+        path_alias,
         Some(&canonical_path),
         language,
         query_string,
@@ -402,7 +434,7 @@ pub(super) fn compile_file_ir_focused(
 
     // NF-02: Override the version with the next monotonic value.
     // The compiler always sets version=1; we fix it here.
-    compiled.version = prev_version.saturating_add(1);
+    compiled.version = previous_version.saturating_add(1);
 
     // A-08: Return source hash along with compiled IR and semantic edges
     Ok((compiled, semantic_edges, source_hash))
