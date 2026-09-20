@@ -18,6 +18,17 @@ pub(crate) fn fail_next_semantic_save(file_path: &str) {
         .expect("semantic save failure hook") = Some(file_path.to_string());
 }
 
+#[cfg(test)]
+pub(super) fn should_fail_semantic_save(file_path: &str) -> bool {
+    if let Ok(mut target) = TEST_FAIL_SEMANTIC_SAVE_FOR.lock()
+        && target.as_deref() == Some(file_path)
+    {
+        target.take();
+        return true;
+    }
+    false
+}
+
 pub(crate) struct RestoredDurableContext {
     pub ir: CompiledIR,
     pub semantic_edges: Vec<SemanticEdge>,
@@ -77,10 +88,7 @@ impl SqliteStore {
         compressed_tokens: u64,
     ) -> Result<String, Box<dyn std::error::Error>> {
         #[cfg(test)]
-        if let Ok(mut target) = TEST_FAIL_SEMANTIC_SAVE_FOR.lock()
-            && target.as_deref() == Some(file_path)
-        {
-            target.take();
+        if should_fail_semantic_save(file_path) {
             return Err("injected semantic baseline persistence failure".into());
         }
         self.begin_transaction()?;
@@ -213,7 +221,7 @@ impl SqliteStore {
         }))
     }
 
-    fn write_semantic_snapshot(
+    pub(super) fn write_semantic_snapshot(
         &self,
         context_id: &str,
         snapshot: &DurableSemanticSnapshot,

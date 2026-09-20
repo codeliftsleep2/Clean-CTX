@@ -260,6 +260,14 @@ impl super::McpState {
         });
     }
 
+    pub(crate) fn forget_pending_transitions(&self, alias: &str) {
+        lock_or_recover!(
+            self.pending_semantic_transitions.lock(),
+            "pending_semantic_transitions"
+        )
+        .retain(|key, _| key.alias != alias);
+    }
+
     pub(crate) fn forget_semantic_state(&self, alias: &str) {
         lock_or_recover!(
             self.semantic_edge_snapshots.lock(),

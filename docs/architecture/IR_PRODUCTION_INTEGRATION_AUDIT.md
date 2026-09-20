@@ -432,6 +432,7 @@ not final certification:
 | `save_context` | Strict reconstruction of the requested session-owned canonical stream | File-scoped physical `0x04` and complete edge snapshot checkpoint | Truthful registered saved/already-durable response | P9-08 user-verified; no substitute-file or empty-IR path found in the handler. |
 | `restore_context` / `replay_history` | Physical `0x04`, checked `dv:2` replay, semantic-state validation, checked hierarchy | Durable state is validated completely before session and `WorkspaceIndex` installation | Compact and structured registered response | P9-10 through P9-12 user-verified; no source-recompile fallback remains. |
 | `delete_context` | Resolves exact session/durable ownership before deletion | SQLite deletion is the commit boundary; live canonical, edge, alias, hash, fidelity, compact, and pending ownership is removed afterward | Truthful registered deletion response | P9-13 user-verified; source files are not mutated. |
+| `apply_edit` | Requires matching disk/live/durable identity, then compiles and checked-projects exact candidate bytes | Durable recovery intent, exact source replacement, aligned `0x04`/edge commit, then live publication | Registered byte-exact edit response | P9-15/P9-16 implemented pending user verification; full-body fallback remains production-covered. |
 
 Static bypass inspection also found that MCP production hierarchy call sites use
 the checked projection boundary; production tuple reconstruction is fallible
@@ -443,8 +444,8 @@ incomplete and will resume after P9-14 is resolved and user-verified.
 
 ## 19. Finding P9-14: baseline handlers publish live state before durable commit
 
-**Severity:** High transactional lifecycle contradiction; approved and
-implemented pending user verification.
+**Severity:** High transactional lifecycle contradiction; repaired and
+user-verified.
 
 When persistence is enabled, `compress_code_context` installs the newly
 compiled canonical IR, source hash, fidelity, complete semantic-edge snapshot,
@@ -497,9 +498,118 @@ response while keeping compact presentation separate from the semantic commit.
 Tracked registered-dispatch regressions inject file-specific atomic-save
 failures and assert preservation of prior and peer ownership.
 
-## 20. Approval gate and next audit action
+## 20. Finding P9-15: `apply_edit` splits source, live, and durable authority
 
-P9-10 through P9-13 were user-verified green. The exhaustive Phase 9
+**Severity:** High contradiction; Option 1 implemented pending verification.
+
+The registered `apply_edit` contract describes an atomic controlled edit. The
+production handler validates and syntax-checks the complete candidate in
+memory, but then writes the source file before compiling the final canonical
+state. If that post-write production compilation fails, the handler logs a
+warning, retains the prior session version and semantic ownership, and still
+returns an edit-success response. Disk and authoritative live state then
+describe different programs.
+
+When post-write compilation succeeds, the handler replaces canonical session
+IR, source hash, fidelity, semantic edges, and `WorkspaceIndex` ownership but
+intentionally leaves the persisted physical `0x04` baseline and semantic-edge
+snapshot unchanged. This does not merely defer an optimization. A subsequent
+`delta_code_context` sees the edited source hash already installed in live
+state and can return the new stream as cached without generating or persisting
+a transition. `restore_context` can then restore the old durable semantics over
+the newly edited source. Explicit `save_context` can repair the split, but the
+successful edit response neither requires nor signals that extra operation.
+
+The contradiction affects byte-exact source authority, canonical versions,
+source hashes, complete semantic-edge snapshots, `WorkspaceIndex`, pending
+transition identity, later delta generation, save/restore behavior, restart
+rehydration, and the truthfulness of the registered edit response.
+
+Alternatives:
+1. Treat the complete edit as a staged source-and-semantic transaction. Build
+   and validate the post-edit canonical IR and complete edge snapshot from the
+   in-memory candidate before writing. When persistence is enabled, commit the
+   corresponding durable semantic transition before publishing live state and
+   return success only when source, durable state, and live ownership all
+   advance coherently. This requires an explicit recoverable strategy for the
+   filesystem write and SQLite commit, which cannot share one native
+   transaction.
+2. Session-only invalidation and 3. caller-visible stale durability were
+   rejected because both weaken the coherent immediate-edit contract.
+
+Recommendation: option 1, with a bounded staged-edit protocol: compile and
+checked-project the in-memory candidate first; write the source through an
+atomic replace with a retained recovery copy; durably commit the exact
+canonical/edge target; publish live state only after both commits; and restore
+the prior source if durable commit fails. This is compensation at the
+filesystem boundary because SQLite and the filesystem cannot share a native
+transaction, not compensating rollback of prematurely published live semantic
+state. The precise recovery and crash-consistency contract requires approval
+before implementation.
+
+The approved contract additionally makes byte identity authoritative: candidate
+validation, atomic replacement, durable `Body`/span ownership, recovery, and
+restart must all use the exact UTF-8 byte sequences, preserving BOM, line
+endings, whitespace, multibyte content, and every byte outside the requested
+edit span. No source regeneration or normalization is permitted.
+
+## 21. Finding P9-16: pre-edit source authority can already be split
+
+**Severity:** High contradiction; Option 1 implemented pending verification.
+
+`apply_edit` deliberately recompiles the current on-disk bytes to relocate unit
+spans, even when those bytes changed outside Clean-CTX after the session
+baseline was established. The approved P9-15 protocol, however, requires a
+recoverable prior state: exact prior source bytes, prior canonical/version/hash,
+and prior durable semantic edges must identify the same program before an edit
+intent can be established.
+
+If current source bytes do not match the live and durable source hash, neither
+permitted P9-15 failure outcome is coherent without another policy. Restoring
+the exact pre-edit bytes after a target durable-commit failure would still leave
+live/durable semantics describing an older byte sequence. Advancing durable or
+live state to the externally changed source before applying the requested edit
+would itself be an externally observable reconciliation transition not covered
+by the approved edit transaction.
+
+Affected contracts include stale-edit detection, existing unit relocation,
+external editor interoperability, canonical version authority, recovery intent
+identity, and whether `apply_edit` may implicitly checkpoint changes it did not
+make.
+
+Alternatives:
+1. Require the exact current source hash to match both live and durable prior
+   ownership before `apply_edit` may start. Reject a mismatch structurally and
+   require an explicit refresh/checkpoint operation first.
+2. Make `apply_edit` first compile, validate, and transactionally reconcile the
+   externally changed current source into durable and live ownership, then start
+   a second edit transaction. This preserves relocation convenience but lets an
+   edit request implicitly adopt unrelated external changes.
+3. Treat current disk bytes as prior solely for recovery while retaining older
+   semantic ownership. This preserves current behavior but violates the
+   approved requirement that source, durable semantics, and live semantics
+   remain aligned on every failure boundary.
+
+Recommendation: option 1. It gives the staged transaction one unambiguous prior
+authority, prevents `apply_edit` from silently adopting unrelated changes, and
+keeps explicit source refresh/checkpoint semantics separate. The structural
+failure should report the expected and actual source hashes and must not create
+an edit intent or mutate source, durable, or live state.
+
+**Implementation update (2026-09-20):** `apply_edit` now requires exact disk,
+live, and durable source-hash agreement before candidate compilation. It
+compiles and checked-projects exact in-memory candidate bytes, records a durable
+recovery intent, atomically replaces the source, atomically commits aligned
+physical `0x04` and complete semantic edges, and only then publishes the exact
+target live. Durable failure restores the exact prior bytes without changing
+live ownership. Restore deterministically resolves an interrupted intent before
+loading durable state. Full-body fallback and byte-addressed `Body`/`UnitTable`
+semantics remain authoritative and have registered production-path coverage.
+
+## 22. Verification gate and next audit action
+
+P9-10 through P9-14 were user-verified green. The exhaustive Phase 9
 production operation/lifecycle and obsolete-path matrix audit is paused for
-user-run verification of P9-14. After that gate is green, resume the remaining
-registered-operation and semantic-family matrix. Phase 9 is not certified.
+user-run verification of P9-15/P9-16. After that gate is green, resume the
+remaining registered-operation and semantic-family matrix. Phase 9 is not
+certified.

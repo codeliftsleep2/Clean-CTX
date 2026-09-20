@@ -22,8 +22,11 @@ use rusqlite::{Connection, params};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
+mod edit_intent;
 mod replay;
 mod semantic_state;
+
+pub(crate) use edit_intent::{EditIntent, EditRecovery};
 
 #[cfg(test)]
 pub(crate) use semantic_state::fail_next_semantic_save;
@@ -215,6 +218,10 @@ impl SqliteStore {
                 INSERT INTO _schema_version (version) VALUES (4);
             ",
             )?;
+        }
+
+        if current_version < 5 {
+            edit_intent::migrate(&self.conn)?;
         }
 
         Ok(())

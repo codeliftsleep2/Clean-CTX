@@ -12,6 +12,10 @@ use crate::compression::Fidelity;
 #[cfg(test)]
 pub(crate) static TEST_INJECTED_IR_FAILURE: std::sync::Mutex<Option<String>> =
     std::sync::Mutex::new(None);
+
+#[cfg(test)]
+pub(crate) static TEST_INJECTED_SOURCE_FAILURE: std::sync::Mutex<Option<String>> =
+    std::sync::Mutex::new(None);
 use crate::layers::meta::semantic::SemanticEdge;
 use crate::mcp::McpState;
 use std::path::PathBuf;
@@ -278,6 +282,29 @@ pub(super) fn compile_file_ir_candidate(
     )
 }
 
+/// Compile exact in-memory source bytes without reading or publishing them.
+pub(super) fn compile_source_ir_candidate(
+    file_path: &str,
+    source: &str,
+    fidelity: Fidelity,
+    state: &McpState,
+) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
+{
+    let alias = state
+        .alias_for_path(file_path)
+        .unwrap_or_else(|| file_path.to_string());
+    let previous_version = state.file_version(&alias).unwrap_or(0);
+    compile_source_ir_focused_with_identity(
+        file_path,
+        source,
+        fidelity,
+        state,
+        None,
+        &alias,
+        previous_version,
+    )
+}
+
 /// Compile a file to IR with symbol targeting (`focus`).
 ///
 /// `focus`: optional set of method names that should receive full verbatim
@@ -316,19 +343,47 @@ fn compile_file_ir_focused_with_identity(
     previous_version: u64,
 ) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
 {
-    // Phase A retirement tests: cfg(test)-only fault injection. The
-    // natural CompileError paths (Capture/Layer) are unreachable with
-    // valid grammars, so the legacy-fallback branches cannot be exercised
-    // end-to-end without this hook. Release builds never compile it.
+    let source_arc = state.read_source(file_path)?;
+    compile_source_ir_focused_with_identity(
+        file_path,
+        source_arc.as_str(),
+        fidelity,
+        state,
+        focus,
+        path_alias,
+        previous_version,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn compile_source_ir_focused_with_identity(
+    file_path: &str,
+    source: &str,
+    fidelity: Fidelity,
+    state: &McpState,
+    focus: Option<&std::collections::HashSet<String>>,
+    path_alias: &str,
+    previous_version: u64,
+) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
+{
+    // Test-only production-compiler failure injection applies equally to
+    // on-disk and exact in-memory candidate compilation.
     #[cfg(test)]
+    if let Ok(injected) = TEST_INJECTED_IR_FAILURE.lock()
+        && let Some(reason) = injected.as_ref()
     {
-        if let Ok(injected) = TEST_INJECTED_IR_FAILURE.lock() {
-            if let Some(reason) = injected.as_ref() {
-                return Err(crate::error::CleanCtxError::Ir(format!(
-                    "injected IR failure: {reason}"
-                )));
-            }
-        }
+        return Err(crate::error::CleanCtxError::Ir(format!(
+            "injected IR failure: {reason}"
+        )));
+    }
+    #[cfg(test)]
+    if let Ok(injected) = TEST_INJECTED_SOURCE_FAILURE.lock()
+        && let Some(marker) = injected.as_ref()
+        && source.contains(marker)
+    {
+        return Err(crate::error::CleanCtxError::Ir(format!(
+            "injected candidate IR failure: {marker}"
+        )));
     }
 
     use crate::ir::compiler::IRCompiler;
@@ -340,9 +395,6 @@ fn compile_file_ir_focused_with_identity(
     // The old ir::layers::angular/spring/dotnet modules have been removed.
     use crate::compression::language::language_for_extension;
 
-    // Use source_cache via state.read_source() — Finding 1
-    let source_arc = state.read_source(file_path)?;
-    let source = source_arc.as_str();
     let path_buf = PathBuf::from(file_path);
     let extension = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
 
@@ -481,7 +533,6 @@ pub(crate) fn diff_code_context_handler(
             &source_hash[..12],
         ));
     }
-
     let current = build_snapshot(source, fidelity)?;
 
     let baseline = cache.get_baseline(&cache_key).cloned();

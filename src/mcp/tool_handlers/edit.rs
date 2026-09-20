@@ -3,26 +3,7 @@
 // `apply_edit` MCP handler — the write-path surface
 // (docs/plans/APPLY_EDIT_PLAN.md Phase 3).
 //
-// Flow (plan Design steps 1–6):
-//   1. Parse + validate params; resolve/exclude-check/size-check the file.
-//   2. v1 policy: require prior tracked state (Open Question 2) so there is
-//      always a "last known state" to verify against.
-//   3. Build a fresh UnitTable by recompiling the CURRENT on-disk bytes at
-//      Edit fidelity — this is plan step 2's unit-level relocation keyed on
-//      qualified name + structural fingerprint. (The whole-file hash fast
-//      path of step 1 is subsumed here: relocation against fresh spans is
-//      strictly safer and costs one local parse, not client tokens.)
-//   4. Verify expected-old-text per operation, splice, run the hard syntax
-//      gate, then commit to disk under the module commit lock.
-//   5. Refresh session state (hash registry, IR context baseline,
-//      llm-text cache) so the next provide_code_context produces a delta.
-//   6. Respond minimally: hash + per-op spans + byte deltas; echo new text
-//      only when `verify: true`.
-//
-// Persistence note (Open Question 3): the SQLite baseline is deliberately
-// NOT written here — it refreshes on the next provide_code_context call,
-// matching the existing fire-and-forget pattern without a new design.
-
+use std::io::Write;
 use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
@@ -34,7 +15,7 @@ use crate::edit::ops::{EditOperation, MAX_OPERATIONS_PER_CALL};
 use crate::mcp::McpState;
 use crate::protocol::send_response;
 
-use super::super::tool_helpers::{compile_file_ir_focused, resolve_file_path_checked};
+use super::super::tool_helpers::{compile_source_ir_candidate, resolve_file_path_checked};
 
 /// Serializes apply_edit COMMIT critical sections (disk write + session
 /// state refresh). The plan's "reuse the RwLock" idea deadlocks today:
@@ -126,7 +107,10 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         return err_response(id, -32603, e, None);
     }
 
-    let alias = state.get_or_create_alias(resolved_path.clone());
+    let Some(alias) = state.alias_for_path(&resolved_path) else {
+        let e = EditError::NoTrackedState(resolved_path.clone());
+        return err_response(id, -32602, e.to_string(), Some(e.structured()));
+    };
     // v1 policy (Open Question 2): no prior tracked state → refuse.
     if !state.ir_context_read().has_file(&alias) {
         let e = EditError::NoTrackedState(resolved_path.clone());
@@ -134,18 +118,65 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     }
 
     // ── Unit relocation against CURRENT bytes (plan step 2/3) ────────
-    let source_arc = match state.read_source(&resolved_path) {
-        Ok(s) => s,
-        Err(e) => return err_response(id, -32603, format!("Cannot read file: {}", e), None),
+    match recover_pending_edit(state, &resolved_path) {
+        Ok(crate::mcp::sqlite_store::EditRecovery::TargetCommitted) => {
+            return err_response(
+                id,
+                -32603,
+                "An interrupted edit was recovered durably; restore_context is required"
+                    .to_string(),
+                None,
+            );
+        }
+        Ok(_) => {}
+        Err(error) => return err_response(id, -32603, error, None),
+    }
+    let prior_bytes = match std::fs::read(&resolved_path) {
+        Ok(bytes) => bytes,
+        Err(e) => return err_response(id, -32603, format!("Cannot read file: {e}"), None),
     };
+    let source = match std::str::from_utf8(&prior_bytes) {
+        Ok(source) => source,
+        Err(error) => {
+            return err_response(
+                id,
+                -32603,
+                format!("Source is not valid UTF-8: {error}"),
+                None,
+            );
+        }
+    };
+    let actual_hash = hash_bytes(state, &prior_bytes);
+    let (live_hash, prior_version) = {
+        let context = state.ir_context_read();
+        let Some(hash) = context.get_source_hash(&alias).cloned() else {
+            return stale_source_response(id, None, None, &actual_hash);
+        };
+        let Some(version) = context.file_version(&alias) else {
+            return stale_source_response(id, Some(&hash), None, &actual_hash);
+        };
+        (hash, version)
+    };
+    let durable_hash = match durable_source_hash(state, &resolved_path, prior_version) {
+        Ok(hash) => hash,
+        Err(error) => return err_response(id, -32603, error, None),
+    };
+    if actual_hash != live_hash
+        || durable_hash
+            .as_deref()
+            .is_some_and(|hash| hash != actual_hash)
+    {
+        return stale_source_response(id, Some(&live_hash), durable_hash.as_deref(), &actual_hash);
+    }
     let extension = std::path::Path::new(&resolved_path)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("");
-    let pre_compiled = match compile_file_ir_focused(&resolved_path, Fidelity::Edit, state, None) {
-        Ok((ir, _, _)) => ir,
-        Err(e) => return err_response(id, -32603, e.to_string(), None),
-    };
+    let pre_compiled =
+        match compile_source_ir_candidate(&resolved_path, source, Fidelity::Edit, state) {
+            Ok((ir, _, _)) => ir,
+            Err(e) => return err_response(id, -32603, e.to_string(), None),
+        };
     let units = if operations
         .iter()
         .any(|operation| matches!(operation, EditOperation::Delete { .. }))
@@ -158,7 +189,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         };
         match UnitTable::from_instructions_with_declarations(
             &pre_compiled.instructions,
-            &source_arc,
+            source,
             language,
             query,
         ) {
@@ -183,7 +214,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     }
 
     // ── Verify + splice + gate (all in memory) ───────────────────────
-    let report = match apply::apply(&source_arc, &units, &operations) {
+    let report = match apply::apply(source, &units, &operations) {
         Ok(r) => r,
         // All EditError variants are caller-state problems (bad params,
         // stale expectations, policy gates) → invalid-request code.
@@ -194,43 +225,126 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         return err_response(id, -32602, e.to_string(), Some(e.structured()));
     }
 
-    // ── Commit critical section ──────────────────────────────────────
-    let new_hash = {
-        let cache = state.cache_read();
-        cache.compute_hash(report.new_source.as_bytes())
+    // Compile and checked-project the exact in-memory candidate before any
+    // source, durable, or live owner changes.
+    let (mut target_ir, semantic_edges, new_hash) = match compile_source_ir_candidate(
+        &resolved_path,
+        &report.new_source,
+        Fidelity::Edit,
+        state,
+    ) {
+        Ok(candidate) => candidate,
+        Err(error) => return err_response(id, -32603, error.to_string(), None),
     };
+    if let Err(error) = crate::ir::hierarchical::try_ir_to_hierarchical(&target_ir) {
+        return err_response(
+            id,
+            -32603,
+            format!("Edited candidate projection failed: {error}"),
+            None,
+        );
+    }
+    let target_bytes = report.new_source.as_bytes();
+    if new_hash != hash_bytes(state, target_bytes) {
+        return err_response(
+            id,
+            -32603,
+            "Edited candidate hash mismatch".to_string(),
+            None,
+        );
+    }
+
+    // ── Crash-recoverable commit critical section ────────────────────
     let _commit_guard = commit_lock().lock().unwrap_or_else(|p| p.into_inner());
-    if let Err(e) = std::fs::write(&resolved_path, report.new_source.as_bytes()) {
-        return err_response(id, -32603, format!("Write failed: {}", e), None);
+    let staged = match stage_exact_bytes(&resolved_path, target_bytes) {
+        Ok(staged) => staged,
+        Err(error) => return err_response(id, -32603, error, None),
+    };
+    let stage_path = staged.path().to_string_lossy().into_owned();
+    let transition_id = edit_transition_id(
+        state,
+        &resolved_path,
+        &actual_hash,
+        &new_hash,
+        prior_version,
+        target_ir.version,
+    );
+    let mut durable_ir = target_ir.clone();
+    durable_ir.file_id.clone_from(&resolved_path);
+    let target_binary = crate::ir::binary_wire::encode(&durable_ir);
+    let intent = crate::mcp::sqlite_store::EditIntent {
+        transition_id: transition_id.clone(),
+        file_path: resolved_path.clone(),
+        prior_hash: actual_hash.clone(),
+        target_hash: new_hash.clone(),
+        prior_version,
+        target_version: target_ir.version,
+        prior_source: prior_bytes.clone(),
+        target_source: target_bytes.to_vec(),
+        target_ir: target_binary.clone(),
+        target_edges: semantic_edges.clone(),
+        fidelity: Fidelity::Edit,
+        stage_path,
+    };
+    if let Err(error) = establish_edit_intent(state, &intent) {
+        return err_response(id, -32603, error, None);
+    }
+    if let Err(error) = staged.persist(&resolved_path) {
+        clear_edit_intent_best_effort(state, &resolved_path, &transition_id);
+        return err_response(
+            id,
+            -32603,
+            format!("Atomic source replacement failed: {}", error.error),
+            None,
+        );
     }
     state.invalidate_source_cache(&resolved_path);
+    if let Err(error) = commit_edit_semantics(
+        state,
+        &resolved_path,
+        &transition_id,
+        &target_binary,
+        &new_hash,
+        target_ir.version,
+        &semantic_edges,
+    ) {
+        if let Err(recovery_error) = atomic_replace_exact(&resolved_path, &prior_bytes) {
+            return err_response(
+                id,
+                -32603,
+                format!(
+                    "Durable edit commit failed ({error}); exact source recovery failed ({recovery_error}); recovery intent retained"
+                ),
+                None,
+            );
+        }
+        state.invalidate_source_cache(&resolved_path);
+        clear_edit_intent_best_effort(state, &resolved_path, &transition_id);
+        return err_response(
+            id,
+            -32603,
+            format!("Durable edit commit failed; exact prior source restored: {error}"),
+            None,
+        );
+    }
 
-    // Refresh session baseline so the next provide_code_context call on
-    // this file yields an incremental delta instead of a full recompress
-    // (plan step 5). Post-edit recompile also re-validates the final file.
-    let version = match compile_file_ir_focused(&resolved_path, Fidelity::Edit, state, None) {
-        // compile_file_ir_focused already assigns version = prev + 1.
-        Ok((post, sem_edges, _)) => {
-            let v = post.version;
-            // Update workspace index with the post-edit semantic edges.
-            let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
-            {
-                let mut idx = state.workspace_index_lock();
-                idx.remove_file(&canonical_path);
-                idx.add_edges(&canonical_path, sem_edges.clone());
-            }
-            state.remember_semantic_edges(&alias, sem_edges);
-            state
-                .ir_context_lock()
-                .load_ir(post, Some(new_hash.clone()));
-            state.remember_context_fidelity(&alias, Fidelity::Edit);
-            v
-        }
-        Err(e) => {
-            tracing::warn!(error = %e, path = %resolved_path, "post-apply_edit recompile failed; session baseline left stale");
-            state.file_version(&alias).unwrap_or(0)
-        }
-    };
+    let version = target_ir.version;
+    target_ir.file_id.clone_from(&alias);
+    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+    state
+        .ir_context_lock()
+        .load_ir(target_ir, Some(new_hash.clone()));
+    state.remember_context_fidelity(&alias, Fidelity::Edit);
+    state.remember_semantic_edges(&alias, semantic_edges.clone());
+    state.forget_pending_transitions(&alias);
+    if state.persistence_store_lock().is_some() {
+        state.remember_persisted_path(&alias, &resolved_path);
+    }
+    {
+        let mut idx = state.workspace_index_lock();
+        idx.remove_file(&canonical_path);
+        idx.add_edges(&canonical_path, semantic_edges);
+    }
     state
         .cache_write()
         .update_and_verify(&resolved_path, &new_hash);
@@ -302,3 +416,171 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         }
     }));
 }
+
+fn hash_bytes(state: &McpState, bytes: &[u8]) -> String {
+    state.cache_read().compute_hash(bytes)
+}
+
+fn stale_source_response(
+    id: &Value,
+    live_hash: Option<&str>,
+    durable_hash: Option<&str>,
+    actual_hash: &str,
+) {
+    err_response(
+        id,
+        -32603,
+        "Source identity does not match live and durable edit authority".to_string(),
+        Some(serde_json::json!({
+            "code": "stale_edit_source",
+            "expectedLiveHash": live_hash,
+            "expectedDurableHash": durable_hash,
+            "actualSourceHash": actual_hash,
+        })),
+    );
+}
+
+fn durable_source_hash(
+    state: &McpState,
+    file_path: &str,
+    live_version: u64,
+) -> Result<Option<String>, String> {
+    let guard = state.persistence_store_lock();
+    let Some(store) = guard.as_ref() else {
+        return Ok(None);
+    };
+    store.flush();
+    let sqlite = store
+        .sqlite()
+        .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
+    let durable = sqlite
+        .load_durable_context(file_path, None)
+        .map_err(|error| format!("Durable edit precondition failed: {error}"))?
+        .ok_or_else(|| "No durable context exists for the requested edit".to_string())?;
+    if durable.ir.version != live_version {
+        return Err(format!(
+            "Durable edit version mismatch: live v{live_version}, durable v{}",
+            durable.ir.version
+        ));
+    }
+    Ok(Some(durable.source_hash))
+}
+
+pub(crate) fn recover_pending_edit(
+    state: &McpState,
+    file_path: &str,
+) -> Result<crate::mcp::sqlite_store::EditRecovery, String> {
+    let guard = state.persistence_store_lock();
+    let Some(store) = guard.as_ref() else {
+        return Ok(crate::mcp::sqlite_store::EditRecovery::None);
+    };
+    store.flush();
+    let mut sqlite = store
+        .sqlite()
+        .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
+    sqlite
+        .recover_edit_intent(file_path)
+        .map_err(|error| format!("Edit recovery failed: {error}"))
+}
+
+fn stage_exact_bytes(file_path: &str, bytes: &[u8]) -> Result<tempfile::NamedTempFile, String> {
+    let parent = std::path::Path::new(file_path)
+        .parent()
+        .ok_or_else(|| "Edited file has no parent directory".to_string())?;
+    let mut staged = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| format!("Cannot create edit staging file: {error}"))?;
+    staged
+        .write_all(bytes)
+        .and_then(|()| staged.flush())
+        .and_then(|()| staged.as_file().sync_all())
+        .map_err(|error| format!("Cannot stage exact edited bytes: {error}"))?;
+    Ok(staged)
+}
+
+fn atomic_replace_exact(file_path: &str, bytes: &[u8]) -> Result<(), String> {
+    stage_exact_bytes(file_path, bytes)?
+        .persist(file_path)
+        .map(|_| ())
+        .map_err(|error| format!("Atomic exact-byte replacement failed: {}", error.error))
+}
+
+fn edit_transition_id(
+    state: &McpState,
+    file_path: &str,
+    prior_hash: &str,
+    target_hash: &str,
+    prior_version: u64,
+    target_version: u64,
+) -> String {
+    hash_bytes(
+        state,
+        format!("edit:v1:{file_path}:{prior_hash}:{target_hash}:{prior_version}:{target_version}")
+            .as_bytes(),
+    )
+}
+
+fn establish_edit_intent(
+    state: &McpState,
+    intent: &crate::mcp::sqlite_store::EditIntent,
+) -> Result<(), String> {
+    let guard = state.persistence_store_lock();
+    let Some(store) = guard.as_ref() else {
+        return Ok(());
+    };
+    store.flush();
+    store
+        .sqlite()
+        .ok_or_else(|| "Persistence DB is unavailable".to_string())?
+        .establish_edit_intent(intent)
+        .map_err(|error| format!("Cannot establish durable edit intent: {error}"))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn commit_edit_semantics(
+    state: &McpState,
+    file_path: &str,
+    transition_id: &str,
+    target_binary: &[u8],
+    target_hash: &str,
+    target_version: u64,
+    semantic_edges: &[crate::layers::meta::semantic::SemanticEdge],
+) -> Result<(), String> {
+    let guard = state.persistence_store_lock();
+    let Some(store) = guard.as_ref() else {
+        return Ok(());
+    };
+    store.flush();
+    let mut sqlite = store
+        .sqlite()
+        .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
+    sqlite
+        .save_context_with_semantics(
+            file_path,
+            Fidelity::Edit,
+            "",
+            target_binary,
+            target_hash,
+            target_version,
+            semantic_edges,
+            0,
+            0,
+        )
+        .map_err(|error| format!("Atomic durable semantic commit failed: {error}"))?;
+    if let Err(error) = sqlite.clear_edit_intent(file_path, transition_id) {
+        tracing::warn!(%error, %file_path, "committed edit intent retained for idempotent recovery");
+    }
+    Ok(())
+}
+
+fn clear_edit_intent_best_effort(state: &McpState, file_path: &str, transition_id: &str) {
+    let guard = state.persistence_store_lock();
+    if let Some(store) = guard.as_ref()
+        && let Some(mut sqlite) = store.sqlite()
+    {
+        let _ = sqlite.clear_edit_intent(file_path, transition_id);
+    }
+}
+
+#[cfg(test)]
+#[path = "../../tests/mcp/apply_edit_transaction.rs"]
+mod transaction_tests;

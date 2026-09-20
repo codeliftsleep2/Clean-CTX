@@ -22,6 +22,11 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         return send_restore_error(id, "Requested file does not match its durable identity");
     }
 
+    if let Err(error) = crate::mcp::tool_handlers::edit::recover_pending_edit(state, &durable_path)
+    {
+        return send_restore_error(id, &error);
+    }
+
     // Validate every durable artifact before mutating live session state.
     let restored = {
         let guard = state.persistence_store_lock();
