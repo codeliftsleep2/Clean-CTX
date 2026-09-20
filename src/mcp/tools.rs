@@ -82,7 +82,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "delta_code_context",
-            "description": "IR-level delta compression.",
+            "description": "IR-level delta compression using versioned positional sequence edits.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -95,7 +95,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "apply_delta",
-            "description": "Applies an IR delta envelope to the in-session state machine.",
+            "description": "Applies a corrected positional IR delta or an unambiguous legacy delta to in-session state.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

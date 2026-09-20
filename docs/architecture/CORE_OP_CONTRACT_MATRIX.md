@@ -114,6 +114,14 @@ Definition and optional-singular facts do not use occurrence identity because
 duplicates are invalid. Repeatable facts use their complete semantic payload
 plus occurrence.
 
+Corrected delta protocol `dv: 2` carries positional `insert`, `remove`, and
+`replace` edits. Position controls placement; destructive edits also carry the
+expected tuple and typed semantic identity plus occurrence ordinal. Replay
+must reject a tuple or occurrence mismatch transactionally. Legacy `+ / ~ / -`
+deltas remain decode-only compatibility input and ambiguous legacy targets
+fail rather than selecting an arbitrary occurrence. This protocol version is
+independent of the CoreOp binary format version.
+
 ### 4.3 Wire classifications
 
 | Term | Meaning |

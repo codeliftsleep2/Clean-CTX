@@ -6,7 +6,7 @@ use super::common::{
 };
 use crate::error::to_jsonrpc_error;
 use crate::ir::compiler::CompiledIR;
-use crate::ir::delta::DeltaComputer;
+use crate::ir::delta::SequenceDeltaComputer;
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::{
     compile_file_ir_focused, count_tokens_with_tokenizer, inject_baseline_breakpoint,
@@ -319,7 +319,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                             version: prev_version,
                             instructions: tuples_to_coreops(prev_instructions),
                         };
-                        DeltaComputer::new().compute(&prev_compiled, &compiled)
+                        SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
                     })
             } else {
                 ir_ctx.load_ir(compiled.clone(), None);
@@ -349,7 +349,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         .map(|f| f.compressed_tokens);
                     let mut response = serde_json::json!({
                         "jsonrpc": "2.0", "id": id, "result": {
-                            "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): +{} ~{} -{} ops", compiled.file_id, d.from, d.to, d.ops.adds.len(), d.ops.mods.len(), d.ops.dels.len()) }],
+                            "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): {} positional edits", compiled.file_id, d.from, d.to, d.edits.len()) }],
                             "_meta": {
                                 "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                                 "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),

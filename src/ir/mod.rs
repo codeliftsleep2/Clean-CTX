@@ -53,8 +53,10 @@ pub use binary_wire::{
 };
 pub use compiler::{CompileError, CompiledIR, IRCompiler};
 pub use delta::{
-    CompactDelta, CompactOps, DeltaComputer, DeltaOps, FieldPatch, IRDelta, ModOp, SemanticIntent,
-    compact_decode, compact_encode, compute_field_patches, key_tuple_from_tuple,
+    CompactDelta, CompactOps, CompactSequenceDelta, DeltaComputer, DeltaIdentity, DeltaOpcode,
+    DeltaOps, FieldPatch, IRDelta, ModOp, OccurrenceKey, SEQUENCE_DELTA_VERSION, SemanticIntent,
+    SequenceDelta, SequenceDeltaComputer, SequenceEdit, compact_decode, compact_encode,
+    compact_sequence_decode, compact_sequence_encode, compute_field_patches, key_tuple_from_tuple,
     primary_key_from_tuple,
 };
 pub use hierarchical::{

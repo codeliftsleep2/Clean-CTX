@@ -3,7 +3,7 @@
 use super::common::{contract_fields, tuples_to_coreops};
 use crate::error::to_jsonrpc_error;
 use crate::ir::compiler::CompiledIR;
-use crate::ir::delta::{DeltaComputer, IRDelta};
+use crate::ir::delta::{IRDelta, SequenceDelta, SequenceDeltaComputer};
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::{
     compile_file_ir, diff_code_context_handler, inject_baseline_breakpoint, inject_tail_breakpoint,
@@ -172,7 +172,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     version: prev_version,
                     instructions: tuples_to_coreops(prev_instructions),
                 };
-                DeltaComputer::new().compute(&prev_compiled, &compiled)
+                SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
             })
     } else {
         ir_ctx.load_ir(compiled.clone(), Some(source_hash));
@@ -186,7 +186,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             let (content_kind, byte_exact) = contract_fields(fidelity);
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id, "result": {
-                    "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): +{} ~{} -{} ops", compiled.file_id, d.from, d.to, d.ops.adds.len(), d.ops.mods.len(), d.ops.dels.len()) }],
+                    "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): {} positional edits", compiled.file_id, d.from, d.to, d.edits.len()) }],
                     "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                     "strategy": "delta", "fidelity": format!("{:?}", fidelity).to_lowercase(),
                     "content_kind": content_kind, "byte_exact": byte_exact,
@@ -223,35 +223,51 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
     let delta_value = &params["arguments"]["delta"];
     let current_version = params["arguments"]["currentVersion"].as_i64();
 
-    let delta: IRDelta = match serde_json::from_value(delta_value.clone()) {
-        Ok(d) => d,
+    enum IncomingDelta {
+        Sequence(SequenceDelta),
+        Legacy(IRDelta),
+    }
+    let delta = if delta_value.get("dv").is_some() {
+        serde_json::from_value(delta_value.clone()).map(IncomingDelta::Sequence)
+    } else {
+        serde_json::from_value(delta_value.clone()).map(IncomingDelta::Legacy)
+    };
+    let delta = match delta {
+        Ok(delta) => delta,
         Err(e) => {
             send_response(&crate::mcp::tool_helpers::jsonrpc_error(
                 id.clone(),
                 -32602,
-                format!("Invalid delta: {}", e),
+                format!("Invalid delta: {e}"),
                 None,
             ));
             return;
         }
     };
+    let (file, from) = match &delta {
+        IncomingDelta::Sequence(delta) => (delta.file.clone(), delta.from),
+        IncomingDelta::Legacy(delta) => (delta.file.clone(), delta.from),
+    };
 
-    if current_version != Some(delta.from as i64) {
+    if current_version != Some(from as i64) {
         send_response(&crate::mcp::tool_helpers::jsonrpc_error(
             id.clone(),
             -32602,
             format!(
                 "Version mismatch: client has v{:?}, delta expects from v{}",
-                current_version, delta.from
+                current_version, from
             ),
             None,
         ));
         return;
     }
 
-    let file = delta.file.clone();
     let mut ir_ctx = state.ir_context_lock();
-    match ir_ctx.apply(delta) {
+    let applied = match delta {
+        IncomingDelta::Sequence(delta) => ir_ctx.apply_sequence(delta),
+        IncomingDelta::Legacy(delta) => ir_ctx.apply(delta),
+    };
+    match applied {
         Ok(new_version) => {
             let rendered = ir_ctx.render_pretty(&file, crate::compression::Fidelity::Low);
             let mut response = serde_json::json!({
@@ -268,3 +284,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         })),
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/mcp/delta_sequence.rs"]
+mod sequence_tests;

@@ -11,12 +11,15 @@
 //   4. Validate version chains to prevent out-of-order application
 
 use super::compiler::CompiledIR;
-use super::delta::IRDelta;
-use super::delta::{key_tuple_from_tuple, primary_key_from_tuple};
+use super::delta::{
+    DeltaIdentity, IRDelta, OccurrenceKey, key_tuple_from_tuple, primary_key_from_tuple,
+};
 use super::render::ir_to_text;
 use super::wire::op_to_tuple;
 use crate::compression::Fidelity;
 use std::collections::HashMap;
+
+mod sequence;
 
 /// Errors during delta application.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,13 +27,34 @@ pub enum DeltaError {
     /// The file is not tracked in the current context state
     UnknownFile(String),
     /// Version mismatch: baseline version doesn't match current state
-    VersionMismatch { expected: u64, got: u64 },
+    VersionMismatch {
+        expected: u64,
+        got: u64,
+    },
     /// A symbol referenced in the delta was not found
     SymbolNotFound(String),
     /// Attempted to add a symbol that already exists
     DuplicateSymbol(String),
     /// Delta to version is not greater than from version (non-monotonic)
-    NonMonotonicVersion { from: u64, to: u64 },
+    NonMonotonicVersion {
+        from: u64,
+        to: u64,
+    },
+    UnsupportedDeltaVersion(u8),
+    InvalidSequenceInstruction {
+        position: usize,
+    },
+    SequenceConflict {
+        position: usize,
+        expected: Vec<String>,
+        actual: Option<Vec<String>>,
+    },
+    OccurrenceConflict {
+        position: usize,
+        expected: OccurrenceKey,
+        actual: Option<OccurrenceKey>,
+    },
+    AmbiguousLegacyTarget(String),
 }
 
 impl std::fmt::Display for DeltaError {
@@ -49,6 +73,31 @@ impl std::fmt::Display for DeltaError {
                     from, to
                 )
             }
+            DeltaError::UnsupportedDeltaVersion(version) => {
+                write!(f, "unsupported delta protocol version: {version}")
+            }
+            DeltaError::InvalidSequenceInstruction { position } => {
+                write!(f, "invalid sequence instruction at position {position}")
+            }
+            DeltaError::SequenceConflict {
+                position,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "sequence conflict at position {position}: expected {expected:?}, found {actual:?}"
+            ),
+            DeltaError::OccurrenceConflict {
+                position,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "occurrence conflict at position {position}: expected {expected:?}, found {actual:?}"
+            ),
+            DeltaError::AmbiguousLegacyTarget(key) => {
+                write!(f, "legacy delta target is ambiguous: {key}")
+            }
         }
     }
 }
@@ -57,15 +106,16 @@ impl std::error::Error for DeltaError {}
 
 /// Per-file IR state with indexed instruction stream.
 ///
-/// Maintains an ordered list of instruction tuples and a primary-key index
-/// for efficient lookup during delta operations. The index maps primary keys
-/// (e.g., "DEF_M:C1:M1") to instruction indices in the `instructions` vec.
+/// Maintains the ordered instruction tuples, a legacy coarse-key index, and
+/// the occurrence-aware semantic index used by corrected sequence replay.
 #[derive(Debug, Clone)]
 pub struct FileState {
     /// Ordered instruction stream (each instruction is a positional tuple)
     pub instructions: Vec<Vec<String>>,
-    /// Index: primary_key → instruction index in `instructions`
+    /// Compatibility index for legacy `+ / ~ / -` deltas.
     pub index: HashMap<String, usize>,
+    /// Corrected occurrence-aware index used by sequence replay.
+    occurrence_index: HashMap<DeltaIdentity, Vec<usize>>,
     /// Version when this file was last modified
     pub version: u64,
 }
@@ -76,6 +126,7 @@ impl FileState {
         Self {
             instructions: Vec::new(),
             index: HashMap::new(),
+            occurrence_index: HashMap::new(),
             version,
         }
     }
@@ -86,13 +137,31 @@ impl FileState {
     /// builds the primary-key index for efficient delta operations.
     pub fn from_compiled(ir: &CompiledIR) -> Self {
         let mut state = Self::new(ir.version);
-        for op in &ir.instructions {
-            let tuple = op_to_tuple(op);
-            let key = primary_key_from_tuple(&tuple);
-            state.index.insert(key, state.instructions.len());
-            state.instructions.push(tuple);
-        }
+        state.instructions = ir.instructions.iter().map(op_to_tuple).collect();
+        state.rebuild_indexes();
         state
+    }
+
+    fn rebuild_indexes(&mut self) {
+        self.index.clear();
+        self.occurrence_index.clear();
+        for (position, tuple) in self.instructions.iter().enumerate() {
+            self.index.insert(primary_key_from_tuple(tuple), position);
+            if let Some(identity) = DeltaIdentity::from_tuple(tuple) {
+                self.occurrence_index
+                    .entry(identity)
+                    .or_default()
+                    .push(position);
+            }
+        }
+    }
+
+    fn legacy_target_count(&self, key_tuple: &[String]) -> usize {
+        let key = primary_key_from_tuple(key_tuple);
+        self.instructions
+            .iter()
+            .filter(|tuple| primary_key_from_tuple(tuple) == key)
+            .count()
     }
 
     /// Remove an instruction by its key tuple.
@@ -101,10 +170,10 @@ impl FileState {
     /// identifies it (e.g., `["DEF_M", "C1", "M1"]`). Returns true if
     /// the instruction was found and removed, false otherwise.
     ///
-    /// Uses `swap_remove` (O(1)) and updates the swapped element's index.
-    /// Instruction order is NOT preserved — the last instruction moves to
-    /// the removed position. The IR stream is positional and a re-render
-    /// at any fidelity does not depend on order.
+    /// Legacy compatibility helper. It retains the historical `swap_remove`
+    /// behavior and therefore does not preserve instruction order. Corrected
+    /// sequence replay never calls this helper; it applies explicit positional
+    /// edits through `apply_sequence`.
     pub fn remove_by_key(&mut self, key_tuple: &[String]) -> bool {
         let key = primary_key_from_tuple(key_tuple);
         if let Some(idx) = self.index.remove(&key) {
@@ -119,6 +188,8 @@ impl FileState {
                 let swapped_key = primary_key_from_tuple(swapped);
                 self.index.insert(swapped_key, idx);
             }
+
+            self.rebuild_indexes();
 
             true
         } else {
@@ -141,6 +212,7 @@ impl FileState {
                 self.index.remove(&key);
                 self.index.insert(new_key, idx);
             }
+            self.rebuild_indexes();
             true
         } else {
             false
@@ -157,11 +229,14 @@ impl FileState {
     /// the same primary key already exists in this file state (F-23).
     pub fn append(&mut self, instruction: Vec<String>) -> Result<(), DeltaError> {
         let key = primary_key_from_tuple(&instruction);
-        if self.index.contains_key(&key) {
+        let repeatable = DeltaIdentity::from_tuple(&instruction)
+            .is_some_and(|identity| identity.is_repeatable());
+        if self.index.contains_key(&key) && !repeatable {
             return Err(DeltaError::DuplicateSymbol(key));
         }
         self.index.insert(key, self.instructions.len());
         self.instructions.push(instruction);
+        self.rebuild_indexes();
         Ok(())
     }
 
@@ -169,6 +244,36 @@ impl FileState {
     pub fn contains_key(&self, key_tuple: &[String]) -> bool {
         let key = primary_key_from_tuple(key_tuple);
         self.index.contains_key(&key)
+    }
+
+    fn remove_legacy_tuple(&mut self, expected: &[String]) -> Result<(), DeltaError> {
+        let key_tuple = key_tuple_from_tuple(expected);
+        let key_only = key_tuple == expected;
+        let coarse_key = primary_key_from_tuple(&key_tuple);
+        let matches = self
+            .instructions
+            .iter()
+            .enumerate()
+            .filter_map(|(position, tuple)| {
+                let matches = if key_only {
+                    primary_key_from_tuple(tuple) == coarse_key
+                } else {
+                    tuple == expected
+                };
+                matches.then_some(position)
+            })
+            .collect::<Vec<_>>();
+        match matches.as_slice() {
+            [position] => {
+                self.instructions.remove(*position);
+                self.rebuild_indexes();
+                Ok(())
+            }
+            [] => Err(DeltaError::SymbolNotFound(primary_key_from_tuple(expected))),
+            _ => Err(DeltaError::AmbiguousLegacyTarget(primary_key_from_tuple(
+                expected,
+            ))),
+        }
     }
 }
 
@@ -265,33 +370,34 @@ impl ContextState {
             });
         }
 
+        let mut candidate = file.clone();
+
         // Phase 1: Deletions (process first so modifications don't find stale keys)
         for del in &delta.ops.dels {
-            let key_tuple = key_tuple_from_tuple(del);
-            if !file.remove_by_key(&key_tuple) {
-                // Check if the key_tuple was derived from a full instruction tuple
-                // Primary key only uses opcode + id(s), which is what key_tuple gives us
-                let key = primary_key_from_tuple(&key_tuple);
-                return Err(DeltaError::SymbolNotFound(key));
-            }
+            candidate.remove_legacy_tuple(del)?;
         }
 
         // Phase 2: Modifications — supports both full replacement and field-patch formats
         for mod_op in &delta.ops.mods {
+            if candidate.legacy_target_count(&mod_op.key) > 1 {
+                return Err(DeltaError::AmbiguousLegacyTarget(primary_key_from_tuple(
+                    &mod_op.key,
+                )));
+            }
             if let Some(replacement) = &mod_op.replace {
                 // Full replacement format
-                if !file.replace_by_key(&mod_op.key, replacement) {
+                if !candidate.replace_by_key(&mod_op.key, replacement) {
                     let key = primary_key_from_tuple(&mod_op.key);
                     return Err(DeltaError::SymbolNotFound(key));
                 }
             } else if let Some(patches) = &mod_op.patches {
                 // Field-patch format (Idea #3) — apply patches to the existing instruction
                 let key = primary_key_from_tuple(&mod_op.key);
-                let idx = *file
+                let idx = *candidate
                     .index
                     .get(&key)
                     .ok_or_else(|| DeltaError::SymbolNotFound(key.clone()))?;
-                let instruction = &mut file.instructions[idx];
+                let instruction = &mut candidate.instructions[idx];
                 for patch in patches {
                     if patch.field_index < instruction.len() {
                         instruction[patch.field_index] = patch.new_value.clone();
@@ -300,19 +406,21 @@ impl ContextState {
                 // Re-index if the key changed (e.g., a rename patch)
                 let new_key = primary_key_from_tuple(instruction);
                 if key != new_key {
-                    file.index.remove(&key);
-                    file.index.insert(new_key, idx);
+                    candidate.index.remove(&key);
+                    candidate.index.insert(new_key, idx);
                 }
             }
         }
 
         // Phase 3: Additions
         for add in &delta.ops.adds {
-            file.append(add.clone())?;
+            candidate.append(add.clone())?;
         }
 
         // Update version tracking
-        file.version = delta.to;
+        candidate.version = delta.to;
+        candidate.rebuild_indexes();
+        *file = candidate;
         self.version = self.version.max(delta.to);
 
         Ok(delta.to)

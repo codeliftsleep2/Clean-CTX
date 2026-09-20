@@ -6,7 +6,7 @@
 // Instead of computing text diffs between CapturedStructure snapshots, the
 // delta engine computes instruction-level deltas between CompiledIR states.
 //
-// Delta Wire Format:
+// Legacy Delta Wire Format (decode/apply compatibility only):
 // ```json
 // {
 //   "file": "<path_alias>",
@@ -19,6 +19,9 @@
 //   }
 // }
 // ```
+// Production emission uses corrected protocol `dv: 2`, implemented in
+// `delta::sequence`, with positional edits, expected tuples, typed semantic
+// identities, and occurrence ordinals.
 
 use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
@@ -26,6 +29,7 @@ use super::wire::op_to_tuple;
 use std::collections::BTreeMap;
 
 mod compact;
+mod sequence;
 mod tuples;
 
 // Glob re-exports keep the established public paths unchanged by the split
@@ -33,12 +37,13 @@ mod tuples;
 // `::primary_key_from_tuple`, `::key_tuple_from_tuple`). Only `pub` items are
 // re-exported, so the private abbreviation helpers stay module-local.
 pub use compact::*;
+pub use sequence::*;
 pub use tuples::*;
 
 /// R-43a: High-level semantic intent of a delta operation.
 /// Provides human-readable context for what changed, beyond the structural diff.
 /// Empty (None) by default — wire format ready for Phase 4 enrichment.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SemanticIntent {
     RenameSymbol {
@@ -547,3 +552,7 @@ pub fn compute_field_patches(
 #[cfg(test)]
 #[path = "../tests/ir/delta.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/delta_sequence.rs"]
+mod sequence_tests;

@@ -267,6 +267,18 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Gate** | `cargo test` |
 
 ---
+### IRDELTA-001 Exact Occurrence-Preserving Delta Replay
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Incremental transport must reconstruct the canonical stream exactly; compactness never authorizes loss of repeated facts or semantic order. |
+| **Invariant** | Corrected delta protocol `dv: 2` satisfies `replay(base, delta(base, target)) == target`. Each positional edit carries typed semantic identity and occurrence ordinal; removals and replacements also carry the expected existing tuple. Replay validates position, tuple, identity, and occurrence before committing transactionally. Production emits only corrected sequence deltas. Legacy `+ / ~ / -` input is compatibility-only and fails when a target is ambiguous. Delta protocol versioning is independent of CoreOp binary serialization. |
+| **Enforcement** | `src/tests/ir/delta_sequence.rs` covers exact duplicates, same-target/different-payload facts, arbitrary positions, duplicate replacement, ordering, deterministic generation, compact round trip, conflict rollback, empty/equal algebra, and valid-stream property cases. `src/tests/mcp/delta_sequence.rs` covers real dispatched `delta_code_context` → corrected payload → `apply_delta`. |
+| **Authority** | `src/ir/delta/sequence.rs`, `src/ir/replay.rs`, `src/ir/replay/sequence.rs`, `src/mcp/tool_handlers/core/delta.rs`, `src/mcp/tool_handlers/core/provide.rs` |
+| **Type** | STRUCTURAL + ENFORCED (test) |
+| **Gate** | `cargo test` |
+
+---
 ### IRPAT-001 IR Identity Preservation During Consumptive Pattern Transformations
 
 | Property | Value |

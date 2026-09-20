@@ -41,8 +41,10 @@ it was user-verified and checkpointed as `3360512` on 2026-09-19.
 Phase 6C implements typed method-pattern facts with a distinct compact `pf:`
 projection; it was user-verified and checkpointed as `6d9b621` on 2026-09-19.
 Phase 6D typed side-effect values were user-verified on 2026-09-19. Phase 6E
-types the five approved method execution contexts while preserving wire strings
-and the compact `ec:` projection.
+typed the five approved method execution contexts while preserving wire strings
+and the compact `ec:` projection and was user-verified on 2026-09-19. Phase 7
+implements the corrected `dv: 2` positional delta protocol and awaits user-run
+verification.
 
 **Production-integration status:** Phase checkpoints certify bounded
 implementation and applicable gates; they do not certify production completion.
@@ -158,10 +160,11 @@ source of semantic authority.
 
 ### 3.5 Delta and replay
 
-`src/ir/delta.rs` indexes instructions with string keys in maps that hold one
-operation per key. Operations whose keys omit semantically significant values
-or occurrences overwrite one another. Replay similarly assumes uniqueness in
-places where the producer model permits repetition.
+The original delta engine indexed instructions with one operation per string
+key, and replay assumed uniqueness where repetition is valid. Phase 7 retains
+that shape only for compatibility input. Production emits versioned positional
+sequence edits with typed identity and occurrence ordinals; corrected replay
+checks expected tuples and applies transactionally without discarding order.
 
 ### 3.6 Wire formats
 
@@ -238,13 +241,11 @@ metadata remains a separate architectural decision.
 
 ### F-05: Delta keys lose multiplicity
 
-The delta index uses `BTreeMap<String, CoreOp>`. Several generated keys contain
-only the opcode and method or class identity. Repeated operations with the same
-target overwrite earlier operations. Pattern keys also rely on incomplete
-arguments.
-
-Required boundary: typed delta keys plus occurrence-aware collections, with
-behavior selected from the operation contract.
+At the original baseline, the delta index used `BTreeMap<String, CoreOp>` and
+collapsed repeated same-target facts. Phase 7 isolates that representation as
+legacy compatibility, adds corrected protocol `dv: 2`, and makes position,
+expected tuple, typed semantic identity, and occurrence ordinal authoritative.
+Ambiguous legacy modifications fail structurally instead of being reinterpreted.
 
 ### F-06: Wire-format claims exceed observed preservation
 

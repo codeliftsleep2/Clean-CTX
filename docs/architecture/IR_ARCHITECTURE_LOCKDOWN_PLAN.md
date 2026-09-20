@@ -333,12 +333,12 @@ Exit criteria:
 
 ### Phase 7: Repair delta and replay
 
-Deliverables:
-
-- typed delta keys;
-- occurrence-aware index collections;
-- per-operation equality and ordering behavior;
-- deterministic and property-based replay coverage.
+Implementation status: corrected protocol `dv: 2` uses typed identity,
+occurrence ordinals, authoritative positions, and expected tuples. Production
+emits transactional positional edits; ambiguous legacy destructive edits fail.
+Compact encoding is independent of CoreOp binary version. Deterministic,
+property, conflict, multiplicity, ordering, and MCP-path coverage awaits
+user-run verification.
 
 Exit criteria:
 
