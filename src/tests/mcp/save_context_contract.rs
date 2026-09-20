@@ -2,6 +2,9 @@
 
 use crate::mcp::context_store::ContextStore;
 use crate::mcp::tools::dispatch_tools_call;
+use crate::ir::compiler::CompiledIR;
+use crate::ir::delta::{SequenceDeltaComputer, SequenceEdit};
+use crate::ir::opcodes::CoreOp;
 use serde_json::{Value, json};
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
@@ -156,4 +159,50 @@ fn save_context_rejects_missing_session_and_mismatched_durable_identity() {
             .is_some_and(|message| message.contains("durable identity")),
         "{mismatch}"
     );
+}
+
+#[test]
+fn registered_apply_delta_rejects_malformed_canonical_tuple_transactionally() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("delta.ts").to_string_lossy().into_owned();
+    let workspace = root.path().to_string_lossy().into_owned();
+    std::fs::write(&path, "export class DeltaOwner { run(): void {} }\n").expect("source");
+    let state = state(&root);
+    assert!(compile(&state, &path, &workspace, 20).get("error").is_none());
+    let alias = state.alias_for_path(&path).expect("session alias");
+    let (version, tuples) = {
+        let context = state.ir_context_read();
+        (
+            context.file_version(&alias).expect("version"),
+            context.get_ir(&alias).cloned().expect("IR"),
+        )
+    };
+    let baseline = CompiledIR {
+        file_id: alias.clone(),
+        version,
+        instructions: tuples
+            .iter()
+            .map(|tuple| crate::ir::wire::tuple_to_op(tuple).expect("canonical tuple"))
+            .collect(),
+    };
+    let mut target = baseline.clone();
+    target.version += 1;
+    target.instructions.push(CoreOp::TypeAlias("T-new".into(), "value".into()));
+    let mut delta = SequenceDeltaComputer::new()
+        .compute(&baseline, &target)
+        .expect("insert delta");
+    let SequenceEdit::Insert { instruction, .. } = &mut delta.edits[0] else {
+        panic!("expected insert");
+    };
+    instruction.pop();
+
+    let rejected = dispatch(
+        &state,
+        21,
+        "apply_delta",
+        json!({ "delta": delta, "currentVersion": version }),
+    );
+    assert!(rejected.get("error").is_some(), "{rejected}");
+    assert_eq!(state.ir_context_read().get_ir(&alias), Some(&tuples));
 }

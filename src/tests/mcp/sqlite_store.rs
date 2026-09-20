@@ -33,6 +33,49 @@ fn test_sqlite_store_open_and_migrate() {
 }
 
 #[test]
+fn persisted_replay_rejects_a_malformed_sequence_tuple() {
+    use crate::ir::delta::{SequenceDeltaComputer, SequenceEdit};
+
+    let mut store = in_memory_store();
+    let file = "/test/malformed.ts";
+    let baseline = test_ir(file, 1);
+    let binary = crate::ir::binary_wire::encode(&baseline);
+    let context_id = store
+        .save_context(
+            file,
+            Fidelity::Low,
+            "baseline",
+            Some(&binary),
+            "malformed-hash",
+            0,
+            0,
+        )
+        .expect("save baseline");
+    let mut target = baseline.clone();
+    target.version = 2;
+    target.instructions.push(CoreOp::Return("m1".into(), "void".into()));
+    let mut delta = SequenceDeltaComputer::new()
+        .compute(&baseline, &target)
+        .expect("insert delta");
+    let SequenceEdit::Insert { instruction, .. } = &mut delta.edits[0] else {
+        panic!("expected insert");
+    };
+    instruction.pop();
+    store
+        .append_delta(
+            &context_id,
+            &serde_json::to_vec(&delta).expect("delta JSON"),
+            Some("sequence_v2"),
+        )
+        .expect("append malformed delta fixture");
+
+    let error = store
+        .load_context_with_deltas(file, None)
+        .expect_err("malformed replay must fail");
+    assert!(error.to_string().contains("invalid canonical tuple"), "{error}");
+}
+
+#[test]
 fn test_sqlite_save_and_load_round_trip() {
     let mut store = in_memory_store();
 

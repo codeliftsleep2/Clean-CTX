@@ -1,6 +1,6 @@
 // Diff, delta, and apply-delta MCP handlers.
 
-use super::common::{contract_fields, tuples_to_coreops};
+use super::common::{compiled_from_tuples, contract_fields, invalid_session_ir_response};
 use crate::error::to_jsonrpc_error;
 use crate::ir::compiler::CompiledIR;
 use crate::ir::delta::{IRDelta, SequenceDelta, SequenceDeltaComputer};
@@ -163,28 +163,38 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     // This ensures no other worker modified ir_context between our check and delta computation
     let mut ir_ctx = state.ir_context_lock();
     let delta = if prev_version > 0 && ir_ctx.has_file(&path_alias) {
-        ir_ctx
-            .get_ir(&path_alias)
+        let Some(prev_instructions) = ir_ctx.get_ir(&path_alias).cloned() else {
+            drop(ir_ctx);
+            send_response(&invalid_session_ir_response(
+                id,
+                "missing prior canonical instruction stream",
+            ));
+            return;
+        };
+        let prev_compiled = match compiled_from_tuples(
+            path_alias.clone(),
+            prev_version,
+            prev_instructions,
+        ) {
+            Ok(compiled) => compiled,
+            Err(error) => {
+                drop(ir_ctx);
+                send_response(&invalid_session_ir_response(id, &error));
+                return;
+            }
+        };
+        let previous_hash = ir_ctx
+            .get_source_hash(&path_alias)
             .cloned()
-            .and_then(|prev_instructions| {
-                let prev_compiled = CompiledIR {
-                    file_id: path_alias.clone(),
-                    version: prev_version,
-                    instructions: tuples_to_coreops(prev_instructions),
-                };
-                let previous_hash = ir_ctx
-                    .get_source_hash(&path_alias)
-                    .cloned()
-                    .unwrap_or_else(|| source_hash.clone());
-                ensure_persisted_baseline(
-                    state,
-                    &resolved_path,
-                    fidelity,
-                    &prev_compiled,
-                    &previous_hash,
-                );
-                SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
-            })
+            .unwrap_or_else(|| source_hash.clone());
+        ensure_persisted_baseline(
+            state,
+            &resolved_path,
+            fidelity,
+            &prev_compiled,
+            &previous_hash,
+        );
+        SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
     } else {
         ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
         None
@@ -311,7 +321,10 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             return;
         }
     };
-    ensure_apply_baseline(state, &file, &durable_file);
+    if let Err(error) = ensure_apply_baseline(state, &file, &durable_file) {
+        send_response(&invalid_session_ir_response(id, &error));
+        return;
+    }
     let persisted_context = match persisted_context_id(state, &durable_file) {
         Ok(context) => context,
         Err(error) => {
@@ -406,27 +419,23 @@ fn ensure_persisted_baseline(
     }
 }
 
-fn ensure_apply_baseline(state: &McpState, alias: &str, file_path: &str) {
+fn ensure_apply_baseline(state: &McpState, alias: &str, file_path: &str) -> Result<(), String> {
     if state.persistence_store_lock().is_none() {
-        return;
+        return Ok(());
     }
     let ir_ctx = state.ir_context_read();
     let Some(instructions) = ir_ctx.get_ir(alias).cloned() else {
-        return;
+        return Ok(());
     };
     let Some(version) = ir_ctx.file_version(alias) else {
-        return;
+        return Ok(());
     };
     let source_hash = ir_ctx
         .get_source_hash(alias)
         .cloned()
         .unwrap_or_else(|| format!("ir-{alias}-{version}"));
     drop(ir_ctx);
-    let compiled = CompiledIR {
-        file_id: alias.to_string(),
-        instructions: tuples_to_coreops(instructions),
-        version,
-    };
+    let compiled = compiled_from_tuples(alias.to_string(), version, instructions)?;
     ensure_persisted_baseline(
         state,
         file_path,
@@ -434,6 +443,7 @@ fn ensure_apply_baseline(state: &McpState, alias: &str, file_path: &str) {
         &compiled,
         &source_hash,
     );
+    Ok(())
 }
 
 fn persisted_context_id(state: &McpState, file_path: &str) -> Result<Option<String>, String> {

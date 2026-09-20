@@ -15,7 +15,7 @@ use super::delta::{
     DeltaIdentity, IRDelta, OccurrenceKey, key_tuple_from_tuple, primary_key_from_tuple,
 };
 use super::render::ir_to_text;
-use super::wire::op_to_tuple;
+use super::wire::{op_to_tuple, tuple_to_op};
 use crate::compression::Fidelity;
 use std::collections::HashMap;
 
@@ -43,6 +43,10 @@ pub enum DeltaError {
     UnsupportedDeltaVersion(u8),
     InvalidSequenceInstruction {
         position: usize,
+    },
+    InvalidCanonicalTuple {
+        position: usize,
+        tuple: Vec<String>,
     },
     SequenceConflict {
         position: usize,
@@ -78,6 +82,9 @@ impl std::fmt::Display for DeltaError {
             }
             DeltaError::InvalidSequenceInstruction { position } => {
                 write!(f, "invalid sequence instruction at position {position}")
+            }
+            DeltaError::InvalidCanonicalTuple { position, tuple } => {
+                write!(f, "invalid canonical tuple at position {position}: {tuple:?}")
             }
             DeltaError::SequenceConflict {
                 position,
@@ -228,6 +235,7 @@ impl FileState {
     /// Returns `Err(DeltaError::DuplicateSymbol)` if an instruction with
     /// the same primary key already exists in this file state (F-23).
     pub fn append(&mut self, instruction: Vec<String>) -> Result<(), DeltaError> {
+        validate_tuple(&instruction, self.instructions.len())?;
         let key = primary_key_from_tuple(&instruction);
         let repeatable = DeltaIdentity::from_tuple(&instruction)
             .is_some_and(|identity| identity.is_repeatable());
@@ -275,6 +283,22 @@ impl FileState {
             ))),
         }
     }
+}
+
+fn validate_tuple(tuple: &[String], position: usize) -> Result<(), DeltaError> {
+    tuple_to_op(tuple)
+        .map(|_| ())
+        .ok_or_else(|| DeltaError::InvalidCanonicalTuple {
+            position,
+            tuple: tuple.to_vec(),
+        })
+}
+
+fn validate_tuples(tuples: &[Vec<String>]) -> Result<(), DeltaError> {
+    for (position, tuple) in tuples.iter().enumerate() {
+        validate_tuple(tuple, position)?;
+    }
+    Ok(())
 }
 
 /// Top-level context state — tracks all files and their IR states.
@@ -417,6 +441,7 @@ impl ContextState {
             candidate.append(add.clone())?;
         }
 
+        validate_tuples(&candidate.instructions)?;
         // Update version tracking
         candidate.version = delta.to;
         candidate.rebuild_indexes();

@@ -140,8 +140,13 @@ impl SqliteStore {
         let version = state.file_version(file_path).unwrap_or(1);
         let instructions = instructions
             .iter()
-            .filter_map(|tuple| crate::ir::wire::tuple_to_op(tuple))
-            .collect();
+            .enumerate()
+            .map(|(position, tuple)| {
+                crate::ir::wire::tuple_to_op(tuple).ok_or_else(|| {
+                    format!("invalid replayed canonical tuple at position {position}: {tuple:?}")
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(Some((
             CompiledIR {
                 file_id: file_path.to_string(),

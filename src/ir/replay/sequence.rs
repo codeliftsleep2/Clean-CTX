@@ -1,6 +1,6 @@
 //! Transactional replay for corrected positional sequence deltas.
 
-use super::{ContextState, DeltaError, OccurrenceKey};
+use super::{ContextState, DeltaError, OccurrenceKey, validate_tuple, validate_tuples};
 use crate::ir::delta::{SEQUENCE_DELTA_VERSION, SequenceDelta, SequenceEdit, occurrence_key_at};
 
 impl ContextState {
@@ -37,6 +37,7 @@ impl ContextState {
                     if *at > instructions.len() {
                         return Err(DeltaError::InvalidSequenceInstruction { position: *at });
                     }
+                    validate_tuple(instruction, *at)?;
                     instructions.insert(*at, instruction.clone());
                     ensure_occurrence(&instructions, *at, value)?;
                 }
@@ -58,11 +59,14 @@ impl ContextState {
                 } => {
                     ensure_expected(&instructions, *at, expected)?;
                     ensure_occurrence(&instructions, *at, target)?;
+                    validate_tuple(replacement, *at)?;
                     instructions[*at] = replacement.clone();
                     ensure_occurrence(&instructions, *at, value)?;
                 }
             }
         }
+
+        validate_tuples(&instructions)?;
 
         file.instructions = instructions;
         file.version = delta.to;

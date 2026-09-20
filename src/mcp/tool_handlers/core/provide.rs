@@ -1,10 +1,9 @@
 // provide_code_context MCP handler.
 use super::common::{
-    checked_hierarchy_or_respond, contract_fields_focused, maybe_economics_fallback,
-    tuples_to_coreops,
+    checked_hierarchy_or_respond, compiled_from_tuples, contract_fields_focused,
+    invalid_session_ir_response, maybe_economics_fallback,
 };
 use crate::error::to_jsonrpc_error;
-use crate::ir::compiler::CompiledIR;
 use crate::ir::delta::SequenceDeltaComputer;
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::{
@@ -21,10 +20,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     use std::time::Instant;
     let overall_start = Instant::now();
 
-    // Symbol targeting: optional set of method names that should receive
-    // full verbatim bodies at Edit fidelity. All other methods are rendered
-    // signature-only. When omitted (None), every method's body is rendered
-    // (current default behavior).
+    // Optional method targeting retains verbatim bodies only for named units.
     let focus_methods: Option<HashSet<String>> =
         params["arguments"]["focusMethods"].as_array().map(|arr| {
             arr.iter()
@@ -65,10 +61,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         return;
     }
 
-    // A-13: Check resource limits before processing
     let limits = &state.config.resource_limits;
 
-    // Check file size if we can read it
     if let Ok(metadata) = std::fs::metadata(&resolved_path) {
         if let Err(e) = limits.check_file_size(metadata.len()) {
             send_response(&serde_json::json!({
@@ -298,7 +292,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 None => return,
             };
 
-            // Compute canonical file identity for WorkspaceIndex provenance
             let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
 
             // Update workspace index: remove stale edges, insert fresh ones.
@@ -312,17 +305,24 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             let prev_version = state.file_version(&alias).unwrap_or(0);
             let mut ir_ctx = state.ir_context_lock();
             let delta = if prev_version > 0 && ir_ctx.has_file(&alias) {
-                ir_ctx
-                    .get_ir(&alias)
-                    .cloned()
-                    .and_then(|prev_instructions| {
-                        let prev_compiled = CompiledIR {
-                            file_id: alias.clone(),
-                            version: prev_version,
-                            instructions: tuples_to_coreops(prev_instructions),
-                        };
-                        SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
-                    })
+                let Some(prev_instructions) = ir_ctx.get_ir(&alias).cloned() else {
+                    drop(ir_ctx);
+                    send_response(&invalid_session_ir_response(id, "missing prior instruction stream"));
+                    return;
+                };
+                let prev_compiled = match compiled_from_tuples(
+                    alias.clone(),
+                    prev_version,
+                    prev_instructions,
+                ) {
+                    Ok(compiled) => compiled,
+                    Err(error) => {
+                        drop(ir_ctx);
+                        send_response(&invalid_session_ir_response(id, &error));
+                        return;
+                    }
+                };
+                SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
             } else {
                 ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
                 None

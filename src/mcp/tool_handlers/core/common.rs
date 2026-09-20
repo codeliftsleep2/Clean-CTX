@@ -10,8 +10,36 @@ use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::protocol::send_response;
 use serde_json::Value;
 use std::collections::HashSet;
-pub(super) fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Vec<CoreOp> {
-    tuples.into_iter().filter_map(|t| tuple_to_op(&t)).collect()
+pub(super) fn tuples_to_coreops(tuples: Vec<Vec<String>>) -> Result<Vec<CoreOp>, String> {
+    tuples
+        .into_iter()
+        .enumerate()
+        .map(|(position, tuple)| {
+            tuple_to_op(&tuple)
+                .ok_or_else(|| format!("invalid canonical tuple at position {position}: {tuple:?}"))
+        })
+        .collect()
+}
+
+pub(super) fn compiled_from_tuples(
+    file_id: String,
+    version: u64,
+    tuples: Vec<Vec<String>>,
+) -> Result<CompiledIR, String> {
+    Ok(CompiledIR {
+        file_id,
+        version,
+        instructions: tuples_to_coreops(tuples)?,
+    })
+}
+
+pub(super) fn invalid_session_ir_response(id: &Value, message: &str) -> Value {
+    crate::mcp::tool_helpers::jsonrpc_error(
+        id.clone(),
+        -32603,
+        format!("Invalid session canonical IR: {message}"),
+        None,
+    )
 }
 
 /// Run the checked semantic-identity projection and map failures through the

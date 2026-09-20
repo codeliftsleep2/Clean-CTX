@@ -185,6 +185,52 @@ fn ambiguous_legacy_modification_fails_structurally() {
     ));
 }
 
+#[test]
+fn malformed_sequence_replacement_fails_without_mutating_state() {
+    let base = compiled(1, vec![CoreOp::SideEffect("M1".into(), SideEffectKind::Io)]);
+    let target = compiled(
+        2,
+        vec![CoreOp::SideEffect("M1".into(), SideEffectKind::Mutation)],
+    );
+    let mut delta = SequenceDeltaComputer::new().compute(&base, &target).unwrap();
+    let SequenceEdit::Replace { replacement, .. } = &mut delta.edits[0] else {
+        panic!("expected replacement");
+    };
+    replacement.pop();
+    let original = target_tuples(&base);
+    let mut state = ContextState::new();
+    state.load_ir(base, None);
+    assert!(matches!(
+        state.apply_sequence(delta),
+        Err(DeltaError::InvalidCanonicalTuple { .. })
+    ));
+    assert_eq!(state.get_ir("sequence.rs"), Some(&original));
+}
+
+#[test]
+fn malformed_legacy_addition_fails_without_mutating_state() {
+    let base = compiled(1, Vec::new());
+    let original = target_tuples(&base);
+    let mut state = ContextState::new();
+    state.load_ir(base, None);
+    let legacy = IRDelta {
+        file: "sequence.rs".into(),
+        from: 1,
+        to: 2,
+        ops: DeltaOps {
+            adds: vec![vec!["EFFECT".into(), "M1".into()]],
+            mods: Vec::new(),
+            dels: Vec::new(),
+        },
+        intent: None,
+    };
+    assert!(matches!(
+        state.apply(legacy),
+        Err(DeltaError::InvalidCanonicalTuple { .. })
+    ));
+    assert_eq!(state.get_ir("sequence.rs"), Some(&original));
+}
+
 fn fact_strategy() -> impl Strategy<Value = CoreOp> {
     prop_oneof![
         Just(CoreOp::SideEffect("M1".into(), SideEffectKind::Io)),

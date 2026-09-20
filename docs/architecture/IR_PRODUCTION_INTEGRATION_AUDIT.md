@@ -266,7 +266,7 @@ that another file cannot substitute and that replay restores the exact stream.
 ## 13. Finding P9-09: malformed session tuples can be silently discarded
 
 **Severity:** High externally observable replay and delta contradiction;
-architectural approval required.
+repaired pending user verification.
 
 Production delta computation converts session tuples back to `CoreOp` with
 `filter_map`, silently dropping any tuple that `tuple_to_op` rejects. Durable
@@ -277,16 +277,45 @@ also carry malformed replacements/additions. A malformed stream can therefore
 be accepted into session history and later appear to replay successfully with
 fewer operations.
 
-Recommended repair: make tuple-to-canonical conversion fallible everywhere it
-crosses a production boundary, validate inserted/replacement tuples before a
-delta commits, and fail replay structurally on the first invalid tuple. Do not
-drop, repair, or synthesize operands. This preserves transactional delta
-semantics and the approved exact replay invariant. The narrower alternative is
-to reject only during final reconstruction, but that permits invalid state to
-live in-session until persistence/reload and gives later consumers inconsistent
-behavior.
+The approved repair makes tuple-to-canonical conversion fallible at production
+boundaries. Corrected sequence insertions and replacements are validated before
+mutation; legacy additions, replacements, and patches validate the complete
+candidate before commit. Session delta generation, baseline persistence, and
+durable replay now fail structurally on the first invalid tuple. Tracked tests
+cover transactional sequence and legacy rejection, registered MCP application,
+and persisted replay. No path drops, repairs, or synthesizes malformed tuples.
 
-## 14. Approval gate and next audit action
+## 14. Finding P9-10: `restore_context` has contradictory public semantics
 
-Phase 9 pauses at P9-09's architectural approval gate. P9-06 and P9-08 remain
-pending user-run verification and are not Phase 9 certification.
+**Severity:** High externally observable lifecycle contradiction; architectural
+approval required.
+
+The registered tool describes restoring compressed context, and
+`docs/agent/tooling.md` says it restores a previously persisted context from
+the database. The production handler instead clears session and persistent
+ownership, then recompiles source; developer documentation describes that
+reset/recompression behavior. On successful recompilation the handler renders
+the result but does not install canonical IR, source hash, fidelity, durable
+path ownership, or semantic edges back into session state. Its response can
+therefore claim restoration while leaving no restored production owner.
+
+Alternatives:
+
+1. Define `restore_context` as reset plus authoritative full recompilation.
+   Install the new canonical/session state and workspace edges, keep the
+   explicit database clear, and make tool/docs wording say reset/recompile.
+2. Define it as persisted restore. Load physical `0x04` plus history like the
+   replay path, without deleting the requested checkpoint or requiring source.
+3. Split the behaviors into separately named tools. This is clearest but adds
+   a new public MCP contract and compatibility/migration work.
+
+Recommendation: option 1 preserves the established production behavior and
+developer contract while making its successful result real. `replay_history`
+already owns persisted restoration. The repair should retain deletion cleanup,
+install every recomputed owner atomically on success, and align the public tool
+and tooling documentation with reset/recompile semantics.
+
+## 15. Approval gate and next audit action
+
+Phase 9 pauses at P9-10's approval gate. P9-09 remains pending user-run
+verification and is not Phase 9 certification.
