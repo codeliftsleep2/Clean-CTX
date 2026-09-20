@@ -145,8 +145,9 @@ Integer values that are semantic integers remain raw unsigned varints:
 
 ## 6. Opcode and operand contract
 
-Opcode indices remain `0` through `25`; a version bump changes layouts, not
-semantic operation assignment.
+Existing opcode indices `0` through `25` retain their meanings. Phase 9 adds
+indices `26` through `29` for explicit interface-owned canonical operations;
+class opcodes are not overloaded or renumbered.
 
 | Opcode | `CoreOp` | `0x04` operands in order |
 |---:|---|---|
@@ -176,6 +177,10 @@ semantic operation assignment.
 | 23 | `ClassModifiers` | count, `class`, ordered typed values |
 | 24 | `ControlSummary` | count, `method`, ordered typed values |
 | 25 | `PatternFacts` | count, `method`, complete serialized facts |
+| 26 | `DefInterfaceMethod` | `interface`, `method`, `name` |
+| 27 | `DefInterfaceField` | `interface`, `field`, `name` |
+| 28 | `InterfaceModifiers` | count, `interface`, ordered typed values |
+| 29 | `InterfaceExtends` | `interface`, `parent` |
 
 `count` is the number of following string-table operands for that instruction.
 It is not a deduplication boundary. Instruction occurrences and payload

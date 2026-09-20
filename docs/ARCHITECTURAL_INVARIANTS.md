@@ -275,7 +275,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Invariant** | Physical binary `0x04` satisfies `decode(encode(value)) == value` for every valid supported `CompiledIR`. Decoding never fabricates empty or synthetic operands and rejects malformed, trailing, or unsupported-version input structurally. The Phase 7 delta version remains independent. |
 | **Enforcement** | `src/tests/ir/binary_wire_v04.rs`, `src/tests/ir/binary_wire.rs`, and `src/tests/ir/round_trip*.rs` enforce all-variant equality, duplicate/order, metadata, malformed-input, wrapper, randomized, and deterministic contracts. `src/tests/mcp/persistence_lifecycle.rs` crosses registered dispatch, buffered persistence, SQLite ownership, reload, corrected-delta replay, and byte-exact editing. |
 | **Authority** | `src/ir/binary_wire.rs`, `src/ir/binary_wire/decode.rs`, `src/mcp/sqlite_store/replay.rs`, and `docs/architecture/BINARY_V04_CONTRACT.md` |
-| **Type** | STRUCTURAL + ENFORCED (test), Phase 8C awaiting user verification |
+| **Type** | STRUCTURAL + ENFORCED (test), including user-verified Phase 8C production persistence |
 | **Gate** | Binary-wire and round-trip tracked tests plus the final verification gate |
 
 ---

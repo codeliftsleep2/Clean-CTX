@@ -20,8 +20,9 @@ const HIERARCHICAL_SCHEMA_REVISION_2: u64 = 2;
 const HIERARCHICAL_SCHEMA_REVISION_3: u64 = 3;
 const HIERARCHICAL_SCHEMA_REVISION_4: u64 = 4;
 const HIERARCHICAL_SCHEMA_REVISION_5: u64 = 5;
-const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 6;
-const HIERARCHICAL_SCHEMA_VERSION: u64 = 7;
+const HIERARCHICAL_SCHEMA_REVISION_6: u64 = 6;
+const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 7;
+const HIERARCHICAL_SCHEMA_VERSION: u64 = 8;
 
 mod decode;
 mod encode;
@@ -44,6 +45,9 @@ pub struct HierarchicalIR {
     #[serde(rename = "c")]
     pub classes: Vec<ClassNode>,
 
+    #[serde(rename = "if", default, skip_serializing_if = "Vec::is_empty")]
+    pub interfaces: Vec<InterfaceNode>,
+
     /// Top-level imports — flat array of [alias, module, named]
     #[serde(rename = "i", default, skip_serializing_if = "Vec::is_empty")]
     pub imports: Vec<Vec<String>>,
@@ -63,6 +67,23 @@ pub struct HierarchicalIR {
     /// instead of silently defaulting an argument count.
     #[serde(rename = "ca", default, skip_serializing_if = "Vec::is_empty")]
     pub calls: Vec<HierarchicalCall>,
+}
+
+/// A semantically distinct interface container.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InterfaceNode {
+    #[serde(rename = "n")]
+    pub id: String,
+    #[serde(rename = "nm")]
+    pub name: String,
+    #[serde(rename = "m", default, skip_serializing_if = "Vec::is_empty")]
+    pub methods: Vec<MethodNode>,
+    #[serde(rename = "f", default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<FieldNode>,
+    #[serde(rename = "mo", default, skip_serializing_if = "Vec::is_empty")]
+    pub modifiers: Vec<Vec<DeclarationModifier>>,
+    #[serde(rename = "x", default, skip_serializing_if = "Vec::is_empty")]
+    pub extends: Vec<String>,
 }
 
 /// One structural invocation in the flat hierarchical call table.
@@ -327,6 +348,7 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         | Some(HIERARCHICAL_SCHEMA_REVISION_3)
         | Some(HIERARCHICAL_SCHEMA_REVISION_4)
         | Some(HIERARCHICAL_SCHEMA_REVISION_5)
+        | Some(HIERARCHICAL_SCHEMA_REVISION_6)
         | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION)
         | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(unsupported) => {
@@ -352,7 +374,9 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
             upgrade_revision_5_pattern_facts(&mut ir_val)?;
         }
         Some(HIERARCHICAL_SCHEMA_REVISION_5) => upgrade_revision_5_pattern_facts(&mut ir_val)?,
-        Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
+        Some(HIERARCHICAL_SCHEMA_REVISION_6)
+        | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION)
+        | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(_) => unreachable!("unsupported revisions returned above"),
     }
 
@@ -574,3 +598,7 @@ mod class_fact_tests;
 #[cfg(test)]
 #[path = "../tests/ir/hierarchical_patterns.rs"]
 mod pattern_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/interface_identity.rs"]
+mod interface_identity_tests;

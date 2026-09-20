@@ -57,6 +57,8 @@ pub enum GraphEdge {
     },
     /// Class extends another class
     Extends { child: String, parent: String },
+    /// Interface extends another interface.
+    InterfaceExtends { child: String, parent: String },
     /// Class implements an interface
     Implements { class: String, interface: String },
     /// Class injects a dependency
@@ -99,7 +101,23 @@ impl GraphBuilder {
                         // Add Calls edge: method belongs to class
                         // (structural relationship)
                     }
+                    CoreOp::DefInterfaceMethod(_iid, mid, name) => {
+                        graph.nodes.push(GraphNode {
+                            id: mid.clone(),
+                            name: name.clone(),
+                            kind: SymbolKind::Method,
+                            file_id: file_id.clone(),
+                        });
+                    }
                     CoreOp::DefField(_cid, fid, name) => {
+                        graph.nodes.push(GraphNode {
+                            id: fid.clone(),
+                            name: name.clone(),
+                            kind: SymbolKind::Field,
+                            file_id: file_id.clone(),
+                        });
+                    }
+                    CoreOp::DefInterfaceField(_iid, fid, name) => {
                         graph.nodes.push(GraphNode {
                             id: fid.clone(),
                             name: name.clone(),
@@ -117,6 +135,12 @@ impl GraphBuilder {
                     }
                     CoreOp::Extends(child, parent) => {
                         graph.edges.push(GraphEdge::Extends {
+                            child: child.clone(),
+                            parent: parent.clone(),
+                        });
+                    }
+                    CoreOp::InterfaceExtends(child, parent) => {
+                        graph.edges.push(GraphEdge::InterfaceExtends {
                             child: child.clone(),
                             parent: parent.clone(),
                         });
@@ -194,7 +218,23 @@ impl GraphBuilder {
                         file_id: String::new(),
                     });
                 }
+                CoreOp::DefInterfaceMethod(_iid, mid, name) => {
+                    graph.nodes.push(GraphNode {
+                        id: mid.clone(),
+                        name: name.clone(),
+                        kind: SymbolKind::Method,
+                        file_id: String::new(),
+                    });
+                }
                 CoreOp::DefField(_cid, fid, name) => {
+                    graph.nodes.push(GraphNode {
+                        id: fid.clone(),
+                        name: name.clone(),
+                        kind: SymbolKind::Field,
+                        file_id: String::new(),
+                    });
+                }
+                CoreOp::DefInterfaceField(_iid, fid, name) => {
                     graph.nodes.push(GraphNode {
                         id: fid.clone(),
                         name: name.clone(),
@@ -212,6 +252,12 @@ impl GraphBuilder {
                 }
                 CoreOp::Extends(child, parent) => {
                     graph.edges.push(GraphEdge::Extends {
+                        child: child.clone(),
+                        parent: parent.clone(),
+                    });
+                }
+                CoreOp::InterfaceExtends(child, parent) => {
+                    graph.edges.push(GraphEdge::InterfaceExtends {
                         child: child.clone(),
                         parent: parent.clone(),
                     });
@@ -307,6 +353,7 @@ fn matches_edge_type(edge: &GraphEdge, edge_type: &str) -> bool {
         (edge, edge_type),
         (GraphEdge::Calls { .. }, "calls")
             | (GraphEdge::Extends { .. }, "extends")
+            | (GraphEdge::InterfaceExtends { .. }, "interface_extends")
             | (GraphEdge::Implements { .. }, "implements")
             | (GraphEdge::Injects { .. }, "injects")
             | (GraphEdge::DataFlowRead { .. }, "dataflow_read")

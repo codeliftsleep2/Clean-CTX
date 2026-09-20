@@ -13,7 +13,7 @@
 
 use super::*;
 use crate::ir::identity::{
-    ClassId, FieldId, MethodId, PatternTarget, pattern_target, validate_identity_graph,
+    ClassId, FieldId, InterfaceId, MethodId, PatternTarget, pattern_target, validate_identity_graph,
 };
 use std::collections::HashMap;
 
@@ -35,7 +35,8 @@ use std::collections::HashMap;
 /// - Extends → set on the class named by its child ID
 /// - Implements → added to the class named by its target ID
 /// - Injects → appended to its target ClassId as one preserved occurrence
-/// - DefInterface → creates a ClassNode with synthetic=false and name
+/// - DefInterface → creates a distinct InterfaceNode
+/// - DefInterfaceMethod/Field → create members under InterfaceId owners
 /// - Import → added to top-level imports
 /// - TypeAlias → added to top-level type_aliases
 /// - Call → appended to the top-level calls table (the caller is carried
@@ -58,17 +59,22 @@ pub fn try_ir_to_hierarchical(
 ) -> Result<HierarchicalIR, HierarchicalProjectionError> {
     let identities = validate_identity_graph(ir)?;
     let mut classes: Vec<ClassNode> = Vec::with_capacity(identities.classes.len());
+    let mut interfaces: Vec<InterfaceNode> = Vec::with_capacity(identities.interfaces.len());
     let mut imports: Vec<Vec<String>> = Vec::new();
     let mut type_aliases: Vec<Vec<String>> = Vec::new();
     let mut calls: Vec<HierarchicalCall> = Vec::new();
     let mut class_locations: HashMap<ClassId, usize> =
         HashMap::with_capacity(identities.classes.len());
-    let mut method_locations: HashMap<MethodId, (usize, usize)> =
+    let mut method_locations: HashMap<MethodId, MethodLocation> =
         HashMap::with_capacity(identities.methods.len());
-    let mut field_locations: HashMap<FieldId, (usize, usize)> =
+    let mut field_locations: HashMap<FieldId, FieldLocation> =
         HashMap::with_capacity(identities.fields.len());
     let mut pending_methods: HashMap<ClassId, Vec<(MethodId, String)>> = HashMap::new();
     let mut pending_fields: HashMap<ClassId, Vec<(FieldId, String)>> = HashMap::new();
+    let mut pending_interface_methods: HashMap<InterfaceId, Vec<(MethodId, String)>> =
+        HashMap::new();
+    let mut pending_interface_fields: HashMap<InterfaceId, Vec<(FieldId, String)>> = HashMap::new();
+    let mut interface_locations: HashMap<InterfaceId, usize> = HashMap::new();
 
     for op in &ir.instructions {
         match op {
@@ -93,14 +99,16 @@ pub fn try_ir_to_hierarchical(
                     for (method_id, method_name) in methods {
                         let method_idx =
                             push_method(&mut classes[class_idx], &method_id, method_name);
-                        method_locations.insert(method_id, (class_idx, method_idx));
+                        method_locations
+                            .insert(method_id, MethodLocation::Class(class_idx, method_idx));
                     }
                 }
                 if let Some(fields) = pending_fields.remove(&class_id) {
                     let class_idx = classes.len() - 1;
                     for (field_id, field_name) in fields {
                         let field_idx = push_field(&mut classes[class_idx], &field_id, field_name);
-                        field_locations.insert(field_id, (class_idx, field_idx));
+                        field_locations
+                            .insert(field_id, FieldLocation::Class(class_idx, field_idx));
                     }
                 }
             }
@@ -110,7 +118,8 @@ pub fn try_ir_to_hierarchical(
                 let method_id = MethodId::from_serialized(mid);
                 if let Some(class_idx) = find_class_by_id(&classes, cid) {
                     let method_idx = push_method(&mut classes[class_idx], &method_id, name.clone());
-                    method_locations.insert(method_id, (class_idx, method_idx));
+                    method_locations
+                        .insert(method_id, MethodLocation::Class(class_idx, method_idx));
                 } else {
                     // The owner is valid but appears later. Preserve the
                     // declaration until its class node is materialized.
@@ -126,7 +135,7 @@ pub fn try_ir_to_hierarchical(
                 let field_id = FieldId::from_serialized(fid);
                 if let Some(class_idx) = find_class_by_id(&classes, cid) {
                     let field_idx = push_field(&mut classes[class_idx], &field_id, name.clone());
-                    field_locations.insert(field_id, (class_idx, field_idx));
+                    field_locations.insert(field_id, FieldLocation::Class(class_idx, field_idx));
                 } else {
                     // The owner is valid but appears later. Preserve the
                     // declaration until its class node is materialized.
@@ -143,11 +152,13 @@ pub fn try_ir_to_hierarchical(
             | CoreOp::FieldType(..)
             | CoreOp::MethodModifiers(..)
             | CoreOp::ClassModifiers(..)
+            | CoreOp::InterfaceModifiers(..)
             | CoreOp::ControlSummary(..)
             | CoreOp::PatternFacts(..)
             | CoreOp::Flags(..)
             | CoreOp::ClassFlags(..)
             | CoreOp::Extends(..)
+            | CoreOp::InterfaceExtends(..)
             | CoreOp::Implements(..)
             | CoreOp::Injects(..)
             | CoreOp::Body(..)
@@ -158,19 +169,75 @@ pub fn try_ir_to_hierarchical(
             | CoreOp::Pattern(..) => {}
 
             CoreOp::DefInterface(id, name) => {
-                classes.push(ClassNode {
+                interfaces.push(InterfaceNode {
                     id: id.clone(),
                     name: name.clone(),
                     methods: Vec::new(),
                     fields: Vec::new(),
                     modifiers: Vec::new(),
-                    class_flags: Vec::new(),
-                    extends: None,
-                    implements: Vec::new(),
-                    injects: Vec::new(),
-                    patterns: Vec::new(),
-                    synthetic: false,
+                    extends: Vec::new(),
                 });
+                let interface_id = InterfaceId::from_serialized(id);
+                let interface_idx = interfaces.len() - 1;
+                interface_locations.insert(interface_id.clone(), interface_idx);
+                if let Some(methods) = pending_interface_methods.remove(&interface_id) {
+                    for (method_id, name) in methods {
+                        let method_idx =
+                            push_interface_method(&mut interfaces[interface_idx], &method_id, name);
+                        method_locations.insert(
+                            method_id,
+                            MethodLocation::Interface(interface_idx, method_idx),
+                        );
+                    }
+                }
+                if let Some(fields) = pending_interface_fields.remove(&interface_id) {
+                    for (field_id, name) in fields {
+                        let field_idx =
+                            push_interface_field(&mut interfaces[interface_idx], &field_id, name);
+                        field_locations
+                            .insert(field_id, FieldLocation::Interface(interface_idx, field_idx));
+                    }
+                }
+            }
+
+            CoreOp::DefInterfaceMethod(iid, mid, name) => {
+                let interface_id = InterfaceId::from_serialized(iid);
+                let method_id = MethodId::from_serialized(mid);
+                if let Some(interface_idx) = interface_locations.get(&interface_id).copied() {
+                    let method_idx = push_interface_method(
+                        &mut interfaces[interface_idx],
+                        &method_id,
+                        name.clone(),
+                    );
+                    method_locations.insert(
+                        method_id,
+                        MethodLocation::Interface(interface_idx, method_idx),
+                    );
+                } else {
+                    pending_interface_methods
+                        .entry(interface_id)
+                        .or_default()
+                        .push((method_id, name.clone()));
+                }
+            }
+
+            CoreOp::DefInterfaceField(iid, fid, name) => {
+                let interface_id = InterfaceId::from_serialized(iid);
+                let field_id = FieldId::from_serialized(fid);
+                if let Some(interface_idx) = interface_locations.get(&interface_id).copied() {
+                    let field_idx = push_interface_field(
+                        &mut interfaces[interface_idx],
+                        &field_id,
+                        name.clone(),
+                    );
+                    field_locations
+                        .insert(field_id, FieldLocation::Interface(interface_idx, field_idx));
+                } else {
+                    pending_interface_fields
+                        .entry(interface_id)
+                        .or_default()
+                        .push((field_id, name.clone()));
+                }
             }
 
             CoreOp::Import(alias, module, named) => {
@@ -197,103 +264,163 @@ pub fn try_ir_to_hierarchical(
 
     debug_assert!(pending_methods.is_empty());
     debug_assert!(pending_fields.is_empty());
+    debug_assert!(pending_interface_methods.is_empty());
+    debug_assert!(pending_interface_fields.is_empty());
 
     for (instruction, op) in ir.instructions.iter().enumerate() {
         match op {
             CoreOp::Param(raw_method, parameter_id, ty, name) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "SIG", instruction)?;
-                classes[class_idx].methods[method_idx].params.push(vec![
-                    parameter_id.clone(),
-                    ty.clone(),
-                    name.clone(),
-                ]);
+                method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "SIG",
+                    instruction,
+                )?
+                .params
+                .push(vec![parameter_id.clone(), ty.clone(), name.clone()]);
             }
             CoreOp::Return(raw_method, ty) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "RET", instruction)?;
-                classes[class_idx].methods[method_idx].return_type = Some(ty.clone());
+                method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "RET",
+                    instruction,
+                )?
+                .return_type = Some(ty.clone());
             }
             CoreOp::FieldType(raw_field, ty) => {
                 let field_id = FieldId::from_serialized(raw_field);
-                let (class_idx, field_idx) =
-                    field_locations.get(&field_id).copied().ok_or_else(|| {
-                        HierarchicalProjectionError::UnresolvedIdentity {
-                            operation: "FIELD_T",
-                            expected: ProjectionIdentityKind::Field,
-                            id: raw_field.clone(),
-                            instruction,
-                        }
-                    })?;
-                classes[class_idx].fields[field_idx].field_type = Some(ty.clone());
+                let location = field_locations.get(&field_id).copied().ok_or_else(|| {
+                    HierarchicalProjectionError::UnresolvedIdentity {
+                        operation: "FIELD_T",
+                        expected: ProjectionIdentityKind::Field,
+                        id: raw_field.clone(),
+                        instruction,
+                    }
+                })?;
+                field_mut(&mut classes, &mut interfaces, location).field_type = Some(ty.clone());
             }
             CoreOp::MethodModifiers(raw_method, modifiers) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "MOD_M", instruction)?;
-                classes[class_idx].methods[method_idx]
-                    .modifiers
-                    .push(modifiers.clone());
+                method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "MOD_M",
+                    instruction,
+                )?
+                .modifiers
+                .push(modifiers.clone());
             }
             CoreOp::ClassModifiers(raw_class, modifiers) => {
                 let class_idx = class_location(&class_locations, raw_class, "MOD_C", instruction)?;
                 classes[class_idx].modifiers.push(modifiers.clone());
             }
+            CoreOp::InterfaceModifiers(raw_interface, modifiers) => {
+                let interface_idx =
+                    interface_location(&interface_locations, raw_interface, "MOD_I", instruction)?;
+                interfaces[interface_idx].modifiers.push(modifiers.clone());
+            }
             CoreOp::ControlSummary(raw_method, summaries) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "CTRL_SUM", instruction)?;
-                classes[class_idx].methods[method_idx]
-                    .control_summaries
-                    .push(summaries.clone());
+                method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "CTRL_SUM",
+                    instruction,
+                )?
+                .control_summaries
+                .push(summaries.clone());
             }
             CoreOp::PatternFacts(raw_method, facts) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "PAT_FACT", instruction)?;
-                classes[class_idx].methods[method_idx]
-                    .pattern_facts
-                    .push(facts.clone());
+                method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "PAT_FACT",
+                    instruction,
+                )?
+                .pattern_facts
+                .push(facts.clone());
             }
             CoreOp::Flags(raw_method, flags) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "FLAGS", instruction)?;
-                classes[class_idx].methods[method_idx]
-                    .flags
-                    .push(flags.clone());
+                method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "FLAGS",
+                    instruction,
+                )?
+                .flags
+                .push(flags.clone());
             }
             CoreOp::Body(raw_method, text, start, end) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "BODY", instruction)?;
-                let method = &mut classes[class_idx].methods[method_idx];
+                let method = method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "BODY",
+                    instruction,
+                )?;
                 method.body = Some(text.clone());
                 method.body_start = *start;
                 method.body_end = *end;
             }
             CoreOp::ControlFlow(raw_method, kind, target) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "CTRL", instruction)?;
-                classes[class_idx].methods[method_idx]
-                    .control_flow
-                    .push(vec![kind.clone(), target.clone()]);
+                method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "CTRL",
+                    instruction,
+                )?
+                .control_flow
+                .push(vec![kind.clone(), target.clone()]);
             }
             CoreOp::DataFlow(raw_method, direction, target) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "DATAFLOW", instruction)?;
-                classes[class_idx].methods[method_idx]
-                    .data_flow
-                    .push(vec![direction.clone(), target.clone()]);
+                method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "DATAFLOW",
+                    instruction,
+                )?
+                .data_flow
+                .push(vec![direction.clone(), target.clone()]);
             }
             CoreOp::SideEffect(raw_method, effect) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "EFFECT", instruction)?;
-                classes[class_idx].methods[method_idx]
-                    .side_effect
-                    .push(*effect);
+                method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "EFFECT",
+                    instruction,
+                )?
+                .side_effect
+                .push(*effect);
             }
             CoreOp::ExecutionContext(raw_method, context) => {
-                let (class_idx, method_idx) =
-                    method_location(&method_locations, raw_method, "CTX", instruction)?;
-                classes[class_idx].methods[method_idx]
-                    .execution_context
-                    .push(*context);
+                method_mut(
+                    &mut classes,
+                    &mut interfaces,
+                    &method_locations,
+                    raw_method,
+                    "CTX",
+                    instruction,
+                )?
+                .execution_context
+                .push(*context);
             }
             CoreOp::ClassFlags(raw_class, flags) => {
                 let class_idx =
@@ -303,6 +430,11 @@ pub fn try_ir_to_hierarchical(
             CoreOp::Extends(raw_class, parent) => {
                 let class_idx = class_location(&class_locations, raw_class, "EXT", instruction)?;
                 classes[class_idx].extends = Some(parent.clone());
+            }
+            CoreOp::InterfaceExtends(raw_interface, parent) => {
+                let interface_idx =
+                    interface_location(&interface_locations, raw_interface, "EXT_I", instruction)?;
+                interfaces[interface_idx].extends.push(parent.clone());
             }
             CoreOp::Implements(raw_class, interface) => {
                 let class_idx = class_location(&class_locations, raw_class, "IMPL", instruction)?;
@@ -335,12 +467,20 @@ pub fn try_ir_to_hierarchical(
                             "PAT class",
                             instruction,
                         )?;
-                        let (class_idx, method_idx) = method_location(
+                        let location = method_location(
                             &method_locations,
                             method.as_str(),
                             "PAT method",
                             instruction,
                         )?;
+                        let MethodLocation::Class(class_idx, method_idx) = location else {
+                            return Err(HierarchicalProjectionError::OwnerMismatch {
+                                operation: "PAT",
+                                id: method.as_str().to_owned(),
+                                expected_owner: class.as_str().to_owned(),
+                                instruction,
+                            });
+                        };
                         if class_idx != expected_class {
                             return Err(HierarchicalProjectionError::OwnerMismatch {
                                 operation: "PAT",
@@ -359,6 +499,7 @@ pub fn try_ir_to_hierarchical(
 
     Ok(HierarchicalIR {
         classes,
+        interfaces,
         imports,
         type_aliases,
         calls,
@@ -383,11 +524,11 @@ fn class_location(
 }
 
 fn method_location(
-    method_locations: &HashMap<MethodId, (usize, usize)>,
+    method_locations: &HashMap<MethodId, MethodLocation>,
     raw_method: &str,
     operation: &'static str,
     instruction: usize,
-) -> Result<(usize, usize), HierarchicalProjectionError> {
+) -> Result<MethodLocation, HierarchicalProjectionError> {
     method_locations
         .get(&MethodId::from_serialized(raw_method))
         .copied()
@@ -399,8 +540,67 @@ fn method_location(
         })
 }
 
+#[derive(Clone, Copy)]
+enum MethodLocation {
+    Class(usize, usize),
+    Interface(usize, usize),
+}
+
+#[derive(Clone, Copy)]
+enum FieldLocation {
+    Class(usize, usize),
+    Interface(usize, usize),
+}
+
+fn method_mut<'a>(
+    classes: &'a mut [ClassNode],
+    interfaces: &'a mut [InterfaceNode],
+    locations: &HashMap<MethodId, MethodLocation>,
+    raw: &str,
+    operation: &'static str,
+    instruction: usize,
+) -> Result<&'a mut MethodNode, HierarchicalProjectionError> {
+    match method_location(locations, raw, operation, instruction)? {
+        MethodLocation::Class(owner, member) => Ok(&mut classes[owner].methods[member]),
+        MethodLocation::Interface(owner, member) => Ok(&mut interfaces[owner].methods[member]),
+    }
+}
+
+fn field_mut<'a>(
+    classes: &'a mut [ClassNode],
+    interfaces: &'a mut [InterfaceNode],
+    location: FieldLocation,
+) -> &'a mut FieldNode {
+    match location {
+        FieldLocation::Class(owner, member) => &mut classes[owner].fields[member],
+        FieldLocation::Interface(owner, member) => &mut interfaces[owner].fields[member],
+    }
+}
+
+fn interface_location(
+    locations: &HashMap<InterfaceId, usize>,
+    raw: &str,
+    operation: &'static str,
+    instruction: usize,
+) -> Result<usize, HierarchicalProjectionError> {
+    locations
+        .get(&InterfaceId::from_serialized(raw))
+        .copied()
+        .ok_or_else(|| HierarchicalProjectionError::UnresolvedIdentity {
+            operation,
+            expected: ProjectionIdentityKind::Interface,
+            id: raw.to_owned(),
+            instruction,
+        })
+}
+
 fn push_method(class: &mut ClassNode, method_id: &MethodId, name: String) -> usize {
-    class.methods.push(MethodNode {
+    class.methods.push(new_method(method_id, name));
+    class.methods.len() - 1
+}
+
+fn new_method(method_id: &MethodId, name: String) -> MethodNode {
+    MethodNode {
         id: method_id.as_str().to_owned(),
         name,
         params: Vec::new(),
@@ -417,8 +617,7 @@ fn push_method(class: &mut ClassNode, method_id: &MethodId, name: String) -> usi
         data_flow: Vec::new(),
         side_effect: Vec::new(),
         execution_context: Vec::new(),
-    });
-    class.methods.len() - 1
+    }
 }
 
 fn push_field(class: &mut ClassNode, field_id: &FieldId, name: String) -> usize {
@@ -428,4 +627,22 @@ fn push_field(class: &mut ClassNode, field_id: &FieldId, name: String) -> usize 
         field_type: None,
     });
     class.fields.len() - 1
+}
+
+fn push_interface_method(
+    interface: &mut InterfaceNode,
+    method_id: &MethodId,
+    name: String,
+) -> usize {
+    interface.methods.push(new_method(method_id, name));
+    interface.methods.len() - 1
+}
+
+fn push_interface_field(interface: &mut InterfaceNode, field_id: &FieldId, name: String) -> usize {
+    interface.fields.push(FieldNode {
+        id: field_id.as_str().to_owned(),
+        name,
+        field_type: None,
+    });
+    interface.fields.len() - 1
 }

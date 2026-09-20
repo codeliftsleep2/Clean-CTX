@@ -511,7 +511,9 @@ impl ContextStore for SqliteStore {
     }
 
     fn clear_file(&mut self, file_path: &str) {
-        let result = self.conn.transaction().and_then(|tx| {
+        // Clear may run directly or as one operation in BufferedStore's batch.
+        // A savepoint keeps the ownership cleanup atomic in either context.
+        let result = self.conn.savepoint().and_then(|tx| {
             tx.execute(
                 "DELETE FROM symbols WHERE context_id IN (SELECT id FROM contexts WHERE file_path = ?1)",
                 params![file_path],

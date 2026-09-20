@@ -75,11 +75,16 @@ impl std::error::Error for PassError {}
 /// type declaration that owns it.
 #[derive(Debug, Clone)]
 pub struct TypeScope {
-    /// Class alias id allocated for this type declaration.
-    pub class_id: String,
+    pub owner: TypeOwner,
     /// Byte offset one past the end of the type declaration node.
     /// Scopes are pruned once the walk passes this offset.
     pub end_byte: usize,
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeOwner {
+    Class(String),
+    Interface(String),
 }
 
 /// A single pass in the IR compilation pipeline.
@@ -129,6 +134,7 @@ pub struct PassContext {
     /// Current class ID (set when processing a class capture).
     /// Nested-type aware: mirrors the innermost entry of `type_scopes`.
     pub current_class: Option<String>,
+    pub current_interface: Option<String>,
     /// Open type-declaration scopes keyed by source span.
     /// A declaration is owned by the innermost scope whose
     /// `[start_byte, end_byte)` window contains it.
@@ -172,6 +178,7 @@ impl PassContext {
             current_method: None,
             current_control_summaries: Vec::new(),
             current_class: None,
+            current_interface: None,
             type_scopes: Vec::new(),
             callable_scopes: Vec::new(),
             current_callable: None,
@@ -216,11 +223,24 @@ impl PassContext {
     /// enclosing type's later members.
     pub(super) fn push_type_scope(&mut self, class_id: String, end_byte: usize) {
         self.type_scopes.push(TypeScope {
-            class_id: class_id.clone(),
+            owner: TypeOwner::Class(class_id.clone()),
             end_byte,
         });
         self.current_class = Some(class_id.clone());
+        self.current_interface = None;
         self.layer_context.current_class = Some(class_id);
+        self.layer_context.current_interface = None;
+    }
+
+    pub(super) fn push_interface_scope(&mut self, interface_id: String, end_byte: usize) {
+        self.type_scopes.push(TypeScope {
+            owner: TypeOwner::Interface(interface_id.clone()),
+            end_byte,
+        });
+        self.current_class = None;
+        self.current_interface = Some(interface_id.clone());
+        self.layer_context.current_class = None;
+        self.layer_context.current_interface = Some(interface_id);
     }
 
     /// Resolve the innermost type scope whose `[start_byte, end_byte)`
@@ -235,9 +255,21 @@ impl PassContext {
                 break;
             }
         }
-        let owner = self.type_scopes.last().map(|s| s.class_id.clone());
-        self.current_class = owner.clone();
-        self.layer_context.current_class = owner;
+        let owner = self.type_scopes.last().map(|scope| scope.owner.clone());
+        self.current_class = match &owner {
+            Some(TypeOwner::Class(id)) => Some(id.clone()),
+            _ => None,
+        };
+        self.current_interface = match &owner {
+            Some(TypeOwner::Interface(id)) => Some(id.clone()),
+            _ => None,
+        };
+        self.layer_context
+            .current_class
+            .clone_from(&self.current_class);
+        self.layer_context
+            .current_interface
+            .clone_from(&self.current_interface);
     }
 
     /// Push the file-wide synthetic scope for top-level functions
@@ -246,11 +278,13 @@ impl PassContext {
     /// file, so it sits ABOVE any other scope and is never pruned.
     pub(super) fn push_file_scope(&mut self, class_id: String) {
         self.type_scopes.push(TypeScope {
-            class_id: class_id.clone(),
+            owner: TypeOwner::Class(class_id.clone()),
             end_byte: usize::MAX,
         });
         self.current_class = Some(class_id.clone());
+        self.current_interface = None;
         self.layer_context.current_class = Some(class_id);
+        self.layer_context.current_interface = None;
     }
 
     /// Push the callable-declaration scope for `method_id`.
@@ -338,7 +372,7 @@ impl PassContext {
     /// Emit a method's IR (DefMethod + Param + Return) and return the method name.
     pub(super) fn emit_method_ir(
         &mut self,
-        class_id: &str,
+        owner: &TypeOwner,
         method_id: &str,
         raw_sig: &str,
     ) -> String {
@@ -358,11 +392,20 @@ impl PassContext {
         let params_str = sig.params_str;
         let return_type = sig.return_type;
 
-        self.instructions.push(CoreOp::DefMethod(
-            class_id.to_string(),
-            method_id.to_string(),
-            name.clone(),
-        ));
+        match owner {
+            TypeOwner::Class(class_id) => self.instructions.push(CoreOp::DefMethod(
+                class_id.clone(),
+                method_id.to_string(),
+                name.clone(),
+            )),
+            TypeOwner::Interface(interface_id) => {
+                self.instructions.push(CoreOp::DefInterfaceMethod(
+                    interface_id.clone(),
+                    method_id.to_string(),
+                    name.clone(),
+                ))
+            }
+        }
 
         if !params_str.is_empty() {
             // The formal parameters are the ones the declaration wrote: a

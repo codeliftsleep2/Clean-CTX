@@ -18,7 +18,7 @@
 //   - async keyword → SideEffect("async") + ExecutionContext("async")
 //   - new Observable() → DataFlow("writes", "observable")
 
-use super::declaration::{declaration_head, has_modifier};
+use super::declaration::{declaration_head, has_modifier, interface_parents};
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{
     CTRL_AWAIT, CTRL_TRY, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, DeclarationModifier,
@@ -250,6 +250,17 @@ impl LanguageLayer for TypeScriptLayer {
                     let modifiers = Self::extract_class_modifiers(raw_text);
                     if !modifiers.is_empty() {
                         ops.push(CoreOp::ClassModifiers(class_id.clone(), modifiers));
+                    }
+                }
+            }
+            "interface.root" => {
+                if let Some(interface_id) = &context.current_interface {
+                    for parent in interface_parents(raw_text, "extends") {
+                        ops.push(CoreOp::InterfaceExtends(interface_id.clone(), parent));
+                    }
+                    let modifiers = Self::extract_class_modifiers(raw_text);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::InterfaceModifiers(interface_id.clone(), modifiers));
                     }
                 }
             }

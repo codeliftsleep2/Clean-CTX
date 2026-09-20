@@ -20,16 +20,25 @@ use super::opcodes::CoreOp;
 /// alias ID from the `DefClass` ops in the stream, then rewrites any
 /// `Extends`/`Implements` ops that reference a raw class name.
 pub(super) fn resolve_forward_aliases(instructions: &mut [CoreOp]) {
-    // First pass: build the class-name → alias-id mapping from DefClass ops.
+    // First pass: build distinct class/interface name maps. An implements
+    // target is interface-owned and must never resolve through a class map.
     let mut name_to_alias: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
+    let mut interface_name_to_alias: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
     for op in instructions.iter() {
-        if let CoreOp::DefClass(alias_id, name) = op {
-            // name is the extracted class name like "FooService" (no modifiers).
-            // Store the mapping so we can resolve Extends("C1", "Foo") → Extends("C1", "C2").
-            if !name_to_alias.contains_key(name) {
-                name_to_alias.insert(name.clone(), alias_id.clone());
+        match op {
+            CoreOp::DefClass(alias_id, name) => {
+                name_to_alias
+                    .entry(name.clone())
+                    .or_insert_with(|| alias_id.clone());
             }
+            CoreOp::DefInterface(alias_id, name) => {
+                interface_name_to_alias
+                    .entry(name.clone())
+                    .or_insert_with(|| alias_id.clone());
+            }
+            _ => {}
         }
     }
 
@@ -45,8 +54,13 @@ pub(super) fn resolve_forward_aliases(instructions: &mut [CoreOp]) {
                     }
                 }
             }
-            CoreOp::Implements(_, target) if !target.starts_with('C') => {
-                if let Some(alias) = name_to_alias.get(target.as_str()) {
+            CoreOp::Implements(_, target) if !target.starts_with('I') => {
+                if let Some(alias) = interface_name_to_alias.get(target.as_str()) {
+                    *target = alias.clone();
+                }
+            }
+            CoreOp::InterfaceExtends(_, target) if !target.starts_with('I') => {
+                if let Some(alias) = interface_name_to_alias.get(target.as_str()) {
                     *target = alias.clone();
                 }
             }

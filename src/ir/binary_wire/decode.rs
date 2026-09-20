@@ -237,9 +237,13 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                     let name = operands.remove(0);
                     CoreOp::Pattern(name, operands)
                 }
-                OP_MOD_M | OP_MOD_C => {
+                OP_MOD_M | OP_MOD_C | OP_MOD_I => {
                     if operands.len() < 2 {
-                        let name = if op_idx == OP_MOD_M { "MOD_M" } else { "MOD_C" };
+                        let name = match op_idx {
+                            OP_MOD_M => "MOD_M",
+                            OP_MOD_C => "MOD_C",
+                            _ => "MOD_I",
+                        };
                         return Err(BinaryDecodeError::TruncatedData(format!(
                             "{name} needs a target_id and at least one modifier"
                         )));
@@ -253,10 +257,10 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                             })
                         })
                         .collect::<Result<Vec<_>, _>>()?;
-                    if op_idx == OP_MOD_M {
-                        CoreOp::MethodModifiers(target, modifiers)
-                    } else {
-                        CoreOp::ClassModifiers(target, modifiers)
+                    match op_idx {
+                        OP_MOD_M => CoreOp::MethodModifiers(target, modifiers),
+                        OP_MOD_C => CoreOp::ClassModifiers(target, modifiers),
+                        _ => CoreOp::InterfaceModifiers(target, modifiers),
                     }
                 }
                 OP_CTRL_SUM => {
@@ -313,6 +317,18 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                     let name = read_operand(&data[pos..], &mut pos)?;
                     CoreOp::DefInterface(iid, name)
                 }
+                OP_DEF_IM => {
+                    let iid = read_operand(&data[pos..], &mut pos)?;
+                    let mid = read_operand(&data[pos..], &mut pos)?;
+                    let name = read_operand(&data[pos..], &mut pos)?;
+                    CoreOp::DefInterfaceMethod(iid, mid, name)
+                }
+                OP_DEF_IF => {
+                    let iid = read_operand(&data[pos..], &mut pos)?;
+                    let fid = read_operand(&data[pos..], &mut pos)?;
+                    let name = read_operand(&data[pos..], &mut pos)?;
+                    CoreOp::DefInterfaceField(iid, fid, name)
+                }
                 OP_SIG => {
                     let mid = read_operand(&data[pos..], &mut pos)?;
                     let pid = read_operand(&data[pos..], &mut pos)?;
@@ -334,6 +350,11 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                     let child = read_operand(&data[pos..], &mut pos)?;
                     let parent = read_operand(&data[pos..], &mut pos)?;
                     CoreOp::Extends(child, parent)
+                }
+                OP_EXT_I => {
+                    let child = read_operand(&data[pos..], &mut pos)?;
+                    let parent = read_operand(&data[pos..], &mut pos)?;
+                    CoreOp::InterfaceExtends(child, parent)
                 }
                 OP_IMPL => {
                     let cid = read_operand(&data[pos..], &mut pos)?;

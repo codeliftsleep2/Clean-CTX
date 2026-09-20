@@ -12,7 +12,7 @@
 // │ Instructions: [count(varint), instruction*]             │
 // │                                                         │
 // │ Instruction:                                            │
-// │   opcode_idx: u8 (0-25)                                 │
+// │   opcode_idx: u8 (0-29)                                 │
 // │   operands: [varint]* (string table indices)            │
 // │   For variadic ops: operand_count as varint prefix      │
 // └─────────────────────────────────────────────────────────┘
@@ -93,6 +93,10 @@ const OP_MOD_M: u8 = 22;
 const OP_MOD_C: u8 = 23;
 const OP_CTRL_SUM: u8 = 24;
 const OP_PAT_FACT: u8 = 25;
+const OP_DEF_IM: u8 = 26;
+const OP_DEF_IF: u8 = 27;
+const OP_MOD_I: u8 = 28;
+const OP_EXT_I: u8 = 29;
 
 /// Highest defined opcode index.
 ///
@@ -101,7 +105,7 @@ const OP_PAT_FACT: u8 = 25;
 /// additive `OP_CALL_SPREAD`) are allocated after the edit-mode `OP_BODY`, so
 /// a guard bounded at `OP_BODY` would report a defined opcode as unknown and
 /// make CALL facts unrepresentable over the binary wire.
-const OP_MAX: u8 = OP_PAT_FACT;
+const OP_MAX: u8 = OP_EXT_I;
 
 /// Opcodes that have a variable number of operands (beyond the first one).
 fn is_variadic(op_idx: u8) -> bool {
@@ -113,6 +117,7 @@ fn is_variadic(op_idx: u8) -> bool {
             | OP_PAT
             | OP_MOD_M
             | OP_MOD_C
+            | OP_MOD_I
             | OP_CTRL_SUM
             | OP_PAT_FACT
     )
@@ -125,16 +130,20 @@ fn op_to_index(op: &CoreOp) -> u8 {
         CoreOp::DefMethod(..) => OP_DEF_M,
         CoreOp::DefField(..) => OP_DEF_F,
         CoreOp::DefInterface(..) => OP_DEF_I,
+        CoreOp::DefInterfaceMethod(..) => OP_DEF_IM,
+        CoreOp::DefInterfaceField(..) => OP_DEF_IF,
         CoreOp::Param(..) => OP_SIG,
         CoreOp::Return(..) => OP_RET,
         CoreOp::FieldType(..) => OP_FIELD_T,
         CoreOp::MethodModifiers(..) => OP_MOD_M,
         CoreOp::ClassModifiers(..) => OP_MOD_C,
+        CoreOp::InterfaceModifiers(..) => OP_MOD_I,
         CoreOp::ControlSummary(..) => OP_CTRL_SUM,
         CoreOp::PatternFacts(..) => OP_PAT_FACT,
         CoreOp::Flags(..) => OP_FLAGS,
         CoreOp::ClassFlags(..) => OP_FLAGS_C,
         CoreOp::Extends(..) => OP_EXT,
+        CoreOp::InterfaceExtends(..) => OP_EXT_I,
         CoreOp::Implements(..) => OP_IMPL,
         CoreOp::Injects(..) => OP_INJECTS,
         CoreOp::Import(..) => OP_IMP,
@@ -290,6 +299,16 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
                 encode_operand(&mut buf, iid);
                 encode_operand(&mut buf, name);
             }
+            CoreOp::DefInterfaceMethod(iid, mid, name) => {
+                encode_operand(&mut buf, iid);
+                encode_operand(&mut buf, mid);
+                encode_operand(&mut buf, name);
+            }
+            CoreOp::DefInterfaceField(iid, fid, name) => {
+                encode_operand(&mut buf, iid);
+                encode_operand(&mut buf, fid);
+                encode_operand(&mut buf, name);
+            }
             CoreOp::Param(mid, pid, ty, name) => {
                 encode_operand(&mut buf, mid);
                 encode_operand(&mut buf, pid);
@@ -314,6 +333,13 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
             CoreOp::ClassModifiers(cid, modifiers) => {
                 write_varint(&mut buf, (1 + modifiers.len()) as u64);
                 encode_operand(&mut buf, cid);
+                for modifier in modifiers {
+                    encode_operand(&mut buf, modifier.as_str());
+                }
+            }
+            CoreOp::InterfaceModifiers(iid, modifiers) => {
+                write_varint(&mut buf, (1 + modifiers.len()) as u64);
+                encode_operand(&mut buf, iid);
                 for modifier in modifiers {
                     encode_operand(&mut buf, modifier.as_str());
                 }
@@ -352,6 +378,10 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
                 }
             }
             CoreOp::Extends(child, parent) => {
+                encode_operand(&mut buf, child);
+                encode_operand(&mut buf, parent);
+            }
+            CoreOp::InterfaceExtends(child, parent) => {
                 encode_operand(&mut buf, child);
                 encode_operand(&mut buf, parent);
             }

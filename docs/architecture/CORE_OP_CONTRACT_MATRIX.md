@@ -1,6 +1,6 @@
 # CoreOp Architectural Contract Matrix
 
-**Status:** Approved target architecture. All 25 current `CoreOp` rows are
+**Status:** Approved target architecture. All 29 current `CoreOp` rows are
 normative. Hierarchical schema-shape decisions identified in Section 10 remain
 separately gated.
 
@@ -38,7 +38,7 @@ validation and projection, and focused tests.
 
 The following defaults were approved on 2026-09-17 and are normative:
 
-1. Introduce internal `ClassId`, `MethodId`, `FieldId`, and `ParameterId`
+1. Introduce internal `ClassId`, `InterfaceId`, `MethodId`, `FieldId`, and `ParameterId`
    types while preserving existing serialized string shapes initially.
 2. Unresolved, duplicate, or kind-mismatched identities fail checked
    projection with structured errors. MCP maps failures to its existing error
@@ -67,9 +67,8 @@ evidence and architectural review.
   delta shapes. `ParameterId` uniqueness is required within its owning method.
 - Class, method, field, and parameter strings remain unchanged on serialized
   boundaries during the first migration.
-- `DefInterface` and import aliases are real identities but are outside the four
-  approved first-slice newtypes. They remain validated string identities until
-  a separately justified typed migration.
+- Phase 9 adds `InterfaceId` and explicit interface-owned method/field
+  declarations. Existing serialized strings remain unchanged.
 - Despite its historical name, `TypeAlias` is an occurrence fact used both for
   configured type substitutions and repeated `Φ` metadata markers. Its alias
   operand is not a unique definition identity.
@@ -151,16 +150,20 @@ not automatically a semantic serialization of the canonical stream.
 | `DefMethod(class, method, name)` | Structural compiler capture; trusted decoder | Defines globally unique `MethodId`; owner `ClassId` must resolve; duplicate or wrong-kind owner fails | Unique definition | None |
 | `DefField(class, field, name)` | Structural compiler capture; trusted decoder | Defines globally unique `FieldId`; owner `ClassId` must resolve; duplicate or wrong-kind owner fails | Unique definition | None |
 | `DefInterface(interface, name)` | Structural compiler capture; trusted decoder | Defines interface identity in its existing string namespace; duplicate or cross-kind collision fails | Unique definition | None |
+| `DefInterfaceMethod(interface, method, name)` | Structural interface capture; trusted decoder | Defines globally unique `MethodId`; owner `InterfaceId` must resolve; duplicate or wrong-kind owner fails | Unique definition | None |
+| `DefInterfaceField(interface, field, name)` | Structural interface capture; trusted decoder | Defines globally unique `FieldId`; owner `InterfaceId` must resolve; duplicate or wrong-kind owner fails | Unique definition | None |
 | `Param(method, parameter, type, name)` | Signature compiler capture; trusted decoder | Defines `(MethodId, ParameterId)`; method must resolve; duplicate parameter ID within method fails | Ordered many per method; source parameter order is semantic | None |
 | `Return(method, type)` | Signature compiler capture; trusted decoder | Targets `MethodId`; method must resolve | Optional singular per method; duplicate fails | None |
 | `FieldType(field, type)` | Field compiler capture; trusted decoder | Targets `FieldId`; field must resolve | Optional singular per field; duplicate fails | None |
 | `MethodModifiers(method, values)` | Language declaration layer; trusted decoder | Targets `MethodId`; method must resolve; typed non-empty payload | Ordered many operations; payload order and duplicates preserved | None |
 | `ClassModifiers(class, values)` | Language declaration layer; trusted decoder | Targets `ClassId`; class must resolve; typed non-empty payload | Ordered many operations; payload order and duplicates preserved | None |
+| `InterfaceModifiers(interface, values)` | Language declaration layer; trusted decoder | Targets `InterfaceId`; interface must resolve; typed non-empty payload | Ordered many operations; payload order and duplicates preserved | None |
 | `ControlSummary(method, values)` | Core capture pipeline; trusted decoder | Targets `MethodId`; method must resolve; closed typed non-empty payload (`IF`, `LOOP`, `RET`, `THROW`) | Ordered many operations; payload order and duplicates preserved | None |
 | `PatternFacts(method, values)` | Additive pattern producer; trusted decoder | Targets `MethodId`; method must resolve; closed typed non-empty payload with accessor properties structurally owned by `Getter`/`Setter` | Ordered many operations; fact order and duplicates preserved | None |
 | `Flags(method, values)` | Legacy decoder/manual compatibility only | Targets `MethodId`; method must resolve; empty payload plus every typed semantic-family spelling is invalid | Ordered many legacy operations | None |
 | `ClassFlags(class, values)` | Residual class-metadata producer; trusted decoder | Targets `ClassId`; class must resolve; empty payload and declaration-modifier spellings are invalid | Ordered many operations; payload order and duplicates preserved | None |
 | `Extends(child, parent)` | Language layer; trusted decoder | Targets child `ClassId`; child must resolve; parent is an external-capable symbolic reference | Optional singular per child; duplicate fails | None |
+| `InterfaceExtends(child, parent)` | Language layer; trusted decoder | Targets child `InterfaceId`; child must resolve; parent is an external-capable symbolic reference | Ordered many per interface; every occurrence preserved | None |
 | `Implements(class, interface)` | Language layer; trusted decoder | Targets `ClassId`; class must resolve; interface is an external-capable symbolic reference | Ordered many per class; every occurrence preserved | None |
 | `Injects(class, dependencies)` | Language or pattern layer; trusted decoder | Targets `ClassId`; class must resolve; dependencies are external-capable symbolic references | Ordered many operations; each payload is ordered and duplicate-preserving | None |
 | `Import(alias, module, named)` | Import compiler capture; trusted decoder | Defines import alias in existing string namespace; duplicate alias fails | Unique definition per alias | None |
@@ -199,16 +202,20 @@ all three vocabularies and remains only for legacy unknown payloads;
 | `DefMethod` | Method under resolved owner class | `MethodId` plus owner for consistency | Lossy: owner class ID omitted | Encode owner, method ID, and name |
 | `DefField` | Field under resolved owner class | `FieldId` plus owner for consistency | Lossy: owner class ID omitted | Encode owner, field ID, and name |
 | `DefInterface` | Explicit interface representation or unsupported projection; never normalize silently to class | Interface identity | Lossy: interface ID omitted | Encode interface ID and name |
+| `DefInterfaceMethod` | Method under resolved owner interface | `MethodId` plus interface owner | Not defined | Additive opcode 26; preserve all operands |
+| `DefInterfaceField` | Field under resolved owner interface | `FieldId` plus interface owner | Not defined | Additive opcode 27; preserve all operands |
 | `Param` | Parameter under resolved method, in source order | `(MethodId, ParameterId)` | Semantic for present operands | Preserve all operands |
 | `Return` | Singular return type under resolved method | `MethodId` | Semantic for present operands | Preserve all operands |
 | `FieldType` | Singular type under resolved field | `FieldId` | Semantic for present operands | Preserve all operands |
 | `MethodModifiers` | Repeated typed modifier occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic via additive opcode 22 under `0x03` | Preserve payload and occurrence order |
 | `ClassModifiers` | Repeated typed modifier occurrences under resolved class | `(ClassId, complete values, occurrence)` | Semantic via additive opcode 23 under `0x03` | Preserve payload and occurrence order |
+| `InterfaceModifiers` | Repeated typed modifier occurrences under resolved interface | `(InterfaceId, complete values, occurrence)` | Not defined | Additive opcode 28; preserve payload and occurrence order |
 | `ControlSummary` | Repeated typed summary occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic via additive opcode 24 under `0x03` | Preserve payload and occurrence order |
 | `PatternFacts` | Repeated typed pattern-fact occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic via additive opcode 25 under `0x03` | Preserve payload and occurrence order |
 | `Flags` | Repeated legacy unknown occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic for present operands | Preserve legacy payload and occurrence order |
 | `ClassFlags` | Repeated flag occurrences under resolved class | `(ClassId, complete values, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
 | `Extends` | Singular parent reference under resolved child | `ClassId` | Lossy: child ID omitted | Encode child and parent |
+| `InterfaceExtends` | Repeated parent references under resolved interface | `(InterfaceId, parent, occurrence)` | Not defined | Additive opcode 29; preserve all occurrences |
 | `Implements` | Repeated interface references under resolved class | `(ClassId, interface, occurrence)` | Lossy: class ID omitted | Encode class and interface |
 | `Injects` | Repeated dependency payloads under resolved class | `(ClassId, complete dependencies, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
 | `Import` | File-level import definition | Import alias | Lossy: alias omitted | Encode alias, module, and named export |

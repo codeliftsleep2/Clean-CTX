@@ -346,8 +346,8 @@ Exit criteria:
 
 ### Phase 8: Version and tighten wire formats
 Phase 8A fixes the normative `0x04` layout in
-[`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md). Phase 8B was user-verified
-on 2026-09-20; Phase 8C connects `0x04`/`dv: 2` to production persistence.
+[`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md). Phase 8B and the production
+persistence integration in Phase 8C were user-verified on 2026-09-20.
 Deliverables:
 
 - truthful preservation classification per format;
@@ -365,6 +365,9 @@ Exit criteria:
 - lossy formats reject or explicitly document unsupported semantics.
 
 ### Phase 9: Production integration audit
+
+Audit evidence and findings are recorded in
+[`IR_PRODUCTION_INTEGRATION_AUDIT.md`](IR_PRODUCTION_INTEGRATION_AUDIT.md).
 
 Earlier phase checkpoints certify bounded implementation and applicable gates;
 they never mark a semantic family complete. Completion requires documented

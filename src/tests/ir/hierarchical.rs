@@ -103,13 +103,13 @@ fn test_round_trip_multi_class() {
 
     // The hierarchical format groups instructions per scope. The restored
     // order is: C1 class+flags → C1 fields → C1 methods → C2 class+rel → C2 fields → C2 methods
-    // → IF1 class. This is semantically equivalent — CoreOp semantics don't
+    // → IF1 interface. This is semantically equivalent — CoreOp semantics don't
     // depend on cross-scope instruction interleaving.
     //
     // Expected order:
     //   C1: DefClass, ClassFlags, DefField, FieldType, DefMethod, Param, Return
     //   C2: DefClass, Extends, Implements, Injects, DefMethod, Return, Flags
-    //   IF1: DefClass
+    //   IF1: DefInterface
     //   Imports, TypeAlias
     let expected = vec![
         // C1
@@ -141,7 +141,7 @@ fn test_round_trip_multi_class() {
         CoreOp::Return("M2".to_string(), "$b".to_string()),
         CoreOp::MethodModifiers("M2".to_string(), vec![DeclarationModifier::Async]),
         // IF1
-        CoreOp::DefClass("IF1".to_string(), "ServiceInterface".to_string()),
+        CoreOp::DefInterface("IF1".to_string(), "ServiceInterface".to_string()),
         // Imports
         CoreOp::Import("IM1".to_string(), "./module".to_string(), "Foo".to_string()),
         CoreOp::Import(
@@ -183,7 +183,14 @@ fn test_hierarchical_structure() {
     let hir = ir_to_hierarchical(&ir);
 
     // Check class count
-    assert_eq!(hir.classes.len(), 3, "Should have 3 classes (C1, C2, IF1)");
+    assert_eq!(
+        hir.classes.len(),
+        2,
+        "Only concrete classes belong in classes"
+    );
+    assert_eq!(hir.interfaces.len(), 1);
+    assert_eq!(hir.interfaces[0].id, "IF1");
+    assert_eq!(hir.interfaces[0].name, "ServiceInterface");
 
     // Find C1
     let c1 = hir.classes.iter().find(|c| c.id == "C1").unwrap();
@@ -262,24 +269,13 @@ fn test_wire_format_multi_class() {
     assert_eq!(ir.file_id, decoded.file_id);
     assert_eq!(ir.version, decoded.version);
 
-    // Normalize: DefInterface becomes DefClass during hierarchical round-trip
-    // since interfaces are stored as ClassNode with synthetic=false.
-    fn normalize(ops: &[CoreOp]) -> Vec<CoreOp> {
-        ops.iter()
-            .map(|op| match op {
-                CoreOp::DefInterface(id, name) => CoreOp::DefClass(id.clone(), name.clone()),
-                other => other.clone(),
-            })
-            .collect()
-    }
-
-    let mut ir_ops = normalize(&ir.instructions);
-    let mut decoded_ops = normalize(&decoded.instructions);
+    let mut ir_ops = ir.instructions.clone();
+    let mut decoded_ops = decoded.instructions;
     ir_ops.sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
     decoded_ops.sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
     assert_eq!(
         ir_ops, decoded_ops,
-        "Multi-class wire: same set of ops (DefInterface→DefClass normalized)"
+        "Multi-class wire preserves distinct class and interface operations"
     );
 }
 
@@ -316,7 +312,7 @@ fn test_wire_format_json_structure() {
     assert!(wire.get("file").is_some(), "Must have 'file' key");
     assert!(wire.get("v").is_some(), "Must have 'v' key");
     assert!(wire.get("encoding").is_some(), "Must have 'encoding' key");
-    assert_eq!(wire.get("hs").and_then(|v| v.as_u64()), Some(6));
+    assert_eq!(wire.get("hs").and_then(|v| v.as_u64()), Some(8));
     assert!(wire.get("ir").is_some(), "Must have 'ir' key");
 
     // Check 'ir' contains expected abbreviated fields

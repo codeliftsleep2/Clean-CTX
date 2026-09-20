@@ -3,8 +3,8 @@ use super::payload::{
     reject_typed_flag_payload, require_non_empty_payload, require_vocabulary, validate_body_span,
 };
 use super::{
-    ClassId, FieldId, IdentityError, IdentityIndex, IdentityKind, MethodId, ParameterId,
-    PatternTarget, pattern_target,
+    ClassId, FieldId, IdentityError, IdentityIndex, IdentityKind, InterfaceId, MethodId,
+    ParameterId, PatternTarget, pattern_target,
 };
 use crate::ir::CompiledIR;
 use crate::ir::opcodes::{
@@ -34,6 +34,8 @@ fn collect_definitions_and_singular_facts(ir: &CompiledIR) -> Result<IdentityInd
         methods: HashMap::new(),
         fields: HashMap::new(),
         method_owners: HashMap::new(),
+        interface_method_owners: HashMap::new(),
+        interface_field_owners: HashMap::new(),
         interfaces: HashMap::new(),
     };
     let mut facts = SingularFacts::default();
@@ -139,13 +141,85 @@ fn collect_definitions_and_singular_facts(ir: &CompiledIR) -> Result<IdentityInd
                 )?;
                 insert_definition(
                     &mut index.interfaces,
-                    raw_id.clone(),
+                    InterfaceId::from_serialized(raw_id),
                     "DEF_I",
                     IdentityKind::Interface,
                     raw_id,
                     None,
                     instruction,
                 )?;
+            }
+            CoreOp::DefInterfaceMethod(raw_owner, raw_id, _) => {
+                require_non_empty(
+                    "DEF_IM owner",
+                    IdentityKind::Interface,
+                    raw_owner,
+                    None,
+                    instruction,
+                )?;
+                require_non_empty(
+                    "DEF_IM",
+                    IdentityKind::Method,
+                    raw_id,
+                    Some(raw_owner),
+                    instruction,
+                )?;
+                register_definition_kind(
+                    &mut definition_kinds,
+                    "DEF_IM identity",
+                    raw_id,
+                    IdentityKind::Method,
+                    instruction,
+                )?;
+                let method = MethodId::from_serialized(raw_id);
+                insert_definition(
+                    &mut index.methods,
+                    method.clone(),
+                    "DEF_IM",
+                    IdentityKind::Method,
+                    raw_id,
+                    Some(raw_owner),
+                    instruction,
+                )?;
+                index
+                    .interface_method_owners
+                    .insert(method, InterfaceId::from_serialized(raw_owner));
+            }
+            CoreOp::DefInterfaceField(raw_owner, raw_id, _) => {
+                require_non_empty(
+                    "DEF_IF owner",
+                    IdentityKind::Interface,
+                    raw_owner,
+                    None,
+                    instruction,
+                )?;
+                require_non_empty(
+                    "DEF_IF",
+                    IdentityKind::Field,
+                    raw_id,
+                    Some(raw_owner),
+                    instruction,
+                )?;
+                register_definition_kind(
+                    &mut definition_kinds,
+                    "DEF_IF identity",
+                    raw_id,
+                    IdentityKind::Field,
+                    instruction,
+                )?;
+                let field = FieldId::from_serialized(raw_id);
+                insert_definition(
+                    &mut index.fields,
+                    field.clone(),
+                    "DEF_IF",
+                    IdentityKind::Field,
+                    raw_id,
+                    Some(raw_owner),
+                    instruction,
+                )?;
+                index
+                    .interface_field_owners
+                    .insert(field, InterfaceId::from_serialized(raw_owner));
             }
             CoreOp::Param(raw_method, raw_parameter, _, _) => {
                 require_non_empty(
@@ -232,9 +306,11 @@ fn collect_definitions_and_singular_facts(ir: &CompiledIR) -> Result<IdentityInd
             | CoreOp::ClassFlags(..)
             | CoreOp::MethodModifiers(..)
             | CoreOp::ClassModifiers(..)
+            | CoreOp::InterfaceModifiers(..)
             | CoreOp::ControlSummary(..)
             | CoreOp::PatternFacts(..)
             | CoreOp::Implements(..)
+            | CoreOp::InterfaceExtends(..)
             | CoreOp::Injects(..)
             | CoreOp::Pattern(..)
             | CoreOp::DataFlow(..)
@@ -273,6 +349,20 @@ fn validate_references_and_payloads(
                 )?;
             }
             CoreOp::DefInterface(..) => {}
+            CoreOp::DefInterfaceMethod(raw_owner, ..) => require_target(
+                "DEF_IM owner",
+                raw_owner,
+                IdentityKind::Interface,
+                instruction,
+                index,
+            )?,
+            CoreOp::DefInterfaceField(raw_owner, ..) => require_target(
+                "DEF_IF owner",
+                raw_owner,
+                IdentityKind::Interface,
+                instruction,
+                index,
+            )?,
             CoreOp::Param(raw_method, ..) => {
                 require_target("SIG", raw_method, IdentityKind::Method, instruction, index)?
             }
@@ -299,6 +389,16 @@ fn validate_references_and_payloads(
             CoreOp::ClassModifiers(raw_class, modifiers) => {
                 require_target("MOD_C", raw_class, IdentityKind::Class, instruction, index)?;
                 require_non_empty_payload("MOD_C", modifiers, instruction)?;
+            }
+            CoreOp::InterfaceModifiers(raw_interface, modifiers) => {
+                require_target(
+                    "MOD_I",
+                    raw_interface,
+                    IdentityKind::Interface,
+                    instruction,
+                    index,
+                )?;
+                require_non_empty_payload("MOD_I", modifiers, instruction)?;
             }
             CoreOp::ControlSummary(raw_method, summaries) => {
                 require_target(
@@ -345,6 +445,13 @@ fn validate_references_and_payloads(
             CoreOp::Extends(raw_class, _) => {
                 require_target("EXT", raw_class, IdentityKind::Class, instruction, index)?
             }
+            CoreOp::InterfaceExtends(raw_interface, _) => require_target(
+                "EXT_I",
+                raw_interface,
+                IdentityKind::Interface,
+                instruction,
+                index,
+            )?,
             CoreOp::Implements(raw_class, _) => {
                 require_target("IMPL", raw_class, IdentityKind::Class, instruction, index)?
             }
@@ -508,7 +615,9 @@ fn require_target(
             .methods
             .contains_key(&MethodId::from_serialized(raw_id)),
         IdentityKind::Field => index.fields.contains_key(&FieldId::from_serialized(raw_id)),
-        IdentityKind::Interface => index.interfaces.contains_key(raw_id),
+        IdentityKind::Interface => index
+            .interfaces
+            .contains_key(&InterfaceId::from_serialized(raw_id)),
         IdentityKind::Parameter | IdentityKind::ImportAlias | IdentityKind::TypeAlias => false,
     };
     if resolved {
@@ -554,7 +663,11 @@ fn conflicting_kind(
     {
         return Some(IdentityKind::Field);
     }
-    if expected != IdentityKind::Interface && index.interfaces.contains_key(raw_id) {
+    if expected != IdentityKind::Interface
+        && index
+            .interfaces
+            .contains_key(&InterfaceId::from_serialized(raw_id))
+    {
         return Some(IdentityKind::Interface);
     }
     None

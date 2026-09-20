@@ -20,7 +20,9 @@
 //   $=import  →=scope  mod:=method-modifiers cmod:=class-modifiers
 //   ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
 
-use super::hierarchical::{ClassNode, HierarchicalIR, PatternEntry};
+use super::hierarchical::{
+    ClassNode, FieldNode, HierarchicalIR, InterfaceNode, MethodNode, PatternEntry,
+};
 use crate::compression::Fidelity;
 use std::collections::{HashMap, HashSet};
 
@@ -73,6 +75,13 @@ pub fn render_hierarchical_for_llm_focused(
     // ── Classes ──
     for class in &hir.classes {
         render_class(&mut output, class, fidelity, focus);
+    }
+
+    if !hir.interfaces.is_empty() {
+        output.push_str("// Q=interface\n");
+        for interface in &hir.interfaces {
+            render_interface(&mut output, interface, fidelity, focus);
+        }
     }
 
     // ── Imports ──
@@ -149,26 +158,48 @@ fn render_class(
     }
 
     // Fields — layout depends on fidelity
-    render_fields(output, class, fidelity);
+    render_fields(output, &class.fields, fidelity);
 
     // Methods — with overload disambiguation
-    render_methods(output, class, fidelity, focus);
+    render_methods(output, &class.methods, fidelity, focus);
+}
+
+fn render_interface(
+    output: &mut String,
+    interface: &InterfaceNode,
+    fidelity: Fidelity,
+    focus: Option<&HashSet<String>>,
+) {
+    output.push_str(&format!("Q {}\n", interface.name));
+    if !interface.modifiers.is_empty() {
+        let modifiers = interface
+            .modifiers
+            .iter()
+            .flatten()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        output.push_str(&format!("imod: {}\n", modifiers.join(" ")));
+    }
+    if !interface.extends.is_empty() {
+        output.push_str(&format!("X {}\n", interface.extends.join(" ")));
+    }
+    render_fields(output, &interface.fields, fidelity);
+    render_methods(output, &interface.methods, fidelity, focus);
 }
 
 /// Render fields for a class.
 ///
 /// Low fidelity: space-separated on one line.
 /// Medium/High: one per line.
-fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
-    if class.fields.is_empty() {
+fn render_fields(output: &mut String, fields: &[FieldNode], fidelity: Fidelity) {
+    if fields.is_empty() {
         return;
     }
 
     match fidelity {
         Fidelity::Low => {
             // Space-separated on one line
-            let field_strs: Vec<String> = class
-                .fields
+            let field_strs: Vec<String> = fields
                 .iter()
                 .map(|f| {
                     if let Some(ft) = &f.field_type {
@@ -182,7 +213,7 @@ fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
         }
         Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
             // One per line
-            for field in &class.fields {
+            for field in fields {
                 if let Some(ft) = &field.field_type {
                     output.push_str(&format!("F {}:{}\n", field.name, ft));
                 } else {
@@ -203,23 +234,23 @@ fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
 /// Non-focused methods fall through to the signature-only rendering path.
 fn render_methods(
     output: &mut String,
-    class: &ClassNode,
+    methods: &[MethodNode],
     fidelity: Fidelity,
     focus: Option<&HashSet<String>>,
 ) {
-    if class.methods.is_empty() {
+    if methods.is_empty() {
         return;
     }
 
     // First pass: count method name occurrences
     let mut name_counts: HashMap<&str, usize> = HashMap::new();
-    for method in &class.methods {
+    for method in methods {
         *name_counts.entry(&method.name).or_insert(0) += 1;
     }
 
     // Second pass: emit methods
     let mut name_indices: HashMap<&str, usize> = HashMap::new();
-    for method in &class.methods {
+    for method in methods {
         let count = name_counts[&method.name.as_str()];
         let idx = name_indices.entry(&method.name).or_insert(0);
         *idx += 1;

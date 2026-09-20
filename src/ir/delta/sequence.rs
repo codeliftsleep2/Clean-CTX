@@ -14,16 +14,20 @@ pub enum DeltaOpcode {
     DefMethod,
     DefField,
     DefInterface,
+    DefInterfaceMethod,
+    DefInterfaceField,
     Param,
     Return,
     FieldType,
     MethodModifiers,
     ClassModifiers,
+    InterfaceModifiers,
     ControlSummary,
     PatternFacts,
     Flags,
     ClassFlags,
     Extends,
+    InterfaceExtends,
     Implements,
     Injects,
     Import,
@@ -44,16 +48,20 @@ impl DeltaOpcode {
             "DEF_M" => Some(Self::DefMethod),
             "DEF_F" => Some(Self::DefField),
             "DEF_I" => Some(Self::DefInterface),
+            "DEF_IM" => Some(Self::DefInterfaceMethod),
+            "DEF_IF" => Some(Self::DefInterfaceField),
             "SIG" => Some(Self::Param),
             "RET" => Some(Self::Return),
             "FIELD_T" => Some(Self::FieldType),
             "MOD_M" => Some(Self::MethodModifiers),
             "MOD_C" => Some(Self::ClassModifiers),
+            "MOD_I" => Some(Self::InterfaceModifiers),
             "CTRL_SUM" => Some(Self::ControlSummary),
             "PAT_FACT" => Some(Self::PatternFacts),
             "FLAGS" => Some(Self::Flags),
             "FLAGS_C" => Some(Self::ClassFlags),
             "EXT" => Some(Self::Extends),
+            "EXT_I" => Some(Self::InterfaceExtends),
             "IMPL" => Some(Self::Implements),
             "INJECTS" => Some(Self::Injects),
             "IMP" => Some(Self::Import),
@@ -76,6 +84,8 @@ impl DeltaOpcode {
                 | Self::DefMethod
                 | Self::DefField
                 | Self::DefInterface
+                | Self::DefInterfaceMethod
+                | Self::DefInterfaceField
                 | Self::Param
                 | Self::Return
                 | Self::FieldType
@@ -97,12 +107,17 @@ impl DeltaIdentity {
     pub fn from_tuple(tuple: &[String]) -> Option<Self> {
         let opcode = DeltaOpcode::from_wire(tuple.first()?.as_str())?;
         let key_len = match opcode {
-            DeltaOpcode::DefMethod | DeltaOpcode::DefField | DeltaOpcode::Param => 3,
+            DeltaOpcode::DefMethod
+            | DeltaOpcode::DefField
+            | DeltaOpcode::DefInterfaceMethod
+            | DeltaOpcode::DefInterfaceField
+            | DeltaOpcode::Param => 3,
             DeltaOpcode::DefClass
             | DeltaOpcode::DefInterface
             | DeltaOpcode::Return
             | DeltaOpcode::FieldType
             | DeltaOpcode::Extends
+            | DeltaOpcode::InterfaceExtends
             | DeltaOpcode::Import
             | DeltaOpcode::Body => 2,
             _ => tuple.len(),

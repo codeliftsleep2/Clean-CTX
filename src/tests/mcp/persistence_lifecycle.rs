@@ -340,3 +340,146 @@ fn registered_replay_rejects_a_mismatched_persisted_file_identity() {
             .is_some_and(|message| message.contains("persisted binary file identity mismatch"))
     );
 }
+
+#[test]
+fn registered_interface_producers_persist_reload_and_expose_interface_semantics() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let state = state_with_persistence(&root);
+    let workspace_root = root.path().to_string_lossy().into_owned();
+    let fixtures = [
+        (
+            "api.ts",
+            "export interface WorkerApi extends BaseApi, Audited { version: number; /* production interface persistence fixture deliberately carries enough source context to keep the compact semantic response cheaper than raw passthrough while exercising the registered dispatch path */ }\n",
+            "WorkerApi",
+            false,
+            true,
+        ),
+        (
+            "WorkerApi.java",
+            "public interface WorkerApi extends BaseApi, Audited { int VERSION = 1; void run(String value); /* production interface persistence fixture deliberately carries enough source context to keep the compact semantic response cheaper than raw passthrough while exercising the registered dispatch path */ }\n",
+            "WorkerApi",
+            true,
+            true,
+        ),
+        (
+            "WorkerApi.cs",
+            "public interface WorkerApi : BaseApi, Audited { int Version { get; } void Run(string value); /* production interface persistence fixture deliberately carries enough source context to keep the compact semantic response cheaper than raw passthrough while exercising the registered dispatch path */ }\n",
+            "WorkerApi",
+            true,
+            true,
+        ),
+    ];
+
+    for (offset, &(name, source, interface_name, has_method, has_field)) in
+        fixtures.iter().enumerate()
+    {
+        let path = root.path().join(name);
+        let source = format!(
+            "{source}// {}\n",
+            "production-interface-context ".repeat(256)
+        );
+        std::fs::write(&path, source).expect("interface source");
+        let file_path = path.to_string_lossy().into_owned();
+        let arguments = || {
+            json!({
+                "filePath": file_path.clone(),
+                "workspaceRoot": workspace_root.clone(),
+                "fidelity": "low"
+            })
+        };
+
+        let first = dispatch(
+            &state,
+            100 + offset as i64 * 3,
+            "compress_code_context",
+            arguments(),
+        );
+        assert!(first.get("error").is_none(), "{first}");
+        let text = first
+            .pointer("/result/content/0/text")
+            .and_then(Value::as_str)
+            .expect("compact interface response");
+        assert!(text.contains(&format!("Q {interface_name}")), "{text}");
+
+        state.flush_persistence();
+        let persisted = {
+            let store = state.persistence_store_lock();
+            let sqlite = store.as_ref().unwrap().sqlite().unwrap();
+            let bytes = sqlite
+                .baseline_binary(&file_path)
+                .unwrap()
+                .expect("interface baseline");
+            crate::ir::binary_wire::decode(&bytes).expect("interface binary")
+        };
+        assert!(
+            persisted
+                .instructions
+                .iter()
+                .any(|op| matches!(op, CoreOp::DefInterface(_, value) if value == interface_name))
+        );
+        assert!(
+            !persisted
+                .instructions
+                .iter()
+                .any(|op| matches!(op, CoreOp::DefClass(_, value) if value == interface_name))
+        );
+        let interface_id = persisted
+            .instructions
+            .iter()
+            .find_map(|op| match op {
+                CoreOp::DefInterface(id, value) if value == interface_name => Some(id),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(
+            persisted.instructions.iter().any(
+                |op| matches!(op, CoreOp::DefInterfaceMethod(owner, ..) if owner == interface_id)
+            ),
+            has_method
+        );
+        assert_eq!(
+            persisted.instructions.iter().any(
+                |op| matches!(op, CoreOp::DefInterfaceField(owner, ..) if owner == interface_id)
+            ),
+            has_field
+        );
+        assert_eq!(
+            persisted
+                .instructions
+                .iter()
+                .filter(
+                    |op| matches!(op, CoreOp::InterfaceExtends(owner, _) if owner == interface_id)
+                )
+                .count(),
+            2
+        );
+
+        let alias = state.get_or_create_alias(file_path.clone());
+        state.ir_context_lock().remove_file(&alias);
+        let replay = dispatch(
+            &state,
+            101 + offset as i64 * 3,
+            "replay_history",
+            json!({ "filePath": file_path.clone() }),
+        );
+        assert!(replay.get("error").is_none(), "{replay}");
+        let reloaded = in_memory_ir(&state, &alias, &file_path);
+        assert_eq!(reloaded, persisted);
+        let hierarchy = crate::ir::hierarchical::try_ir_to_hierarchical(&reloaded).unwrap();
+        assert_eq!(hierarchy.interfaces.len(), 1);
+        assert_eq!(hierarchy.interfaces[0].name, interface_name);
+
+        let after_reload = dispatch(
+            &state,
+            102 + offset as i64 * 3,
+            "compress_code_context",
+            arguments(),
+        );
+        let text = after_reload
+            .pointer("/result/content/0/text")
+            .and_then(Value::as_str)
+            .expect("post-reload interface response");
+        assert!(text.contains(&format!("Q {interface_name}")), "{text}");
+    }
+}

@@ -54,6 +54,7 @@ fn render_hierarchical_for_llm_typescript_class() {
     });
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![vec!["IM1".into(), "./core".into(), "OnInit".into()]],
         type_aliases: vec![],
         calls: vec![],
@@ -134,6 +135,7 @@ fn render_hierarchical_for_llm_spring_boot_class() {
     class.methods.push(m2);
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![vec![
             "IM1".into(),
             "org.springframework.web".into(),
@@ -175,6 +177,7 @@ fn render_hierarchical_for_llm_angular_class() {
     };
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![
             vec!["@cmp".into(), "AppComponent".into()],
@@ -193,6 +196,7 @@ fn render_hierarchical_for_llm_empty_hir_produces_header() {
     use crate::ir::*;
     let hir = HierarchicalIR {
         classes: vec![],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![],
         calls: vec![],
@@ -236,6 +240,7 @@ fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
     };
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![],
         calls: vec![],
@@ -275,6 +280,7 @@ fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
     };
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![],
         calls: vec![],
@@ -304,6 +310,7 @@ fn render_hierarchical_for_llm_injects_do_not_panic() {
     };
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![],
         calls: vec![],

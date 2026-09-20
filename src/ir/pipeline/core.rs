@@ -61,6 +61,13 @@ impl IRPass for CoreIRPass {
             fidelity,
             |capture_name, raw, fidelity| match capture_name {
                 "class.root" => Some(extract_class_name(raw)),
+                "interface.root" => Some(
+                    extract_class_name(raw)
+                        .split(':')
+                        .next()
+                        .unwrap_or_default()
+                        .to_string(),
+                ),
                 "struct.root" | "trait.root" | "impl.root" => Some(extract_rust_struct_name(raw)),
                 "enum.root" => {
                     if query_string == crate::queries::CS_QUERY {
@@ -117,8 +124,7 @@ impl IRPass for CoreIRPass {
                     .call_producer
                     .record_arrow_name(cap.match_index, &cap.text),
                 ARROW_ROOT_CAPTURE => register_arrow_capture(state, cap, &file_id),
-                "class.root" | "interface.root" | "struct.root" | "enum.root" | "trait.root"
-                | "record.root" => {
+                "class.root" | "struct.root" | "enum.root" | "trait.root" | "record.root" => {
                     let class_id = state.next_id("C");
                     state
                         .instructions
@@ -140,19 +146,50 @@ impl IRPass for CoreIRPass {
                         ));
                     }
                 }
+                "interface.root" => {
+                    let interface_id = state.next_id("I");
+                    state
+                        .instructions
+                        .push(CoreOp::DefInterface(interface_id.clone(), cap.text.clone()));
+                    state.push_interface_scope(interface_id.clone(), cap.end_byte);
+                    state.layer_context.current_class_name = Some(cap.raw_text.clone());
+                    state.layer_context.current_class_bare_name = Some(cap.text.clone());
+                    state.layer_context.symbol_table_mut().register(
+                        interface_id,
+                        cap.text.clone(),
+                        SymbolKind::Interface,
+                        &file_id,
+                    );
+                    for layer in state.language_layers.iter_mut() {
+                        state.instructions.extend(layer.process_capture(
+                            &cap.name,
+                            &cap.raw_text,
+                            &mut state.layer_context,
+                        ));
+                    }
+                }
                 "impl.root" => process_impl_capture(state, cap),
                 "method.root" | "constructor.root" | "func.root" => {
                     process_method_capture(state, cap, &file_id, fidelity, focus.as_ref());
                 }
                 "field.root" => {
                     state.refresh_type_owner(cap.start_byte);
-                    let Some(class_id) = state.current_class.clone() else {
-                        continue;
-                    };
                     let field_id = state.next_id("F");
-                    state
-                        .instructions
-                        .push(CoreOp::DefField(class_id, field_id, cap.text.clone()));
+                    if let Some(class_id) = state.current_class.clone() {
+                        state.instructions.push(CoreOp::DefField(
+                            class_id,
+                            field_id,
+                            cap.text.clone(),
+                        ));
+                    } else if let Some(interface_id) = state.current_interface.clone() {
+                        state.instructions.push(CoreOp::DefInterfaceField(
+                            interface_id,
+                            field_id,
+                            cap.text.clone(),
+                        ));
+                    } else {
+                        continue;
+                    }
                     for layer in state.language_layers.iter_mut() {
                         state.instructions.extend(layer.process_capture(
                             &cap.name,
@@ -232,7 +269,7 @@ fn process_method_capture(
     fidelity: Fidelity,
     focus: Option<&std::collections::HashSet<String>>,
 ) {
-    let Some(class_id) = resolve_callable_class(state, cap, file_id) else {
+    let Some(owner) = resolve_callable_owner(state, cap, file_id) else {
         return;
     };
 
@@ -244,7 +281,7 @@ fn process_method_capture(
     state.push_callable_scope(method_id.clone(), cap.start_byte, cap.end_byte);
     state.layer_context.current_method = Some(method_id.clone());
     state.layer_context.current_method_name = Some(cap.text.clone());
-    let method_name = state.emit_method_ir(&class_id, &method_id, &cap.text);
+    let method_name = state.emit_method_ir(&owner, &method_id, &cap.text);
 
     if fidelity == Fidelity::Edit
         && focus.is_none_or(|focused| focused.contains(&method_name))
@@ -266,15 +303,16 @@ fn process_method_capture(
 ///
 /// `None` means the declaration has no home in this compilation (a member
 /// declaration outside every type), and the caller must register nothing.
-fn resolve_callable_class(
+fn resolve_callable_owner(
     state: &mut PassContext,
     cap: &CapturedNode,
     file_id: &str,
-) -> Option<String> {
+) -> Option<super::TypeOwner> {
     state.refresh_type_owner(cap.start_byte);
-    match state.current_class.clone() {
-        Some(class_id) => Some(class_id),
-        None if cap.name == "func.root" || cap.name == ARROW_ROOT_CAPTURE => {
+    match (state.current_class.clone(), state.current_interface.clone()) {
+        (Some(class_id), None) => Some(super::TypeOwner::Class(class_id)),
+        (None, Some(interface_id)) => Some(super::TypeOwner::Interface(interface_id)),
+        (None, None) if cap.name == "func.root" || cap.name == ARROW_ROOT_CAPTURE => {
             let class_id = state.next_id("C");
             let file_class = format!("__file_{file_id}");
             state
@@ -283,9 +321,9 @@ fn resolve_callable_class(
             state.push_file_scope(class_id.clone());
             state.layer_context.current_class_name = Some(file_class.clone());
             state.layer_context.current_class_bare_name = Some(file_class);
-            Some(class_id)
+            Some(super::TypeOwner::Class(class_id))
         }
-        None => None,
+        _ => None,
     }
 }
 
@@ -316,13 +354,20 @@ fn register_arrow_capture(state: &mut PassContext, cap: &CapturedNode, file_id: 
     let Some(name) = state.call_producer.take_arrow_name(cap.match_index) else {
         return;
     };
-    let Some(class_id) = resolve_callable_class(state, cap, file_id) else {
+    let Some(owner) = resolve_callable_owner(state, cap, file_id) else {
         return;
     };
     let method_id = state.next_id("M");
-    state
-        .instructions
-        .push(CoreOp::DefMethod(class_id, method_id.clone(), name));
+    match owner {
+        super::TypeOwner::Class(class_id) => {
+            state
+                .instructions
+                .push(CoreOp::DefMethod(class_id, method_id.clone(), name))
+        }
+        super::TypeOwner::Interface(interface_id) => state.instructions.push(
+            CoreOp::DefInterfaceMethod(interface_id, method_id.clone(), name),
+        ),
+    }
     state.push_callable_scope(method_id, cap.start_byte, cap.end_byte);
 }
 

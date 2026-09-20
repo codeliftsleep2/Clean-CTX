@@ -98,7 +98,7 @@ fn hierarchy_preserves_context_order_duplicates_and_compact_llm_shape() {
             ExecutionContextKind::Realtime
         ]
     );
-    assert_eq!(ir_to_hierarchical_wire(&ir)["hs"], 7);
+    assert_eq!(ir_to_hierarchical_wire(&ir)["hs"], 8);
     let rendered = render_hierarchical_for_llm(&hierarchy, Fidelity::High);
     assert!(rendered.contains(" ec:sync,sync,realtime"), "{rendered}");
 }

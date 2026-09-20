@@ -29,8 +29,9 @@ method `Flags`, `Body`, `ControlFlow`, `DataFlow`, `SideEffect`, and
 user-run verification was green on 2026-09-18. Phase 4C implemented and user-
 verified typed class-fact attribution plus hierarchical schema revision 3.
 Phase 4D implemented shared schema-derived typed pattern targeting and was
-user-verified on 2026-09-18. The projection cursor and ID-prefix inference are removed;
-interface-representation findings remain open. User-run verification proved that
+user-verified on 2026-09-18. The projection cursor and ID-prefix inference are removed.
+Phase 9 P9-01 now implements explicit canonical interface ownership and a
+distinct hierarchy/LLM projection; user verification is pending. User-run verification proved that
 `TypeAlias` carries repeated `Φ` metadata; its ordered-many correction was
 approved, implemented, and verified on 2026-09-18.
 Phase 6A separates declaration modifiers into typed method/class operations
@@ -48,7 +49,7 @@ verified on 2026-09-19. Phase 8A inventories physical `0x03` and defines the
 complete semantic `0x04` contract. Phase 8B implements the codec and tracked
 contract coverage and was user-verified on 2026-09-20. Phase 8C connects
 canonical `0x04` baselines and corrected `dv: 2` history to buffered SQLite
-persistence and registered MCP replay; implementation awaits user verification.
+persistence and registered MCP replay; it was user-verified on 2026-09-20.
 
 **Production-integration status:** Phase checkpoints certify bounded
 implementation and applicable gates; they do not certify production completion.
@@ -69,9 +70,9 @@ or wire-format code.
 The original highest-risk defect was positional attribution in the
 hierarchical projection. The bounded method-fact families are migrated in
 Phase 4B and the projection cursor is removed. Phase 4C addresses class-fact
-attribution and multiplicity. Phase 4D addresses pattern targeting; interface
-representation remains production-relevant because MCP handlers consume this
-projection.
+attribution and multiplicity. Phase 4D addresses pattern targeting. Phase 9
+P9-01 addresses the deeper canonical and projected interface representation
+used by production MCP handlers; verification remains pending.
 
 Related risks reinforce the same failure mode:
 

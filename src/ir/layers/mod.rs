@@ -38,6 +38,7 @@ pub mod typescript;
 pub struct LayerContext {
     /// Current class ID (set when processing a class capture)
     pub current_class: Option<String>,
+    pub current_interface: Option<String>,
     /// Current class original name (set when processing a class capture).
     /// May include `extends`/`implements` suffixes from raw_text.
     /// F-FULL-14: Previously was the extracted bare name; now stores the
@@ -72,6 +73,7 @@ impl LayerContext {
     pub fn new(source: &str, fidelity: Fidelity) -> Self {
         Self {
             current_class: None,
+            current_interface: None,
             current_class_name: None,
             current_class_bare_name: None,
             current_method: None,

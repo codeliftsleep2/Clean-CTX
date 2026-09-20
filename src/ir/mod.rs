@@ -60,7 +60,7 @@ pub use delta::{
     primary_key_from_tuple,
 };
 pub use hierarchical::{
-    ClassNode, FieldNode, HierarchicalIR, MethodNode, PatternEntry,
+    ClassNode, FieldNode, HierarchicalIR, InterfaceNode, MethodNode, PatternEntry,
     estimate_savings as hierarchical_savings, hierarchical_to_ir, ir_to_hierarchical,
     ir_to_hierarchical_wire, wire_to_ir as hierarchical_wire_to_ir,
 };

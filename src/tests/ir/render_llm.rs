@@ -15,6 +15,7 @@ use std::collections::HashSet;
 fn empty_hir() -> HierarchicalIR {
     HierarchicalIR {
         classes: vec![],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![],
         calls: vec![],

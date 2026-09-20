@@ -351,6 +351,7 @@ pub const RS_QUERY: &str = r#"
 
 // Java AST node types: class_declaration, interface_declaration,
 //   method_declaration, constructor_declaration, field_declaration,
+//   constant_declaration,
 //   enum_declaration, record_declaration, import_declaration,
 //   package_declaration, if_statement, for_statement, while_statement,
 //   do_statement, return_statement, throw_statement, try_statement,
@@ -364,6 +365,7 @@ pub const JAVA_QUERY: &str = r#"
     (method_declaration) @method.root
     (constructor_declaration) @constructor.root
     (field_declaration) @field.root
+    (constant_declaration) @field.root
     ; Import and package
     (import_declaration) @import.root
     (package_declaration) @package.root

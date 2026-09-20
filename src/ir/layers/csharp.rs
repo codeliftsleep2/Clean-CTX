@@ -19,6 +19,7 @@
 //   - TransactionScope → ExecutionContext("transaction_scope")
 //   - IDisposable → SideEffect("io")
 
+use super::declaration::interface_parents;
 use super::{LanguageLayer, LayerContext};
 use crate::compaction::modifiers::strip_csharp_attributes;
 use crate::ir::opcodes::{
@@ -382,7 +383,19 @@ impl LanguageLayer for CSharpLayer {
             // flags through this layer: only `class.root` carries EXPORT/etc.
             // Routing them through the class arm would reset per-class R-43a
             // state and misattribute the enclosing class's flags.
-            "interface.root" | "struct.root" | "enum.root" | "trait.root" | "record.root" => {}
+            "interface.root" => {
+                if let Some(interface_id) = &context.current_interface {
+                    let declaration = strip_csharp_attributes(raw_text);
+                    for parent in interface_parents(declaration, ":") {
+                        ops.push(CoreOp::InterfaceExtends(interface_id.clone(), parent));
+                    }
+                    let modifiers = Self::extract_class_modifiers(raw_text);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::InterfaceModifiers(interface_id.clone(), modifiers));
+                    }
+                }
+            }
+            "struct.root" | "enum.root" | "trait.root" | "record.root" => {}
             "method.root" => {
                 // Extract method-level flags
                 let modifiers = Self::extract_method_modifiers(raw_text);

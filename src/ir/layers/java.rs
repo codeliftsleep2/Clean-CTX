@@ -11,7 +11,7 @@
 //   - Method-level flags (async, static, abstract, visibility)
 //   - Constructor injection patterns
 
-use super::declaration::{declaration_head, has_modifier};
+use super::declaration::{declaration_head, has_modifier, interface_parents};
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
@@ -151,7 +151,7 @@ impl LanguageLayer for JavaLayer {
         let mut ops = Vec::new();
 
         match capture_name {
-            "class.root" | "interface.root" | "enum.root" | "record.root" => {
+            "class.root" | "enum.root" | "record.root" => {
                 // Extract extends/implements from raw text
                 let (base, interfaces) = Self::extract_class_relationships(raw_text);
                 if let Some(class_id) = &context.current_class {
@@ -178,6 +178,17 @@ impl LanguageLayer for JavaLayer {
                     let modifiers = Self::extract_class_modifiers(raw_text);
                     if !modifiers.is_empty() {
                         ops.push(CoreOp::ClassModifiers(class_id.clone(), modifiers));
+                    }
+                }
+            }
+            "interface.root" => {
+                if let Some(interface_id) = &context.current_interface {
+                    for parent in interface_parents(raw_text, "extends") {
+                        ops.push(CoreOp::InterfaceExtends(interface_id.clone(), parent));
+                    }
+                    let modifiers = Self::extract_class_modifiers(raw_text);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::InterfaceModifiers(interface_id.clone(), modifiers));
                     }
                 }
             }

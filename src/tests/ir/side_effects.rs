@@ -95,7 +95,7 @@ fn hierarchy_preserves_side_effect_order_duplicates_and_llm_shape() {
             SideEffectKind::Mutation
         ]
     );
-    assert_eq!(ir_to_hierarchical_wire(&ir)["hs"], 7);
+    assert_eq!(ir_to_hierarchical_wire(&ir)["hs"], 8);
     let rendered = render_hierarchical_for_llm(&hierarchy, Fidelity::High);
     assert!(rendered.contains(" se:io,io,mutation"), "{rendered}");
 }

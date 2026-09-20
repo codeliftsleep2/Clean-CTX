@@ -58,6 +58,12 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             vec!["DEF_F".into(), cid.clone(), fid.clone(), name.clone()]
         }
         CoreOp::DefInterface(id, name) => vec!["DEF_I".into(), id.clone(), name.clone()],
+        CoreOp::DefInterfaceMethod(iid, mid, name) => {
+            vec!["DEF_IM".into(), iid.clone(), mid.clone(), name.clone()]
+        }
+        CoreOp::DefInterfaceField(iid, fid, name) => {
+            vec!["DEF_IF".into(), iid.clone(), fid.clone(), name.clone()]
+        }
         CoreOp::Param(mid, pid, ty, name) => {
             vec![
                 "SIG".into(),
@@ -76,6 +82,11 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
         }
         CoreOp::ClassModifiers(cid, modifiers) => {
             let mut tuple = vec!["MOD_C".into(), cid.clone()];
+            tuple.extend(modifiers.iter().map(|modifier| modifier.as_str().into()));
+            tuple
+        }
+        CoreOp::InterfaceModifiers(iid, modifiers) => {
+            let mut tuple = vec!["MOD_I".into(), iid.clone()];
             tuple.extend(modifiers.iter().map(|modifier| modifier.as_str().into()));
             tuple
         }
@@ -102,6 +113,9 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             v
         }
         CoreOp::Extends(child, parent) => vec!["EXT".into(), child.clone(), parent.clone()],
+        CoreOp::InterfaceExtends(child, parent) => {
+            vec!["EXT_I".into(), child.clone(), parent.clone()]
+        }
         CoreOp::Implements(cid, iid) => vec!["IMPL".into(), cid.clone(), iid.clone()],
         CoreOp::Injects(cid, deps) => {
             let mut v = vec!["INJECTS".into(), cid.clone()];
@@ -215,6 +229,12 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
                 None
             }
         }
+        "DEF_IM" => (tuple.len() >= 4).then(|| {
+            CoreOp::DefInterfaceMethod(tuple[1].clone(), tuple[2].clone(), tuple[3].clone())
+        }),
+        "DEF_IF" => (tuple.len() >= 4).then(|| {
+            CoreOp::DefInterfaceField(tuple[1].clone(), tuple[2].clone(), tuple[3].clone())
+        }),
         "SIG" => {
             if tuple.len() >= 5 {
                 Some(CoreOp::Param(
@@ -263,6 +283,17 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
                 None
             }
         }
+        "MOD_I" => {
+            if tuple.len() >= 3 {
+                let modifiers = tuple[2..]
+                    .iter()
+                    .map(|value| DeclarationModifier::from_serialized(value))
+                    .collect::<Option<Vec<_>>>()?;
+                Some(CoreOp::InterfaceModifiers(tuple[1].clone(), modifiers))
+            } else {
+                None
+            }
+        }
         "CTRL_SUM" => {
             if tuple.len() >= 3 {
                 let summaries = tuple[2..]
@@ -304,6 +335,9 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
             } else {
                 None
             }
+        }
+        "EXT_I" => {
+            (tuple.len() >= 3).then(|| CoreOp::InterfaceExtends(tuple[1].clone(), tuple[2].clone()))
         }
         "IMPL" => {
             if tuple.len() >= 3 {

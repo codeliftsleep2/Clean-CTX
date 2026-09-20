@@ -86,6 +86,40 @@ pub(super) fn declaration_head(source: &str) -> &str {
     source
 }
 
+/// Parse the ordered parent list from an interface declaration head.
+/// Commas inside generic arguments do not split parent occurrences.
+pub(super) fn interface_parents(source: &str, separator: &str) -> Vec<String> {
+    let head = declaration_head(source);
+    let Some((_, declaration)) = head.split_once("interface") else {
+        return Vec::new();
+    };
+    let Some((_, parents)) = declaration.split_once(separator) else {
+        return Vec::new();
+    };
+    let mut result = Vec::new();
+    let mut start = 0;
+    let mut angle_depth = 0usize;
+    for (index, ch) in parents.char_indices() {
+        match ch {
+            '<' => angle_depth += 1,
+            '>' => angle_depth = angle_depth.saturating_sub(1),
+            ',' if angle_depth == 0 => {
+                let parent = parents[start..index].trim();
+                if !parent.is_empty() {
+                    result.push(parent.to_string());
+                }
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    let parent = parents[start..].trim();
+    if !parent.is_empty() {
+        result.push(parent.to_string());
+    }
+    result
+}
+
 /// Match a standalone modifier token outside strings and comments.
 pub(super) fn has_modifier(head: &str, modifier: &str) -> bool {
     let bytes = head.as_bytes();

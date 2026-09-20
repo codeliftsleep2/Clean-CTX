@@ -39,6 +39,12 @@ pub enum CoreOp {
     /// ["DEF_I", interface_id, original_name]
     DefInterface(String, String),
 
+    /// ["DEF_IM", interface_id, method_id, original_name]
+    DefInterfaceMethod(String, String, String),
+
+    /// ["DEF_IF", interface_id, field_id, original_name]
+    DefInterfaceField(String, String, String),
+
     // ── Signatures & Types ──────────────────────────────
     /// ["SIG", method_id, param_id, type_opcode, param_name]
     Param(String, String, String, String),
@@ -54,6 +60,9 @@ pub enum CoreOp {
 
     /// ["MOD_C", class_id, modifier1, modifier2, ...]
     ClassModifiers(String, Vec<DeclarationModifier>),
+
+    /// ["MOD_I", interface_id, modifier1, modifier2, ...]
+    InterfaceModifiers(String, Vec<DeclarationModifier>),
 
     // ── Control Flow & Behavior ─────────────────────────
     /// ["CTRL_SUM", method_id, summary1, summary2, ...]
@@ -73,6 +82,9 @@ pub enum CoreOp {
     // ── Relationships ───────────────────────────────────
     /// ["EXT", child_id, parent_id]
     Extends(String, String),
+
+    /// ["EXT_I", interface_id, parent_interface]
+    InterfaceExtends(String, String),
 
     /// ["IMPL", class_id, interface_id]
     Implements(String, String),
@@ -186,6 +198,12 @@ impl fmt::Display for CoreOp {
             CoreOp::DefMethod(cid, mid, name) => write!(f, "DEF_M {} {} {}", cid, mid, name),
             CoreOp::DefField(cid, fid, name) => write!(f, "DEF_F {} {} {}", cid, fid, name),
             CoreOp::DefInterface(id, name) => write!(f, "DEF_I {} {}", id, name),
+            CoreOp::DefInterfaceMethod(iid, mid, name) => {
+                write!(f, "DEF_IM {} {} {}", iid, mid, name)
+            }
+            CoreOp::DefInterfaceField(iid, fid, name) => {
+                write!(f, "DEF_IF {} {} {}", iid, fid, name)
+            }
             CoreOp::Param(mid, pid, ty, name) => write!(f, "SIG {} {} {} {}", mid, pid, ty, name),
             CoreOp::Return(mid, ty) => write!(f, "RET {} {}", mid, ty),
             CoreOp::FieldType(fid, ty) => write!(f, "FIELD_T {} {}", fid, ty),
@@ -203,6 +221,16 @@ impl fmt::Display for CoreOp {
                 f,
                 "MOD_C {} {}",
                 cid,
+                modifiers
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+            CoreOp::InterfaceModifiers(iid, modifiers) => write!(
+                f,
+                "MOD_I {} {}",
+                iid,
                 modifiers
                     .iter()
                     .map(ToString::to_string)
@@ -232,6 +260,7 @@ impl fmt::Display for CoreOp {
             CoreOp::Flags(tid, flags) => write!(f, "FLAGS {} {}", tid, flags.join(" ")),
             CoreOp::ClassFlags(cid, flags) => write!(f, "FLAGS_C {} {}", cid, flags.join(" ")),
             CoreOp::Extends(child, parent) => write!(f, "EXT {} {}", child, parent),
+            CoreOp::InterfaceExtends(child, parent) => write!(f, "EXT_I {} {}", child, parent),
             CoreOp::Implements(cid, iid) => write!(f, "IMPL {} {}", cid, iid),
             CoreOp::Injects(cid, deps) => write!(f, "INJECTS {} {}", cid, deps.join(" ")),
             CoreOp::Import(alias, module, named) => {
@@ -331,16 +360,20 @@ pub fn arity(opcode: &str) -> Option<i32> {
         "DEF_M" => Some(4),     // class_id, id, name
         "DEF_F" => Some(4),     // class_id, id, name
         "DEF_I" => Some(3),     // id, name
+        "DEF_IM" => Some(4),    // interface_id, id, name
+        "DEF_IF" => Some(4),    // interface_id, id, name
         "SIG" => Some(5),       // method_id, param_id, type, name
         "RET" => Some(3),       // method_id, type
         "FIELD_T" => Some(3),   // field_id, type
         "MOD_M" => Some(-1),    // method_id, declaration modifiers...
         "MOD_C" => Some(-1),    // class_id, declaration modifiers...
+        "MOD_I" => Some(-1),    // interface_id, declaration modifiers...
         "CTRL_SUM" => Some(-1), // method_id, control summaries...
         "PAT_FACT" => Some(-1), // method_id, typed pattern facts...
         "FLAGS" => Some(-1),    // target_id, flags...
         "FLAGS_C" => Some(-1),  // class_id, flags...
         "EXT" => Some(3),       // child_id, parent_id
+        "EXT_I" => Some(3),     // interface_id, parent_interface
         "IMPL" => Some(3),      // class_id, iface_id
         "INJECTS" => Some(-1),  // class_id, deps...
         "IMP" => Some(4),       // alias, module, named
@@ -369,16 +402,20 @@ pub fn opcode_name(op: &CoreOp) -> &'static str {
         CoreOp::DefMethod(..) => "DEF_M",
         CoreOp::DefField(..) => "DEF_F",
         CoreOp::DefInterface(..) => "DEF_I",
+        CoreOp::DefInterfaceMethod(..) => "DEF_IM",
+        CoreOp::DefInterfaceField(..) => "DEF_IF",
         CoreOp::Param(..) => "SIG",
         CoreOp::Return(..) => "RET",
         CoreOp::FieldType(..) => "FIELD_T",
         CoreOp::MethodModifiers(..) => "MOD_M",
         CoreOp::ClassModifiers(..) => "MOD_C",
+        CoreOp::InterfaceModifiers(..) => "MOD_I",
         CoreOp::ControlSummary(..) => "CTRL_SUM",
         CoreOp::PatternFacts(..) => "PAT_FACT",
         CoreOp::Flags(..) => "FLAGS",
         CoreOp::ClassFlags(..) => "FLAGS_C",
         CoreOp::Extends(..) => "EXT",
+        CoreOp::InterfaceExtends(..) => "EXT_I",
         CoreOp::Implements(..) => "IMPL",
         CoreOp::Injects(..) => "INJECTS",
         CoreOp::Import(..) => "IMP",

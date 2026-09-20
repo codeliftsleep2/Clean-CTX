@@ -55,6 +55,15 @@ impl ClassId {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct InterfaceId(String);
+
+impl InterfaceId {
+    pub(crate) fn from_serialized(value: &str) -> Self {
+        Self(value.to_owned())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct MethodId(String);
 
 impl MethodId {
@@ -95,7 +104,9 @@ pub(crate) struct IdentityIndex {
     pub(crate) methods: HashMap<MethodId, usize>,
     pub(crate) fields: HashMap<FieldId, usize>,
     pub(super) method_owners: HashMap<MethodId, ClassId>,
-    pub(super) interfaces: HashMap<String, usize>,
+    pub(super) interface_method_owners: HashMap<MethodId, InterfaceId>,
+    pub(super) interface_field_owners: HashMap<FieldId, InterfaceId>,
+    pub(crate) interfaces: HashMap<InterfaceId, usize>,
 }
 
 /// Validate every current identity, ownership, cardinality, pattern-shape,
