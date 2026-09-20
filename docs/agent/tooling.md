@@ -64,6 +64,7 @@ as `filePath`.
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
 | `save_context` | `filePath` | — | Explicitly save in-memory compressed context to the persistence DB. |
+| `delete_context` | `filePath` | — | Transactionally delete one file's persisted and session semantic context without modifying its source file. |
 | `list_sessions` | — | — | List all persisted file contexts with fidelity, token counts, and timestamps. |
 | `replay_history` | `filePath` | `targetSequence`, `fidelity` | Replay delta history from the DB. |
 | `purge_old_deltas` | — | `days`, `filePath` | Purge old delta entries. |

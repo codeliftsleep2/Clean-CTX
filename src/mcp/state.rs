@@ -479,23 +479,6 @@ impl McpState {
             .copied()
     }
 
-    pub fn remember_persisted_path(&self, alias: &str, file_path: &str) {
-        lock_or_recover!(self.persisted_paths.lock(), "persisted_paths")
-            .insert(alias.to_string(), file_path.to_string());
-    }
-
-    pub fn persisted_path(&self, alias: &str) -> Option<String> {
-        lock_or_recover!(self.persisted_paths.lock(), "persisted_paths")
-            .get(alias)
-            .cloned()
-    }
-
-    pub fn forget_persisted_path(&self, alias: &str) {
-        lock_or_recover!(self.persisted_paths.lock(), "persisted_paths").remove(alias);
-        lock_or_recover!(self.context_fidelities.lock(), "context_fidelities").remove(alias);
-        self.forget_semantic_state(alias);
-    }
-
     /// Get or create a bundle alias (thread-safe convenience method).
     pub fn get_or_create_bundle_alias(&self, component_name: String) -> String {
         self.dict_lock().get_or_create_bundle_alias(component_name)

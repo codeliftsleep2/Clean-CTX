@@ -381,8 +381,8 @@ supplied edge snapshots remain a separately reviewable future capability.
 
 ## 17. Finding P9-13: deletion/reset has no registered lifecycle owner
 
-**Severity:** High externally visible lifecycle gap; architectural decision
-required.
+**Severity:** High externally visible lifecycle gap; approved and implemented
+pending user verification.
 
 P9-10 correctly removes deletion/reset behavior from `restore_context`, whose
 approved sole meaning is transactional durable restoration. The repository has
@@ -409,8 +409,18 @@ Recommendation: option 1. A single file-scoped deletion contract matches the
 existing ownership aggregate and can remove all associated state coherently.
 It must remain distinct from source-file deletion and from durable restore.
 
+**Implementation update (2026-09-20):** The approved registered
+`delete_context(filePath)` operation uses durable SQLite deletion as its commit
+boundary, then removes only the matching canonical session IR, source hash,
+fidelity, alias/durable mapping, pending target-edge authority, semantic-edge
+snapshot, compact render, and occurrence-exact `WorkspaceIndex` ownership. The
+source file is never mutated. Registered-dispatch coverage includes successful
+cascade deletion, peer isolation, mismatched ownership, durable failure
+transactionality, truthful response metadata, and restore-after-delete failure.
+
 ## 18. Approval gate and next audit action
 
-P9-10, P9-11, and P9-12 are implemented and await user-run verification. After
-that gate is green, Phase 9 pauses at P9-13 before the exhaustive production
-matrix audit resumes. These repairs alone are not Phase 9 certification.
+P9-10, P9-11, and P9-12 were user-verified green. P9-13 is implemented and
+awaits user-run verification. Once that gate is green, the exhaustive Phase 9
+production operation/lifecycle and obsolete-path matrix audit resumes. These
+repairs alone are not Phase 9 certification.

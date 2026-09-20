@@ -519,6 +519,7 @@ impl ContextState {
     ///
     /// Returns true if the file was tracked and removed.
     pub fn remove_file(&mut self, file_id: &str) -> bool {
+        self.source_hashes.remove(file_id);
         self.files.remove(file_id).is_some()
     }
 

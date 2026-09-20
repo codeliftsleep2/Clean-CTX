@@ -137,6 +137,36 @@ pub(crate) fn sequence_delta_identity(delta: &SequenceDelta) -> Result<String, S
 }
 
 impl super::McpState {
+    pub fn remember_persisted_path(&self, alias: &str, file_path: &str) {
+        lock_or_recover!(self.persisted_paths.lock(), "persisted_paths")
+            .insert(alias.to_string(), file_path.to_string());
+    }
+
+    pub fn persisted_path(&self, alias: &str) -> Option<String> {
+        lock_or_recover!(self.persisted_paths.lock(), "persisted_paths")
+            .get(alias)
+            .cloned()
+    }
+
+    pub fn forget_persisted_path(&self, alias: &str) {
+        lock_or_recover!(self.persisted_paths.lock(), "persisted_paths").remove(alias);
+        lock_or_recover!(self.context_fidelities.lock(), "context_fidelities").remove(alias);
+        self.forget_semantic_state(alias);
+    }
+
+    pub(crate) fn forget_path_alias(&self, alias: &str, path: &str) -> bool {
+        self.dict_lock().remove_path_alias(alias, path)
+    }
+
+    pub(crate) fn forget_context_caches(&self, file_path: &str) {
+        self.invalidate_source_cache(file_path);
+        self.cache_write().forget_file(file_path);
+        let canonical = crate::dictionary::path::canonical_identity_key(file_path);
+        self.cbm_filter_lock()
+            .skip_sets
+            .retain(|path, _| crate::dictionary::path::canonical_identity_key(path) != canonical);
+    }
+
     pub(crate) fn remember_semantic_edges(&self, alias: &str, edges: Vec<SemanticEdge>) {
         lock_or_recover!(
             self.semantic_edge_snapshots.lock(),

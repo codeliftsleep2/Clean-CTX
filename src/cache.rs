@@ -117,6 +117,22 @@ impl LocalStateCache {
         self.baseline_hashes.remove(key);
     }
 
+    /// Remove path-owned hash and diff-baseline state while retaining shared
+    /// content-hash token counts that may belong to other files.
+    pub fn forget_file(&mut self, file_path: &str) {
+        let canonical = crate::dictionary::path::canonical_identity_key(file_path);
+        self.registry
+            .retain(|path, _| crate::dictionary::path::canonical_identity_key(path) != canonical);
+        self.baseline_snapshots.retain(|key, _| {
+            let path = key.rsplit_once("::").map_or(key.as_str(), |(path, _)| path);
+            crate::dictionary::path::canonical_identity_key(path) != canonical
+        });
+        self.baseline_hashes.retain(|key, _| {
+            let path = key.rsplit_once("::").map_or(key.as_str(), |(path, _)| path);
+            crate::dictionary::path::canonical_identity_key(path) != canonical
+        });
+    }
+
     /// F-14: Store the raw-token count for a content hash so the cache-hit
     /// path can skip the BPE encode.
     /// F-FULL-17: LRU-evicting cache bounded by MAX_RAW_TOKEN_COUNT_ENTRIES.

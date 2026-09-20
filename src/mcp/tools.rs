@@ -216,6 +216,17 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             }
         }),
         serde_json::json!({
+            "name": "delete_context",
+            "description": "Delete one file's persisted and session semantic context without modifying the source file.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filePath": { "type": "string" }
+                },
+                "required": ["filePath"]
+            }
+        }),
+        serde_json::json!({
             "name": "list_sessions",
             "description": "List all persisted contexts stored in the DB — per-file rows with fidelity, token counts, delta count and last-update time.",
             "inputSchema": { "type": "object", "properties": {} }

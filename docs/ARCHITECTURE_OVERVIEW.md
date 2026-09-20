@@ -264,6 +264,7 @@ The persistence layer provides **cross-session persistence** for compression con
 | Tool | Purpose |
 |------|---------|
 | `save_context` | Explicit manual checkpoint to DB |
+| `delete_context` | Transactionally remove one file's durable and session semantic context without modifying source |
 | `list_sessions` | Show tracked sessions/files |
 | `replay_history` | Replay deltas from DB up to target sequence |
 | `purge_old_deltas` | Trim old delta history by age |

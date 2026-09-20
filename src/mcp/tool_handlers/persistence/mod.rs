@@ -149,6 +149,98 @@ fn send_persistence_error(id: &Value, message: &str) {
     ));
 }
 
+/// Handle `delete_context` — transactionally delete one file-scoped semantic
+/// context without modifying the source file.
+pub(crate) fn handle_delete_context(id: &Value, params: &Value, state: &McpState) {
+    let requested = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
+    if requested.is_empty() {
+        return send_persistence_error(id, "Missing required parameter: filePath");
+    }
+
+    let direct_alias = state.ir_context_read().has_file(requested);
+    let path_alias = state.alias_for_path(requested);
+    let alias = match (direct_alias, path_alias) {
+        (true, Some(path_alias)) if path_alias != requested => {
+            return send_persistence_error(id, "Ambiguous session ownership for requested file");
+        }
+        (true, _) => requested.to_string(),
+        (false, Some(alias)) => alias,
+        (false, None) => {
+            return send_persistence_error(id, "No session-owned context for requested file");
+        }
+    };
+    if !state.ir_context_read().has_file(&alias) {
+        return send_persistence_error(
+            id,
+            "Missing canonical session ownership for requested file",
+        );
+    }
+    let owned_path = match state.path_for_alias(&alias) {
+        Some(path) => path,
+        None => return send_persistence_error(id, "Missing path identity for requested context"),
+    };
+    let durable_path = match state.persisted_path(&alias) {
+        Some(path) => path,
+        None => {
+            return send_persistence_error(id, "Missing durable identity for requested context");
+        }
+    };
+    let requested_path = if direct_alias {
+        owned_path.as_str()
+    } else {
+        requested
+    };
+    let canonical_requested = crate::dictionary::path::canonical_identity_key(requested_path);
+    if canonical_requested != crate::dictionary::path::canonical_identity_key(&owned_path)
+        || canonical_requested != crate::dictionary::path::canonical_identity_key(&durable_path)
+    {
+        return send_persistence_error(id, "Requested file does not match its durable identity");
+    }
+
+    let durable_matches = {
+        let store_guard = state.persistence_store_lock();
+        let Some(store) = store_guard.as_ref() else {
+            return send_persistence_error(id, "Persistence is not enabled");
+        };
+        store.flush();
+        let Some(mut sqlite) = store.sqlite() else {
+            return send_persistence_error(id, "Persistence DB is unavailable");
+        };
+        match sqlite.delete_context_transactionally(&durable_path) {
+            Ok(matches) => matches,
+            Err(error) => {
+                return send_persistence_error(id, &format!("Context deletion failed: {error}"));
+            }
+        }
+    };
+    match durable_matches {
+        1 => {}
+        0 => return send_persistence_error(id, "No matching persisted context was deleted"),
+        _ => return send_persistence_error(id, "Ambiguous persisted ownership for requested file"),
+    }
+
+    state.ir_context_lock().remove_file(&alias);
+    state
+        .workspace_index_lock()
+        .remove_file(&canonical_requested);
+    state.llm_text_cache_lock().remove(&alias);
+    state.forget_context_caches(&durable_path);
+    state.forget_persisted_path(&alias);
+    let alias_removed = state.forget_path_alias(&alias, &owned_path);
+    debug_assert!(
+        alias_removed,
+        "validated alias ownership must remain stable"
+    );
+
+    send_response(&serde_json::json!({
+        "jsonrpc": "2.0", "id": id,
+        "result": {
+            "content": [{ "type": "text", "text": format!("Deleted persisted context for {durable_path}.") }],
+            "_meta": { "ok": true, "deleted": 1, "file": durable_path, "source_deleted": false }
+        }
+    }));
+}
+
 /// Handle `list_sessions` — enumerate persisted contexts stored in the DB.
 ///
 /// Non-CBM audit 2026-08-25 #7: this tool previously returned a static
@@ -325,3 +417,7 @@ mod save_context_contract_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/durable_semantic_restore.rs"]
 mod durable_semantic_restore_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/delete_context_contract.rs"]
+mod delete_context_contract_tests;

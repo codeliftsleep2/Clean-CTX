@@ -204,9 +204,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         return;
                     }
                     let compiled_file = compiled.file_id.clone();
-                    state
-                        .ir_context_lock()
-                        .load_ir(compiled, Some(source_hash));
+                    state.ir_context_lock().load_ir(compiled, Some(source_hash));
                     state.remember_context_fidelity(&compiled_file, effective_fidelity);
 
                     // Rendering economics never changes semantic ownership.

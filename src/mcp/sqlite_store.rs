@@ -68,6 +68,43 @@ impl SqliteStore {
         Ok(store)
     }
 
+    /// Delete one persisted context and all of its owned history/snapshots in
+    /// a single SQLite transaction. A count other than one is returned without
+    /// mutation so callers can distinguish missing from ambiguous ownership.
+    pub fn delete_context_transactionally(
+        &mut self,
+        file_path: &str,
+    ) -> Result<usize, Box<dyn std::error::Error>> {
+        let tx = self.conn.transaction()?;
+        let context_count: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM contexts WHERE file_path = ?1",
+            params![file_path],
+            |row| row.get(0),
+        )?;
+        if context_count != 1 {
+            tx.rollback()?;
+            return Ok(context_count as usize);
+        }
+        tx.execute(
+            "DELETE FROM symbols WHERE context_id IN (SELECT id FROM contexts WHERE file_path = ?1)",
+            params![file_path],
+        )?;
+        tx.execute(
+            "DELETE FROM deltas WHERE context_id IN (SELECT id FROM contexts WHERE file_path = ?1)",
+            params![file_path],
+        )?;
+        tx.execute(
+            "DELETE FROM semantic_edge_snapshots WHERE context_id IN (SELECT id FROM contexts WHERE file_path = ?1)",
+            params![file_path],
+        )?;
+        let deleted = tx.execute(
+            "DELETE FROM contexts WHERE file_path = ?1",
+            params![file_path],
+        )?;
+        tx.commit()?;
+        Ok(deleted)
+    }
+
     /// Run schema migrations. Idempotent.
     fn migrate(&self) -> Result<(), Box<dyn std::error::Error>> {
         self.conn.execute_batch(
