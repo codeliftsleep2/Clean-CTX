@@ -40,8 +40,9 @@ summaries while keeping the LLM-facing `ctl:` projection independently compact;
 it was user-verified and checkpointed as `3360512` on 2026-09-19.
 Phase 6C implements typed method-pattern facts with a distinct compact `pf:`
 projection; it was user-verified and checkpointed as `6d9b621` on 2026-09-19.
-Phase 6D implements typed side-effect values while preserving the existing
-wire strings and compact `se:` projection; it awaits user-run verification.
+Phase 6D typed side-effect values were user-verified on 2026-09-19. Phase 6E
+types the five approved method execution contexts while preserving wire strings
+and the compact `ec:` projection.
 
 **Production-integration status:** Phase checkpoints certify bounded
 implementation and applicable gates; they do not certify production completion.
@@ -228,8 +229,12 @@ Required boundary: represent distinct semantic families with distinct Rust
 types or enum variants.
 
 Phase 6A resolves declaration modifiers, Phase 6B resolves control summaries,
-Phase 6C resolves method-pattern facts, and Phase 6D implements typed side
-effects. Execution contexts remain the final semantic-family slice.
+Phase 6C resolves method-pattern facts, and Phase 6D resolves side effects.
+Phase 6E types the five method execution contexts. It removes TypeScript's
+invalid `CTX(class_id, "di_scope")` path because injectable status is
+class/metaclass DI metadata, not because the information is unnecessary.
+`Injects` remains the dependencies consumed by a class; replacement DI
+metadata remains a separate architectural decision.
 
 ### F-05: Delta keys lose multiplicity
 

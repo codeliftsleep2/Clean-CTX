@@ -75,7 +75,7 @@ fn canonical_hierarchy_and_compact_llm_pattern_views_are_distinct() {
     );
     let rendered = render_hierarchical_for_llm(&hierarchy, Fidelity::Low);
     assert!(rendered.contains("pf:GETTER(name),CTOR"), "{rendered}");
-    assert_eq!(ir_to_hierarchical_wire(&ir)["hs"], 6);
+    assert_eq!(ir_to_hierarchical_wire(&ir)["hs"], 7);
 }
 
 #[test]

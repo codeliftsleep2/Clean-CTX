@@ -8,8 +8,8 @@ use super::{
 };
 use crate::ir::CompiledIR;
 use crate::ir::opcodes::{
-    CTRL_AWAIT, CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTRL_TRY, CTX_ASYNC, CTX_REALTIME,
-    CTX_SYNC, CTX_THREAD_BOUND, CTX_TRANSACTION_SCOPE, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE,
+    CTRL_AWAIT, CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTRL_TRY, CoreOp, DATAFLOW_READ,
+    DATAFLOW_WRITE,
 };
 use std::collections::HashMap;
 
@@ -403,21 +403,8 @@ fn validate_references_and_payloads(
                     index,
                 )?;
             }
-            CoreOp::ExecutionContext(raw_method, context) => {
+            CoreOp::ExecutionContext(raw_method, _) => {
                 require_target("CTX", raw_method, IdentityKind::Method, instruction, index)?;
-                require_vocabulary(
-                    "CTX",
-                    "context",
-                    context,
-                    &[
-                        CTX_SYNC,
-                        CTX_ASYNC,
-                        CTX_THREAD_BOUND,
-                        CTX_TRANSACTION_SCOPE,
-                        CTX_REALTIME,
-                    ],
-                    instruction,
-                )?;
             }
             CoreOp::Call(raw_caller, ..) => {
                 require_target("CALL", raw_caller, IdentityKind::Method, instruction, index)?

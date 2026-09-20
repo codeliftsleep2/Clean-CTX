@@ -10,7 +10,7 @@
 
 use super::compiler::CompiledIR;
 use super::opcodes::{
-    ControlSummary, CoreOp, DeclarationModifier, PatternFact, SideEffectKind,
+    ControlSummary, CoreOp, DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind,
 };
 use super::wire::DecodeError;
 use serde::{Deserialize, Serialize};
@@ -19,8 +19,9 @@ use serde_json::{Value, json};
 const HIERARCHICAL_SCHEMA_REVISION_2: u64 = 2;
 const HIERARCHICAL_SCHEMA_REVISION_3: u64 = 3;
 const HIERARCHICAL_SCHEMA_REVISION_4: u64 = 4;
-const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 5;
-const HIERARCHICAL_SCHEMA_VERSION: u64 = 6;
+const HIERARCHICAL_SCHEMA_REVISION_5: u64 = 5;
+const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 6;
+const HIERARCHICAL_SCHEMA_VERSION: u64 = 7;
 
 mod decode;
 mod encode;
@@ -235,7 +236,7 @@ pub struct MethodNode {
     /// Execution context annotations (R-43a), in canonical occurrence order.
     /// context_type: "sync" | "async" | "thread_bound" | "transaction_scope" | "realtime"
     #[serde(rename = "ec", default, skip_serializing_if = "Vec::is_empty")]
-    pub execution_context: Vec<String>,
+    pub execution_context: Vec<ExecutionContextKind>,
 }
 
 /// A single field node — nested inside a class.
@@ -325,6 +326,7 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         | Some(HIERARCHICAL_SCHEMA_REVISION_2)
         | Some(HIERARCHICAL_SCHEMA_REVISION_3)
         | Some(HIERARCHICAL_SCHEMA_REVISION_4)
+        | Some(HIERARCHICAL_SCHEMA_REVISION_5)
         | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION)
         | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(unsupported) => {
@@ -349,10 +351,8 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
             upgrade_revision_4_control_summaries(&mut ir_val)?;
             upgrade_revision_5_pattern_facts(&mut ir_val)?;
         }
-        Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) => {
-            upgrade_revision_5_pattern_facts(&mut ir_val)?
-        }
-        Some(HIERARCHICAL_SCHEMA_VERSION) => {}
+        Some(HIERARCHICAL_SCHEMA_REVISION_5) => upgrade_revision_5_pattern_facts(&mut ir_val)?,
+        Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION) | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(_) => unreachable!("unsupported revisions returned above"),
     }
 

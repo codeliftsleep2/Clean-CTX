@@ -293,7 +293,7 @@ pub fn try_ir_to_hierarchical(
                     method_location(&method_locations, raw_method, "CTX", instruction)?;
                 classes[class_idx].methods[method_idx]
                     .execution_context
-                    .push(context.clone());
+                    .push(*context);
             }
             CoreOp::ClassFlags(raw_class, flags) => {
                 let class_idx =

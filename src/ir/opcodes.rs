@@ -17,7 +17,9 @@
 use std::fmt;
 
 mod semantic;
-pub use semantic::{ControlSummary, DeclarationModifier, PatternFact, SideEffectKind};
+pub use semantic::{
+    ControlSummary, DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind,
+};
 
 /// Core IR opcodes — the universal instruction set.
 /// Every language compiles down to these operations.
@@ -136,7 +138,7 @@ pub enum CoreOp {
     /// Execution context: ["CTX", method_id, context_type]
     /// context_type: "sync" | "async" | "thread_bound" | "transaction_scope" | "realtime"
     /// Extracted from tree-sitter captures (confidence = 1.0).
-    ExecutionContext(String, String),
+    ExecutionContext(String, ExecutionContextKind),
 
     // ── Structural Invocations (native call graph) ──────
     ///
@@ -485,3 +487,7 @@ mod pattern_fact_tests;
 #[cfg(test)]
 #[path = "../tests/ir/side_effects.rs"]
 mod side_effect_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/execution_contexts.rs"]
+mod execution_context_tests;

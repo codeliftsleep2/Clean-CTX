@@ -1,7 +1,9 @@
 use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{ir_to_hierarchical_wire, try_ir_to_hierarchical, wire_to_ir};
-use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier, SideEffectKind};
+use crate::ir::opcodes::{
+    ControlSummary, CoreOp, DeclarationModifier, ExecutionContextKind, SideEffectKind,
+};
 use crate::ir::render_llm::render_hierarchical_for_llm;
 
 fn compiled(instructions: Vec<CoreOp>) -> CompiledIR {
@@ -20,7 +22,7 @@ fn method_facts_resolve_by_identity_before_and_across_definitions() {
             vec![DeclarationModifier::Async, DeclarationModifier::Async],
         ),
         CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
-        CoreOp::ExecutionContext("M2".into(), "async".into()),
+        CoreOp::ExecutionContext("M2".into(), ExecutionContextKind::Async),
         CoreOp::ControlFlow("M1".into(), "if".into(), "ready".into()),
         CoreOp::DataFlow("M2".into(), "reads".into(), "cache".into()),
         CoreOp::Body("M1".into(), "{ work(); }".into(), Some(10), Some(21)),
@@ -57,7 +59,7 @@ fn method_facts_resolve_by_identity_before_and_across_definitions() {
         vec![vec![DeclarationModifier::Async, DeclarationModifier::Async]]
     );
     assert_eq!(second.data_flow, vec![vec!["reads", "cache"]]);
-    assert_eq!(second.execution_context, vec!["async"]);
+    assert_eq!(second.execution_context, vec![ExecutionContextKind::Async]);
     assert!(second.side_effect.is_empty());
     assert!(second.control_flow.is_empty());
     assert!(second.body.is_none());
@@ -79,8 +81,8 @@ fn repeated_method_facts_round_trip_without_union_or_replacement() {
         CoreOp::DataFlow("M1".into(), "reads".into(), "state".into()),
         CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
         CoreOp::SideEffect("M1".into(), SideEffectKind::Mutation),
-        CoreOp::ExecutionContext("M1".into(), "sync".into()),
-        CoreOp::ExecutionContext("M1".into(), "async".into()),
+        CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Sync),
+        CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Async),
     ]);
 
     let hierarchy = try_ir_to_hierarchical(&ir).expect("identity graph is valid");
@@ -105,7 +107,10 @@ fn repeated_method_facts_round_trip_without_union_or_replacement() {
         method.side_effect,
         vec![SideEffectKind::Io, SideEffectKind::Mutation]
     );
-    assert_eq!(method.execution_context, vec!["sync", "async"]);
+    assert_eq!(
+        method.execution_context,
+        vec![ExecutionContextKind::Sync, ExecutionContextKind::Async]
+    );
 
     let restored = crate::ir::hierarchical::hierarchical_to_ir(&hierarchy);
     let facts = restored
@@ -134,12 +139,12 @@ fn versioned_wire_emits_occurrence_preserving_shapes() {
         CoreOp::ControlSummary("M1".into(), vec![ControlSummary::Return]),
         CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
         CoreOp::SideEffect("M1".into(), SideEffectKind::Mutation),
-        CoreOp::ExecutionContext("M1".into(), "sync".into()),
-        CoreOp::ExecutionContext("M1".into(), "async".into()),
+        CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Sync),
+        CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Async),
     ]);
 
     let wire = ir_to_hierarchical_wire(&ir);
-    assert_eq!(wire["hs"], 6);
+    assert_eq!(wire["hs"], 7);
     assert_eq!(
         wire["ir"]["c"][0]["m"][0]["mo"],
         serde_json::json!([["STATIC"]])
@@ -170,8 +175,8 @@ fn renderer_exposes_every_method_fact_occurrence_in_order() {
         CoreOp::ControlSummary("M1".into(), vec![ControlSummary::Return]),
         CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
         CoreOp::SideEffect("M1".into(), SideEffectKind::Mutation),
-        CoreOp::ExecutionContext("M1".into(), "sync".into()),
-        CoreOp::ExecutionContext("M1".into(), "async".into()),
+        CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Sync),
+        CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Async),
     ]))
     .expect("identity graph is valid");
 
@@ -211,7 +216,7 @@ fn legacy_hierarchy_without_schema_marker_still_decodes() {
             CoreOp::DefMethod("C1".into(), "M1".into(), "work".into()),
             CoreOp::Flags("M1".into(), vec!["STATIC".into(), "RET".into()]),
             CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
-            CoreOp::ExecutionContext("M1".into(), "async".into()),
+            CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Async),
         ]
     );
 }

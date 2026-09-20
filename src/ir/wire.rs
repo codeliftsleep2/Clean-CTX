@@ -14,7 +14,7 @@
 
 use super::compiler::CompiledIR;
 use super::opcodes::{
-    ControlSummary, CoreOp, DeclarationModifier, PatternFact, SideEffectKind,
+    ControlSummary, CoreOp, DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind,
 };
 use serde_json::{Value, json};
 
@@ -150,7 +150,7 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             vec!["EFFECT".into(), mid.clone(), effect_type.as_str().into()]
         }
         CoreOp::ExecutionContext(mid, context_type) => {
-            vec!["CTX".into(), mid.clone(), context_type.clone()]
+            vec!["CTX".into(), mid.clone(), context_type.as_str().into()]
         }
         // Structural invocation. Dual shape: the exact form keeps the
         // established 4-tuple byte-for-byte, and the spread qualifier is an
@@ -400,7 +400,10 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
         }
         "CTX" => {
             if tuple.len() >= 3 {
-                Some(CoreOp::ExecutionContext(tuple[1].clone(), tuple[2].clone()))
+                Some(CoreOp::ExecutionContext(
+                    tuple[1].clone(),
+                    ExecutionContextKind::from_serialized(&tuple[2])?,
+                ))
             } else {
                 None
             }

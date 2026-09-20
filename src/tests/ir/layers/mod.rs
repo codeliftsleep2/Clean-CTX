@@ -14,7 +14,7 @@ use crate::ir::layers::typescript::TypeScriptLayer;
 // P0-4: ir::layers::MetaLayer and angular/spring/dotnet modules removed.
 // Meta-layers now use the canonical trait in src/layers/meta/.
 // LanguageLayer tests remain (TypeScript, C#).
-use crate::ir::opcodes::{CoreOp, DeclarationModifier, SideEffectKind};
+use crate::ir::opcodes::{CoreOp, DeclarationModifier, ExecutionContextKind, SideEffectKind};
 
 // ── TypeScript Layer Tests ────────────────────────────
 
@@ -95,6 +95,22 @@ fn ts_layer_extracts_async_flag() {
         has_async,
         "TypeScript layer should emit ASYNC flag: {:?}",
         ops
+    );
+}
+
+#[test]
+fn ts_injectable_metadata_is_not_misrepresented_as_method_execution_context() {
+    let mut layer = TypeScriptLayer::new();
+    let source = "@Injectable() export class Service {}";
+    let mut ctx = LayerContext::new(source, Fidelity::Low);
+    ctx.current_class = Some("C1".into());
+
+    let ops = layer.process_capture("class.root", source, &mut ctx);
+
+    assert!(
+        !ops.iter()
+            .any(|op| matches!(op, CoreOp::ExecutionContext(..))),
+        "class DI metadata must not enter the method-scoped CTX family: {ops:?}"
     );
 }
 
@@ -340,7 +356,7 @@ fn cs_signalr_hub_method_emits_realtime_ctx() {
 
     let has_realtime = ops.iter().any(|op| {
         matches!(op, CoreOp::ExecutionContext(mid, ctx_type)
-            if mid == "M5" && ctx_type == "realtime")
+            if mid == "M5" && *ctx_type == ExecutionContextKind::Realtime)
     });
     assert!(
         has_realtime,
@@ -377,11 +393,11 @@ fn cs_signalr_hub_method_still_emits_async_semantics() {
 
     let realtime = ops.iter().any(|op| {
         matches!(op, CoreOp::ExecutionContext(mid, ctx_type)
-            if mid == "M5" && ctx_type == "realtime")
+            if mid == "M5" && *ctx_type == ExecutionContextKind::Realtime)
     });
     let async_ctx = ops.iter().any(|op| {
         matches!(op, CoreOp::ExecutionContext(mid, ctx_type)
-            if mid == "M5" && ctx_type == "async")
+            if mid == "M5" && *ctx_type == ExecutionContextKind::Async)
     });
     assert!(
         async_ctx,
@@ -489,7 +505,7 @@ fn cs_signalr_hub_flags_reset_between_classes() {
     let ops = layer.process_capture("method.root", "public void DoSomething()", &mut ctx);
     let has_realtime = ops.iter().any(|op| {
         matches!(op, CoreOp::ExecutionContext(mid, ctx_type)
-            if mid == "M10" && ctx_type == "realtime")
+            if mid == "M10" && *ctx_type == ExecutionContextKind::Realtime)
     });
     assert!(
         !has_realtime,

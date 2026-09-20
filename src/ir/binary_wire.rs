@@ -31,7 +31,7 @@
 
 use super::compiler::CompiledIR;
 use super::opcodes::{
-    ControlSummary, CoreOp, DeclarationModifier, PatternFact, SideEffectKind,
+    ControlSummary, CoreOp, DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind,
 };
 use super::string_table::StringTable;
 
@@ -433,7 +433,7 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
             }
             CoreOp::ExecutionContext(mid, context_type) => {
                 encode_operand(&mut buf, mid);
-                encode_operand(&mut buf, context_type);
+                encode_operand(&mut buf, context_type.as_str());
             }
             // Structural invocations (native call graph).
             // [caller_idx, callee_idx, argc_varint] — the explicit argument

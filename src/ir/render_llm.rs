@@ -365,7 +365,12 @@ fn render_methods(
         // e.g. `ec:async` — tells the agent the runtime context without
         // a full body read.
         if fidelity == Fidelity::High && !method.execution_context.is_empty() {
-            output.push_str(&format!(" ec:{}", method.execution_context.join(",")));
+            let contexts = method
+                .execution_context
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>();
+            output.push_str(&format!(" ec:{}", contexts.join(",")));
         }
 
         // Verbatim method body at Edit fidelity (byte-exact for replace_in_file).

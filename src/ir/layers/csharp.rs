@@ -22,8 +22,8 @@
 use super::{LanguageLayer, LayerContext};
 use crate::compaction::modifiers::strip_csharp_attributes;
 use crate::ir::opcodes::{
-    CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CTX_REALTIME, CTX_TRANSACTION_SCOPE, CoreOp, DATAFLOW_READ,
-    DATAFLOW_WRITE, DeclarationModifier, SideEffectKind,
+    CTRL_AWAIT, CTRL_TRY, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, DeclarationModifier,
+    ExecutionContextKind, SideEffectKind,
 };
 
 /// True when `head` (a declaration head, never a full body) carries `word`
@@ -222,7 +222,7 @@ impl CSharpLayer {
             ));
             ops.push(CoreOp::ExecutionContext(
                 method_id.to_string(),
-                CTX_ASYNC.to_string(),
+                ExecutionContextKind::Async,
             ));
 
             // Detect IAsyncEnumerable (streaming)
@@ -244,7 +244,7 @@ impl CSharpLayer {
             if !is_async {
                 ops.push(CoreOp::ExecutionContext(
                     method_id.to_string(),
-                    CTX_ASYNC.to_string(),
+                    ExecutionContextKind::Async,
                 ));
             }
         }
@@ -253,7 +253,7 @@ impl CSharpLayer {
         if raw_sig.contains("TransactionScope") {
             ops.push(CoreOp::ExecutionContext(
                 method_id.to_string(),
-                CTX_TRANSACTION_SCOPE.to_string(),
+                ExecutionContextKind::TransactionScope,
             ));
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
@@ -399,7 +399,7 @@ impl LanguageLayer for CSharpLayer {
                     if context.is_signalr_hub {
                         ops.push(CoreOp::ExecutionContext(
                             method_id.clone(),
-                            CTX_REALTIME.to_string(),
+                            ExecutionContextKind::Realtime,
                         ));
                     }
 

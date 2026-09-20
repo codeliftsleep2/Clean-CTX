@@ -3,7 +3,7 @@
 // Tests for R-43b Phase 5: IR Validation Engine
 
 use crate::ir::compiler::CompiledIR;
-use crate::ir::opcodes::{CoreOp, DeclarationModifier, SideEffectKind};
+use crate::ir::opcodes::{CoreOp, DeclarationModifier, ExecutionContextKind, SideEffectKind};
 use crate::ir::validator::{DefaultValidator, IRValidator, ValidationError};
 
 fn valid_ir() -> CompiledIR {
@@ -21,7 +21,7 @@ fn valid_ir() -> CompiledIR {
             CoreOp::DataFlow("M1".into(), "reads".into(), "userRepo".into()),
             CoreOp::ControlFlow("M1".into(), "if".into(), "condition".into()),
             CoreOp::SideEffect("M1".into(), SideEffectKind::Async),
-            CoreOp::ExecutionContext("M1".into(), "async".into()),
+            CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Async),
         ],
         version: 1,
     }
@@ -180,7 +180,7 @@ fn test_ctx_unknown_method() {
         file_id: "test.ts".to_string(),
         instructions: vec![
             CoreOp::DefClass("C1".into(), "Test".into()),
-            CoreOp::ExecutionContext("M99".into(), "async".into()),
+            CoreOp::ExecutionContext("M99".into(), ExecutionContextKind::Async),
         ],
         version: 1,
     };

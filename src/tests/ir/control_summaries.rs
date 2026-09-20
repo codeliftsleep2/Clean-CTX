@@ -82,7 +82,7 @@ fn canonical_hierarchy_and_compact_llm_projection_are_distinct() {
     assert!(rendered.contains("pf:OBSERVABLE"), "{rendered}");
 
     let wire = ir_to_hierarchical_wire(&ir);
-    assert_eq!(wire["hs"], 6);
+    assert_eq!(wire["hs"], 7);
     assert_eq!(
         wire["ir"]["c"][0]["m"][0]["cs"],
         serde_json::json!([["IF", "RET"]])

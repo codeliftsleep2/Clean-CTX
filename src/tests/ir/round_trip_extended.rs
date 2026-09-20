@@ -21,11 +21,11 @@ fn round_trip_only_execution_semantics() {
             CoreOp::SideEffect("M1".into(), SideEffectKind::Mutation),
             CoreOp::SideEffect("M1".into(), SideEffectKind::Async),
             CoreOp::SideEffect("M1".into(), SideEffectKind::Transaction),
-            CoreOp::ExecutionContext("M1".into(), "sync".into()),
-            CoreOp::ExecutionContext("M1".into(), "async".into()),
-            CoreOp::ExecutionContext("M1".into(), "thread_bound".into()),
-            CoreOp::ExecutionContext("M1".into(), "transaction_scope".into()),
-            CoreOp::ExecutionContext("M1".into(), "realtime".into()),
+            CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Sync),
+            CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Async),
+            CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::ThreadBound),
+            CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::TransactionScope),
+            CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Realtime),
         ],
     };
 

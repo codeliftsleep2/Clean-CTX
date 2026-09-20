@@ -144,6 +144,50 @@ impl fmt::Display for SideEffectKind {
     }
 }
 
+/// Closed vocabulary for method execution-context observations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ExecutionContextKind {
+    #[serde(rename = "sync")]
+    Sync,
+    #[serde(rename = "async")]
+    Async,
+    #[serde(rename = "thread_bound")]
+    ThreadBound,
+    #[serde(rename = "transaction_scope")]
+    TransactionScope,
+    #[serde(rename = "realtime")]
+    Realtime,
+}
+
+impl ExecutionContextKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Sync => "sync",
+            Self::Async => "async",
+            Self::ThreadBound => "thread_bound",
+            Self::TransactionScope => "transaction_scope",
+            Self::Realtime => "realtime",
+        }
+    }
+
+    pub fn from_serialized(value: &str) -> Option<Self> {
+        match value {
+            "sync" => Some(Self::Sync),
+            "async" => Some(Self::Async),
+            "thread_bound" => Some(Self::ThreadBound),
+            "transaction_scope" => Some(Self::TransactionScope),
+            "realtime" => Some(Self::Realtime),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for ExecutionContextKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Closed typed vocabulary for additive method-pattern evidence.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "k", content = "v")]

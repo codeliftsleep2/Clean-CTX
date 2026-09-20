@@ -154,7 +154,7 @@ not automatically a semantic serialization of the canonical stream.
 | `DataFlow(method, direction, target)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; direction must be from the declared vocabulary | Ordered many; every occurrence preserved | None |
 | `ControlFlow(method, kind, target)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; kind must be from the declared vocabulary | Ordered many; every occurrence preserved | None |
 | `SideEffect(method, SideEffectKind)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; closed typed vocabulary (`pure`, `io`, `mutation`, `async`, `transaction`) | Ordered many; every occurrence preserved | None |
-| `ExecutionContext(method, context)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; context must be from the declared vocabulary | Ordered many; every occurrence preserved | None |
+| `ExecutionContext(method, ExecutionContextKind)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; closed typed vocabulary (`sync`, `async`, `thread_bound`, `transaction_scope`, `realtime`) | Ordered many; every occurrence preserved | None |
 | `Call(caller, callee, argc, spread)` | Structural call capture; trusted decoder | Targets caller `MethodId`; caller must resolve; callee is deliberately an unresolved textual name; `argc` is written-node count and is exact only when `spread` is false | Ordered many; every call-site occurrence preserved | None |
 
 ### 5.1 Pattern schema restriction
@@ -212,6 +212,7 @@ Phase 4B implements the method-scoped subset of these changes:
 - method `flags` stores an ordered collection of complete operation payloads;
 - `side_effect` is an occurrence-preserving collection;
 - `execution_context` is an occurrence-preserving collection;
+- TypeScript `@Injectable` is class/metaclass DI metadata, not a method execution context or an `Injects` dependency edge. Phase 6E removes its invalid `CTX(class_id, "di_scope")` encoding; a replacement class-scoped family requires separate architectural review.
 - `Body`, `DataFlow`, and `ControlFlow` resolve through the complete method-ID
   index rather than current-scope state;
 - hierarchical wire output declares schema revision `"hs": 2` and its decoder

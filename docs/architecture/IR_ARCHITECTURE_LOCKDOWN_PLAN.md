@@ -315,10 +315,11 @@ distinct compact LLM projection uses `ctl:`; hierarchical revision 5 and
 additive `0x03` opcode 24 carry it. Physical `0x04` remains Phase 8.
 
 Phase 6C typed `PatternFacts` was user-verified and checkpointed as `6d9b621`.
-Phase 6D implements typed `SideEffectKind` through producers, validation,
-projection, existing wires, and unchanged compact `se:` rendering. A tracked
-real compile-helper path reaches checked projection and rendering; the slice
-awaits user verification. Execution contexts remain the final family slice.
+Phase 6D typed `SideEffectKind` was user-verified. Phase 6E types the five
+method-scoped execution contexts and removes invalid TypeScript
+`CTX(class_id, "di_scope")` emission. Injectable status remains required
+class/metaclass DI metadata, distinct from `Injects`; its replacement family
+is deferred for separate architectural review.
 For each slice, migrate producer, IR representation, validator,
 transformation, projection, wire format, consumer, and tests before beginning
 the next family.

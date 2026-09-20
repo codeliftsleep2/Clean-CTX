@@ -20,7 +20,7 @@ use super::declaration::{declaration_head, has_modifier};
 use super::{LanguageLayer, LayerContext};
 use crate::compression::Fidelity;
 use crate::ir::opcodes::{
-    CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTX_ASYNC, CoreOp, DeclarationModifier,
+    CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CoreOp, DeclarationModifier, ExecutionContextKind,
     SideEffectKind,
 };
 
@@ -453,13 +453,10 @@ impl LanguageLayer for RustLayer {
                     // The raw_text here is the method signature + body.
                     // We detect async to emit SideEffect + ExecutionContext.
                     if is_async {
-                        ops.push(CoreOp::SideEffect(
-                            method_id.clone(),
-                            SideEffectKind::Async,
-                        ));
+                        ops.push(CoreOp::SideEffect(method_id.clone(), SideEffectKind::Async));
                         ops.push(CoreOp::ExecutionContext(
                             method_id.clone(),
-                            CTX_ASYNC.to_string(),
+                            ExecutionContextKind::Async,
                         ));
                     }
 

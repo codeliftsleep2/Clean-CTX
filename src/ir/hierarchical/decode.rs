@@ -156,7 +156,7 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
 
             // Execution context annotations
             for ec in &method.execution_context {
-                instructions.push(CoreOp::ExecutionContext(method.id.clone(), ec.clone()));
+                instructions.push(CoreOp::ExecutionContext(method.id.clone(), *ec));
             }
 
             // Method-level patterns (args stored as-is)

@@ -17,13 +17,12 @@
 //   - .pipe() with map/filter → DataFlow("reads", "observable")
 //   - async keyword → SideEffect("async") + ExecutionContext("async")
 //   - new Observable() → DataFlow("writes", "observable")
-//   - @Injectable() → ExecutionContext("di_scope")
 
 use super::declaration::{declaration_head, has_modifier};
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{
-    CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, DeclarationModifier,
-    SideEffectKind,
+    CTRL_AWAIT, CTRL_TRY, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, DeclarationModifier,
+    ExecutionContextKind, SideEffectKind,
 };
 
 /// TypeScript language layer (Layer 2).
@@ -142,7 +141,7 @@ impl TypeScriptLayer {
             ));
             ops.push(CoreOp::ExecutionContext(
                 method_id.to_string(),
-                CTX_ASYNC.to_string(),
+                ExecutionContextKind::Async,
             ));
         }
 
@@ -178,14 +177,6 @@ impl TypeScriptLayer {
                 method_id.to_string(),
                 DATAFLOW_WRITE.to_string(),
                 "observable".to_string(),
-            ));
-        }
-
-        // Angular: detect @Injectable() → ExecutionContext("di_scope")
-        if raw_sig.contains("@Injectable") {
-            ops.push(CoreOp::ExecutionContext(
-                method_id.to_string(),
-                "di_scope".to_string(),
             ));
         }
 
@@ -259,14 +250,6 @@ impl LanguageLayer for TypeScriptLayer {
                     let modifiers = Self::extract_class_modifiers(raw_text);
                     if !modifiers.is_empty() {
                         ops.push(CoreOp::ClassModifiers(class_id.clone(), modifiers));
-                    }
-
-                    // R-43a: Detect @Injectable() on class → ExecutionContext("di_scope")
-                    if raw_text.contains("@Injectable") {
-                        ops.push(CoreOp::ExecutionContext(
-                            class_id.clone(),
-                            "di_scope".to_string(),
-                        ));
                     }
                 }
             }

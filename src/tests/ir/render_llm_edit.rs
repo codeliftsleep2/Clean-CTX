@@ -11,6 +11,7 @@
 // implementations.
 
 use super::*;
+use crate::ir::ExecutionContextKind;
 
 // ── Edit Mode & High-Fidelity Rendering Tests (Phase 4) ───────────
 
@@ -134,7 +135,7 @@ fn test_high_fidelity_renders_execution_context() {
     let mut hir = empty_hir();
     let mut class = make_class("MyService");
     let mut method = make_method("poll");
-    method.execution_context = vec!["async".to_string()];
+    method.execution_context = vec![ExecutionContextKind::Async];
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -154,7 +155,7 @@ fn test_low_fidelity_no_execution_metadata() {
     let mut method = make_method("process");
     method.data_flow = vec![vec!["reads".to_string(), "config".to_string()]];
     method.side_effect = vec![SideEffectKind::Io];
-    method.execution_context = vec!["sync".to_string()];
+    method.execution_context = vec![ExecutionContextKind::Sync];
     class.methods.push(method);
     hir.classes.push(class);
 

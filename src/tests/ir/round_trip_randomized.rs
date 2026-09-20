@@ -120,13 +120,12 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
         18 => CoreOp::ExecutionContext(
             format!("M{}", rng() % 10),
             match rng() % 5 {
-                0 => "sync",
-                1 => "async",
-                2 => "thread_bound",
-                3 => "transaction_scope",
-                _ => "realtime",
-            }
-            .to_string(),
+                0 => ExecutionContextKind::Sync,
+                1 => ExecutionContextKind::Async,
+                2 => ExecutionContextKind::ThreadBound,
+                3 => ExecutionContextKind::TransactionScope,
+                _ => ExecutionContextKind::Realtime,
+            },
         ),
         19 => CoreOp::Body(
             format!("M{}", rng() % 10),

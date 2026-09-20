@@ -40,6 +40,8 @@ pub enum BinaryDecodeError {
     InvalidPatternFact,
     /// Unknown side-effect value in the typed side-effect opcode
     InvalidSideEffect(String),
+    /// Unknown execution-context value in the typed execution-context opcode
+    InvalidExecutionContext(String),
 }
 
 impl std::fmt::Display for BinaryDecodeError {
@@ -64,6 +66,9 @@ impl std::fmt::Display for BinaryDecodeError {
             BinaryDecodeError::InvalidPatternFact => f.write_str("invalid pattern fact payload"),
             BinaryDecodeError::InvalidSideEffect(value) => {
                 write!(f, "invalid side effect: {value}")
+            }
+            BinaryDecodeError::InvalidExecutionContext(value) => {
+                write!(f, "invalid execution context: {value}")
             }
         }
     }
@@ -382,7 +387,9 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                 OP_CTX => {
                     let mid = read_operand(&data[pos..], &mut pos)?;
                     let context_type = read_operand(&data[pos..], &mut pos)?;
-                    CoreOp::ExecutionContext(mid, context_type)
+                    let context = ExecutionContextKind::from_serialized(&context_type)
+                        .ok_or(BinaryDecodeError::InvalidExecutionContext(context_type))?;
+                    CoreOp::ExecutionContext(mid, context)
                 }
                 _ => return Err(BinaryDecodeError::UnknownOpcode(op_idx)),
             }
