@@ -500,7 +500,7 @@ failures and assert preservation of prior and peer ownership.
 
 ## 20. Finding P9-15: `apply_edit` splits source, live, and durable authority
 
-**Severity:** High contradiction; Option 1 implemented pending verification.
+**Severity:** High contradiction; Option 1 repaired and user-verified.
 
 The registered `apply_edit` contract describes an atomic controlled edit. The
 production handler validates and syntax-checks the complete candidate in
@@ -555,7 +555,7 @@ edit span. No source regeneration or normalization is permitted.
 
 ## 21. Finding P9-16: pre-edit source authority can already be split
 
-**Severity:** High contradiction; Option 1 implemented pending verification.
+**Severity:** High contradiction; Option 1 repaired and user-verified.
 
 `apply_edit` deliberately recompiles the current on-disk bytes to relocate unit
 spans, even when those bytes changed outside Clean-CTX after the session
@@ -606,10 +606,10 @@ live ownership. Restore deterministically resolves an interrupted intent before
 loading durable state. Full-body fallback and byte-addressed `Body`/`UnitTable`
 semantics remain authoritative and have registered production-path coverage.
 
-## 22. Verification gate and next audit action
+## 22. Verification result and next audit action
 
-P9-10 through P9-14 were user-verified green. The exhaustive Phase 9
-production operation/lifecycle and obsolete-path matrix audit is paused for
-user-run verification of P9-15/P9-16. After that gate is green, resume the
-remaining registered-operation and semantic-family matrix. Phase 9 is not
-certified.
+P9-10 through P9-16 were user-verified green. The exhaustive Phase 9
+production operation/lifecycle, semantic-family, and obsolete-path matrix audit
+resumed in
+[`IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION.md`](IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION.md).
+Phase 9 is not certified.

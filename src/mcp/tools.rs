@@ -135,7 +135,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "apply_edit",
-            "description": "Editor for controlled filesystem edits on the text file at the provided path. Provide `insert_line` to insert `new_text` at a specific line number. Otherwise, the tool replaces `old_text` with `new_text`, or creates the file with `new_text` if file does not exist. Preferred write path for SINGLE-UNIT edits (one method body / insertion anchored to one unit) once this session has seen byte-exact content via provide_code_context(fidelity=\"edit\"|\"verbatim\"): verified against Clean-CTX's tracked unit spans, gated by an in-memory tree-sitter parse before any byte hits disk. Multi-unit batches targeting different units are supported. Cross-file renames/signature changes still belong in the host's native edit tool.",
+            "description": "Applies an atomic batch of structural edits to a previously tracked and owned source file; it never creates arbitrary files. Supported operations are `replace_body`, `delete`, `insert_after`, and `insert_before`. Edits resolve known structural units rather than generic text coordinates, validate expected unit text where required, preserve byte-exact source behavior, and return operation-specific absolute byte spans. Current source bytes must match the live and durable owned source identity; stale or externally diverged source fails structurally. Successful edits use the staged durable transaction before publishing live semantic state. Request edit/verbatim fidelity and a full method body when compact representation is insufficient for safe editing.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

@@ -110,6 +110,42 @@ fn schema_provide_code_context_includes_focus_methods() {
     );
 }
 
+#[test]
+fn apply_edit_discovery_describes_only_the_structural_transaction_contract() {
+    let tools = tool_list();
+    let description = tools
+        .iter()
+        .find(|tool| tool["name"] == "apply_edit")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("apply_edit registered description");
+
+    for obsolete in ["insert_line", "new_text", "old_text", "creates the file"] {
+        assert!(
+            !description.contains(obsolete),
+            "obsolete contract: {obsolete}"
+        );
+    }
+    for required in [
+        "previously tracked and owned",
+        "replace_body",
+        "delete",
+        "insert_after",
+        "insert_before",
+        "structural units",
+        "expected unit text",
+        "byte-exact",
+        "stale or externally diverged",
+        "staged durable transaction",
+        "absolute byte spans",
+        "full method body",
+    ] {
+        assert!(
+            description.contains(required),
+            "missing contract: {required}"
+        );
+    }
+}
+
 /// Gap 4 fix: fidelity enums include edit/verbatim where applicable.
 #[test]
 fn schema_fidelity_enums_include_edit_and_verbatim() {
