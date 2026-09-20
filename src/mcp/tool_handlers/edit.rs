@@ -217,8 +217,9 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
             {
                 let mut idx = state.workspace_index_lock();
                 idx.remove_file(&canonical_path);
-                idx.add_edges(&canonical_path, sem_edges);
+                idx.add_edges(&canonical_path, sem_edges.clone());
             }
+            state.remember_semantic_edges(&alias, sem_edges);
             state
                 .ir_context_lock()
                 .load_ir(post, Some(new_hash.clone()));

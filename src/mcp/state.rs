@@ -74,6 +74,9 @@ macro_rules! lock_or_recover {
     };
 }
 
+#[path = "durable_semantics.rs"]
+pub(crate) mod durable_semantics;
+
 /// Per-file CBM filter state: symbols to skip during compression.
 ///
 /// Populated by the CBM Intelligence Layer **before** compression runs.
@@ -157,7 +160,14 @@ pub struct McpState {
     /// Exact durable persistence path owned by each session-local IR alias.
     persisted_paths: Mutex<HashMap<String, String>>,
     context_fidelities: Mutex<HashMap<String, Fidelity>>,
-    pending_delta_hashes: Mutex<HashMap<(String, u64), String>>,
+    semantic_edge_snapshots:
+        Mutex<HashMap<String, Vec<crate::layers::meta::semantic::SemanticEdge>>>,
+    pending_semantic_transitions: Mutex<
+        HashMap<
+            durable_semantics::PendingTransitionKey,
+            durable_semantics::PendingSemanticTransition,
+        >,
+    >,
 
     /// Tracks which cache breakpoints have already been emitted this session.
     /// Key format: "{region}::{breaker}" — e.g., "tools::tools-v1".
@@ -277,7 +287,8 @@ impl McpState {
             persistence_store: Mutex::new(persistence_store),
             persisted_paths: Mutex::new(HashMap::new()),
             context_fidelities: Mutex::new(HashMap::new()),
-            pending_delta_hashes: Mutex::new(HashMap::new()),
+            semantic_edge_snapshots: Mutex::new(HashMap::new()),
+            pending_semantic_transitions: Mutex::new(HashMap::new()),
             llm_text_cache: Mutex::new(HashMap::new()),
             emitted_breakpoints: Mutex::new(HashSet::new()),
             cache_metrics: Mutex::new(CacheMetrics::default()),
@@ -482,18 +493,7 @@ impl McpState {
     pub fn forget_persisted_path(&self, alias: &str) {
         lock_or_recover!(self.persisted_paths.lock(), "persisted_paths").remove(alias);
         lock_or_recover!(self.context_fidelities.lock(), "context_fidelities").remove(alias);
-        lock_or_recover!(self.pending_delta_hashes.lock(), "pending_delta_hashes")
-            .retain(|(file, _), _| file != alias);
-    }
-
-    pub fn remember_delta_source_hash(&self, alias: &str, version: u64, source_hash: String) {
-        lock_or_recover!(self.pending_delta_hashes.lock(), "pending_delta_hashes")
-            .insert((alias.to_string(), version), source_hash);
-    }
-
-    pub fn take_delta_source_hash(&self, alias: &str, version: u64) -> Option<String> {
-        lock_or_recover!(self.pending_delta_hashes.lock(), "pending_delta_hashes")
-            .remove(&(alias.to_string(), version))
+        self.forget_semantic_state(alias);
     }
 
     /// Get or create a bundle alias (thread-safe convenience method).

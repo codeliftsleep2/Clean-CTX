@@ -61,8 +61,13 @@ $GeneratedDependencyLockfiles = @(
 #     chronological record the registry exists to provide. Exempted by explicit
 #     maintainer decision (2026-09-17); adding a path here requires the same
 #     explicit authorization as expanding an encoding allowlist.
+#   docs/ARCHITECTURE_OVERVIEW.md — the repository-wide architecture reference.
+#     Its single-document structure is intentionally retained for coherent
+#     navigation and retrieval. Exempted by explicit maintainer decision
+#     (2026-09-20).
 $ExemptPaths = @(
-    'docs/agent/DISCOVERY_REGISTRY.md'
+    'docs/agent/DISCOVERY_REGISTRY.md',
+    'docs/ARCHITECTURE_OVERVIEW.md'
 )
 
 if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {

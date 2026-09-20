@@ -210,7 +210,7 @@ fn buffered_v04_persistence_preserves_exact_duplicate_operations() {
 }
 
 #[test]
-fn overwrite_reset_and_delete_replace_persisted_ownership_coherently() {
+fn overwrite_and_durable_restore_preserve_persisted_ownership_coherently() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("temp workspace");
     let path = root.path().join("lifecycle.ts");
@@ -260,39 +260,40 @@ fn overwrite_reset_and_delete_replace_persisted_ownership_coherently() {
         );
     }
 
-    let reset = dispatch(&state, 13, "restore_context", args());
-    assert!(reset.get("error").is_none(), "{reset}");
+    let restored = dispatch(&state, 13, "restore_context", args());
+    assert!(restored.get("error").is_none(), "{restored}");
     {
         let store = state.persistence_store_lock();
         let sqlite = store.as_ref().unwrap().sqlite().unwrap();
-        assert!(!sqlite.has_context(&file_path));
-        assert!(
-            sqlite
-                .load_context_with_deltas(&file_path, None)
-                .unwrap()
-                .is_none()
-        );
+        assert!(sqlite.has_context(&file_path));
     }
 
-    assert!(
-        dispatch(&state, 14, "compress_code_context", args())
-            .get("error")
-            .is_none()
-    );
     std::fs::remove_file(&path).expect("delete source");
-    let deleted = dispatch(&state, 15, "restore_context", args());
-    assert!(
-        deleted.get("error").is_some(),
-        "deleted source cannot be recompiled: {deleted}"
+    state.ir_context_lock().remove_file(
+        &state
+            .alias_for_path(&file_path)
+            .expect("session alias before restart"),
     );
-    let store = state.persistence_store_lock();
-    let sqlite = store.as_ref().unwrap().sqlite().unwrap();
-    assert!(!sqlite.has_context(&file_path));
+    let restored_without_source = dispatch(&state, 14, "restore_context", args());
     assert!(
-        sqlite
-            .load_context_with_deltas(&file_path, None)
+        restored_without_source.get("error").is_none(),
+        "restore must not recompile or require source: {restored_without_source}"
+    );
+
+    state
+        .persistence_store_lock()
+        .as_ref()
+        .unwrap()
+        .queue_clear_file(&file_path);
+    state.flush_persistence();
+    let store = state.persistence_store_lock();
+    assert!(
+        !store
+            .as_ref()
             .unwrap()
-            .is_none()
+            .sqlite()
+            .unwrap()
+            .has_context(&file_path)
     );
 }
 

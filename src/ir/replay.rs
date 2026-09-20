@@ -84,7 +84,10 @@ impl std::fmt::Display for DeltaError {
                 write!(f, "invalid sequence instruction at position {position}")
             }
             DeltaError::InvalidCanonicalTuple { position, tuple } => {
-                write!(f, "invalid canonical tuple at position {position}: {tuple:?}")
+                write!(
+                    f,
+                    "invalid canonical tuple at position {position}: {tuple:?}"
+                )
             }
             DeltaError::SequenceConflict {
                 position,

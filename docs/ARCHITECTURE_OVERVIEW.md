@@ -215,7 +215,7 @@ The zero-touch workflow is the **recommended entry point** for any file-related 
 | Tool | Purpose |
 |------|---------|
 | `provide_code_context` | **Single entry point** — auto-detects, selects fidelity, uses delta transport on subsequent calls |
-| `restore_context` | Force full re-compression, clearing all baselines and DB entries |
+| `restore_context` | Transactionally restore persisted canonical IR, delta history, and semantic-edge ownership without source recompilation |
 | `context_history` | View compression history and delta savings for tracked files |
 | `context_stats` | Dashboard: token savings, compression stats, session metrics |
 

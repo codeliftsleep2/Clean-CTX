@@ -124,6 +124,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             idx.remove_file(&canonical_path);
             idx.add_edges(&canonical_path, semantic_edges.clone());
         }
+        state.remember_semantic_edges(&ir.file_id, semantic_edges.clone());
         let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
         let footer = state.format_dict_footer_for_aliases(&[&ir.file_id]);
         let llm_text_with_footer = format!(
@@ -156,20 +157,34 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 let mut durable_ir = ir.clone();
                 durable_ir.file_id.clone_from(&resolved_path);
                 let ir_binary = crate::ir::binary_wire::encode(&durable_ir);
-
-                store.queue_save_context(
-                    &resolved_path,
-                    effective_fidelity,
-                    &llm_text_with_footer,
-                    &ir_binary,
-                    &source_hash,
-                    raw_tokens as u64,
-                    compressed_tokens as u64,
-                );
+                store.flush();
+                let persisted = store.sqlite().is_some_and(|mut sqlite| {
+                    sqlite
+                        .save_context_with_semantics(
+                            &resolved_path,
+                            effective_fidelity,
+                            &llm_text_with_footer,
+                            &ir_binary,
+                            &source_hash,
+                            ir.version,
+                            &semantic_edges,
+                            raw_tokens as u64,
+                            compressed_tokens as u64,
+                        )
+                        .is_ok()
+                });
+                if !persisted {
+                    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                        id.clone(),
+                        -32603,
+                        "Canonical IR and semantic edges could not be persisted atomically",
+                        None,
+                    ));
+                    return;
+                }
                 state.remember_persisted_path(&ir.file_id, &resolved_path);
             }
         }
-        state.flush_persistence();
 
         let ir_value = match encoding {
             "positional" => {

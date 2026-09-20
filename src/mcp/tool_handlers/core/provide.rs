@@ -14,8 +14,6 @@ use crate::mcp::tools::parse_tokenizer_arg;
 use crate::protocol::send_response;
 use serde_json::Value;
 use std::collections::HashSet;
-// ── Handler: provide_code_context ─────────────────────────────────
-
 pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &McpState) {
     use std::time::Instant;
     let overall_start = Instant::now();
@@ -171,19 +169,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         return;
     }
 
-    // -- Token-economics gate (Stage 1: Preflight heuristic) --
-    // Before entering the expensive compression pipeline (IR compilation + render),
-    // cheaply predict whether compression at verbatim-body-preserving fidelities
-    // (Edit) is likely to produce a net token savings. If not, skip compression
-    // early and return raw passthrough.
-    //
-    // Structural fidelities (Low, Medium, High) skip this heuristic because they
-    // strip method bodies entirely and produce substantial savings even on very
-    // small files. The actual economic decision is made in Stage 2 below
-    // (post-compression verification) which applies uniformly to all fidelities.
-    //
-    // Observability: lift prediction and threshold out for the tracing span below
-    // so we can correlate predictions with actual outcomes.
+    // Predict Edit-fidelity economics before entering the render pipeline.
     let mut te_prediction: &str = "bypass";
     let mut te_threshold: usize = 0;
     if effective_fidelity == crate::compression::Fidelity::Edit {
@@ -206,36 +192,31 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         };
         te_threshold = threshold;
         if !prediction {
-            // Compression predicted unfavorable -- but Edit fidelity still
-            // requires tracked IR state so that apply_edit can resolve unit
-            // byte ranges. Compile IR and load state, then return raw source
-            // without entering the expensive compression/rendering pipeline.
-            // IR compilation is cheap (~1ms for small files) compared to the
-            // full render pipeline that would otherwise be needed.
+            // Edit fidelity still requires tracked IR state for byte ranges.
             match compile_file_ir_focused(
                 &resolved_path,
                 crate::compression::Fidelity::Edit,
                 state,
                 focus_methods.as_ref(),
             ) {
-                Ok((compiled, semantic_edges, _)) => {
+                Ok((compiled, semantic_edges, source_hash)) => {
                     if checked_hierarchy_or_respond(id, &compiled).is_none() {
                         return;
                     }
                     let compiled_file = compiled.file_id.clone();
-                    state.ir_context_lock().load_ir(compiled, None);
+                    state
+                        .ir_context_lock()
+                        .load_ir(compiled, Some(source_hash));
                     state.remember_context_fidelity(&compiled_file, effective_fidelity);
 
-                    // PERSIST-01: Preserve semantic edges extracted during
-                    // compilation even though the token-economics gate
-                    // predicts the full render is not economical. The
-                    // WorkspaceIndex must reflect the latest compilation
-                    // state regardless of the rendering strategy chosen.
+                    // Rendering economics never changes semantic ownership.
                     let canonical_path =
                         crate::dictionary::path::canonical_identity_key(&resolved_path);
                     let mut idx = state.workspace_index_lock();
                     idx.remove_file(&canonical_path);
-                    idx.add_edges(&canonical_path, semantic_edges);
+                    idx.add_edges(&canonical_path, semantic_edges.clone());
+                    drop(idx);
+                    state.remember_semantic_edges(&compiled_file, semantic_edges);
                 }
                 Err(e) => {
                     send_response(&to_jsonrpc_error(id, &e));
@@ -294,42 +275,53 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
 
             let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
 
-            // Update workspace index: remove stale edges, insert fresh ones.
-            {
-                let mut idx = state.workspace_index_lock();
-                idx.remove_file(&canonical_path);
-                idx.add_edges(&canonical_path, semantic_edges.clone());
-            }
-
             let delta_start = Instant::now();
             let prev_version = state.file_version(&alias).unwrap_or(0);
             let mut ir_ctx = state.ir_context_lock();
-            let delta = if prev_version > 0 && ir_ctx.has_file(&alias) {
+            let mut delta = if prev_version > 0 && ir_ctx.has_file(&alias) {
                 let Some(prev_instructions) = ir_ctx.get_ir(&alias).cloned() else {
                     drop(ir_ctx);
-                    send_response(&invalid_session_ir_response(id, "missing prior instruction stream"));
+                    send_response(&invalid_session_ir_response(
+                        id,
+                        "missing prior instruction stream",
+                    ));
                     return;
                 };
-                let prev_compiled = match compiled_from_tuples(
-                    alias.clone(),
-                    prev_version,
-                    prev_instructions,
-                ) {
-                    Ok(compiled) => compiled,
-                    Err(error) => {
-                        drop(ir_ctx);
-                        send_response(&invalid_session_ir_response(id, &error));
-                        return;
-                    }
-                };
+                let prev_compiled =
+                    match compiled_from_tuples(alias.clone(), prev_version, prev_instructions) {
+                        Ok(compiled) => compiled,
+                        Err(error) => {
+                            drop(ir_ctx);
+                            send_response(&invalid_session_ir_response(id, &error));
+                            return;
+                        }
+                    };
                 SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
             } else {
                 ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
+                let mut idx = state.workspace_index_lock();
+                idx.remove_file(&canonical_path);
+                idx.add_edges(&canonical_path, semantic_edges.clone());
+                drop(idx);
+                state.remember_semantic_edges(&alias, semantic_edges.clone());
                 None
             };
+            if let Some(delta) = &mut delta {
+                delta.target_hash = Some(source_hash.clone());
+            }
             state.remember_context_fidelity(&alias, effective_fidelity);
             if let Some(delta) = &delta {
-                state.remember_delta_source_hash(&alias, delta.to, source_hash);
+                if let Err(error) = state.remember_pending_transition(
+                    &alias,
+                    &resolved_path,
+                    delta,
+                    source_hash,
+                    semantic_edges.clone(),
+                ) {
+                    drop(ir_ctx);
+                    send_response(&invalid_session_ir_response(id, &error));
+                    return;
+                }
             }
             drop(ir_ctx);
             let _delta_ms = delta_start.elapsed().as_millis() as u64;
@@ -340,7 +332,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             match delta {
                 Some(ref d) => {
                     let wire_delta = serde_json::to_value(d).unwrap_or_default();
-                    // Count the actual delta wire tokens for dashboard efficiency.
+                    // Count the actual delta payload.
                     let delta_text = serde_json::to_string(&wire_delta).unwrap_or_default();
                     raw_tokens = count_tokens_with_tokenizer(&delta_text, tokenizer_ref);
                     comp_tokens = raw_tokens; // delta is the payload itself
@@ -502,6 +494,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     idx.remove_file(&canonical_path);
                     idx.add_edges(&canonical_path, semantic_edges.clone());
                 }
+                state.remember_semantic_edges(&ir.file_id, semantic_edges.clone());
                 let llm_text = crate::ir::render_hierarchical_for_llm_focused(
                     &hir,
                     effective_fidelity,

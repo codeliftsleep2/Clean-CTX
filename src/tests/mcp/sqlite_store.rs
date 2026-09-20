@@ -53,7 +53,9 @@ fn persisted_replay_rejects_a_malformed_sequence_tuple() {
         .expect("save baseline");
     let mut target = baseline.clone();
     target.version = 2;
-    target.instructions.push(CoreOp::Return("m1".into(), "void".into()));
+    target
+        .instructions
+        .push(CoreOp::Return("m1".into(), "void".into()));
     let mut delta = SequenceDeltaComputer::new()
         .compute(&baseline, &target)
         .expect("insert delta");
@@ -72,7 +74,10 @@ fn persisted_replay_rejects_a_malformed_sequence_tuple() {
     let error = store
         .load_context_with_deltas(file, None)
         .expect_err("malformed replay must fail");
-    assert!(error.to_string().contains("invalid canonical tuple"), "{error}");
+    assert!(
+        error.to_string().contains("invalid canonical tuple"),
+        "{error}"
+    );
 }
 
 #[test]

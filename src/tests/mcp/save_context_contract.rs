@@ -1,10 +1,10 @@
 //! Registered-dispatch contract for file-scoped persistence checkpoints.
 
-use crate::mcp::context_store::ContextStore;
-use crate::mcp::tools::dispatch_tools_call;
 use crate::ir::compiler::CompiledIR;
 use crate::ir::delta::{SequenceDeltaComputer, SequenceEdit};
 use crate::ir::opcodes::CoreOp;
+use crate::mcp::context_store::ContextStore;
+use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
@@ -169,7 +169,11 @@ fn registered_apply_delta_rejects_malformed_canonical_tuple_transactionally() {
     let workspace = root.path().to_string_lossy().into_owned();
     std::fs::write(&path, "export class DeltaOwner { run(): void {} }\n").expect("source");
     let state = state(&root);
-    assert!(compile(&state, &path, &workspace, 20).get("error").is_none());
+    assert!(
+        compile(&state, &path, &workspace, 20)
+            .get("error")
+            .is_none()
+    );
     let alias = state.alias_for_path(&path).expect("session alias");
     let (version, tuples) = {
         let context = state.ir_context_read();
@@ -188,7 +192,9 @@ fn registered_apply_delta_rejects_malformed_canonical_tuple_transactionally() {
     };
     let mut target = baseline.clone();
     target.version += 1;
-    target.instructions.push(CoreOp::TypeAlias("T-new".into(), "value".into()));
+    target
+        .instructions
+        .push(CoreOp::TypeAlias("T-new".into(), "value".into()));
     let mut delta = SequenceDeltaComputer::new()
         .compute(&baseline, &target)
         .expect("insert delta");

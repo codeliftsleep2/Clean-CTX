@@ -2,7 +2,6 @@
 
 use super::common::{compiled_from_tuples, contract_fields, invalid_session_ir_response};
 use crate::error::to_jsonrpc_error;
-use crate::ir::compiler::CompiledIR;
 use crate::ir::delta::{IRDelta, SequenceDelta, SequenceDeltaComputer};
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::{
@@ -13,6 +12,10 @@ use crate::mcp::tools::parse_fidelity_arg;
 use crate::protocol::send_response;
 use serde_json::Value;
 use std::path::PathBuf;
+mod persistence;
+use persistence::{
+    ensure_apply_baseline, ensure_persisted_baseline, persist_baseline, persisted_context_id,
+};
 // ── Handler: diff_code_context ────────────────────────────────────
 
 pub(crate) fn handle_diff_code_context(id: &Value, params: &Value, state: &McpState) {
@@ -148,21 +151,12 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             }
         };
 
-    // Compute canonical file identity for WorkspaceIndex provenance
     let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
-
-    // Update workspace index before delta computation: remove stale edges,
-    // insert fresh edges from the latest compilation.
-    {
-        let mut idx = state.workspace_index_lock();
-        idx.remove_file(&canonical_path);
-        idx.add_edges(&canonical_path, semantic_edges.clone());
-    }
 
     // P0-4: Re-acquire lock atomically for delta computation
     // This ensures no other worker modified ir_context between our check and delta computation
     let mut ir_ctx = state.ir_context_lock();
-    let delta = if prev_version > 0 && ir_ctx.has_file(&path_alias) {
+    let mut delta = if prev_version > 0 && ir_ctx.has_file(&path_alias) {
         let Some(prev_instructions) = ir_ctx.get_ir(&path_alias).cloned() else {
             drop(ir_ctx);
             send_response(&invalid_session_ir_response(
@@ -171,37 +165,56 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             ));
             return;
         };
-        let prev_compiled = match compiled_from_tuples(
-            path_alias.clone(),
-            prev_version,
-            prev_instructions,
-        ) {
-            Ok(compiled) => compiled,
-            Err(error) => {
-                drop(ir_ctx);
-                send_response(&invalid_session_ir_response(id, &error));
-                return;
-            }
-        };
+        let prev_compiled =
+            match compiled_from_tuples(path_alias.clone(), prev_version, prev_instructions) {
+                Ok(compiled) => compiled,
+                Err(error) => {
+                    drop(ir_ctx);
+                    send_response(&invalid_session_ir_response(id, &error));
+                    return;
+                }
+            };
         let previous_hash = ir_ctx
             .get_source_hash(&path_alias)
             .cloned()
             .unwrap_or_else(|| source_hash.clone());
-        ensure_persisted_baseline(
+        if let Err(error) = ensure_persisted_baseline(
             state,
             &resolved_path,
             fidelity,
             &prev_compiled,
             &previous_hash,
-        );
+        ) {
+            drop(ir_ctx);
+            send_response(&invalid_session_ir_response(id, &error));
+            return;
+        }
         SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
     } else {
         ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
+        let mut idx = state.workspace_index_lock();
+        idx.remove_file(&canonical_path);
+        idx.add_edges(&canonical_path, semantic_edges.clone());
+        drop(idx);
+        state.remember_semantic_edges(&path_alias, semantic_edges.clone());
         None
     };
+    if let Some(delta) = &mut delta {
+        delta.target_hash = Some(source_hash.clone());
+    }
     state.remember_context_fidelity(&path_alias, fidelity);
     if let Some(delta) = &delta {
-        state.remember_delta_source_hash(&path_alias, delta.to, source_hash.clone());
+        if let Err(error) = state.remember_pending_transition(
+            &path_alias,
+            &resolved_path,
+            delta,
+            source_hash.clone(),
+            semantic_edges.clone(),
+        ) {
+            drop(ir_ctx);
+            send_response(&invalid_session_ir_response(id, &error));
+            return;
+        }
     } else if prev_version > 0 {
         ir_ctx.set_source_hash(&path_alias, source_hash.clone());
     }
@@ -227,7 +240,17 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
         }
         None => {
             if prev_version == 0 {
-                persist_baseline(state, &resolved_path, fidelity, &compiled, &source_hash);
+                if let Err(error) = persist_baseline(
+                    state,
+                    &resolved_path,
+                    fidelity,
+                    &compiled,
+                    &source_hash,
+                    &semantic_edges,
+                ) {
+                    send_response(&invalid_session_ir_response(id, &error));
+                    return;
+                }
             }
             let version = if prev_version == 0 {
                 compiled.version
@@ -301,6 +324,26 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         .persisted_path(&file)
         .or_else(|| state.path_for_alias(&file))
         .unwrap_or_else(|| file.clone());
+    let persistence_enabled = state.persistence_store_lock().is_some();
+    let pending_transition = match &delta {
+        IncomingDelta::Sequence(delta) if persistence_enabled => {
+            match state.pending_transition(&file, &durable_file, delta) {
+                Ok(transition) => Some(transition),
+                Err(error) => {
+                    send_response(&invalid_session_ir_response(id, &error));
+                    return;
+                }
+            }
+        }
+        IncomingDelta::Legacy(_) if persistence_enabled => {
+            send_response(&invalid_session_ir_response(
+                id,
+                "durable legacy delta application lacks authoritative semantic-edge state",
+            ));
+            return;
+        }
+        _ => None,
+    };
     let persisted_payload = match &delta {
         IncomingDelta::Sequence(delta) => {
             crate::mcp::persistence_ir::PersistedDelta::normalize_sequence(delta, &durable_file)
@@ -343,24 +386,102 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         IncomingDelta::Legacy(_) => "legacy",
     };
     let mut ir_ctx = state.ir_context_lock();
-    let applied = match delta {
-        IncomingDelta::Sequence(delta) => ir_ctx.apply_sequence(delta),
-        IncomingDelta::Legacy(delta) => ir_ctx.apply(delta),
+    let mut candidate = ir_ctx.clone();
+    let applied = match &delta {
+        IncomingDelta::Sequence(delta) => candidate.apply_sequence(delta.clone()),
+        IncomingDelta::Legacy(delta) => candidate.apply(delta.clone()),
     };
     match applied {
         Ok(new_version) => {
-            if edit_type == "sequence_v2"
-                && let Some(source_hash) = state.take_delta_source_hash(&file, new_version)
-            {
-                ir_ctx.set_source_hash(&file, source_hash);
+            let source_hash = pending_transition
+                .as_ref()
+                .map(|transition| transition.target_source_hash.clone())
+                .or_else(|| candidate.get_source_hash(&file).cloned())
+                .unwrap_or_else(|| format!("ir-{file}-{new_version}"));
+            candidate.set_source_hash(&file, source_hash.clone());
+            let target_tuples = candidate
+                .get_ir(&file)
+                .cloned()
+                .ok_or_else(|| "applied delta lost canonical target state".to_string());
+            let target_ir = target_tuples
+                .and_then(|tuples| compiled_from_tuples(file.clone(), new_version, tuples));
+            let target_ir = match target_ir {
+                Ok(target) => target,
+                Err(error) => {
+                    drop(ir_ctx);
+                    send_response(&invalid_session_ir_response(id, &error));
+                    return;
+                }
+            };
+            let hierarchy = match crate::ir::hierarchical::try_ir_to_hierarchical(&target_ir) {
+                Ok(hierarchy) => hierarchy,
+                Err(error) => {
+                    drop(ir_ctx);
+                    send_response(&crate::mcp::tool_handlers::core::projection_error_response(
+                        id, &error,
+                    ));
+                    return;
+                }
+            };
+            let fidelity = state
+                .context_fidelity(&file)
+                .unwrap_or(crate::compression::Fidelity::Low);
+            let compact = crate::ir::render_hierarchical_for_llm(&hierarchy, fidelity);
+
+            if let Some(transition) = &pending_transition {
+                debug_assert_eq!(transition.from, from);
+                debug_assert_eq!(transition.to, new_version);
+                let snapshot = crate::mcp::state::durable_semantics::DurableSemanticSnapshot::new(
+                    durable_file.clone(),
+                    source_hash.clone(),
+                    new_version,
+                    &transition.semantic_edges,
+                );
+                let persisted = persisted_context.as_ref().is_some_and(|context_id| {
+                    state
+                        .persistence_store_lock()
+                        .as_ref()
+                        .is_some_and(|store| {
+                            store.flush();
+                            store.sqlite().is_some_and(|mut sqlite| {
+                                sqlite
+                                    .append_delta_with_semantics(
+                                        context_id,
+                                        &persisted_payload,
+                                        edit_type,
+                                        &compact,
+                                        &snapshot,
+                                    )
+                                    .is_ok()
+                            })
+                        })
+                });
+                if !persisted {
+                    drop(ir_ctx);
+                    send_response(&invalid_session_ir_response(
+                        id,
+                        "canonical delta and semantic edges were not persisted atomically",
+                    ));
+                    return;
+                }
+            } else if let Some(context_id) = &persisted_context {
+                if let Some(ref store) = *state.persistence_store_lock() {
+                    store.queue_append_delta(context_id, &persisted_payload, Some(edit_type));
+                    store.flush();
+                }
             }
+
+            *ir_ctx = candidate;
             let rendered = ir_ctx.render_pretty(&file, crate::compression::Fidelity::Low);
             drop(ir_ctx);
-            if let Some(context_id) = persisted_context {
-                if let Some(ref store) = *state.persistence_store_lock() {
-                    store.queue_append_delta(&context_id, &persisted_payload, Some(edit_type));
-                }
-                state.flush_persistence();
+            if let Some(transition) = pending_transition {
+                let canonical_path = crate::dictionary::path::canonical_identity_key(&durable_file);
+                let mut index = state.workspace_index_lock();
+                index.remove_file(&canonical_path);
+                index.add_edges(&canonical_path, transition.semantic_edges.clone());
+                drop(index);
+                state.remember_semantic_edges(&file, transition.semantic_edges);
+                state.consume_pending_transition(&file, from, new_version);
             }
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
@@ -375,91 +496,6 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             "error": { "code": -32603, "message": format!("Apply delta failed: {}", e) }
         })),
     }
-}
-
-fn persist_baseline(
-    state: &McpState,
-    file_path: &str,
-    fidelity: crate::compression::Fidelity,
-    compiled: &CompiledIR,
-    source_hash: &str,
-) {
-    let durable = crate::mcp::persistence_ir::baseline(compiled, file_path);
-    let binary = crate::ir::binary_wire::encode(&durable);
-    if let Some(ref store) = *state.persistence_store_lock() {
-        store.queue_save_context(file_path, fidelity, "", &binary, source_hash, 0, 0);
-        state.remember_persisted_path(&compiled.file_id, file_path);
-    }
-    state.flush_persistence();
-}
-
-fn ensure_persisted_baseline(
-    state: &McpState,
-    file_path: &str,
-    fidelity: crate::compression::Fidelity,
-    compiled: &CompiledIR,
-    source_hash: &str,
-) {
-    let missing = state
-        .persistence_store_lock()
-        .as_ref()
-        .is_some_and(|store| {
-            store.flush();
-            store.sqlite().is_some_and(|sqlite| {
-                sqlite
-                    .baseline_binary(file_path)
-                    .ok()
-                    .flatten()
-                    .and_then(|bytes| crate::ir::binary_wire::decode(&bytes).ok())
-                    .is_none_or(|ir| ir.file_id != file_path)
-            })
-        });
-    if missing {
-        persist_baseline(state, file_path, fidelity, compiled, source_hash);
-    }
-}
-
-fn ensure_apply_baseline(state: &McpState, alias: &str, file_path: &str) -> Result<(), String> {
-    if state.persistence_store_lock().is_none() {
-        return Ok(());
-    }
-    let ir_ctx = state.ir_context_read();
-    let Some(instructions) = ir_ctx.get_ir(alias).cloned() else {
-        return Ok(());
-    };
-    let Some(version) = ir_ctx.file_version(alias) else {
-        return Ok(());
-    };
-    let source_hash = ir_ctx
-        .get_source_hash(alias)
-        .cloned()
-        .unwrap_or_else(|| format!("ir-{alias}-{version}"));
-    drop(ir_ctx);
-    let compiled = compiled_from_tuples(alias.to_string(), version, instructions)?;
-    ensure_persisted_baseline(
-        state,
-        file_path,
-        crate::compression::Fidelity::Low,
-        &compiled,
-        &source_hash,
-    );
-    Ok(())
-}
-
-fn persisted_context_id(state: &McpState, file_path: &str) -> Result<Option<String>, String> {
-    let guard = state.persistence_store_lock();
-    let Some(store) = guard.as_ref() else {
-        return Ok(None);
-    };
-    store.flush();
-    let sqlite = store
-        .sqlite()
-        .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
-    sqlite
-        .current_context_id(file_path)
-        .map_err(|error| format!("Persistence lookup failed: {error}"))?
-        .map(Some)
-        .ok_or_else(|| format!("No persisted baseline for delta file: {file_path}"))
 }
 
 #[cfg(test)]

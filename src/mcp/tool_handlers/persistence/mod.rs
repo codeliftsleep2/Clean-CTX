@@ -4,7 +4,6 @@
 // and purge old deltas.
 
 use crate::mcp::McpState;
-use crate::mcp::context_store::ContextStore;
 use crate::protocol::send_response;
 use serde_json::Value;
 
@@ -85,6 +84,10 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
         .unwrap_or_else(|| crate::ir::render_hierarchical_for_llm(&hierarchy, fidelity));
     let durable_ir = crate::mcp::persistence_ir::baseline(&session_ir, &durable_path);
     let binary = crate::ir::binary_wire::encode(&durable_ir);
+    let semantic_edges = match state.semantic_edges(&alias) {
+        Some(edges) => edges,
+        None => return send_persistence_error(id, "Missing authoritative semantic-edge state"),
+    };
 
     let store_guard = state.persistence_store_lock();
     let Some(store) = store_guard.as_ref() else {
@@ -92,26 +95,35 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
     };
     let already_durable = store.sqlite().is_some_and(|sqlite| {
         sqlite
-            .checkpoint_matches(&durable_path, fidelity, &compact, &binary, &source_hash)
+            .durable_state_matches(
+                &durable_path,
+                fidelity,
+                &compact,
+                &binary,
+                &source_hash,
+                version,
+                &semantic_edges,
+            )
             .unwrap_or(false)
     });
     let saved_count = if already_durable {
         0
     } else {
-        store.queue_save_context(
-            &durable_path,
-            fidelity,
-            &compact,
-            &binary,
-            &source_hash,
-            0,
-            0,
-        );
         store.flush();
-        let persisted = store.sqlite().is_some_and(|sqlite| {
+        let persisted = store.sqlite().is_some_and(|mut sqlite| {
             sqlite
-                .checkpoint_matches(&durable_path, fidelity, &compact, &binary, &source_hash)
-                .unwrap_or(false)
+                .save_context_with_semantics(
+                    &durable_path,
+                    fidelity,
+                    &compact,
+                    &binary,
+                    &source_hash,
+                    version,
+                    &semantic_edges,
+                    0,
+                    0,
+                )
+                .is_ok()
         });
         if !persisted {
             return send_persistence_error(id, "Requested checkpoint was not persisted");
@@ -210,97 +222,62 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         return;
     }
 
-    let guard = state.persistence_store_lock();
-    if let Some(ref store) = *guard {
-        let (fidelity, source_hash) = match store.load_latest(file_path) {
-            Ok(Some(metadata)) => (metadata.fidelity, metadata.source_hash),
-            Ok(None) => {
-                drop(guard);
-                send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                    id.clone(),
-                    -32603,
-                    format!("No context metadata found for: {file_path}"),
-                    None,
-                ));
-                return;
-            }
-            Err(error) => {
-                drop(guard);
-                send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                    id.clone(),
-                    -32603,
-                    format!("Replay metadata failed: {error}"),
-                    None,
-                ));
-                return;
-            }
+    let restored = {
+        let guard = state.persistence_store_lock();
+        let Some(store) = guard.as_ref() else {
+            return send_persistence_error(id, "Persistence DB not enabled");
         };
-        let persisted_compact = store
-            .sqlite()
-            .and_then(|sqlite| sqlite.latest_compact_output(file_path).ok().flatten());
-        match store.load_context_with_deltas(file_path, target_seq) {
-            Ok(Some((mut ir, version))) => {
-                drop(guard);
-                let path_alias = state.get_or_create_alias(file_path.to_string());
-                state.forget_persisted_path(&path_alias);
-                state.remember_persisted_path(&path_alias, file_path);
-                ir.file_id = path_alias;
-                state
-                    .ir_context_lock()
-                    .load_ir(ir.clone(), Some(source_hash));
-                state.remember_context_fidelity(&ir.file_id, fidelity);
-                let hierarchy = match crate::ir::hierarchical::try_ir_to_hierarchical(&ir) {
-                    Ok(hierarchy) => hierarchy,
-                    Err(error) => {
-                        send_response(&crate::mcp::tool_handlers::core::projection_error_response(
-                            id, &error,
-                        ));
-                        return;
-                    }
-                };
-                let rendered = persisted_compact.unwrap_or_else(|| {
-                    crate::ir::render_hierarchical_for_llm(&hierarchy, fidelity)
-                });
-                state
-                    .llm_text_cache_lock()
-                    .insert(ir.file_id.clone(), rendered.clone());
-                send_response(&serde_json::json!({
-                    "jsonrpc": "2.0", "id": id,
-                    "result": {
-                        "content": [{ "type": "text", "text": rendered }],
-                        "ir": crate::ir::hierarchical::hierarchy_to_wire(&ir, &hierarchy),
-                        "_meta": { "file": file_path, "version": version, "instruction_count": ir.instructions.len() }
-                    }
-                }));
-            }
-            Ok(None) => {
-                drop(guard);
-                send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                    id.clone(),
-                    -32603,
-                    format!("No context found for: {}", file_path),
-                    None,
-                ));
-            }
-            Err(e) => {
-                drop(guard);
-                send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                    id.clone(),
-                    -32603,
-                    format!("Replay failed: {}", e),
-                    None,
-                ));
+        store.flush();
+        let Some(sqlite) = store.sqlite() else {
+            return send_persistence_error(id, "Persistence DB is unavailable");
+        };
+        match sqlite.load_durable_context(file_path, target_seq) {
+            Ok(Some(restored)) => restored,
+            Ok(None) => return send_persistence_error(id, "No persisted context found"),
+            Err(error) => {
+                return send_persistence_error(id, &format!("Replay failed: {error}"));
             }
         }
-    } else {
-        drop(guard);
-        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-            id.clone(),
-            -32603,
-            "Persistence DB not enabled.",
-            None,
-        ));
+    };
+
+    let path_alias = state.get_or_create_alias(file_path.to_string());
+    let mut ir = restored.ir;
+    ir.file_id.clone_from(&path_alias);
+    let hierarchy = match crate::ir::hierarchical::try_ir_to_hierarchical(&ir) {
+        Ok(hierarchy) => hierarchy,
+        Err(error) => {
+            send_response(&crate::mcp::tool_handlers::core::projection_error_response(
+                id, &error,
+            ));
+            return;
+        }
+    };
+    let rendered = restored
+        .compact_output
+        .unwrap_or_else(|| crate::ir::render_hierarchical_for_llm(&hierarchy, restored.fidelity));
+    let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
+    state
+        .ir_context_lock()
+        .load_ir(ir.clone(), Some(restored.source_hash));
+    state.remember_persisted_path(&path_alias, file_path);
+    state.remember_context_fidelity(&path_alias, restored.fidelity);
+    state.remember_semantic_edges(&path_alias, restored.semantic_edges.clone());
+    {
+        let mut index = state.workspace_index_lock();
+        index.remove_file(&canonical_path);
+        index.add_edges(&canonical_path, restored.semantic_edges);
     }
+    state
+        .llm_text_cache_lock()
+        .insert(path_alias, rendered.clone());
+    send_response(&serde_json::json!({
+        "jsonrpc": "2.0", "id": id,
+        "result": {
+            "content": [{ "type": "text", "text": rendered }],
+            "ir": crate::ir::hierarchical::hierarchy_to_wire(&ir, &hierarchy),
+            "_meta": { "file": file_path, "version": ir.version, "instruction_count": ir.instructions.len() }
+        }
+    }));
 }
 
 /// Handle `purge_old_deltas` — clean up old deltas from DB.
@@ -344,3 +321,7 @@ mod lifecycle_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/save_context_contract.rs"]
 mod save_context_contract_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/durable_semantic_restore.rs"]
+mod durable_semantic_restore_tests;

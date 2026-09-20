@@ -95,7 +95,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "apply_delta",
-            "description": "Applies a corrected positional IR delta or an unambiguous legacy delta to in-session state.",
+            "description": "Applies an IR delta. With durable persistence enabled, corrected positional deltas must match a server-generated pending semantic transition.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -123,12 +123,11 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "restore_context",
-            "description": "Explicitly restores compressed context for a file.",
+            "description": "Restores a file's persisted canonical IR, delta history, fidelity, source hash, and complete semantic-edge state.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
                     "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
                 },
                 "required": ["filePath"]

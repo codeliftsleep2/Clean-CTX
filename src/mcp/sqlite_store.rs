@@ -23,6 +23,7 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 
 mod replay;
+mod semantic_state;
 
 /// SQLite-backed implementation of [`ContextStore`].
 pub struct SqliteStore {
@@ -156,6 +157,22 @@ impl SqliteStore {
                 ALTER TABLE contexts ADD COLUMN source_hash TEXT NOT NULL DEFAULT '';
                 UPDATE contexts SET source_hash = content_hash WHERE source_hash = '';
                 INSERT INTO _schema_version (version) VALUES (3);
+            ",
+            )?;
+        }
+
+        if current_version < 4 {
+            self.conn.execute_batch(
+                "
+                CREATE TABLE IF NOT EXISTS semantic_edge_snapshots (
+                    context_id TEXT NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
+                    file_path TEXT NOT NULL,
+                    source_hash TEXT NOT NULL,
+                    semantic_version INTEGER NOT NULL,
+                    edges_json TEXT NOT NULL,
+                    PRIMARY KEY (context_id, semantic_version)
+                );
+                INSERT INTO _schema_version (version) VALUES (4);
             ",
             )?;
         }

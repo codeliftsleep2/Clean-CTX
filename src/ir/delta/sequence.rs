@@ -184,6 +184,8 @@ pub struct SequenceDelta {
     pub file: String,
     pub from: u64,
     pub to: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_hash: Option<String>,
     pub edits: Vec<SequenceEdit>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub intent: Option<SemanticIntent>,
@@ -196,6 +198,7 @@ impl SequenceDelta {
             file: file.into(),
             from,
             to,
+            target_hash: None,
             edits: Vec::new(),
             intent: None,
         }
@@ -293,6 +296,7 @@ impl SequenceDeltaComputer {
             file: current.file_id.clone(),
             from: baseline_version,
             to: current.version,
+            target_hash: None,
             edits,
             intent,
         })
@@ -315,6 +319,8 @@ pub struct CompactSequenceDelta {
     pub versions: [u64; 2],
     #[serde(rename = "e")]
     pub edits: Vec<SequenceEdit>,
+    #[serde(rename = "h", default, skip_serializing_if = "Option::is_none")]
+    pub target_hash: Option<String>,
     #[serde(rename = "i", skip_serializing_if = "Option::is_none")]
     pub intent: Option<SemanticIntent>,
 }
@@ -325,6 +331,7 @@ pub fn compact_sequence_encode(delta: &SequenceDelta) -> CompactSequenceDelta {
         file: delta.file.clone(),
         versions: [delta.from, delta.to],
         edits: delta.edits.clone(),
+        target_hash: delta.target_hash.clone(),
         intent: delta.intent.clone(),
     }
 }
@@ -335,6 +342,7 @@ pub fn compact_sequence_decode(compact: &CompactSequenceDelta) -> SequenceDelta 
         file: compact.file.clone(),
         from: compact.versions[0],
         to: compact.versions[1],
+        target_hash: compact.target_hash.clone(),
         edits: compact.edits.clone(),
         intent: compact.intent.clone(),
     }

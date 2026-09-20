@@ -192,7 +192,9 @@ fn malformed_sequence_replacement_fails_without_mutating_state() {
         2,
         vec![CoreOp::SideEffect("M1".into(), SideEffectKind::Mutation)],
     );
-    let mut delta = SequenceDeltaComputer::new().compute(&base, &target).unwrap();
+    let mut delta = SequenceDeltaComputer::new()
+        .compute(&base, &target)
+        .unwrap();
     let SequenceEdit::Replace { replacement, .. } = &mut delta.edits[0] else {
         panic!("expected replacement");
     };

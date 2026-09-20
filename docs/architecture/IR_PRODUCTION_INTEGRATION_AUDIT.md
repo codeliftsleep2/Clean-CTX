@@ -231,15 +231,12 @@ coverage; no surrounding-text inference was introduced.
 
 ## 11. Finding P9-07: deletion evidence bypassed registered production path
 
-**Severity:** Test-authority gap; repaired during audit.
+**Severity:** Test-authority gap; prior repair superseded by P9-10.
 
-The lifecycle regression deleted the source and then called the persistence
-store directly. That proved SQLite cleanup but not production integration.
-The regression now invokes registered `restore_context` after source deletion.
-That path clears session IR, path ownership, compact cache, workspace-index
-provenance, and persistent state before the expected source-read failure. The
-handler invalidates its source cache before that read so a deleted file cannot
-be resurrected from stale cached content.
+The earlier repair routed deletion through `restore_context`. P9-10 established
+that restore is durable restoration and must never clear persistence or require
+source. The lifecycle regression now proves restore succeeds after source
+deletion; public deletion/reset remains a separate lifecycle surface to audit.
 
 ## 12. Finding P9-08: `save_context` does not implement its public contract
 
@@ -287,8 +284,8 @@ and persisted replay. No path drops, repairs, or synthesizes malformed tuples.
 
 ## 14. Finding P9-10: `restore_context` has contradictory public semantics
 
-**Severity:** High externally observable lifecycle contradiction; architectural
-approval required.
+**Severity:** High externally observable lifecycle contradiction; approved and
+implemented pending user verification.
 
 The registered tool describes restoring compressed context, and
 `docs/agent/tooling.md` says it restores a previously persisted context from
@@ -309,13 +306,111 @@ Alternatives:
 3. Split the behaviors into separately named tools. This is clearest but adds
    a new public MCP contract and compatibility/migration work.
 
-Recommendation: option 1 preserves the established production behavior and
-developer contract while making its successful result real. `replay_history`
-already owns persisted restoration. The repair should retain deletion cleanup,
-install every recomputed owner atomically on success, and align the public tool
-and tooling documentation with reset/recompile semantics.
+Approved option 2 supersedes the original recommendation. `restore_context`
+now loads persisted `0x04`, replays durable history, validates the complete
+semantic state, and installs session/index ownership only after all checks
+succeed. It never recompiles source or clears the checkpoint.
 
-## 15. Approval gate and next audit action
+## 15. Finding P9-11: persisted state omits framework semantic edges
 
-Phase 9 pauses at P9-10's approval gate. P9-09 remains pending user-run
-verification and is not Phase 9 certification.
+**Severity:** High ownership/persistence contradiction; approved and
+implemented pending user verification.
+
+Physical `0x04` persists canonical `CoreOp` and `dv:2` persists canonical
+sequence changes. Generic method-declaration and call edges can be projected
+from those operations, but framework/meta-layer semantic edges are produced
+from source captures and live outside `CompiledIR`. SQLite does not currently
+persist that edge collection. A durable-only `restore_context` therefore
+cannot reinstall the complete workspace-index ownership required by normal
+session operation without either silently restoring a subset or recompiling
+source, both forbidden by the approved P9-10 contract.
+
+Alternatives:
+
+1. Persist a versioned semantic-edge snapshot with each canonical baseline and
+   restore it transactionally with `0x04` plus `dv:2` history. Delta-producing
+   paths must replace or advance that snapshot coherently with canonical state.
+2. Extend canonical IR so every framework/meta relationship is represented by
+   typed operations and derive all edges from canonical IR. This is the
+   strongest long-term model but is a much broader semantic-family migration.
+3. Restore only generic IR-derived edges. This is smaller but violates the
+   approved requirement for normal session-equivalent semantic ownership.
+
+Approved option 1 is implemented as immutable per-version durable edge
+snapshots owned by the same context identity, source hash, and semantic version
+as canonical IR. Baseline replacement and accepted deltas commit canonical and
+edge state in one SQLite transaction. Current and historical replay select the
+snapshot matching the replayed canonical version. Restore rejects missing,
+malformed, or mismatched state before changing the session or `WorkspaceIndex`.
+
+## 16. Finding P9-12: standalone `dv:2` lacks authoritative target edges
+
+**Severity:** High delta/persistence contract decision; approved and
+implemented pending user verification.
+
+Production delta generation compiles the target source and therefore owns the
+complete target semantic-edge snapshot. That snapshot can be held pending by
+file identity, target version, and source hash until the generated delta is
+accepted. The public `apply_delta` path also accepts a standalone client-
+supplied `dv:2` payload, however, and that protocol carries canonical sequence
+edits only. After restart, or for a delta not generated by the current session,
+there is no authoritative framework/meta-layer target edge snapshot. Canonical
+IR cannot reconstruct it completely and P9-10 forbids source recompilation.
+
+Alternatives:
+
+1. Require `apply_delta` to possess the server-generated pending edge snapshot
+   matching file/from/to/hash whenever durable persistence is enabled. Reject
+   standalone or stale deltas structurally rather than applying a state that
+   cannot be completely restored.
+2. Extend the public delta application contract so the caller supplies a
+   versioned complete semantic-edge snapshot plus aligned file/version/hash
+   metadata. This supports portable deltas but expands and secures a larger
+   externally supplied semantic surface.
+3. Allow standalone deltas only as explicitly non-durable session mutations.
+   This preserves compatibility but creates two application guarantees and
+   requires prominent response/state signaling.
+
+Approved option 1 is implemented. Production delta generation retains the
+complete target edges and binds them to durable file identity, from/to version,
+the production-emitted `target_hash`, and a digest of the exact `dv:2` payload. Durable application
+validates that pending authority, commits delta and target edges atomically,
+then installs live canonical/index state and consumes the pending snapshot.
+Failure preserves the prior state and pending authority. Portable caller-
+supplied edge snapshots remain a separately reviewable future capability.
+
+## 17. Finding P9-13: deletion/reset has no registered lifecycle owner
+
+**Severity:** High externally visible lifecycle gap; architectural decision
+required.
+
+P9-10 correctly removes deletion/reset behavior from `restore_context`, whose
+approved sole meaning is transactional durable restoration. The repository has
+the necessary cleanup primitives: SQLite context deletion cascades to delta and
+per-version semantic-edge ownership, `ContextState` can remove canonical
+session state, `WorkspaceIndex` supports occurrence-exact file removal, and
+`McpState` can discard fidelity, durable-path, pending-transition, edge, and
+compact-render ownership. No registered MCP operation now composes those
+primitives into the deletion/reset lifecycle previously (incorrectly) hidden
+inside restore.
+
+Alternatives:
+
+1. Introduce an explicitly named file-scoped `delete_context` operation that
+   transactionally removes session, workspace-index, pending-transition, and
+   durable ownership without touching the source file.
+2. Introduce separate `reset_session_context` and `delete_persisted_context`
+   operations. This is more explicit but creates two public contracts and a
+   caller-visible ordering question when both are desired.
+3. Keep cleanup internal only. This leaves no registered production path able
+   to satisfy the approved deletion/reset lifecycle requirement.
+
+Recommendation: option 1. A single file-scoped deletion contract matches the
+existing ownership aggregate and can remove all associated state coherently.
+It must remain distinct from source-file deletion and from durable restore.
+
+## 18. Approval gate and next audit action
+
+P9-10, P9-11, and P9-12 are implemented and await user-run verification. After
+that gate is green, Phase 9 pauses at P9-13 before the exhaustive production
+matrix audit resumes. These repairs alone are not Phase 9 certification.
