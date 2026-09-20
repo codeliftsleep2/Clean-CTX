@@ -116,7 +116,7 @@ fn test_high_fidelity_renders_side_effect() {
     let mut hir = empty_hir();
     let mut class = make_class("MyService");
     let mut method = make_method("save");
-    method.side_effect = vec!["mutation".to_string()];
+    method.side_effect = vec![SideEffectKind::Mutation];
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -153,7 +153,7 @@ fn test_low_fidelity_no_execution_metadata() {
     let mut class = make_class("MyService");
     let mut method = make_method("process");
     method.data_flow = vec![vec!["reads".to_string(), "config".to_string()]];
-    method.side_effect = vec!["io".to_string()];
+    method.side_effect = vec![SideEffectKind::Io];
     method.execution_context = vec!["sync".to_string()];
     class.methods.push(method);
     hir.classes.push(class);
@@ -181,7 +181,7 @@ fn test_edit_fidelity_no_execution_metadata() {
     let mut method = make_method("doWork");
     method.body = Some("{\n  let x = 1;\n}".to_string());
     method.data_flow = vec![vec!["reads".to_string(), "config".to_string()]];
-    method.side_effect = vec!["io".to_string()];
+    method.side_effect = vec![SideEffectKind::Io];
     class.methods.push(method);
     hir.classes.push(class);
 

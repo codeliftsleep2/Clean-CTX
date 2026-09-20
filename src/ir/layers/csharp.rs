@@ -23,7 +23,7 @@ use super::{LanguageLayer, LayerContext};
 use crate::compaction::modifiers::strip_csharp_attributes;
 use crate::ir::opcodes::{
     CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CTX_REALTIME, CTX_TRANSACTION_SCOPE, CoreOp, DATAFLOW_READ,
-    DATAFLOW_WRITE, DeclarationModifier, EFFECT_ASYNC, EFFECT_IO, EFFECT_TRANSACTION,
+    DATAFLOW_WRITE, DeclarationModifier, SideEffectKind,
 };
 
 /// True when `head` (a declaration head, never a full body) carries `word`
@@ -218,7 +218,7 @@ impl CSharpLayer {
         if is_async {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_ASYNC.to_string(),
+                SideEffectKind::Async,
             ));
             ops.push(CoreOp::ExecutionContext(
                 method_id.to_string(),
@@ -239,7 +239,7 @@ impl CSharpLayer {
         if raw_sig.contains("SaveChangesAsync") {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_IO.to_string(),
+                SideEffectKind::Io,
             ));
             if !is_async {
                 ops.push(CoreOp::ExecutionContext(
@@ -257,7 +257,7 @@ impl CSharpLayer {
             ));
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_TRANSACTION.to_string(),
+                SideEffectKind::Transaction,
             ));
         }
 
@@ -405,7 +405,7 @@ impl LanguageLayer for CSharpLayer {
 
                     // R-43a: Per-method IDisposable side-effect
                     if context.is_disposable_class {
-                        ops.push(CoreOp::SideEffect(method_id.clone(), EFFECT_IO.to_string()));
+                        ops.push(CoreOp::SideEffect(method_id.clone(), SideEffectKind::Io));
                     }
                 }
             }

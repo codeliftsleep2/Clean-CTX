@@ -10,7 +10,6 @@ use crate::ir::CompiledIR;
 use crate::ir::opcodes::{
     CTRL_AWAIT, CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTRL_TRY, CTX_ASYNC, CTX_REALTIME,
     CTX_SYNC, CTX_THREAD_BOUND, CTX_TRANSACTION_SCOPE, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE,
-    EFFECT_ASYNC, EFFECT_IO, EFFECT_MUTATION, EFFECT_PURE, EFFECT_TRANSACTION,
 };
 use std::collections::HashMap;
 
@@ -395,26 +394,13 @@ fn validate_references_and_payloads(
                     instruction,
                 )?;
             }
-            CoreOp::SideEffect(raw_method, effect) => {
+            CoreOp::SideEffect(raw_method, _) => {
                 require_target(
                     "EFFECT",
                     raw_method,
                     IdentityKind::Method,
                     instruction,
                     index,
-                )?;
-                require_vocabulary(
-                    "EFFECT",
-                    "effect",
-                    effect,
-                    &[
-                        EFFECT_PURE,
-                        EFFECT_IO,
-                        EFFECT_MUTATION,
-                        EFFECT_ASYNC,
-                        EFFECT_TRANSACTION,
-                    ],
-                    instruction,
                 )?;
             }
             CoreOp::ExecutionContext(raw_method, context) => {

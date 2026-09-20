@@ -30,7 +30,9 @@
 // and mixed streams.
 
 use super::compiler::CompiledIR;
-use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact};
+use super::opcodes::{
+    ControlSummary, CoreOp, DeclarationModifier, PatternFact, SideEffectKind,
+};
 use super::string_table::StringTable;
 
 mod decode;
@@ -427,7 +429,7 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
             }
             CoreOp::SideEffect(mid, effect_type) => {
                 encode_operand(&mut buf, mid);
-                encode_operand(&mut buf, effect_type);
+                encode_operand(&mut buf, effect_type.as_str());
             }
             CoreOp::ExecutionContext(mid, context_type) => {
                 encode_operand(&mut buf, mid);

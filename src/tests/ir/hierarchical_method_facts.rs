@@ -1,7 +1,7 @@
 use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::{ir_to_hierarchical_wire, try_ir_to_hierarchical, wire_to_ir};
-use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier, SideEffectKind};
 use crate::ir::render_llm::render_hierarchical_for_llm;
 
 fn compiled(instructions: Vec<CoreOp>) -> CompiledIR {
@@ -19,7 +19,7 @@ fn method_facts_resolve_by_identity_before_and_across_definitions() {
             "M2".into(),
             vec![DeclarationModifier::Async, DeclarationModifier::Async],
         ),
-        CoreOp::SideEffect("M1".into(), "io".into()),
+        CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
         CoreOp::ExecutionContext("M2".into(), "async".into()),
         CoreOp::ControlFlow("M1".into(), "if".into(), "ready".into()),
         CoreOp::DataFlow("M2".into(), "reads".into(), "cache".into()),
@@ -44,7 +44,7 @@ fn method_facts_resolve_by_identity_before_and_across_definitions() {
         .and_then(|class| class.methods.iter().find(|method| method.id == "M2"))
         .expect("M2 must be owned by C2");
 
-    assert_eq!(first.side_effect, vec!["io"]);
+    assert_eq!(first.side_effect, vec![SideEffectKind::Io]);
     assert_eq!(first.control_flow, vec![vec!["if", "ready"]]);
     assert_eq!(first.body.as_deref(), Some("{ work(); }"));
     assert_eq!((first.body_start, first.body_end), (Some(10), Some(21)));
@@ -77,8 +77,8 @@ fn repeated_method_facts_round_trip_without_union_or_replacement() {
         CoreOp::ControlFlow("M1".into(), "if".into(), "first".into()),
         CoreOp::DataFlow("M1".into(), "reads".into(), "state".into()),
         CoreOp::DataFlow("M1".into(), "reads".into(), "state".into()),
-        CoreOp::SideEffect("M1".into(), "io".into()),
-        CoreOp::SideEffect("M1".into(), "mutation".into()),
+        CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
+        CoreOp::SideEffect("M1".into(), SideEffectKind::Mutation),
         CoreOp::ExecutionContext("M1".into(), "sync".into()),
         CoreOp::ExecutionContext("M1".into(), "async".into()),
     ]);
@@ -101,7 +101,10 @@ fn repeated_method_facts_round_trip_without_union_or_replacement() {
         method.data_flow,
         vec![vec!["reads", "state"], vec!["reads", "state"]]
     );
-    assert_eq!(method.side_effect, vec!["io", "mutation"]);
+    assert_eq!(
+        method.side_effect,
+        vec![SideEffectKind::Io, SideEffectKind::Mutation]
+    );
     assert_eq!(method.execution_context, vec!["sync", "async"]);
 
     let restored = crate::ir::hierarchical::hierarchical_to_ir(&hierarchy);
@@ -129,8 +132,8 @@ fn versioned_wire_emits_occurrence_preserving_shapes() {
         CoreOp::DefMethod("C1".into(), "M1".into(), "work".into()),
         CoreOp::MethodModifiers("M1".into(), vec![DeclarationModifier::Static]),
         CoreOp::ControlSummary("M1".into(), vec![ControlSummary::Return]),
-        CoreOp::SideEffect("M1".into(), "io".into()),
-        CoreOp::SideEffect("M1".into(), "mutation".into()),
+        CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
+        CoreOp::SideEffect("M1".into(), SideEffectKind::Mutation),
         CoreOp::ExecutionContext("M1".into(), "sync".into()),
         CoreOp::ExecutionContext("M1".into(), "async".into()),
     ]);
@@ -165,8 +168,8 @@ fn renderer_exposes_every_method_fact_occurrence_in_order() {
             vec![DeclarationModifier::Static, DeclarationModifier::Static],
         ),
         CoreOp::ControlSummary("M1".into(), vec![ControlSummary::Return]),
-        CoreOp::SideEffect("M1".into(), "io".into()),
-        CoreOp::SideEffect("M1".into(), "mutation".into()),
+        CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
+        CoreOp::SideEffect("M1".into(), SideEffectKind::Mutation),
         CoreOp::ExecutionContext("M1".into(), "sync".into()),
         CoreOp::ExecutionContext("M1".into(), "async".into()),
     ]))
@@ -207,7 +210,7 @@ fn legacy_hierarchy_without_schema_marker_still_decodes() {
             CoreOp::DefClass("C1".into(), "Sample".into()),
             CoreOp::DefMethod("C1".into(), "M1".into(), "work".into()),
             CoreOp::Flags("M1".into(), vec!["STATIC".into(), "RET".into()]),
-            CoreOp::SideEffect("M1".into(), "io".into()),
+            CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
             CoreOp::ExecutionContext("M1".into(), "async".into()),
         ]
     );

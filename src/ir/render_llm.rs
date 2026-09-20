@@ -353,7 +353,12 @@ fn render_methods(
         // e.g. `se:mutation` — quickly tells the LLM whether a method is
         // pure, performs I/O, mutates state, is async, or is transactional.
         if fidelity == Fidelity::High && !method.side_effect.is_empty() {
-            output.push_str(&format!(" se:{}", method.side_effect.join(",")));
+            let effects = method
+                .side_effect
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>();
+            output.push_str(&format!(" se:{}", effects.join(",")));
         }
 
         // Execution-context annotation at High fidelity (Gap 1 fix).

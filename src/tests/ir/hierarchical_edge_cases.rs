@@ -6,7 +6,7 @@ use crate::ir::hierarchical::{
     HierarchicalProjectionError, ProjectionIdentityKind, estimate_savings, hierarchical_to_ir,
     ir_to_hierarchical, try_ir_to_hierarchical,
 };
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, SideEffectKind};
 // ── Identity-Failure Tests ─────────────────────────────────────
 
 #[test]
@@ -281,7 +281,7 @@ fn test_r43a_metadata_round_trip() {
             CoreOp::Return("M1".to_string(), "$v".to_string()),
             CoreOp::ControlFlow("M1".to_string(), "if".to_string(), "x > 0".to_string()),
             CoreOp::DataFlow("M1".to_string(), "reads".to_string(), "config".to_string()),
-            CoreOp::SideEffect("M1".to_string(), "mutation".to_string()),
+            CoreOp::SideEffect("M1".to_string(), SideEffectKind::Mutation),
             CoreOp::ExecutionContext("M1".to_string(), "async".to_string()),
         ],
     };
@@ -296,7 +296,7 @@ fn test_r43a_metadata_round_trip() {
         m1.data_flow,
         vec![vec!["reads".to_string(), "config".to_string()]]
     );
-    assert_eq!(m1.side_effect, vec!["mutation".to_string()]);
+    assert_eq!(m1.side_effect, vec![SideEffectKind::Mutation]);
     assert_eq!(m1.execution_context, vec!["async".to_string()]);
 
     let restored = hierarchical_to_ir(&hir);

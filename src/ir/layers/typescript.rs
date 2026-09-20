@@ -23,7 +23,7 @@ use super::declaration::{declaration_head, has_modifier};
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{
     CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, DeclarationModifier,
-    EFFECT_ASYNC, EFFECT_IO,
+    SideEffectKind,
 };
 
 /// TypeScript language layer (Layer 2).
@@ -138,7 +138,7 @@ impl TypeScriptLayer {
         if raw_sig.contains("async") {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_ASYNC.to_string(),
+                SideEffectKind::Async,
             ));
             ops.push(CoreOp::ExecutionContext(
                 method_id.to_string(),
@@ -159,7 +159,7 @@ impl TypeScriptLayer {
         if raw_sig.contains(".pipe(") && raw_sig.contains("tap(") {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_IO.to_string(),
+                SideEffectKind::Io,
             ));
         }
 

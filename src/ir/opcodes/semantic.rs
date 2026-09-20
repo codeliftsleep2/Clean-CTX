@@ -100,6 +100,50 @@ impl fmt::Display for ControlSummary {
     }
 }
 
+/// Closed vocabulary for method side-effect observations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SideEffectKind {
+    #[serde(rename = "pure")]
+    Pure,
+    #[serde(rename = "io")]
+    Io,
+    #[serde(rename = "mutation")]
+    Mutation,
+    #[serde(rename = "async")]
+    Async,
+    #[serde(rename = "transaction")]
+    Transaction,
+}
+
+impl SideEffectKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pure => "pure",
+            Self::Io => "io",
+            Self::Mutation => "mutation",
+            Self::Async => "async",
+            Self::Transaction => "transaction",
+        }
+    }
+
+    pub fn from_serialized(value: &str) -> Option<Self> {
+        match value {
+            "pure" => Some(Self::Pure),
+            "io" => Some(Self::Io),
+            "mutation" => Some(Self::Mutation),
+            "async" => Some(Self::Async),
+            "transaction" => Some(Self::Transaction),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for SideEffectKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Closed typed vocabulary for additive method-pattern evidence.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "k", content = "v")]

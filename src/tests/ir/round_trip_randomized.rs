@@ -110,13 +110,12 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
         17 => CoreOp::SideEffect(
             format!("M{}", rng() % 10),
             match rng() % 5 {
-                0 => "pure",
-                1 => "io",
-                2 => "mutation",
-                3 => "async",
-                _ => "transaction",
-            }
-            .to_string(),
+                0 => SideEffectKind::Pure,
+                1 => SideEffectKind::Io,
+                2 => SideEffectKind::Mutation,
+                3 => SideEffectKind::Async,
+                _ => SideEffectKind::Transaction,
+            },
         ),
         18 => CoreOp::ExecutionContext(
             format!("M{}", rng() % 10),

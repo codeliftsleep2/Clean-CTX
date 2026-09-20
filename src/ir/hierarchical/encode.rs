@@ -286,7 +286,7 @@ pub fn try_ir_to_hierarchical(
                     method_location(&method_locations, raw_method, "EFFECT", instruction)?;
                 classes[class_idx].methods[method_idx]
                     .side_effect
-                    .push(effect.clone());
+                    .push(*effect);
             }
             CoreOp::ExecutionContext(raw_method, context) => {
                 let (class_idx, method_idx) =

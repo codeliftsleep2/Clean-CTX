@@ -21,7 +21,7 @@ use super::{LanguageLayer, LayerContext};
 use crate::compression::Fidelity;
 use crate::ir::opcodes::{
     CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTX_ASYNC, CoreOp, DeclarationModifier,
-    EFFECT_ASYNC, EFFECT_IO, EFFECT_MUTATION,
+    SideEffectKind,
 };
 
 /// Rust visibility enum
@@ -189,7 +189,7 @@ impl RustLayer {
         if body.contains("unsafe ") || body.contains("unsafe{") || body.contains("unsafe\n") {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_MUTATION.to_string(),
+                SideEffectKind::Mutation,
             ));
         }
 
@@ -204,7 +204,7 @@ impl RustLayer {
         {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_IO.to_string(),
+                SideEffectKind::Io,
             ));
         }
 
@@ -455,7 +455,7 @@ impl LanguageLayer for RustLayer {
                     if is_async {
                         ops.push(CoreOp::SideEffect(
                             method_id.clone(),
-                            EFFECT_ASYNC.to_string(),
+                            SideEffectKind::Async,
                         ));
                         ops.push(CoreOp::ExecutionContext(
                             method_id.clone(),

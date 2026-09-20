@@ -13,7 +13,9 @@
 //    └── opcode (always first element)
 
 use super::compiler::CompiledIR;
-use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact};
+use super::opcodes::{
+    ControlSummary, CoreOp, DeclarationModifier, PatternFact, SideEffectKind,
+};
 use serde_json::{Value, json};
 
 /// Errors during wire format decoding.
@@ -145,7 +147,7 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             vec!["CTRL".into(), mid.clone(), kind.clone(), target.clone()]
         }
         CoreOp::SideEffect(mid, effect_type) => {
-            vec!["EFFECT".into(), mid.clone(), effect_type.clone()]
+            vec!["EFFECT".into(), mid.clone(), effect_type.as_str().into()]
         }
         CoreOp::ExecutionContext(mid, context_type) => {
             vec!["CTX".into(), mid.clone(), context_type.clone()]
@@ -388,7 +390,10 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
         }
         "EFFECT" => {
             if tuple.len() >= 3 {
-                Some(CoreOp::SideEffect(tuple[1].clone(), tuple[2].clone()))
+                Some(CoreOp::SideEffect(
+                    tuple[1].clone(),
+                    SideEffectKind::from_serialized(&tuple[2])?,
+                ))
             } else {
                 None
             }

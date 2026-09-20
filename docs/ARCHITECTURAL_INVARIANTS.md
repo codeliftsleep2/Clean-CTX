@@ -105,7 +105,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Intent** | Internal correctness structure must not force a verbose model-facing representation, and token optimization must never weaken canonical guarantees. |
 | **Invariant** | Canonical IR is explicit, typed, ordered, identity-bearing, and occurrence-preserving. LLM text is a separate compact projection that may abbreviate presentation only while preserving complete meaning; it is not the canonical storage or validation model. |
 | **Enforcement** | Distinct canonical types/wire paths and `render_hierarchical_for_llm`; semantic-family renderer contracts under `src/tests/ir/**`. |
-| **Authority** | `src/ir/opcodes.rs`, `src/ir/hierarchical.rs`, `src/ir/render_llm.rs`, `src/tests/ir/control_summaries.rs` |
+| **Authority** | `src/ir/opcodes.rs`, `src/ir/opcodes/semantic.rs`, `src/ir/hierarchical.rs`, `src/ir/render_llm.rs`, `src/tests/ir/control_summaries.rs`, `src/tests/ir/pattern_facts.rs`, `src/tests/ir/side_effects.rs`, `src/tests/mcp/tool_helpers.rs` |
 | **Type** | STRUCTURAL and ENFORCED |
 | **Gate** | Rust compiler and `cargo test --all-features` |
 

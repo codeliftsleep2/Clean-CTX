@@ -38,6 +38,8 @@ pub enum BinaryDecodeError {
     InvalidControlSummary(String),
     /// Malformed typed pattern-fact payload
     InvalidPatternFact,
+    /// Unknown side-effect value in the typed side-effect opcode
+    InvalidSideEffect(String),
 }
 
 impl std::fmt::Display for BinaryDecodeError {
@@ -60,6 +62,9 @@ impl std::fmt::Display for BinaryDecodeError {
                 write!(f, "invalid control summary: {value}")
             }
             BinaryDecodeError::InvalidPatternFact => f.write_str("invalid pattern fact payload"),
+            BinaryDecodeError::InvalidSideEffect(value) => {
+                write!(f, "invalid side effect: {value}")
+            }
         }
     }
 }
@@ -370,7 +375,9 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                 OP_EFFECT => {
                     let mid = read_operand(&data[pos..], &mut pos)?;
                     let effect_type = read_operand(&data[pos..], &mut pos)?;
-                    CoreOp::SideEffect(mid, effect_type)
+                    let effect = SideEffectKind::from_serialized(&effect_type)
+                        .ok_or(BinaryDecodeError::InvalidSideEffect(effect_type))?;
+                    CoreOp::SideEffect(mid, effect)
                 }
                 OP_CTX => {
                     let mid = read_operand(&data[pos..], &mut pos)?;

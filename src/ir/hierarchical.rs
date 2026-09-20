@@ -9,7 +9,9 @@
 // Estimated savings: 40-60% reduction in wire bytes vs. positional encoding.
 
 use super::compiler::CompiledIR;
-use super::opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact};
+use super::opcodes::{
+    ControlSummary, CoreOp, DeclarationModifier, PatternFact, SideEffectKind,
+};
 use super::wire::DecodeError;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -228,7 +230,7 @@ pub struct MethodNode {
     /// Side-effect annotations (R-43a), in canonical occurrence order.
     /// effect_type: "pure" | "io" | "mutation" | "async" | "transaction"
     #[serde(rename = "se", default, skip_serializing_if = "Vec::is_empty")]
-    pub side_effect: Vec<String>,
+    pub side_effect: Vec<SideEffectKind>,
 
     /// Execution context annotations (R-43a), in canonical occurrence order.
     /// context_type: "sync" | "async" | "thread_bound" | "transaction_scope" | "realtime"

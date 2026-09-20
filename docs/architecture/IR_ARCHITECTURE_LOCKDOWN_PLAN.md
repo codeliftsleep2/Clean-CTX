@@ -314,18 +314,18 @@ makes canonical `ControlSummary` ordered and duplicate-preserving while the
 distinct compact LLM projection uses `ctl:`; hierarchical revision 5 and
 additive `0x03` opcode 24 carry it. Physical `0x04` remains Phase 8.
 
-Phase 6C implements typed `PatternFacts`, hierarchical revision 6, binary opcode
-25, and compact `pf:` rendering; it awaits user-run verification.
-Remaining families migrate one at a time: side effects, then execution contexts.
+Phase 6C typed `PatternFacts` was user-verified and checkpointed as `6d9b621`.
+Phase 6D implements typed `SideEffectKind` through producers, validation,
+projection, existing wires, and unchanged compact `se:` rendering. A tracked
+real compile-helper path reaches checked projection and rendering; the slice
+awaits user verification. Execution contexts remain the final family slice.
 For each slice, migrate producer, IR representation, validator,
 transformation, projection, wire format, consumer, and tests before beginning
 the next family.
-
 Deferred follow-up: after canonical repairs, audit LLM token efficiency where
 whole bodies are required; presentation changes must preserve complete meaning.
 
 Exit criteria:
-
 - consumers cannot confuse unrelated semantic families;
 - every destination field represents its declared cardinality;
 - reducers are named and directly tested.

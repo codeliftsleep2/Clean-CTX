@@ -153,7 +153,7 @@ not automatically a semantic serialization of the canonical stream.
 | `Body(method, text, start, end)` | Edit-fidelity compiler capture; trusted decoder | Targets `MethodId`; method must resolve; span fields are both present or both absent; present span must be valid | Optional singular per method; duplicate fails | None |
 | `DataFlow(method, direction, target)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; direction must be from the declared vocabulary | Ordered many; every occurrence preserved | None |
 | `ControlFlow(method, kind, target)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; kind must be from the declared vocabulary | Ordered many; every occurrence preserved | None |
-| `SideEffect(method, effect)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; effect must be from the declared vocabulary | Ordered many; every occurrence preserved | None |
+| `SideEffect(method, SideEffectKind)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; closed typed vocabulary (`pure`, `io`, `mutation`, `async`, `transaction`) | Ordered many; every occurrence preserved | None |
 | `ExecutionContext(method, context)` | Language semantic layer; trusted decoder | Targets `MethodId`; method must resolve; context must be from the declared vocabulary | Ordered many; every occurrence preserved | None |
 | `Call(caller, callee, argc, spread)` | Structural call capture; trusted decoder | Targets caller `MethodId`; caller must resolve; callee is deliberately an unresolved textual name; `argc` is written-node count and is exact only when `spread` is false | Ordered many; every call-site occurrence preserved | None |
 
@@ -240,6 +240,15 @@ Phase 6C adds ordered typed `pattern_facts` (`pf`) under resolved methods and
 advances the hierarchy to revision 6. This annotation migration never changes
 `Body` text or spans; Edit-fidelity bodies remain byte-exact and continue to
 force conservative pattern-compression decline where required by IRPAT-001.
+
+Phase 6D types side effects as `SideEffectKind` without changing their named
+wire spelling, binary opcode, hierarchical `se` strings, compact LLM `se:`
+projection, hierarchical revision 6, LLM schema v5, or physical binary `0x03`.
+Every occurrence, order, and duplicate remains authoritative. `SideEffect`
+continues to block unsafe consumptive pattern compression. The tracked MCP
+compile-helper contract proves the default file compiler reaches checked
+projection and unchanged High-fidelity `se:` rendering; Phase 9 still owns the
+complete external lifecycle certification.
 
 The remaining hierarchy change is explicit interface representation or
 rejection as unsupported.

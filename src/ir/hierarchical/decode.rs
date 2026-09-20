@@ -151,7 +151,7 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
 
             // Side-effect annotations
             for se in &method.side_effect {
-                instructions.push(CoreOp::SideEffect(method.id.clone(), se.clone()));
+                instructions.push(CoreOp::SideEffect(method.id.clone(), *se));
             }
 
             // Execution context annotations

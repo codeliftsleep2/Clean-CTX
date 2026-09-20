@@ -14,7 +14,7 @@ use crate::ir::layers::typescript::TypeScriptLayer;
 // P0-4: ir::layers::MetaLayer and angular/spring/dotnet modules removed.
 // Meta-layers now use the canonical trait in src/layers/meta/.
 // LanguageLayer tests remain (TypeScript, C#).
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{CoreOp, DeclarationModifier, SideEffectKind};
 
 // ── TypeScript Layer Tests ────────────────────────────
 
@@ -434,7 +434,7 @@ fn cs_disposable_class_method_emits_io_side_effect() {
 
     let has_io = ops
         .iter()
-        .any(|op| matches!(op, CoreOp::SideEffect(mid, etype) if mid == "M5" && etype == "io"));
+        .any(|op| matches!(op, CoreOp::SideEffect(mid, SideEffectKind::Io) if mid == "M5"));
     assert!(has_io, "method must emit SideEffect(M5, io): {:?}", ops);
 
     let has_bad = ops

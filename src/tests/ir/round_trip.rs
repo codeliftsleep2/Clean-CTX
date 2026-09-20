@@ -15,7 +15,9 @@ use crate::ir::binary_wire::{decode, encode};
 use crate::ir::compiler::CompiledIR;
 use crate::ir::delta::{DeltaOps, IRDelta, ModOp, compact_decode, compact_encode};
 use crate::ir::hierarchical::{ir_to_hierarchical_wire, wire_to_ir as hierarchical_wire_to_ir};
-use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact};
+use crate::ir::opcodes::{
+    ControlSummary, CoreOp, DeclarationModifier, PatternFact, SideEffectKind,
+};
 use crate::ir::wire::{ir_to_wire, op_to_tuple, tuple_to_op, wire_to_ir};
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -59,7 +61,7 @@ fn all_variants_ir() -> CompiledIR {
             // R-43a: 4 new execution semantics variants
             CoreOp::DataFlow("M1".into(), "reads".into(), "userRepo".into()),
             CoreOp::ControlFlow("M1".into(), "if".into(), "condition".into()),
-            CoreOp::SideEffect("M1".into(), "async".into()),
+            CoreOp::SideEffect("M1".into(), SideEffectKind::Async),
             CoreOp::ExecutionContext("M1".into(), "async".into()),
         ],
     }
@@ -106,7 +108,7 @@ fn round_trip_controlflow() {
 
 #[test]
 fn round_trip_side_effect() {
-    let original = CoreOp::SideEffect("M1".into(), "io".into());
+    let original = CoreOp::SideEffect("M1".into(), SideEffectKind::Io);
     let tuple = op_to_tuple(&original);
     assert_eq!(tuple, vec!["EFFECT", "M1", "io"]);
     let restored = tuple_to_op(&tuple).unwrap();

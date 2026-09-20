@@ -2,7 +2,7 @@
 
 use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
-use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier, SideEffectKind};
 use crate::ir::pipeline::{IRPass, PassContext, ValidationPass};
 use crate::ir::validator::{DefaultValidator, IRValidator};
 
@@ -48,7 +48,7 @@ fn accepts_all_operation_contracts_in_legal_predefinition_order() {
         CoreOp::Body("M1".into(), "{}".into(), Some(10), Some(12)),
         CoreOp::DataFlow("M1".into(), "reads".into(), "value".into()),
         CoreOp::ControlFlow("M1".into(), "if".into(), "condition".into()),
-        CoreOp::SideEffect("M1".into(), "io".into()),
+        CoreOp::SideEffect("M1".into(), SideEffectKind::Io),
         CoreOp::ExecutionContext("M1".into(), "async".into()),
         CoreOp::Call("M1".into(), "external_call".into(), 1, false),
     ];
@@ -164,7 +164,6 @@ fn rejects_values_outside_execution_vocabularies() {
     let invalid_ops = [
         CoreOp::DataFlow("M1".into(), "copies".into(), "value".into()),
         CoreOp::ControlFlow("M1".into(), "goto".into(), "label".into()),
-        CoreOp::SideEffect("M1".into(), "network".into()),
         CoreOp::ExecutionContext("M1".into(), "worker".into()),
     ];
 

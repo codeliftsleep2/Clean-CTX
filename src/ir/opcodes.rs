@@ -17,7 +17,7 @@
 use std::fmt;
 
 mod semantic;
-pub use semantic::{ControlSummary, DeclarationModifier, PatternFact};
+pub use semantic::{ControlSummary, DeclarationModifier, PatternFact, SideEffectKind};
 
 /// Core IR opcodes — the universal instruction set.
 /// Every language compiles down to these operations.
@@ -130,7 +130,7 @@ pub enum CoreOp {
     /// Side-effect annotation: ["EFFECT", method_id, effect_type]
     /// effect_type: "pure" | "io" | "mutation" | "async" | "transaction"
     /// Extracted from tree-sitter captures (confidence = 1.0).
-    SideEffect(String, String),
+    SideEffect(String, SideEffectKind),
 
     ///
     /// Execution context: ["CTX", method_id, context_type]
@@ -481,3 +481,7 @@ mod control_summary_tests;
 #[cfg(test)]
 #[path = "../tests/ir/pattern_facts.rs"]
 mod pattern_fact_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/side_effects.rs"]
+mod side_effect_tests;

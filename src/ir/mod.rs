@@ -62,7 +62,7 @@ pub use hierarchical::{
     estimate_savings as hierarchical_savings, hierarchical_to_ir, ir_to_hierarchical,
     ir_to_hierarchical_wire, wire_to_ir as hierarchical_wire_to_ir,
 };
-pub use opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact};
+pub use opcodes::{ControlSummary, CoreOp, DeclarationModifier, PatternFact, SideEffectKind};
 pub use patterns::{CompressingPatternRecognizer, CompressionStats, MergeItem, PatternOp};
 pub use positional::{
     PositionalConfig, decode_op, encode_op, encode_stream, estimate_savings, ir_to_positional_wire,

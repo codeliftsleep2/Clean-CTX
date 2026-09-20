@@ -218,3 +218,41 @@ fn resolve_file_path_checked_with_valid_additional_root() {
     let _ = std::fs::remove_file(&test_file);
     let _ = std::fs::remove_dir(&root_dir);
 }
+
+#[cfg(feature = "typescript")]
+#[test]
+fn production_compile_path_carries_typed_side_effect_to_llm_projection() {
+    use crate::compression::Fidelity;
+    use crate::ir::SideEffectKind;
+
+    let root = std::env::temp_dir().join(format!(
+        "clean_ctx_side_effect_{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&root).expect("temporary root");
+    let file = root.join("side_effect.ts");
+    std::fs::write(
+        &file,
+        "class Worker { async run() { console.log('work'); } }",
+    )
+    .expect("typescript fixture");
+
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    let path = file.to_string_lossy();
+    let (compiled, _, _) = compile_file_ir_focused(&path, Fidelity::High, &state, None)
+        .expect("default production compilation path");
+    assert!(compiled.instructions.iter().any(|operation| {
+        matches!(
+            operation,
+            crate::ir::CoreOp::SideEffect(_, SideEffectKind::Async)
+        )
+    }));
+
+    let hierarchy = crate::ir::hierarchical::try_ir_to_hierarchical(&compiled)
+        .expect("checked production projection");
+    let rendered = crate::ir::render_hierarchical_for_llm(&hierarchy, Fidelity::High);
+    assert!(rendered.contains(" se:async"), "{rendered}");
+
+    let _ = std::fs::remove_file(&file);
+    let _ = std::fs::remove_dir(&root);
+}

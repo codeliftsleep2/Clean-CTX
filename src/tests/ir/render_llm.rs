@@ -6,7 +6,7 @@
 
 use crate::compression::Fidelity;
 use crate::ir::{ClassNode, FieldNode, HierarchicalIR, MethodNode, PatternEntry};
-use crate::ir::{ControlSummary, DeclarationModifier, PatternFact};
+use crate::ir::{ControlSummary, DeclarationModifier, PatternFact, SideEffectKind};
 use crate::ir::{render_hierarchical_for_llm, render_hierarchical_for_llm_focused};
 use std::collections::HashSet;
 
