@@ -43,8 +43,10 @@ projection; it was user-verified and checkpointed as `6d9b621` on 2026-09-19.
 Phase 6D typed side-effect values were user-verified on 2026-09-19. Phase 6E
 typed the five approved method execution contexts while preserving wire strings
 and the compact `ec:` projection and was user-verified on 2026-09-19. Phase 7
-implements the corrected `dv: 2` positional delta protocol and awaits user-run
-verification.
+implemented the corrected `dv: 2` positional delta protocol and was user-
+verified on 2026-09-19. Phase 8A inventories physical `0x03` and defines the
+complete semantic `0x04` contract. Phase 8B implements the codec and tracked
+contract coverage and awaits user verification.
 
 **Production-integration status:** Phase checkpoints certify bounded
 implementation and applicable gates; they do not certify production completion.
@@ -168,10 +170,11 @@ checks expected tuples and applies transactionally without discarding order.
 
 ### 3.6 Wire formats
 
-The binary wire encoder and decoder represent some structural operations by
-opcode while omitting identity operands. Decoding then substitutes empty
-identifiers. Existing round-trip coverage often compares only operation kinds,
-which cannot detect semantic identity loss.
+Physical `0x03` omits identity operands for eight operations and raw
+`CompiledIR.file_id`; decoding substitutes empty IDs and the literal `"bin"`.
+Phase 8A records the exact losses, malformed-input gaps, absent compatibility
+evidence, production persistence gap, and normative physical `0x04` layout in
+[`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md).
 
 ### 3.7 Production consumption
 
@@ -257,6 +260,10 @@ round-trip tests also tolerate normalization and semantic loss.
 Required boundary: each format declares semantic, structural, lossy, or
 unsupported behavior. Tests must verify the declared level rather than only
 the opcode sequence.
+
+Phase 8A classifies physical `0x03` as lossy and fixes `0x04` as a semantic,
+exact-`CompiledIR` format. Phase 8B replaces opcode-only and selective-field
+test authority with complete equality and structured malformed-input coverage.
 
 ### F-07: Declaration ownership differs by language
 

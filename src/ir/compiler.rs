@@ -29,7 +29,7 @@ use crate::compression::Fidelity;
 use crate::layers::meta::semantic::SemanticEdge;
 
 /// The compiled IR for a single file.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompiledIR {
     /// File identifier (path alias)
     pub file_id: String,

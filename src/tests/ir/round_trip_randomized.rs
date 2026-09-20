@@ -8,7 +8,7 @@ use super::*;
 
 /// Generate a random CoreOp for property testing.
 fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
-    let variant = rng() % 24;
+    let variant = rng() % 25;
     match variant {
         0 => CoreOp::DefClass(format!("C{}", rng() % 10), format!("Class{}", rng() % 100)),
         1 => CoreOp::DefMethod(
@@ -169,6 +169,12 @@ fn random_op(rng: &mut impl FnMut() -> u64) -> CoreOp {
             format!("M{}", rng() % 10),
             vec![PatternFact::Constructor, PatternFact::Observable],
         ),
+        24 => CoreOp::Call(
+            format!("M{}", rng() % 10),
+            format!("callee{}", rng() % 10),
+            (rng() % 8) as usize,
+            rng() % 2 == 1,
+        ),
         _ => unreachable!(),
     }
 }
@@ -231,8 +237,6 @@ fn property_named_wire_round_trip() {
 
 /// Property test: Binary wire format round-trip with random IRs.
 /// Runs 100 iterations with different random seeds.
-/// Note: Binary wire drops structural parent IDs (class_id, etc.) — we verify
-/// opcode match and data field preservation instead of full equality.
 #[test]
 fn property_binary_wire_round_trip() {
     for seed in 0..100 {
@@ -242,63 +246,7 @@ fn property_binary_wire_round_trip() {
         let restored = decode(&bytes).unwrap_or_else(|e| {
             panic!("seed {}: binary wire decode failed: {}", seed, e);
         });
-        assert_eq!(
-            restored.instructions.len(),
-            original.instructions.len(),
-            "seed {}: instruction count mismatch after binary wire round-trip",
-            seed
-        );
-        for (i, (a, b)) in restored
-            .instructions
-            .iter()
-            .zip(original.instructions.iter())
-            .enumerate()
-        {
-            // Binary wire uses empty string for structural parent IDs
-            match (a, b) {
-                (CoreOp::DefClass(_, _), CoreOp::DefClass(_, _))
-                | (CoreOp::DefMethod(_, _, _), CoreOp::DefMethod(_, _, _))
-                | (CoreOp::DefField(_, _, _), CoreOp::DefField(_, _, _))
-                | (CoreOp::DefInterface(_, _), CoreOp::DefInterface(_, _))
-                | (CoreOp::Extends(_, _), CoreOp::Extends(_, _))
-                | (CoreOp::Implements(_, _), CoreOp::Implements(_, _))
-                | (CoreOp::Import(_, _, _), CoreOp::Import(_, _, _))
-                | (CoreOp::TypeAlias(_, _), CoreOp::TypeAlias(_, _)) => {
-                    // Just verify opcode matches
-                    assert_eq!(
-                        crate::ir::wire::op_to_tuple(a)[0],
-                        crate::ir::wire::op_to_tuple(b)[0],
-                        "seed {}: binary wire opcode mismatch at index {}",
-                        seed,
-                        i
-                    );
-                }
-                // Data-preserving ops
-                (CoreOp::Body(..), CoreOp::Body(..))
-                | (CoreOp::DataFlow(..), CoreOp::DataFlow(..))
-                | (CoreOp::ControlFlow(..), CoreOp::ControlFlow(..))
-                | (CoreOp::SideEffect(..), CoreOp::SideEffect(..))
-                | (CoreOp::ExecutionContext(..), CoreOp::ExecutionContext(..))
-                | (CoreOp::Param(..), CoreOp::Param(..))
-                | (CoreOp::Return(..), CoreOp::Return(..))
-                | (CoreOp::FieldType(..), CoreOp::FieldType(..))
-                | (CoreOp::MethodModifiers(..), CoreOp::MethodModifiers(..))
-                | (CoreOp::ClassModifiers(..), CoreOp::ClassModifiers(..))
-                | (CoreOp::ControlSummary(..), CoreOp::ControlSummary(..))
-                | (CoreOp::PatternFacts(..), CoreOp::PatternFacts(..))
-                | (CoreOp::Flags(..), CoreOp::Flags(..))
-                | (CoreOp::ClassFlags(..), CoreOp::ClassFlags(..))
-                | (CoreOp::Injects(..), CoreOp::Injects(..))
-                | (CoreOp::Pattern(..), CoreOp::Pattern(..)) => {
-                    assert_eq!(
-                        a, b,
-                        "seed {}: binary wire instruction mismatch at index {}",
-                        seed, i
-                    );
-                }
-                _ => panic!("seed {}: variant mismatch at index {}", seed, i),
-            }
-        }
+        assert_ir_eq(&original, &restored);
     }
 }
 
@@ -322,21 +270,7 @@ fn property_double_encode_stability() {
         let decoded_bin1 = decode(&bytes1).unwrap();
         let bytes2 = encode(&decoded_bin1);
         let decoded_bin2 = decode(&bytes2).unwrap();
-        assert_eq!(
-            decoded_bin1.instructions.len(),
-            decoded_bin2.instructions.len()
-        );
-        for (i, (a, b)) in decoded_bin1
-            .instructions
-            .iter()
-            .zip(decoded_bin2.instructions.iter())
-            .enumerate()
-        {
-            assert_eq!(
-                a, b,
-                "seed {}: binary double-encode mismatch at index {}",
-                seed, i
-            );
-        }
+        assert_ir_eq(&original, &decoded_bin1);
+        assert_ir_eq(&decoded_bin1, &decoded_bin2);
     }
 }

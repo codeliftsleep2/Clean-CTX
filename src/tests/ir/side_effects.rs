@@ -45,7 +45,7 @@ fn side_effect_vocabulary_and_named_wire_are_closed() {
 fn binary_wire_preserves_typed_side_effect_and_rejects_unknown_value() {
     let ir = compiled(vec![CoreOp::SideEffect("M1".into(), SideEffectKind::Io)]);
     let bytes = encode(&ir);
-    assert_eq!(bytes[2], 0x03, "Phase 6D does not claim physical 0x04");
+    assert_eq!(bytes[2], 0x04, "Phase 8 corrected physical version");
     assert_eq!(
         decode(&bytes).expect("binary round trip").instructions,
         ir.instructions

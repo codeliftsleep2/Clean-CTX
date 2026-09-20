@@ -48,7 +48,7 @@ fn binary_wire_preserves_typed_execution_context_and_rejects_unknown_value() {
         ExecutionContextKind::Async,
     )]);
     let bytes = encode(&ir);
-    assert_eq!(bytes[2], 0x03, "Phase 6E does not claim physical 0x04");
+    assert_eq!(bytes[2], 0x04, "Phase 8 corrected physical version");
     assert_eq!(
         decode(&bytes).expect("binary round trip").instructions,
         ir.instructions

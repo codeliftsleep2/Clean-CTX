@@ -13,8 +13,9 @@
 // Each family can carry repeated operations. The hierarchy stores one inner
 // vector per occurrence in its distinct `modifiers` and `flags` fields.
 //
-// Projection semantics pinned here: occurrence order, payload order, and
-// duplicate values are all preserved.
+// Projection semantics pinned here: occurrence order and payload order within
+// each typed family, plus duplicate values, are all preserved. Separate
+// families project in schema order rather than recreating flat interleaving.
 //
 // ── ROUND-TRIP SCOPE (deliberate) ───────────────────────────────────────
 // Flat → hierarchical → flat restores each original `Flags` occurrence.
@@ -233,10 +234,10 @@ fn red_flag3_duplicate_values_are_preserved() {
 // ── RED-FLAG4: three producer-style writes for one method ──────────────
 
 #[test]
-fn red_flag4_three_producer_style_writes_remain_ordered() {
-    // Three writes in the order the flat stream can carry them: a
-    // declaration modifier, a pattern-additive annotation, then the
-    // control-flow family.
+fn red_flag4_three_semantic_families_preserve_values_and_schema_order() {
+    // The flat stream interleaves three distinct semantic families. The
+    // hierarchy preserves each family internally and exposes deterministic
+    // schema order: modifiers, control summaries, then pattern facts.
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "stream".to_string()),
@@ -250,13 +251,13 @@ fn red_flag4_three_producer_style_writes_remain_ordered() {
         method_flags(&hir, "stream"),
         vec![
             "PRIVATE".to_string(),
-            "OBSERVABLE".to_string(),
             "IF".to_string(),
             "RET".to_string(),
             "LOOP".to_string(),
-            "RET".to_string()
+            "RET".to_string(),
+            "OBSERVABLE".to_string()
         ],
-        "every write contributes in occurrence and payload order"
+        "every family preserves occurrences and payload order"
     );
 }
 
@@ -475,7 +476,7 @@ fn named_wire_pins_separate_modifier_and_control_summary_ops() {
 
 #[test]
 fn binary_wire_round_trips_separate_modifier_and_control_summary_ops() {
-    // The typed family has its own additive opcode under physical 0x03.
+    // The typed family retains its dedicated opcode under physical 0x04.
     let ir = flat_ir(vec![
         CoreOp::DefClass("C1".to_string(), "Sample".to_string()),
         CoreOp::DefMethod("C1".to_string(), "M1".to_string(), "work".to_string()),

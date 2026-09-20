@@ -10,8 +10,8 @@
 //     `ir` does NOT depend on `mcp`, but `mcp` depends on `ir`.
 //   - Context ID is content-hash-derived for deterministic, idempotent saves.
 //   - Version tracking derived from `COUNT(deltas) + 1`.
-//   - `binary_wire::decode()` loses `file_id` and `version` (Gap 2 in plan);
-//     those are restored from DB columns on load.
+//   - Corrected binary `0x04` owns `file_id` and version; persisted ownership
+//     metadata must agree rather than overwriting decoded identity.
 //   - LOW-05: SqliteStore is now wrapped in `Arc<Mutex<>>` by BufferedStore
 //     for the retry/fallback pattern. The comment has been updated to reflect
 //     that the store is used in a multi-threaded context (retry with sleep).
@@ -175,8 +175,17 @@ impl SqliteStore {
         };
 
         // 2. Decode baseline IR
-        let mut ir = crate::ir::binary_wire::decode(&row.0)?;
-        ir.file_id = file_path.to_string();
+        let ir = crate::ir::binary_wire::decode(&row.0)?;
+        if ir.file_id != file_path {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "persisted binary file identity mismatch: expected {file_path:?}, found {:?}",
+                    ir.file_id
+                ),
+            )
+            .into());
+        }
 
         // 3. Load deltas up to target_sequence
         let max_seq = target_sequence.unwrap_or(u32::MAX);

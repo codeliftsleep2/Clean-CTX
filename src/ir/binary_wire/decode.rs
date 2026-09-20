@@ -42,6 +42,12 @@ pub enum BinaryDecodeError {
     InvalidSideEffect(String),
     /// Unknown execution-context value in the typed execution-context opcode
     InvalidExecutionContext(String),
+    /// BODY span flag is not the canonical 0 or 1 value
+    InvalidBodySpanFlag(u64),
+    /// A decoded integer cannot be represented by the target Rust type
+    IntegerOverflow(&'static str),
+    /// Bytes remain after the declared instruction stream
+    TrailingData(usize),
 }
 
 impl std::fmt::Display for BinaryDecodeError {
@@ -70,6 +76,15 @@ impl std::fmt::Display for BinaryDecodeError {
             BinaryDecodeError::InvalidExecutionContext(value) => {
                 write!(f, "invalid execution context: {value}")
             }
+            BinaryDecodeError::InvalidBodySpanFlag(value) => {
+                write!(f, "invalid BODY span flag: {value}")
+            }
+            BinaryDecodeError::IntegerOverflow(field) => {
+                write!(f, "integer overflow decoding {field}")
+            }
+            BinaryDecodeError::TrailingData(bytes) => {
+                write!(f, "trailing data after instruction stream: {bytes} bytes")
+            }
         }
     }
 }
@@ -94,30 +109,24 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
     if data[0] != MAGIC[0] || data[1] != MAGIC[1] {
         return Err(BinaryDecodeError::InvalidMagic);
     }
-    if data[2] != VERSION && data[2] != VERSION_PRE_SPAN && data[2] != VERSION_LEGACY {
+    if data[2] != VERSION {
         return Err(BinaryDecodeError::UnsupportedVersion(data[2]));
     }
     let mut pos = 3;
 
-    // 2. IR version (edit sequence number) — only in VERSION (0x02)
-    // Versions 0x02 and 0x03 carry the IR edit-sequence number; only
-    // VERSION_LEGACY (0x01) omits it.
-    let ir_version = if data[2] != VERSION_LEGACY {
-        let (ver, consumed) = read_varint(&data[pos..])
-            .ok_or_else(|| BinaryDecodeError::TruncatedData("IR version".into()))?;
-        pos += consumed;
-        ver
-    } else {
-        // VERSION_LEGACY (0x01) — no IR version stored
-        0
-    };
+    // 2. IR version (edit sequence number)
+    let (ir_version, consumed) = read_varint(&data[pos..])
+        .ok_or_else(|| BinaryDecodeError::TruncatedData("IR version".into()))?;
+    pos += consumed;
 
     // 3. String table
     let (table_len, consumed) = read_varint(&data[pos..])
         .ok_or_else(|| BinaryDecodeError::TruncatedData("string table count".into()))?;
     pos += consumed;
 
-    let mut strings: Vec<String> = Vec::with_capacity(table_len as usize);
+    let table_capacity = usize::try_from(table_len)
+        .map_err(|_| BinaryDecodeError::IntegerOverflow("string table count"))?;
+    let mut strings: Vec<String> = Vec::with_capacity(table_capacity.min(data.len()));
     for i in 0..table_len {
         if pos >= data.len() {
             return Err(BinaryDecodeError::TruncatedData(format!(
@@ -125,31 +134,46 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                 i
             )));
         }
-        let (s, consumed) = read_string(&data[pos..]).ok_or_else(|| {
-            BinaryDecodeError::TruncatedData(format!("string data for entry {}", i))
+        let (len, consumed) = read_varint(&data[pos..]).ok_or_else(|| {
+            BinaryDecodeError::TruncatedData(format!("string length for entry {i}"))
         })?;
         pos += consumed;
-        strings.push(s);
+        let len = usize::try_from(len)
+            .map_err(|_| BinaryDecodeError::IntegerOverflow("string byte length"))?;
+        let end = pos
+            .checked_add(len)
+            .ok_or(BinaryDecodeError::IntegerOverflow("string byte range"))?;
+        let bytes = data.get(pos..end).ok_or_else(|| {
+            BinaryDecodeError::TruncatedData(format!("string data for entry {i}"))
+        })?;
+        let value = std::str::from_utf8(bytes)
+            .map_err(|error| BinaryDecodeError::InvalidUtf8(error.to_string()))?;
+        strings.push(value.to_owned());
+        pos = end;
     }
-
-    // 3. Instructions
-    let (inst_count, consumed) = read_varint(&data[pos..])
-        .ok_or_else(|| BinaryDecodeError::TruncatedData("instruction count".into()))?;
-    pos += consumed;
 
     // Helper: read a string table index varint and return the string
     let read_operand = |data: &[u8], pos: &mut usize| -> Result<String, BinaryDecodeError> {
         let (idx, consumed) = read_varint(data)
             .ok_or_else(|| BinaryDecodeError::TruncatedData("operand index".into()))?;
         *pos += consumed;
-        let idx_usize = idx as usize;
+        let idx_usize = usize::try_from(idx)
+            .map_err(|_| BinaryDecodeError::IntegerOverflow("string table index"))?;
         if idx_usize >= strings.len() {
             return Err(BinaryDecodeError::InvalidStringIndex(idx));
         }
         Ok(strings[idx_usize].clone())
     };
 
-    let mut instructions = Vec::with_capacity(inst_count as usize);
+    // 4. File identity and instructions
+    let file_id = read_operand(&data[pos..], &mut pos)?;
+    let (inst_count, consumed) = read_varint(&data[pos..])
+        .ok_or_else(|| BinaryDecodeError::TruncatedData("instruction count".into()))?;
+    pos += consumed;
+
+    let instruction_capacity = usize::try_from(inst_count)
+        .map_err(|_| BinaryDecodeError::IntegerOverflow("instruction count"))?;
+    let mut instructions = Vec::with_capacity(instruction_capacity.min(data.len()));
 
     for _ in 0..inst_count {
         if pos >= data.len() {
@@ -168,7 +192,9 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                 .ok_or_else(|| BinaryDecodeError::TruncatedData("variadic operand count".into()))?;
             pos += consumed;
 
-            let mut operands: Vec<String> = Vec::with_capacity(var_count as usize);
+            let operand_capacity = usize::try_from(var_count)
+                .map_err(|_| BinaryDecodeError::IntegerOverflow("variadic operand count"))?;
+            let mut operands: Vec<String> = Vec::with_capacity(operand_capacity.min(data.len()));
             for _ in 0..var_count {
                 let operand = read_operand(&data[pos..], &mut pos)?;
                 operands.push(operand);
@@ -266,24 +292,26 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
         } else {
             match op_idx {
                 OP_DEF_C => {
+                    let cid = read_operand(&data[pos..], &mut pos)?;
                     let name = read_operand(&data[pos..], &mut pos)?;
-                    CoreOp::DefClass(String::new(), name)
+                    CoreOp::DefClass(cid, name)
                 }
                 OP_DEF_M => {
+                    let cid = read_operand(&data[pos..], &mut pos)?;
                     let mid = read_operand(&data[pos..], &mut pos)?;
                     let name = read_operand(&data[pos..], &mut pos)?;
-                    // Need class_id too — use "C0" as placeholder since binary
-                    // doesn't store class_id redundantly
-                    CoreOp::DefMethod(String::new(), mid, name)
+                    CoreOp::DefMethod(cid, mid, name)
                 }
                 OP_DEF_F => {
+                    let cid = read_operand(&data[pos..], &mut pos)?;
                     let fid = read_operand(&data[pos..], &mut pos)?;
                     let name = read_operand(&data[pos..], &mut pos)?;
-                    CoreOp::DefField(String::new(), fid, name)
+                    CoreOp::DefField(cid, fid, name)
                 }
                 OP_DEF_I => {
+                    let iid = read_operand(&data[pos..], &mut pos)?;
                     let name = read_operand(&data[pos..], &mut pos)?;
-                    CoreOp::DefInterface(String::new(), name)
+                    CoreOp::DefInterface(iid, name)
                 }
                 OP_SIG => {
                     let mid = read_operand(&data[pos..], &mut pos)?;
@@ -303,36 +331,36 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                     CoreOp::FieldType(fid, ty)
                 }
                 OP_EXT => {
+                    let child = read_operand(&data[pos..], &mut pos)?;
                     let parent = read_operand(&data[pos..], &mut pos)?;
-                    CoreOp::Extends(String::new(), parent)
+                    CoreOp::Extends(child, parent)
                 }
                 OP_IMPL => {
+                    let cid = read_operand(&data[pos..], &mut pos)?;
                     let iid = read_operand(&data[pos..], &mut pos)?;
-                    CoreOp::Implements(String::new(), iid)
+                    CoreOp::Implements(cid, iid)
                 }
                 OP_IMP => {
+                    let alias = read_operand(&data[pos..], &mut pos)?;
                     let module = read_operand(&data[pos..], &mut pos)?;
                     let named = read_operand(&data[pos..], &mut pos)?;
-                    CoreOp::Import(String::new(), module, named)
+                    CoreOp::Import(alias, module, named)
                 }
                 OP_TYPE => {
+                    let alias = read_operand(&data[pos..], &mut pos)?;
                     let original = read_operand(&data[pos..], &mut pos)?;
-                    CoreOp::TypeAlias(String::new(), original)
+                    CoreOp::TypeAlias(alias, original)
                 }
                 // Edit Mode: Verbatim Method Bodies
-                // v0x03 streams append a has-span flag varint plus two raw
-                // byte-offset varints after the string-table operands;
-                // pre-span streams stop at the operands and decode
-                // span-less (apply_edit plan Phase 1 compat gate).
+                // v0x04: [mid, text, has_span, start?, end?].
                 OP_BODY => {
                     let mid = read_operand(&data[pos..], &mut pos)?;
                     let text = read_operand(&data[pos..], &mut pos)?;
-                    if data[2] == VERSION {
-                        let (has_span, consumed) = read_varint(&data[pos..]).ok_or_else(|| {
-                            BinaryDecodeError::TruncatedData("BODY span flag".into())
-                        })?;
-                        pos += consumed;
-                        if has_span == 1 {
+                    let (has_span, consumed) = read_varint(&data[pos..])
+                        .ok_or_else(|| BinaryDecodeError::TruncatedData("BODY span flag".into()))?;
+                    pos += consumed;
+                    match has_span {
+                        1 => {
                             let (start, consumed) = read_varint(&data[pos..]).ok_or_else(|| {
                                 BinaryDecodeError::TruncatedData("BODY start_byte".into())
                             })?;
@@ -342,11 +370,9 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                             })?;
                             pos += consumed;
                             CoreOp::Body(mid, text, Some(start), Some(end))
-                        } else {
-                            CoreOp::Body(mid, text, None, None)
                         }
-                    } else {
-                        CoreOp::Body(mid, text, None, None)
+                        0 => CoreOp::Body(mid, text, None, None),
+                        value => return Err(BinaryDecodeError::InvalidBodySpanFlag(value)),
                     }
                 }
                 // Structural invocations (native call graph).
@@ -362,7 +388,9 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                         BinaryDecodeError::TruncatedData("CALL explicit_arg_count".into())
                     })?;
                     pos += consumed;
-                    CoreOp::Call(caller, callee, argc as usize, op_idx == OP_CALL_SPREAD)
+                    let argc = usize::try_from(argc)
+                        .map_err(|_| BinaryDecodeError::IntegerOverflow("CALL argument count"))?;
+                    CoreOp::Call(caller, callee, argc, op_idx == OP_CALL_SPREAD)
                 }
                 // R-43a: Execution Semantics
                 OP_DATAFLOW => {
@@ -398,11 +426,12 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
         instructions.push(op);
     }
 
-    // Note: The binary format doesn't encode file_id or the IR version
-    // (edit sequence count). The caller (e.g. sqlite_store) is responsible
-    // for setting file_id and version from the DB columns.
+    if pos != data.len() {
+        return Err(BinaryDecodeError::TrailingData(data.len() - pos));
+    }
+
     Ok(CompiledIR {
-        file_id: "bin".to_string(),
+        file_id,
         instructions,
         version: ir_version,
     })

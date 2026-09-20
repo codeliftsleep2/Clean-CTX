@@ -333,12 +333,10 @@ Exit criteria:
 
 ### Phase 7: Repair delta and replay
 
-Implementation status: corrected protocol `dv: 2` uses typed identity,
-occurrence ordinals, authoritative positions, and expected tuples. Production
-emits transactional positional edits; ambiguous legacy destructive edits fail.
-Compact encoding is independent of CoreOp binary version. Deterministic,
-property, conflict, multiplicity, ordering, and MCP-path coverage awaits
-user-run verification.
+Implementation status: corrected protocol `dv: 2` and its deterministic,
+property, conflict, multiplicity, ordering, and MCP-path coverage were user-
+verified on 2026-09-19. Production emits transactional positional edits;
+ambiguous legacy destructive edits fail. Binary versioning is independent.
 
 Exit criteria:
 
@@ -347,7 +345,9 @@ Exit criteria:
 - old assumptions about upstream merging are removed or made real contracts.
 
 ### Phase 8: Version and tighten wire formats
-
+Phase 8A inventories `0x03` and fixes the normative `0x04` layout in
+[`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md). Phase 8B implements the
+semantic codec and tracked coverage; it awaits user verification.
 Deliverables:
 
 - truthful preservation classification per format;

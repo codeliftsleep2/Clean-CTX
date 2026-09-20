@@ -22,7 +22,7 @@ use crate::ir::wire::{ir_to_wire, op_to_tuple, tuple_to_op, wire_to_ir};
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-/// Build a CompiledIR containing every CoreOp variant (all 24).
+/// Build a CompiledIR containing every CoreOp variant (all 25).
 fn all_variants_ir() -> CompiledIR {
     CompiledIR {
         file_id: "all.ts".to_string(),
@@ -63,6 +63,7 @@ fn all_variants_ir() -> CompiledIR {
             CoreOp::ControlFlow("M1".into(), "if".into(), "condition".into()),
             CoreOp::SideEffect("M1".into(), SideEffectKind::Async),
             CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Async),
+            CoreOp::Call("M1".into(), "invoke".into(), 2, false),
         ],
     }
 }
@@ -149,57 +150,7 @@ fn round_trip_binary_wire_all_variants() {
     let original = all_variants_ir();
     let bytes = encode(&original);
     let restored = decode(&bytes).expect("binary wire round-trip should succeed");
-    // Binary format doesn't preserve file_id (uses "bin" placeholder)
-    assert_eq!(restored.instructions.len(), original.instructions.len());
-    // Binary format stores class_id as empty string for DefClass, DefMethod, DefField
-    // (it expects the caller to reconstruct from context). So we check opcode-by-opcode
-    // using opcode_name rather than full equality for structural ops.
-    for (i, (a, b)) in restored
-        .instructions
-        .iter()
-        .zip(original.instructions.iter())
-        .enumerate()
-    {
-        // Binary wire uses empty string for structural parent IDs — skip those
-        match (a, b) {
-            (CoreOp::DefClass(_, _), CoreOp::DefClass(_, _))
-            | (CoreOp::DefMethod(_, _, _), CoreOp::DefMethod(_, _, _))
-            | (CoreOp::DefField(_, _, _), CoreOp::DefField(_, _, _))
-            | (CoreOp::DefInterface(_, _), CoreOp::DefInterface(_, _))
-            | (CoreOp::Extends(_, _), CoreOp::Extends(_, _))
-            | (CoreOp::Implements(_, _), CoreOp::Implements(_, _))
-            | (CoreOp::Import(_, _, _), CoreOp::Import(_, _, _))
-            | (CoreOp::TypeAlias(_, _), CoreOp::TypeAlias(_, _)) => {
-                // Binary format uses empty strings for ID fields — just verify opcode match
-                assert_eq!(
-                    crate::ir::wire::op_to_tuple(a)[0],
-                    crate::ir::wire::op_to_tuple(b)[0],
-                    "binary wire opcode mismatch at index {}",
-                    i
-                );
-            }
-            // Edit Mode + R-43a execution semantics ops have all data preserved
-            (CoreOp::Body(..), CoreOp::Body(..))
-            | (CoreOp::DataFlow(..), CoreOp::DataFlow(..))
-            | (CoreOp::ControlFlow(..), CoreOp::ControlFlow(..))
-            | (CoreOp::SideEffect(..), CoreOp::SideEffect(..))
-            | (CoreOp::ExecutionContext(..), CoreOp::ExecutionContext(..))
-            | (CoreOp::Param(..), CoreOp::Param(..))
-            | (CoreOp::Return(..), CoreOp::Return(..))
-            | (CoreOp::FieldType(..), CoreOp::FieldType(..))
-            | (CoreOp::MethodModifiers(..), CoreOp::MethodModifiers(..))
-            | (CoreOp::ClassModifiers(..), CoreOp::ClassModifiers(..))
-            | (CoreOp::ControlSummary(..), CoreOp::ControlSummary(..))
-            | (CoreOp::PatternFacts(..), CoreOp::PatternFacts(..))
-            | (CoreOp::Flags(..), CoreOp::Flags(..))
-            | (CoreOp::ClassFlags(..), CoreOp::ClassFlags(..))
-            | (CoreOp::Injects(..), CoreOp::Injects(..))
-            | (CoreOp::Pattern(..), CoreOp::Pattern(..)) => {
-                assert_eq!(a, b, "binary wire instruction mismatch at index {}", i);
-            }
-            _ => panic!("variant mismatch at index {}", i),
-        }
-    }
+    assert_ir_eq(&original, &restored);
 }
 
 #[test]

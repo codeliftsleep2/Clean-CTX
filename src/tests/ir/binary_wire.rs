@@ -103,8 +103,7 @@ fn test_varint_small_values() {
     assert!(bytes.len() > 3, "binary output should have header");
     assert_eq!(bytes[0], 0xCC, "magic byte 1");
     assert_eq!(bytes[1], 0x02, "magic byte 2");
-    // apply_edit Phase 1: body spans bumped the wire version to 0x03.
-    assert_eq!(bytes[2], 0x03, "version byte");
+    assert_eq!(bytes[2], 0x04, "corrected physical version byte");
 }
 
 // ── Round-trip Tests ───────────────────────────────────────────────
@@ -114,55 +113,9 @@ fn test_round_trip_simple_ir() {
     let ir = make_simple_ir();
     let bytes = encode(&ir);
     let decoded = decode(&bytes).unwrap();
-
-    assert_eq!(
-        decoded.instructions.len(),
-        ir.instructions.len(),
-        "instruction count should match"
-    );
-    for (i, (original, decoded_op)) in ir
-        .instructions
-        .iter()
-        .zip(decoded.instructions.iter())
-        .enumerate()
-    {
-        // Check structural equality (note: binary format may use empty strings
-        // for some parent IDs like class_id in DefMethod)
-        match (original, decoded_op) {
-            (CoreOp::DefClass(_, orig_name), CoreOp::DefClass(_, dec_name)) => {
-                assert_eq!(orig_name, dec_name, "DefClass name mismatch at {}", i);
-            }
-            (
-                CoreOp::DefMethod(_, orig_mid, orig_name),
-                CoreOp::DefMethod(_, dec_mid, dec_name),
-            ) => {
-                assert_eq!(orig_mid, dec_mid, "DefMethod mid mismatch at {}", i);
-                assert_eq!(orig_name, dec_name, "DefMethod name mismatch at {}", i);
-            }
-            (CoreOp::DefField(_, orig_fid, orig_name), CoreOp::DefField(_, dec_fid, dec_name)) => {
-                assert_eq!(orig_fid, dec_fid, "DefField fid mismatch at {}", i);
-                assert_eq!(orig_name, dec_name, "DefField name mismatch at {}", i);
-            }
-            (CoreOp::Return(_, orig_ty), CoreOp::Return(_, dec_ty)) => {
-                assert_eq!(orig_ty, dec_ty, "Return type mismatch at {}", i);
-            }
-            (
-                CoreOp::Param(_, orig_pid, orig_ty, orig_name),
-                CoreOp::Param(_, dec_pid, dec_ty, dec_name),
-            ) => {
-                assert_eq!(orig_pid, dec_pid, "Param pid mismatch at {}", i);
-                assert_eq!(orig_ty, dec_ty, "Param type mismatch at {}", i);
-                assert_eq!(orig_name, dec_name, "Param name mismatch at {}", i);
-            }
-            (CoreOp::Flags(_, orig_flags), CoreOp::Flags(_, dec_flags)) => {
-                assert_eq!(orig_flags, dec_flags, "Flags mismatch at {}", i);
-            }
-            _ => panic!(
-                "Opcode variant mismatch at index {}: original={:?} decoded={:?}",
-                i, original, decoded_op
-            ),
-        }
-    }
+    assert_eq!(decoded.file_id, ir.file_id);
+    assert_eq!(decoded.version, ir.version);
+    assert_eq!(decoded.instructions, ir.instructions);
 }
 
 #[test]
@@ -170,85 +123,9 @@ fn test_round_trip_full_ir() {
     let ir = make_full_ir();
     let bytes = encode(&ir);
     let decoded = decode(&bytes).unwrap();
-
-    assert_eq!(
-        decoded.instructions.len(),
-        ir.instructions.len(),
-        "instruction count should match"
-    );
-    for (i, (original, decoded_op)) in ir
-        .instructions
-        .iter()
-        .zip(decoded.instructions.iter())
-        .enumerate()
-    {
-        match (original, decoded_op) {
-            (CoreOp::DefClass(_, orig_name), CoreOp::DefClass(_, dec_name)) => {
-                assert_eq!(orig_name, dec_name, "DefClass name mismatch at {}", i);
-            }
-            (
-                CoreOp::DefMethod(_, orig_mid, orig_name),
-                CoreOp::DefMethod(_, dec_mid, dec_name),
-            ) => {
-                assert_eq!(orig_mid, dec_mid, "DefMethod mid mismatch at {}", i);
-                assert_eq!(orig_name, dec_name, "DefMethod name mismatch at {}", i);
-            }
-            (CoreOp::DefField(_, orig_fid, orig_name), CoreOp::DefField(_, dec_fid, dec_name)) => {
-                assert_eq!(orig_fid, dec_fid, "DefField fid mismatch at {}", i);
-                assert_eq!(orig_name, dec_name, "DefField name mismatch at {}", i);
-            }
-            (CoreOp::DefInterface(_, orig_name), CoreOp::DefInterface(_, dec_name)) => {
-                assert_eq!(orig_name, dec_name, "DefInterface name mismatch at {}", i);
-            }
-            (
-                CoreOp::Param(_, orig_pid, orig_ty, orig_name),
-                CoreOp::Param(_, dec_pid, dec_ty, dec_name),
-            ) => {
-                assert_eq!(orig_pid, dec_pid, "Param pid mismatch at {}", i);
-                assert_eq!(orig_ty, dec_ty, "Param type mismatch at {}", i);
-                assert_eq!(orig_name, dec_name, "Param name mismatch at {}", i);
-            }
-            (CoreOp::Return(_, orig_ty), CoreOp::Return(_, dec_ty)) => {
-                assert_eq!(orig_ty, dec_ty, "Return type mismatch at {}", i);
-            }
-            (CoreOp::FieldType(_, orig_ty), CoreOp::FieldType(_, dec_ty)) => {
-                assert_eq!(orig_ty, dec_ty, "FieldType mismatch at {}", i);
-            }
-            (CoreOp::Flags(_, orig_flags), CoreOp::Flags(_, dec_flags)) => {
-                assert_eq!(orig_flags, dec_flags, "Flags mismatch at {}", i);
-            }
-            (CoreOp::ClassFlags(_, orig_flags), CoreOp::ClassFlags(_, dec_flags)) => {
-                assert_eq!(orig_flags, dec_flags, "ClassFlags mismatch at {}", i);
-            }
-            (CoreOp::Extends(_, orig_parent), CoreOp::Extends(_, dec_parent)) => {
-                assert_eq!(orig_parent, dec_parent, "Extends parent mismatch at {}", i);
-            }
-            (CoreOp::Implements(_, orig_iid), CoreOp::Implements(_, dec_iid)) => {
-                assert_eq!(orig_iid, dec_iid, "Implements iid mismatch at {}", i);
-            }
-            (CoreOp::Injects(_, orig_deps), CoreOp::Injects(_, dec_deps)) => {
-                assert_eq!(orig_deps, dec_deps, "Injects deps mismatch at {}", i);
-            }
-            (CoreOp::Import(_, orig_mod, orig_named), CoreOp::Import(_, dec_mod, dec_named)) => {
-                assert_eq!(orig_mod, dec_mod, "Import module mismatch at {}", i);
-                assert_eq!(orig_named, dec_named, "Import named mismatch at {}", i);
-            }
-            (CoreOp::TypeAlias(_, orig_original), CoreOp::TypeAlias(_, dec_original)) => {
-                assert_eq!(
-                    orig_original, dec_original,
-                    "TypeAlias original mismatch at {}",
-                    i
-                );
-            }
-            (CoreOp::Pattern(_, orig_args), CoreOp::Pattern(_, dec_args)) => {
-                assert_eq!(orig_args, dec_args, "Pattern args mismatch at {}", i);
-            }
-            _ => panic!(
-                "Opcode variant mismatch at index {}: original={:?} decoded={:?}",
-                i, original, decoded_op
-            ),
-        }
-    }
+    assert_eq!(decoded.file_id, ir.file_id);
+    assert_eq!(decoded.version, ir.version);
+    assert_eq!(decoded.instructions, ir.instructions);
 }
 
 #[test]
@@ -260,7 +137,7 @@ fn test_round_trip_empty_ir() {
     };
     let bytes = encode(&ir);
     let decoded = decode(&bytes).unwrap();
-    assert_eq!(decoded.instructions.len(), 0);
+    assert_eq!(decoded, ir);
 }
 
 // ── Detection Tests ────────────────────────────────────────────────
@@ -317,8 +194,7 @@ fn test_decode_empty() {
 #[test]
 fn test_decode_truncated_string_table() {
     // Valid header but no string table
-    // Legacy magic would be 0xCC,0x01,0x01 but current is 0xCC,0x02,0x02
-    let data = vec![0xCC, 0x02, 0x02];
+    let data = vec![0xCC, 0x02, 0x04];
     let result = decode(&data);
     assert!(matches!(result, Err(BinaryDecodeError::TruncatedData(_))));
 }
@@ -375,24 +251,9 @@ fn test_binary_wire_json_round_trip() {
 
     // Round-trip
     let decoded = binary_wire_json_to_ir(&json_value).unwrap();
-    assert_eq!(
-        decoded.instructions.len(),
-        ir.instructions.len(),
-        "base64 round-trip instruction count should match"
-    );
-
-    // Verify key structural properties
-    let class_count = ir
-        .instructions
-        .iter()
-        .filter(|op| matches!(op, CoreOp::DefClass(..)))
-        .count();
-    let decoded_class_count = decoded
-        .instructions
-        .iter()
-        .filter(|op| matches!(op, CoreOp::DefClass(..)))
-        .count();
-    assert_eq!(decoded_class_count, class_count, "class count should match");
+    assert_eq!(decoded.file_id, ir.file_id);
+    assert_eq!(decoded.version, ir.version);
+    assert_eq!(decoded.instructions, ir.instructions);
 }
 
 #[test]
@@ -419,11 +280,9 @@ fn test_wire_to_ir_detect_binary() {
     let ir = make_simple_ir();
     let json_value = ir_to_binary_wire_json(&ir);
     let decoded = crate::ir::wire::wire_to_ir_detect(&json_value).unwrap();
-    assert_eq!(
-        decoded.instructions.len(),
-        ir.instructions.len(),
-        "wire_to_ir_detect should handle binary encoding"
-    );
+    assert_eq!(decoded.file_id, ir.file_id);
+    assert_eq!(decoded.version, ir.version);
+    assert_eq!(decoded.instructions, ir.instructions);
 }
 
 #[test]
@@ -435,7 +294,9 @@ fn test_wire_to_ir_detect_binary_via_serde() {
     let json_str = serde_json::to_string(&json_value).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
     let decoded = crate::ir::wire::wire_to_ir_detect(&parsed).unwrap();
-    assert_eq!(decoded.instructions.len(), ir.instructions.len());
+    assert_eq!(decoded.file_id, ir.file_id);
+    assert_eq!(decoded.version, ir.version);
+    assert_eq!(decoded.instructions, ir.instructions);
 }
 
 // ── Encoding Stability Tests ──────────────────────────────────────
@@ -492,7 +353,9 @@ fn test_round_trip_large_ir() {
 
     let bytes = encode(&ir);
     let decoded = decode(&bytes).unwrap();
-    assert_eq!(decoded.instructions.len(), 300); // 100 * 3 instructions
+    assert_eq!(decoded.file_id, ir.file_id);
+    assert_eq!(decoded.version, ir.version);
+    assert_eq!(decoded.instructions, ir.instructions);
 }
 
 // ── Zero-State Tests ──────────────────────────────────────────────
@@ -507,10 +370,8 @@ fn test_round_trip_large_ir() {
 /// binary wire — the encoder wrote them and no reader could read them. The
 /// guard now bounds `OP_MAX`, so every opcode this build defines round-trips.
 ///
-/// Identity is asserted over the surface the format actually transports: class
-/// ids are deliberately not transported (`decode` emits an empty class id for
-/// `DEF_C`/`DEF_M`), while a call fact's caller, callee, and explicit argument
-/// count all are.
+/// Physical `0x04` transports the complete canonical operation and container
+/// identity while retaining the established call opcode assignments.
 #[test]
 fn binary_wire_round_trips_call_facts_and_every_defined_opcode() {
     let ir = CompiledIR {
@@ -526,6 +387,10 @@ fn binary_wire_round_trips_call_facts_and_every_defined_opcode() {
     };
 
     let decoded = decode(&encode(&ir)).expect("every defined opcode must decode");
+
+    assert_eq!(decoded.file_id, ir.file_id);
+    assert_eq!(decoded.version, ir.version);
+    assert_eq!(decoded.instructions, ir.instructions);
 
     let opcodes = |instructions: &[CoreOp]| -> Vec<&'static str> {
         instructions
@@ -577,16 +442,7 @@ fn test_ir_with_only_variadic_ops() {
     };
     let bytes = encode(&ir);
     let decoded = decode(&bytes).unwrap();
-    assert_eq!(decoded.instructions.len(), 4);
-    for (orig, dec) in ir.instructions.iter().zip(decoded.instructions.iter()) {
-        match (orig, dec) {
-            (CoreOp::Flags(_, of), CoreOp::Flags(_, df)) => assert_eq!(of, df),
-            (CoreOp::ClassFlags(_, of), CoreOp::ClassFlags(_, df)) => assert_eq!(of, df),
-            (CoreOp::Injects(_, od), CoreOp::Injects(_, dd)) => assert_eq!(od, dd),
-            (CoreOp::Pattern(_, oa), CoreOp::Pattern(_, da)) => assert_eq!(oa, da),
-            _ => panic!("variant mismatch: {:?} vs {:?}", orig, dec),
-        }
-    }
+    assert_eq!(decoded, ir);
 }
 
 #[test]
@@ -605,5 +461,5 @@ fn test_ir_with_only_fixed_ops() {
     };
     let bytes = encode(&ir);
     let decoded = decode(&bytes).unwrap();
-    assert_eq!(decoded.instructions.len(), 6);
+    assert_eq!(decoded, ir);
 }

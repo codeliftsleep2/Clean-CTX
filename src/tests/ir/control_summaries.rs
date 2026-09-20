@@ -51,9 +51,9 @@ fn named_and_binary_wires_preserve_order_and_duplicates() {
 
     let ir = compiled(vec![operation]);
     let bytes = encode(&ir);
-    assert_eq!(bytes[2], 0x03, "Phase 6B does not claim physical 0x04");
+    assert_eq!(bytes[2], 0x04, "Phase 8 corrected physical version");
     let decoded = decode(&bytes).expect("binary round trip");
-    assert_eq!(decoded.file_id, "bin");
+    assert_eq!(decoded.file_id, ir.file_id);
     assert_eq!(decoded.version, ir.version);
     assert_eq!(decoded.instructions, ir.instructions);
 }

@@ -130,7 +130,7 @@ fn additive_binary_opcodes_round_trip_under_physical_version_three() {
         ),
     ]);
     let bytes = encode(&ir);
-    assert_eq!(bytes[2], 0x03, "Phase 6A must not claim physical 0x04");
+    assert_eq!(bytes[2], 0x04, "Phase 8 corrected physical version");
     let decoded = decode(&bytes).expect("binary modifier round trip");
     assert_eq!(decoded.version, ir.version);
     assert_eq!(decoded.instructions, ir.instructions);

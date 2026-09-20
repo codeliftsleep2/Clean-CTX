@@ -82,6 +82,33 @@ fn test_sqlite_save_with_ir_blob() {
 }
 
 #[test]
+fn sqlite_replay_rejects_mismatched_binary_file_identity() {
+    let mut store = in_memory_store();
+    let ir_binary = crate::ir::binary_wire::encode(&test_ir("/other/file.ts", 1));
+    store
+        .save_context(
+            "/test/file.ts",
+            Fidelity::Medium,
+            "compressed",
+            Some(&ir_binary),
+            "mismatched_identity",
+            0,
+            0,
+        )
+        .expect("store mismatched fixture");
+
+    let error = store
+        .load_context_with_deltas("/test/file.ts", None)
+        .expect_err("persisted owner and binary file identity must agree");
+    assert!(
+        error
+            .to_string()
+            .contains("persisted binary file identity mismatch"),
+        "{error}"
+    );
+}
+
+#[test]
 fn test_sqlite_has_context() {
     let mut store = in_memory_store();
     assert!(!store.has_context("/test/file.ts"));

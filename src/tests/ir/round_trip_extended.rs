@@ -182,28 +182,7 @@ fn round_trip_ir_with_type_aliases_binary_wire() {
     };
     let bytes = encode(&ir);
     let restored = decode(&bytes).expect("binary wire round-trip with type aliases");
-    // Binary wire format uses empty strings for TypeAlias ID fields (like
-    // DefClass, Import, etc.), so we verify the TYPE opcode is present
-    // rather than the full alias/original content.
-    assert!(
-        restored
-            .instructions
-            .iter()
-            .any(|op| matches!(op, CoreOp::TypeAlias(..))),
-        "TypeAlias op should survive binary wire round-trip"
-    );
-    // Verify the substituted type values survived (FieldType/Return are
-    // data-preserving in binary wire).
-    assert!(
-        restored.instructions.iter().any(|op| matches!(op,
-        CoreOp::FieldType(_, t) if t == "$uid")),
-        "FieldType with $uid should survive"
-    );
-    assert!(
-        restored.instructions.iter().any(|op| matches!(op,
-        CoreOp::Return(_, t) if t == "$uid")),
-        "Return with $uid should survive"
-    );
+    assert_ir_eq(&ir, &restored);
 }
 
 #[test]

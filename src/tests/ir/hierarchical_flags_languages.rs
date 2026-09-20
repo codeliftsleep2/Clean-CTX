@@ -173,10 +173,15 @@ fn pattern_recognition_input_holds_two_separate_flag_ops_csharp() {
         raw_flags[0].contains(&"IF".to_string()) && raw_flags[0].contains(&"RET".to_string()),
         "the control-flow family has its own typed op: {raw_flags:?}"
     );
+    let expected = raw_modifiers
+        .iter()
+        .flatten()
+        .map(|modifier| modifier.as_str().to_string())
+        .chain(raw_flags.iter().flatten().cloned())
+        .collect::<Vec<_>>();
     assert_eq!(
-        merged.len(),
-        3,
-        "declaration + control flow occurrences: {merged:?}"
+        merged, &expected,
+        "declaration and every control occurrence must survive"
     );
 }
 

@@ -50,7 +50,7 @@ fn named_and_binary_wires_preserve_pattern_fact_payloads() {
 
     let ir = compiled(vec![operation]);
     let bytes = encode(&ir);
-    assert_eq!(bytes[2], 0x03, "Phase 6C does not claim physical 0x04");
+    assert_eq!(bytes[2], 0x04, "Phase 8 corrected physical version");
     let decoded = decode(&bytes).expect("binary round trip");
     assert_eq!(decoded.instructions, ir.instructions);
 }

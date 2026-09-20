@@ -1,6 +1,6 @@
 # CoreOp Architectural Contract Matrix
 
-**Status:** Approved target architecture. All 21 current `CoreOp` rows are
+**Status:** Approved target architecture. All 25 current `CoreOp` rows are
 normative. Hierarchical schema-shape decisions identified in Section 10 remain
 separately gated.
 
@@ -22,6 +22,7 @@ schema-derived typed pattern targeting and was user-verified on 2026-09-18.
 
 - [`IR_PROJECTION_RECONNAISSANCE_REPORT.md`](IR_PROJECTION_RECONNAISSANCE_REPORT.md)
 - [`IR_ARCHITECTURE_LOCKDOWN_PLAN.md`](IR_ARCHITECTURE_LOCKDOWN_PLAN.md)
+- [`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md)
 
 ## 1. Purpose
 
@@ -83,12 +84,19 @@ owning identity, that owner must resolve; external symbolic operands and the
 
 ### 3.3 Binary version-number contradiction
 
-The current binary encoder emits `VERSION = 0x03` and the decoder already
-accepts `0x01`, `0x02`, and `0x03`. The corrected/versioned binary format is
-therefore assigned the approved physical version `0x04`.
+Before Phase 8, the binary encoder emitted `VERSION = 0x03` and the decoder
+nominally accepted `0x01`, `0x02`, and `0x03`. The corrected/versioned binary
+format is the approved physical version `0x04`.
 
 The binary migration is deferred to its later phase and is not part of the
 bounded `Param`/`Return` implementation slice.
+
+Phase 8A resolves the complete corrected layout in
+[`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md). Source inspection found no
+persisted binary fixture and no production writer of non-empty binary IR.
+Physical `0x03` omits eight identity operands and raw `file_id`; the corrected
+`0x04` target preserves the complete `CompiledIR`, instruction order, and all
+occurrences. No lossy `0x01`–`0x03` compatibility decoder is authorized.
 
 ## 4. Contract vocabulary
 
@@ -185,7 +193,7 @@ all three vocabularies and remains only for legacy unknown payloads;
 
 ## 6. Projection, delta, and wire matrix
 
-| `CoreOp` | Checked projection target | Delta identity | Current binary status | Corrected binary target |
+| `CoreOp` | Checked projection target | Delta identity | `0x03` baseline status | `0x04` contract |
 |---|---|---|---|---|
 | `DefClass` | One non-synthetic `ClassNode` | `ClassId` | Lossy: class ID omitted | Encode class ID and name |
 | `DefMethod` | Method under resolved owner class | `MethodId` plus owner for consistency | Lossy: owner class ID omitted | Encode owner, method ID, and name |
@@ -379,12 +387,12 @@ legacy decoded documents remain outside this bounded slice.
 
 ## 12. Review checklist
 
-- [ ] All 21 current `CoreOp` variants appear exactly once in each matrix.
+- [x] All 25 current `CoreOp` variants appear exactly once in each matrix.
 - [ ] Definition and optional-singular cardinalities are accepted.
 - [ ] Repeatable facts preserve every occurrence by default.
 - [ ] External symbolic references are distinguished from owning identities.
 - [ ] Delta identity preserves exact duplicates.
 - [ ] Projection destinations do not require silent loss or synthesis.
-- [ ] Current binary losses are accurately identified.
-- [ ] The physical corrected-binary version is resolved.
+- [x] Current binary losses are accurately identified by Phase 8A.
+- [x] The physical corrected-binary version and layout are resolved as `0x04`.
 - [ ] Each row has an identified tracked test owner before implementation.
