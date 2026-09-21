@@ -228,7 +228,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "list_sessions",
-            "description": "List all persisted contexts stored in the DB — per-file rows with fidelity, token counts, delta count and last-update time.",
+            "description": "Read committed persisted contexts from the DB without flushing pending lifecycle work — per-file rows with fidelity, token counts, delta count and last-update time.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         serde_json::json!({

@@ -447,3 +447,7 @@ mod durable_semantic_restore_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/delete_context_contract.rs"]
 mod delete_context_contract_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/mcp/list_sessions_read_only.rs"]
+mod list_sessions_read_only_tests;

@@ -2,18 +2,16 @@
 //
 // Buffered persistence layer with three-tier defense:
 //
-//   Tier 1: Batched writes — ops accumulate in memory, flushed as a
-//           single SQLite transaction when the buffer hits the threshold.
+//   Tier 1: Batched writes — ops accumulate in memory and are flushed as a
+//           single SQLite transaction by their explicit lifecycle owner.
 //   Tier 2: Retry with exponential backoff — transient DB failures
 //           (file lock, WAL contention) are retried up to MAX_RETRIES.
 //   Tier 3: JSON file fallback — if all retries fail, ops are written
 //           as standalone JSON files in .clean-ctx/fallback/.
 //           On next successful flush, fallback files are re-imported.
 //
-// Flush boundaries:
-//   - Auto-flush when pending.len() >= BATCH_THRESHOLD (5)
-//   - Explicit flush via `context_stats` handler
-//   - Server shutdown (future: flush on drop)
+// Flush boundaries are owned explicitly by the lifecycle operation that
+// produced the pending work. Reads and maintenance operations never flush.
 
 use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
@@ -24,9 +22,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
-
-/// Auto-flush when the buffer reaches this many pending ops.
-const BATCH_THRESHOLD: usize = 5;
 
 /// Maximum retry attempts for flush (exponential backoff).
 const MAX_RETRIES: u32 = 3;
@@ -397,7 +392,7 @@ impl BufferedStore {
         self.pending.lock().map(|p| p.len()).unwrap_or(0)
     }
 
-    /// Queue a save_context operation. Auto-flushes if threshold reached.
+    /// Queue a save operation for its producing lifecycle to commit explicitly.
     #[allow(clippy::too_many_arguments)]
     pub fn queue_save_context(
         &self,
@@ -419,15 +414,10 @@ impl BufferedStore {
                 raw_tokens,
                 compressed_tokens,
             });
-            let len = pending.len();
-            if len >= BATCH_THRESHOLD {
-                drop(pending);
-                self.flush();
-            }
         }
     }
 
-    /// Queue an append_delta operation. Auto-flushes if threshold reached.
+    /// Queue a delta operation for its producing lifecycle to commit explicitly.
     pub fn queue_append_delta(
         &self,
         context_id: &str,
@@ -440,25 +430,15 @@ impl BufferedStore {
                 delta_payload: delta_payload.to_vec(),
                 edit_type: edit_type.map(String::from),
             });
-            let len = pending.len();
-            if len >= BATCH_THRESHOLD {
-                drop(pending);
-                self.flush();
-            }
         }
     }
 
-    /// Queue a clear_file operation. Auto-flushes if threshold reached (MED-01 fix).
+    /// Queue a clear operation for its producing lifecycle to commit explicitly.
     pub fn queue_clear_file(&self, file_path: &str) {
         if let Ok(mut pending) = self.pending.lock() {
             pending.push(WriteOp::ClearFile {
                 file_path: file_path.to_string(),
             });
-            let len = pending.len();
-            if len >= BATCH_THRESHOLD {
-                drop(pending);
-                self.flush();
-            }
         }
     }
 }
@@ -485,11 +465,6 @@ impl ContextStore for BufferedStore {
                 raw_tokens,
                 compressed_tokens,
             });
-            let len = pending.len();
-            if len >= BATCH_THRESHOLD {
-                drop(pending);
-                self.flush();
-            }
         }
         Ok(id)
     }
@@ -498,105 +473,10 @@ impl ContextStore for BufferedStore {
         &self,
         file_path: &str,
     ) -> Result<Option<StoredContextMeta>, Box<dyn std::error::Error>> {
-        // MED-02: Flush pending ops and read in a single lock scope to avoid
-        // the double-lock that occurs when flush() acquires the inner lock
-        // then releases it before sqlite() acquires it again.
-        // P1-2: Recover from poisoned lock instead of discarding pending writes
-        let ops = match self.pending.lock() {
-            Ok(mut p) => std::mem::take(&mut *p),
-            Err(e) => {
-                eprintln!("[clean-ctx] WARNING: pending mutex poisoned, recovering: {e}");
-                let mut p = e.into_inner();
-                std::mem::take(&mut *p)
-            }
-        };
-        let mut conn = match self.inner.lock() {
-            Ok(c) => c,
-            Err(_) => return Ok(None),
-        };
-        if !ops.is_empty() {
-            // Best-effort flush inside the same lock scope
-            if let Err(e) = conn.begin_transaction() {
-                eprintln!("[clean-ctx] BEGIN failed during load_latest flush: {e}");
-                // Re-queue all ops so they're not lost
-                if let Ok(mut pending) = self.pending.lock() {
-                    pending.splice(0..0, ops);
-                }
-            } else {
-                let mut flushed = false;
-                let mut failed_at = None;
-                for (idx, op) in ops.iter().enumerate() {
-                    match op {
-                        WriteOp::SaveContext {
-                            file_path,
-                            fidelity,
-                            compressed_output,
-                            ir_binary,
-                            source_hash,
-                            raw_tokens,
-                            compressed_tokens,
-                        } => {
-                            if let Err(e) = crate::mcp::context_store::ContextStore::save_context(
-                                &mut *conn,
-                                file_path,
-                                *fidelity,
-                                compressed_output,
-                                Some(ir_binary),
-                                source_hash,
-                                *raw_tokens,
-                                *compressed_tokens,
-                            ) {
-                                let _ = conn.rollback();
-                                eprintln!(
-                                    "[clean-ctx] save_context during load_latest flush failed: {e}"
-                                );
-                                failed_at = Some(idx);
-                                break;
-                            }
-                        }
-                        WriteOp::AppendDelta {
-                            context_id,
-                            delta_payload,
-                            edit_type,
-                        } => {
-                            if let Err(e) = crate::mcp::context_store::ContextStore::append_delta(
-                                &mut *conn,
-                                context_id,
-                                delta_payload,
-                                edit_type.as_deref(),
-                            ) {
-                                let _ = conn.rollback();
-                                eprintln!(
-                                    "[clean-ctx] append_delta during load_latest flush failed: {e}"
-                                );
-                                failed_at = Some(idx);
-                                break;
-                            }
-                        }
-                        WriteOp::ClearFile { file_path } => {
-                            conn.clear_file(file_path);
-                        }
-                    }
-                    flushed = true;
-                }
-                if flushed {
-                    let _ = conn.commit();
-                    conn.wal_checkpoint();
-                }
-                // If any op failed, re-queue the un-flushed remainder so
-                // they're not permanently lost (they were dequeued but
-                // never written to the DB or fallback JSON files).
-                if let Some(failed_idx) = failed_at {
-                    let remaining: Vec<WriteOp> = ops.into_iter().skip(failed_idx).collect();
-                    if !remaining.is_empty() {
-                        if let Ok(mut pending) = self.pending.lock() {
-                            pending.splice(0..0, remaining);
-                        }
-                    }
-                }
-            }
+        match self.sqlite() {
+            Some(guard) => guard.load_latest(file_path),
+            None => Ok(None),
         }
-        conn.load_latest(file_path)
     }
 
     fn has_context(&self, file_path: &str) -> bool {
@@ -619,17 +499,11 @@ impl ContextStore for BufferedStore {
                 delta_payload: delta_payload.to_vec(),
                 edit_type: edit_type.map(String::from),
             });
-            let len = pending.len();
-            if len >= BATCH_THRESHOLD {
-                drop(pending);
-                self.flush();
-            }
         }
         Ok(())
     }
 
     fn delta_count(&self, context_id: &str) -> usize {
-        self.flush();
         if let Some(guard) = self.sqlite() {
             guard.delta_count(context_id)
         } else {
@@ -638,14 +512,31 @@ impl ContextStore for BufferedStore {
     }
 
     fn clear_file(&mut self, file_path: &str) {
+        let committed_context_id = self
+            .sqlite()
+            .and_then(|guard| guard.load_latest(file_path).ok().flatten())
+            .map(|meta| format!("ctx-{}", meta.source_hash));
         if let Ok(mut pending) = self.pending.lock() {
+            let mut owned_context_ids = pending
+                .iter()
+                .filter_map(|op| match op {
+                    WriteOp::SaveContext {
+                        file_path: pending_file,
+                        source_hash,
+                        ..
+                    } if pending_file == file_path => Some(format!("ctx-{source_hash}")),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            if let Some(context_id) = committed_context_id {
+                owned_context_ids.push(context_id);
+            }
             pending.retain(|op| match op {
                 WriteOp::SaveContext { file_path: fp, .. } => fp != file_path,
                 WriteOp::ClearFile { file_path: fp } => fp != file_path,
-                _ => true,
+                WriteOp::AppendDelta { context_id, .. } => !owned_context_ids.contains(context_id),
             });
         }
-        self.flush();
         if let Ok(mut guard) = self.inner.lock() {
             guard.clear_file(file_path);
         }
@@ -660,7 +551,6 @@ impl BufferedStore {
         file_path: &str,
         target_seq: Option<u32>,
     ) -> Result<Option<(CompiledIR, u32)>, Box<dyn std::error::Error>> {
-        self.flush();
         if let Some(guard) = self.sqlite() {
             guard.load_context_with_deltas(file_path, target_seq)
         } else {
@@ -669,7 +559,6 @@ impl BufferedStore {
     }
 
     pub fn purge_old_deltas(&self, days: u32) -> Result<usize, Box<dyn std::error::Error>> {
-        self.flush();
         if let Some(guard) = self.sqlite() {
             guard.purge_old_deltas(days)
         } else {
@@ -684,7 +573,6 @@ impl BufferedStore {
         limit: usize,
     ) -> Result<Vec<crate::mcp::sqlite_store::PersistedContextSummary>, Box<dyn std::error::Error>>
     {
-        self.flush();
         if let Some(guard) = self.sqlite() {
             guard.list_contexts(limit)
         } else {
@@ -696,3 +584,11 @@ impl BufferedStore {
 #[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/buffered_store.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../tests/mcp/buffered_store_integration.rs"]
+mod integration_tests;
+
+#[cfg(test)]
+#[path = "../tests/mcp/buffered_store_authority.rs"]
+mod authority_tests;

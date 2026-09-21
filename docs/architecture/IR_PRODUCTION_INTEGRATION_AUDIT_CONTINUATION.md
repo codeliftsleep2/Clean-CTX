@@ -314,7 +314,7 @@ is not certified.
 ## 32. Finding P9-22: read-only context stats commits and mutates state
 
 **Severity:** High cross-file durability and observation-contract
-contradiction; approved and implemented pending user verification.
+contradiction; repaired and user-verified on 2026-09-20.
 
 P9-20 left read-only stats outside the semantic-publication recovery boundary
 unless implementation evidence showed authoritative mutation. Registered
@@ -375,6 +375,133 @@ intent, canonical, hash, fidelity, edge, and `WorkspaceIndex` ownership.
 
 ## 33. Approval gate and next audit action
 
-The exhaustive Phase 9 audit is paused for user-run verification of P9-22.
-After that gate is green, resume the remaining registered-operation, semantic-
-family, lifecycle, and obsolete-path matrix. Phase 9 is not certified.
+P9-22 was user-verified green. The exhaustive Phase 9 audit resumed; Phase 9
+is not certified.
+
+## 34. Finding P9-23: persisted-context listing commits buffered lifecycle work
+
+**Severity:** High cross-file durability and observation-contract
+contradiction; approved and implemented pending user verification.
+
+The audit of buffered persistence ownership found no registered production
+write that became stranded solely because P9-22 removed `context_stats` as a
+flush boundary. The remaining production `queue_append_delta` caller performs
+an explicit flush in the same accepted-delta lifecycle, while no registered
+production caller was found for `queue_save_context` or `queue_clear_file`.
+This means the removed stats flush was not the authoritative commit owner for
+current registered writes.
+
+The same audit found a different implicit boundary. Registered
+`list_sessions` calls `BufferedStore::list_contexts`, and `list_contexts`
+unconditionally calls `flush()` before reading committed SQLite rows. A tool
+described as showing tracked sessions/files can therefore commit every queued
+save, delta, or clear across unrelated files merely because persistence was
+listed. The response reports only the resulting rows; it neither identifies
+the lifecycle operations it committed nor reports their individual durability
+outcomes. It also bypasses the file-scoped recovery and transaction ownership
+required of semantic mutations.
+
+The buffer's `load_latest` and `delta_count` read methods contain the same
+read-causes-flush pattern. No current registered production call path was found
+through those methods during this checkpoint, but they remain an obsolete
+bypass surface that can recreate the defect if reused.
+
+### Alternatives
+
+1. Make persisted-context enumeration strictly observational. Remove the
+   implicit flush from `list_contexts` and read only committed SQLite rows.
+   Remove read-triggered flushing from `load_latest` and `delta_count`, or make
+   those methods inaccessible as lifecycle authorities, so buffered writes can
+   commit only at explicit producing-operation boundaries.
+2. Redefine `list_sessions` as a global flush-and-list operation, exposing and
+   recovering every affected file before commit. This changes a read tool into
+   a cross-file lifecycle command and substantially expands its response and
+   failure contract.
+3. Keep the implicit flush as an implementation detail. This preserves a
+   hidden, non-file-scoped durability boundary and permits future callers to
+   depend accidentally on reads for commits.
+
+### Recommendation
+
+Choose option 1. Reads should observe committed state and never become fallback
+commit owners. Each registered producer must either commit synchronously at its
+approved lifecycle boundary or retain explicitly pending work with a named
+owner. Tracked registered coverage should prove that `list_sessions` leaves
+queued saves, deltas, and clears pending; returns only committed contexts;
+does not recover edit intents or mutate semantic/session/index ownership; and
+is idempotent. Focused storage coverage should prevent `load_latest` and
+`delta_count` from silently flushing queued work. Existing explicit delta
+commit behavior must remain unchanged.
+
+**Implementation update (2026-09-20):** Persisted-context reads now inspect
+committed SQLite state directly. `list_contexts`, `load_latest`,
+`load_context_with_deltas`, and `delta_count` do not flush or otherwise publish
+queued work. Registered `list_sessions` documents this committed-state-only
+contract. Queue size no longer creates an implicit commit boundary; the
+producing lifecycle must invoke its explicit commit, including the existing
+accepted-delta boundary. Tracked storage coverage proves queued saves, deltas,
+and clears remain pending across repeated reads.
+
+## 35. Approval gate and next audit action
+
+P9-23 is implemented with P9-24 and awaits user-run verification. Phase 9 is
+not certified.
+
+## 36. Finding P9-24: purge commits unrelated buffered lifecycle work
+
+**Severity:** High cross-file durability and operation-authority
+contradiction; approved and implemented pending user verification.
+
+Implementation inspection for approved P9-23 found another global flush
+boundary before production code was changed. Registered `purge_old_deltas`
+calls `BufferedStore::purge_old_deltas`, which unconditionally calls `flush()`
+before performing the requested age-based history purge. A request authorized
+to remove old delta history can therefore commit unrelated queued saves,
+deltas, or clears for any file. Those commits are absent from the operation's
+response and do not pass through their producing file's approved lifecycle
+boundary.
+
+The legacy `ContextStore::clear_file` implementation also flushes the complete
+queue before clearing one file. Registered `delete_context` no longer uses
+that path and instead performs its approved atomic file-scoped deletion, but
+the legacy method remains an obsolete cross-file commit surface.
+
+This is distinct from P9-23: making reads observational does not remove a
+mutating operation's authority to commit unrelated work.
+
+### Alternatives
+
+1. Scope `purge_old_deltas` strictly to its requested purge transaction and
+   remove its global pre-flush. Remove or constrain the legacy buffered
+   `clear_file` implementation so it cannot commit unrelated queued work.
+   Existing explicitly owned accepted-delta commits remain unchanged.
+2. Redefine purge as a global flush-then-purge lifecycle operation and expose
+   every affected file's recovery, commit result, and failure. This greatly
+   expands a maintenance operation's public authority and response contract.
+3. Retain the pre-flush as an undocumented convenience. This preserves the
+   cross-file commit bypass and prevents buffered writes from having one
+   explicit producing owner.
+
+### Recommendation
+
+Choose option 1 and implement it in the same bounded storage decomposition as
+P9-23. Registered coverage should prove purge changes only qualifying committed
+history, leaves every queued operation pending, and preserves unrelated files.
+Focused storage coverage should prove legacy file clearing cannot flush other
+files' queued work. The registered transactional `delete_context` contract
+must remain unchanged.
+
+**Implementation update (2026-09-20):** `purge_old_deltas` now operates only
+on committed SQLite history and never flushes the queue. The legacy
+`ContextStore::clear_file` implementation removes the requested committed
+context plus queued operations demonstrably owned by that file, without
+publishing peer work. Registered transactional `delete_context` remains the
+sole production deletion contract. Focused coverage preserves peer committed
+and queued state across purge and legacy clear operations.
+
+## 37. Approval gate and next audit action
+
+P9-23 and P9-24 are implemented as one bounded storage-authority repair and
+await user-run verification. After that gate is green, resume the remaining
+registered-operation, semantic-family, lifecycle, and obsolete-path matrix.
+Phase 9 is not certified.
