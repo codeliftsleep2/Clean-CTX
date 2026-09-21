@@ -193,12 +193,11 @@ The unchecked hierarchy convenience and legacy delta types remain internal
 compatibility/convenience surfaces with no registered production consumer.
 They are not production authorities and do not weaken the checked MCP path.
 
-## 44. Phase 9 certification
+## 44. Phase 9 certification boundary
 
-**Status:** Certified on 2026-09-20 from the user-verified green repository
-gate and the completed production-integration matrix.
+**Status:** Certification pending user-run production-path verification.
 
-Phase 9 completion criteria are satisfied:
+The code-level production-integration matrix is complete:
 
 - every registered IR/MCP operation was classified and traced through its
   actual production ownership and consumer path;
@@ -213,6 +212,61 @@ Phase 9 completion criteria are satisfied:
 - the applicable repository gate was reported green by the user after the last
   bounded repair.
 
-This certification closes Phase 9 only. Phase 10 documentation reconciliation
-and final verification require explicit approval and must not begin
+Final Phase 9 certification remains withheld until the required operator
+verification artifacts can exercise every approved production boundary and the
+user reports their results. Phase 10 must not begin automatically.
+
+## 45. Finding P9-27: fallback inspection production reachability
+
+**Severity:** Verification-blocking production-reachability gap; approved and
+implemented pending user verification.
+
+The P9-26 repair introduced non-mutating
+`BufferedStore::inspect_legacy_fallbacks`, but that method is crate-internal and
+has no registered MCP operation, CLI command, or other executable production
+entry point. The required Phase 9 operator scenario cannot exercise the
+approved inspection boundary through the real production binary. Calling it
+from a scratch program or tracked test would verify implementation code, not
+registered production reachability, and would violate the requested harness
+contract.
+
+Alternatives:
+
+1. Add a registered read-only MCP maintenance operation for legacy fallback
+   inspection. It reports artifact path, parseable kind/identity/metadata, and
+   the unsupported semantic-authority reason, while performing no recovery or
+   mutation. This makes the approved boundary operator-verifiable.
+2. Add a separately named CLI maintenance command with the same read-only
+   contract. This avoids enlarging MCP but creates a second executable routing
+   surface and would not satisfy a registered-MCP lifecycle scenario.
+3. Declare fallback inspection internal-only and waive the requested live
+   production-path verification. This leaves P9-26 without operator-reachable
+   evidence and contradicts the current verification request.
+
+Recommendation: option 1. The operation is a truthful read-only view over an
+already-approved maintenance boundary and provides the smallest way to verify
+that quarantined artifacts cannot mutate semantic state. Its public name,
+schema, response, and registration require explicit approval before
+implementation.
+
+**Implementation update (2026-09-20):** The registered read-only
+`inspect_legacy_fallbacks` MCP operation now routes through the existing
+`BufferedStore::inspect_legacy_fallbacks` authority. It returns every
+discoverable artifact, including malformed artifacts, with its path,
+parseable legacy operation/identity/metadata, explicit `recoverable: false`,
+and the incomplete-authority reason. The handler performs no fallback import,
+flush, recovery, deletion, rewrite, SQLite write, or semantic/session/index
+publication. Tracked registered-path coverage preserves that non-mutation
+contract.
+
+The operator-only package under `target/phase9-verification/` drives the
+registered MCP operation and the remaining Phase 9 lifecycle scenarios through
+a freshly built production binary. Those artifacts are explicitly not tracked
+tests, CI evidence, or substitutes for the repository verification gate.
+
+## 46. Verification handoff
+
+P9-27 and the Phase 9 operator fixtures are ready for user-run verification.
+Phase 9 certification remains withheld until the user reports the tracked
+repository gate and the operator scenarios green. Phase 10 must not begin
 automatically.

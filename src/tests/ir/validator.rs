@@ -84,7 +84,11 @@ fn test_flags_unknown_method() {
     let validator = DefaultValidator::new();
     let errors = validator.validate(&ir);
     assert!(!errors.is_empty());
-    assert!(errors.iter().any(|e| e.code == "E003"));
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.code == "ir_projection_unresolved_identity")
+    );
 }
 
 #[test]

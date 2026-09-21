@@ -121,13 +121,13 @@ fn java_layer_detects_class_with_implements_only() {
 fn java_layer_detects_interface() {
     let mut layer = JavaLayer::new();
     let mut ctx = make_ctx("public interface MyService {}");
-    ctx.current_class = Some("C1".into());
+    ctx.current_interface = Some("I1".into());
 
     let ops = layer.process_capture("interface.root", "public interface MyService {}", &mut ctx);
 
     // Interface with no extends should produce flags only
     let has_export = ops.iter().any(|op| {
-        matches!(op, CoreOp::ClassModifiers(c, modifiers) if c == "C1" && modifiers.contains(&DeclarationModifier::Export))
+        matches!(op, CoreOp::InterfaceModifiers(i, modifiers) if i == "I1" && modifiers.contains(&DeclarationModifier::Export))
     });
     assert!(
         has_export,
@@ -140,7 +140,7 @@ fn java_layer_detects_interface() {
 fn java_layer_detects_interface_extends() {
     let mut layer = JavaLayer::new();
     let mut ctx = make_ctx("public interface MyRepo extends JpaRepository<MyEntity, Long> {}");
-    ctx.current_class = Some("C1".into());
+    ctx.current_interface = Some("I1".into());
 
     let ops = layer.process_capture(
         "interface.root",
@@ -148,9 +148,9 @@ fn java_layer_detects_interface_extends() {
         &mut ctx,
     );
 
-    let has_extend = ops
-        .iter()
-        .any(|op| matches!(op, CoreOp::Extends(c, b) if c == "C1" && b == "JpaRepository"));
+    let has_extend = ops.iter().any(
+        |op| matches!(op, CoreOp::InterfaceExtends(i, b) if i == "I1" && b == "JpaRepository<MyEntity, Long>"),
+    );
     assert!(
         has_extend,
         "Interface with extends JpaRepository should emit EXT: {:?}",

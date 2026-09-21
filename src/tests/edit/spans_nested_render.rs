@@ -12,7 +12,7 @@ fn nested_enum_outer_class_renders_without_static_and_enum_stays_nested() {
 
     // Medium fidelity so the nested enum's two members survive as fields
     // (`extract_field` suppresses fields at Low). The C# language layer
-    // must be registered: `ClassFlags` (EXPORT/STATIC) are emitted by the
+    // must be registered: typed class modifiers are emitted by the
     // layer, not Core IR — a bare `IRCompiler::new()` yields no flags.
     let source = nested_service_source();
     let (language, query) = detect_language(&source);
@@ -36,23 +36,23 @@ fn nested_enum_outer_class_renders_without_static_and_enum_stays_nested() {
         .iter()
         .find(|c| c.name == "SomeService")
         .expect("outer class must exist in hierarchical IR");
-    let flags = service
-        .class_flags
+    let modifiers = service
+        .modifiers
         .iter()
         .flatten()
-        .cloned()
+        .copied()
         .collect::<Vec<_>>();
     assert!(
-        flags.iter().any(|f| f == "EXPORT"),
-        "outer class keeps EXPORT, got: {flags:?}"
+        modifiers.contains(&crate::ir::opcodes::DeclarationModifier::Export),
+        "outer class keeps EXPORT, got: {modifiers:?}"
     );
     assert!(
-        !flags.iter().any(|f| f == "STATIC"),
-        "non-static outer class must never render STATIC, got: {flags:?}"
+        !modifiers.contains(&crate::ir::opcodes::DeclarationModifier::Static),
+        "non-static outer class must never render STATIC, got: {modifiers:?}"
     );
     assert!(
-        rendered.contains("cl: EXPORT\n"),
-        "rendered output must show `cl: EXPORT` without STATIC, got:\n{rendered}"
+        rendered.contains("cmod: EXPORT\n"),
+        "rendered output must show `cmod: EXPORT` without STATIC, got:\n{rendered}"
     );
     assert!(
         !rendered.contains("STATIC"),

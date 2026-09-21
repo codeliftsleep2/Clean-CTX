@@ -130,11 +130,11 @@ fn ensure_indexed_does_not_trigger_indexing() {
 /// Prove indexing begins at bridge construction and reaches a non-`NotStarted`
 /// state.
 ///
-/// Uses the shared live-CBM instance (no second subprocess): the very fact that
-/// `shared_live_state()` returns at all proves `try_create` started async
-/// indexing — if it had not, `wait_for_indexing_complete` would time out. We
-/// then assert the resulting indexing state is `InProgress`/`Complete`/`Failed`
-/// (never `NotStarted`), which is exactly the K-1 guarantee.
+/// Uses a small dedicated root because this assertion is about construction-
+/// time state publication, not successful indexing of the repository-wide
+/// shared fixture. A terminal CBM indexing failure is still evidence that the
+/// constructor started the indexer; the shared live scenarios separately own
+/// successful-index requirements.
 #[serial(cbm_live)]
 #[test]
 fn try_create_begins_indexing_at_construction() {
@@ -145,7 +145,18 @@ fn try_create_begins_indexing_at_construction() {
         eprintln!("Skipping -- CBM not installed");
         return;
     }
-    let state = shared_live_state();
+    let fixture = tempfile::tempdir().expect("construction-index fixture");
+    std::fs::write(
+        fixture.path().join("construction.ts"),
+        "export class ConstructionProbe { run(): number { return 1; } }\n",
+    )
+    .expect("construction-index source");
+    let config = crate::cbm::config::CbmConfig {
+        enabled: true,
+        ..Default::default()
+    };
+    let bridge = crate::cbm::bridge::GraphBridge::try_create(&config, fixture.path());
+    assert!(bridge.is_available(), "live CBM bridge must launch");
 
     // Valid lifecycle: the bridge started indexing at construction.
     // The `indexing_state` map must NOT be empty (an empty map means
@@ -155,14 +166,8 @@ fn try_create_begins_indexing_at_construction() {
     // `ensure_indexed()` lazily inserted it -- the K-1 regression this
     // test guards against).
     //
-    // Snapshot an owned copy of the whole map while holding the bridge lock:
-    // the inner `indexing_state()` guard borrows from the outer
-    // `graph_bridge_lock()` guard, so it cannot outlive this block.
+    // Snapshot an owned copy while holding the indexing-state guard.
     let states = {
-        let guard = state.graph_bridge_lock();
-        let bridge = guard
-            .as_ref()
-            .expect("shared live McpState must contain a GraphBridge");
         bridge
             .indexing_state()
             .iter()
@@ -171,7 +176,7 @@ fn try_create_begins_indexing_at_construction() {
     };
     assert!(
         !states.is_empty(),
-        "K-1: indexing_state is empty after shared init -- \
+        "K-1: indexing_state is empty after bridge construction -- \
          the construction-time async indexer never ran."
     );
     for (project, state) in &states {

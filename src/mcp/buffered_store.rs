@@ -149,13 +149,12 @@ impl BufferedStore {
 
     /// Inspect incomplete historical fallback artifacts without importing,
     /// rewriting, deleting, or publishing any semantic state.
-    #[allow(dead_code)] // Invoked by maintenance tooling/tests, never semantic handlers.
     pub(crate) fn inspect_legacy_fallbacks(&self) -> Vec<LegacyFallbackArtifact> {
         let directory = self.project_root.join(".clean-ctx").join("fallback");
         let Ok(entries) = std::fs::read_dir(directory) else {
             return Vec::new();
         };
-        entries
+        let mut artifacts = entries
             .filter_map(Result::ok)
             .filter(|entry| entry.path().extension().and_then(|ext| ext.to_str()) == Some("json"))
             .map(|entry| {
@@ -181,7 +180,9 @@ impl BufferedStore {
                     reason: "legacy artifact lacks complete aligned semantic authority",
                 }
             })
-            .collect()
+            .collect::<Vec<_>>();
+        artifacts.sort_by(|left, right| left.path.cmp(&right.path));
+        artifacts
     }
 
     /// Try to flush ops in a single SQLite transaction.

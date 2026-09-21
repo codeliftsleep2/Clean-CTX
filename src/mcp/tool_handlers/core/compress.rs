@@ -125,6 +125,8 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             None => return,
         };
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
+        let candidate_compact = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
+        let compressed_tokens = count_tokens_with_tokenizer(&candidate_compact, tokenizer_ref);
 
         // P9-14: durability is the publication boundary. Persist the checked
         // candidate and its complete edge snapshot before creating aliases or
@@ -146,7 +148,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                             ir.version,
                             &semantic_edges,
                             raw_tokens as u64,
-                            0,
+                            compressed_tokens as u64,
                         )
                         .is_ok()
                 });

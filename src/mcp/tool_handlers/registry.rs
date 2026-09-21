@@ -150,6 +150,15 @@ pub fn create_default_registry() -> HandlerRegistry {
     );
     register_tool!(
         reg,
+        "inspect_legacy_fallbacks",
+        Box::new(|id, params, state| {
+            crate::mcp::tool_handlers::persistence::handle_inspect_legacy_fallbacks(
+                id, params, state,
+            );
+        })
+    );
+    register_tool!(
+        reg,
         "replay_history",
         Box::new(|id, params, state| {
             crate::mcp::tool_handlers::persistence::handle_replay_history(id, params, state);

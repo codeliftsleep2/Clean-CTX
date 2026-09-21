@@ -91,6 +91,11 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
         Some(edges) => edges,
         None => return send_persistence_error(id, "Missing authoritative semantic-edge state"),
     };
+    let (raw_tokens, compressed_tokens) = state
+        .session_stats_lock()
+        .file_stats(&requested_path)
+        .map(|stats| (stats.raw_tokens as u64, stats.compressed_tokens as u64))
+        .unwrap_or((0, 0));
 
     let store_guard = state.persistence_store_lock();
     let Some(store) = store_guard.as_ref() else {
@@ -122,8 +127,8 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
                     &source_hash,
                     version,
                     &semantic_edges,
-                    0,
-                    0,
+                    raw_tokens,
+                    compressed_tokens,
                 )
                 .is_ok()
         });
@@ -302,6 +307,44 @@ pub(crate) fn handle_list_sessions(id: &Value, params: &Value, state: &McpState)
     }
 }
 
+/// Inspect quarantined legacy fallback evidence without recovering or mutating it.
+pub(crate) fn handle_inspect_legacy_fallbacks(id: &Value, params: &Value, state: &McpState) {
+    let _ = params;
+    let guard = state.persistence_store_lock();
+    let Some(store) = guard.as_ref() else {
+        return send_persistence_error(id, "Persistence is not enabled");
+    };
+    let result = legacy_fallback_inspection_result(store.inspect_legacy_fallbacks());
+    send_response(&serde_json::json!({
+        "jsonrpc": "2.0", "id": id, "result": result
+    }));
+}
+
+fn legacy_fallback_inspection_result(
+    artifacts: Vec<crate::mcp::buffered_store::LegacyFallbackArtifact>,
+) -> Value {
+    let rows = artifacts
+        .iter()
+        .map(|artifact| {
+            serde_json::json!({
+                "path": artifact.path.to_string_lossy(),
+                "operation": artifact.operation,
+                "identity": artifact.identity,
+                "availableMetadata": artifact.available_metadata,
+                "recoverable": false,
+                "reason": artifact.reason,
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::json!({
+        "content": [{
+            "type": "text",
+            "text": format!("Quarantined legacy fallback artifacts: {}. None are recoverable under the current semantic contract.", rows.len())
+        }],
+        "structuredContent": { "count": rows.len(), "artifacts": rows }
+    })
+}
+
 /// Handle `replay_history` — loads and replays delta history from DB.
 pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState) {
     let file_path = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
@@ -448,3 +491,7 @@ mod delete_context_contract_tests;
 #[cfg(test)]
 #[path = "../../../tests/mcp/list_sessions_read_only.rs"]
 mod list_sessions_read_only_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/mcp/legacy_fallback_inspection.rs"]
+mod legacy_fallback_inspection_tests;

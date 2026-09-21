@@ -218,7 +218,10 @@ fn test_hierarchical_structure() {
     assert_eq!(c2.methods.len(), 1);
     assert_eq!(c2.methods[0].id, "M2");
     assert_eq!(c2.methods[0].return_type, Some("$b".to_string()));
-    assert_eq!(c2.methods[0].flags, vec![vec!["ASYNC".to_string()]]);
+    assert_eq!(
+        c2.methods[0].modifiers,
+        vec![vec![DeclarationModifier::Async]]
+    );
 }
 
 #[test]

@@ -47,7 +47,6 @@ fn ctor_stream(call: Option<CoreOp>) -> Vec<CoreOp> {
     if let Some(op) = call {
         ops.push(op);
     }
-    ops.push(CoreOp::Flags("M1".into(), vec!["CTOR".into()]));
     ops
 }
 

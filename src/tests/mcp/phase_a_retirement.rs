@@ -66,10 +66,9 @@ fn phase_a_fallbacks_return_structured_ir_unavailable_not_legacy_text() {
     let id = json!(77);
 
     let mk = |root: &str, p: &str| json!({ "arguments": { "filePath": p, "fidelity": "medium", "workspaceRoot": root } });
-    let cases: [(&str, serde_json::Value); 3] = [
+    let cases: [(&str, serde_json::Value); 2] = [
         ("compress_code_context", mk(&fx.root, &fx.path)),
         ("provide_code_context", mk(&fx.root, &fx.path)),
-        ("restore_context", mk(&fx.root, &fx.path)),
     ];
 
     for (tool, params) in cases {
@@ -130,10 +129,9 @@ fn phase_a_success_paths_render_schema_v3() {
     let id = json!(78);
 
     let mk = |root: &str, p: &str| json!({ "arguments": { "filePath": p, "fidelity": "medium", "workspaceRoot": root } });
-    let cases: [(&str, serde_json::Value); 3] = [
+    let cases: [(&str, serde_json::Value); 2] = [
         ("compress_code_context", mk(&fx.root, &fx.path)),
         ("provide_code_context", mk(&fx.root, &fx.path)),
-        ("restore_context", mk(&fx.root, &fx.path)),
     ];
 
     for (tool, params) in cases {

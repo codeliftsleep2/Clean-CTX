@@ -6,6 +6,7 @@ mod delta;
 mod provide;
 #[cfg(feature = "angular")]
 mod provide_angular;
+mod provide_persistence;
 mod restore;
 
 pub(crate) use common::projection_error_response;

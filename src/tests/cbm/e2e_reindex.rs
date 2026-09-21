@@ -41,11 +41,21 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
         indexed_before_edit,
         "doSomething must be indexed before edit"
     );
+    let _responses = crate::protocol::handler_response_serial();
+    crate::protocol::captured_responses().clear();
     crate::mcp::tool_handlers::core::handle_provide_code_context(
         &serde_json::json!(1),
         &serde_json::json!({"arguments": {"filePath": file_path_str.clone(), "fidelity": "edit"}}),
         &state,
     );
+    let provided = crate::protocol::captured_responses()
+        .pop()
+        .expect("provide_code_context response");
+    assert!(
+        provided.get("error").is_none(),
+        "edit baseline must succeed: {provided}"
+    );
+    crate::protocol::captured_responses().clear();
     crate::mcp::tool_handlers::edit::handle_apply_edit(
         &serde_json::json!(2),
         &serde_json::json!({"arguments": {"filePath": file_path_str.clone(), "operations": [{
@@ -55,6 +65,13 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
             "newText": "{\n    return 99;\n  }"
         }]}}),
         &state,
+    );
+    let edited = crate::protocol::captured_responses()
+        .pop()
+        .expect("apply_edit response");
+    assert!(
+        edited.get("error").is_none(),
+        "registered edit must succeed before reindex: {edited}"
     );
     let on_disk = std::fs::read_to_string(&fixture_path).expect("fixture must exist after edit");
     assert!(

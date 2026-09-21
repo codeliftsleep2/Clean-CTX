@@ -1,4 +1,3 @@
-// provide_code_context MCP handler.
 use super::common::{
     checked_hierarchy_or_respond, compiled_from_tuples, contract_fields_focused,
     invalid_session_ir_response, maybe_economics_fallback,
@@ -18,7 +17,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     use std::time::Instant;
     let overall_start = Instant::now();
 
-    // Optional method targeting retains verbatim bodies only for named units.
     let focus_methods: Option<HashSet<String>> =
         params["arguments"]["focusMethods"].as_array().map(|arr| {
             arr.iter()
@@ -93,7 +91,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     let source = source_arc.as_str();
     let alias = state.get_or_create_alias(resolved_path.clone());
 
-    // Angular templates have a separate producer and rendering lifecycle.
     #[cfg(feature = "angular")]
     if super::provide_angular::try_handle_angular_template(
         id,
@@ -108,7 +105,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     let explicit_fidelity = params["arguments"]["fidelity"].as_str();
     let explicit_intent = params["arguments"]["intent"].as_str();
 
-    // Phase 1: Heuristics decision
     let heuristics_start = Instant::now();
     let ir_read = state.ir_context_read();
     let decision = match crate::mcp::heuristics::decide(
@@ -134,10 +130,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     let heuristics_ms = heuristics_start.elapsed().as_millis() as u64;
 
     let effective_fidelity = decision.fidelity;
-    // Gap 5/3/6 fixes: self-reporting contract fields (content_kind,
-    // byte_exact) plus a degradation signal for the legacy fallback.
-    // When `focusMethods` is supplied, only the focused method bodies are
-    // byte-exact — the contract must reflect that (not claim every body).
     let (content_kind, byte_exact) =
         contract_fields_focused(effective_fidelity, focus_methods.as_ref());
     let strategy = decision.strategy;
@@ -146,10 +138,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
 
-    // Verbatim fidelity: return the full raw source byte-exact, exactly as
-    // the plan's fidelity table promises ("Full raw source, byte-exact
-    // entire document"). Bypasses IR/legacy compression entirely so the
-    // `verbatim_document`/`["document"]` contract fields match the payload.
     if effective_fidelity == crate::compression::Fidelity::Verbatim {
         let full = source.to_string();
         let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
@@ -179,7 +167,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         return;
     }
 
-    // Predict Edit-fidelity economics before entering the render pipeline.
     let mut te_prediction: &str = "bypass";
     let mut te_threshold: usize = 0;
     if effective_fidelity == crate::compression::Fidelity::Edit {
@@ -202,7 +189,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         };
         te_threshold = threshold;
         if !prediction {
-            // Edit fidelity still requires tracked IR state for byte ranges.
             match compile_file_ir_focused(
                 &resolved_path,
                 crate::compression::Fidelity::Edit,
@@ -214,6 +200,23 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         return;
                     }
                     let compiled_file = compiled.file_id.clone();
+                    if let Err(error) = super::provide_persistence::persist_edit_baseline(
+                        state,
+                        &resolved_path,
+                        effective_fidelity,
+                        &compiled,
+                        &semantic_edges,
+                        &source_hash,
+                        raw_tokens,
+                    ) {
+                        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                            id.clone(),
+                            -32603,
+                            error,
+                            None,
+                        ));
+                        return;
+                    }
                     state.ir_context_lock().load_ir(compiled, Some(source_hash));
                     state.remember_context_fidelity(&compiled_file, effective_fidelity);
 
@@ -247,7 +250,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         }
     }
 
-    // A-04: Create tracing span for this call
     let _span = tracing::info_span!(
         "provide_code_context",
         file_path = %resolved_path,

@@ -62,33 +62,13 @@ fn result_content_text(result: &serde_json::Map<String, serde_json::Value>) -> O
 fn save_context_has_canonical_envelope_with_content_and_meta() {
     let resp = phase3_dispatch("save_context", json!({ "filePath": "/nonexistent.ts" }));
     assert!(
-        resp.get("error").is_none(),
-        "save_context must not error: {resp}"
+        resp.get("error").is_some(),
+        "unowned save_context must fail structurally: {resp}"
     );
-
-    let result = resp
-        .get("result")
-        .and_then(|r| r.as_object())
-        .expect("result must be an object");
-    assert_valid_mcp_envelope(result);
-
-    let text =
-        result_content_text(result).unwrap_or_else(|| panic!("missing content[0].text: {resp}"));
     assert!(
-        text.contains("Saved") && text.contains("context(s)"),
-        "content must summarize the save: {text}"
-    );
-
-    let meta = result
-        .get("_meta")
-        .and_then(|m| m.as_object())
-        .unwrap_or_else(|| panic!("missing _meta: {resp}"));
-    assert_eq!(meta.get("ok").and_then(|o| o.as_bool()), Some(true));
-    // Persistence is disabled in test_config, so exactly 0 contexts are saved;
-    // the invariant is that `saved` lives in `_meta` as a number, not its value.
-    assert!(
-        meta.get("saved").and_then(|s| s.as_i64()).is_some(),
-        "_meta.saved must be a number: {resp}"
+        resp["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("No session-owned context"))
     );
 }
 
@@ -302,32 +282,13 @@ fn restore_context_moves_version_and_restored_to_meta() {
         &state,
     );
     let resp = phase3_take_response();
+    assert!(resp.get("error").is_some(), "restore must fail: {resp}");
+    let message = resp["error"]["message"].as_str().unwrap_or_default();
     assert!(
-        resp.get("error").is_none(),
-        "restore must not error: {resp}"
+        message.contains("Persistence is not enabled"),
+        "restore must require durable state: {resp}"
     );
-
-    let result = resp
-        .get("result")
-        .and_then(|r| r.as_object())
-        .expect("result must be an object");
-    assert_valid_mcp_envelope(result);
-
-    for banned in ["version", "restored"] {
-        assert!(
-            !result.contains_key(banned),
-            "result must not carry '{banned}': {resp}"
-        );
-    }
-    let meta = result.get("_meta").and_then(|m| m.as_object()).unwrap();
-    assert!(meta.contains_key("version"));
-    assert_eq!(meta.get("restored").and_then(|r| r.as_bool()), Some(true));
-
-    let text = result_content_text(result).unwrap();
-    assert!(
-        text.contains("// SCHEMA v5"),
-        "restore content must be SCHEMA v5: {text}"
-    );
+    assert!(!message.contains("Restored context"));
 }
 
 // ══════════════════════════════════════════════════════════════════════

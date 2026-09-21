@@ -232,6 +232,11 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
         serde_json::json!({
+            "name": "inspect_legacy_fallbacks",
+            "description": "Read quarantined legacy fallback artifacts and report why they are incomplete; never recover, import, delete, rewrite, or mutate semantic/session/durable state.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        serde_json::json!({
             "name": "replay_history",
             "description": "Replay deltas from the DB for a file up to a specific edit sequence.",
             "inputSchema": {
