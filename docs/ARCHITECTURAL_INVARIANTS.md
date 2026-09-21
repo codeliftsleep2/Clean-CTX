@@ -422,6 +422,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### CTX-001 Model-Visible Context Is a Correctness-Complete Projection
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Token savings cannot compensate for semantic facts being absent from the portable model-visible channel. |
+| **Invariant** | For every non-Verbatim context response, MCP `content` is a versioned CONTROL-FULL projection of checked hierarchical IR plus the complete semantic-edge snapshot. It preserves explicit canonical IDs, typed ownership, occurrence order/grouping/duplicates, unresolved written call names and written-arity/spread evidence, injection facts, edge relation/layer/file provenance, and exact bodies/spans when compiled. `_meta` and legacy result siblings may mirror these facts but are not their exclusive authority. Restore/replay regenerate the projection from durable canonical IR and edges instead of trusting historical compact text. `focusMethods` is resolved against typed owners into canonical method IDs before bodies are filtered: bare selectors spanning owners and duplicate qualified owners are errors; a same-owner overload family selects every canonical occurrence. Structured modes never fall back to a cheaper semantically incomplete raw payload; Verbatim remains the explicit whole-document source mode. |
+| **Enforcement** | `src/ir/control_full.rs` and `src/ir/focus.rs`; exact-oracle and focus regressions under `src/tests/ir/control_full.rs` and `src/tests/ir/focus.rs`; registered MCP dispatch regressions under `src/tests/mcp/control_full_content.rs`; language call regressions under `src/tests/ir/calls_{typescript,java,csharp}.rs`; injection rendering regressions under `src/tests/ir/render_llm_meta.rs` and `src/tests/mcp/tool_handlers_render.rs`. |
+| **Authority** | `src/ir/control_full.rs`, `src/ir/focus.rs`, `src/mcp/tool_handlers/core/content.rs`, `docs/architecture/LLM_CONTEXT_COMPRESSION_RESEARCH.md` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test --all-features` |
+
+---
+
 ## Architectural Debt
 
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)

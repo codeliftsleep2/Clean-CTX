@@ -127,10 +127,10 @@ explicit `fidelity` when you need to override the heuristic choice.
 | Intent | When to Use | Detail Level | Fidelity Mapping |
 |--------|-------------|--------------|------------------|
 | `overview` | Understanding file structure/purpose; first look at an unfamiliar file | Lowest token usage | Maps to `Low` (configurable) |
-| `debug` | Investigating a defect or root cause | Balanced detail with behavior flags | Maps to `Medium` or `High` depending on config |
+| `debug` | Investigating a defect or root cause | Balanced detail with behavior flags | Maps to `Medium` by default (configurable) |
 | `edit` | Preparing for a targeted edit | Verbatim method bodies for edit-safe replacement | Maps to `Edit` |
 | `refactor` | Understanding broader structural changes | Highest structural detail including control-flow/data-flow metadata | Maps to `High` (configurable) |
-| `implement` | Adding new code or extending existing functionality | Moderate-to-high detail preserving method bodies and type information | Maps to config default (typically `Edit`) |
+| `implement` | Adding new code or extending existing functionality | Moderate structural detail and type information | Maps to `Medium` by default (configurable) |
 
 ---
 
@@ -138,13 +138,13 @@ explicit `fidelity` when you need to override the heuristic choice.
 
 When you explicitly specify `fidelity` instead of `intent`, these are the values:
 
-| Fidelity | What the Agent Sees | Method Bodies | Verbatim? | Typical Savings |
-|----------|---------------------|:-------------:|:---------:|:---------------:|
-| `low` | Structural skeleton (thin) | ❌ | ❌ | ~85% |
-| `medium` | Structural skeleton (balanced) with async/export/behavior markers | ❌ | ❌ | ~70-80% |
-| `high` | Structural skeleton (max detail) + control-flow/data-flow metadata | ❌ | ❌ | ~50-60% |
-| `edit` | Structural skeleton + verbatim method bodies | ✅ (all or focused) | ✅ (bodies) | ~40-60% |
-| `verbatim` | Full raw source, entire document | ✅ | ✅ (all) | 0% |
+| Fidelity | What the Agent Sees | Method Bodies | Verbatim? |
+|----------|---------------------|:-------------:|:---------:|
+| `low` | CONTROL-FULL of the compiled Low semantic envelope | ❌ | ❌ |
+| `medium` | CONTROL-FULL of the compiled Medium semantic envelope | ❌ | ❌ |
+| `high` | CONTROL-FULL complete reasoning envelope + control/data-flow metadata | ❌ | ❌ |
+| `edit` | CONTROL-FULL + exact method bodies and spans | ✅ (all or resolved focus) | ✅ (bodies) |
+| `verbatim` | Full raw source, entire document | ✅ | ✅ (all) |
 
 ---
 
@@ -158,7 +158,12 @@ controls **which** method bodies receive verbatim content at Edit fidelity.
 - You are editing or deeply inspecting **only specific methods** in a file.
 - You want verbatim body text only for the methods you intend to change.
 - Target names use qualified notation: `"ClassName.methodName"`, or an
-  unambiguous bare method name when no overload ambiguity exists.
+  unambiguous bare method name when exactly one typed owner defines it.
+- Selection is resolved to canonical method IDs before rendering. A bare name
+  shared by owners, or a qualified owner name that is itself duplicated, is an
+  invalid request; Clean-CTX returns `-32602` rather than guessing. A qualified
+  same-owner overload family selects every overload because the selector grammar
+  has no signature discriminator.
 
 ### When to omit `focusMethods`
 

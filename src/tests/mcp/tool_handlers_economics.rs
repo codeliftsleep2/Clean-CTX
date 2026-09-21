@@ -12,118 +12,13 @@
 
 use super::*;
 
-// ── Token-economics regression tests (2026-08-31) ───────────────────
-
-// ── Token-economics regression tests (2026-08-31) ───────────────────
-// Verifies post-compression economic invariant: candidate_tokens <= raw_tokens
-// for all fidelity levels. See token_economics.rs for the two-stage gate.
-
-use crate::mcp::tool_handlers::core::maybe_economics_fallback;
+// CONTROL-PROD token economics remains measurement input; CONTROL-FULL is the
+// correctness baseline and is never replaced by a semantically weaker payload.
 
 fn count_tokens(text: &str) -> usize {
     let kind = crate::tokenizer::TokenizerKind::default();
     let tok = crate::tokenizer::create_tokenizer(kind).unwrap();
     tok.count_tokens(text)
-}
-
-// ── maybe_economics_fallback unit tests ────────────────────────────
-
-#[test]
-fn economics_candidate_worse_than_raw_triggers_fallback() {
-    let state = crate::mcp::McpState::new(crate::tests::test_config());
-    let id = serde_json::json!(1);
-    let source = "hello world";
-    let result = maybe_economics_fallback(
-        &id,
-        source,
-        100,
-        200,
-        &state,
-        "/test/file.ts",
-        false,
-        crate::compression::Fidelity::Edit,
-        "test",
-    );
-    assert!(result, "should fall back when candidate > raw");
-}
-
-#[test]
-fn economics_candidate_cheaper_than_raw_does_not_trigger_fallback() {
-    let state = crate::mcp::McpState::new(crate::tests::test_config());
-    let id = serde_json::json!(1);
-    let source = "hello world";
-    let result = maybe_economics_fallback(
-        &id,
-        source,
-        200,
-        100,
-        &state,
-        "/test/file.ts",
-        false,
-        crate::compression::Fidelity::Edit,
-        "test",
-    );
-    assert!(!result, "should NOT fall back when candidate < raw");
-}
-
-#[test]
-fn economics_candidate_equal_to_raw_does_not_trigger_fallback() {
-    let state = crate::mcp::McpState::new(crate::tests::test_config());
-    let id = serde_json::json!(1);
-    let source = "hello world";
-    let result = maybe_economics_fallback(
-        &id,
-        source,
-        100,
-        100,
-        &state,
-        "/test/file.ts",
-        false,
-        crate::compression::Fidelity::Edit,
-        "test",
-    );
-    assert!(!result, "should NOT fall back when candidate == raw");
-}
-
-#[test]
-fn economics_fallback_works_for_all_fidelity_levels() {
-    let state = crate::mcp::McpState::new(crate::tests::test_config());
-    let id = serde_json::json!(1);
-    let source = "hello world";
-    for fidelity in &[
-        crate::compression::Fidelity::Low,
-        crate::compression::Fidelity::Medium,
-        crate::compression::Fidelity::High,
-        crate::compression::Fidelity::Edit,
-    ] {
-        let result = maybe_economics_fallback(
-            &id,
-            source,
-            100,
-            200,
-            &state,
-            "/test/file.ts",
-            false,
-            *fidelity,
-            "test",
-        );
-        assert!(result, "{fidelity:?}: must fall back when candidate > raw");
-        let result = maybe_economics_fallback(
-            &id,
-            source,
-            200,
-            100,
-            &state,
-            "/test/file.ts",
-            false,
-            *fidelity,
-            "test",
-        );
-        assert!(
-            !result,
-            "{fidelity:?}: must NOT fall back when candidate < raw"
-        );
-    }
 }
 
 // ── Integration tests with real files ──────────────────────────────
@@ -168,7 +63,7 @@ fn resp_text(resp: &serde_json::Value) -> String {
 }
 
 #[test]
-fn economics_small_file_edit_uses_raw_passthrough() {
+fn small_edit_uses_model_visible_control_full() {
     let dir = tempfile::TempDir::new().unwrap();
     let root_str = dir.path().to_string_lossy().into_owned();
     let path = dir.path().join("tiny.rs");
@@ -184,14 +79,12 @@ fn economics_small_file_edit_uses_raw_passthrough() {
         .pop()
         .expect("handler must send response");
     let kind = resp_kind(&resp);
-    assert_eq!(
-        kind, "raw_passthrough",
-        "small Edit -> raw_passthrough, got: {kind}"
-    );
+    assert_eq!(kind, "skeleton_with_verbatim_bodies");
+    assert!(resp_text(&resp).starts_with("// CONTROL-FULL v1"));
 }
 
 #[test]
-fn economics_edit_multi_method_candidate_vs_raw() {
+fn edit_mode_keeps_control_full_even_when_it_exceeds_raw() {
     let dir = tempfile::TempDir::new().unwrap();
     let root_str = dir.path().to_string_lossy().into_owned();
     let path_str = create_multi_method_fixture(&dir, "svc.rs", 35);
@@ -211,21 +104,15 @@ fn economics_edit_multi_method_candidate_vs_raw() {
     let resp = crate::protocol::captured_responses()
         .pop()
         .expect("handler must send response");
-    let kind = resp_kind(&resp);
     let text = resp_text(&resp);
     let comp_tokens = count_tokens(&text);
-    if kind == "raw_passthrough" {
-        assert_eq!(text, source, "raw_passthrough must return verbatim source");
-    } else {
-        assert!(
-            comp_tokens <= raw_tokens,
-            "invariant at Edit: raw={raw_tokens}, candidate={comp_tokens}"
-        );
-    }
+    assert_eq!(resp_kind(&resp), "skeleton_with_verbatim_bodies");
+    assert!(text.starts_with("// CONTROL-FULL v1"));
+    assert!(comp_tokens > 0 && raw_tokens > 0);
 }
 
 #[test]
-fn economics_structural_fidelities_obey_invariant() {
+fn structural_fidelities_keep_the_correctness_baseline() {
     let dir = tempfile::TempDir::new().unwrap();
     let root_str = dir.path().to_string_lossy().into_owned();
     let path_str = create_multi_method_fixture(&dir, "s.rs", 15);
@@ -242,22 +129,15 @@ fn economics_structural_fidelities_obey_invariant() {
         let resp = crate::protocol::captured_responses()
             .pop()
             .expect("handler must send resp");
-        let kind = resp_kind(&resp);
         let text = resp_text(&resp);
-        let comp_tokens = count_tokens(&text);
-        if kind == "raw_passthrough" {
-            assert_eq!(text, source, "raw_passthrough at {fidelity}");
-        } else {
-            assert!(
-                comp_tokens <= raw_tokens,
-                "invariant at {fidelity}: raw={raw_tokens}, candidate={comp_tokens}"
-            );
-        }
+        assert_eq!(resp_kind(&resp), "skeleton");
+        assert!(text.starts_with("// CONTROL-FULL v1"), "{fidelity}");
+        assert!(count_tokens(&text) > 0 && raw_tokens > 0);
     }
 }
 
 #[test]
-fn economics_positive_compression_still_selected() {
+fn large_files_still_use_control_full() {
     let dir = tempfile::TempDir::new().unwrap();
     let root_str = dir.path().to_string_lossy().into_owned();
     let path = dir.path().join("large.rs");
@@ -293,24 +173,17 @@ fn economics_positive_compression_still_selected() {
             .expect("handler must send resp");
         let kind = resp_kind(&resp);
         let text = resp_text(&resp);
-        let comp_tokens = count_tokens(&text);
         assert_ne!(
             kind, "raw_passthrough",
-            "{fidelity}: large file must compress"
+            "{fidelity}: CONTROL-FULL must stay authoritative"
         );
-        assert!(
-            comp_tokens <= raw_tokens,
-            "invariant at {fidelity}: raw={raw_tokens}, candidate={comp_tokens}"
-        );
-        assert!(
-            raw_tokens > comp_tokens,
-            "{fidelity}: saves tokens, raw={raw_tokens}, candidate={comp_tokens}"
-        );
+        assert!(text.starts_with("// CONTROL-FULL v1"));
+        assert!(raw_tokens > 0);
     }
 }
 
 #[test]
-fn economics_intent_edit_obeys_invariant() {
+fn intent_edit_selects_control_full_edit_mode() {
     let dir = tempfile::TempDir::new().unwrap();
     let root_str = dir.path().to_string_lossy().into_owned();
     let path_str = create_multi_method_fixture(&dir, "intent.rs", 20);
@@ -326,15 +199,8 @@ fn economics_intent_edit_obeys_invariant() {
     let resp = crate::protocol::captured_responses()
         .pop()
         .expect("handler must send resp");
-    let kind = resp_kind(&resp);
     let text = resp_text(&resp);
-    let comp_tokens = count_tokens(&text);
-    if kind == "raw_passthrough" {
-        assert_eq!(text, source, "raw_passthrough must return verbatim source");
-    } else {
-        assert!(
-            comp_tokens <= raw_tokens,
-            "invariant for intent=edit: raw={raw_tokens}, candidate={comp_tokens}"
-        );
-    }
+    assert_eq!(resp_kind(&resp), "skeleton_with_verbatim_bodies");
+    assert!(text.starts_with("// CONTROL-FULL v1"));
+    assert!(count_tokens(&text) > 0 && raw_tokens > 0);
 }

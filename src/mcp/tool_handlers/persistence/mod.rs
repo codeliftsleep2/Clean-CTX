@@ -80,17 +80,20 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
             return;
         }
     };
-    let compact = state
-        .llm_text_cache_lock()
-        .get(&alias)
-        .cloned()
-        .unwrap_or_else(|| crate::ir::render_hierarchical_for_llm(&hierarchy, fidelity));
-    let durable_ir = crate::mcp::persistence_ir::baseline(&session_ir, &durable_path);
-    let binary = crate::ir::binary_wire::encode(&durable_ir);
     let semantic_edges = match state.semantic_edges(&alias) {
         Some(edges) => edges,
         None => return send_persistence_error(id, "Missing authoritative semantic-edge state"),
     };
+    let compact = crate::mcp::tool_handlers::core::content::control_full_document(
+        &session_ir,
+        &hierarchy,
+        &semantic_edges,
+        fidelity,
+        &durable_path,
+        state,
+    );
+    let durable_ir = crate::mcp::persistence_ir::baseline(&session_ir, &durable_path);
+    let binary = crate::ir::binary_wire::encode(&durable_ir);
     let (raw_tokens, compressed_tokens) = state
         .session_stats_lock()
         .file_stats(&requested_path)
@@ -395,16 +398,14 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
             return;
         }
     };
-    let rendered = restored.compact_output.unwrap_or_else(|| {
-        let compact = crate::ir::render_hierarchical_for_llm(&hierarchy, restored.fidelity);
-        format!(
-            "{}\n// ── {} ({}) ──\n{}",
-            compact.trim(),
-            path_alias,
-            file_path,
-            state.format_dict_footer_for_aliases(&[&path_alias]).trim()
-        )
-    });
+    let rendered = crate::mcp::tool_handlers::core::content::control_full_document(
+        &ir,
+        &hierarchy,
+        &restored.semantic_edges,
+        restored.fidelity,
+        file_path,
+        state,
+    );
     let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
     state
         .ir_context_lock()

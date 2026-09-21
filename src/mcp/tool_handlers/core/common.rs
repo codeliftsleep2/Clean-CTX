@@ -5,8 +5,6 @@ use crate::ir::compiler::CompiledIR;
 use crate::ir::hierarchical::HierarchicalIR;
 use crate::ir::opcodes::CoreOp;
 use crate::ir::wire::tuple_to_op;
-use crate::mcp::McpState;
-use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::protocol::send_response;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -54,6 +52,33 @@ pub(super) fn checked_hierarchy_or_respond(id: &Value, ir: &CompiledIR) -> Optio
             None
         }
     }
+}
+
+/// Resolve `focusMethods` through typed ownership, then retain exact body
+/// opcodes only for the resulting canonical method IDs.
+pub(super) fn resolve_focus_or_respond(
+    id: &Value,
+    ir: &mut CompiledIR,
+    focus: Option<&HashSet<String>>,
+) -> Option<HierarchicalIR> {
+    let hierarchy = checked_hierarchy_or_respond(id, ir)?;
+    let Some(selectors) = focus else {
+        return Some(hierarchy);
+    };
+    let method_ids = match crate::ir::focus::resolve_focus_method_ids(&hierarchy, selectors) {
+        Ok(ids) => ids,
+        Err(error) => {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32602,
+                error.to_string(),
+                None,
+            ));
+            return None;
+        }
+    };
+    crate::ir::focus::retain_focused_bodies(ir, &method_ids);
+    checked_hierarchy_or_respond(id, ir)
 }
 
 pub(crate) fn projection_error_response(
@@ -121,58 +146,4 @@ pub(crate) fn contract_fields_focused(
         ),
         _ => ("skeleton", Vec::new()),
     }
-}
-
-/// Token-economics post-compression check.
-///
-/// After the compressed/hybrid representation has been rendered, compare its
-/// actual token cost against the raw source. If the candidate is more
-/// expensive, fall back to raw passthrough — returning the raw source with
-/// `content_kind: "raw_passthrough"` and `byte_exact: ["document"]`.
-///
-/// Returns `true` if fallback was triggered (caller should `return`),
-/// `false` if the candidate is economically sound (caller should continue).
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn maybe_economics_fallback(
-    id: &Value,
-    source: &str,
-    raw_tokens: usize,
-    comp_tokens: usize,
-    state: &McpState,
-    resolved_path: &str,
-    is_angular: bool,
-    fidelity: crate::compression::Fidelity,
-    decision_summary: &str,
-) -> bool {
-    if comp_tokens <= raw_tokens {
-        // Candidate is cheaper or equal → continue normally.
-        return false;
-    }
-    // Candidate is more expensive → fall back to raw passthrough.
-    let fidelity_str = format!("{:?}", fidelity).to_lowercase();
-    state.record_compression(
-        resolved_path,
-        raw_tokens,
-        raw_tokens,
-        &fidelity_str,
-        is_angular,
-        "full",
-        None,
-        "raw_passthrough",
-    );
-    let mut response = serde_json::json!({
-        "jsonrpc": "2.0", "id": id, "result": {
-            "content": [{ "type": "text", "text": source }],
-            "_meta": {
-                "strategy": "full", "fidelity": fidelity_str,
-                "decision_summary": decision_summary,
-                "content_kind": "raw_passthrough",
-                "byte_exact": ["document"],
-                "degradation": null
-            }
-        }
-    });
-    inject_baseline_breakpoint(&mut response, state, source);
-    send_response(&response);
-    true
 }

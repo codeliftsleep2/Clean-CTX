@@ -304,22 +304,16 @@ fn test_cache_dashboard_json() {
     );
 }
 
-/// Verify that generate_vocabulary_text serves ONLY current vocabulary:
-/// SCHEMA v5 response symbols plus the live α / Φ systems — never the
-/// retired `$`-opcode / `⊕`-marker tables (Phase A retirement).
+/// Verify that generated vocabulary teaches the current CONTROL-FULL contract.
 #[test]
 fn test_generate_vocabulary_text() {
     let text = generate_vocabulary_text();
     assert!(
-        text.contains("SCHEMA v5"),
-        "vocabulary prompt must teach the SCHEMA v5 legend"
+        text.contains("CONTROL-FULL v1"),
+        "vocabulary prompt must teach CONTROL-FULL v1"
     );
-    assert!(text.contains("Φcmp"), "Φ Angular markers remain current");
+    assert!(text.contains("semantic_edges"));
     assert!(text.contains("α"), "path aliases remain current");
-    assert!(
-        text.contains("fl:") || text.contains("fl:"),
-        "behavior-flag key should be documented"
-    );
     for banned in [
         "$c   → class",
         "⊕guard",

@@ -6,23 +6,6 @@ use crate::mcp::persistence_ir::PersistedDelta;
 use rusqlite::{OptionalExtension, params};
 
 impl SqliteStore {
-    pub(crate) fn latest_compact_output(
-        &self,
-        file_path: &str,
-    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
-        Ok(self
-            .conn
-            .query_row(
-                "SELECT pretty_text FROM contexts WHERE file_path = ?1
-                 ORDER BY updated_at DESC LIMIT 1",
-                params![file_path],
-                |row| row.get::<_, Option<String>>(0),
-            )
-            .optional()?
-            .flatten()
-            .filter(|text| !text.is_empty()))
-    }
-
     pub(crate) fn checkpoint_matches(
         &self,
         file_path: &str,

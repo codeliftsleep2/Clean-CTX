@@ -1,6 +1,7 @@
 use crate::ir::compiler::CompiledIR;
 use crate::ir::opcodes::CoreOp;
 use crate::mcp::context_store::ContextStore;
+use crate::mcp::tool_handlers::control_full_test_support;
 use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
 
@@ -230,7 +231,10 @@ fn overwrite_and_durable_restore_preserve_persisted_ownership_coherently() {
     let repeated = dispatch(&state, 11, "compress_code_context", args());
     assert!(first.get("error").is_none(), "{first}");
     assert!(repeated.get("error").is_none(), "{repeated}");
-    assert_eq!(first["result"]["content"], repeated["result"]["content"]);
+    assert_eq!(
+        control_full_test_support::payload_without_ir_version(&first),
+        control_full_test_support::payload_without_ir_version(&repeated)
+    );
     std::fs::write(&path, "class Second { two(): void {} }\n").unwrap();
     state.invalidate_source_cache(&file_path);
     assert!(
@@ -375,8 +379,13 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
     assert!(produced.get("error").is_none(), "{produced}");
     let compact = produced["result"]["content"][0]["text"]
         .as_str()
-        .expect("compact MCP text");
-    for marker in ["cmod:", "mod:", "ctl:", "pf:"] {
+        .expect("CONTROL-FULL MCP text");
+    assert!(compact.starts_with("// CONTROL-FULL v1"));
+    for marker in [
+        "modifier_occurrences",
+        "control_summary_occurrences",
+        "pattern_fact_occurrences",
+    ] {
         assert!(compact.contains(marker), "missing {marker}: {compact}");
     }
     let methods = produced["result"]["ir"]["ir"]["c"][0]["m"]
@@ -448,7 +457,12 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
     let replayed_text = replayed["result"]["content"][0]["text"]
         .as_str()
         .expect("replayed MCP text");
-    for marker in ["cmod:", "mod:", "ctl:", "pf:"] {
+    assert!(replayed_text.starts_with("// CONTROL-FULL v1"));
+    for marker in [
+        "modifier_occurrences",
+        "control_summary_occurrences",
+        "pattern_fact_occurrences",
+    ] {
         assert!(replayed_text.contains(marker), "missing replayed {marker}");
     }
 }
@@ -508,11 +522,10 @@ fn registered_interface_producers_persist_reload_and_expose_interface_semantics(
             arguments(),
         );
         assert!(first.get("error").is_none(), "{first}");
-        let text = first
-            .pointer("/result/content/0/text")
-            .and_then(Value::as_str)
-            .expect("compact interface response");
-        assert!(text.contains(&format!("Q {interface_name}")), "{text}");
+        assert!(
+            control_full_test_support::has_interface(&first, interface_name),
+            "{first}"
+        );
 
         state.flush_persistence();
         let persisted = {
@@ -588,10 +601,9 @@ fn registered_interface_producers_persist_reload_and_expose_interface_semantics(
             "compress_code_context",
             arguments(),
         );
-        let text = after_reload
-            .pointer("/result/content/0/text")
-            .and_then(Value::as_str)
-            .expect("post-reload interface response");
-        assert!(text.contains(&format!("Q {interface_name}")), "{text}");
+        assert!(
+            control_full_test_support::has_interface(&after_reload, interface_name),
+            "{after_reload}"
+        );
     }
 }

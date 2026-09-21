@@ -114,7 +114,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "filePath": { "type": "string" },
                     "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"], "description": "edit: byte-exact method bodies for safe replace_in_file. refactor: full structural detail. overview: max compression. debug: balanced. implement: moderate detail." },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: config default." },
-                    "focusMethods": { "type": "array", "items": { "type": "string" }, "description": "Optional. When set alongside fidelity: \"edit\", only these method/function names get full verbatim bodies; all other methods in the file are rendered signature-only. Omit to render every method's body (current default behavior)." },
+                    "focusMethods": { "type": "array", "items": { "type": "string" }, "description": "Optional with fidelity \"edit\". Select qualified Owner.method names, or a bare name owned by exactly one typed owner. Selectors resolve to canonical method IDs before body filtering; ambiguous selectors fail. A same-owner overload family selects all overload occurrences. Omit to render every method body." },
                     "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." },
                     "tokenizer": { "type": "string" }
                 },

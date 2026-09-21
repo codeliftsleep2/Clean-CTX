@@ -34,7 +34,6 @@ pub(crate) struct RestoredDurableContext {
     pub semantic_edges: Vec<SemanticEdge>,
     pub source_hash: String,
     pub fidelity: Fidelity,
-    pub compact_output: Option<String>,
 }
 
 impl SqliteStore {
@@ -213,11 +212,6 @@ impl SqliteStore {
             semantic_edges,
             source_hash: snapshot.source_hash,
             fidelity: metadata.fidelity,
-            compact_output: if target_sequence.is_none() {
-                self.latest_compact_output(file_path)?
-            } else {
-                None
-            },
         }))
     }
 

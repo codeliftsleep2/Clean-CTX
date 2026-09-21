@@ -125,7 +125,14 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             None => return,
         };
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
-        let candidate_compact = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
+        let candidate_compact = crate::ir::render_control_full(
+            &ir.file_id,
+            &resolved_path,
+            ir.version,
+            effective_fidelity,
+            &hir,
+            &semantic_edges,
+        );
         let compressed_tokens = count_tokens_with_tokenizer(&candidate_compact, tokenizer_ref);
 
         // P9-14: durability is the publication boundary. Persist the checked
@@ -167,14 +174,13 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         let path_alias = state.get_or_create_alias(resolved_path.clone());
         ir.file_id.clone_from(&path_alias);
         let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
-        let llm_text = crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
-        let footer = state.format_dict_footer_for_aliases(&[&path_alias]);
-        let llm_text_with_footer = format!(
-            "{}\n// ── {} ({}) ──\n{}",
-            llm_text.trim(),
-            path_alias,
-            resolved_path,
-            footer.trim()
+        let llm_text_with_footer = super::content::control_full_document(
+            &ir,
+            &hir,
+            &semantic_edges,
+            effective_fidelity,
+            &resolved_path,
+            state,
         );
         let compressed_tokens = count_tokens_with_tokenizer(&llm_text_with_footer, tokenizer_ref);
 
@@ -263,7 +269,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             "error": {
                 "code": -32603,
                 "message": format!(
-                    "IR compilation unavailable for {}: {}. SCHEMA v5 output \
+                    "IR compilation unavailable for {}: {}. CONTROL-FULL output \
                      cannot be produced for this input; retry with fidelity \
                      \"verbatim\" or read the source directly.",
                     resolved_path, reason

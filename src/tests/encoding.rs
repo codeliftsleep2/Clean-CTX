@@ -148,6 +148,7 @@ fn collect_text_files() -> Vec<PathBuf> {
         .lines()
         .filter(|l| !l.trim().is_empty() && is_tracked_text_file(l))
         .map(|l| repo_root().join(l))
+        .filter(|path| path.is_file())
         .collect()
 }
 

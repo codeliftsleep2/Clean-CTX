@@ -1,6 +1,6 @@
 use super::common::{
-    checked_hierarchy_or_respond, compiled_from_tuples, contract_fields_focused,
-    invalid_session_ir_response, maybe_economics_fallback,
+    compiled_from_tuples, contract_fields_focused, invalid_session_ir_response,
+    resolve_focus_or_respond,
 };
 use crate::error::to_jsonrpc_error;
 use crate::ir::delta::SequenceDeltaComputer;
@@ -130,6 +130,9 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     let heuristics_ms = heuristics_start.elapsed().as_millis() as u64;
 
     let effective_fidelity = decision.fidelity;
+    let edit_focus = (effective_fidelity == crate::compression::Fidelity::Edit)
+        .then_some(focus_methods.as_ref())
+        .flatten();
     let (content_kind, byte_exact) =
         contract_fields_focused(effective_fidelity, focus_methods.as_ref());
     let strategy = decision.strategy;
@@ -188,66 +191,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             "unfavorable"
         };
         te_threshold = threshold;
-        if !prediction {
-            match compile_file_ir_focused(
-                &resolved_path,
-                crate::compression::Fidelity::Edit,
-                state,
-                focus_methods.as_ref(),
-            ) {
-                Ok((compiled, semantic_edges, source_hash)) => {
-                    if checked_hierarchy_or_respond(id, &compiled).is_none() {
-                        return;
-                    }
-                    let compiled_file = compiled.file_id.clone();
-                    if let Err(error) = super::provide_persistence::persist_edit_baseline(
-                        state,
-                        &resolved_path,
-                        effective_fidelity,
-                        &compiled,
-                        &semantic_edges,
-                        &source_hash,
-                        raw_tokens,
-                    ) {
-                        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                            id.clone(),
-                            -32603,
-                            error,
-                            None,
-                        ));
-                        return;
-                    }
-                    state.ir_context_lock().load_ir(compiled, Some(source_hash));
-                    state.remember_context_fidelity(&compiled_file, effective_fidelity);
-
-                    // Rendering economics never changes semantic ownership.
-                    let canonical_path =
-                        crate::dictionary::path::canonical_identity_key(&resolved_path);
-                    let mut idx = state.workspace_index_lock();
-                    idx.remove_file(&canonical_path);
-                    idx.add_edges(&canonical_path, semantic_edges.clone());
-                    drop(idx);
-                    state.remember_semantic_edges(&compiled_file, semantic_edges);
-                }
-                Err(e) => {
-                    send_response(&to_jsonrpc_error(id, &e));
-                    return;
-                }
-            }
-
-            maybe_economics_fallback(
-                id,
-                source,
-                raw_tokens,
-                raw_tokens + 1, // comp_tokens > raw_tokens always (raw passthrough)
-                state,
-                &resolved_path,
-                is_angular,
-                crate::compression::Fidelity::Edit,
-                &decision.summary(),
-            );
-            return;
-        }
     }
 
     let _span = tracing::info_span!(
@@ -265,20 +208,16 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     match strategy {
         crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
             let compile_start = Instant::now();
-            let (compiled, semantic_edges, source_hash) = match compile_file_ir_focused(
-                &resolved_path,
-                effective_fidelity,
-                state,
-                focus_methods.as_ref(),
-            ) {
-                Ok(c) => c,
-                Err(e) => {
-                    send_response(&to_jsonrpc_error(id, &e));
-                    return;
-                }
-            };
+            let (mut compiled, semantic_edges, source_hash) =
+                match compile_file_ir_focused(&resolved_path, effective_fidelity, state, None) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        send_response(&to_jsonrpc_error(id, &e));
+                        return;
+                    }
+                };
             let compile_ms = compile_start.elapsed().as_millis() as u64;
-            let checked_hir = match checked_hierarchy_or_respond(id, &compiled) {
+            let checked_hir = match resolve_focus_or_respond(id, &mut compiled, edit_focus) {
                 Some(hierarchy) => hierarchy,
                 None => return,
             };
@@ -287,6 +226,40 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
 
             let delta_start = Instant::now();
             let prev_version = state.file_version(&alias).unwrap_or(0);
+            let initial_full = if prev_version == 0 {
+                let full = super::content::control_full_document(
+                    &compiled,
+                    &checked_hir,
+                    &semantic_edges,
+                    effective_fidelity,
+                    &resolved_path,
+                    state,
+                );
+                let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
+                let compressed_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
+                if effective_fidelity == crate::compression::Fidelity::Edit {
+                    if let Err(error) = super::provide_persistence::persist_edit_baseline(
+                        state,
+                        &resolved_path,
+                        &compiled,
+                        &semantic_edges,
+                        &source_hash,
+                        raw_tokens,
+                        compressed_tokens,
+                    ) {
+                        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                            id.clone(),
+                            -32603,
+                            error,
+                            None,
+                        ));
+                        return;
+                    }
+                }
+                Some(full)
+            } else {
+                None
+            };
             let mut ir_ctx = state.ir_context_lock();
             let mut delta = if prev_version > 0 && ir_ctx.has_file(&alias) {
                 let Some(prev_instructions) = ir_ctx.get_ir(&alias).cloned() else {
@@ -342,8 +315,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             match delta {
                 Some(ref d) => {
                     let wire_delta = serde_json::to_value(d).unwrap_or_default();
-                    // Count the actual delta payload.
-                    let delta_text = serde_json::to_string(&wire_delta).unwrap_or_default();
+                    let delta_text = super::content::control_full_delta(
+                        &compiled.file_id,
+                        effective_fidelity,
+                        d,
+                        &semantic_edges,
+                    );
                     raw_tokens = count_tokens_with_tokenizer(&delta_text, tokenizer_ref);
                     comp_tokens = raw_tokens; // delta is the payload itself
                     let prev_full_compressed = state
@@ -352,7 +329,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         .map(|f| f.compressed_tokens);
                     let mut response = serde_json::json!({
                         "jsonrpc": "2.0", "id": id, "result": {
-                            "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): {} positional edits", compiled.file_id, d.from, d.to, d.edits.len()) }],
+                            "content": [{ "type": "text", "text": delta_text }],
                             "_meta": {
                                 "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                                 "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
@@ -381,38 +358,19 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 }
                 None => {
                     let render_start = Instant::now();
-                    let llm_text = crate::ir::render_hierarchical_for_llm_focused(
-                        &checked_hir,
-                        effective_fidelity,
-                        focus_methods.as_ref(),
-                    );
-                    let full = format!(
-                        "{}\n// ── {} ({}) ──\n{}",
-                        llm_text.trim(),
-                        compiled.file_id,
-                        resolved_path,
-                        state
-                            .format_dict_footer_for_aliases(&[&compiled.file_id])
-                            .trim()
-                    );
+                    let full = initial_full.unwrap_or_else(|| {
+                        super::content::control_full_document(
+                            &compiled,
+                            &checked_hir,
+                            &semantic_edges,
+                            effective_fidelity,
+                            &resolved_path,
+                            state,
+                        )
+                    });
                     let render_ms = render_start.elapsed().as_millis() as u64;
                     raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                     comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
-                    // Fall back when the compact representation costs more
-                    // tokens than the raw source, at every fidelity level.
-                    if maybe_economics_fallback(
-                        id,
-                        source,
-                        raw_tokens,
-                        comp_tokens,
-                        state,
-                        &resolved_path,
-                        is_angular,
-                        effective_fidelity,
-                        &decision.summary(),
-                    ) {
-                        return;
-                    }
                     state.record_compression(
                         &resolved_path,
                         raw_tokens,
@@ -447,7 +405,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         raw_tokens = raw_tokens,
                         comp_tokens = comp_tokens,
                         savings_pct = if raw_tokens > 0 {
-                            ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0) as u64
+                            (raw_tokens.saturating_sub(comp_tokens) as f64 / raw_tokens as f64
+                                * 100.0) as u64
                         } else {
                             0
                         },
@@ -475,21 +434,47 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         }
         crate::mcp::heuristics::ContextStrategy::FullCompress => {
             let compile_start = Instant::now();
-            let ir_result = compile_file_ir_focused(
-                &resolved_path,
-                effective_fidelity,
-                state,
-                focus_methods.as_ref(),
-            );
+            let ir_result =
+                compile_file_ir_focused(&resolved_path, effective_fidelity, state, None);
             let compile_ms = compile_start.elapsed().as_millis() as u64;
 
-            if let Ok((ir, semantic_edges, source_hash)) = ir_result {
+            if let Ok((mut ir, semantic_edges, source_hash)) = ir_result {
                 let render_start = Instant::now();
                 // Note: IR error is logged below in the else branch (4.4 audit fix)
-                let hir = match checked_hierarchy_or_respond(id, &ir) {
+                let hir = match resolve_focus_or_respond(id, &mut ir, edit_focus) {
                     Some(hierarchy) => hierarchy,
                     None => return,
                 };
+
+                let full = super::content::control_full_document(
+                    &ir,
+                    &hir,
+                    &semantic_edges,
+                    effective_fidelity,
+                    &resolved_path,
+                    state,
+                );
+                let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
+                let comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
+                if effective_fidelity == crate::compression::Fidelity::Edit {
+                    if let Err(error) = super::provide_persistence::persist_edit_baseline(
+                        state,
+                        &resolved_path,
+                        &ir,
+                        &semantic_edges,
+                        &source_hash,
+                        raw_tokens,
+                        comp_tokens,
+                    ) {
+                        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                            id.clone(),
+                            -32603,
+                            error,
+                            None,
+                        ));
+                        return;
+                    }
+                }
 
                 // Compute canonical file identity for WorkspaceIndex provenance
                 let canonical_path =
@@ -505,38 +490,10 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     idx.add_edges(&canonical_path, semantic_edges.clone());
                 }
                 state.remember_semantic_edges(&ir.file_id, semantic_edges.clone());
-                let llm_text = crate::ir::render_hierarchical_for_llm_focused(
-                    &hir,
-                    effective_fidelity,
-                    focus_methods.as_ref(),
-                );
-                let full = format!(
-                    "{}\n// ── {} ({}) ──\n{}",
-                    llm_text.trim(),
-                    ir.file_id,
-                    resolved_path,
-                    state.format_dict_footer_for_aliases(&[&ir.file_id]).trim()
-                );
                 state
                     .llm_text_cache_lock()
                     .insert(ir.file_id.clone(), full.clone());
                 let render_ms = render_start.elapsed().as_millis() as u64;
-                let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
-                let comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
-                // Apply the shared token-economics fallback at every fidelity.
-                if maybe_economics_fallback(
-                    id,
-                    source,
-                    raw_tokens,
-                    comp_tokens,
-                    state,
-                    &resolved_path,
-                    is_angular,
-                    effective_fidelity,
-                    &decision.summary(),
-                ) {
-                    return;
-                }
                 state.record_compression(
                     &resolved_path,
                     raw_tokens,
@@ -572,7 +529,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     raw_tokens = raw_tokens,
                     comp_tokens = comp_tokens,
                     savings_pct = if raw_tokens > 0 {
-                        ((raw_tokens - comp_tokens) as f64 / raw_tokens as f64 * 100.0) as u64
+                        (raw_tokens.saturating_sub(comp_tokens) as f64 / raw_tokens as f64 * 100.0)
+                            as u64
                     } else {
                         0
                     },
@@ -596,7 +554,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     "error": {
                         "code": -32603,
                         "message": format!(
-                            "IR compilation unavailable for {}: {}. SCHEMA v5 output \
+                            "IR compilation unavailable for {}: {}. CONTROL-FULL output \
                              cannot be produced for this input; retry with fidelity \
                              \"verbatim\" or read the source directly.",
                             resolved_path, reason

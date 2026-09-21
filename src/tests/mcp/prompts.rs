@@ -2,49 +2,37 @@
 //
 // Contract tests for SYSTEM_PROMPT notation documentation.
 //
-// Guards against silent drift back to the retired `$`-opcode / `⊕`
-// marker tables: the PRIMARY response notation (SCHEMA v5) must stay
-// taught first, High/Edit behaviors must stay documented, and the
-// retired text-compressor vocabulary must remain explicitly scoped to
-// the legacy section (compress_workspace).
+// Guards the portable model-visible CONTROL-FULL contract.
 
 use super::SYSTEM_PROMPT;
 
 #[test]
-fn teaches_schema_v5_legend_as_primary_notation() {
-    let legend_fragments = [
-        "// SCHEMA v5",
-        "@=meta",
-        "X=extends",
-        "I=implements",
-        "F=field",
-        "M=method",
-        "$=import",
-        "→=scope",
-        "mod:=method-modifiers",
-        "cmod:=class-modifiers",
-        "ctl:=control-summary",
-        "pf:=pattern-facts",
-        "fl:=legacy-flags",
-        "cl:=class-metadata",
-        "P=pattern",
-        "T=type-alias",
-    ];
-    for frag in legend_fragments {
+fn teaches_control_full_as_primary_notation() {
+    for frag in [
+        "// CONTROL-FULL v1",
+        "canonical IDs are authoritative",
+        "classes` / `interfaces`",
+        "caller_method_id",
+        "callee_written_name",
+        "semantic_edges",
+        "typed ownership",
+    ] {
         assert!(
             SYSTEM_PROMPT.contains(frag),
-            "SYSTEM_PROMPT must teach the SCHEMA v5 legend fragment `{frag}`"
+            "SYSTEM_PROMPT must teach CONTROL-FULL fragment `{frag}`"
         );
     }
-    assert!(
-        SYSTEM_PROMPT.contains("## Response Notation (SCHEMA v5)"),
-        "primary notation section missing"
-    );
 }
 
 #[test]
 fn documents_high_and_edit_behaviors() {
-    for frag in ["cf:", "df:", "se:", "ec:", "VERBATIM source body"] {
+    for frag in [
+        "Low/Medium/High",
+        "Edit adds byte-exact method bodies",
+        "exact_body_method_ids",
+        "fidelity=\"verbatim\"",
+        "CONTROL-FULL-DELTA v1",
+    ] {
         assert!(
             SYSTEM_PROMPT.contains(frag),
             "SYSTEM_PROMPT must document High/Edit fragment `{frag}`"
@@ -53,12 +41,8 @@ fn documents_high_and_edit_behaviors() {
 }
 
 #[test]
-fn retired_vocabulary_is_absent_from_the_prompt_entirely() {
-    // Phase A retirement: with the three IR fallbacks converted to
-    // structured `ir_unavailable` errors, no LLM-facing prompt teaches
-    // the retired `$`-primitive / `⊕`-marker / `§`-micro-code tables.
+fn retired_vocabulary_is_not_taught_as_current_semantics() {
     for tok in [
-        "## Legacy Notation",
         "Primitive opcodes",
         "$ctor",
         "$nw",

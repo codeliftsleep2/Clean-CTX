@@ -1,6 +1,9 @@
 // Diff, delta, and apply-delta MCP handlers.
 
-use super::common::{compiled_from_tuples, contract_fields, invalid_session_ir_response};
+use super::common::{
+    checked_hierarchy_or_respond, compiled_from_tuples, contract_fields,
+    invalid_session_ir_response,
+};
 use crate::error::to_jsonrpc_error;
 use crate::ir::delta::{IRDelta, SequenceDelta, SequenceDeltaComputer};
 use crate::mcp::McpState;
@@ -224,9 +227,15 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
         Some(d) => {
             let wire_delta = serde_json::to_value(&d).unwrap_or_default();
             let (content_kind, byte_exact) = contract_fields(fidelity);
+            let content = super::content::control_full_delta(
+                &compiled.file_id,
+                fidelity,
+                &d,
+                &semantic_edges,
+            );
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id, "result": {
-                    "content": [{ "type": "text", "text": format!("Δ delta for {} (v{} → v{}): {} positional edits", compiled.file_id, d.from, d.to, d.edits.len()) }],
+                    "content": [{ "type": "text", "text": content }],
                     "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                     "strategy": "delta", "fidelity": format!("{:?}", fidelity).to_lowercase(),
                     "content_kind": content_kind, "byte_exact": byte_exact,
@@ -275,10 +284,22 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             } else {
                 prev_version
             };
+            let hierarchy = match checked_hierarchy_or_respond(id, &compiled) {
+                Some(hierarchy) => hierarchy,
+                None => return,
+            };
+            let content = super::content::control_full_document(
+                &compiled,
+                &hierarchy,
+                &semantic_edges,
+                fidelity,
+                &resolved_path,
+                state,
+            );
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": {
-                    "content": [{ "type": "text", "text": format!("Baseline stored for {} (v{})", compiled.file_id, version) }],
+                    "content": [{ "type": "text", "text": content }],
                     "version": version, "instruction_count": compiled.instructions.len(),
                     "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                 }
@@ -348,7 +369,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
     }
     let persistence_enabled = state.persistence_store_lock().is_some();
     let pending_transition = match &delta {
-        IncomingDelta::Sequence(delta) if persistence_enabled => {
+        IncomingDelta::Sequence(delta) if !delta.edits.is_empty() => {
             match state.pending_transition(&file, &durable_file, delta) {
                 Ok(transition) => Some(transition),
                 Err(error) => {
@@ -357,10 +378,14 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                 }
             }
         }
-        IncomingDelta::Legacy(_) if persistence_enabled => {
+        IncomingDelta::Legacy(delta)
+            if !delta.ops.adds.is_empty()
+                || !delta.ops.mods.is_empty()
+                || !delta.ops.dels.is_empty() =>
+        {
             send_response(&invalid_session_ir_response(
                 id,
-                "durable legacy delta application lacks authoritative semantic-edge state",
+                "mutating legacy delta application lacks authoritative semantic-edge state",
             ));
             return;
         }
@@ -448,42 +473,57 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             let fidelity = state
                 .context_fidelity(&file)
                 .unwrap_or(crate::compression::Fidelity::Low);
-            let compact = crate::ir::render_hierarchical_for_llm(&hierarchy, fidelity);
+            let target_edges = pending_transition
+                .as_ref()
+                .map(|transition| transition.semantic_edges.clone())
+                .or_else(|| state.semantic_edges(&file))
+                .unwrap_or_default();
+            let compact = crate::ir::render_control_full(
+                &target_ir.file_id,
+                &durable_file,
+                target_ir.version,
+                fidelity,
+                &hierarchy,
+                &target_edges,
+            );
 
             if let Some(transition) = &pending_transition {
                 debug_assert_eq!(transition.from, from);
                 debug_assert_eq!(transition.to, new_version);
-                let snapshot = crate::mcp::state::durable_semantics::DurableSemanticSnapshot::new(
-                    durable_file.clone(),
-                    source_hash.clone(),
-                    new_version,
-                    &transition.semantic_edges,
-                );
-                let persisted = persisted_context.as_ref().is_some_and(|context_id| {
-                    state
-                        .persistence_store_lock()
-                        .as_ref()
-                        .is_some_and(|store| {
-                            store.sqlite().is_some_and(|mut sqlite| {
-                                sqlite
-                                    .append_delta_with_semantics(
-                                        context_id,
-                                        &persisted_payload,
-                                        edit_type,
-                                        &compact,
-                                        &snapshot,
-                                    )
-                                    .is_ok()
+                if persistence_enabled {
+                    let snapshot =
+                        crate::mcp::state::durable_semantics::DurableSemanticSnapshot::new(
+                            durable_file.clone(),
+                            source_hash.clone(),
+                            new_version,
+                            &transition.semantic_edges,
+                        );
+                    let persisted = persisted_context.as_ref().is_some_and(|context_id| {
+                        state
+                            .persistence_store_lock()
+                            .as_ref()
+                            .is_some_and(|store| {
+                                store.sqlite().is_some_and(|mut sqlite| {
+                                    sqlite
+                                        .append_delta_with_semantics(
+                                            context_id,
+                                            &persisted_payload,
+                                            edit_type,
+                                            &compact,
+                                            &snapshot,
+                                        )
+                                        .is_ok()
+                                })
                             })
-                        })
-                });
-                if !persisted {
-                    drop(ir_ctx);
-                    send_response(&invalid_session_ir_response(
-                        id,
-                        "canonical delta and semantic edges were not persisted atomically",
-                    ));
-                    return;
+                    });
+                    if !persisted {
+                        drop(ir_ctx);
+                        send_response(&invalid_session_ir_response(
+                            id,
+                            "canonical delta and semantic edges were not persisted atomically",
+                        ));
+                        return;
+                    }
                 }
             } else if let Some(context_id) = &persisted_context {
                 if let Some(ref store) = *state.persistence_store_lock() {
@@ -508,7 +548,6 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             }
 
             *ir_ctx = candidate;
-            let rendered = ir_ctx.render_pretty(&file, crate::compression::Fidelity::Low);
             drop(ir_ctx);
             if let Some(transition) = pending_transition {
                 let canonical_path = crate::dictionary::path::canonical_identity_key(&durable_file);
@@ -519,9 +558,17 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                 state.remember_semantic_edges(&file, transition.semantic_edges);
                 state.consume_pending_transition(&file, from, new_version);
             }
+            let rendered = super::content::control_full_document(
+                &target_ir,
+                &hierarchy,
+                &target_edges,
+                fidelity,
+                &durable_file,
+                state,
+            );
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
-                "result": { "content": [{ "type": "text", "text": rendered.unwrap_or_default() }], "_meta": { "version": new_version } }
+                "result": { "content": [{ "type": "text", "text": rendered }], "_meta": { "version": new_version } }
             });
             // Applied delta output is rolling dynamic content — mark as tail (ephemeral).
             inject_tail_breakpoint(&mut response, state);

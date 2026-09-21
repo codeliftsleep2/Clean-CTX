@@ -210,17 +210,14 @@ fn test_renderer_no_panic_on_large_hir() {
 }
 
 #[test]
-fn test_injects_field_not_rendered_as_separate_line() {
-    // Injects are part of the class node but not directly rendered as a
-    // marker line in the current renderer (they flow through IR pipeline).
-    // This test verifies they don't cause panics.
+fn test_injects_are_explicit_in_control_full() {
     let mut hir = empty_hir();
     let mut class = make_class("InjectedService");
     class.injects.push(vec!["Dep1".into(), "Dep2".into()]);
     hir.classes.push(class);
 
-    // Should render without error, injects are structural (pattern-level)
-    // not directly rendered as standalone markers
-    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ── InjectedService ──"));
+    let result = crate::ir::render_control_full("alpha", "fixture.ts", 1, Fidelity::Low, &hir, &[]);
+    assert!(result.contains("\"injection_occurrences\""));
+    assert!(result.contains("\"Dep1\""));
+    assert!(result.contains("\"Dep2\""));
 }

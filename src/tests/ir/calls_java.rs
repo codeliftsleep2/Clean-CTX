@@ -23,7 +23,7 @@ use crate::ir::layers::java::JavaLayer;
 use crate::ir::layers::patterns::CodePatternRecognizer;
 use crate::ir::opcodes::CoreOp;
 use crate::ir::patterns::CompressingPatternRecognizer;
-use crate::ir::render_llm::render_hierarchical_for_llm;
+use crate::ir::render_control_full;
 use crate::queries::JAVA_QUERY;
 
 /// Compile a Java source string with the production compiler configuration.
@@ -354,7 +354,7 @@ fn java_call24_call_capture_costs_no_additional_parse() {
 }
 
 #[test]
-fn java_call25_call_captures_do_not_touch_existing_compressed_output() {
+fn java_call25_calls_are_model_visible_in_control_full() {
     let language =
         crate::compression::language::safe_java_language().expect("java grammar enabled");
     let source = "class Example { void a() { b(x); } }";
@@ -377,12 +377,15 @@ fn java_call25_call_captures_do_not_touch_existing_compressed_output() {
         captures.iter().map(|c| c.name.clone()).collect::<Vec<_>>()
     );
 
-    // 2. The LLM-facing hierarchical render is byte-identical whether or not
-    //    the native call facts are present in the instruction stream.
+    // 2. CONTROL-FULL changes when canonical call facts are removed.
     let ir = compile_java(source);
-    let with_calls = render_hierarchical_for_llm(
-        &crate::ir::hierarchical::ir_to_hierarchical(&ir),
+    let with_calls = render_control_full(
+        &ir.file_id,
+        "Fixture.java",
+        ir.version,
         Fidelity::Medium,
+        &crate::ir::hierarchical::ir_to_hierarchical(&ir),
+        &[],
     );
     let stripped = CompiledIR {
         file_id: ir.file_id.clone(),
@@ -394,14 +397,19 @@ fn java_call25_call_captures_do_not_touch_existing_compressed_output() {
             .collect(),
         version: ir.version,
     };
-    let without_calls = render_hierarchical_for_llm(
-        &crate::ir::hierarchical::ir_to_hierarchical(&stripped),
+    let without_calls = render_control_full(
+        &stripped.file_id,
+        "Fixture.java",
+        stripped.version,
         Fidelity::Medium,
+        &crate::ir::hierarchical::ir_to_hierarchical(&stripped),
+        &[],
     );
-    assert_eq!(
+    assert_ne!(
         with_calls, without_calls,
-        "adding call captures must not change compressed rendering"
+        "canonical calls must change model-visible CONTROL-FULL"
     );
+    assert!(with_calls.contains("callee_written_name"));
 }
 
 #[test]

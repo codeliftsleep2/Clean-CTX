@@ -29,6 +29,10 @@ pub use registry::HandlerRegistry;
 #[allow(unused_imports)]
 pub use traits::BoxedHandlerFn;
 
+#[cfg(test)]
+#[path = "../../tests/mcp/control_full_test_support.rs"]
+pub(crate) mod control_full_test_support;
+
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/tool_handlers.rs"]
 pub(crate) mod tool_handlers_tests;

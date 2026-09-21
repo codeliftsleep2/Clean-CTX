@@ -54,16 +54,14 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         Some(hierarchy) => hierarchy,
         None => return,
     };
-    let full = restored.compact_output.unwrap_or_else(|| {
-        let compact = crate::ir::render_hierarchical_for_llm(&hierarchy, restored.fidelity);
-        format!(
-            "{}\n// ── {} ({}) ──\n{}",
-            compact.trim(),
-            alias,
-            durable_path,
-            state.format_dict_footer_for_aliases(&[&alias]).trim()
-        )
-    });
+    let full = super::content::control_full_document(
+        &session_ir,
+        &hierarchy,
+        &restored.semantic_edges,
+        restored.fidelity,
+        &durable_path,
+        state,
+    );
     let canonical_path = crate::dictionary::path::canonical_identity_key(&durable_path);
     let edge_count = restored.semantic_edges.len();
 

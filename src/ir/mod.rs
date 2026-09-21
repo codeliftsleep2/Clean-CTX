@@ -22,7 +22,9 @@ pub mod binary_wire;
 pub mod calls;
 pub mod compiler;
 pub(crate) mod compiler_methods;
+pub mod control_full;
 pub mod delta;
+pub mod focus;
 pub mod hierarchical;
 pub mod identity;
 pub mod layers;
@@ -52,6 +54,7 @@ pub use binary_wire::{
     ir_to_binary_wire_json, is_binary_wire,
 };
 pub use compiler::{CompileError, CompiledIR, IRCompiler};
+pub use control_full::{normalize_control_full, render_control_full};
 pub use delta::{
     CompactDelta, CompactOps, CompactSequenceDelta, DeltaComputer, DeltaIdentity, DeltaOpcode,
     DeltaOps, FieldPatch, IRDelta, ModOp, OccurrenceKey, SEQUENCE_DELTA_VERSION, SemanticIntent,

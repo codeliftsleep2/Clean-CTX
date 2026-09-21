@@ -169,8 +169,8 @@ fn workspace_query_transitive_deps_missing_args() {
 
 // ── Token-economics regression (Issue #2) ──────────────────────────
 //
-// Verifies that compile_file_ir_focused semantic edges survive the
-// token-economics unfavorable-prediction fallback path.
+// Verifies that CONTROL-FULL publication and the WorkspaceIndex share the
+// same semantic-edge authority.
 //
 // The write path (handle_provide_code_context) compiles a small file
 // at Edit fidelity. Token-economics predicts the full render is not
@@ -185,7 +185,7 @@ fn workspace_query_transitive_deps_missing_args() {
 
 #[test]
 #[cfg(any(feature = "csharp", feature = "dotnet"))]
-fn find_entities_after_token_economics_fallback() {
+fn find_entities_after_control_full_publication() {
     use crate::mcp::tools::dispatch_tools_call;
     use serde_json::json;
     use tempfile::TempDir;
@@ -210,8 +210,6 @@ public class TestController : ControllerBase
     let id = json!(1);
 
     // Step 1: Call provide_code_context with Edit fidelity.
-    // The file is small so token-economics should predict
-    // unfavorable and return raw passthrough.
     let pcc_params = json!({
         "arguments": {
             "filePath": file_str,
@@ -227,15 +225,10 @@ public class TestController : ControllerBase
         "provide_code_context should succeed for small file"
     );
 
-    // Confirm the response uses the economics fallback (raw passthrough)
-    let is_fallback = pcc_resp["result"]["_meta"]["content_kind"]
-        .as_str()
-        .map(|k| k == "raw_passthrough")
-        .unwrap_or(false);
     assert!(
-        is_fallback,
-        "small file at Edit fidelity must trigger token-economics fallback: {:?}",
-        pcc_resp["result"]["_meta"]["content_kind"].as_str()
+        pcc_resp["result"]["content"][0]["text"]
+            .as_str()
+            .is_some_and(|text| text.starts_with("// CONTROL-FULL v1"))
     );
 
     // Step 2: Query find_entities for the expected entity name.
@@ -260,12 +253,11 @@ public class TestController : ControllerBase
         .as_object()
         .expect("structuredContent");
     let count = sc["count"].as_i64().unwrap_or(-1);
-    // RED → GREEN: fails before the fix (count == 0 because semantic
-    // edges discarded in token-economics fallback), passes after the
-    // fix (edges persisted to WorkspaceIndex before fallback).
+    // The same authoritative edge stream feeds both model-visible content and
+    // the WorkspaceIndex.
     assert!(
         count > 0,
-        "find_entities must find entity after token-economics fallback; count={}",
+        "find_entities must find entity after CONTROL-FULL publication; count={}",
         count
     );
 

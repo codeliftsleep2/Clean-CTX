@@ -1,4 +1,5 @@
 use crate::ir::opcodes::CoreOp;
+use crate::mcp::tool_handlers::control_full_test_support;
 use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
 
@@ -28,7 +29,7 @@ fn baseline(state: &crate::mcp::McpState, file: &str, root: &tempfile::TempDir) 
     dispatch(
         state,
         1,
-        "compress_code_context",
+        "provide_code_context",
         json!({
             "filePath": file,
             "workspaceRoot": root.path().to_string_lossy(),
@@ -79,10 +80,9 @@ fn registered_edit_is_byte_exact_and_commits_source_durable_and_live_together() 
 
     let produced = baseline(&state, &file, &root);
     assert!(produced.get("error").is_none(), "{produced}");
-    let compact = produced["result"]["content"][0]["text"].as_str().unwrap();
     assert!(
-        compact.contains(old_body),
-        "full Body fallback was lost: {compact}"
+        control_full_test_support::has_method_body(&produced, "run", old_body),
+        "full Body fallback was lost: {produced}"
     );
 
     let old_start = prior
@@ -134,12 +134,9 @@ fn registered_edit_is_byte_exact_and_commits_source_durable_and_live_together() 
     state.ir_context_lock().remove_file(&alias);
     let restored = dispatch(&state, 3, "restore_context", json!({ "filePath": file }));
     assert!(restored.get("error").is_none(), "{restored}");
-    assert!(
-        restored["result"]["content"][0]["text"]
-            .as_str()
-            .unwrap()
-            .contains(new_body)
-    );
+    assert!(control_full_test_support::has_method_body(
+        &restored, "run", new_body
+    ));
 }
 
 #[test]
@@ -355,12 +352,11 @@ fn restore_recovers_exact_target_after_restart_between_source_and_durable_commit
     assert!(restored.get("error").is_none(), "{restored}");
     assert_eq!(std::fs::read(&file).unwrap(), target);
     assert_eq!(durable(&restarted, &file).version, target_version);
-    assert!(
-        restored["result"]["content"][0]["text"]
-            .as_str()
-            .unwrap()
-            .contains(target_body)
-    );
+    assert!(control_full_test_support::has_method_body(
+        &restored,
+        "run",
+        target_body
+    ));
     assert!(
         !restarted
             .persistence_store_lock()

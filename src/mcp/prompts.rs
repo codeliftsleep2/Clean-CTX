@@ -1,181 +1,80 @@
-// src/mcp/prompts.rs
-//
 // Prompt content for the MCP server.
 
-/// The cleanctx-notation system prompt.
-pub(crate) const SYSTEM_PROMPT: &str = concat!(
-    "# Clean-CTX Notation Guide\n\n",
-    "# Clean-CTX Notation Guide\n\n",
-    "You are working with Clean-CTX structured code context. Responses use ONE LLM-facing notation: SCHEMA v5 (below). The separate workspace manifests of `compress_workspace` are legacy compressed text — decode those with `decompress_code_context` instead of by hand.\n\n",
-    "## Response Notation (SCHEMA v5)\n\n",
-    "Every provide_code_context / compress_code_context / restore_context response starts with this legend:\n\n",
-    "`// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias`\n\n",
-    "Line grammar:\n",
-    "- `// ── <ClassName> ──` opens a class scope\n",
-    "- `cmod: <MODIFIERS>` typed class declaration modifiers\n",
-    "- `cl: <FLAGS>` residual class metadata\n",
-    "- `X <Parent>` — extends\n",
-    "- `I <Iface…>` — implements\n",
-    "- `F <name>:<type>` field (Low fidelity packs all fields on one `F` line)\n",
-    "- `M <name>(+N)` method — overloads disambiguated by parameter count\n",
-    "- `  → p:<name>:<type> …` parameters (Medium/High; hidden at Low unless overloaded)\n",
-    "- `  → <returnType>` return type\n",
-    "- `mod:<MODIFIER,…>` typed method declaration modifiers\n",
-    "- `ctl:<IF|LOOP|RET|THROW,…>` compact control summaries\n",
-    "- `fl:<FACT,…>` residual pattern facts\n",
-    "- `$ <alias> <module> [*|<names>]` import\n",
-    "- `T <alias> = <Type>` type alias\n",
-    "- `P <NAME> [args…]` structural pattern (e.g. CTOR, OBSERVABLE, GETTER, SETTER)\n",
-    "- Types render exactly as captured during compression\n\n",
-    "Per-fidelity additions:\n",
-    "- High: `cf:<kind>:<target,…>` control flow · `df:<dir>:<target,…>` reads/writes · `se:<effect>` pure/io/mutation/async/transaction · `ec:<ctx>` sync/async/thread_bound/transaction_scope/realtime\n",
-    "- Edit: the VERBATIM source body follows each focused method line — byte-exact, safe for exact-match editing\n\n",
-    "### Path Aliases\n",
-    "File paths are compressed to α1, α2, β1, etc. Check §MAP footer for path mappings.\n\n",
-    "## Behavioral Flags & Metadata\n",
-    "Control summaries ride inline on `M` lines via `ctl:`. Residual pattern facts use `fl:`. High fidelity additionally appends detailed `cf:` control flow, `df:` data flow, `se:` side effects and `ec:` execution context.\n\n",
-    "## Framework Meta Markers (Angular Meta-Layer, Phase 1)\n",
-    "When the source is an Angular file, the compressor appends a `// --- Φ Angular Meta ---` block below the compacted class entry. The block contains one or more `Φ`-prefixed lines that encode framework-annotation context. The Φ markers are **separate from** the opcodes and behavior markers — they describe what role the class plays in the framework.\n\n",
-    "| Marker | Meaning |\n",
-    "|--------|---------|\n",
-    "| Φcmp:<Class> | `@Component({...})` — class is an Angular component |\n",
-    "| Φdir:<Class> | `@Directive({...})` — class is an Angular directive |\n",
-    "| Φpipe:<Class> | `@Pipe({...})` — class is an Angular pipe |\n",
-    "| Φsvc:<Class> | `@Injectable({...})` — class is an Angular service (the `scope=...` attribute carries `providedIn`) |\n",
-    "| Φmod:<Class> | `@NgModule({...})` — class is an Angular module (with `decl=…` / `imp=…` / `exp=…` arrays) |\n",
-    "| Φin:<Field> | `@Input()` — class field is an input binding (optional `alias=...`) |\n",
-    "| Φout:<Field> | `@Output()` — class field is an output binding (optional `alias=...`) |\n",
-    "| Φinjects:[<Type>,…] | Constructor parameters with `private` / `protected` access modifier (Phase 1 emits bare type names; Phase 3 will resolve them to file aliases) |\n\n",
-    "The block looks like this for a component:\n",
-    "```\n",
-    "// --- Φ Angular Meta ---\n",
-    "Φcmp:UserCardComponent sel=app-user-card tpl=./user-card.component.html sty=./user-card.component.scss\n",
-    "Φin:userId\n",
-    "Φin:userName\n",
-    "Φout:userDeleted\n",
-    "Φinjects:[AuthService]\n",
-    "```\n\n",
-    "On decompression, the Φ markers are rewritten back to their `@…` decorator forms (e.g. `Φcmp:UserCard` → `@Component UserCard`). Non-Angular files produce **zero** Φ lines and the block is omitted entirely — there is no overhead for non-Angular projects.\n\n",
-    "## Angular Ecosystem Deepening Meta Markers (Φ-prefixed, Angular feature files only)\n",
-    "When the source is an Angular file that uses RxJS, NgRx, Signals, or Routing, the compressor appends additional `Φ` blocks below the Angular decorator block. Each block is scoped by its own `// --- Φ … Meta ---` header. Non-matching files pay zero overhead (import-gate detection).\n\n",
-    "### RxJS (`// --- Φ RxJS Meta ---`)\n",
-    "| Marker | Meaning |\n",
-    "|--------|---------|\n",
-    "| Φobs:name | Observable field declaration (`Observable<T>`, `of()`, `from()`, `interval()`, `timer()`, `fromEvent()`) |\n",
-    "| Φsubject:name | Subject/BehaviorSubject/ReplaySubject/AsyncSubject declaration (initial value for BehaviorSubject) |\n",
-    "| ΦpipeRx:name | RxJS `pipe()` chain container (renamed — no `@Pipe` collision) |\n",
-    "| Φmap:op | map/switchMap/mergeMap/concatMap/exhaustMap operator |\n",
-    "| Φtap: | tap() side-effect operator |\n",
-    "| Φfilter: | filter() predicate |\n",
-    "| Φcatch: | catchError() recovery |\n",
-    "| Φfinalize: | finalize() cleanup |\n",
-    "| Φdelay: | delay/debounceTime/throttleTime (ms value at High) |\n",
-    "| Φcombine:op | combineLatest/forkJoin/zip/race combinator |\n",
-    "| Φshare: | share()/shareReplay() multicasting (buffer size at High) |\n",
-    "| Φto: | firstValueFrom/lastValueFrom/toPromise conversion |\n",
-    "| Φwith: | withLatestFrom |\n",
-    "| Φscan: | scan/reduce |\n",
-    "| Φdistinct: | distinctUntilChanged |\n",
-    "| Φretry: | retry/retryWhen (count at High) |\n\n",
-    "### NgRx (`// --- Φ NgRx Meta ---`)\n",
-    "| Marker | Meaning |\n",
-    "|--------|---------|\n",
-    "| Φngrx:Feature | NgRx feature state identifier (`createFeature` / `StoreModule.forFeature`) |\n",
-    "| Φaction:name | Action creator with event string and props type |\n",
-    "| Φreducer:name | Reducer with state shape and transition summary |\n",
-    "| Φeffect:name$ | Effect with source action → service → result actions (`(no-dispatch)` for `{dispatch: false}`) |\n",
-    "| Φselector:name | Selector with input selectors |\n",
-    "| Φentity:Type | Entity adapter configuration (`selectId`, `sortComparer`, default selectors) |\n",
-    "| Φstore:State | `Store<T>` DI injection |\n",
-    "| Φdispatch:action | `store.dispatch()` call site |\n",
-    "| Φselect:sel | `store.select()` call site |\n\n",
-    "### Signals (`// --- Φ Signals Meta ---`)\n",
-    "| Marker | Meaning |\n",
-    "|--------|---------|\n",
-    "| Φsignal:name | `signal()` writable signal with type |\n",
-    "| Φcomputed:name | `computed()` derived signal |\n",
-    "| Φsig-effect: | `effect()` registration (disambiguated from NgRx `Φeffect:`) |\n",
-    "| ΦtoSignal:name | `toSignal()` observable → signal interop |\n",
-    "| ΦtoObservable:name | `toObservable()` signal → observable interop |\n",
-    "| ΦlinkedSignal:name | `linkedSignal()` (Angular 19+) |\n\n",
-    "### Routing (`// --- Φ Routing Meta ---`)\n",
-    "| Marker | Meaning |\n",
-    "|--------|---------|\n",
-    "| Φroute:path | Route with component/loadComponent/loadChildren, guards, resolvers |\n",
-    "| Φguard:name | Route guard (CanActivate/CanLoad/CanDeactivate/CanActivateFn) |\n",
-    "| Φresolver:name | Route resolver (Resolve/ResolveFn) |\n\n",
-    "### Cross-layer graph edges (`§ΦGRAPH` footer)\n",
-    "When CBM is available, the workspace manifest footer includes NgRx cross-layer edges:\n",
-    "`Φact→red:`, `Φact→eff:`, `Φeff→svc:`, `Φeff→act:`, `Φcmp→store:`, `Φcmp→sel:`, `Φeff→endpoint:` — enabling the LLM to trace `dispatch(loadUsers)` → `loadUsers$ effect` → `UserService.getUsers()` → `.NET UserController.GetAll()` as a single semantic chain.\n\n",
-    "## Diff Markers (from diff_code_context)\n",
-    "| Marker | Meaning |\n",
-    "|--------|---------|\n",
-    "| + | Added (new class, method, field, or import) |\n",
-    "| - | Removed |\n",
-    "| ~ | Modified (signature or markers changed) |\n",
-    "| = | Unchanged (included for scope context) |\n\n",
-    "## Edit Mode (byte-exact method bodies)\n\n",
-    "When you are about to MODIFY a file (not just read it), call\n",
-    "`provide_code_context` with `intent=\"edit\"`. This returns:\n\n",
-    "  - Compact structural skeleton (class/method/field signatures)\n",
-    "  - VERBATIM method bodies — byte-exact copies of the source\n\n",
-    "The response includes `\"byte_exact\": [\"method_bodies\"]` — this tells\n",
-    "you which parts are safe to use in `replace_in_file` SEARCH blocks.\n\n",
-    "Rules:\n",
-    "1. ALWAYS use `intent=\"edit\"` before editing a file you haven't\n",
-    "   already loaded in edit mode\n",
-    "2. NEVER use `replace_in_file` SEARCH blocks that span beyond the\n",
-    "   byte-exact regions (method bodies) — structural signatures are\n",
-    "   compressed and may not match the source exactly\n",
-    "3. For a SINGLE-UNIT edit (replace one body / insert one method after\n",
-    "   an anchor / delete one method) on a file this session has already\n",
-    "   loaded in edit mode, PREFER `apply_edit` over the host write tool.\n",
-    "   It verifies only the changed unit's bytes, then syntax-gates the\n",
-    "   result before writing — no full raw re-read is needed.\n",
-    "4. `apply_edit` forms: replace_body (target, expectedOldText, newText),\n",
-    "   delete (target, expectedOldText), insert_after/insert_before\n",
-    "   (anchor, unitText). A rejection means the unit changed under you —\n",
-    "   re-read via `provide_code_context` and retry; never blind-retry.\n",
-    "5. If you need to edit a signature, import, or class-level structure,\n",
-    "   use `fidelity=\"verbatim\"` for the full document\n",
-    "6. For read-only understanding, use `intent=\"overview\"` or\n",
-    "   `intent=\"debug\"` — these stay maximally compressed\n\n",
-    "## Rules for Using Compressed Notation\n",
-    "1. Interpret tool responses using the SCHEMA v5 notation above; an `ir_unavailable` error means the file could not be compiled — never guess at its structure\n",
-    "2. When writing code in compressed form, mirror the notation of the context you received\n",
-    "3. NEVER output raw metadata footers (path-map or symbol-table blocks) — those are internal\n",
-    "4. When asked to expand, use the decompress_code_context tool\n",
-    "5. When asked for changes between versions, use the diff_code_context tool — it returns only the deltas\n",
-    "6. Preserve the semantic meaning — compressed ≠ less accurate\n",
-    "7. Use the same fidelity level as the compressed context you received\n",
-    "8. When generating Angular code, mirror the Φ vocabulary in your output (e.g. emit `Φcmp:Foo sel=app-foo`) and round-trip via decompress_code_context when the user requests expanded form\n\n",
-    "## Example (SCHEMA v5 response fragment)\n",
-    "```\n",
-    "// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias\n",
-    "// ── UserService ──\n",
-    "X BaseService\n",
-    "F userRepo:UserRepository\n",
-    "M processData(payload:$s):$b  ctl:IF,RET\n",
-    "```\n",
-    "Reading: class `UserService` extends `BaseService`; field `userRepo:UserRepository`; method `processData` takes `payload:$s`, returns `$b`, with branch and return summaries.\n",
-);
+/// The Clean-CTX model-visible context guide.
+pub(crate) const SYSTEM_PROMPT: &str = r#"# Clean-CTX Context Guide
+
+`provide_code_context`, `compress_code_context`, `restore_context`, and replay
+responses use the versioned CONTROL-FULL JSON document in `content`. This is
+the portable semantic authority. `_meta` is application-facing state and may
+mirror facts, but never treat it as the only source of code meaning.
+
+## CONTROL-FULL v1
+
+The document begins with:
+
+`// CONTROL-FULL v1; canonical IDs are authoritative`
+
+The JSON fields are named and preserve canonical order:
+
+- `file`: session ID, canonical source path, and IR version.
+- `mode`: effective fidelity, exact-body method IDs, and source-escalation rule.
+- `classes` / `interfaces`: typed owners with explicit IDs, methods, fields,
+  inheritance, implements, injection occurrences, modifiers, flags, and facts.
+- `methods`: explicit IDs, parameters, return type, occurrence-grouped facts,
+  flow/effects/context, and optional exact body plus source spans.
+- `calls`: ordered call occurrences. `caller_method_id` is canonical;
+  `callee_written_name` is spelling evidence only. When
+  `callee_resolution` is `unresolved`, never invent a declaration target.
+- `semantic_edges`: complete generic/framework relationships with relation,
+  typed subject/object, layer, file provenance, and call evidence where present.
+
+Arrays preserve occurrence order, duplicates, and nested group boundaries.
+Names are display data; explicit IDs and typed ownership determine identity.
+
+## Fidelity and exact source
+
+- Low/Medium/High contain the complete canonical envelope compiled at that
+  fidelity. High is the structural reasoning baseline.
+- Edit adds byte-exact method bodies. With `focusMethods`, selectors resolve
+  through typed owner identity to canonical method IDs before other bodies are
+  removed. Ambiguous selectors are errors, never guesses.
+- Verbatim is the explicit byte-exact whole-document mode. Request it for
+  signatures, imports, class-level structure, or any edit outside exact bodies.
+- Delta content uses `CONTROL-FULL-DELTA v1`; apply it only to the acknowledged
+  prior canonical state. Its post-apply semantic-edge snapshot is authoritative.
+
+## Editing
+
+Use `intent="edit"` before a body edit. Only regions identified by
+`byte_exact` and `mode.exact_body_method_ids` are safe exact-match inputs.
+Prefer `apply_edit` for a supported unit edit. On rejection, re-read and retry;
+never blind-retry. Use `fidelity="verbatim"` for whole-document edits.
+
+## Paths and legacy formats
+
+The trailing `§PATHMAP` maps session aliases to paths. Do not reproduce it in
+source edits. `compress_workspace` manifests and the historical SCHEMA v5
+renderer are legacy/CONTROL-PROD measurement formats; use
+`decompress_code_context` where expansion is required. They are not the
+correctness authority for current file-context responses.
+"#;
 
 /// Return the list of available prompt definitions (for `prompts/list`).
 pub(crate) fn prompt_list() -> Vec<serde_json::Value> {
     vec![
         serde_json::json!({
             "name": "cleanctx-notation",
-            "description": "System instructions for reading and writing Clean-CTX compressed notation",
+            "description": "System instructions for reading Clean-CTX CONTROL-FULL context",
             "arguments": []
         }),
         serde_json::json!({
             "name": "dashboard",
-            "description": "View the Clean-CTX token savings dashboard. Shows session stats, per-file breakdown, and compression efficiency metrics.",
+            "description": "View the Clean-CTX token savings dashboard and per-file metrics.",
             "arguments": []
         }),
         serde_json::json!({
             "name": "clean-ctx-vocabulary",
-            "description": "Clean-CTX SCHEMA v5 response vocabulary: compact structure, typed mod:/cmod: declarations, ctl: summaries, pf: pattern facts, residual fl:/cl: facts, High-fidelity cf:/df:/se:/ec: metadata, α path aliases and current Φ framework-meta markers.",
+            "description": "CONTROL-FULL v1 named semantic fields, canonical identity, exact-body, delta, and path-map rules.",
             "arguments": []
         }),
     ]
@@ -183,4 +82,4 @@ pub(crate) fn prompt_list() -> Vec<serde_json::Value> {
 
 #[cfg(test)]
 #[path = "../tests/mcp/prompts.rs"]
-mod prompts_tests;
+mod tests;

@@ -274,37 +274,29 @@ pub fn render_cache_json(metrics: &CacheMetrics, enabled: bool) -> serde_json::V
 }
 
 /// Generate the response-vocabulary text for the `clean-ctx-vocabulary`
-/// prompt resource. Phase A retirement (2026-08-25): teaches ONLY the
-/// current SCHEMA v5 notation plus the live α / Φ systems — the retired
-/// `$`-primitive / `⊕`-marker / `§`-micro-code tables are gone.
+/// prompt resource. Teaches the portable CONTROL-FULL model-visible contract.
 ///
 /// This function is used by the `prompts/get` MCP handler.
 pub fn generate_vocabulary_text() -> String {
     let lines = vec![
-        "Clean-CTX Response Vocabulary (SCHEMA v5)",
-        "==========================================",
+        "Clean-CTX Response Vocabulary (CONTROL-FULL v1)",
+        "================================================",
         "",
-        "// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias",
-        "// ── Name ──   opens a class scope",
-        "X Parent      extends          I Iface…   implements",
-        "F name:type   field            M name(+N) method (+N = overload param count)",
-        "→ p:name:type … / → ret       parameters / return type",
-        "mod:/cmod: ASYNC GEN EXPORT STATIC PRIVATE PROTECTED ABSTRACT UNSAFE",
-        "ctl: IF LOOP RET THROW        compact control summaries",
-        "fl:/cl: residual pattern and class-metadata facts",
-        "$ alias module [names]        import",
-        "T alias = Type                type alias",
-        "P NAME [args]                 structural pattern (CTOR, OBSERVABLE, GETTER, SETTER…)",
+        "// CONTROL-FULL v1; canonical IDs are authoritative",
+        "file: session ID, source path, IR version",
+        "mode: fidelity, exact_body_method_ids, source escalation rule",
+        "classes/interfaces: typed owners with explicit IDs and grouped facts",
+        "methods/fields: explicit IDs, ownership, types, bodies/spans when exact",
+        "calls: ordered occurrences; written callee names stay unresolved",
+        "semantic_edges: complete relation/layer/file provenance and evidence",
         "",
-        "High fidelity adds:  cf: control-flow · df: reads/writes · se: side effect · ec: context",
-        "Edit fidelity appends VERBATIM source bodies (byte-exact)",
+        "Arrays preserve order, duplicates, and occurrence-group boundaries.",
+        "Edit focus resolves typed ownership to canonical method IDs before filtering.",
+        "CONTROL-FULL-DELTA v1 requires an acknowledged prior canonical state.",
         "",
         "α/β/γ   path aliases — see §PATHMAP footer",
-        "Φcmp/Φdir/Φpipe/Φsvc/Φmod/Φin/Φout …  Angular meta-layer markers (current)",
-        "Φctrl/Φef/Φhub/Φmap …  .NET meta-layer markers (current)",
         "",
-        "Note: compress_workspace manifests emit a legacy compressed-text",
-        "format — decode via decompress_code_context.",
+        "SCHEMA v5 and compress_workspace text are CONTROL-PROD/legacy formats.",
     ];
     lines.join("\n")
 }

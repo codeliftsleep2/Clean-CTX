@@ -3,7 +3,7 @@
 // End-to-end `provide_code_context` regressions for method-declaration
 // identity, through the REAL dispatch path (`dispatch_tools_call` ->
 // `handle_provide_code_context` -> `compile_file_ir_focused` -> CoreIRPass ->
-// `render_hierarchical_for_llm_focused`).
+// canonical focus resolution -> CONTROL-FULL rendering).
 //
 // Compression-path proof: every case asserts that the response did NOT come
 // back as `raw_passthrough`. A raw passthrough returns the file verbatim, so
@@ -159,32 +159,27 @@ fn provide_code_context_returns_structural_method_identity_at_every_structural_f
         );
 
         let text = rendered(&resp);
-        // Skeleton form — impossible to satisfy with the raw source.
-        assert!(text.contains("M GetPair"), "{fidelity}: {text}");
-        assert!(text.contains("M Tenth"), "{fidelity}: {text}");
+        assert!(text.contains("\"name\": \"GetPair\""), "{fidelity}: {text}");
+        assert!(text.contains("\"name\": \"Tenth\""), "{fidelity}: {text}");
         assert!(
-            !text.contains("M TSecond>"),
+            !text.contains("\"name\": \"TSecond>\""),
             "{fidelity}: a type parameter must never be the identity: {text}"
         );
         assert!(
-            !text.contains("M static"),
+            !text.contains("\"name\": \"static\""),
             "{fidelity}: a modifier must never be the identity: {text}"
         );
         assert!(
-            !text.contains("static(+2)"),
+            !text.contains("\"name\": \"static(+2)\""),
             "{fidelity}: distinct methods must not group as overloads of a fabricated \
              identity: {text}"
         );
-        assert!(
-            !text.lines().any(|line| line.trim_start().starts_with("X ")),
-            "{fidelity}: a member body expression must never render as a base type: {text}"
-        );
         if fidelity == "low" {
             // Low carries the bare identifier (the established Low contract).
-            assert!(text.contains("M Pair"), "{fidelity}: {text}");
+            assert!(text.contains("\"name\": \"Pair\""), "{fidelity}: {text}");
         } else {
             assert!(
-                text.contains("M Pair<TFirst, TSecond>"),
+                text.contains("\"name\": \"Pair<TFirst, TSecond>\""),
                 "{fidelity}: {text}"
             );
         }
@@ -232,7 +227,7 @@ fn provide_code_context_edit_focus_methods_targets_corrected_identities() {
         "an unfocused method's body must stay signature-only: {text}"
     );
     assert!(
-        !text.contains("M static"),
+        !text.contains("\"name\": \"static\""),
         "the focused identities must be the declared names: {text}"
     );
 }

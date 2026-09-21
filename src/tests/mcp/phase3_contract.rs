@@ -207,29 +207,16 @@ fn provide_code_context_uses_meta_not_ad_hoc_fields() {
 
     let text = result_content_text(result).unwrap();
 
-    // Token-economics gate may select raw_passthrough when the
-    // compressed representation costs more tokens than the raw
-    // source (tiny files at structural fidelities). Both outcomes
-    // are valid — SCHEMA v5 when compression is economical,
-    // raw_passthrough when it is not.
     let content_kind = result
         .get("_meta")
         .and_then(|m| m.get("content_kind"))
         .and_then(|k| k.as_str());
 
-    if content_kind == Some("raw_passthrough") {
-        // raw source returned verbatim — no SCHEMA v5 expected.
-        // Verbatim document means the raw fixture content.
-        assert!(
-            text.contains("class Greeter"),
-            "raw_passthrough must contain the class: {text}"
-        );
-    } else {
-        assert!(
-            text.contains("// SCHEMA v5"),
-            "content must be SCHEMA v5: {text}"
-        );
-    }
+    assert_eq!(content_kind, Some("skeleton"));
+    assert!(
+        text.contains("// CONTROL-FULL v1"),
+        "content must be CONTROL-FULL v1: {text}"
+    );
 
     for banned in [
         "strategy",

@@ -293,7 +293,7 @@ fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
 }
 
 #[test]
-fn render_hierarchical_for_llm_injects_do_not_panic() {
+fn control_full_renders_injection_occurrences() {
     use crate::ir::*;
     let class = ClassNode {
         id: "C1".into(),
@@ -315,9 +315,9 @@ fn render_hierarchical_for_llm_injects_do_not_panic() {
         type_aliases: vec![],
         calls: vec![],
     };
-    // Should not panic — injects are structural (pattern-level), not rendered
-    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ── Service ──"));
+    let result = crate::ir::render_control_full("alpha", "fixture.ts", 1, Fidelity::Low, &hir, &[]);
+    assert!(result.contains("\"injection_occurrences\""));
+    assert!(result.contains("\"DepA\""));
 }
 
 // ── LLM text cache integration tests ──

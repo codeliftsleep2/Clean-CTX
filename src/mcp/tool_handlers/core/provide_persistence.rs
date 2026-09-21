@@ -1,18 +1,18 @@
-use crate::compression::Fidelity;
+//! Durable publication boundary for `provide_code_context` baselines.
+
 use crate::ir::compiler::CompiledIR;
 use crate::layers::meta::semantic::SemanticEdge;
 use crate::mcp::McpState;
 
-/// Commit an edit-fidelity candidate before its raw-passthrough presentation
-/// publishes the corresponding live semantic owners.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn persist_edit_baseline(
     state: &McpState,
     resolved_path: &str,
-    fidelity: Fidelity,
     compiled: &CompiledIR,
     semantic_edges: &[SemanticEdge],
     source_hash: &str,
     raw_tokens: usize,
+    compressed_tokens: usize,
 ) -> Result<(), &'static str> {
     let guard = state.persistence_store_lock();
     let Some(store) = guard.as_ref() else {
@@ -24,14 +24,14 @@ pub(super) fn persist_edit_baseline(
         sqlite
             .save_context_with_semantics(
                 resolved_path,
-                fidelity,
+                crate::compression::Fidelity::Edit,
                 "",
                 &binary,
                 source_hash,
                 compiled.version,
                 semantic_edges,
                 raw_tokens as u64,
-                raw_tokens as u64,
+                compressed_tokens as u64,
             )
             .is_ok()
     });
