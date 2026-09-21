@@ -1,7 +1,9 @@
 # IR Projection Reconnaissance Report
 
-**Status:** Investigation report; records observed implementation evidence and
-architectural gaps. It does not approve the proposed changes.
+**Status:** Historical reconnaissance baseline. Its findings describe the
+pre-migration source state and are not a current status dashboard. Current
+contracts and certification are recorded in
+[`IR_ARCHITECTURE_CERTIFICATION.md`](IR_ARCHITECTURE_CERTIFICATION.md).
 
 **Date:** 2026-09-17
 
@@ -30,8 +32,8 @@ user-run verification was green on 2026-09-18. Phase 4C implemented and user-
 verified typed class-fact attribution plus hierarchical schema revision 3.
 Phase 4D implemented shared schema-derived typed pattern targeting and was
 user-verified on 2026-09-18. The projection cursor and ID-prefix inference are removed.
-Phase 9 P9-01 now implements explicit canonical interface ownership and a
-distinct hierarchy/LLM projection; user verification is pending. User-run verification proved that
+Phase 9 P9-01 implemented explicit canonical interface ownership and a
+distinct hierarchy/LLM projection; it was user-verified. User-run verification proved that
 `TypeAlias` carries repeated `Φ` metadata; its ordered-many correction was
 approved, implemented, and verified on 2026-09-18.
 Phase 6A separates declaration modifiers into typed method/class operations
@@ -51,28 +53,24 @@ contract coverage and was user-verified on 2026-09-20. Phase 8C connects
 canonical `0x04` baselines and corrected `dv: 2` history to buffered SQLite
 persistence and registered MCP replay; it was user-verified on 2026-09-20.
 
-**Production-integration status:** Phase checkpoints certify bounded
-implementation and applicable gates; they do not certify production completion.
-No migrated family is complete until Phase 9 traces and records its real default
-entry point, production compiler path, result and persistent owner, workspace
-lifecycle, actual consumer, MCP/API exposure, and applicable live reachability.
-The existence of code, fields, or passing isolated tests is not integration
-evidence.
+**Production-integration status:** Phase 9 traced every registered operation
+and migrated family through the real production lifecycle, repaired findings
+P9-01 through P9-27, and was user-verified on 2026-09-21. The original findings
+below remain preserved as reconnaissance history.
 
 ## 1. Executive summary
 
-The repository has several sound local protections for semantic identity, but
-the complete IR lifecycle does not yet enforce those protections consistently.
-Stable identifiers can survive production in the canonical instruction stream
-and still be ignored, overwritten, or discarded by projection, delta/replay,
-or wire-format code.
+At reconnaissance time, the repository had sound local protections for
+semantic identity but did not enforce them consistently through the lifecycle.
+Phases 1-9 repaired and production-traced those gaps; this section retains the
+original problem statement rather than redefining the baseline retrospectively.
 
 The original highest-risk defect was positional attribution in the
 hierarchical projection. The bounded method-fact families are migrated in
-Phase 4B and the projection cursor is removed. Phase 4C addresses class-fact
-attribution and multiplicity. Phase 4D addresses pattern targeting. Phase 9
-P9-01 addresses the deeper canonical and projected interface representation
-used by production MCP handlers; verification remains pending.
+Phase 4B and the projection cursor is removed. Phase 4C addressed class-fact
+attribution and multiplicity. Phase 4D addressed pattern targeting. Phase 9
+P9-01 repaired canonical and projected interface ownership through production
+MCP persistence and reload.
 
 Related risks reinforce the same failure mode:
 
@@ -300,8 +298,8 @@ treated as architectural authority.
 This table records the source state observed at the start of the migration. It
 is not a current-state status dashboard. The implementation updates at the top
 of this report and the phase records in the companion plan supersede baseline
-findings that have since been repaired. Phase 9 will replace this baseline with
-an audited current-state assessment after the production lifecycle is traced.
+findings that have since been repaired. The Phase 9 audit and final
+certification document supersede this table for current-state assessment.
 
 Classification meanings:
 

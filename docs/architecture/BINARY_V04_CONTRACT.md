@@ -1,8 +1,8 @@
 # Corrected Binary Format Contract — Physical Version `0x04`
 
-**Status:** Approved Phase 8 target. Phase 8A fixed the normative contract;
-Phase 8B was user-verified. Phase 8C production persistence integration is
-implemented and awaiting user verification.
+**Status:** Implemented normative contract. Phase 8B codec and Phase 8C
+production persistence integration were user-verified; Phase 9 certified the
+registered lifecycle.
 
 **Date:** 2026-09-20
 
@@ -242,6 +242,6 @@ deletion/reset clear ownership. Registered-dispatch coverage crosses producer,
 buffer, SQLite, reload, replay, MCP response, and byte-exact `apply_edit`.
 
 The Angular template compressor remains a distinct representation without a
-canonical `CompiledIR` producer. Phase 8C therefore removes its empty-IR write
-rather than fabricating canonical semantics. Phase 9 must audit this lifecycle
-evidence before certifying repository-wide production integration.
+canonical `CompiledIR` producer. Phase 8C removed its empty-IR write rather
+than fabricating canonical semantics. Phase 9 confirmed that no registered
+path persists empty or noncanonical IR in its place.

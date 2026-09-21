@@ -1,6 +1,6 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-08-29 (roadmap: added deferred R-46 — MCP envelope migration for `compress_code_context`/`delta_code_context`; CBM graph-intelligence audits ✅ — graph-intel live-probe pass + typed graph_trace wire-contract fix, both recorded in Completed below)
+**Last updated:** 2026-09-21 (`0.8.0-rc`: IR architecture lockdown and production lifecycle certification complete; final `0.8.0` awaits live field testing)
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -10,6 +10,7 @@
 
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
+| **Release candidate** | v0.8.0-rc | Typed IR, exact persistence, lifecycle safety | ✅ Phase 9 certified; live field gate pending |
 | **Now** | v0.3.0 | Advanced capabilities | ✅ 0 (all complete) |
 | **Next** | v0.5.0 | Advanced capabilities | 6 |
 | **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
@@ -27,7 +28,7 @@ These items are complete and documented. Listed for historical context.
 | **R-02** | Type-aware compression | v0.3.0 | Inline `type_aliases` applied across both text + IR compression paths. Text path: configured type names replaced with `$alias` tokens + `§TA $uid→UserId` footer. IR path: `CoreOp::TypeAlias(alias, original)` ops appended. Token-boundary matching (`$` treated as identifier char) prevents false matches in `UserService`/`user_id`. 5-15% additional savings on type-heavy files at Medium/High fidelity. See `docs/plans/TYPE_AWARE_COMPRESSION_PLAN.md`. |
 | **R-12** | Multi-file / Git-Commit Diff | v0.3.0 | New `diff_commits` MCP tool + `src/gitdiff/` module (refs, runner, workspace, engine). Per-file AST change-sets across an entire workspace between two git refs. Strict ref allowlist + `--end-of-options` + XPIA mitigation. Resource limits (file count + per-file size). 32 unit tests + black-box e2e dispatch test. See `docs/DIFF_COMMITS_GUIDE.md`. |
 | **R-22** | Angular Meta-Layer | v0.1.x | Phase 1 (decorators) ✅ · Phase 2 (triplet bundling) ✅ · Phase 2.5 (Angular 17–21 syntax) ✅ · Phase 3 (cross-file DI + selector graph) ✅ · Phase 4 (fidelity-gated template compression) ✅ |
-| **R-30** | SQLite Persistence Layer | v0.1.x | `SqliteStore` with WAL mode, contexts/deltas/symbols/sessions tables, content-hash deterministic IDs, non-fatal fire-and-forget writes |
+| **R-30** | SQLite Persistence Layer | v0.1.x; hardened v0.8.0-rc | WAL-mode store with physical `0x04`, checked `dv:2`, aligned semantic-edge snapshots, edit intents, and file-scoped transactional lifecycle authority |
 | **R-31** | Zero-Touch Workflow + Heuristics Engine | v0.1.x | `provide_code_context` single entry point, `heuristics.rs` auto-selects fidelity + strategy, session stats dashboard |
 | **R-32** | ULTRA_COMPACT_PLAN — All Phases | v0.1.x | Phase I (string table + field-level delta diffing + contextual delta) ✅ · Phase II (hierarchical IR + binary wire) ✅ · Phase III (header elision + structural dedup + cross-file symbols + Huffman + VarInt micro-opcodes) ✅ · Phase IV (text delta transport) ✅ · 759 tests passing |
 | **R-11** | Cross-File Symbol Resolution | v0.1.x | Angular Phase 3 DI graph + selector linkages + transitive dependencies + global cross-language TS/C# symbol table — supersedes original scope |

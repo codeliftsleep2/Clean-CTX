@@ -8,7 +8,36 @@ Historical releases are archived per version as `CHANGELOG_<version>.md` (`_a`/`
 
 ---
 
-## [Unreleased]
+## [0.8.0-rc] - 2026-09-21
+
+### Architecture lockdown
+
+* **Typed canonical ownership and checked projection** — class, interface,
+  method, field, and parameter identities are compiler-distinct; all current
+  operations have exhaustive validation, declared cardinality/order semantics,
+  and stable-ID projection independent of stream position. TypeScript, Java,
+  C#, and Rust declaration modifiers use declaration-owned structure.
+* **Semantic families remain distinct** — declaration modifiers, control
+  summaries, pattern facts, side effects, execution contexts, bodies/spans,
+  relationships, calls, and explicit interface members have dedicated typed
+  contracts. The compact LLM view remains independently minimized.
+* **Exact transport and replay** — physical binary `0x04` round-trips complete
+  canonical streams, while production `dv:2` deltas preserve position,
+  occurrence identity, duplicates, and expected-tuple conflict detection.
+* **Transactional production lifecycle** — canonical IR and complete semantic
+  edges persist as one file-scoped logical state. Save, restore, replay,
+  accepted deltas, replacement, deletion, byte-exact edits, and crash recovery
+  commit durable state before live publication. Observational tools never
+  flush or create ownership.
+* **Phase 9 production certification** — every registered IR/MCP operation and
+  semantic family was traced through dispatch, production compilation/input,
+  validation, session/durable ownership, lifecycle transitions, consumers,
+  and registered responses. Findings P9-01 through P9-27 were repaired and
+  user-verified. Incomplete legacy fallback artifacts are registered,
+  read-only quarantine evidence through `inspect_legacy_fallbacks`.
+* **Release-candidate boundary** — repository gates and operator production
+  scenarios were reported green by the maintainer. This is `0.8.0-rc`; final
+  `0.8.0` remains withheld until live field testing is complete.
 
 ### Fixed
 
@@ -22,7 +51,11 @@ Historical releases are archived per version as `CHANGELOG_<version>.md` (`_a`/`
 
 * **Flat-stream content changes wherever a pattern matches** — the retained declaration ops are re-emitted and the `PAT` op now follows them, so structural op counts move for exactly the matched spans: CTOR (`DEF_M` + `SIG` + `RET` + `INJECTS`) goes from 1 output op to 5 (only `INJECTS` is summarized into the classification) and PROMISE (`DEF_M` + `RET`) goes from 1 to 3 (nothing but identity matched, so the classification is additive). No opcode, operand arity, named-tuple shape, binary-wire layout, delta key formula or hierarchical field changed, so this is a content-sequence change and not a format change; a stored pre-change flat baseline can therefore report a one-time spurious mod set for those regions (per-item multiplicity in delta transport, F8, remains unfixed and out of scope).
 
-* **Roadmap scope — Phase 1 only** — this change addresses F2 alone (method identity destruction by consumptive pattern compression). F1 (cross-class `Flags` attribution), F3 (pre-`DefMethod` additive classification flags), F4 (the additive GETTER/SETTER lifecycle), F5–F7 and F9–F14, and the delta-multiplicity item F8 are separate future phases and are untouched here; none of them became a dependency of this fix.
+* **Migration lineage** — method-identity retention was the first bounded
+  slice. Later slices in this same release completed attribution, semantic
+  families, occurrence-aware delta, exact binary persistence, and the
+  registered production lifecycle without weakening the conservative body
+  fallback.
 
 ### Not yet wired / observed but deliberately not fixed
 
@@ -37,9 +70,10 @@ Historical releases are archived per version as `CHANGELOG_<version>.md` (`_a`/`
 
 ### Verification
 
-* `scripts/check-utf8.ps1` — **PASS** (675 text files valid strict UTF-8, 0 BOMs, 0 unexplained mojibake or letter-substitution signatures; the count includes the seven newly archived changelog files).
-* `scripts/check-file-sizes.ps1` — **PASS** (16 active text files checked, all inside the 615-line ceiling — the seven newly archived changelog files are 75 lines or fewer; the largest touched file is `src/ir/patterns/recognize.rs` at 592 lines, and the two new test files are 565 and 292 lines).
-* `git diff --check` — clean (no whitespace errors; the two files the working-tree copies report as LF, `src/ir/patterns/recognize.rs` and `src/tests/ir/call_pattern_orphan.rs`, are LF at `HEAD` as well, `.gitattributes` declares `* text=auto`, and the diff is content-only).
-* Focused regressions through the real production pipeline — first maintainer run: **13 tests ran; 10 passed, 3 failed, 0 ignored**. The 3 failures were test-fixture fidelity assumptions, not implementation defects (the PROMISE and OBSERVABLE fixtures and the rendered-`M`-line fixture asserted a classification at `Fidelity::Low`, where the TypeScript compacted label makes that shape impossible — see the recorded `Low`-fidelity observation above). The producer-side diff was unchanged by the correction: those fixtures moved to `Fidelity::Medium`, one downstream fixture moved `Low` → `Medium` so its pattern is genuinely active rather than identity-only, and a new `Low`-fidelity identity guard was added. Verified green in that run: CTOR retention, EMPTY_CTOR retention, the complete consumptive surface, the all-fidelity no-orphan invariant, the exact retained-declaration op-count contract, hierarchical `MethodNode` retention with the production-shape regression, `UnitTable` addressing, and `Calls` caller identity. **Re-run pending for the three corrected fixtures and for the Rust `fn new` regression (which needs `--features rust`/`--all-features` and did not run in the first pass) — this build is not claimed green.**
-* Full gate (`cargo fmt --all -- --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test --all-features`, `cargo test --all-features encoding`) — **not run by the agent** (`.clinerules/engineering.md` §1) and not yet reported for this change; it is handed to the maintainer (see `docs/agent/verification.md`).
-* Documentation housekeeping shipped in the same change: the released sections that had accumulated inside `docs/changelogs/CHANGELOG.md` (`0.6.3`–`0.7.0`) were archived as their own `CHANGELOG_<version>.md` files, matching the directory's established convention (`---`, blank line, `## [x.y.z] - date`), and this file now carries only the header plus this `[Unreleased]` section. The move was mechanical and byte-exact: the text was read and written as strict BOM-less UTF-8 with CRLF preserved, every archive body was verified by SHA256 to be a verbatim substring of the pre-split file, the version-heading count was reconciled (7 across the archives == 7 in the original, no heading gained or lost), the header hash was compared against the original's, and a restore-and-re-run of the splitter reproduced all seven archive hashes and the rewritten file byte-for-byte. No historical entry was reworded, reflowed, or re-encoded. (Sources: `0.7.0` was lines 11–84, `0.6.8` 86–108, `0.6.7` 110–131, `0.6.6` 133–152, `0.6.5` 154–172, `0.6.4` 174–203, `0.6.3` 205–267 of the pre-split file.)
+* The maintainer reported the complete repository gates green after the final
+  P9-27 repair, including zero-warning Clippy and tracked tests.
+* The maintainer also reported the Phase 9 registered-production operator
+  scenarios green. Those ignored `target/phase9-verification/` artifacts are
+  live reachability evidence, not substitutes for tracked tests or CI.
+* Phase 10 documentation/version edits require one final user-run gate before
+  the release-candidate commit; no agent-run Cargo result is claimed.

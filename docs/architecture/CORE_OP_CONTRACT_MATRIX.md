@@ -1,8 +1,8 @@
 # CoreOp Architectural Contract Matrix
 
-**Status:** Approved target architecture. All 29 current `CoreOp` rows are
-normative. Hierarchical schema-shape decisions identified in Section 10 remain
-separately gated.
+**Status:** Final implemented contract for `0.8.0-rc`. Every current `CoreOp`
+row is normative and was traced through the registered production lifecycle
+during Phase 9.
 
 **Date:** 2026-09-17
 
@@ -23,6 +23,7 @@ schema-derived typed pattern targeting and was user-verified on 2026-09-18.
 - [`IR_PROJECTION_RECONNAISSANCE_REPORT.md`](IR_PROJECTION_RECONNAISSANCE_REPORT.md)
 - [`IR_ARCHITECTURE_LOCKDOWN_PLAN.md`](IR_ARCHITECTURE_LOCKDOWN_PLAN.md)
 - [`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md)
+- [`IR_ARCHITECTURE_CERTIFICATION.md`](IR_ARCHITECTURE_CERTIFICATION.md)
 
 ## 1. Purpose
 
@@ -201,7 +202,7 @@ all three vocabularies and remains only for legacy unknown payloads;
 | `DefClass` | One non-synthetic `ClassNode` | `ClassId` | Lossy: class ID omitted | Encode class ID and name |
 | `DefMethod` | Method under resolved owner class | `MethodId` plus owner for consistency | Lossy: owner class ID omitted | Encode owner, method ID, and name |
 | `DefField` | Field under resolved owner class | `FieldId` plus owner for consistency | Lossy: owner class ID omitted | Encode owner, field ID, and name |
-| `DefInterface` | Explicit interface representation or unsupported projection; never normalize silently to class | Interface identity | Lossy: interface ID omitted | Encode interface ID and name |
+| `DefInterface` | Explicit `InterfaceNode`; never normalize to class | `InterfaceId` | Lossy: interface ID omitted | Encode interface ID and name |
 | `DefInterfaceMethod` | Method under resolved owner interface | `MethodId` plus interface owner | Not defined | Additive opcode 26; preserve all operands |
 | `DefInterfaceField` | Field under resolved owner interface | `FieldId` plus interface owner | Not defined | Additive opcode 27; preserve all operands |
 | `Param` | Parameter under resolved method, in source order | `(MethodId, ParameterId)` | Semantic for present operands | Preserve all operands |
@@ -269,13 +270,14 @@ Phase 6D types side effects as `SideEffectKind` without changing their named
 wire spelling, binary opcode, hierarchical `se` strings, compact LLM `se:`
 projection, hierarchical revision 6, LLM schema v5, or physical binary `0x03`.
 Every occurrence, order, and duplicate remains authoritative. `SideEffect`
-continues to block unsafe consumptive pattern compression. The tracked MCP
-compile-helper contract proves the default file compiler reaches checked
-projection and unchanged High-fidelity `se:` rendering; Phase 9 still owns the
-complete external lifecycle certification.
+continues to block unsafe consumptive pattern compression. Phase 9 confirmed
+the default compiler, checked projection, persistence, reload, and registered
+MCP exposure for this family.
 
-The remaining hierarchy change is explicit interface representation or
-rejection as unsupported.
+Phase 9 adds explicit `InterfaceNode` projection and interface-owned canonical
+method and field declarations. Class and interface ownership remain distinct
+through validation, physical `0x04`, persistence, hierarchy, and compact LLM
+rendering.
 
 The serialized hierarchical shape is externally observable. Its revision-2
 method-fact contract and revision-3 class-fact contract were approved on
@@ -350,14 +352,11 @@ The first implementation slice should protect `DefClass`, `DefMethod`,
 The test and corresponding repair land together under the approved rollout
 policy.
 
-## 10. Open review items not covered by the approved operation contracts
+## 10. Resolved review items and separately deferred work
 
-These items do not reopen the five defaults:
-
-1. Approve the eventual semantic-family enum members and their language-
-   specific mappings. Preservation remains mandatory in the meantime.
-2. Decide whether `DefInterface` gains a dedicated typed ID in a later slice;
-   the first slice retains its validated string identity.
+Typed semantic-family vocabularies and language mappings were implemented in
+Phase 6. Phase 9 introduced `InterfaceId`, explicit interface-owned member
+operations, and distinct hierarchy/LLM representation.
 
 Resolved on 2026-09-18: method flag occurrences, side effects, and execution
 contexts use hierarchical schema revision `"hs": 2`; unmarked legacy
@@ -369,8 +368,9 @@ remain readable through decode-only compatibility paths.
 
 Import aliases are normatively file-wide because no downstream operation
 carries a narrower owner. `TypeAlias` is not a definition identity; production
-evidence established its ordered-many occurrence contract. The remaining items
-do not block the approved validation or checked projection work.
+evidence established its ordered-many occurrence contract. Class-scoped
+injectable metadata remains a separately reviewable future semantic family;
+it is not represented as method `ExecutionContext` or as an `Injects` edge.
 
 ## 11. Required second-slice tests
 
@@ -394,12 +394,12 @@ legacy decoded documents remain outside this bounded slice.
 
 ## 12. Review checklist
 
-- [x] All 25 current `CoreOp` variants appear exactly once in each matrix.
-- [ ] Definition and optional-singular cardinalities are accepted.
-- [ ] Repeatable facts preserve every occurrence by default.
-- [ ] External symbolic references are distinguished from owning identities.
-- [ ] Delta identity preserves exact duplicates.
-- [ ] Projection destinations do not require silent loss or synthesis.
+- [x] Every current `CoreOp` variant appears exactly once in each matrix.
+- [x] Definition and optional-singular cardinalities are accepted.
+- [x] Repeatable facts preserve every occurrence by default.
+- [x] External symbolic references are distinguished from owning identities.
+- [x] Delta identity preserves exact duplicates.
+- [x] Projection destinations do not require silent loss or synthesis.
 - [x] Current binary losses are accurately identified by Phase 8A.
 - [x] The physical corrected-binary version and layout are resolved as `0x04`.
-- [ ] Each row has an identified tracked test owner before implementation.
+- [x] Each row has tracked contract and production-path evidence.

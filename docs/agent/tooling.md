@@ -40,7 +40,7 @@ as `filePath`.
 |------|----------|----------|-----------|
 | `provide_code_context` | `filePath` | `intent`, `fidelity`, `focusMethods`, `workspaceRoot`, `tokenizer` | **Primary entry point.** Heuristics engine selects fidelity, classifies file, and auto-detects delta transport. Prefer over `compress_code_context`. |
 | `compress_code_context` | `filePath` | `fidelity`, `encoding`, `tokenizer`, `workspaceRoot` | Direct AST compilation without heuristics. Lower-level tool; prefer `provide_code_context`. |
-| `restore_context` | `filePath` | `fidelity`, `workspaceRoot` | Restore a previously persisted compressed context from the DB. |
+| `restore_context` | `filePath` | `fidelity`, `workspaceRoot` | Transactionally restore physical `0x04`, checked `dv:2` history, and the aligned semantic-edge snapshot. Never recompiles source as fallback. |
 | `decompress_code_context` | `compressedText` | — | Expand compressed IR back to human-readable format. |
 | `context_stats` | — | `filePath`, `format` | Token-savings dashboard. Shows raw vs compressed tokens, delta hit rate, per-file breakdown. |
 
@@ -57,7 +57,7 @@ as `filePath`.
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
-| `apply_edit` | `filePath`, `operations` | `verify` | Tree-sitter-gated single-unit edit. Operations: `replace_body`, `delete`, `insert_after`, `insert_before`. **Requires prior `provide_code_context` at edit/verbatim fidelity in the same session.** After a successful edit, Clean-CTX marks the affected CBM project dirty but does NOT synchronously reindex — the next graph query automatically refreshes the project before executing. The agent does not need to call `index_repository` after `apply_edit`. |
+| `apply_edit` | `filePath`, `operations` | `verify` | Byte-exact structural edit (`replace_body`, `delete`, `insert_after`, `insert_before`) over tracked units. Requires matching disk/live/durable source identity and commits source plus semantic state through the staged durable transaction. Full-body fidelity remains available when safe editing requires it. |
 | `apply_delta` | `delta`, `currentVersion` | — | Apply an IR delta envelope to the in-session state machine. Low-level; typically not called directly by agents. |
 ### 1.5 Admin/Persistence Tools
 
@@ -69,6 +69,7 @@ as `filePath`.
 | `replay_history` | `filePath` | `targetSequence`, `fidelity` | Replay delta history from the DB. |
 | `purge_old_deltas` | — | `days`, `filePath` | Purge old delta entries. |
 | `context_history` | `filePath` | — | View compression history for a specific file. |
+| `inspect_legacy_fallbacks` | — | — | Read-only inspection of quarantined legacy fallback artifacts. Reports why they are incomplete; never imports, repairs, deletes, or mutates semantic state. |
 
 ### 1.6 CBM / Graph Tools (Architectural Intelligence)
 

@@ -1,8 +1,9 @@
 # IR Production Integration Audit — Continuation
 
-**Status:** Phase 9 in progress. This document continues
+**Status:** Historical Phase 9 audit volume 2. This document continues
 [`IR_PRODUCTION_INTEGRATION_AUDIT.md`](IR_PRODUCTION_INTEGRATION_AUDIT.md)
-after P9-15/P9-16 were user-verified green.
+after P9-15/P9-16 were user-verified green; final status is recorded in the
+certification document.
 
 ## 23. Finding P9-17: registered `apply_edit` description advertises a removed contract
 

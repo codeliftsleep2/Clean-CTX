@@ -1,8 +1,8 @@
 # Clean-CTX — Architecture Overview
 
 > **Owner:** System + module architecture · **Status:** Living reference
-> **Version:** 0.6.0
-> **Last updated:** 2026-08-31 (0.5.2–0.6.0: semantic edge model, WorkspaceIndex, legacy graph removal, token-economics gate)
+> **Version:** 0.8.0-rc
+> **Last updated:** 2026-09-21 (typed canonical IR, physical `0x04`, `dv:2`, transactional semantic persistence, explicit interfaces)
 >
 > **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
 
@@ -235,11 +235,13 @@ The persistence layer provides **cross-session persistence** for compression con
           │
           ▼
 ┌─────────────────────┐
-│ SqliteStore         │  Non-fatal persistence (fire-and-forget)
+│ SqliteStore         │  File-scoped transactional semantic persistence
 │ (sqlite_store.rs)   │
 │                     │
-│  contexts table     │  Baseline IR BLOB + compressed text
-│  deltas table       │  Sequential delta payloads
+│  contexts table     │  Physical 0x04 baseline + source identity
+│  deltas table       │  Checked dv:2 sequence history
+│  semantic snapshots │  Complete aligned semantic-edge ownership
+│  edit intents       │  Crash-recoverable byte-exact edit staging
 │  symbols table      │  Symbol table entries
 │  sessions table     │  Workspace session tracking
 └─────────┬───────────┘
@@ -253,11 +255,13 @@ The persistence layer provides **cross-session persistence** for compression con
 
 ### Design Decisions
 
-- **Non-fatal persistence**: All DB writes are fire-and-forget with `eprintln!` warnings — compression never fails due to DB issues.
+- **Durable publication boundary**: persistence-enabled semantic operations commit the requested file's canonical IR and complete edge snapshot before publishing live state; failure is structural and mutation-free.
+- **File-scoped authority**: reads never flush pending work, and one file's save, restore, replay, delta, edit, or deletion cannot commit another file's lifecycle state.
+- **Shared edit recovery**: pending byte-exact edit intents resolve before any durable semantic load, compilation, checkpoint, or index hydration becomes authoritative.
 - **Content-hash deterministic IDs**: `ctx-{sha256_hex}` ensures idempotent saves (same content → same ID → UPSERT).
 - **Thread-safe state**: `McpState` is wrapped in `RwLock` for the A-09 multi-threaded dispatcher — parallel reads, serial writes.
 - **Lazy initialization**: DB only opens when persistence is enabled — zero overhead for users who don't need persistence.
-- **`binary_wire::encode/decode`**: IR is serialized/deserialized as BLOBs; `file_id` and `version` are restored from DB columns on load.
+- **Physical `0x04` authority**: canonical identity, version, operations, order, duplicates, bodies, and spans round-trip in the BLOB itself; DB metadata must agree rather than repair it.
 
 ### Tools
 
@@ -268,6 +272,7 @@ The persistence layer provides **cross-session persistence** for compression con
 | `list_sessions` | Show tracked sessions/files |
 | `replay_history` | Replay deltas from DB up to target sequence |
 | `purge_old_deltas` | Trim old delta history by age |
+| `inspect_legacy_fallbacks` | Read-only report over quarantined incomplete legacy artifacts; never imports or mutates them |
 
 ---
 
@@ -540,12 +545,15 @@ SQLite provides:
 - **Schema versioning** — forward-compatible migrations via `_schema_version` table
 - **Portability** — single file can be backed up or moved
 
-### Why non-fatal persistence?
+### Why transactional semantic persistence?
 
-All DB writes are fire-and-forget with `eprintln!` warnings. This ensures:
-- Compression **never fails** due to DB issues (disk full, permissions, etc.)
-- The MCP server remains **always available** even if persistence is misconfigured
-- Users can **opt-in** to persistence without breaking existing workflows
+Canonical IR, source identity, semantic version, fidelity, and complete
+framework/meta semantic edges describe one program state. Persistence-enabled
+operations therefore commit that state atomically before live publication.
+SQLite failure returns a structured operation failure; it never produces a
+successful response backed by split live/durable authority. Read-only tools
+remain available and observational, and persistence can still be disabled for
+explicitly session-only operation.
 
 ### Why string-based Meta-Layer extraction?
 

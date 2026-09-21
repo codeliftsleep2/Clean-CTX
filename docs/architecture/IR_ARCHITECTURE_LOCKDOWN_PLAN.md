@@ -1,15 +1,9 @@
 # IR Architecture Lock-Down Implementation Plan
 
-**Status:** Approved target defaults. The bounded `DefClass`/`DefMethod`/
-`Param`/`Return` slice is user-verified and checkpointed. The bounded
-`DefField`/`FieldType` slice is user-verified as the Phase 2 checkpoint; later
-operation families remain pending. The bounded shared-validation slice was
-user-verified as the Phase 3 checkpoint on 2026-09-18. Phase 4A completed the
-shared validation contracts for all current operations and was user-verified
-on 2026-09-18. Phase 4B implemented stable-identity method-fact projection and
-hierarchical schema revision 2 and was user-verified on 2026-09-18. Phase 4C's
-stable-identity class-fact projection and schema revision 3 were user-verified.
-Phase 4D typed pattern targeting was implemented and user-verified.
+**Status:** Phases 1-9 implemented and user-verified. Phase 9 certified the
+registered production lifecycle on 2026-09-21. Phase 10 documentation and
+release-candidate finalization is in progress for `0.8.0-rc`; final `0.8.0`
+remains gated on live field testing.
 
 **Date:** 2026-09-17
 
@@ -26,10 +20,9 @@ default multiplicity, corrected-binary, and green-test-rollout defaults were
 approved. They are now target contracts and must not be reopened without direct
 contradictory source evidence requiring architectural review.
 
-Source inspection found that the current binary format already emits version
-`0x03` and decodes `0x01` through `0x03`. Physical version `0x04` is approved
-for the later corrected/versioned binary format. The binary migration is not
-part of the `Param`/`Return` slice.
+Source inspection originally found physical `0x03`. Phase 8 implemented the
+approved semantic physical `0x04` format; `0x01`-`0x03` are rejected as lossy
+canonical inputs rather than silently fabricating identity.
 
 ## 1. Objective
 
@@ -368,6 +361,9 @@ Exit criteria:
 
 Audit evidence and findings are recorded in
 [`IR_PRODUCTION_INTEGRATION_AUDIT.md`](IR_PRODUCTION_INTEGRATION_AUDIT.md).
+The continuation records contain findings P9-01 through P9-27 and the final
+certification. The user reported both the repository gate and production-path
+operator scenarios green on 2026-09-21.
 
 Earlier phase checkpoints certify bounded implementation and applicable gates;
 they never mark a semantic family complete. Completion requires documented
@@ -391,6 +387,10 @@ Exit criteria:
 - no obsolete production path remains.
 
 ### Phase 10: Documentation and final gate
+
+**Status:** In progress for `0.8.0-rc`. This phase reconciles authoritative
+documentation and release metadata. It does not promote the candidate to final
+`0.8.0`; live field acceptance remains a separate release boundary.
 
 Deliverables:
 
@@ -480,39 +480,39 @@ Unknown revisions fail. The LLM text schema and binary contract are unchanged.
 
 ### Contract review
 
-- [ ] Every `CoreOp` appears exactly once in the contract matrix.
-- [ ] Every identity-bearing operation declares its target kind.
-- [ ] Every repeatable operation declares cardinality and ordering.
-- [ ] Every reducer has a semantic name and direct tests.
-- [ ] Every format declares its preservation level.
+- [x] Every `CoreOp` appears exactly once in the contract matrix.
+- [x] Every identity-bearing operation declares its target kind.
+- [x] Every repeatable operation declares cardinality and ordering.
+- [x] Every reducer has a semantic name and direct tests.
+- [x] Every format declares its preservation level.
 
 ### Implementation review
 
-- [ ] No projection handler uses a current-scope cursor as semantic authority.
-- [ ] No unresolved fact is silently discarded or assigned a synthetic owner.
-- [ ] No delta key maps multiple permitted occurrences to one value slot.
-- [ ] No decoder fabricates an identity required by the canonical contract.
-- [ ] No producer scans descendant text to define a declaration-owned fact.
-- [ ] No transformation changes identity without a declared mapping.
+- [x] No projection handler uses a current-scope cursor as semantic authority.
+- [x] No unresolved fact is silently discarded or assigned a synthetic owner.
+- [x] No delta key maps multiple permitted occurrences to one value slot.
+- [x] No decoder fabricates an identity required by the canonical contract.
+- [x] No producer scans descendant text to define a declaration-owned fact.
+- [x] No transformation changes identity without a declared mapping.
 
 ### Test review
 
-- [ ] Pre-definition, post-scope, and interleaved facts are covered.
-- [ ] Wrong-kind and unresolved targets are covered.
-- [ ] Repeated and duplicated facts are covered.
-- [ ] Cross-language ownership cases are equivalent.
-- [ ] Property tests exercise permutation, delta/replay, and round trip.
-- [ ] Compile-fail tests are limited to meaningful public/module boundaries.
-- [ ] Every required test is tracked under `src/tests/**`.
+- [x] Pre-definition, post-scope, and interleaved facts are covered.
+- [x] Wrong-kind and unresolved targets are covered.
+- [x] Repeated and duplicated facts are covered.
+- [x] Cross-language ownership cases are equivalent.
+- [x] Property tests exercise permutation, delta/replay, and round trip.
+- [x] Compile-fail tests are limited to meaningful public/module boundaries.
+- [x] Every required test is tracked under `src/tests/**`.
 
 ### Production review
 
-- [ ] The checked path is used by default compilation.
-- [ ] Projected state survives the result and ownership boundaries.
-- [ ] Workspace recompilation, deletion, and reset remain coherent.
-- [ ] Real consumers use the migrated fields.
-- [ ] MCP responses expose the intended behavior.
-- [ ] Relevant live scenarios are handed to the user when field verification is
+- [x] The checked path is used by default compilation.
+- [x] Projected state survives the result and ownership boundaries.
+- [x] Workspace recompilation, deletion, and reset remain coherent.
+- [x] Real consumers use the migrated fields.
+- [x] MCP responses expose the intended behavior.
+- [x] Relevant live scenarios are handed to the user when field verification is
       required.
 
 ## 9. First implementation slice

@@ -1,7 +1,7 @@
 # IR Production Integration Audit
 
-**Status:** Phase 9 in progress. This document records production-path
-evidence; it is not a completion certificate.
+**Status:** Historical Phase 9 audit volume 1. Final status is recorded in
+[`IR_ARCHITECTURE_CERTIFICATION.md`](IR_ARCHITECTURE_CERTIFICATION.md).
 
 **Started:** 2026-09-20
 

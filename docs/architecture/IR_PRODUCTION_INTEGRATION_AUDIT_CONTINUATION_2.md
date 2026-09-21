@@ -212,9 +212,9 @@ The code-level production-integration matrix is complete:
 - the applicable repository gate was reported green by the user after the last
   bounded repair.
 
-Final Phase 9 certification remains withheld until the required operator
-verification artifacts can exercise every approved production boundary and the
-user reports their results. Phase 10 must not begin automatically.
+At this checkpoint, final Phase 9 certification was withheld until the
+operator artifacts exercised every approved production boundary. Section 46
+records the later user-verified certification and explicit start of Phase 10.
 
 ## 45. Finding P9-27: fallback inspection production reachability
 
@@ -266,7 +266,11 @@ tests, CI evidence, or substitutes for the repository verification gate.
 
 ## 46. Verification handoff
 
-P9-27 and the Phase 9 operator fixtures are ready for user-run verification.
-Phase 9 certification remains withheld until the user reports the tracked
-repository gate and the operator scenarios green. Phase 10 must not begin
-automatically.
+**Final status:** Phase 9 certified on 2026-09-21.
+
+The user reported the tracked repository gate and registered production-path
+operator scenarios green after the P9-27 repair and harness corrections. The
+exhaustive matrix is complete, no unresolved high-severity integration gap or
+registered obsolete bypass remains, and all bounded repairs are user-verified.
+Phase 10 was then explicitly started for `0.8.0-rc`. Final `0.8.0` remains
+withheld until live field testing is complete.
