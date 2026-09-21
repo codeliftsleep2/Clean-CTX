@@ -54,7 +54,10 @@ pub use binary_wire::{
     ir_to_binary_wire_json, is_binary_wire,
 };
 pub use compiler::{CompileError, CompiledIR, IRCompiler};
-pub use control_full::{normalize_control_full, render_control_full};
+pub use control_full::{
+    CONTROL_FULL_NAVIGATION_SCHEMA, CONTROL_FULL_NAVIGATION_VERSION, CONTROL_FULL_VERSION,
+    normalize_control_full, render_control_full, semantic_edge_navigation,
+};
 pub use delta::{
     CompactDelta, CompactOps, CompactSequenceDelta, DeltaComputer, DeltaIdentity, DeltaOpcode,
     DeltaOps, FieldPatch, IRDelta, ModOp, OccurrenceKey, SEQUENCE_DELTA_VERSION, SemanticIntent,

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pass", "failure_categories", "notes"],
+  "properties": {
+    "pass": { "type": "boolean" },
+    "failure_categories": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "identity error",
+          "ownership error",
+          "fabricated resolved call target",
+          "missing/incorrect call occurrence",
+          "arity/spread error",
+          "DI error",
+          "provenance error",
+          "duplicate/order loss",
+          "unsupported claim",
+          "wrong source-escalation decision",
+          "wrong edit target",
+          "source/body corruption",
+          "other semantic mismatch"
+        ]
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}

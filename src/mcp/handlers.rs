@@ -159,7 +159,7 @@ pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str, state: &McpState
             "jsonrpc": "2.0",
             "id": id,
             "result": {
-                "description": "Clean-CTX CONTROL-FULL v1 vocabulary: named canonical identities, ordered calls, complete semantic edges/provenance, exact Edit bodies, delta state, and α path aliases.",
+                "description": "Clean-CTX CONTROL-FULL v2 vocabulary: named canonical identities, stable typed navigation, ordered calls, complete semantic edges/provenance, exact Edit bodies, delta state, and α path aliases.",
                 "messages": [
                     {
                         "role": "user",

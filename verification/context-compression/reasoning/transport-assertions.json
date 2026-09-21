@@ -1,0 +1,24 @@
+[
+  {
+    "id": "edit-focus-ambiguous",
+    "capture": "edit-focus-ambiguous",
+    "expected": "registered structured error",
+    "assertions": [
+      "bare selector matching multiple typed owners fails structurally",
+      "selection is not guessed or broadened",
+      "no partial semantic result is published",
+      "no ordinary successful result.content is exposed"
+    ]
+  },
+  {
+    "id": "edit-focus-invalid",
+    "capture": "edit-focus-invalid",
+    "expected": "registered structured error",
+    "assertions": [
+      "selector resolving to no canonical method fails structurally",
+      "selection does not fall back to all methods",
+      "selector is not silently ignored",
+      "no successful semantic result is published"
+    ]
+  }
+]

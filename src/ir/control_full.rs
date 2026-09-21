@@ -9,7 +9,99 @@ use crate::layers::meta::semantic::SemanticEdge;
 use serde_json::{Value, json};
 
 pub const CONTROL_FULL_SCHEMA: &str = "clean-ctx/control-full";
-pub const CONTROL_FULL_VERSION: u64 = 1;
+pub const CONTROL_FULL_VERSION: u64 = 2;
+pub const CONTROL_FULL_NAVIGATION_SCHEMA: &str = "clean-ctx/control-full-navigation";
+pub const CONTROL_FULL_NAVIGATION_VERSION: u64 = 1;
+
+const OCCURRENCE_FAMILIES: [&str; 4] = [
+    "modifier_occurrences",
+    "control_summary_occurrences",
+    "pattern_fact_occurrences",
+    "legacy_flag_occurrences",
+];
+
+fn method_occurrence_navigation(
+    owner_kind: &str,
+    owner_id: &str,
+    method: &MethodNode,
+) -> Vec<Value> {
+    OCCURRENCE_FAMILIES
+        .iter()
+        .map(|family| {
+            json!({
+                "locator": {
+                    "owner": { "kind": owner_kind, "id": owner_id },
+                    "member": { "kind": "method", "id": method.id },
+                    "field": { "kind": "occurrence_group_array", "name": family },
+                },
+                "semantics": {
+                    "outer_array": "ordered_occurrences",
+                    "inner_array": "one_occurrence_group",
+                    "duplicates_significant": true,
+                    "empty_groups_significant": true,
+                }
+            })
+        })
+        .collect()
+}
+
+/// Stable typed descriptors for the existing semantic-edge records.
+/// Locators use semantic identity and occurrence rather than serialization offsets.
+pub fn semantic_edge_navigation(semantic_edges: &[SemanticEdge], collection: &str) -> Vec<Value> {
+    semantic_edges
+        .iter()
+        .enumerate()
+        .map(|(occurrence, edge)| {
+            json!({
+                "locator": {
+                    "collection": collection,
+                    "occurrence": occurrence,
+                    "relation": edge.relation,
+                    "layer": edge.layer,
+                    "subject": {
+                        "domain": edge.subject.domain,
+                        "entity_type": edge.subject.entity_type,
+                        "name": edge.subject.name,
+                    },
+                    "object": {
+                        "domain": edge.object.domain,
+                        "entity_type": edge.object.entity_type,
+                        "name": edge.object.name,
+                    },
+                },
+                "endpoint_fields": {
+                    "subject_file": { "endpoint": "subject", "field": "file" },
+                    "object_file": { "endpoint": "object", "field": "file" },
+                }
+            })
+        })
+        .collect()
+}
+
+fn navigation(hierarchy: &HierarchicalIR, semantic_edges: &[SemanticEdge]) -> Value {
+    let occurrence_groups = hierarchy
+        .classes
+        .iter()
+        .flat_map(|owner| {
+            owner
+                .methods
+                .iter()
+                .flat_map(|method| method_occurrence_navigation("class", &owner.id, method))
+        })
+        .chain(hierarchy.interfaces.iter().flat_map(|owner| {
+            owner
+                .methods
+                .iter()
+                .flat_map(|method| method_occurrence_navigation("interface", &owner.id, method))
+        }))
+        .collect::<Vec<_>>();
+    json!({
+        "schema": CONTROL_FULL_NAVIGATION_SCHEMA,
+        "schema_version": CONTROL_FULL_NAVIGATION_VERSION,
+        "occurrence_groups": occurrence_groups,
+        "semantic_edge_provenance": semantic_edge_navigation(semantic_edges, "semantic_edges"),
+    })
+}
 
 fn patterns(values: &[PatternEntry]) -> Value {
     Value::Array(
@@ -195,6 +287,7 @@ pub fn normalize_control_full(
         "type_aliases": type_aliases,
         "calls": calls,
         "semantic_edges": edges,
+        "navigation": navigation(hierarchy, semantic_edges),
     })
 }
 

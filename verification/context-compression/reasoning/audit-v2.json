@@ -1,0 +1,23 @@
+{
+  "audited_count": 36,
+  "join_authority": "Join case_id with generated reasoning-results-codex.json for mode, fidelity, intent, focus, capture, question, oracle, and original result.",
+  "valid_unchanged": [
+    "dense-graph--high-large-dense",
+    "unresolved-honesty--high-refactor",
+    "inheritance--high-refactor",
+    "inheritance--high-csharp",
+    "inheritance--high-java",
+    "behavior-facts--high-refactor",
+    "behavior-facts--high-large-dense",
+    "source-escalation--low-overview",
+    "source-escalation--medium-debug",
+    "source-escalation--high-refactor",
+    "focused-overload-family--edit-focus-overloads",
+    "implement-source-escalation--medium-implement",
+    "framework-edge-provenance--high-refactor",
+    "body-byte-fidelity--edit-all-crlf"
+  ],
+  "invalid_repaired": "See repairs-v2.json; all 22 entries include case_id, defect, capture-local question, and capture-local expected answer.",
+  "validity_rule": "Only facts in or legitimately derivable from the individual model-visible payload may be required.",
+  "lifecycle_facts_visible_by_default": false
+}

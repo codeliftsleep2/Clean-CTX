@@ -1,0 +1,23 @@
+[package]
+name = "clean-ctx-measure-helper"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+clean-ctx = { path = "../../..", default-features = false, features = [
+    "typescript",
+    "csharp",
+    "rust",
+    "java",
+    "angular",
+    "spring_boot",
+    "dotnet",
+] }
+serde_json = "1.0"
+
+[[bin]]
+name = "clean-ctx-measure-helper"
+path = "../scripts/measure.rs"

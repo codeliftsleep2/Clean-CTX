@@ -1,0 +1,229 @@
+# CONTROL-FULL production verification and baseline harness
+
+This directory contains the tracked, reusable definitions for the operator-run
+CTX-001 research harness and the Section 14 production-mode matrix. It does not
+implement a codec or CTX-002 selection. Generated runtime state and evidence are
+written beneath `target/context-compression-verification/`.
+
+**Operator PASS is not tracked-test PASS.** Files under `target/` are ignored, are not CI regression tests, and cannot satisfy an architectural test requirement. The tracked tests under `src/tests/**` remain the enforcement authority.
+
+## Prerequisites and exact command order
+
+Run from the repository root in PowerShell:
+
+```powershell
+cargo build --all-features
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Reset.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Prepare-Fixtures.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Validate-ReasoningDefinitions.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Build-MeasureHelper.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Capture-Baselines.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Verify-Captures.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Measure-Baselines.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Prepare-ReasoningWorksheet.ps1
+```
+
+The agent did not run these commands. `cargo build` is the user-owned prerequisite. The capture script launches `target/debug/clean-ctx.exe`; this is also user-owned live execution.
+
+The helper build runs Cargo in offline mode and prints normal compilation progress. Capture prints each scenario name before invoking it. If progress stops, the last printed scenario identifies the production call being awaited.
+
+## Fixture and behavior matrix
+
+`expected/scenarios.json` is the machine-readable scenario inventory. It covers:
+
+- Low/overview, Medium/debug, Medium/implement, High/refactor via provide and direct compress, and an explicit High-over-debug override;
+- Edit with all bodies, one/many qualified targets, an overload family, a unique bare target, ambiguous bare failure, and invalid qualified failure;
+- Verbatim through provide and direct compress;
+- registered delta baseline/generation/application;
+- durable restore and historical replay;
+- equal cross-file display names with distinct provenance;
+- TypeScript, C#, Java, and Rust production compilation;
+- a many-class, large-owner, dense-call/DI graph with multibyte UTF-8;
+- a mandatory tiny payload;
+- generated marginal pairs for +1 class, method, parameter, call, duplicate call, injection, semantic edge, repeated type, and known exact body.
+
+`Prepare-Fixtures.ps1` also creates a strict CRLF/UTF-8 copy and all marginal pairs. The rich TypeScript fixture contains ownership collisions, overloads, DI, ordered duplicate calls, spread, unresolved calls, inheritance/interfaces, imports/type aliases, control flow, side effects, and exact bodies. The language fixtures exercise only facts their current production compilers emit.
+
+## Capture semantics
+
+- `control-full.txt` always comes from `result.content[0].text` returned by a registered production tool.
+- `control-prod-<tokenizer>.txt` is produced only by the operator helper from the historical renderer and a hierarchical `ir` returned by a registered production call. For historical provide paths it also reproduces the old tokenizer-specific raw-source fallback. Production is never routed back through CONTROL-PROD.
+- Error scenarios retain `response.json`, must not expose a successful result or
+  `control-full.txt`, and intentionally have no token or reasoning comparison.
+- Verbatim uses the exact source as its historical comparison and is not a semantic codec candidate.
+
+The helper is a standalone Cargo package that depends on the repository by path, ensuring Cargo selects one coherent dependency graph. It uses the repository's real `cl100k` and `o200k` implementations and refuses Claude/Llama labels because those local implementations are approximations. The helper build is user-run and shares the repository `target/` directory so the prerequisite all-feature build can be reused.
+
+## Expected outputs
+
+Generated data appears under
+`target/context-compression-verification/captures/`:
+
+- `<scenario>/response.json` — exact registered MCP response;
+- `<scenario>/control-full.txt` — exact model-visible content;
+- `<scenario>/control-prod-{cl100k,o200k}.txt` — historical model-visible payload after the old request-tokenizer economics decision, when reconstructible;
+- `<scenario>/control-full-fixed.txt` — the same request's schema/file/mode/path envelope with fact families emptied, used to measure request-local fixed overhead;
+- `verification-result.json` — operator semantic checks;
+- `baseline-records.json` — one record per capture/tokenizer with bytes, characters, family counts, CONTROL-PROD tokens, CONTROL-FULL tokens, null candidate tokens, and reasoning-oracle path.
+- `marginal-costs.json` — paired CONTROL-PROD/CONTROL-FULL token deltas for each added semantic family under both real local tokenizers.
+- `reasoning-results.json` — unscored per-task/per-capture worksheet with exact oracle and zero-tolerance fields; it deliberately has no aggregate score.
+
+The per-family `*_value_tokens` and `*_json_tokens` fields isolate selected values for cost diagnosis. They are not an additive partition of the payload because the enclosing CONTROL-FULL JSON syntax is intentionally excluded.
+
+The expected verifier result is `{"pass":true,...}`. Any missing call/edge/body identity, focus ambiguity acceptance, stale restore/replay representation, or cross-file provenance collapse is a failure.
+
+## Section 14 mapping
+
+| Section 14 row | Captures |
+|---|---|
+| Low / overview | `low-overview`, `tiny-low` |
+| Medium / debug | `medium-debug` |
+| Medium / implement | `medium-implement` |
+| High / refactor | `high-refactor`, `high-compress`, `high-large-dense`, language High captures, explicit override |
+| Edit / all bodies | `edit-all` |
+| Edit / focused bodies | every `edit-focus-*` capture |
+| Verbatim | `verbatim`, `verbatim-compress` |
+| Delta/apply | `delta-flow-baseline`, `delta-flow-delta`, `delta-flow-apply` |
+| Restore | `restore-flow` |
+| Replay | `replay-flow` |
+| Cross-file | `cross-a`, `cross-b` |
+
+Populate Section 14 only after inspecting `verification-result.json`, `baseline-records.json`, and the reasoning results. Do not insert candidate values.
+
+## Reasoning workflow
+
+`reasoning/oracles.json` expands to exactly 36 executable case/capture pairs.
+`reasoning/transport-assertions.json` separately owns the ambiguous and invalid
+focus rejection contracts; those errors are never LLM inputs.
+Verbatim remains in the production capture matrix but is excluded from semantic
+reasoning scoring because exact source is not a CONTROL-FULL envelope.
+
+### Local Codex lane
+
+After captures and the worksheet exist, run the complete local Codex baseline
+with one command:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-CodexReasoning.ps1
+```
+
+Pass `-Model '<model-id>'` only when a specific installed Codex model must be
+ pinned. The runner resolves `codex` from `PATH` or the newest VS Code Codex
+extension; `-CodexPath '<full-path>'` is available as an explicit fallback.
+Each answer and score uses a fresh ephemeral process in an isolated
+read-only working directory. The run is resumable; use `-Restart` only to
+discard and repeat the Codex result set. Outputs are kept separate as
+`reasoning-results-codex.json` and `reasoning-summary-codex.json`.
+
+This is a user-owned long-running model run. The preparation agent does not
+start it.
+
+The first completed Codex run is preserved as invalid historical evidence in
+`reasoning/run-lineage.json`. After benchmark repair, prepare and run only the
+22 cleared cases while carrying forward the 14 unchanged valid results:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Prepare-CorrectedReasoningRun.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-CodexReasoning.ps1 -ResultsPath ./target/context-compression-verification/captures/reasoning-results-codex-corrected.json
+```
+
+### Production Claude lane
+
+Run the same tracked capture and case definitions independently inside the work
+environment. Keep raw work captures and answers there, and label its result set
+`claude`; do not copy repository source or captures between machines unless
+organizational policy permits it. New Relic is authoritative for Claude's exact
+production token counts. Codex reasoning results and Claude production evidence
+remain separate and must never be relabeled as one another.
+
+### Twelve-case failure triage
+
+The investigation dossier and controlled matrix are under `investigation/`.
+Run five independent trials for each of the twelve failed cases with one command:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-FailureTriageTrials.ps1
+```
+
+This preserves the other 24 results in every trial. Outputs are written as
+`reasoning-results-codex-triage-v2-1.json` through `-5.json`, with matching summary
+files beneath `target/context-compression-verification/captures/`.
+
+The earlier files without the `v2` marker reused cached answers across trials
+and are retained only as invalid experiment evidence.
+
+### Same-information organization experiments
+
+The DI-provenance and occurrence-group experiments add only a navigation index;
+the original CONTROL-FULL semantic object remains otherwise exactly equal.
+Generate and deterministically validate the variants with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Prepare-OrganizationExperiments.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Validate-ControlFullExperiments.ps1
+```
+
+After that validation passes, the complete bounded model experiment is:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-OrganizationExperiments.ps1
+```
+
+It runs three trials for one representative DI case and one representative
+occurrence-group case—six answers and six scores total. It does not alter
+production, begin codec selection, or change canonical semantics.
+
+After the approved production presentation repair, run the two affected cases
+against a fresh production CONTROL-FULL v2 capture with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-PresentationRepairSmoke.ps1
+```
+
+The script creates a timestamped result lane, rejects stale/non-v2 captures,
+and executes only `dependency-injection--high-refactor` and
+`behavior-facts--high-refactor`. Existing experiment answers are never reused.
+
+For each row in the generated `reasoning-results.json`:
+
+1. Start a fresh model conversation with the same model/version and fixed sampling settings.
+2. Use `List-ReasoningCases.ps1` to inspect case IDs, then use
+   `Show-ReasoningCase.ps1 -CaseId <id>` to obtain only the exact registered
+   CONTROL-FULL payload plus the question, and provide that output to the model.
+3. Save the answer to a text file, then use `Record-ReasoningResult.ps1` with the
+   case ID, answer path, pass/fail judgment, model metadata, and any failure
+   categories.
+4. Score each task family separately against `expected` and every `zero_tolerance` condition.
+5. Record unavailable native tokenizers as unavailable—never substitute the Claude/Llama approximations as actual counts.
+
+After all cases are populated, run `Summarize-ReasoningResults.ps1`. It writes
+`reasoning-summary.json` and exits unsuccessfully unless all 36 cases pass. No
+aggregate score may hide an identity, ownership, ordering, unresolved-target,
+edit-target, source-escalation, or byte-fidelity failure.
+
+Example recording command:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Record-ReasoningResult.ps1 `
+  -CaseId ownership--low-overview `
+  -AnswerPath .\target\context-compression-verification\answers\ownership--low-overview.txt `
+  -Result pass -Model '<model>' -ModelVersion '<version>' -SamplingSettings '<settings>'
+```
+
+## Known production boundary
+
+Current `provide_code_context` is a single-file compiler. The cross-file captures prove equal-name separation and asserting-file provenance, but they do not fabricate a resolved cross-file call target. If no registered response emits such a relation for the fixtures, record cross-file resolution as unsupported/unreachable rather than inferring it. This limitation must remain visible when judging whether a codec experiment is fair.
+
+The current Rust compiler does not emit structural call facts for the representative Rust fixture. The Rust capture still measures its supported declaration/ownership families, while call reasoning is explicitly unavailable for that row. TypeScript focus targets are declared independently of the inheritance stress class so qualified selectors remain exact canonical owner matches; the harness does not normalize or heuristically shorten owner names.
+
+The registered TypeScript/Angular compiler currently emits the `Alpha → Injects → Repository` semantic fact but collapses the deterministic repeated constructor dependency to one edge and emits no core injection occurrences. The verifier records duplicate-DI reasoning as unsupported while still requiring at least one injection fact. This limitation must be resolved or explicitly excluded before comparing any codec on duplicate-injection tasks.
+
+CONTROL-PROD reconstruction is unavailable for structured error responses and for a delta summary without a hierarchical snapshot; those cells remain `unavailable`, not estimated. Apply/restore/replay reconstruction uses registered post-state hierarchical responses where available. `edit-focus-ambiguous` and `edit-focus-invalid` remain registered-path transport assertions only because their correct JSON-RPC error responses contain no successful model-visible semantic content.
+
+## Cleanup
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Reset.ps1
+```
+
+This removes generated runtime state, captures, and the helper executable. It preserves deterministic fixtures, scripts, expected manifests, and reasoning oracles.

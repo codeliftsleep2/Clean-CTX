@@ -8,11 +8,11 @@ responses use the versioned CONTROL-FULL JSON document in `content`. This is
 the portable semantic authority. `_meta` is application-facing state and may
 mirror facts, but never treat it as the only source of code meaning.
 
-## CONTROL-FULL v1
+## CONTROL-FULL v2
 
 The document begins with:
 
-`// CONTROL-FULL v1; canonical IDs are authoritative`
+`// CONTROL-FULL v2; canonical IDs are authoritative`
 
 The JSON fields are named and preserve canonical order:
 
@@ -40,7 +40,11 @@ Names are display data; explicit IDs and typed ownership determine identity.
   removed. Ambiguous selectors are errors, never guesses.
 - Verbatim is the explicit byte-exact whole-document mode. Request it for
   signatures, imports, class-level structure, or any edit outside exact bodies.
-- Delta content uses `CONTROL-FULL-DELTA v1`; apply it only to the acknowledged
+- `navigation` uses stable typed owner/member/edge locators. It never uses array
+  offsets; occurrence-group descriptors preserve outer occurrence order and
+  inner group boundaries, while endpoint descriptors keep `subject.file` and
+  `object.file` independently addressable.
+- Delta content uses `CONTROL-FULL-DELTA v2`; apply it only to the acknowledged
   prior canonical state. Its post-apply semantic-edge snapshot is authoritative.
 
 ## Editing
@@ -74,7 +78,7 @@ pub(crate) fn prompt_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "clean-ctx-vocabulary",
-            "description": "CONTROL-FULL v1 named semantic fields, canonical identity, exact-body, delta, and path-map rules.",
+            "description": "CONTROL-FULL v2 named semantic fields, stable typed navigation, canonical identity, exact-body, delta, and path-map rules.",
             "arguments": []
         }),
     ]

@@ -80,7 +80,7 @@ fn small_edit_uses_model_visible_control_full() {
         .expect("handler must send response");
     let kind = resp_kind(&resp);
     assert_eq!(kind, "skeleton_with_verbatim_bodies");
-    assert!(resp_text(&resp).starts_with("// CONTROL-FULL v1"));
+    assert!(resp_text(&resp).starts_with("// CONTROL-FULL v2"));
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn edit_mode_keeps_control_full_even_when_it_exceeds_raw() {
     let text = resp_text(&resp);
     let comp_tokens = count_tokens(&text);
     assert_eq!(resp_kind(&resp), "skeleton_with_verbatim_bodies");
-    assert!(text.starts_with("// CONTROL-FULL v1"));
+    assert!(text.starts_with("// CONTROL-FULL v2"));
     assert!(comp_tokens > 0 && raw_tokens > 0);
 }
 
@@ -131,7 +131,7 @@ fn structural_fidelities_keep_the_correctness_baseline() {
             .expect("handler must send resp");
         let text = resp_text(&resp);
         assert_eq!(resp_kind(&resp), "skeleton");
-        assert!(text.starts_with("// CONTROL-FULL v1"), "{fidelity}");
+        assert!(text.starts_with("// CONTROL-FULL v2"), "{fidelity}");
         assert!(count_tokens(&text) > 0 && raw_tokens > 0);
     }
 }
@@ -177,7 +177,7 @@ fn large_files_still_use_control_full() {
             kind, "raw_passthrough",
             "{fidelity}: CONTROL-FULL must stay authoritative"
         );
-        assert!(text.starts_with("// CONTROL-FULL v1"));
+        assert!(text.starts_with("// CONTROL-FULL v2"));
         assert!(raw_tokens > 0);
     }
 }
@@ -201,6 +201,6 @@ fn intent_edit_selects_control_full_edit_mode() {
         .expect("handler must send resp");
     let text = resp_text(&resp);
     assert_eq!(resp_kind(&resp), "skeleton_with_verbatim_bodies");
-    assert!(text.starts_with("// CONTROL-FULL v1"));
+    assert!(text.starts_with("// CONTROL-FULL v2"));
     assert!(count_tokens(&text) > 0 && raw_tokens > 0);
 }

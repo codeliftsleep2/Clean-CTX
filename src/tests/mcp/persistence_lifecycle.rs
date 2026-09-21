@@ -380,7 +380,7 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
     let compact = produced["result"]["content"][0]["text"]
         .as_str()
         .expect("CONTROL-FULL MCP text");
-    assert!(compact.starts_with("// CONTROL-FULL v1"));
+    assert!(compact.starts_with("// CONTROL-FULL v2"));
     for marker in [
         "modifier_occurrences",
         "control_summary_occurrences",
@@ -457,7 +457,7 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
     let replayed_text = replayed["result"]["content"][0]["text"]
         .as_str()
         .expect("replayed MCP text");
-    assert!(replayed_text.starts_with("// CONTROL-FULL v1"));
+    assert!(replayed_text.starts_with("// CONTROL-FULL v2"));
     for marker in [
         "modifier_occurrences",
         "control_summary_occurrences",

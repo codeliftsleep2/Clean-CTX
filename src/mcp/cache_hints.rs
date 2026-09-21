@@ -279,10 +279,10 @@ pub fn render_cache_json(metrics: &CacheMetrics, enabled: bool) -> serde_json::V
 /// This function is used by the `prompts/get` MCP handler.
 pub fn generate_vocabulary_text() -> String {
     let lines = vec![
-        "Clean-CTX Response Vocabulary (CONTROL-FULL v1)",
+        "Clean-CTX Response Vocabulary (CONTROL-FULL v2)",
         "================================================",
         "",
-        "// CONTROL-FULL v1; canonical IDs are authoritative",
+        "// CONTROL-FULL v2; canonical IDs are authoritative",
         "file: session ID, source path, IR version",
         "mode: fidelity, exact_body_method_ids, source escalation rule",
         "classes/interfaces: typed owners with explicit IDs and grouped facts",
@@ -292,7 +292,8 @@ pub fn generate_vocabulary_text() -> String {
         "",
         "Arrays preserve order, duplicates, and occurrence-group boundaries.",
         "Edit focus resolves typed ownership to canonical method IDs before filtering.",
-        "CONTROL-FULL-DELTA v1 requires an acknowledged prior canonical state.",
+        "navigation uses stable typed locators, never serialized array indices; endpoint file fields remain separate.",
+        "CONTROL-FULL-DELTA v2 requires an acknowledged prior canonical state.",
         "",
         "α/β/γ   path aliases — see §PATHMAP footer",
         "",

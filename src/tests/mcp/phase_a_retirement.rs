@@ -151,8 +151,8 @@ fn phase_a_success_paths_render_schema_v3() {
             .and_then(|t| t.as_str())
             .unwrap_or_else(|| panic!("[{tool}] missing result.content[0].text: {resp}"));
         assert!(
-            text.contains("// CONTROL-FULL v1"),
-            "[{tool}] successful output must be CONTROL-FULL v1"
+            text.contains("// CONTROL-FULL v2"),
+            "[{tool}] successful output must be CONTROL-FULL v2"
         );
         assert!(
             text.contains("Greeter"),

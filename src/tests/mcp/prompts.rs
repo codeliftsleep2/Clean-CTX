@@ -9,7 +9,7 @@ use super::SYSTEM_PROMPT;
 #[test]
 fn teaches_control_full_as_primary_notation() {
     for frag in [
-        "// CONTROL-FULL v1",
+        "// CONTROL-FULL v2",
         "canonical IDs are authoritative",
         "classes` / `interfaces`",
         "caller_method_id",
@@ -31,7 +31,7 @@ fn documents_high_and_edit_behaviors() {
         "Edit adds byte-exact method bodies",
         "exact_body_method_ids",
         "fidelity=\"verbatim\"",
-        "CONTROL-FULL-DELTA v1",
+        "CONTROL-FULL-DELTA v2",
     ] {
         assert!(
             SYSTEM_PROMPT.contains(frag),

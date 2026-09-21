@@ -1,0 +1,11 @@
+[
+  {"id":"class","base":"class A {}\n","plus":"class A {}\nclass B {}\n"},
+  {"id":"method","base":"class A {}\n","plus":"class A { one(): void {} }\n"},
+  {"id":"parameter","base":"class A { one(): void {} }\n","plus":"class A { one(value: string): void {} }\n"},
+  {"id":"call","base":"class A { one(): void {} }\n","plus":"class A { one(): void { external(); } }\n"},
+  {"id":"duplicate-call","base":"class A { one(): void { external(); } }\n","plus":"class A { one(): void { external(); external(); } }\n"},
+  {"id":"injection","base":"class D {}\nclass A {}\n","plus":"class D {}\nclass A { constructor(private d: D) {} }\n"},
+  {"id":"semantic-edge","base":"class A {}\n","plus":"import { Injectable } from \"@angular/core\";\n@Injectable() class A {}\n"},
+  {"id":"repeated-type","base":"class A { one(value: LongTypeName): void {} }\n","plus":"class A { one(value: LongTypeName, other: LongTypeName): void {} }\n"},
+  {"id":"exact-body","base":"class A { one(): void {} }\n","plus":"class A { one(): void { const known = \"0123456789abcdef\"; consume(known); } }\n"}
+]

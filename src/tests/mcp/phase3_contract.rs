@@ -214,8 +214,8 @@ fn provide_code_context_uses_meta_not_ad_hoc_fields() {
 
     assert_eq!(content_kind, Some("skeleton"));
     assert!(
-        text.contains("// CONTROL-FULL v1"),
-        "content must be CONTROL-FULL v1: {text}"
+        text.contains("// CONTROL-FULL v2"),
+        "content must be CONTROL-FULL v2: {text}"
     );
 
     for banned in [

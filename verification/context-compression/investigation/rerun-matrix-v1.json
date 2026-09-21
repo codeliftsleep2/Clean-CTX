@@ -1,0 +1,9 @@
+{
+  "trials_per_case": 5,
+  "model_and_settings": "same model/version and isolated settings as corrected run",
+  "category_a_cases": ["call-order--low-overview","call-order--high-refactor","provenance--cross-a","provenance--cross-b","durable-regeneration--restore-flow","durable-regeneration--replay-flow"],
+  "category_b_cases": ["dense-graph--high-large-dense","dependency-injection--high-refactor","dependency-injection--edit-all","behavior-facts--high-refactor","behavior-facts--high-large-dense","delta-authority--delta-flow-delta"],
+  "record": ["trial","case_id","representation_variant","answer","pass","failure_categories"],
+  "gate": "Report pass frequency per case; any correctness-critical error remains a risk signal and is not averaged away."
+  ,"invalid_prior_trial_files": "reasoning-results-codex-triage-1.json through -5.json reused cached answers and are invalid for stochasticity conclusions"
+}

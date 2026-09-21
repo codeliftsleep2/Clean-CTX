@@ -1,6 +1,8 @@
 use crate::compression::Fidelity;
 use crate::ir::opcodes::CoreOp;
-use crate::ir::{CompiledIR, normalize_control_full, render_control_full};
+use crate::ir::{
+    CompiledIR, normalize_control_full, render_control_full, semantic_edge_navigation,
+};
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
 fn fixture() -> (CompiledIR, crate::ir::HierarchicalIR, Vec<SemanticEdge>) {
@@ -102,4 +104,88 @@ fn rendered_control_full_is_the_pretty_form_of_the_exact_oracle() {
     let (_, json) = rendered.split_once('\n').unwrap();
     let reparsed: serde_json::Value = serde_json::from_str(json).unwrap();
     assert_eq!(reparsed, normalized);
+}
+
+#[test]
+fn navigation_uses_typed_identity_locators_without_array_indices() {
+    let (ir, hierarchy, edges) = fixture();
+    let normalized = normalize_control_full(
+        &ir.file_id,
+        "C:/repo/owner.ts",
+        ir.version,
+        Fidelity::High,
+        &hierarchy,
+        &edges,
+    );
+
+    assert_eq!(normalized["schema_version"], 2);
+    assert_eq!(
+        normalized["navigation"]["schema"],
+        "clean-ctx/control-full-navigation"
+    );
+    let groups = normalized["navigation"]["occurrence_groups"]
+        .as_array()
+        .unwrap();
+    let method = groups
+        .iter()
+        .find(|entry| {
+            entry["locator"]["member"]["id"] == "M1"
+                && entry["locator"]["field"]["name"] == "control_summary_occurrences"
+        })
+        .unwrap();
+    assert_eq!(method["locator"]["owner"]["id"], "C1");
+    assert_eq!(method["locator"]["owner"]["kind"], "class");
+    assert_eq!(method["semantics"]["outer_array"], "ordered_occurrences");
+
+    let edge = &normalized["navigation"]["semantic_edge_provenance"][0];
+    assert_eq!(edge["locator"]["collection"], "semantic_edges");
+    assert_eq!(edge["locator"]["relation"], "Injects");
+    assert_eq!(edge["locator"]["subject"]["name"], "Owner");
+    assert_eq!(edge["locator"]["object"]["name"], "Repo");
+    assert_eq!(
+        edge["endpoint_fields"]["subject_file"],
+        serde_json::json!({ "endpoint": "subject", "field": "file" })
+    );
+    assert_eq!(
+        edge["endpoint_fields"]["object_file"],
+        serde_json::json!({ "endpoint": "object", "field": "file" })
+    );
+    let navigation = serde_json::to_string(&normalized["navigation"]).unwrap();
+    assert!(!navigation.contains("classes["));
+    assert!(!navigation.contains("semantic_edges["));
+}
+
+#[test]
+fn navigation_is_stable_across_fidelity_and_edge_collection_names() {
+    let (ir, hierarchy, edges) = fixture();
+    let expected = normalize_control_full(
+        &ir.file_id,
+        "C:/repo/owner.ts",
+        ir.version,
+        Fidelity::Low,
+        &hierarchy,
+        &edges,
+    )["navigation"]
+        .clone();
+
+    for fidelity in [Fidelity::Medium, Fidelity::High, Fidelity::Edit] {
+        let normalized = normalize_control_full(
+            &ir.file_id,
+            "C:/repo/owner.ts",
+            ir.version,
+            fidelity,
+            &hierarchy,
+            &edges,
+        );
+        assert_eq!(normalized["navigation"], expected);
+    }
+
+    let after_apply = semantic_edge_navigation(&edges, "semantic_edges_after_apply");
+    assert_eq!(
+        after_apply[0]["locator"]["collection"],
+        "semantic_edges_after_apply"
+    );
+    assert_eq!(after_apply[0]["locator"]["occurrence"], 0);
+    assert_eq!(after_apply[0]["locator"]["subject"]["name"], "Owner");
+    assert_eq!(after_apply[0]["locator"]["object"]["name"], "Repo");
 }

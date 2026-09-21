@@ -1,6 +1,6 @@
 # LLM-context compression research
 
-**Status:** CONTROL-FULL correctness repair implemented; verification checkpoint; codec work stopped  
+**Status:** CONTROL-FULL v2 presentation repair verified; codec work stopped pending the next approved research phase
 **Date:** 2026-09-21  
 **Scope:** the representation delivered to an LLM. Canonical IR and tool input contracts are unchanged; structured production `content` now uses the approved CONTROL-FULL envelope. Sections 1–13 preserve the pre-repair research findings; Section 14 records the approved production-mode boundary and current checkpoint.
 
@@ -583,13 +583,13 @@ The benchmark corpus must exercise full provide/compress, selected and all-body 
 
 | Fidelity | Intent | Focus mode | Production path | Required semantic families | Body behavior | CONTROL-PROD tokens | CONTROL-FULL tokens | Candidate tokens | Reasoning result |
 |---|---|---|---|---|---|---:|---:|---:|---|
-| Low | overview | ignored | provide full | canonical Low hierarchy + calls + injections + all edges/provenance | none; request Edit/Verbatim when needed | pending | pending | n/a | pending |
-| Medium | debug/implement | ignored | provide full | canonical Medium hierarchy + calls + injections + all edges/provenance | none; request Edit/Verbatim when needed | pending | pending | n/a | pending |
-| High | refactor | ignored | provide/compress full | complete compiled reasoning envelope, IDs, groups, calls, DI/framework/generic edges | none; request Edit/Verbatim when needed | pending | pending | n/a | pending |
-| Edit | edit | omitted | provide full | High structural envelope plus every exact method body/span | all method bodies exact | pending | pending | n/a | pending |
-| Edit | edit | one/many typed selectors | provide full | same envelope; focus resolves to canonical method IDs | only resolved target set exact; overload family retained | pending | pending | n/a | pending |
-| Verbatim | any/explicit | ignored | provide/compress raw | exact source document; no compressed semantic claim | entire document exact | pending | n/a | n/a | pending |
-| Low–Edit | mapped/explicit | inherited | provide/delta/apply | exact delta plus complete post-apply edge snapshot; acknowledged prior state required | follows effective fidelity/focus | pending | pending | n/a | pending |
-| persisted fidelity | n/a | persisted | restore/replay | regenerated CONTROL-FULL from durable checked IR + durable edges, never trusted stale compact text | follows persisted body facts | pending | pending | n/a | pending |
+| Low | overview | ignored | provide full | canonical Low hierarchy + calls + injections + all edges/provenance | none; request Edit/Verbatim when needed | pending | pending | n/a | pending user run |
+| Medium | debug/implement | ignored | provide full | canonical Medium hierarchy + calls + injections + all edges/provenance | none; request Edit/Verbatim when needed | pending | pending | n/a | pending user run |
+| High | refactor | ignored | provide/compress full | complete compiled reasoning envelope, IDs, groups, calls, DI/framework/generic edges | none; request Edit/Verbatim when needed | pending | pending | n/a | pending user run |
+| Edit | edit | omitted | provide full | High structural envelope plus every exact method body/span | all method bodies exact | pending | pending | n/a | pending user run |
+| Edit | edit | one/many typed selectors | provide full | same envelope; focus resolves to canonical method IDs | only resolved target set exact; overload family retained | pending | pending | n/a | pending user run; rejection cases are transport-only |
+| Verbatim | any/explicit | ignored | provide/compress raw | exact source document; no compressed semantic claim | entire document exact | pending | n/a | n/a | excluded from semantic reasoning baseline |
+| Low–Edit | mapped/explicit | inherited | provide/delta/apply | exact delta plus complete post-apply edge snapshot; acknowledged prior state required | follows effective fidelity/focus | pending | pending | n/a | pending user run |
+| persisted fidelity | n/a | persisted | restore/replay | regenerated CONTROL-FULL from durable checked IR + durable edges, never trusted stale compact text | follows persisted body facts | pending | pending | n/a | pending user run |
 
-Codec work remains stopped. The next gate is user-run verification plus per-row CONTROL-PROD/CONTROL-FULL token and reasoning-baseline capture; only then may COMPACT-A/B/ULTRA experiments begin.
+Registered-path verification, token capture, and the corrected 36-case reasoning run completed. Follow-up diagnostics found that the required DI provenance and occurrence facts were present and deterministically correct, while their organization reduced model reasoning reliability. The approved CONTROL-FULL v2 repair adds only stable typed navigation descriptors: owner/member/field identity for occurrence groups and endpoint-local edge provenance descriptors. It never uses serialized array positions or textual JSON paths, and it does not alter canonical facts. The user-run local implementation gates are green. A fresh production-v2 smoke run passed both affected cases: DI provenance and occurrence grouping. The presentation repair is verified; codec work remains stopped pending the next explicitly approved research phase.

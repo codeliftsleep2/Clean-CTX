@@ -200,7 +200,7 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     assert!(
         baseline["result"]["content"][0]["text"]
             .as_str()
-            .is_some_and(|text| text.starts_with("// CONTROL-FULL v1"))
+            .is_some_and(|text| text.starts_with("// CONTROL-FULL v2"))
     );
 
     std::fs::write(&path, "class Delta { run() { second(); } }\n").unwrap();
@@ -209,9 +209,17 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     let text = delta["result"]["content"][0]["text"]
         .as_str()
         .expect("delta content");
-    assert!(text.starts_with("// CONTROL-FULL-DELTA v1"));
+    assert!(text.starts_with("// CONTROL-FULL-DELTA v2"));
     assert!(text.contains("\"delta\""));
     assert!(text.contains("\"semantic_edges_after_apply\""));
+    let (_, delta_json) = text.split_once('\n').expect("delta header");
+    let delta_payload: serde_json::Value =
+        serde_json::from_str(delta_json).expect("CONTROL-FULL delta JSON");
+    assert_eq!(delta_payload["schema_version"], 2);
+    assert_eq!(
+        delta_payload["navigation"]["schema"],
+        "clean-ctx/control-full-navigation"
+    );
 
     let applied = dispatch(
         &state,
@@ -224,6 +232,8 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     );
     assert!(applied.get("error").is_none(), "{applied}");
     let applied_payload = control_full_json(&applied);
+    assert_eq!(applied_payload["schema_version"], 2);
+    assert!(applied_payload["navigation"].is_object());
     assert!(applied_payload["calls"].as_array().is_some_and(|calls| {
         calls
             .iter()
@@ -261,6 +271,10 @@ fn registered_restore_and_replay_regenerate_control_full_from_durable_facts() {
         assert!(response.get("error").is_none(), "{response}");
         let payload = control_full_json(&response);
         assert_eq!(payload["schema"], "clean-ctx/control-full");
+        assert_eq!(
+            payload["navigation"]["schema"],
+            "clean-ctx/control-full-navigation"
+        );
         assert!(
             payload["calls"]
                 .as_array()
