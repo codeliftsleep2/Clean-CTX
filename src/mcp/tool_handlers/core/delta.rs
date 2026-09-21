@@ -94,18 +94,9 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             return;
         }
     };
-    match state.recover_pending_edit(&resolved_path) {
-        Ok(crate::mcp::sqlite_store::EditRecovery::None) => {}
-        Ok(_) => {
-            if let Err(error) = state.hydrate_recovered_durable_state(&resolved_path) {
-                send_response(&invalid_session_ir_response(id, &error));
-                return;
-            }
-        }
-        Err(error) => {
-            send_response(&invalid_session_ir_response(id, &error));
-            return;
-        }
+    if let Err(error) = state.preflight_semantic_publication(&resolved_path) {
+        send_response(&invalid_session_ir_response(id, &error));
+        return;
     }
     let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
@@ -351,18 +342,9 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         .persisted_path(&file)
         .or_else(|| state.path_for_alias(&file))
         .unwrap_or_else(|| file.clone());
-    match state.recover_pending_edit(&durable_file) {
-        Ok(crate::mcp::sqlite_store::EditRecovery::None) => {}
-        Ok(_) => {
-            if let Err(error) = state.hydrate_recovered_durable_state(&durable_file) {
-                send_response(&invalid_session_ir_response(id, &error));
-                return;
-            }
-        }
-        Err(error) => {
-            send_response(&invalid_session_ir_response(id, &error));
-            return;
-        }
+    if let Err(error) = state.preflight_semantic_publication(&durable_file) {
+        send_response(&invalid_session_ir_response(id, &error));
+        return;
     }
     let persistence_enabled = state.persistence_store_lock().is_some();
     let pending_transition = match &delta {

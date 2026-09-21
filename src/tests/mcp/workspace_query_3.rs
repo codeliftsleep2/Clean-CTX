@@ -58,7 +58,8 @@ fn call_find(
             let count = entities.len();
             (serde_json::to_value(entities).unwrap_or_default(), count)
         },
-    );
+    )
+    .expect("hydration succeeds");
     // The response projection itself, so these regressions assert the contract
     // the handler actually produces and cannot drift from it.
     let mut structured = serde_json::json!({ "entities": entities, "count": count })

@@ -118,7 +118,7 @@ fn run_query_with_hydration<F>(
     query_name: &str,
     workspace_root: Option<&str>,
     query_fn: F,
-) -> (Value, usize, super::hydration::HydrationReport)
+) -> Result<(Value, usize, super::hydration::HydrationReport), String>
 where
     F: Fn(&crate::workspace::index::WorkspaceIndex) -> (Value, usize),
 {
@@ -134,16 +134,16 @@ where
         &serde_json::json!({ "name": query_name }),
     );
     if !eligible {
-        return (
+        return Ok((
             initial_results,
             initial_count,
             super::hydration::HydrationReport::default(),
-        );
+        ));
     }
 
     // Step 3: One exhaustive discovery hydration pass.
     let hydration =
-        super::hydration::hydrate_workspace_index(state, query_type, query_name, workspace_root);
+        super::hydration::hydrate_workspace_index(state, query_type, query_name, workspace_root)?;
 
     // Step 4: Rerun original query exactly once.
     let (final_results, final_count) = {
@@ -151,7 +151,16 @@ where
         query_fn(&idx)
     };
 
-    (final_results, final_count, hydration)
+    Ok((final_results, final_count, hydration))
+}
+
+fn send_hydration_failure(id: &Value, error: String) {
+    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+        id.clone(),
+        -32603,
+        error,
+        None,
+    ));
 }
 
 /// Extract a required string argument from the arguments object.

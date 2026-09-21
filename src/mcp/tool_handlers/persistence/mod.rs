@@ -39,6 +39,9 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
     {
         return send_persistence_error(id, "Requested file does not match its durable identity");
     }
+    if let Err(error) = state.preflight_semantic_publication(&durable_path) {
+        return send_persistence_error(id, &error);
+    }
     let fidelity = match state.context_fidelity(&alias) {
         Some(fidelity) => fidelity,
         None => return send_persistence_error(id, "Missing fidelity for requested file"),
@@ -197,7 +200,7 @@ pub(crate) fn handle_delete_context(id: &Value, params: &Value, state: &McpState
         return send_persistence_error(id, "Requested file does not match its durable identity");
     }
 
-    let durable_matches = {
+    let deletion = {
         let store_guard = state.persistence_store_lock();
         let Some(store) = store_guard.as_ref() else {
             return send_persistence_error(id, "Persistence is not enabled");
@@ -207,16 +210,20 @@ pub(crate) fn handle_delete_context(id: &Value, params: &Value, state: &McpState
             return send_persistence_error(id, "Persistence DB is unavailable");
         };
         match sqlite.delete_context_transactionally(&durable_path) {
-            Ok(matches) => matches,
+            Ok(deletion) => deletion,
             Err(error) => {
                 return send_persistence_error(id, &format!("Context deletion failed: {error}"));
             }
         }
     };
-    match durable_matches {
+    match deletion.count {
         1 => {}
         0 => return send_persistence_error(id, "No matching persisted context was deleted"),
         _ => return send_persistence_error(id, "Ambiguous persisted ownership for requested file"),
+    }
+
+    if let Some(stage_path) = deletion.recovery_stage.as_deref() {
+        crate::mcp::sqlite_store::remove_deleted_recovery_stage(&durable_path, stage_path);
     }
 
     state.ir_context_lock().remove_file(&alias);

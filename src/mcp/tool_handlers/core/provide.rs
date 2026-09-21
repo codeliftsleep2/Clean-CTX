@@ -59,6 +59,16 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         return;
     }
 
+    if let Err(error) = state.preflight_semantic_publication(&resolved_path) {
+        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+            id.clone(),
+            -32603,
+            error,
+            None,
+        ));
+        return;
+    }
+
     let limits = &state.config.resource_limits;
 
     if let Ok(metadata) = std::fs::metadata(&resolved_path) {
@@ -511,10 +521,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 let render_ms = render_start.elapsed().as_millis() as u64;
                 let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                 let comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
-                // Post-compression token-economics check: if the
-                // compressed/hybrid representation costs more tokens than
-                // the raw source, fall back to raw passthrough. This
-                // applies to all fidelity levels (Edit, Low, Medium, High).
+                // Apply the shared token-economics fallback at every fidelity.
                 if maybe_economics_fallback(
                     id,
                     source,

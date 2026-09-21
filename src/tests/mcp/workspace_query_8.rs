@@ -113,7 +113,8 @@ fn call_query(
             let count = values.as_array().map_or(0, Vec::len);
             (values, count)
         },
-    );
+    )
+    .expect("hydration succeeds");
     // The response projection itself, so these regressions assert the contract
     // the handler actually produces and cannot drift from it.
     let mut structured = serde_json::json!({ "result": result, "count": count })

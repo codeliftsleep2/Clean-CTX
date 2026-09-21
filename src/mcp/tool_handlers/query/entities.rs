@@ -16,7 +16,8 @@
 // filter is added.
 
 use super::{
-    discovery_field, query_scope, required_str, run_query_with_hydration, send_scope_rejection,
+    discovery_field, query_scope, required_str, run_query_with_hydration, send_hydration_failure,
+    send_scope_rejection,
 };
 use crate::mcp::McpState;
 use crate::protocol::send_response;
@@ -54,14 +55,17 @@ pub(super) fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
         }
     };
     let (results, count, hydration) =
-        run_query_with_hydration(state, "find_entities", name, workspace_root, move |idx| {
+        match run_query_with_hydration(state, "find_entities", name, workspace_root, move |idx| {
             let r = match scope.as_ref() {
                 Some(scope) => idx.find_entities_by_name_in_scope(name, scope),
                 None => idx.find_entities_by_name(name),
             };
             let c = r.len();
             (serde_json::to_value(&r).unwrap_or_default(), c)
-        });
+        }) {
+            Ok(result) => result,
+            Err(error) => return send_hydration_failure(id, error),
+        };
     // The semantic answer is `entities` + `count`; discovery diagnostics are
     // attached only when discovery deviated from its expected path.
     let mut structured = serde_json::json!({

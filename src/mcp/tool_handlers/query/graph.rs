@@ -10,7 +10,7 @@
 
 use super::{
     discovery_field, optional_i32, query_scope, required_str, run_query_with_hydration,
-    send_scope_rejection,
+    send_hydration_failure, send_scope_rejection,
 };
 use crate::mcp::McpState;
 use crate::protocol::send_response;
@@ -78,7 +78,7 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
     let name_owned = name.to_string();
     let depth_captured = depth;
     let (results, count, hydration) =
-        run_query_with_hydration(state, "transitive_dependencies", name, workspace_root, {
+        match run_query_with_hydration(state, "transitive_dependencies", name, workspace_root, {
             let domain = domain_owned.clone();
             let et = et_owned.clone();
             let name = name_owned.clone();
@@ -96,7 +96,10 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
                 let c = r.len();
                 (serde_json::to_value(&r).unwrap_or_default(), c)
             }
-        });
+        }) {
+            Ok(result) => result,
+            Err(error) => return send_hydration_failure(id, error),
+        };
     // The semantic answer is `dependencies` + `count` (+ `depth_used`); discovery
     // diagnostics are attached only when discovery deviated from its expected path.
     let mut structured = serde_json::json!({

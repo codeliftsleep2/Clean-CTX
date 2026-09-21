@@ -35,6 +35,53 @@ fn compile(state: &crate::mcp::McpState, id: i64, file: &str, root: &str) -> Val
     )
 }
 
+fn establish_deletion_intent(
+    state: &crate::mcp::McpState,
+    file: &str,
+    stage_path: &str,
+    transition: &str,
+) {
+    let source = std::fs::read(file).expect("current source");
+    let alias = state.alias_for_path(file).expect("alias");
+    let prior_hash = state
+        .ir_context_read()
+        .get_source_hash(&alias)
+        .cloned()
+        .expect("source hash");
+    let prior_version = state.file_version(&alias).expect("version");
+    let (mut target_ir, target_edges, target_hash) =
+        crate::mcp::tool_helpers::compile_source_ir_candidate(
+            file,
+            std::str::from_utf8(&source).expect("UTF-8 fixture"),
+            crate::compression::Fidelity::Edit,
+            state,
+        )
+        .expect("target compilation");
+    target_ir.file_id = file.to_string();
+    let intent = crate::mcp::sqlite_store::EditIntent {
+        transition_id: transition.to_string(),
+        file_path: file.to_string(),
+        prior_hash,
+        target_hash,
+        prior_version,
+        target_version: target_ir.version,
+        prior_source: source.clone(),
+        target_source: source,
+        target_ir: crate::ir::binary_wire::encode(&target_ir),
+        target_edges,
+        fidelity: crate::compression::Fidelity::Edit,
+        stage_path: stage_path.to_string(),
+    };
+    state
+        .persistence_store_lock()
+        .as_ref()
+        .unwrap()
+        .sqlite()
+        .unwrap()
+        .establish_edit_intent(&intent)
+        .expect("edit intent");
+}
+
 #[test]
 fn registered_delete_removes_exact_owned_context_without_touching_source_or_peer() {
     let _serial = crate::protocol::handler_response_serial();
@@ -124,6 +171,13 @@ fn registered_delete_removes_exact_owned_context_without_touching_source_or_peer
             .is_ok()
     );
     let source_before_delete = std::fs::read(&first).expect("source bytes");
+    let stage = root
+        .path()
+        .join("first.stage")
+        .to_string_lossy()
+        .into_owned();
+    std::fs::write(&stage, b"recovery artifact").unwrap();
+    establish_deletion_intent(&state, &first, &stage, "delete-first");
 
     let deleted = dispatch(&state, 6, "delete_context", json!({ "filePath": &first }));
     assert_eq!(deleted["result"]["_meta"]["deleted"], 1, "{deleted}");
@@ -132,6 +186,7 @@ fn registered_delete_removes_exact_owned_context_without_touching_source_or_peer
         std::fs::read(&first).expect("source remains"),
         source_before_delete
     );
+    assert!(!std::path::Path::new(&stage).exists());
     assert!(!state.ir_context_read().has_file(&first_alias));
     assert!(
         state
@@ -172,6 +227,7 @@ fn registered_delete_removes_exact_owned_context_without_touching_source_or_peer
         let store = state.persistence_store_lock();
         let sqlite = store.as_ref().unwrap().sqlite().unwrap();
         assert!(!sqlite.has_context(&first));
+        assert!(!sqlite.has_edit_intent(&first).unwrap());
         assert!(sqlite.has_context(&second));
         assert!(
             sqlite
@@ -236,6 +292,13 @@ fn rejected_or_failed_delete_preserves_all_live_ownership() {
             .is_ok()
     );
     let source_before_failure = std::fs::read(&file).expect("source bytes");
+    let stage = root
+        .path()
+        .join("owned.stage")
+        .to_string_lossy()
+        .into_owned();
+    std::fs::write(&stage, b"retained recovery artifact").unwrap();
+    establish_deletion_intent(&state, &file, &stage, "retain-on-failure");
 
     {
         let store = state.persistence_store_lock();
@@ -267,6 +330,17 @@ fn rejected_or_failed_delete_preserves_all_live_ownership() {
     assert_eq!(
         std::fs::read(&file).expect("source remains"),
         source_before_failure
+    );
+    assert!(std::path::Path::new(&stage).exists());
+    assert!(
+        state
+            .persistence_store_lock()
+            .as_ref()
+            .unwrap()
+            .sqlite()
+            .unwrap()
+            .has_edit_intent(&file)
+            .unwrap()
     );
 
     let missing = dispatch(

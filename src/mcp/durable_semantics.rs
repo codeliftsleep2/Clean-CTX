@@ -137,6 +137,15 @@ pub(crate) fn sequence_delta_identity(delta: &SequenceDelta) -> Result<String, S
 }
 
 impl super::McpState {
+    /// Resolve crash-recovery ownership before a registered path may compile,
+    /// checkpoint, or publish authoritative semantics for one file.
+    pub(crate) fn preflight_semantic_publication(&self, file_path: &str) -> Result<(), String> {
+        match self.recover_pending_edit(file_path)? {
+            crate::mcp::sqlite_store::EditRecovery::None => Ok(()),
+            _ => self.hydrate_recovered_durable_state(file_path),
+        }
+    }
+
     pub(crate) fn recover_pending_edit(
         &self,
         file_path: &str,

@@ -108,8 +108,8 @@ irreconcilable source bytes.
 
 ## 26. Finding P9-19: delta durable-baseline paths bypass edit recovery
 
-**Severity:** High cross-cutting transactional contradiction; Option 1
-implemented pending user verification.
+**Severity:** High cross-cutting transactional contradiction; Option 1 repaired
+and user-verified.
 
 The required post-P9-18 inspection found that `delta_code_context` and
 `apply_delta` reach durable baseline helpers without first resolving a pending
@@ -162,7 +162,92 @@ and persistence failure for generation and application.
 
 ## 27. Approval gate and next audit action
 
-P9-18 was user-verified green. The exhaustive audit is paused for user-run
-verification of P9-19. After that gate is green, resume the remaining
-operation, semantic-family, lifecycle, and obsolete-path matrix. Phase 9 is not
-certified.
+P9-18 and P9-19 were user-verified green. The exhaustive Phase 9 audit has
+resumed; Phase 9 is not certified.
+
+## 28. Finding P9-20: remaining context producers bypass recovery ownership
+
+**Severity:** High cross-cutting lifecycle contradiction; approved and
+implemented pending user verification.
+
+The post-P9-19 registered-path audit found four remaining ways to publish,
+checkpoint, index, or delete semantic state without coherently owning a pending
+edit intent:
+
+- Non-verbatim `compress_code_context` compiles current disk bytes and can
+  replace the durable baseline and live canonical/index state without first
+  resolving the intent.
+- `provide_code_context` reads source and creates alias/durable mappings before
+  strategy selection, then several strategies compile or publish canonical IR,
+  semantic edges, pending deltas, and `WorkspaceIndex` state without recovery.
+- `save_context` can checkpoint session canonical/edge state while an intent
+  still owns whether prior or target bytes are authoritative.
+- Registered `workspace_query` hydration compiles discovered files and publishes
+  semantic edges into `WorkspaceIndex` without checking file-scoped recovery.
+
+Deletion has the inverse ownership defect. `delete_context_transactionally`
+deletes the context baseline, delta history, and semantic-edge snapshot but not
+the file's `edit_intents` row. Registered `delete_context` can therefore report
+complete deletion while leaving durable crash-recovery ownership behind. The
+row has no foreign key that would remove it with the context.
+
+Read-only source diff, stats, list, and history-metadata operations do not
+publish durable canonical or semantic state and have not been shown to require
+this boundary. Verbatim compression returns source bytes without publishing a
+semantic baseline and remains distinct from state-producing compression.
+
+### Alternatives
+
+1. Make shared pending-edit preflight mandatory for every registered path that
+   compiles and publishes canonical/edge/index state or writes a semantic
+   checkpoint: non-verbatim compression, provision strategies, `save_context`,
+   and per-file workspace hydration. Recovery and checked durable hydration
+   complete before aliases, mappings, compilation, checkpointing, pending
+   transitions, or index mutation. Extend transactional deletion to remove the
+   file's edit intent as owned durable state, without first committing a target
+   that is immediately being deleted.
+2. Reject those operations whenever an intent exists and require explicit
+   `restore_context`; deletion would still need transactional intent removal.
+3. Allow each operation to infer or overwrite recovery state independently,
+   recreating the split-authority defects repaired in P9-15 through P9-19.
+
+### Recommendation
+
+Choose option 1. Recovery is a file-scoped storage lifecycle boundary; semantic
+producers and checkpoint writers must enter through it, while deletion must
+atomically remove it. Implement one reusable preflight that recovers and
+hydrates checked durable state before publication, preserving each handler's
+response, fidelity, compact rendering, full-body fallback, and transaction
+semantics. Add the edit-intent row to the SQLite deletion transaction and
+remove any staged recovery artifact only after durable deletion commits.
+
+Tracked registered coverage should prove each affected path cannot compile,
+checkpoint, publish aliases/edges/index state, or overwrite baselines before
+successful recovery; failure is mutation-free; deletion removes baseline,
+history, edge snapshot, and intent together while preserving source bytes; and
+unaffected read-only operations retain their current behavior.
+
+**Implementation update (2026-09-20):** `McpState` now exposes one semantic-
+publication preflight that deterministically resolves any durable edit intent
+and checked-hydrates the recovered canonical and complete edge state before a
+caller may continue. Non-verbatim compression, all provision strategies,
+file-scoped checkpointing, registered delta entry points, and per-file
+workspace hydration enter through this authority before compilation or
+publication. Workspace hydration propagates recovery failures to the
+registered MCP response rather than misclassifying them as ordinary candidate
+compile misses. Verbatim compression remains byte-only and outside the gate.
+
+Transactional deletion now owns the baseline, `dv:2` history, semantic-edge
+snapshot, and edit-intent row in one SQLite commit. Only after that commit does
+the handler remove the staged recovery artifact and live session/index owners;
+failure rolls the intent and all other durable rows back together. Registered
+coverage exercises mutation-free failure and successful recovery for
+compression, provision, save, and workspace hydration, plus deletion success
+and failure with exact source and peer ownership preserved.
+
+## 29. Approval gate and next audit action
+
+P9-18 and P9-19 were user-verified green. The exhaustive audit is paused for
+user-run verification of P9-20. After that gate is green, resume the remaining
+operation, semantic-family, lifecycle, and obsolete-path matrix. Phase 9 is
+not certified.

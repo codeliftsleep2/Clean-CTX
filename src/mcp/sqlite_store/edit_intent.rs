@@ -231,3 +231,14 @@ fn remove_stage(path: &str) {
         let _ = std::fs::remove_file(path);
     }
 }
+
+/// Remove an internally staged recovery artifact only after durable context
+/// deletion commits. Never permit the source path itself to become the target.
+pub(crate) fn remove_deleted_recovery_stage(file_path: &str, stage_path: &str) {
+    if !stage_path.is_empty()
+        && crate::dictionary::path::canonical_identity_key(stage_path)
+            != crate::dictionary::path::canonical_identity_key(file_path)
+    {
+        remove_stage(stage_path);
+    }
+}

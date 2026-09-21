@@ -47,6 +47,18 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         return;
     }
 
+    if fidelity != crate::compression::Fidelity::Verbatim {
+        if let Err(error) = state.preflight_semantic_publication(&resolved_path) {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                error,
+                None,
+            ));
+            return;
+        }
+    }
+
     // A-13: Check resource limits before processing
     let limits = &state.config.resource_limits;
     if let Ok(metadata) = std::fs::metadata(&resolved_path) {
