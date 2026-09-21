@@ -1,7 +1,7 @@
 // src/mcp/tool_handlers/context/mod.rs
 //
-// Context history handler — queries in-memory context store and
-// session-level stats to show per-file versioning and cache metrics.
+// Context history handler — reads live and committed durable metadata plus
+// session-level stats without creating semantic ownership.
 //
 // v0.3.0: Separated from core handlers for Single Responsibility.
 
@@ -16,9 +16,19 @@ pub(crate) fn handle_context_history(id: &Value, params: &Value, state: &McpStat
     let file_path = crate::mcp::tool_helpers::arg_str(params, "filePath");
 
     if let Some(fp) = file_path {
-        let path_alias = state.get_or_create_alias(fp.to_string());
-        let ir_version = state.file_version(&path_alias);
-        let store_meta = state.context_store.load_latest(fp).ok().flatten();
+        let path_alias = state.alias_for_path(fp);
+        let ir_version = path_alias
+            .as_deref()
+            .and_then(|alias| state.file_version(alias));
+        let durable_meta = {
+            let guard = state.persistence_store_lock();
+            guard
+                .as_ref()
+                .and_then(|store| store.sqlite())
+                .and_then(|sqlite| sqlite.load_latest(fp).ok().flatten())
+        };
+        let store_meta =
+            durable_meta.or_else(|| state.context_store.load_latest(fp).ok().flatten());
 
         let mut lines = Vec::new();
         lines.push(format!("File: {}", fp));
@@ -107,3 +117,7 @@ pub(crate) fn handle_context_history(id: &Value, params: &Value, state: &McpStat
         }));
     }
 }
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/context_history_read_only.rs"]
+mod read_only_tests;

@@ -167,8 +167,8 @@ resumed; Phase 9 is not certified.
 
 ## 28. Finding P9-20: remaining context producers bypass recovery ownership
 
-**Severity:** High cross-cutting lifecycle contradiction; approved and
-implemented pending user verification.
+**Severity:** High cross-cutting lifecycle contradiction; repaired and user-
+verified on 2026-09-20.
 
 The post-P9-19 registered-path audit found four remaining ways to publish,
 checkpoint, index, or delete semantic state without coherently owning a pending
@@ -247,7 +247,67 @@ and failure with exact source and peer ownership preserved.
 
 ## 29. Approval gate and next audit action
 
-P9-18 and P9-19 were user-verified green. The exhaustive audit is paused for
-user-run verification of P9-20. After that gate is green, resume the remaining
-operation, semantic-family, lifecycle, and obsolete-path matrix. Phase 9 is
-not certified.
+P9-18 through P9-20 were user-verified green. The exhaustive audit resumed;
+Phase 9 is not certified.
+
+## 30. Finding P9-21: read-only context history creates identity ownership
+
+**Severity:** High session-identity contract contradiction; approved and
+implemented pending user verification.
+
+The P9-20 audit explicitly left read-only history metadata outside the shared
+semantic-publication preflight unless implementation evidence showed that it
+mutated authoritative state. Registered `context_history(filePath)` does so:
+before reading either session history or durable metadata, it calls
+`get_or_create_alias`. That method takes the mutable path dictionary and
+creates a session alias for any supplied string, including a file that has
+never been compiled, validated, persisted, or otherwise tracked.
+
+This contradicts the registered description, which says the tool views
+history for tracked files, and makes a nominal read operation establish path
+identity ownership. The invented alias can affect later alias allocation,
+dictionary/footer output, path lookup, and handlers that distinguish a known
+alias from an unowned path. It also bypasses the P9-20 rule that alias creation
+which establishes semantic ownership occurs only after recovery and checked
+hydration. No canonical IR, fidelity, source hash, semantic-edge state, or
+durable mapping is installed with this alias, so the resulting session identity
+is incomplete by construction.
+
+### Alternatives
+
+1. Make `context_history` strictly non-mutating. Use `alias_for_path` to inspect
+   an existing session owner; if none exists, report no live IR baseline while
+   still reading durable history by the supplied durable file identity. Never
+   allocate an alias merely to answer history metadata.
+2. Route `context_history` through recovery and checked durable hydration before
+   creating an alias. This makes a read-only metadata request restore and
+   publish semantic state, changing the operation's public meaning and failure
+   surface.
+3. Retain alias allocation and document the side effect. This preserves the
+   defect and permits partial identity ownership without canonical semantics.
+
+### Recommendation
+
+Choose option 1. History inspection does not require publication. Existing
+session identity should be observed without mutation, durable history should
+remain keyed by the requested durable identity, and an untracked file should
+not become tracked merely because its history was queried. Registered coverage
+should prove that existing tracked history remains unchanged, unknown paths do
+not change dictionary/alias state, repeated reads are idempotent, and no
+pending edit intent is recovered or otherwise mutated by this read-only tool.
+
+**Implementation update (2026-09-20):** The registered handler now observes an
+existing alias with `alias_for_path` and never allocates session identity.
+Committed durable history metadata is read directly from SQLite by the supplied
+file identity without flushing buffered writes, recovering edit intents, or
+hydrating semantic state. The legacy session-only metadata store remains a
+non-mutating fallback when durable persistence is unavailable. The tool
+description now states the read-only ownership contract. Registered coverage
+proves tracked and durable-only history, unknown-path idempotence and alias
+ordering, and preservation of pending edit intent and all semantic owners.
+
+## 31. Approval gate and next audit action
+
+The exhaustive Phase 9 audit is paused for user-run verification of P9-21.
+After that gate is green, resume the remaining registered-operation, semantic-
+family, lifecycle, and obsolete-path matrix. Phase 9 is not certified.

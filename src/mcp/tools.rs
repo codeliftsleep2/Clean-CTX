@@ -196,7 +196,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "context_history",
-            "description": "View compression history and savings for tracked files.",
+            "description": "Read compression history and savings for tracked files without creating, restoring, or mutating context ownership.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
