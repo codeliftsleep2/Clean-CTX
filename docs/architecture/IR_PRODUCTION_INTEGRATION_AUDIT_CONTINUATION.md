@@ -55,8 +55,8 @@ vocabulary. The exhaustive Phase 9 audit has resumed; Phase 9 is not certified.
 
 ## 25. Finding P9-18: `replay_history` bypasses durable edit-intent recovery
 
-**Severity:** High transactional lifecycle contradiction; Option 1 implemented
-pending user verification.
+**Severity:** High transactional lifecycle contradiction; Option 1 repaired
+and user-verified.
 
 The approved P9-15 crash-recovery contract makes a durable edit intent the
 authority for deciding whether exact prior bytes remain authoritative or exact
@@ -108,8 +108,8 @@ irreconcilable source bytes.
 
 ## 26. Finding P9-19: delta durable-baseline paths bypass edit recovery
 
-**Severity:** High cross-cutting transactional contradiction; architectural
-approval required.
+**Severity:** High cross-cutting transactional contradiction; Option 1
+implemented pending user verification.
 
 The required post-P9-18 inspection found that `delta_code_context` and
 `apply_delta` reach durable baseline helpers without first resolving a pending
@@ -150,10 +150,19 @@ after restart, existing-baseline generation, and application failure paths,
 proving no compile, durable replacement, pending delta transition, live state,
 or `WorkspaceIndex` mutation occurs before recovery succeeds.
 
+**Implementation update (2026-09-20):** Both registered delta entry points now
+resolve the shared durable edit intent before compilation, baseline access,
+pending target-edge lookup, generation, or application. A resolved intent is
+hydrated from its checked durable canonical/edge state before delta work, so a
+recovered target cannot be overwritten as a synthetic first baseline. Recovery
+failure returns structurally without compiling or changing live, durable,
+index, or pending-delta ownership. Registered coverage exercises prior and
+target recovery, restart, corrected `dv:2` generation, duplicate application,
+and persistence failure for generation and application.
+
 ## 27. Approval gate and next audit action
 
-P9-18 is implemented pending user verification. The exhaustive audit is paused
-at P9-19, and no delta production code has been modified for that finding.
-After approval and user verification of the applicable repairs, resume the
-remaining operation, semantic-family, lifecycle, and obsolete-path matrix.
-Phase 9 is not certified.
+P9-18 was user-verified green. The exhaustive audit is paused for user-run
+verification of P9-19. After that gate is green, resume the remaining
+operation, semantic-family, lifecycle, and obsolete-path matrix. Phase 9 is not
+certified.

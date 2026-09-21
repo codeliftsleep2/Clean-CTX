@@ -22,6 +22,7 @@ pub(crate) struct EditIntent {
     pub stage_path: String,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum EditRecovery {
     None,
     PriorRestored,

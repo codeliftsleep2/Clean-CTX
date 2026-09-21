@@ -94,6 +94,19 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             return;
         }
     };
+    match state.recover_pending_edit(&resolved_path) {
+        Ok(crate::mcp::sqlite_store::EditRecovery::None) => {}
+        Ok(_) => {
+            if let Err(error) = state.hydrate_recovered_durable_state(&resolved_path) {
+                send_response(&invalid_session_ir_response(id, &error));
+                return;
+            }
+        }
+        Err(error) => {
+            send_response(&invalid_session_ir_response(id, &error));
+            return;
+        }
+    }
     let fidelity = match parse_fidelity_arg(id, params, &state.config) {
         Ok(f) => f,
         Err(()) => return,
@@ -338,6 +351,19 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         .persisted_path(&file)
         .or_else(|| state.path_for_alias(&file))
         .unwrap_or_else(|| file.clone());
+    match state.recover_pending_edit(&durable_file) {
+        Ok(crate::mcp::sqlite_store::EditRecovery::None) => {}
+        Ok(_) => {
+            if let Err(error) = state.hydrate_recovered_durable_state(&durable_file) {
+                send_response(&invalid_session_ir_response(id, &error));
+                return;
+            }
+        }
+        Err(error) => {
+            send_response(&invalid_session_ir_response(id, &error));
+            return;
+        }
+    }
     let persistence_enabled = state.persistence_store_lock().is_some();
     let pending_transition = match &delta {
         IncomingDelta::Sequence(delta) if persistence_enabled => {
@@ -515,3 +541,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
 #[cfg(test)]
 #[path = "../../../tests/mcp/delta_sequence.rs"]
 mod sequence_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/delta_edit_recovery.rs"]
+mod edit_recovery_tests;

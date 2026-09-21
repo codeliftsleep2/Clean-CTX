@@ -154,6 +154,40 @@ impl super::McpState {
             .map_err(|error| format!("Edit recovery failed: {error}"))
     }
 
+    pub(crate) fn hydrate_recovered_durable_state(&self, file_path: &str) -> Result<(), String> {
+        let restored = {
+            let guard = self.persistence_store_lock();
+            let store = guard
+                .as_ref()
+                .ok_or_else(|| "Persistence is not enabled".to_string())?;
+            store.flush();
+            let sqlite = store
+                .sqlite()
+                .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
+            sqlite
+                .load_durable_context(file_path, None)
+                .map_err(|error| format!("Recovered durable load failed: {error}"))?
+                .ok_or_else(|| "Recovered durable context is missing".to_string())?
+        };
+        crate::ir::hierarchical::try_ir_to_hierarchical(&restored.ir)
+            .map_err(|error| format!("Recovered durable projection failed: {error}"))?;
+        let alias = self.get_or_create_alias(file_path.to_string());
+        let mut ir = restored.ir;
+        ir.file_id.clone_from(&alias);
+        self.ir_context_lock()
+            .load_ir(ir, Some(restored.source_hash));
+        self.remember_persisted_path(&alias, file_path);
+        self.remember_context_fidelity(&alias, restored.fidelity);
+        self.remember_semantic_edges(&alias, restored.semantic_edges.clone());
+        let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
+        let mut index = self.workspace_index_lock();
+        index.remove_file(&canonical_path);
+        index.add_edges(&canonical_path, restored.semantic_edges);
+        drop(index);
+        self.llm_text_cache_lock().remove(&alias);
+        Ok(())
+    }
+
     pub fn remember_persisted_path(&self, alias: &str, file_path: &str) {
         lock_or_recover!(self.persisted_paths.lock(), "persisted_paths")
             .insert(alias.to_string(), file_path.to_string());
@@ -283,6 +317,17 @@ impl super::McpState {
             "pending_semantic_transitions"
         )
         .retain(|key, _| key.alias != alias);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pending_transition_count(&self, alias: &str) -> usize {
+        lock_or_recover!(
+            self.pending_semantic_transitions.lock(),
+            "pending_semantic_transitions"
+        )
+        .keys()
+        .filter(|key| key.alias == alias)
+        .count()
     }
 
     pub(crate) fn forget_semantic_state(&self, alias: &str) {
