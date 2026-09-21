@@ -252,8 +252,7 @@ impl McpState {
         // Rehydrate session stats from DB if available
         let mut session_stats = SessionStats::new();
         if let Some(ref store) = persistence_store {
-            // Flush any pending writes, then rebuild stats from DB
-            store.flush();
+            // Rebuild only from already committed durable state.
             if let Some(guard) = store.sqlite() {
                 match guard.rebuild_stats() {
                     Ok(stats) => {
@@ -565,6 +564,7 @@ impl McpState {
         self.cbm_filter_lock().skip_sets.get(file_path).cloned()
     }
 
+    #[cfg(test)]
     pub fn flush_persistence(&self) -> usize {
         let guard = self.persistence_store_lock();
         if let Some(ref store) = *guard {

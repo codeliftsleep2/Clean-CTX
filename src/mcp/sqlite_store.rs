@@ -334,11 +334,8 @@ impl SqliteStore {
         let _ = self.conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
     }
 
-    /// Execute a raw SQL batch statement.
-    ///
-    /// Used internally by `BufferedStore` for foreign key toggling during
-    /// fallback reimport. Exposed as `pub(crate)` to avoid exposing the
-    /// underlying `Connection` directly.
+    /// Test-only raw SQL hook for transactional corruption/failure fixtures.
+    #[cfg(test)]
     pub(crate) fn execute_batch(&self, sql: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.conn.execute_batch(sql)?;
         Ok(())

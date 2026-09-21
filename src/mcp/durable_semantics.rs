@@ -154,7 +154,6 @@ impl super::McpState {
         let Some(store) = guard.as_ref() else {
             return Ok(crate::mcp::sqlite_store::EditRecovery::None);
         };
-        store.flush();
         let mut sqlite = store
             .sqlite()
             .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
@@ -169,7 +168,6 @@ impl super::McpState {
             let store = guard
                 .as_ref()
                 .ok_or_else(|| "Persistence is not enabled".to_string())?;
-            store.flush();
             let sqlite = store
                 .sqlite()
                 .ok_or_else(|| "Persistence DB is unavailable".to_string())?;

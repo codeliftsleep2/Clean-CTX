@@ -97,3 +97,54 @@ fn legacy_clear_is_file_scoped_and_does_not_commit_peer_work() {
     assert_eq!(store.delta_count("ctx-keep"), 0);
     assert_eq!(store.pending_count(), 2);
 }
+
+#[test]
+fn legacy_fallback_inspection_is_non_mutating_and_rejects_recovery() {
+    let root = tempfile::tempdir().expect("temporary fallback quarantine");
+    let directory = root.path().join(".clean-ctx").join("fallback");
+    std::fs::create_dir_all(&directory).expect("fallback quarantine directory");
+    let save = directory.join("save.json");
+    let delta = directory.join("delta.json");
+    let clear = directory.join("clear.json");
+    std::fs::write(
+        &save,
+        r#"{"type":"save_context","file_path":"/legacy.ts","source_hash":"old"}"#,
+    )
+    .expect("legacy save artifact");
+    std::fs::write(
+        &delta,
+        r#"{"type":"append_delta","context_id":"ctx-old","delta_payload":"AA=="}"#,
+    )
+    .expect("legacy delta artifact");
+    std::fs::write(&clear, r#"{"type":"clear_file","file_path":"/legacy.ts"}"#)
+        .expect("legacy clear artifact");
+
+    let store = BufferedStore::new(
+        SqliteStore::open(Path::new(":memory:")).expect("in-memory SQLite"),
+        root.path().to_path_buf(),
+    );
+    let reports = store.inspect_legacy_fallbacks();
+
+    assert_eq!(reports.len(), 3);
+    assert!(reports.iter().all(|report| {
+        report
+            .reason
+            .contains("lacks complete aligned semantic authority")
+    }));
+    assert!(reports.iter().any(|report| {
+        report.operation.as_deref() == Some("append_delta")
+            && report.identity.as_deref() == Some("ctx-old")
+    }));
+    assert!(
+        reports
+            .iter()
+            .all(|report| report.available_metadata.is_object())
+    );
+    assert!(save.exists() && delta.exists() && clear.exists());
+    assert!(
+        store
+            .list_contexts(10)
+            .expect("committed listing")
+            .is_empty()
+    );
+}

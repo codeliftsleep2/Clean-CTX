@@ -464,7 +464,6 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                         .persistence_store_lock()
                         .as_ref()
                         .is_some_and(|store| {
-                            store.flush();
                             store.sqlite().is_some_and(|mut sqlite| {
                                 sqlite
                                     .append_delta_with_semantics(
@@ -488,8 +487,23 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                 }
             } else if let Some(context_id) = &persisted_context {
                 if let Some(ref store) = *state.persistence_store_lock() {
-                    store.queue_append_delta(context_id, &persisted_payload, Some(edit_type));
-                    store.flush();
+                    let persisted = store.sqlite().is_some_and(|mut sqlite| {
+                        crate::mcp::context_store::ContextStore::append_delta(
+                            &mut *sqlite,
+                            context_id,
+                            &persisted_payload,
+                            Some(edit_type),
+                        )
+                        .is_ok()
+                    });
+                    if !persisted {
+                        drop(ir_ctx);
+                        send_response(&invalid_session_ir_response(
+                            id,
+                            "accepted delta was not persisted by its scoped transaction",
+                        ));
+                        return;
+                    }
                 }
             }
 

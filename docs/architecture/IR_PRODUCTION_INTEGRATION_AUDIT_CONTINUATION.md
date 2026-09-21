@@ -381,7 +381,7 @@ is not certified.
 ## 34. Finding P9-23: persisted-context listing commits buffered lifecycle work
 
 **Severity:** High cross-file durability and observation-contract
-contradiction; approved and implemented pending user verification.
+contradiction; repaired and user-verified on 2026-09-20.
 
 The audit of buffered persistence ownership found no registered production
 write that became stranded solely because P9-22 removed `context_stats` as a
@@ -444,13 +444,12 @@ and clears remain pending across repeated reads.
 
 ## 35. Approval gate and next audit action
 
-P9-23 is implemented with P9-24 and awaits user-run verification. Phase 9 is
-not certified.
+P9-23 was user-verified green with P9-24. Phase 9 is not certified.
 
 ## 36. Finding P9-24: purge commits unrelated buffered lifecycle work
 
 **Severity:** High cross-file durability and operation-authority
-contradiction; approved and implemented pending user verification.
+contradiction; repaired and user-verified on 2026-09-20.
 
 Implementation inspection for approved P9-23 found another global flush
 boundary before production code was changed. Registered `purge_old_deltas`
@@ -501,7 +500,9 @@ and queued state across purge and legacy clear operations.
 
 ## 37. Approval gate and next audit action
 
-P9-23 and P9-24 are implemented as one bounded storage-authority repair and
-await user-run verification. After that gate is green, resume the remaining
-registered-operation, semantic-family, lifecycle, and obsolete-path matrix.
-Phase 9 is not certified.
+P9-23 and P9-24 were user-verified green as one bounded storage-authority
+repair. The remaining registered-operation, semantic-family, lifecycle, and
+obsolete-path matrix audit resumed. Phase 9 is not certified.
+
+The audit continues in
+[`IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION_2.md`](IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION_2.md).

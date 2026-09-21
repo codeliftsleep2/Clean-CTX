@@ -32,7 +32,6 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         let Some(store) = guard.as_ref() else {
             return send_restore_error(id, "Persistence is not enabled");
         };
-        store.flush();
         let Some(sqlite) = store.sqlite() else {
             return send_restore_error(id, "Persistence DB is unavailable");
         };

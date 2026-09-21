@@ -16,7 +16,6 @@ pub(super) fn persist_baseline(
     let durable = crate::mcp::persistence_ir::baseline(compiled, file_path);
     let binary = crate::ir::binary_wire::encode(&durable);
     if let Some(ref store) = *state.persistence_store_lock() {
-        store.flush();
         let persisted = store.sqlite().is_some_and(|mut sqlite| {
             sqlite
                 .save_context_with_semantics(
@@ -53,7 +52,6 @@ pub(super) fn ensure_persisted_baseline(
         let Some(store) = guard.as_ref() else {
             return Ok(());
         };
-        store.flush();
         let sqlite = store
             .sqlite()
             .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
@@ -133,7 +131,6 @@ pub(super) fn persisted_context_id(
     let Some(store) = guard.as_ref() else {
         return Ok(None);
     };
-    store.flush();
     let sqlite = store
         .sqlite()
         .ok_or_else(|| "Persistence DB is unavailable".to_string())?;

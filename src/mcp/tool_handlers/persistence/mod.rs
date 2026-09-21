@@ -112,7 +112,6 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
     let saved_count = if already_durable {
         0
     } else {
-        store.flush();
         let persisted = store.sqlite().is_some_and(|mut sqlite| {
             sqlite
                 .save_context_with_semantics(
@@ -205,7 +204,6 @@ pub(crate) fn handle_delete_context(id: &Value, params: &Value, state: &McpState
         let Some(store) = store_guard.as_ref() else {
             return send_persistence_error(id, "Persistence is not enabled");
         };
-        store.flush();
         let Some(mut sqlite) = store.sqlite() else {
             return send_persistence_error(id, "Persistence DB is unavailable");
         };
@@ -330,7 +328,6 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         let Some(store) = guard.as_ref() else {
             return send_persistence_error(id, "Persistence DB not enabled");
         };
-        store.flush();
         let Some(sqlite) = store.sqlite() else {
             return send_persistence_error(id, "Persistence DB is unavailable");
         };

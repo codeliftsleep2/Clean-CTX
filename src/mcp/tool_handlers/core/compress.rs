@@ -135,7 +135,6 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 let mut durable_ir = ir.clone();
                 durable_ir.file_id.clone_from(&resolved_path);
                 let ir_binary = crate::ir::binary_wire::encode(&durable_ir);
-                store.flush();
                 let persisted = store.sqlite().is_some_and(|mut sqlite| {
                     sqlite
                         .save_context_with_semantics(

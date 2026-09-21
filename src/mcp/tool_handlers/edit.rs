@@ -449,7 +449,6 @@ fn durable_source_hash(
     let Some(store) = guard.as_ref() else {
         return Ok(None);
     };
-    store.flush();
     let sqlite = store
         .sqlite()
         .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
@@ -510,7 +509,6 @@ fn establish_edit_intent(
     let Some(store) = guard.as_ref() else {
         return Ok(());
     };
-    store.flush();
     store
         .sqlite()
         .ok_or_else(|| "Persistence DB is unavailable".to_string())?
@@ -532,7 +530,6 @@ fn commit_edit_semantics(
     let Some(store) = guard.as_ref() else {
         return Ok(());
     };
-    store.flush();
     let mut sqlite = store
         .sqlite()
         .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
