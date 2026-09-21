@@ -9,6 +9,9 @@
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+static TEST_PROXY_STATS: std::sync::Mutex<Option<ProxyStatsResponse>> = std::sync::Mutex::new(None);
+
 /// Response from the proxy's `GET /stats` endpoint.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProxyStatsResponse {
@@ -70,6 +73,12 @@ pub struct ProxyCacheStats {
 /// `proxy_port` is the port the proxy is listening on (default: 8787).
 /// Returns `None` if the proxy is unreachable (not running, wrong port, etc.).
 pub fn fetch_proxy_stats(proxy_port: u16) -> Option<ProxyStatsResponse> {
+    #[cfg(test)]
+    if let Ok(mut injected) = TEST_PROXY_STATS.lock()
+        && injected.is_some()
+    {
+        return injected.take();
+    }
     let url = format!("http://127.0.0.1:{}/stats", proxy_port);
     match ureq::get(&url).call() {
         Ok(response) => match response.into_body().read_json::<ProxyStatsResponse>() {
@@ -83,6 +92,13 @@ pub fn fetch_proxy_stats(proxy_port: u16) -> Option<ProxyStatsResponse> {
             eprintln!("[clean-ctx] Proxy stats unavailable (proxy not running?): {e}");
             None
         }
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn inject_test_proxy_stats(stats: ProxyStatsResponse) {
+    if let Ok(mut injected) = TEST_PROXY_STATS.lock() {
+        *injected = Some(stats);
     }
 }
 

@@ -252,8 +252,8 @@ Phase 9 is not certified.
 
 ## 30. Finding P9-21: read-only context history creates identity ownership
 
-**Severity:** High session-identity contract contradiction; approved and
-implemented pending user verification.
+**Severity:** High session-identity contract contradiction; repaired and user-
+verified on 2026-09-20.
 
 The P9-20 audit explicitly left read-only history metadata outside the shared
 semantic-publication preflight unless implementation evidence showed that it
@@ -308,6 +308,73 @@ ordering, and preservation of pending edit intent and all semantic owners.
 
 ## 31. Approval gate and next audit action
 
-The exhaustive Phase 9 audit is paused for user-run verification of P9-21.
+The exhaustive Phase 9 audit resumed after user verification of P9-21. Phase 9
+is not certified.
+
+## 32. Finding P9-22: read-only context stats commits and mutates state
+
+**Severity:** High cross-file durability and observation-contract
+contradiction; approved and implemented pending user verification.
+
+P9-20 left read-only stats outside the semantic-publication recovery boundary
+unless implementation evidence showed authoritative mutation. Registered
+`context_stats` performs two such mutations before returning its dashboard.
+
+First, it calls `McpState::flush_persistence`. `BufferedStore` documentation
+explicitly names `context_stats` as a flush boundary, so merely viewing the
+dashboard can commit any queued save or clear operation, including unrelated
+files. The response does not identify those commits, cannot report individual
+failures truthfully, and does not run file-scoped pending-edit recovery before
+making queued durable semantic changes authoritative.
+
+Second, when proxy metrics are available, the handler writes fetched proxy
+counters into live `session_stats` and then also applies them to its local
+dashboard clone. Repeated reads can therefore change the session statistics
+they purport to observe. The registered description and architecture overview
+both describe `context_stats` as a view/dashboard operation, including an
+explicit diagram label of `context_stats (read)`.
+
+Affected contracts include unrelated buffered persistence ownership,
+file-scoped edit recovery, truthful failure reporting, repeatable statistics,
+session metrics, and the read-only classification used by the Phase 9
+operation matrix.
+
+### Alternatives
+
+1. Make `context_stats` strictly observational. Remove it as a persistence
+   flush boundary; read only committed SQLite statistics and current in-memory
+   statistics. Apply fetched proxy values to the local response snapshot only,
+   without recording them back into session ownership. Pending buffered work
+   remains owned by its producing lifecycle and is committed only by an
+   explicit/approved durability boundary.
+2. Redefine `context_stats` as an explicit global flush-and-refresh operation,
+   expose every affected persistence result, and run recovery for every file
+   involved. This is a substantially different public operation and couples
+   observation to unrelated lifecycle transitions.
+3. Keep flushing and live counter mutation as undocumented implementation
+   details. This retains non-idempotent reads and bypasses the approved
+   file-scoped transaction model.
+
+### Recommendation
+
+Choose option 1. A dashboard read should not become an implicit global commit
+or rewrite its own source metrics. Registered coverage should prove queued
+writes and clears remain pending, committed SQLite rows are still reported,
+proxy observations affect only the current response, repeated reads are
+idempotent, pending edit intents and semantic owners remain unchanged, and no
+other file is committed or cleared by a stats request.
+
+**Implementation update (2026-09-20):** `context_stats` no longer flushes the
+buffered store. It reads committed SQLite statistics and clones current session
+statistics without changing either owner. Proxy observations are applied only
+to the response-local clone and never recorded into authoritative
+`session_stats`. The registered description now states the observational
+contract. Registered coverage retains queued saves and clears, proves committed
+rows remain visible, isolates proxy-derived response data, and preserves edit
+intent, canonical, hash, fidelity, edge, and `WorkspaceIndex` ownership.
+
+## 33. Approval gate and next audit action
+
+The exhaustive Phase 9 audit is paused for user-run verification of P9-22.
 After that gate is green, resume the remaining registered-operation, semantic-
 family, lifecycle, and obsolete-path matrix. Phase 9 is not certified.

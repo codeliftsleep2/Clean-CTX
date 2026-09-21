@@ -14,8 +14,6 @@ use serde_json::Value;
 /// Shows per-file or session-level token savings, compression stats,
 /// and cache/persistence status. Supports `text` (default) and `json` formats.
 pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState) {
-    state.flush_persistence();
-
     // Rebuild stats from DB if persistence is enabled
     let db_stats = {
         let guard = state.persistence_store_lock();
@@ -36,13 +34,11 @@ pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState)
         stats.clone()
     };
 
-    // Fetch proxy stats if available and apply to BOTH live stats and merged clone
+    // Proxy observations belong only to this response snapshot. A dashboard
+    // read never rewrites the authoritative session accumulator.
     if state.proxy_port > 0 {
         let proxy_stats = crate::mcp::proxy_stats::fetch_proxy_stats(state.proxy_port);
         if let Some(ref ps) = proxy_stats {
-            let mut stats_guard = state.session_stats_lock();
-            crate::mcp::proxy_stats::record_proxy_filter_stats(&mut stats_guard, ps);
-            // Also apply to the merged clone so the current dashboard call shows them
             crate::mcp::proxy_stats::record_proxy_filter_stats(&mut merged, ps);
         }
     }
@@ -162,3 +158,7 @@ pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState)
         }
     }
 }
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/context_stats_read_only.rs"]
+mod read_only_tests;

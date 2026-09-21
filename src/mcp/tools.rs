@@ -257,7 +257,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "context_stats",
-            "description": "View the Clean-CTX dashboard: token savings, compression stats, and session metrics.",
+            "description": "Read the Clean-CTX dashboard without flushing persistence or mutating lifecycle state: token savings, compression stats, and session metrics.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
