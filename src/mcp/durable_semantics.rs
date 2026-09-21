@@ -137,6 +137,23 @@ pub(crate) fn sequence_delta_identity(delta: &SequenceDelta) -> Result<String, S
 }
 
 impl super::McpState {
+    pub(crate) fn recover_pending_edit(
+        &self,
+        file_path: &str,
+    ) -> Result<crate::mcp::sqlite_store::EditRecovery, String> {
+        let guard = self.persistence_store_lock();
+        let Some(store) = guard.as_ref() else {
+            return Ok(crate::mcp::sqlite_store::EditRecovery::None);
+        };
+        store.flush();
+        let mut sqlite = store
+            .sqlite()
+            .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
+        sqlite
+            .recover_edit_intent(file_path)
+            .map_err(|error| format!("Edit recovery failed: {error}"))
+    }
+
     pub fn remember_persisted_path(&self, alias: &str, file_path: &str) {
         lock_or_recover!(self.persisted_paths.lock(), "persisted_paths")
             .insert(alias.to_string(), file_path.to_string());

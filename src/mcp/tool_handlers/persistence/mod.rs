@@ -314,6 +314,10 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         return;
     }
 
+    if let Err(error) = state.recover_pending_edit(file_path) {
+        return send_persistence_error(id, &error);
+    }
+
     let restored = {
         let guard = state.persistence_store_lock();
         let Some(store) = guard.as_ref() else {
@@ -420,6 +424,10 @@ mod lifecycle_tests;
 #[cfg(test)]
 #[path = "../../../tests/mcp/baseline_publication.rs"]
 mod baseline_publication_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/replay_edit_recovery.rs"]
+mod replay_edit_recovery_tests;
 
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/save_context_contract.rs"]

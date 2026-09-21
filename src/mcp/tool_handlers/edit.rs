@@ -118,7 +118,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     }
 
     // ── Unit relocation against CURRENT bytes (plan step 2/3) ────────
-    match recover_pending_edit(state, &resolved_path) {
+    match state.recover_pending_edit(&resolved_path) {
         Ok(crate::mcp::sqlite_store::EditRecovery::TargetCommitted) => {
             return err_response(
                 id,
@@ -464,23 +464,6 @@ fn durable_source_hash(
         ));
     }
     Ok(Some(durable.source_hash))
-}
-
-pub(crate) fn recover_pending_edit(
-    state: &McpState,
-    file_path: &str,
-) -> Result<crate::mcp::sqlite_store::EditRecovery, String> {
-    let guard = state.persistence_store_lock();
-    let Some(store) = guard.as_ref() else {
-        return Ok(crate::mcp::sqlite_store::EditRecovery::None);
-    };
-    store.flush();
-    let mut sqlite = store
-        .sqlite()
-        .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
-    sqlite
-        .recover_edit_intent(file_path)
-        .map_err(|error| format!("Edit recovery failed: {error}"))
 }
 
 fn stage_exact_bytes(file_path: &str, bytes: &[u8]) -> Result<tempfile::NamedTempFile, String> {
