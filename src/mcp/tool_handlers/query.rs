@@ -52,6 +52,7 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+mod content;
 mod diagnostics;
 mod edges;
 mod entities;

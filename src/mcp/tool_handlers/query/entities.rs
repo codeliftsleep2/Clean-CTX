@@ -75,10 +75,16 @@ pub(super) fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
     if let Some(discovery) = discovery_field(&hydration) {
         structured["discovery"] = discovery;
     }
+    let content = super::content::render(
+        "find_entities",
+        args,
+        &structured,
+        &state.config.additional_roots,
+    );
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} entities.") }],
+            "content": [{ "type": "text", "text": content }],
             "structuredContent": structured,
         }
     }));
@@ -121,7 +127,7 @@ pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState
             // return empty results (the user asked for a file that
             // hasn't been compiled). This matches the pre-fix behavior
             // where a non-existent path produced no entities.
-            send_empty_entities_in_file(id);
+            send_empty_entities_in_file(id, args, state);
             return;
         }
     };
@@ -135,7 +141,7 @@ pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState
         .as_ref()
         .is_some_and(|scope| scope.has_narrowing() && !scope.admits(&canonical_path))
     {
-        send_empty_entities_in_file(id);
+        send_empty_entities_in_file(id, args, state);
         return;
     }
     let idx = state.workspace_index_read();
@@ -146,14 +152,18 @@ pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState
     // so its response carries no discovery diagnostics at all: a constant
     // "attempted: false" says nothing a caller can act on, and absence is the
     // documented meaning of "nothing noteworthy happened".
+    let structured = serde_json::json!({ "entities": serialized, "count": count });
+    let content = super::content::render(
+        "entities_in_file",
+        args,
+        &structured,
+        &state.config.additional_roots,
+    );
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} entities in file.") }],
-            "structuredContent": {
-                "entities": serialized,
-                "count": count,
-            }
+            "content": [{ "type": "text", "text": content }],
+            "structuredContent": structured,
         }
     }));
 }
@@ -163,12 +173,19 @@ pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState
 /// the workspace roots, or it lies outside the `withinPath` narrowing. The shape
 /// is exactly the pre-`withinPath` one (no hydration metadata at all), so an
 /// out-of-scope path is answered as it always was.
-fn send_empty_entities_in_file(id: &Value) {
+fn send_empty_entities_in_file(id: &Value, args: &Value, state: &McpState) {
+    let structured = serde_json::json!({ "entities": [], "count": 0 });
+    let content = super::content::render(
+        "entities_in_file",
+        args,
+        &structured,
+        &state.config.additional_roots,
+    );
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
-            "content": [{ "type": "text", "text": "Found 0 entities in file." }],
-            "structuredContent": { "entities": [], "count": 0 }
+            "content": [{ "type": "text", "text": content }],
+            "structuredContent": structured,
         }
     }));
 }

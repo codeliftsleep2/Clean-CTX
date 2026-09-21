@@ -14,5 +14,7 @@ Current packages:
 
 - `context-compression/` — CONTROL-PROD/CONTROL-FULL capture, measurement, and
   reasoning-verification definitions;
+- `workspace-query/` — registered workspace graph-query capture and model-
+  visibility diagnostics;
 - `lifecycle/phase9/` — durable-context lifecycle field harness;
 - `live-acceptance/` — focused live MCP acceptance drivers.

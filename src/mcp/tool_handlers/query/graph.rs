@@ -110,10 +110,16 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
     if let Some(discovery) = discovery_field(&hydration) {
         structured["discovery"] = discovery;
     }
+    let content = super::content::render(
+        "transitive_dependencies",
+        args,
+        &structured,
+        &state.config.additional_roots,
+    );
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} dependencies (depth {depth}).") }],
+            "content": [{ "type": "text", "text": content }],
             "structuredContent": structured,
         }
     }));
@@ -143,20 +149,20 @@ pub(super) fn handle_has_cycle(id: &Value, args: &Value, state: &McpState) {
         Some(scope) => idx.has_cycle_in_scope(scope),
         None => idx.has_cycle(),
     };
-    let text = if has_cycle {
-        "Cycle detected."
-    } else {
-        "No cycle detected."
-    };
+    let structured = serde_json::json!({ "has_cycle": has_cycle });
+    let content = super::content::render(
+        "has_cycle",
+        args,
+        &structured,
+        &state.config.additional_roots,
+    );
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
-            "content": [{ "type": "text", "text": text }],
+            "content": [{ "type": "text", "text": content }],
             // NOT hydration-eligible, so the response carries no discovery
             // diagnostics at all — absence means "nothing noteworthy happened".
-            "structuredContent": {
-                "has_cycle": has_cycle,
-            }
+            "structuredContent": structured,
         }
     }));
 }

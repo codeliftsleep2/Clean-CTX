@@ -105,10 +105,16 @@ pub(super) fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
     if let Some(discovery) = discovery_field(&hydration) {
         structured["discovery"] = discovery;
     }
+    let content = super::content::render(
+        "forward_edges",
+        args,
+        &structured,
+        &state.config.additional_roots,
+    );
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} outgoing edges.") }],
+            "content": [{ "type": "text", "text": content }],
             "structuredContent": structured,
         }
     }));
@@ -201,10 +207,16 @@ pub(super) fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
     if let Some(discovery) = discovery_field(&hydration) {
         structured["discovery"] = discovery;
     }
+    let content = super::content::render(
+        "reverse_edges",
+        args,
+        &structured,
+        &state.config.additional_roots,
+    );
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} incoming edges.") }],
+            "content": [{ "type": "text", "text": content }],
             "structuredContent": structured,
         }
     }));
