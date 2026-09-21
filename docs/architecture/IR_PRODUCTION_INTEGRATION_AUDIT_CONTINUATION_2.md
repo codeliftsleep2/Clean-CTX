@@ -5,8 +5,8 @@
 
 ## 38. Finding P9-25: file-scoped lifecycle operations globally flush storage
 
-**Severity:** High cross-file transaction-authority contradiction; approved
-and implemented pending user verification.
+**Severity:** High cross-file transaction-authority contradiction; repaired
+and user-verified on 2026-09-20.
 
 The post-P9-24 registered-path audit found that removing implicit commits from
 reads, purge, and legacy clear did not eliminate the global commit surface.
@@ -81,13 +81,12 @@ non-authoritative and requires an explicit owner-controlled commit.
 
 ## 39. Approval gate and next audit action
 
-P9-25 is implemented with P9-26 and awaits user-run verification. Phase 9 is
-not certified.
+P9-25 was user-verified green with P9-26. Phase 9 is not certified.
 
 ## 40. Finding P9-26: legacy fallback artifacts cannot restore complete semantics
 
-**Severity:** High durable-state completeness contradiction; approved and
-implemented pending user verification.
+**Severity:** High durable-state completeness contradiction; repaired and
+user-verified on 2026-09-20.
 
 P9-25 requires fallback reimport to move behind an explicit recovery boundary
 that performs the required file-scoped recovery and validation. The existing
@@ -153,6 +152,67 @@ live state. Existing legacy artifacts remain quarantined in place.
 
 ## 41. Approval gate and next audit action
 
-P9-25 and P9-26 are implemented together and await user-run verification.
-After that gate is green, resume the remaining exhaustive Phase 9 matrix.
-Phase 9 is not certified.
+P9-25 and P9-26 were user-verified green together. The remaining exhaustive
+Phase 9 matrix audit resumed. Phase 9 is not certified.
+
+## 42. Remaining registered-operation audit
+
+The final registered paths were traced from dispatch through their actual
+owners and consumers after P9-25/P9-26 verification.
+
+| Registered operation/family | Authority and lifecycle | Consumer/exposure | Final status |
+|---|---|---|---|
+| `diff_code_context` | Reads authorized source bytes and owns only its AST-diff baseline in `LocalStateCache`; it does not publish canonical IR, durable semantics, aliases, or `WorkspaceIndex` state. | Registered rolling diff response | Confirmed distinct from the semantic persistence lifecycle. |
+| `diff_commits` | Reads validated Git refs under the authorized workspace and constructs a bounded multi-file diff without installing canonical/session ownership. | Registered manifest and change-count response | Confirmed read/compute path; no semantic persistence bypass. |
+| `index_repository` | Delegates explicitly to CBM indexing with caller-supplied repository identity and mode. CBM project/index ownership is separate from canonical IR and SQLite semantic contexts. | Registered CBM response | Confirmed external index lifecycle, not an alternate IR producer. |
+| CBM graph/status/proxy tools | Inline dispatch is the intentional CBM boundary; project selection and graph cache/index state remain CBM-owned. The inline-name/registry parity contract prevents double dispatch. | Registered graph/status responses | Confirmed distinct ownership; no canonical IR publication. |
+| `workspace_query` | Reads `WorkspaceIndex`; eligible queries may invoke one discovery/hydration cycle. Every discovered file enters the shared P9-20 pending-edit recovery and checked semantic publication boundary before index mutation. | Registered scoped entity/edge/graph responses | Confirmed production integration; recovery failures propagate structurally. |
+| Semantic definition and fact families | Default compiler, ordered production passes, exhaustive shared validation, checked typed projection, physical `0x04`, complete edge snapshot, and compact renderer remain the authoritative path. | Context, delta, restore, replay, edit, and workspace responses | Confirmed across definitions, signatures, modifiers, control summaries, patterns, side effects, execution contexts, relationships, bodies/spans, and explicit interfaces. |
+| Delta/replay | Production emits `dv:2`; accepted durable transitions require server-owned target-edge authority and persist scoped canonical/edge state before live publication. Legacy input remains compatibility-only and cannot become durable without approved authority. | Registered delta/apply/replay responses | Confirmed occurrence/order preservation and transactional ownership. |
+| Persistence lifecycle | Save, restore, replay, replacement, deletion, reset, edit, and recovery use file-scoped durable transactions. Reads, stats, listing, purge, and history inspection cannot publish pending work. | Registered persistence/context responses | Confirmed after P9-08 through P9-26. |
+| Legacy buffered/fallback surface | No registered production semantic path queues or globally flushes buffered work. Incomplete fallback artifacts are quarantine/inspection-only and cannot enter SQLite or live semantics. | No semantic MCP exposure | Obsolete production authority removed; future versioned fallback remains separately reviewable. |
+
+## 43. Final obsolete/bypass review
+
+The final static production-path review found:
+
+- no registered caller of unchecked hierarchical projection;
+- no legacy delta emission from production generation;
+- no lossy `filter_map` canonical tuple reconstruction in registered paths;
+- no empty/noncanonical registered persistence write;
+- no restore/replay source-recompilation fallback;
+- no class/interface normalization in the corrected production path;
+- no registered semantic global-buffer flush dependency;
+- no opportunistic fallback creation or import;
+- no read-only context operation that creates identity or commits lifecycle
+  work;
+- no live canonical, semantic-edge, or `WorkspaceIndex` publication before its
+  approved durable commit boundary.
+
+The unchecked hierarchy convenience and legacy delta types remain internal
+compatibility/convenience surfaces with no registered production consumer.
+They are not production authorities and do not weaken the checked MCP path.
+
+## 44. Phase 9 certification
+
+**Status:** Certified on 2026-09-20 from the user-verified green repository
+gate and the completed production-integration matrix.
+
+Phase 9 completion criteria are satisfied:
+
+- every registered IR/MCP operation was classified and traced through its
+  actual production ownership and consumer path;
+- every canonical semantic family was traced through production compilation,
+  validation/transformation, session ownership, persistence/lifecycle, checked
+  projection, and external exposure where applicable;
+- all high-severity findings P9-01 through P9-26 were either repaired and
+  user-verified or explicitly retained as non-authoritative future capability;
+- no obsolete registered production bypass remains for the audited contracts;
+- physical `0x04`, `dv:2`, semantic-edge, interface, edit-fidelity, full-body,
+  and compact-rendering boundaries remain distinct and coherent;
+- the applicable repository gate was reported green by the user after the last
+  bounded repair.
+
+This certification closes Phase 9 only. Phase 10 documentation reconciliation
+and final verification require explicit approval and must not begin
+automatically.
