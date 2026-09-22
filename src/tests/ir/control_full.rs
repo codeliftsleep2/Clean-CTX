@@ -5,7 +5,7 @@ use crate::ir::{
 };
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
-fn fixture() -> (CompiledIR, crate::ir::HierarchicalIR, Vec<SemanticEdge>) {
+pub(super) fn fixture() -> (CompiledIR, crate::ir::HierarchicalIR, Vec<SemanticEdge>) {
     let ir = CompiledIR {
         file_id: "alpha".into(),
         version: 7,

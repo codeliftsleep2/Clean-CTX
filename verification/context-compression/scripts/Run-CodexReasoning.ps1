@@ -2,6 +2,8 @@ param(
     [string]$Model = "",
     [string]$CodexPath = "",
     [string]$ResultsPath = "",
+    [int]$ExpectedCaseCount = 36,
+    [switch]$UsePreparedResults,
     [switch]$NoFailSummary,
     [switch]$Restart
 )
@@ -39,8 +41,18 @@ if (-not $CodexPath -or -not (Test-Path $CodexPath)) {
 if (-not (Test-Path $templatePath)) { & (Join-Path $PSScriptRoot "Prepare-ReasoningWorksheet.ps1") }
 if (-not (Test-Path $templatePath)) { throw "Reasoning worksheet was not created" }
 
+if ($Restart -and (Test-Path $workingRoot)) {
+    $expectedRoot = [IO.Path]::GetFullPath(
+        (Join-Path $repositoryRoot "target\context-compression-verification\codex-reasoning")
+    )
+    $resolvedWorkingRoot = [IO.Path]::GetFullPath($workingRoot)
+    if (-not $resolvedWorkingRoot.StartsWith("$expectedRoot\", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to clear reasoning state outside $expectedRoot"
+    }
+    Remove-Item -LiteralPath $resolvedWorkingRoot -Recurse -Force
+}
 New-Item -ItemType Directory -Force $workingRoot | Out-Null
-if ($Restart -or -not (Test-Path $resultsPath)) {
+if (($Restart -or -not (Test-Path $resultsPath)) -and -not $UsePreparedResults) {
     $template = @(Get-Content -Raw $templatePath | ConvertFrom-Json -Depth 100)
     foreach ($row in $template) {
         $row.model = "codex"
@@ -49,9 +61,12 @@ if ($Restart -or -not (Test-Path $resultsPath)) {
     }
     $template | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8NoBOM $resultsPath
 }
+if (-not (Test-Path $resultsPath)) { throw "Prepared results do not exist: $resultsPath" }
 
 $rows = @(Get-Content -Raw $resultsPath | ConvertFrom-Json -Depth 100)
-if ($rows.Count -ne 36) { throw "Expected 36 Codex cases, found $($rows.Count)" }
+if ($rows.Count -ne $ExpectedCaseCount) {
+    throw "Expected $ExpectedCaseCount Codex cases, found $($rows.Count)"
+}
 
 function Invoke-Codex([string]$promptPath, [string]$outputPath, [string]$schemaPath = "") {
     $stderrPath = "$outputPath.stderr.log"
@@ -86,7 +101,7 @@ function Invoke-Codex([string]$promptPath, [string]$outputPath, [string]$schemaP
 for ($index = 0; $index -lt $rows.Count; $index++) {
     $row = $rows[$index]
     if ($null -ne $row.pass -and -not [string]::IsNullOrWhiteSpace($row.actual_model_answer)) {
-        Write-Host "[$($index + 1)/36] $($row.case_id): already recorded"
+        Write-Host "[$($index + 1)/$ExpectedCaseCount] $($row.case_id): already recorded"
         continue
     }
     if (-not (Test-Path $row.control_full_capture)) { throw "Missing capture: $($row.control_full_capture)" }
@@ -118,9 +133,9 @@ $($row.question)
 "@
     [IO.File]::WriteAllText($answerPrompt, $answerText, [Text.UTF8Encoding]::new($false))
     if (Test-Path $answerPath) {
-        Write-Host "[$($index + 1)/36] $($row.case_id): reusing completed answer"
+        Write-Host "[$($index + 1)/$ExpectedCaseCount] $($row.case_id): reusing completed answer"
     } else {
-        Write-Host "[$($index + 1)/36] $($row.case_id): evaluating"
+        Write-Host "[$($index + 1)/$ExpectedCaseCount] $($row.case_id): evaluating"
         Invoke-Codex $answerPrompt $answerPath
     }
     $answer = Get-Content -Raw $answerPath
@@ -144,7 +159,7 @@ MODEL ANSWER
 $answer
 "@
     [IO.File]::WriteAllText($scorePrompt, $scoreText, [Text.UTF8Encoding]::new($false))
-    Write-Host "[$($index + 1)/36] $($row.case_id): scoring"
+    Write-Host "[$($index + 1)/$ExpectedCaseCount] $($row.case_id): scoring"
     Invoke-Codex $scorePrompt $scorePath $scoreSchema
     $score = Get-Content -Raw $scorePath | ConvertFrom-Json -Depth 20
 
@@ -156,4 +171,8 @@ $answer
 }
 
 $evaluator = ([IO.Path]::GetFileNameWithoutExtension($resultsPath) -replace '^reasoning-results-', '')
-& (Join-Path $PSScriptRoot "Summarize-ReasoningResults.ps1") -ResultsPath $resultsPath -Evaluator $evaluator -NoFail:$NoFailSummary
+& (Join-Path $PSScriptRoot "Summarize-ReasoningResults.ps1") `
+    -ResultsPath $resultsPath `
+    -Evaluator $evaluator `
+    -ExpectedCaseCount $ExpectedCaseCount `
+    -NoFail:$NoFailSummary
