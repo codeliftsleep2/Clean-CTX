@@ -2,7 +2,7 @@
 
 use crate::compression::Fidelity;
 use crate::ir::normalize_control_full;
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 
 const KEYS: &[(&str, &str)] = &[
     ("schema", "s"),

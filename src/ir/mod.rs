@@ -21,6 +21,8 @@ pub mod binary_wire;
 /// Generic native call facts (`CoreOp::Call`): grammar boundary + producer.
 pub mod calls;
 pub mod compact_a;
+/// Research-only sparse positional file-context codec. Not production-wired.
+pub mod compact_a3;
 pub mod compiler;
 pub(crate) mod compiler_methods;
 pub mod control_full;

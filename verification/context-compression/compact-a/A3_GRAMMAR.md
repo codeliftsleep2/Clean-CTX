@@ -101,11 +101,12 @@ missing rows without serializing empty family columns.
 ## File records
 
 ```text
-$|<import-id>|<module>|<named-export-or-->
+$|<alias-or-->|<module-or-->|<named-export-or-->
 T|<alias>|<original-type>
 ```
 
-Import and alias occurrence order is physical record order. Values are
+Import and alias occurrence order is physical record order; no redundant
+occurrence column is serialized. Values are
 positional JSON-string columns; named objects are forbidden.
 
 ## Local call stream

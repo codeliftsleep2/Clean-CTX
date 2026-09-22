@@ -1,7 +1,7 @@
 use crate::compression::Fidelity;
 use crate::ir::opcodes::CoreOp;
 use crate::ir::{
-    CompiledIR, normalize_control_full, render_control_full, semantic_edge_navigation,
+    normalize_control_full, render_control_full, semantic_edge_navigation, CompiledIR,
 };
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 

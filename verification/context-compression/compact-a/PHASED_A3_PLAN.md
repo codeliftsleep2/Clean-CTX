@@ -1,6 +1,6 @@
 # COMPACT-A3 sparse positional phase plan
 
-**Status:** Phase 0 complete; Phase 1 research encoder/decoder is next
+**Status:** Phase 0 complete; Phase 1A/1B/1C green; Phase 1 completion matrix pending
 **Predecessor:** A2 stopped after failing raw-source economics
 **Scope:** model-facing file-context representation only. Canonical IR,
 normalized semantic objects, persistence authority, workspace-query authority,
@@ -100,6 +100,21 @@ Implement a research encoder/decoder over normalized fixtures:
 Do not use generic object-key substitution. Each family receives an explicit
 typed row schema. Empty optional families are omitted, not serialized as empty
 fixed columns.
+
+Phase 1A implements the research-only header, typed class/interface scopes,
+fields, method signatures, parameters, inheritance/implements, grouped
+modifiers, patterns, and core injection occurrences. It is intentionally not
+wired into MCP production. Phase 1B implements sparse High/Edit behavior,
+caller-run local calls, positional imports/types, and exact body frames as
+merge-ready research records. Phase 1C composes 1A and 1B into one framed
+High/Edit document and verifies full normalized-target equality, terminal
+counts, body framing, and cross-record method references.
+
+The Phase 1 completion matrix runs that document through the real checked
+CONTROL-FULL normalizer fixture. It covers overload identity, duplicate DI and
+call occurrences, spread evidence, caller-run switches, Edit body retention,
+and the requirement that High never expose canonical body facts retained
+internally by the hierarchy.
 
 ### Checkpoint 1
 

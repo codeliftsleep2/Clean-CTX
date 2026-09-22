@@ -12,6 +12,16 @@ production contract.
 `A3_PHASE0_BASELINE.md` records the reproduced A2 anatomy and the evidence for
 moving to the A3 research encoder/decoder.
 
+The Phase 1A research codec lives in `src/ir/compact_a3.rs`. It currently covers
+typed declarations and signatures only and is deliberately unreachable from
+MCP production rendering. Its tracked tests live under `src/tests/ir/**`.
+Phase 1B fact/body records live in `src/ir/compact_a3/facts.rs` and remain under
+the same production-isolation boundary.
+Phase 1C document composition lives in `src/ir/compact_a3/document.rs`; it is
+the first complete research stream and remains unreachable from MCP handlers.
+The tracked completion matrix also consumes the real checked CONTROL-FULL
+normalizer fixture rather than relying only on hand-authored semantic objects.
+
 ## Candidate lineage
 
 - **A0** is the compact-JSON/key-substitution control. Its cold-schema result is

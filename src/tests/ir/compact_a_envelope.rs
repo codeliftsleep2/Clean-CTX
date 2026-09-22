@@ -1,12 +1,12 @@
 use crate::compression::Fidelity;
 use crate::ir::normalize_control_full;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
 use super::compact_a_graph_tests::{decode_graph, encode_graph};
 use super::compact_a_tests::{
-    BodyFrame, decode_body_frames, decode_scoped_declarations, encode_body_frame,
-    encode_scoped_declarations,
+    decode_body_frames, decode_scoped_declarations, encode_body_frame, encode_scoped_declarations,
+    BodyFrame,
 };
 
 fn body_frames(oracle: &Value) -> Vec<BodyFrame> {
