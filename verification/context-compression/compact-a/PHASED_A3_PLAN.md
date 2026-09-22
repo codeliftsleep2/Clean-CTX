@@ -1,6 +1,6 @@
 # COMPACT-A3 sparse positional phase plan
 
-**Status:** approved research and implementation plan; deterministic gates first
+**Status:** Phase 0 complete; Phase 1 research encoder/decoder is next
 **Predecessor:** A2 stopped after failing raw-source economics
 **Scope:** model-facing file-context representation only. Canonical IR,
 normalized semantic objects, persistence authority, workspace-query authority,
@@ -81,6 +81,11 @@ the normalized correctness boundary.
 - A3 legend and every nested row grammar are explicit and versioned.
 - The required semantic families for each fidelity are documented.
 - No production path emits A3 yet.
+
+Checkpoint 0 is complete. `A3_GRAMMAR.md` is the versioned grammar and fidelity
+target. The reproduced A2 anatomy is recorded in `A3_PHASE0_BASELINE.md`; it
+confirms that declarations and ungrouped call rows, not the legend, dominate
+the failed candidate.
 
 ## Phase 1 — complete positional encoding
 
@@ -208,7 +213,8 @@ Stop and do not spend model tokens if:
 
 ## Immediate next work
 
-Complete Phase 0 only: write the A3 grammar and fidelity-target matrix, add
-token-anatomy reporting, and preserve the current A2 evidence. Do not modify
-production selection until the research encoder/decoder clears deterministic
-roundtrip and economics.
+Begin Phase 1 with a research-only A3 encoder/decoder over normalized fixtures.
+Implement typed owner/member/signature rows first, followed by sparse behavior,
+local calls, imports/types, and exact body frames. Do not modify production
+selection until the research encoder/decoder clears deterministic roundtrip and
+economics.

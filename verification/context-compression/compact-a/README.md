@@ -7,6 +7,10 @@ acceptance. A2's legend is only 146 cl100k / 147 o200k tokens; its inflation is
 caused by incomplete nested positional encoding, fixed empty columns, repeated
 call defaults, and fidelity-insensitive layouts. See `PHASED_A2_PLAN.md` for the
 closed finding and `PHASED_A3_PLAN.md` for the approved successor gates.
+`A3_GRAMMAR.md` is the Phase 0 wire and fidelity specification; it is not yet a
+production contract.
+`A3_PHASE0_BASELINE.md` records the reproduced A2 anatomy and the evidence for
+moving to the A3 research encoder/decoder.
 
 ## Candidate lineage
 
@@ -135,6 +139,10 @@ The script writes per-capture cl100k/o200k comparisons to
 Its primary comparison is capture-time raw source versus A2. CONTROL-FULL-to-A2
 numbers are retained only as oracle-encoding diagnostics. These screening
 counts decide whether any bounded model smoke is economically justified.
+Each record also reports independent token anatomy for the legend, file/mode,
+declarations, local calls, navigation, imports, aliases, and body frames. These
+component counts diagnose representation cost and are not expected to sum
+exactly to the whole payload because tokenizer merges cross component bounds.
 
 After measurement, validate every generated capture without model calls:
 

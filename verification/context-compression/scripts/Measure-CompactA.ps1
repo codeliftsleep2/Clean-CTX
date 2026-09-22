@@ -4,8 +4,18 @@ $runtimeRoot = Join-Path $repositoryRoot "target\context-compression-verificatio
 $captures = Join-Path $runtimeRoot "captures"
 $measure = Join-Path $runtimeRoot "scripts\measure.exe"
 if (-not (Test-Path $measure)) { throw "Run Build-MeasureHelper.ps1 first" }
+$anatomyScratch = Join-Path $runtimeRoot "token-anatomy-$PID.tmp"
 
 $schema = "S A2 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution]. Workspace graph edges are retrieved with workspace_query. N.D and N.V index existing local facts. B[method_id,start,end,utf8_bytes]"
+
+function Count-TextTokens([string]$tokenizer, [string]$text) {
+    try {
+        [IO.File]::WriteAllText($anatomyScratch, $text, [Text.UTF8Encoding]::new($false))
+        return [int](& $measure count $tokenizer $anatomyScratch)
+    } finally {
+        Remove-Item -LiteralPath $anatomyScratch -Force -ErrorAction SilentlyContinue
+    }
+}
 
 function Method-Row($method, [System.Collections.Generic.List[object]]$bodyFrames) {
     if ($null -ne $method.body) {
@@ -114,9 +124,11 @@ foreach ($directory in Get-ChildItem -LiteralPath $captures -Directory) {
     $semantic = $remainder.Substring(0, $pathmap) | ConvertFrom-Json -Depth 100
     $footer = $remainder.Substring($pathmap)
     $encoded = Encode-A2 $semantic
-    $candidate = "// COMPACT-A A2; file-local; workspace graph via workspace_query`n$schema`n" +
+    $legendText = "// COMPACT-A A2; file-local; workspace graph via workspace_query`n$schema`n"
+    $bodyText = Body-Wire $encoded.bodies
+    $candidate = $legendText +
         ($encoded.envelope | ConvertTo-Json -Depth 100 -Compress) +
-        "`n§BODIES`n" + (Body-Wire $encoded.bodies) + $footer
+        "`n§BODIES`n" + $bodyText + $footer
     $candidatePath = Join-Path $directory.FullName "compact-a2.txt"
     [IO.File]::WriteAllText($candidatePath, $candidate, [Text.UTF8Encoding]::new($false))
     foreach ($tokenizer in @("cl100k", "o200k")) {
@@ -135,6 +147,14 @@ foreach ($directory in Get-ChildItem -LiteralPath $captures -Directory) {
             economical_vs_raw = $candidateTokens -lt $rawTokens
             oracle_saved_tokens = $fullTokens - $candidateTokens
             oracle_reduction_percent = [Math]::Round((($fullTokens - $candidateTokens) * 100.0 / $fullTokens), 2)
+            legend_tokens = Count-TextTokens $tokenizer $legendText
+            file_mode_tokens = Count-TextTokens $tokenizer (ConvertTo-Json -InputObject $encoded.envelope.h -Depth 100 -Compress)
+            declaration_tokens = Count-TextTokens $tokenizer (ConvertTo-Json -InputObject $encoded.envelope.d -Depth 100 -Compress)
+            local_call_tokens = Count-TextTokens $tokenizer (ConvertTo-Json -InputObject $encoded.envelope.g -Depth 100 -Compress)
+            navigation_tokens = Count-TextTokens $tokenizer (ConvertTo-Json -InputObject $encoded.envelope.n -Depth 100 -Compress)
+            import_tokens = Count-TextTokens $tokenizer (ConvertTo-Json -InputObject $encoded.envelope.i -Depth 100 -Compress)
+            type_alias_tokens = Count-TextTokens $tokenizer (ConvertTo-Json -InputObject $encoded.envelope.t -Depth 100 -Compress)
+            body_frame_tokens = Count-TextTokens $tokenizer $bodyText
             raw_source_payload = $rawPath
             candidate_payload = $candidatePath
         }
