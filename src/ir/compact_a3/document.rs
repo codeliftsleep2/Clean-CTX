@@ -53,13 +53,13 @@ fn counts(value: &Value) -> Result<(usize, usize, usize), String> {
     Ok((owners, methods, calls))
 }
 
-/// Encode one complete cold A3 High/Edit document. No production caller uses it.
+/// Encode one complete cold A3 document. No production caller uses it.
 pub fn encode(normalized: &Value) -> Result<Vec<u8>, String> {
     if !matches!(
         normalized["mode"]["fidelity"].as_str(),
-        Some("high" | "edit")
+        Some("low" | "medium" | "high" | "edit")
     ) {
-        return Err("Phase 1C supports High/Edit only".into());
+        return Err("unsupported A3 fidelity".into());
     }
     let declarations = encode_declarations(normalized)?;
     let (declarations, _) = declarations
@@ -74,6 +74,20 @@ pub fn encode(normalized: &Value) -> Result<Vec<u8>, String> {
     }
     output.extend(format!("Z|{owners}|{methods}|{calls}|{}\n", bodies.len()).into_bytes());
     Ok(output)
+}
+
+pub fn encode_cold(normalized: &Value) -> Result<Vec<u8>, String> {
+    let mut output = format!("{}\n{}\n", super::COLD_PREAMBLE, super::COLD_LEGEND).into_bytes();
+    output.extend(encode(normalized)?);
+    Ok(output)
+}
+
+pub fn decode_cold(input: &[u8]) -> Result<Value, String> {
+    let prefix = format!("{}\n{}\n", super::COLD_PREAMBLE, super::COLD_LEGEND);
+    let document = input
+        .strip_prefix(prefix.as_bytes())
+        .ok_or("invalid A3 cold legend")?;
+    decode(document)
 }
 
 fn marker(input: &[u8], needle: &[u8]) -> Option<usize> {
@@ -247,6 +261,9 @@ pub fn decode(input: &[u8]) -> Result<Value, String> {
 
 /// Fidelity-specific normalized target used by deterministic A3 equality tests.
 pub fn target(normalized: &Value) -> Result<Value, String> {
+    let fidelity = normalized["mode"]["fidelity"]
+        .as_str()
+        .ok_or("target fidelity missing")?;
     let mut target = json!({
         "schema":"clean-ctx/file-context","schema_version":3,
         "file":normalized["file"],
@@ -259,16 +276,39 @@ pub fn target(normalized: &Value) -> Result<Value, String> {
         .map(|method| method["id"].clone())
         .collect::<Vec<_>>();
     target["mode"]["exact_body_method_ids"] = json!(body_ids);
-    if normalized["mode"]["fidelity"] != "edit" {
-        for family in ["classes", "interfaces"] {
-            for owner in target[family]
-                .as_array_mut()
-                .ok_or("target owners missing")?
+    for family in ["classes", "interfaces"] {
+        for owner in target[family]
+            .as_array_mut()
+            .ok_or("target owners missing")?
+        {
+            let mut names = std::collections::HashMap::new();
+            for method in owner["methods"]
+                .as_array()
+                .ok_or("target methods missing")?
             {
-                for method in owner["methods"]
-                    .as_array_mut()
-                    .ok_or("target methods missing")?
-                {
+                *names
+                    .entry(
+                        method["name"]
+                            .as_str()
+                            .ok_or("target method name missing")?
+                            .to_string(),
+                    )
+                    .or_insert(0usize) += 1;
+            }
+            for method in owner["methods"]
+                .as_array_mut()
+                .ok_or("target methods missing")?
+            {
+                if fidelity == "low" && names[method["name"].as_str().unwrap()] == 1 {
+                    method["parameters"] = json!([]);
+                }
+                if matches!(fidelity, "low" | "medium") {
+                    method["control_flow"] = json!([]);
+                    method["data_flow"] = json!([]);
+                    method["side_effects"] = json!([]);
+                    method["execution_contexts"] = json!([]);
+                }
+                if fidelity != "edit" {
                     method["body"] = Value::Null;
                     method["body_start"] = Value::Null;
                     method["body_end"] = Value::Null;

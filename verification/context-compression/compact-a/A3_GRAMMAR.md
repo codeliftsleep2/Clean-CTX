@@ -71,7 +71,7 @@ M|<method-id>|<name>|<declared-arity>|<return-type-or-->
 p|<parameter-id>|<name>|<type-or-->
 mo|<occurrence>|<value-count>|<value>...
 cs|<occurrence>|<value-count>|<value>...
-pf|<occurrence>|<value-count>|<value>...
+pf|<occurrence>|<fact-count>|<kind>|[<kind-value>]...
 lf|<occurrence>|<value-count>|<value>...
 pt|<pattern-name>|<argument-count>|<argument>...
 ```
@@ -83,7 +83,9 @@ same-owner overload families so overload signatures remain distinguishable.
 Medium, High, and Edit include all parameter rows.
 
 The occurrence index is explicit because empty and duplicate occurrence groups
-are significant. Values are positional strings, never copied named objects.
+are significant. Pattern-fact kinds are `CTOR`, `OBSERVABLE`, `OVERRIDE`,
+`GETTER`, and `SETTER`; only getter/setter consume the following value column.
+Values are positional strings, never copied named objects.
 
 ## High/Edit behavior records
 

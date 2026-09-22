@@ -22,6 +22,22 @@ the first complete research stream and remains unreachable from MCP handlers.
 The tracked completion matrix also consumes the real checked CONTROL-FULL
 normalizer fixture rather than relying only on hand-authored semantic objects.
 
+Phase 2 gives Low, Medium, High, and Edit distinct decoded targets. Low keeps
+overload-family signatures while eliding unique-method parameter rows; Medium
+keeps full signatures; detailed flow/effect/context records begin at High; and
+only Edit carries exact body frames.
+
+After the tracked A3 tests pass, rebuild the local helper and run the Phase 3
+zero-model economics screen:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Build-MeasureHelper.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Measure-CompactA3.ps1
+```
+
+This writes `compact-a3-token-records.json`, reports raw-to-cold-A3 results by
+lane and fidelity, and includes the complete inline legend in every candidate.
+
 ## Candidate lineage
 
 - **A0** is the compact-JSON/key-substitution control. Its cold-schema result is

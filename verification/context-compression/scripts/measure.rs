@@ -71,6 +71,31 @@ fn fixed_envelope(args: &[String]) {
     fs::write(&args[3], output).expect("fixed-envelope output");
 }
 
+fn render_a3(args: &[String]) {
+    let text = fs::read_to_string(&args[2]).expect("CONTROL-FULL payload");
+    let (_, remainder) = text.split_once('\n').expect("CONTROL-FULL header");
+    let normalized = serde_json::Deserializer::from_str(remainder)
+        .into_iter::<Value>()
+        .next()
+        .expect("CONTROL-FULL JSON value")
+        .expect("CONTROL-FULL JSON");
+    let payload =
+        clean_ctx::ir::compact_a3::document::encode_cold(&normalized).expect("A3 cold encoding");
+    fs::write(&args[3], payload).expect("A3 output");
+}
+
+fn write_a3_legend(args: &[String]) {
+    fs::write(
+        &args[2],
+        format!(
+            "{}\n{}\n",
+            clean_ctx::ir::compact_a3::COLD_PREAMBLE,
+            clean_ctx::ir::compact_a3::COLD_LEGEND
+        ),
+    )
+    .expect("A3 legend output");
+}
+
 fn render_prod(args: &[String]) {
     let response: Value = serde_json::from_str(
         &fs::read_to_string(&args[2]).expect("compress/restore/replay response"),
@@ -218,8 +243,10 @@ fn main() {
         Some("fixed") if args.len() == 4 => fixed_envelope(&args),
         Some("prod") if args.len() == 9 => render_prod(&args),
         Some("oracle") if args.len() == 7 => render_oracle(&args),
+        Some("a3") if args.len() == 4 => render_a3(&args),
+        Some("a3-legend") if args.len() == 3 => write_a3_legend(&args),
         _ => panic!(
-            "usage: measure count <cl100k|o200k> <file> | measure fixed <control-full.txt> <output> | measure prod <response.json> <source> <fidelity> <focus-csv-or-empty> <selection-tokenizer> <provide-fallback|renderer> <output> | measure oracle <response.json> <source> <fidelity> <focus-csv-or-empty> <output>"
+            "usage: measure count <cl100k|o200k> <file> | measure fixed <control-full.txt> <output> | measure a3 <control-full.txt> <output> | measure a3-legend <output> | measure prod <response.json> <source> <fidelity> <focus-csv-or-empty> <selection-tokenizer> <provide-fallback|renderer> <output> | measure oracle <response.json> <source> <fidelity> <focus-csv-or-empty> <output>"
         ),
     }
 }

@@ -1,4 +1,4 @@
-use super::{decode, encode, target};
+use super::{decode, decode_cold, encode, encode_cold, target};
 use serde_json::json;
 
 fn oracle() -> serde_json::Value {
@@ -15,7 +15,7 @@ fn oracle() -> serde_json::Value {
             "methods":[{
                 "id":"M1","name":"run","parameters":[{"id":"P1","name":"value","type":"string"}],
                 "return_type":"Promise<Result>","modifier_occurrences":[["PUBLIC","ASYNC"]],
-                "control_summary_occurrences":[["IF","RET"]],"pattern_fact_occurrences":[["OBSERVABLE"]],
+                "control_summary_occurrences":[["IF","RET"]],"pattern_fact_occurrences":[[{"k":"OBSERVABLE"}]],
                 "legacy_flag_occurrences":[],"patterns":[{"name":"OBSERVABLE","args":["M1"]}],
                 "body":"{\r\n  return this.repo.find(value); // 🦀 | Z\r\n}","body_start":40,"body_end":96,
                 "control_flow":[["return","Result"]],"data_flow":[["reads","F1"]],
@@ -53,6 +53,18 @@ fn phase1c_complete_edit_document_roundtrips_normalized_target() {
 }
 
 #[test]
+fn cold_document_requires_the_exact_versioned_legend() {
+    let oracle = oracle();
+    let wire = encode_cold(&oracle).unwrap();
+    assert_eq!(decode_cold(&wire).unwrap(), target(&oracle).unwrap());
+    let corrupted = String::from_utf8(wire)
+        .unwrap()
+        .replacen("S A3", "S A4", 1)
+        .into_bytes();
+    assert!(decode_cold(&corrupted).is_err());
+}
+
+#[test]
 fn phase1c_document_rejects_terminal_body_and_reference_corruption() {
     let wire = encode(&oracle()).unwrap();
     let bad_count = String::from_utf8_lossy(&wire)
@@ -64,4 +76,47 @@ fn phase1c_document_rejects_terminal_body_and_reference_corruption() {
         .replace("K|M1", "K|M404")
         .into_bytes();
     assert!(decode(&bad_call).is_err());
+}
+
+#[test]
+fn phase2_low_medium_high_have_distinct_declared_targets() {
+    let base = oracle();
+    let mut low = base.clone();
+    low["mode"]["fidelity"] = json!("low");
+    let mut medium = base.clone();
+    medium["mode"]["fidelity"] = json!("medium");
+    let mut high = base;
+    high["mode"]["fidelity"] = json!("high");
+
+    let low_wire = encode(&low).unwrap();
+    let medium_wire = encode(&medium).unwrap();
+    let high_wire = encode(&high).unwrap();
+    let low_decoded = decode(&low_wire).unwrap();
+    let medium_decoded = decode(&medium_wire).unwrap();
+    let high_decoded = decode(&high_wire).unwrap();
+
+    assert_eq!(low_decoded, target(&low).unwrap());
+    assert_eq!(medium_decoded, target(&medium).unwrap());
+    assert_eq!(high_decoded, target(&high).unwrap());
+    assert_eq!(
+        low_decoded["classes"][0]["methods"][0]["parameters"],
+        json!([])
+    );
+    assert_eq!(
+        medium_decoded["classes"][0]["methods"][0]["parameters"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        medium_decoded["classes"][0]["methods"][0]["control_flow"],
+        json!([])
+    );
+    assert_eq!(
+        high_decoded["classes"][0]["methods"][0]["control_flow"],
+        json!([["return", "Result"]])
+    );
+    assert!(low_wire.len() < medium_wire.len());
+    assert!(medium_wire.len() < high_wire.len());
 }

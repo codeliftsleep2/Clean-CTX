@@ -73,3 +73,32 @@ fn caller_run_encoding_preserves_global_switch_and_duplicate_order() {
     let decoded = decode(&wire).unwrap();
     assert_eq!(decoded["calls"], normalized["calls"]);
 }
+
+#[test]
+fn low_retains_parameters_for_same_owner_overload_family() {
+    let (ir, hierarchy, edges) = super::tests::fixture();
+    let normalized = normalize_control_full(
+        &ir.file_id,
+        "C:/repo/owner.ts",
+        ir.version,
+        Fidelity::Low,
+        &hierarchy,
+        &edges,
+    );
+    let decoded = decode(&encode(&normalized).unwrap()).unwrap();
+    assert_eq!(decoded, target(&normalized).unwrap());
+    assert_eq!(
+        decoded["classes"][0]["methods"][0]["parameters"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        decoded["classes"][0]["methods"][1]["parameters"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+}

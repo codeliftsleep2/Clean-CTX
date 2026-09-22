@@ -5,7 +5,7 @@ fn method(id: &str, name: &str, parameters: Value) -> Value {
     json!({
         "id":id,"name":name,"parameters":parameters,"return_type":"Result|Value",
         "modifier_occurrences":[["PUBLIC"],[]],"control_summary_occurrences":[["IF","RET"]],
-        "pattern_fact_occurrences":[["OBSERVABLE"]],"legacy_flag_occurrences":[],
+        "pattern_fact_occurrences":[[{"k":"OBSERVABLE"}]],"legacy_flag_occurrences":[],
         "patterns":[{"name":"PIPE|SAFE","args":[id]}],"body":null,"body_start":null,
         "body_end":null,"control_flow":[],"data_flow":[],"side_effects":[],
         "execution_contexts":[]

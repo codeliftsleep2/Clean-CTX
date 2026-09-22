@@ -1,6 +1,6 @@
 # COMPACT-A3 sparse positional phase plan
 
-**Status:** Phase 0 complete; Phase 1A/1B/1C green; Phase 1 completion matrix pending
+**Status:** Phase 1 complete; Phase 2 green; Phase 3 cold economics implemented, verification pending
 **Predecessor:** A2 stopped after failing raw-source economics
 **Scope:** model-facing file-context representation only. Canonical IR,
 normalized semantic objects, persistence authority, workspace-query authority,
@@ -138,6 +138,12 @@ Define and test separate layouts:
 The encoder must receive the effective fidelity and omit families outside that
 mode's approved semantic target. The decoder must reconstruct the corresponding
 normalized target, not pretend omitted High-only families were present.
+
+The implemented projection now makes these distinctions explicit: Low omits
+parameter rows only for unique-name methods while retaining complete
+same-owner overload signatures; Medium retains every parameter; Low and Medium
+omit detailed control/data flow, effects, and execution contexts; High retains
+those families without bodies; Edit adds only the selected/all exact bodies.
 
 ### Checkpoint 2
 
