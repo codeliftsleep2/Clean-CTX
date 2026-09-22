@@ -123,3 +123,14 @@ pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scrip
 `-Restart` clears only that result lane's saved prompt/answer files. This is
 required after changing a candidate payload; otherwise a resumable run would
 correctly reuse the previous answer rather than evaluate the new presentation.
+
+## Production edge-case matrix
+
+The tracked heavy deterministic pass compiles real TypeScript/Angular and C#
+source through the production compiler before A1 encoding. It covers multiple
+bound arrows, nested RxJS/object callbacks, microtask callbacks, spread,
+unresolved callees, Angular constructor DI/meta edges, C# overload identity,
+nested types, multiple lambdas, ASP.NET route/action meta edges, and exact Edit
+bodies/spans. Java and Spring
+remain explicitly deferred from this heavier pass; their existing independent
+tests still apply, but they are not evidence of A1 production-edge coverage.

@@ -82,7 +82,7 @@ fn navigation_index(oracle: &Value) -> Value {
     json!({ "D": di, "V": behavior, "E": edges })
 }
 
-fn encode(oracle: &Value) -> (Value, Vec<u8>) {
+pub(super) fn encode(oracle: &Value) -> (Value, Vec<u8>) {
     let declarations = encode_scoped_declarations(oracle);
     let graph = encode_graph(oracle);
     let envelope = json!({
@@ -181,7 +181,7 @@ fn navigation(decoded: &Value) -> Value {
     })
 }
 
-fn decode(envelope: &Value, body_wire: &[u8]) -> Result<Value, String> {
+pub(super) fn decode(envelope: &Value, body_wire: &[u8]) -> Result<Value, String> {
     let declarations = decode_scoped_declarations(&envelope["d"]);
     let graph = decode_graph(&envelope["g"]);
     let expected_ids = envelope["h"][3]["exact_body_method_ids"]

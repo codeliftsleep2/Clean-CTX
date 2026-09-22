@@ -329,3 +329,7 @@ mod compact_a_graph_tests;
 #[cfg(test)]
 #[path = "../tests/ir/compact_a_envelope.rs"]
 mod compact_a_envelope_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/compact_a_production_edges.rs"]
+mod compact_a_production_edge_tests;
