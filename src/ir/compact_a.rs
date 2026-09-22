@@ -9,6 +9,30 @@ use std::fmt::Write;
 
 pub const LEGEND: &str = "S A1 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution] E[occurrence,relation,S(domain,type,name,file),O(domain,type,name,file),layer,call_evidence]. N.D[owner_id,ordered_core_injection_groups]; NO_CORE_INJECTION_OCCURRENCES is authoritative; constructor parameters are signatures and NEVER injection evidence; duplicates significant. N.V tagged rows: mod,cs,pf,lf,pt,cf,df,se,ec. N.E framework relation direction is subject -> object; subject_file and object_file are independent. B[method_id,start,end,utf8_bytes]";
 
+pub const FILE_CONTEXT_LEGEND: &str = "S A2 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution]. Workspace graph edges are retrieved with workspace_query. N.D and N.V index existing local facts. B[method_id,start,end,utf8_bytes]";
+pub const FILE_CONTEXT_SCHEMA: &str = "clean-ctx/file-context";
+pub const FILE_CONTEXT_VERSION: u64 = 1;
+
+fn file_navigation(normalized: &Value) -> Value {
+    let injections = normalized["classes"]
+        .as_array()
+        .expect("normalized classes")
+        .iter()
+        .filter(|owner| {
+            !owner["injection_occurrences"]
+                .as_array()
+                .expect("normalized DI")
+                .is_empty()
+        })
+        .map(|owner| json!([owner["id"], "inj"]))
+        .collect::<Vec<_>>();
+    let behavior = behavior_navigation(normalized)
+        .into_iter()
+        .map(|row| json!([row[0], row[1]]))
+        .collect::<Vec<_>>();
+    json!({ "D": injections, "V": behavior })
+}
+
 fn method_row(method: &Value) -> Value {
     json!([
         method["id"],
@@ -213,6 +237,26 @@ pub fn render(normalized: &Value) -> String {
         "// COMPACT-A A1; decodes to normalized CONTROL-FULL v2\n{}\n{}\n§BODIES\n{}",
         LEGEND,
         serde_json::to_string(&envelope(normalized)).expect("A1 envelope is serializable"),
+        body_wire(normalized)
+    )
+}
+
+/// Render the file-local A2 boundary. Workspace graph edges remain in the
+/// authoritative index/auxiliary state and are fetched through workspace_query.
+pub fn render_file_context(normalized: &Value) -> String {
+    let mut file_envelope = envelope(normalized);
+    file_envelope["A"] = json!(2);
+    file_envelope["h"][0] = json!(FILE_CONTEXT_SCHEMA);
+    file_envelope["h"][1] = json!(FILE_CONTEXT_VERSION);
+    file_envelope["g"]
+        .as_object_mut()
+        .expect("A2 graph")
+        .remove("E");
+    file_envelope["n"] = file_navigation(normalized);
+    format!(
+        "// COMPACT-A A2; file-local; workspace graph via workspace_query\n{}\n{}\n§BODIES\n{}",
+        FILE_CONTEXT_LEGEND,
+        serde_json::to_string(&file_envelope).expect("A2 envelope is serializable"),
         body_wire(normalized)
     )
 }

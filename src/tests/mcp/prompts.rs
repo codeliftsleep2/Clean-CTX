@@ -9,12 +9,13 @@ use super::SYSTEM_PROMPT;
 #[test]
 fn teaches_compact_a_as_primary_notation() {
     for frag in [
-        "// COMPACT-A A1",
+        "// COMPACT-A A2",
         "canonical IDs are authoritative",
         "d.c` / `d.i",
         "caller_method_id",
         "callee_written_name",
-        "g.K` / `g.E",
+        "`g.K`",
+        "workspace_query",
         "typed ownership",
     ] {
         assert!(
@@ -31,7 +32,7 @@ fn documents_high_and_edit_behaviors() {
         "Edit adds byte-exact `B[method_id,start,end,utf8_bytes]` frames",
         "exact body IDs",
         "fidelity=\"verbatim\"",
-        "CONTROL-FULL-DELTA v2",
+        "FILE-CONTEXT-DELTA v1",
     ] {
         assert!(
             SYSTEM_PROMPT.contains(frag),

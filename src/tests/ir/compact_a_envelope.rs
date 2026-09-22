@@ -263,6 +263,40 @@ fn scoped_a1_envelope_roundtrips_the_complete_normalized_oracle() {
 }
 
 #[test]
+fn file_context_a2_excludes_workspace_edges_but_keeps_local_graph_facts() {
+    let (ir, hierarchy, edges) = super::tests::fixture();
+    let oracle = normalize_control_full(
+        &ir.file_id,
+        "C:/repo/owner.ts",
+        ir.version,
+        Fidelity::High,
+        &hierarchy,
+        &edges,
+    );
+    let rendered = crate::ir::compact_a::render_file_context(&oracle);
+    let mut lines = rendered.lines();
+    assert_eq!(
+        lines.next(),
+        Some("// COMPACT-A A2; file-local; workspace graph via workspace_query")
+    );
+    let _legend = lines.next().expect("A2 legend");
+    let envelope: Value = serde_json::from_str(lines.next().expect("A2 envelope")).unwrap();
+
+    assert_eq!(envelope["A"], 2);
+    assert_eq!(envelope["h"][0], "clean-ctx/file-context");
+    assert_eq!(envelope["h"][1], 1);
+    assert!(envelope["g"].get("E").is_none());
+    assert!(envelope["n"].get("E").is_none());
+    assert!(!envelope["g"]["K"].as_array().unwrap().is_empty());
+    assert_eq!(envelope["n"]["D"], json!([["C1", "inj"]]));
+    assert_eq!(envelope["n"]["V"], json!([]));
+    assert_eq!(
+        envelope["d"]["c"][0][9],
+        json!([["Repo", "Repo", "Clock"], ["Repo"]])
+    );
+}
+
+#[test]
 fn scoped_a1_envelope_rejects_missing_duplicate_and_unexpected_bodies() {
     let (ir, hierarchy, edges) = super::tests::fixture();
     let oracle = normalize_control_full(

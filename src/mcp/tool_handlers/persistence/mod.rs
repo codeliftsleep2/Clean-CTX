@@ -414,18 +414,17 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
                 state.cache_read().compute_hash(source.as_bytes()) == restored.source_hash;
             let tokenizer_kind = crate::mcp::tools::parse_tokenizer_arg(params, &state.config);
             let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
-            let economic =
-                crate::mcp::tool_handlers::core::content::economical_compact_a_document(
-                    &ir,
-                    &hierarchy,
-                    &restored.semantic_edges,
-                    restored.fidelity,
-                    file_path,
-                    &source,
-                    state,
-                    tokenizer_kind,
-                    tokenizer_box.as_deref(),
-                );
+            let economic = crate::mcp::tool_handlers::core::content::economical_compact_a_document(
+                &ir,
+                &hierarchy,
+                &restored.semantic_edges,
+                restored.fidelity,
+                file_path,
+                &source,
+                state,
+                tokenizer_kind,
+                tokenizer_box.as_deref(),
+            );
             let selected_raw = matches!(
                 economic.selected,
                 crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
@@ -439,6 +438,8 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         Err(_) => (compact(), false),
     };
     let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
+    let semantic_edges_wire =
+        serde_json::to_value(&restored.semantic_edges).unwrap_or_else(|_| serde_json::json!([]));
     state
         .ir_context_lock()
         .load_ir(ir.clone(), Some(restored.source_hash));
@@ -458,10 +459,11 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         "result": {
             "content": [{ "type": "text", "text": rendered }],
             "ir": crate::ir::hierarchical::hierarchy_to_wire(&ir, &hierarchy),
+            "semantic_edges": semantic_edges_wire,
             "_meta": {
                 "file": file_path, "version": ir.version,
                 "instruction_count": ir.instructions.len(),
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a1" },
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
                 "byte_exact": if raw_passthrough {
                     serde_json::json!(["document"])
                 } else if restored.fidelity == crate::compression::Fidelity::Edit {

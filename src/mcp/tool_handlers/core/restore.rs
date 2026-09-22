@@ -1,8 +1,8 @@
 // Durable restore_context MCP handler.
 
 use super::common::checked_hierarchy_or_respond;
-use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::mcp::McpState;
+use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::protocol::send_response;
 use serde_json::Value;
 
@@ -95,6 +95,8 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     };
     let canonical_path = crate::dictionary::path::canonical_identity_key(&durable_path);
     let edge_count = restored.semantic_edges.len();
+    let semantic_edges_wire =
+        serde_json::to_value(&restored.semantic_edges).unwrap_or_else(|_| serde_json::json!([]));
 
     state
         .ir_context_lock()
@@ -116,12 +118,13 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         "result": {
             "content": [{ "type": "text", "text": full }],
             "ir": crate::ir::hierarchical::hierarchy_to_wire(&session_ir, &hierarchy),
+            "semantic_edges": semantic_edges_wire,
             "_meta": {
                 "version": session_ir.version, "restored": true,
                 "file": durable_path,
                 "instruction_count": session_ir.instructions.len(),
                 "semantic_edge_count": edge_count,
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a1" },
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
                 "byte_exact": if raw_passthrough {
                     serde_json::json!(["document"])
                 } else if restored.fidelity == crate::compression::Fidelity::Edit {

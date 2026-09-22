@@ -22,7 +22,7 @@ pub(crate) fn compact_a_document(
         hierarchy,
         semantic_edges,
     );
-    let payload = crate::ir::compact_a::render(&normalized);
+    let payload = crate::ir::compact_a::render_file_context(&normalized);
     let footer = state.format_dict_footer_for_aliases(&[&ir.file_id]);
     // Keep the body-frame terminator emitted by A1. The additional newline is
     // the document/footer boundary; trimming the payload would corrupt the
@@ -51,32 +51,61 @@ pub(crate) fn economical_compact_a_document(
     )
 }
 
+/// Select a correctness-complete focused representation without admitting the
+/// full source document as a fallback. Full raw source is not semantically
+/// equivalent to focused Edit because it exposes bodies outside the resolved
+/// target set.
+fn required_focused_content(
+    raw_source: &str,
+    candidate: String,
+    tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
+) -> crate::mcp::content_economics::EconomicContent {
+    let raw_tokens = crate::mcp::tool_helpers::count_tokens_with_tokenizer(raw_source, tokenizer);
+    let candidate_tokens =
+        crate::mcp::tool_helpers::count_tokens_with_tokenizer(&candidate, tokenizer);
+    crate::mcp::content_economics::EconomicContent {
+        text: candidate,
+        selected: crate::mcp::content_economics::SelectedRepresentation::Candidate,
+        raw_tokens,
+        candidate_tokens,
+    }
+}
+
+pub(crate) fn select_complete_content(
+    raw_source: &str,
+    candidate: String,
+    focused_edit: bool,
+    tokenizer_kind: crate::tokenizer::TokenizerKind,
+    tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
+) -> crate::mcp::content_economics::EconomicContent {
+    if focused_edit {
+        required_focused_content(raw_source, candidate, tokenizer)
+    } else {
+        crate::mcp::content_economics::select_with_local_tokenizer(
+            raw_source,
+            candidate,
+            tokenizer_kind,
+            tokenizer,
+        )
+    }
+}
+
 pub(super) fn control_full_delta<T: Serialize>(
     file_id: &str,
     fidelity: Fidelity,
     delta: &T,
-    semantic_edges: &[SemanticEdge],
+    _semantic_edges: &[SemanticEdge],
 ) -> String {
     let value = serde_json::json!({
-        "schema": "clean-ctx/control-full-delta",
-        "schema_version": crate::ir::CONTROL_FULL_VERSION,
+        "schema": "clean-ctx/file-context-delta",
+        "schema_version": 1,
         "file_id": file_id,
         "fidelity": fidelity,
         "delta": delta,
-        "semantic_edges_after_apply": semantic_edges,
-        "navigation": {
-            "schema": crate::ir::CONTROL_FULL_NAVIGATION_SCHEMA,
-            "schema_version": crate::ir::CONTROL_FULL_NAVIGATION_VERSION,
-            "occurrence_groups": [],
-            "semantic_edge_provenance": crate::ir::semantic_edge_navigation(
-                semantic_edges,
-                "semantic_edges_after_apply",
-            ),
-        },
+        "workspace_graph": "query workspace_query after apply when graph facts are required",
     });
     format!(
-        "// CONTROL-FULL-DELTA v{}; apply to the acknowledged prior canonical state\n{}",
-        crate::ir::CONTROL_FULL_VERSION,
+        "// FILE-CONTEXT-DELTA v1; apply to the acknowledged prior canonical state\n{}",
         serde_json::to_string_pretty(&value).expect("CONTROL-FULL delta is serializable")
     )
 }

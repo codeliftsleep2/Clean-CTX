@@ -133,7 +133,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             &hir,
             &semantic_edges,
         );
-        let candidate_compact = crate::ir::compact_a::render(&normalized);
+        let candidate_compact = crate::ir::compact_a::render_file_context(&normalized);
         let compressed_tokens = count_tokens_with_tokenizer(&candidate_compact, tokenizer_ref);
 
         // P9-14: durability is the publication boundary. Persist the checked

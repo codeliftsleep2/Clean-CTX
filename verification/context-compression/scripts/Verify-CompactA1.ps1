@@ -64,7 +64,7 @@ function Expected-BodyWire($semantic, $bodies) {
     return $builder.ToString()
 }
 
-function Decode-A1($encoded, $bodies) {
+function Decode-A2($encoded, $bodies) {
     $classes = foreach ($row in $encoded.d.c) {
         [ordered]@{
             kind="class"; id=$row[0]; name=$row[1]; synthetic=$row[2]
@@ -86,23 +86,16 @@ function Decode-A1($encoded, $bodies) {
             explicit_argument_count=$row[3]; has_spread=$row[4]; callee_resolution=$row[5]
         }
     }
-    $edges = foreach ($row in $encoded.g.E) {
-        [ordered]@{
-            occurrence=$row[0]; relation=$row[1]; subject=(Entity-Object $row[2])
-            object=(Entity-Object $row[3]); layer=$row[4]; call_evidence=$row[5]
-        }
-    }
     return [ordered]@{
         schema=$encoded.h[0]; schema_version=$encoded.h[1]; file=$encoded.h[2]; mode=$encoded.h[3]
         classes=@($classes); interfaces=@($interfaces); imports=@($encoded.i)
-        type_aliases=@($encoded.t); calls=@($calls); semantic_edges=@($edges)
+        type_aliases=@($encoded.t); calls=@($calls); semantic_edges=@()
     }
 }
 
 function Expected-NavigationIndex($semantic) {
-    $di = @($semantic.classes | ForEach-Object {
-        ,@($_.id, $(if (@($_.injection_occurrences).Count) { @($_.injection_occurrences) } else { 'NO_CORE_INJECTION_OCCURRENCES' }))
-    })
+    $di = @($semantic.classes | Where-Object { @($_.injection_occurrences).Count } |
+        ForEach-Object { ,@($_.id, 'inj') })
     $behavior = [Collections.Generic.List[object]]::new()
     @(
         @($semantic.classes) + @($semantic.interfaces) |
@@ -116,21 +109,20 @@ function Expected-NavigationIndex($semantic) {
                     @('df', @($method.data_flow)), @('se', @($method.side_effects)),
                     @('ec', @($method.execution_contexts))
                 )) {
-                    if (@($entry[1]).Count) { $behavior.Add(@($method.id, $entry[0], $entry[1])) }
+                    if (@($entry[1]).Count) { $behavior.Add(@($method.id, $entry[0])) }
                 }
             }
     ) | Out-Null
-    $edges = @($semantic.semantic_edges | Where-Object { $_.layer -ne 'builtin' } | ForEach-Object {
-        [ordered]@{ occurrence=$_.occurrence; relation=$_.relation; subject_name=$_.subject.name; subject_file=$_.subject.file; object_name=$_.object.name; object_file=$_.object.file; layer=$_.layer }
-    })
-    return [ordered]@{ D=$di; V=@($behavior); E=$edges }
+    return [ordered]@{ D=$di; V=@($behavior) }
 }
 
 $verified = 0
 foreach ($directory in Get-ChildItem -LiteralPath $captures -Directory) {
     $fullPath = Join-Path $directory.FullName "control-full.txt"
-    $candidatePath = Join-Path $directory.FullName "compact-a1.txt"
+    $candidatePath = Join-Path $directory.FullName "compact-a2.txt"
+    $rawPath = Join-Path $directory.FullName "raw-source.txt"
     if (-not (Test-Path $fullPath) -or -not (Test-Path $candidatePath)) { continue }
+    if (-not (Test-Path $rawPath)) { throw "$($directory.Name): missing capture-time raw source" }
     $full = Get-Content -Raw $fullPath
     if (-not $full.StartsWith("// CONTROL-FULL v2")) { continue }
     $fullRemainder = $full -replace "^[^`r`n]*`r?`n", ""
@@ -141,8 +133,8 @@ foreach ($directory in Get-ChildItem -LiteralPath $captures -Directory) {
     $parts = $candidate.Split(@("`n§BODIES`n"), 2, [StringSplitOptions]::None)
     if ($parts.Count -ne 2) { throw "$($directory.Name): missing BODIES boundary" }
     $header = $parts[0].Split(@("`n"), 3, [StringSplitOptions]::None)
-    if ($header.Count -ne 3 -or $header[0] -ne "// COMPACT-A A1; decodes to normalized CONTROL-FULL v2") {
-        throw "$($directory.Name): invalid A1 header"
+    if ($header.Count -ne 3 -or $header[0] -ne "// COMPACT-A A2; file-local; workspace graph via workspace_query") {
+        throw "$($directory.Name): invalid A2 header"
     }
     $encoded = $header[2] | ConvertFrom-Json -Depth 100
     $candidatePathmap = $parts[1].LastIndexOf("`n§PATHMAP", [StringComparison]::Ordinal)
@@ -154,11 +146,14 @@ foreach ($directory in Get-ChildItem -LiteralPath $captures -Directory) {
 
     $expected = $semantic | ConvertTo-Json -Depth 100 | ConvertFrom-Json -Depth 100
     $expected.PSObject.Properties.Remove("navigation")
-    $decoded = Decode-A1 $encoded $bodies
+    $expected.schema = 'clean-ctx/file-context'
+    $expected.schema_version = 1
+    $expected.semantic_edges = @()
+    $decoded = Decode-A2 $encoded $bodies
     $expectedJson = Canonical $expected | ConvertTo-Json -Depth 100 -Compress
     $decodedJson = Canonical $decoded | ConvertTo-Json -Depth 100 -Compress
     if ($decodedJson -cne $expectedJson) {
-        $diagnostics = Join-Path $captures "compact-a1-validation-diagnostics"
+        $diagnostics = Join-Path $captures "compact-a2-validation-diagnostics"
         New-Item -ItemType Directory -Force $diagnostics | Out-Null
         [IO.File]::WriteAllText(
             (Join-Path $diagnostics "$($directory.Name)-expected.json"),
@@ -179,5 +174,5 @@ foreach ($directory in Get-ChildItem -LiteralPath $captures -Directory) {
     }
     $verified++
 }
-if (-not $verified) { throw "No COMPACT-A1 captures were verified" }
-Write-Host "PASS: $verified COMPACT-A1 captures decode to normalized CONTROL-FULL v2; exact body frames match."
+if (-not $verified) { throw "No COMPACT-A2 captures were verified" }
+Write-Host "PASS: $verified COMPACT-A2 captures decode to the file-local CONTROL-FULL projection; exact body frames match."

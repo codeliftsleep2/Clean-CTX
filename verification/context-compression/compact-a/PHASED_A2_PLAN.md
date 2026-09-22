@@ -1,13 +1,36 @@
 # COMPACT-A2 phased implementation plan
 
-**Status:** approved direction; implementation checkpoints not yet passed  
+**Status:** stopped after deterministic economics; rejected as a production encoding
 **Scope:** lightweight navigation references plus explicitly acknowledged
 schema reuse. Canonical IR, normalized CONTROL-FULL, exact Edit bodies, and
 raw-source economics remain authoritative.
 
+## Final A2 finding
+
+A2 preserved the intended file/workspace authority split and exact semantic
+oracle, but its wire encoding failed the raw-source economics gate. The failure
+is representational, not evidence that correctness requires inflation:
+
+- the complete inline legend costs 146 cl100k / 147 o200k tokens;
+- nested parameters, fields, imports, aliases, patterns, and flow facts remain
+  named JSON objects rather than positional rows;
+- fixed-width method rows serialize repeated empty arrays and nulls;
+- call rows repeat occurrence, caller, spread, and unresolved defaults;
+- fidelity is recorded in metadata but does not select a smaller family layout;
+- navigation remains measurable overhead even where scoped layout already
+  supplies locality.
+
+On the two qualifying tracked economics fixtures, A2 was 19–55% larger than
+raw under cl100k and 18–52% larger under o200k. It is therefore ineligible for
+model smoke or production selection. A2 remains a frozen diagnostic artifact;
+its row layout must not be silently changed. The approved successor work is
+defined in `PHASED_A3_PLAN.md`.
+
 ## Non-negotiable invariants
 
-1. Decoding produces the same normalized CONTROL-FULL semantic object.
+1. Decoding produces the same normalized CONTROL-FULL file-context object.
+   Workspace semantic edges are verified separately against the authoritative
+   workspace-query/index snapshot, not folded into that object.
 2. Canonical typed IDs remain identity; display names and serialized positions
    never become identity.
 3. Occurrence order, duplicates, nested group boundaries, endpoint-local
@@ -21,6 +44,11 @@ raw-source economics remain authoritative.
    alone never proves that the model has the legend.
 7. No model calls occur until deterministic roundtrip and raw-source economics
    pass.
+8. File-context content is file-local and intent/fidelity scoped. Workspace
+   graph edges are indexed, persisted, and returned by `workspace_query`; they
+   are not copied into provide/compress/apply/restore/replay model content.
+   Canonical file-local calls and injection occurrences remain in the file
+   envelope.
 
 ## Schema naming
 
@@ -37,10 +65,16 @@ Complete the already-started correctness repairs before changing the codec:
   skeletons;
 - unfocused modes retain the raw-source ceiling;
 - every capture stores `raw-source.txt` at capture time;
-- CONTROL-FULL is regenerated from structured IR plus semantic edges;
+- the CONTROL-FULL file oracle is regenerated from structured IR, while the
+  semantic-edge snapshot is retained and verified separately;
 - measurement reports raw→candidate as the production comparison;
 - paired reasoning uses equivalent questions that do not require IDs absent
   from raw source.
+- remove workspace semantic-edge snapshots and edge-navigation copies from
+  model-visible file-context and delta content while retaining the same edge
+  state for indexing, persistence, auxiliary results, and `workspace_query`;
+- prove that file content retains canonical local calls/injections while
+  `workspace_query` still returns forward/reverse/framework graph facts.
 
 ### Checkpoint 0
 
@@ -49,6 +83,8 @@ Complete the already-started correctness repairs before changing the codec:
 - The corrected capture, measurement, and decoder scripts complete with zero
   model calls.
 - A1 raw-source results are recorded as the baseline, even if they are poor.
+- The file-context/workspace-query authority split is green across provide,
+  compress, delta/apply, restore, and replay.
 
 Stop if this checkpoint is red. Do not mix navigation or caching changes into
 foundation debugging.
@@ -107,6 +143,16 @@ shape. Do not re-embed names, files, layer values, or endpoints.
 ## Phase 2 — deterministic economics and locality screen
 
 Render A2 with its complete inline legend and run the corrected capture matrix.
+Keep the semantic/lifecycle fixtures as the correctness lane. Use the tracked
+`src/test_files/angular`, `src/test_files/dotnet`, and
+`src/test_files/typescript` trees as a separate production-economics lane;
+preserve their relative layout so companion files and meta-layer relationships
+remain discoverable. Measure supported TypeScript and C# inputs; retain Angular
+HTML as companion context but classify it as raw-only because it has no
+structured IR/codec candidate. Require at least 8 KiB per file for aggregate
+compression economics. The tracked `LargeService.ts` and
+`UserManagementService.ts` currently qualify; no tracked C# fixture does, so C#
+economic conclusions remain pending a genuinely large fixture.
 Record per capture and tokenizer:
 
 - raw-source tokens;
@@ -116,6 +162,10 @@ Record per capture and tokenizer:
 - navigation tokens by `D`, `V`, and `E`;
 - legend tokens separately;
 - selected production representation.
+
+Workspace graph edges are excluded from file-envelope token totals. Measure
+their cost separately against versioned `workspace_query` content only when a
+request actually asks for graph information.
 
 Do not aggregate away fidelity, language, focus mode, or lifecycle path.
 

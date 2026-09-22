@@ -5,19 +5,28 @@ pub(crate) fn payload(response: &Value) -> Value {
         .pointer("/result/content/0/text")
         .and_then(Value::as_str)
         .expect("model-visible text response");
-    if text.starts_with("// COMPACT-A A1") {
+    if text.starts_with("// COMPACT-A A1") || text.starts_with("// COMPACT-A A2") {
         let document = text.split("\n§PATHMAP").next().expect("A1 document");
         let (_, after_header) = document.split_once('\n').expect("A1 header");
         let (_, encoded_and_bodies) = after_header.split_once('\n').expect("A1 legend");
         let (encoded, body_wire) = encoded_and_bodies
             .split_once("\n§BODIES\n")
             .expect("A1 body boundary");
-        let envelope = serde_json::from_str(encoded).expect("valid A1 envelope");
-        return crate::ir::control_full::compact_a_envelope_tests::decode(
+        let mut envelope: Value = serde_json::from_str(encoded).expect("valid compact envelope");
+        let is_a2 = envelope["A"] == 2;
+        if is_a2 {
+            envelope["g"]["E"] = serde_json::json!([]);
+            envelope["n"]["E"] = serde_json::json!([]);
+        }
+        let mut decoded = crate::ir::control_full::compact_a_envelope_tests::decode(
             &envelope,
             body_wire.as_bytes(),
         )
         .expect("decoded normalized CONTROL-FULL");
+        if is_a2 {
+            decoded.as_object_mut().unwrap().remove("navigation");
+        }
+        return decoded;
     }
     let document = text
         .split("\n§PATHMAP")

@@ -151,7 +151,7 @@ fn phase_a_success_paths_render_schema_v3() {
             .and_then(|t| t.as_str())
             .unwrap_or_else(|| panic!("[{tool}] missing result.content[0].text: {resp}"));
         assert!(
-            text.contains("// COMPACT-A A1") || text.contains("class Greeter"),
+            text.contains("// COMPACT-A A2") || text.contains("class Greeter"),
             "[{tool}] output must be A1 or exact raw source"
         );
         assert!(

@@ -9,9 +9,7 @@ if (-not (Test-Path $templatePath)) { throw "Missing reasoning worksheet: $templ
 $caseIds = @(
     "overloads--high-refactor",
     "behavior-facts--high-refactor",
-    "dependency-injection--high-refactor",
     "unresolved-honesty--high-refactor",
-    "framework-edge-provenance--high-refactor",
     "body-byte-fidelity--edit-all-crlf"
 )
 $rows = @(
@@ -22,16 +20,16 @@ if ($rows.Count -ne $caseIds.Count) {
     throw "Expected $($caseIds.Count) bounded smoke cases, found $($rows.Count)"
 }
 foreach ($row in $rows) {
-    $candidate = Join-Path $captures "$($row.capture)\compact-a1.txt"
-    if (-not (Test-Path $candidate)) { throw "Missing A1 capture: $candidate" }
-    if (-not (Get-Content -Raw $candidate).StartsWith("// COMPACT-A A1")) {
-        throw "Stale or invalid A1 capture: $candidate"
+    $candidate = Join-Path $captures "$($row.capture)\compact-a2.txt"
+    if (-not (Test-Path $candidate)) { throw "Missing A2 capture: $candidate" }
+    if (-not (Get-Content -Raw $candidate).StartsWith("// COMPACT-A A2")) {
+        throw "Stale or invalid A2 capture: $candidate"
     }
     $row.control_full_capture = $candidate
     $row.actual_model_answer = $null
     $row.pass = $null
     $row.failure_categories = @()
-    $row.notes = "BOUNDED COMPACT-A1 HIGH-RISK SMOKE"
+    $row.notes = "BOUNDED COMPACT-A2 FILE-LOCAL HIGH-RISK SMOKE"
     $row.exact_expected_oracle = switch ($row.case_id) {
         "overloads--high-refactor" {
             "Alpha owns two run methods: M11 and M13. High fidelity carries no exact bodies, so mode.exact_body_method_ids and the body section are empty."
@@ -52,7 +50,7 @@ foreach ($row in $rows) {
     }
 }
 
-$resultsPath = Join-Path $captures "reasoning-results-compact-a1-smoke.json"
+$resultsPath = Join-Path $captures "reasoning-results-compact-a2-smoke.json"
 if ($Restart -or -not (Test-Path $resultsPath)) {
     $rows | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8NoBOM $resultsPath
 }
@@ -67,4 +65,4 @@ if ($Model) { $arguments.Model = $Model }
 if ($CodexPath) { $arguments.CodexPath = $CodexPath }
 & (Join-Path $PSScriptRoot "Run-CodexReasoning.ps1") @arguments
 
-Write-Host "COMPACT-A1 bounded smoke results: $resultsPath"
+Write-Host "COMPACT-A2 bounded file-local smoke results: $resultsPath"

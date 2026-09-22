@@ -8,9 +8,11 @@ $ErrorActionPreference = "Stop"
 $definitionRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $runtimeRoot = Join-Path $RepositoryRoot "target\context-compression-verification"
 $fixtureSource = Join-Path $definitionRoot "fixtures"
+$trackedEconomicsSource = Join-Path $RepositoryRoot "src\test_files"
 $generatedFixtures = Join-Path $runtimeRoot "fixtures"
 $runtime = Join-Path $runtimeRoot "runtime"
 $workspace = Join-Path $runtime "workspace"
+$economicsWorkspace = Join-Path $workspace "tracked-economics"
 $captures = Join-Path $runtimeRoot "captures"
 $measure = Join-Path $runtimeRoot "scripts\measure.exe"
 if (-not $BinaryPath) { $BinaryPath = Join-Path $RepositoryRoot "target\debug\clean-ctx.exe" }
@@ -19,6 +21,15 @@ if (-not (Test-Path -LiteralPath $measure)) { throw "Missing measure.exe. Run sc
 
 New-Item -ItemType Directory -Force $runtime, $workspace, $captures | Out-Null
 Get-ChildItem -LiteralPath $fixtureSource -File | Copy-Item -Destination $workspace -Force
+New-Item -ItemType Directory -Force $economicsWorkspace | Out-Null
+foreach ($family in @("angular", "dotnet", "typescript")) {
+    Copy-Item -LiteralPath (Join-Path $trackedEconomicsSource $family) `
+        -Destination $economicsWorkspace -Recurse -Force
+}
+foreach ($largeFixture in @("LargeService.ts", "UserManagementService.ts")) {
+    Copy-Item -LiteralPath (Join-Path $trackedEconomicsSource $largeFixture) `
+        -Destination $economicsWorkspace -Force
+}
 if (Test-Path -LiteralPath $generatedFixtures) {
     Get-ChildItem -LiteralPath $generatedFixtures -File | Copy-Item -Destination $workspace -Force
 }
@@ -30,7 +41,7 @@ $config = @{
 } | ConvertTo-Json -Depth 10
 [IO.File]::WriteAllText((Join-Path $runtime ".clean-ctx.json"), $config, [Text.UTF8Encoding]::new($false))
 
-function Save-Capture($scenario, $response, [string]$suffix = "") {
+function Save-Capture($scenario, $response, [string]$suffix = "", [string]$sourcePath = "") {
     $name = if ($suffix) { "$($scenario.id)-$suffix" } else { $scenario.id }
     $dir = Join-Path $captures $name
     New-Item -ItemType Directory -Force $dir | Out-Null
@@ -38,6 +49,9 @@ function Save-Capture($scenario, $response, [string]$suffix = "") {
     $content = @($response.result.content)
     if ($content.Count -gt 0 -and $null -ne $content[0].text) {
         [IO.File]::WriteAllText((Join-Path $dir "control-full.txt"), [string]$content[0].text, [Text.UTF8Encoding]::new($false))
+    }
+    if ($sourcePath -and (Test-Path -LiteralPath $sourcePath)) {
+        Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $dir "raw-source.txt") -Force
     }
     return $dir
 }
@@ -59,6 +73,23 @@ function Invoke-ProdRender($compressResponse, $scenario, $dir, $path) {
     }
 }
 
+function Invoke-OracleRender($structuredResponse, $scenario, $dir, $path) {
+    if ($null -eq $structuredResponse.result.ir -and
+        $null -eq $structuredResponse.result.structuredContent.ir) {
+        throw "CONTROL-FULL oracle input for $($scenario.id) is missing result.ir"
+    }
+    if ($null -eq $structuredResponse.result.semantic_edges -and
+        $null -eq $structuredResponse.result.structuredContent.semantic_edges -and
+        $null -eq $structuredResponse.result._meta.semantic_edges) {
+        throw "CONTROL-FULL oracle input for $($scenario.id) is missing semantic_edges"
+    }
+    $responsePath = Join-Path $dir "oracle-source-response.json"
+    $structuredResponse | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8NoBOM $responsePath
+    $focus = if ($scenario.focus) { ($scenario.focus -join ",") } else { "" }
+    & $measure oracle $responsePath $path $scenario.fidelity $focus (Join-Path $dir "control-full.txt")
+    if ($LASTEXITCODE -ne 0) { throw "CONTROL-FULL oracle render failed for $($scenario.id)" }
+}
+
 $scenarios = Get-Content -Raw (Join-Path $definitionRoot "expected\scenarios.json") | ConvertFrom-Json
 $session = Start-CleanCtxSession $BinaryPath $runtime
 $requestId = 10
@@ -72,7 +103,7 @@ try {
         if ($scenario.explicitFidelity) { $args.fidelity = $scenario.explicitFidelity }
         if ($scenario.focus) { $args.focusMethods = @($scenario.focus) }
         $response = Invoke-CleanCtxTool $session $requestId "provide_code_context" $args
-        $dir = Save-Capture $scenario $response
+        $dir = Save-Capture $scenario $response "" $path
         if ($scenario.expect -eq "error") { continue }
         if ($scenario.fidelity -eq "verbatim") {
             foreach ($tokenizer in @("cl100k", "o200k")) {
@@ -84,6 +115,7 @@ try {
         $compress = Invoke-CleanCtxTool $session $requestId "compress_code_context" @{
             filePath = $path; workspaceRoot = $workspace; fidelity = $scenario.fidelity; tokenizer = "o200k"
         }
+        Invoke-OracleRender $compress $scenario $dir $path
         Invoke-ProdRender $compress $scenario $dir $path
     }
 
@@ -98,11 +130,12 @@ try {
             $response = Invoke-CleanCtxTool $session $requestId "provide_code_context" @{
                 filePath=$path; workspaceRoot=$workspace; fidelity=$fidelity; tokenizer="o200k"
             }
-            $dir = Save-Capture $synthetic $response
+            $dir = Save-Capture $synthetic $response "" $path
             $requestId++
             $compress = Invoke-CleanCtxTool $session $requestId "compress_code_context" @{
                 filePath=$path; workspaceRoot=$workspace; fidelity=$fidelity; tokenizer="o200k"
             }
+            Invoke-OracleRender $compress $synthetic $dir $path
             Invoke-ProdRender $compress $synthetic $dir $path
         }
     }
@@ -114,14 +147,50 @@ try {
         $response = Invoke-CleanCtxTool $session $requestId "compress_code_context" @{
             filePath=$path; workspaceRoot=$workspace; fidelity=$scenario.fidelity; tokenizer="o200k"
         }
-        $dir = Save-Capture $scenario $response
+        $dir = Save-Capture $scenario $response "" $path
         if ($scenario.fidelity -eq "verbatim") {
             foreach ($tokenizer in @("cl100k", "o200k")) {
                 Copy-Item -LiteralPath $path -Destination (Join-Path $dir "control-prod-$tokenizer.txt") -Force
             }
         } else {
+            Invoke-OracleRender $response $scenario $dir $path
             Invoke-ProdRender $response $scenario $dir $path
         }
+    }
+
+    $minimumEconomicsBytes = 8kb
+    $supportedTrackedFiles = Get-ChildItem -LiteralPath $economicsWorkspace -Recurse -File |
+        Where-Object { $_.Extension -in ".ts", ".cs" }
+    $economicsFiles = @($supportedTrackedFiles | Where-Object { $_.Length -ge $minimumEconomicsBytes })
+    $smallTrackedFiles = @($supportedTrackedFiles | Where-Object { $_.Length -lt $minimumEconomicsBytes })
+    $rawOnlyTemplates = Get-ChildItem -LiteralPath $economicsWorkspace -Recurse -File |
+        Where-Object { $_.Extension -eq ".html" }
+    Write-Host "Skipping $($rawOnlyTemplates.Count) Angular HTML template(s): structured IR is unsupported, so production is raw-only."
+    Write-Host "Excluding $($smallTrackedFiles.Count) sub-8 KiB file(s) from compression economics; they remain correctness fixtures and raw-fallback cases."
+    if (-not $economicsFiles.Count) {
+        throw "No tracked source file meets the 8 KiB production-economics minimum"
+    }
+    foreach ($economicsFile in $economicsFiles) {
+        $relative = [IO.Path]::GetRelativePath($economicsWorkspace, $economicsFile.FullName)
+        $id = "economics-" + (($relative -replace '[^A-Za-z0-9]+', '-').Trim('-').ToLowerInvariant())
+        Write-Host "Capturing tracked economics scenario: $relative"
+        $scenario = [pscustomobject]@{
+            id = $id
+            fidelity = "high"
+            focus = $null
+            operation = "compress_code_context"
+        }
+        $requestId++
+        $response = Invoke-CleanCtxTool $session $requestId "compress_code_context" @{
+            filePath = $economicsFile.FullName
+            workspaceRoot = $workspace
+            fidelity = "high"
+            tokenizer = "o200k"
+        }
+        Require-ToolSuccess $response "tracked economics capture $relative"
+        $dir = Save-Capture $scenario $response "" $economicsFile.FullName
+        Invoke-OracleRender $response $scenario $dir $economicsFile.FullName
+        Invoke-ProdRender $response $scenario $dir $economicsFile.FullName
     }
 } finally { Stop-CleanCtxSession $session }
 
@@ -134,7 +203,9 @@ try {
     Write-Host "Capturing delta baseline/generation/application"
     $baseline = Invoke-CleanCtxTool $session 1001 "delta_code_context" @{ filePath = $deltaPath; workspaceRoot = $workspace; fidelity = "high" }
     Require-ToolSuccess $baseline "delta baseline"
-    Save-Capture $deltaScenario $baseline "baseline" | Out-Null
+    Save-Capture $deltaScenario $baseline "baseline" $deltaPath | Out-Null
+    $baselineDir = Join-Path $captures "delta-flow-baseline"
+    Invoke-OracleRender $baseline ([pscustomobject]@{ id="delta-flow-baseline"; fidelity="high"; focus=$null }) $baselineDir $deltaPath
 } finally { Stop-CleanCtxSession $session }
 $deltaReplacement = "audit(`"delta-change`");`n    return `"none`";"
 $updated = (Get-Content -Raw $deltaPath).Replace('return "none";', $deltaReplacement)
@@ -145,12 +216,13 @@ try {
     Require-ToolSuccess $hydrated "delta baseline hydration"
     $delta = Invoke-CleanCtxTool $session 1003 "delta_code_context" @{ filePath = $deltaPath; workspaceRoot = $workspace; fidelity = "high" }
     Require-ToolSuccess $delta "delta generation"
-    Save-Capture $deltaScenario $delta "delta" | Out-Null
+    Save-Capture $deltaScenario $delta "delta" $deltaPath | Out-Null
     $applied = Invoke-CleanCtxTool $session 1004 "apply_delta" @{
         delta = $delta.result.delta; currentVersion = $delta.result.from_version
     }
     Require-ToolSuccess $applied "delta application"
-    $applyDir = Save-Capture $deltaScenario $applied "apply"
+    $applyDir = Save-Capture $deltaScenario $applied "apply" $deltaPath
+    Invoke-OracleRender $applied ([pscustomobject]@{ id="delta-flow-apply"; fidelity="high"; focus=$null }) $applyDir $deltaPath
     $after = Invoke-CleanCtxTool $session 1005 "compress_code_context" @{ filePath = $deltaPath; workspaceRoot = $workspace; fidelity = "low" }
     Require-ToolSuccess $after "post-apply historical projection"
     Invoke-ProdRender $after ([pscustomobject]@{ id="delta-flow-apply"; fidelity="low"; focus=$null; operation="apply_delta" }) $applyDir $deltaPath
@@ -187,11 +259,13 @@ try {
     Write-Host "Capturing registered restore and replay"
     $restored = Invoke-CleanCtxTool $session 2005 "restore_context" @{ filePath = $restorePath; workspaceRoot = $workspace }
     Require-ToolSuccess $restored "registered restore"
-    $restoreDir = Save-Capture $restoreScenario $restored
+    $restoreDir = Save-Capture $restoreScenario $restored "" (Join-Path $runtime "restore-latest-source.ts")
+    Invoke-OracleRender $restored $restoreScenario $restoreDir $restorePath
     Invoke-ProdRender $restored $restoreScenario $restoreDir $restorePath
     $replayed = Invoke-CleanCtxTool $session 2006 "replay_history" @{ filePath = $restorePath; targetSequence = 0 }
     Require-ToolSuccess $replayed "registered replay"
-    $replayDir = Save-Capture $replayScenario $replayed
+    $replayDir = Save-Capture $replayScenario $replayed "" (Join-Path $runtime "restore-baseline-source.ts")
+    Invoke-OracleRender $replayed $replayScenario $replayDir $restorePath
     Invoke-ProdRender $replayed $replayScenario $replayDir $restorePath
 } finally { Stop-CleanCtxSession $session }
 

@@ -179,7 +179,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                 &hierarchy,
                 &target_edges,
             );
-            let compact = crate::ir::compact_a::render(&normalized);
+            let compact = crate::ir::compact_a::render_file_context(&normalized);
 
             if let Some(transition) = &pending_transition {
                 debug_assert_eq!(transition.from, from);
@@ -281,13 +281,19 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             );
             let rendered = economic.text;
             let (_, candidate_byte_exact) = contract_fields(fidelity);
+            let hierarchical_wire =
+                crate::ir::hierarchical::hierarchy_to_wire(&target_ir, &hierarchy);
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": rendered }],
+                    "structuredContent": {
+                        "ir": hierarchical_wire,
+                        "semantic_edges": serde_json::to_value(&target_edges).unwrap_or_default()
+                    },
                     "_meta": {
                         "version": new_version,
-                        "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a1" },
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
                         "byte_exact": if raw_passthrough {
                             serde_json::json!(["document"])
                         } else {

@@ -1,7 +1,7 @@
 #![cfg(feature = "typescript")]
 
 use crate::mcp::tools::dispatch_tools_call;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn dispatch(state: &crate::mcp::McpState, id: i64, tool: &str, arguments: Value) -> Value {
     crate::protocol::captured_responses().clear();
@@ -15,19 +15,28 @@ fn control_full_json(response: &Value) -> Value {
     let text = response["result"]["content"][0]["text"]
         .as_str()
         .expect("model-visible text");
-    if text.starts_with("// COMPACT-A A1") {
+    if text.starts_with("// COMPACT-A A1") || text.starts_with("// COMPACT-A A2") {
         let payload = text.split("\n§PATHMAP").next().expect("COMPACT-A payload");
         let (_, after_header) = payload.split_once('\n').expect("A1 header");
         let (_, encoded_and_bodies) = after_header.split_once('\n').expect("A1 legend");
         let (encoded, body_wire) = encoded_and_bodies
             .split_once("\n§BODIES\n")
             .expect("A1 body boundary");
-        let envelope: Value = serde_json::from_str(encoded).expect("A1 envelope JSON");
-        return crate::ir::control_full::compact_a_envelope_tests::decode(
+        let mut envelope: Value = serde_json::from_str(encoded).expect("compact envelope JSON");
+        let is_a2 = envelope["A"] == 2;
+        if is_a2 {
+            envelope["g"]["E"] = json!([]);
+            envelope["n"]["E"] = json!([]);
+        }
+        let mut decoded = crate::ir::control_full::compact_a_envelope_tests::decode(
             &envelope,
             body_wire.as_bytes(),
         )
         .expect("decoded normalized CONTROL-FULL");
+        if is_a2 {
+            decoded.as_object_mut().unwrap().remove("navigation");
+        }
+        return decoded;
     }
     let payload = text
         .split("\n§PATHMAP")
@@ -60,7 +69,7 @@ fn persistent_state(root: &tempfile::TempDir) -> crate::mcp::McpState {
 }
 
 #[test]
-fn registered_provide_exposes_calls_injections_edges_and_provenance_in_content() {
+fn registered_provide_keeps_local_facts_in_content_and_workspace_edges_auxiliary() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("consumer.service.ts");
@@ -89,7 +98,7 @@ export class Consumer {
     assert!(response.get("error").is_none(), "{response}");
     let payload = control_full_json(&response);
 
-    assert_eq!(payload["schema"], "clean-ctx/control-full");
+    assert_eq!(payload["schema"], "clean-ctx/file-context");
     assert!(payload["classes"][0]["id"].as_str().is_some());
     let methods = payload["classes"][0]["methods"].as_array().unwrap();
     let overloads = methods
@@ -114,15 +123,20 @@ export class Consumer {
             && call["callee_resolution"] == "unresolved"
     }));
 
-    let edges = payload["semantic_edges"].as_array().unwrap();
+    assert_eq!(payload["semantic_edges"], json!([]));
+    let edges = response["result"]["_meta"]["semantic_edges"]
+        .as_array()
+        .expect("authoritative auxiliary edge snapshot");
     let injection = edges
         .iter()
         .find(|edge| edge["relation"] == "Injects")
-        .expect("framework injection edge must be model-visible");
+        .expect("framework injection edge must remain available to the workspace index");
     assert_eq!(injection["layer"], "angular");
-    assert!(injection["subject"]["file"]
-        .as_str()
-        .is_some_and(|file| file.ends_with("consumer.service.ts")));
+    assert!(
+        injection["subject"]["file"]
+            .as_str()
+            .is_some_and(|file| file.ends_with("consumer.service.ts"))
+    );
 }
 
 #[test]
@@ -188,9 +202,11 @@ fn registered_focus_rejects_ambiguous_bare_method() {
         }),
     );
     assert_eq!(response["error"]["code"], -32602);
-    assert!(response["error"]["message"]
-        .as_str()
-        .is_some_and(|message| message.contains("owned by multiple types")));
+    assert!(
+        response["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("owned by multiple types"))
+    );
 }
 
 #[test]
@@ -216,9 +232,21 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     };
 
     let baseline = dispatch(&state, 1, "delta_code_context", args());
-    assert!(baseline["result"]["content"][0]["text"]
-        .as_str()
-        .is_some_and(|text| text.starts_with("// COMPACT-A A1")));
+    assert!(
+        baseline["result"]["ir"].is_object(),
+        "delta baseline must expose its structured lifecycle snapshot"
+    );
+    assert!(baseline["result"]["semantic_edges"].is_array());
+    assert!(
+        baseline["result"]["content"][0]["text"]
+            .as_str()
+            .is_some_and(|text| text.starts_with("// COMPACT-A A2"))
+    );
+
+    let cached = dispatch(&state, 2, "delta_code_context", args());
+    assert_eq!(cached["result"]["cached"], true);
+    assert!(cached["result"]["ir"].is_object());
+    assert!(cached["result"]["semantic_edges"].is_array());
 
     std::fs::write(
         &path,
@@ -229,25 +257,23 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     )
     .unwrap();
     state.invalidate_source_cache(path.to_string_lossy().as_ref());
-    let delta = dispatch(&state, 2, "delta_code_context", args());
+    let delta = dispatch(&state, 3, "delta_code_context", args());
     let text = delta["result"]["content"][0]["text"]
         .as_str()
         .expect("delta content");
-    assert!(text.starts_with("// CONTROL-FULL-DELTA v2"));
+    assert!(text.starts_with("// FILE-CONTEXT-DELTA v1"));
     assert!(text.contains("\"delta\""));
-    assert!(text.contains("\"semantic_edges_after_apply\""));
+    assert!(!text.contains("semantic_edges_after_apply"));
+    assert!(text.contains("workspace_query"));
     let (_, delta_json) = text.split_once('\n').expect("delta header");
     let delta_payload: serde_json::Value =
         serde_json::from_str(delta_json).expect("CONTROL-FULL delta JSON");
-    assert_eq!(delta_payload["schema_version"], 2);
-    assert_eq!(
-        delta_payload["navigation"]["schema"],
-        "clean-ctx/control-full-navigation"
-    );
+    assert_eq!(delta_payload["schema_version"], 1);
+    assert_eq!(delta_payload["schema"], "clean-ctx/file-context-delta");
 
     let applied = dispatch(
         &state,
-        3,
+        4,
         "apply_delta",
         json!({
             "delta": delta["result"]["delta"].clone(),
@@ -255,9 +281,17 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
         }),
     );
     assert!(applied.get("error").is_none(), "{applied}");
+    assert!(
+        applied["result"]["structuredContent"]["ir"].is_object(),
+        "applied delta must expose its structured lifecycle snapshot"
+    );
+    assert!(
+        applied["result"]["structuredContent"]["semantic_edges"].is_array(),
+        "applied delta must expose its semantic-edge snapshot"
+    );
     let applied_payload = control_full_json(&applied);
-    assert_eq!(applied_payload["schema_version"], 2);
-    assert!(applied_payload["navigation"].is_object());
+    assert_eq!(applied_payload["schema_version"], 1);
+    assert_eq!(applied_payload["semantic_edges"], json!([]));
     assert!(applied_payload["calls"].as_array().is_some_and(|calls| {
         calls
             .iter()
@@ -300,15 +334,20 @@ fn registered_restore_and_replay_regenerate_control_full_from_durable_facts() {
             json!({ "filePath": path.to_string_lossy() }),
         );
         assert!(response.get("error").is_none(), "{response}");
-        let payload = control_full_json(&response);
-        assert_eq!(payload["schema"], "clean-ctx/control-full");
-        assert_eq!(
-            payload["navigation"]["schema"],
-            "clean-ctx/control-full-navigation"
+        assert!(response["result"]["ir"].is_object(), "{tool} hierarchy");
+        assert!(
+            response["result"]["semantic_edges"].is_array(),
+            "{tool} semantic edges"
         );
-        assert!(payload["calls"]
-            .as_array()
-            .is_some_and(|calls| !calls.is_empty()));
+        let payload = control_full_json(&response);
+        assert_eq!(payload["schema"], "clean-ctx/file-context");
+        assert!(payload.get("navigation").is_none());
+        assert_eq!(payload["semantic_edges"], json!([]));
+        assert!(
+            payload["calls"]
+                .as_array()
+                .is_some_and(|calls| !calls.is_empty())
+        );
     }
 }
 

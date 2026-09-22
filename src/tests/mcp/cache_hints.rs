@@ -309,10 +309,11 @@ fn test_cache_dashboard_json() {
 fn test_generate_vocabulary_text() {
     let text = generate_vocabulary_text();
     assert!(
-        text.contains("COMPACT-A A1"),
-        "vocabulary prompt must teach COMPACT-A A1"
+        text.contains("COMPACT-A A2"),
+        "vocabulary prompt must teach COMPACT-A A2"
     );
-    assert!(text.contains("g.K/g.E"));
+    assert!(text.contains("g.K:"));
+    assert!(text.contains("workspace_query:"));
     assert!(text.contains("α"), "path aliases remain current");
     for banned in [
         "$c   → class",

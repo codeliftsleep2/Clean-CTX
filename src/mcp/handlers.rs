@@ -159,7 +159,7 @@ pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str, state: &McpState
             "jsonrpc": "2.0",
             "id": id,
             "result": {
-                "description": "Clean-CTX COMPACT-A A1 vocabulary: positional rows with canonical identities, exact body frames, local economic raw fallback, delta state, and α path aliases.",
+                "description": "Clean-CTX COMPACT-A A2 file-local vocabulary: positional rows with canonical identities, exact body frames, workspace-query graph retrieval, local economic raw fallback, delta state, and α path aliases.",
                 "messages": [
                     {
                         "role": "user",

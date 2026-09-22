@@ -1,9 +1,11 @@
 use clean_ctx::compression::Fidelity;
 use clean_ctx::ir::hierarchical::try_ir_to_hierarchical;
 use clean_ctx::ir::{
-    hierarchical_wire_to_ir, render_hierarchical_for_llm, render_hierarchical_for_llm_focused,
+    hierarchical_wire_to_ir, render_control_full, render_hierarchical_for_llm,
+    render_hierarchical_for_llm_focused,
 };
-use clean_ctx::tokenizer::{TokenizerKind, create_tokenizer};
+use clean_ctx::layers::meta::semantic::{CallEvidence, EntityRef, SemanticEdge, SemanticRelation};
+use clean_ctx::tokenizer::{create_tokenizer, TokenizerKind};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::fs;
@@ -76,6 +78,7 @@ fn render_prod(args: &[String]) {
     .expect("response JSON");
     let wire = response
         .pointer("/result/ir")
+        .or_else(|| response.pointer("/result/structuredContent/ir"))
         .expect("hierarchical result.ir");
     let ir = hierarchical_wire_to_ir(wire).expect("decode hierarchical IR");
     let hierarchy = try_ir_to_hierarchical(&ir).expect("checked hierarchy");
@@ -121,14 +124,102 @@ fn render_prod(args: &[String]) {
     fs::write(&args[8], output).expect("CONTROL-PROD output");
 }
 
+fn render_oracle(args: &[String]) {
+    let response: Value =
+        serde_json::from_str(&fs::read_to_string(&args[2]).expect("structured response"))
+            .expect("response JSON");
+    let wire = response
+        .pointer("/result/ir")
+        .or_else(|| response.pointer("/result/structuredContent/ir"))
+        .expect("hierarchical result.ir or result.structuredContent.ir");
+    let mut ir = hierarchical_wire_to_ir(wire).expect("decode hierarchical IR");
+    let focus = args[5]
+        .split(',')
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .collect::<HashSet<_>>();
+    if !focus.is_empty() {
+        let hierarchy = try_ir_to_hierarchical(&ir).expect("checked hierarchy");
+        let method_ids = clean_ctx::ir::focus::resolve_focus_method_ids(&hierarchy, &focus)
+            .expect("resolve focus against typed owners");
+        clean_ctx::ir::focus::retain_focused_bodies(&mut ir, &method_ids);
+    }
+    let hierarchy = try_ir_to_hierarchical(&ir).expect("checked focused hierarchy");
+    let edges_value = response
+        .pointer("/result/semantic_edges")
+        .or_else(|| response.pointer("/result/structuredContent/semantic_edges"))
+        .or_else(|| response.pointer("/result/_meta/semantic_edges"))
+        .cloned()
+        .unwrap_or_else(|| Value::Array(Vec::new()));
+    let edges = edges_value
+        .as_array()
+        .expect("semantic edge array")
+        .iter()
+        .map(edge_from_json)
+        .collect::<Vec<_>>();
+    let source_path = &args[3];
+    let payload = render_control_full(
+        &ir.file_id,
+        source_path,
+        ir.version,
+        fidelity(&args[4]),
+        &hierarchy,
+        &edges,
+    );
+    let footer = format!(
+        "// ── {} ({}) ──\n§PATHMAP\n  {} = {}",
+        ir.file_id, source_path, ir.file_id, source_path
+    );
+    fs::write(&args[6], format!("{payload}\n{footer}")).expect("CONTROL-FULL oracle output");
+}
+
+fn leaked_str(value: &Value, field: &str) -> &'static str {
+    Box::leak(
+        value[field]
+            .as_str()
+            .unwrap_or_else(|| panic!("missing semantic edge field: {field}"))
+            .to_owned()
+            .into_boxed_str(),
+    )
+}
+
+fn entity_from_json(value: &Value) -> EntityRef {
+    let mut entity = EntityRef::new(
+        leaked_str(value, "domain"),
+        leaked_str(value, "entity_type"),
+        value["name"].as_str().expect("entity name"),
+    );
+    if let Some(file) = value["file"].as_str() {
+        entity = entity.with_file(file.to_owned());
+    }
+    entity
+}
+
+fn edge_from_json(value: &Value) -> SemanticEdge {
+    SemanticEdge {
+        relation: serde_json::from_value::<SemanticRelation>(value["relation"].clone())
+            .expect("semantic relation"),
+        subject: entity_from_json(&value["subject"]),
+        object: entity_from_json(&value["object"]),
+        layer: leaked_str(value, "layer"),
+        call_evidence: value
+            .get("call_evidence")
+            .filter(|evidence| !evidence.is_null())
+            .map(|evidence| {
+                serde_json::from_value::<CallEvidence>(evidence.clone()).expect("call evidence")
+            }),
+    }
+}
+
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     match args.get(1).map(String::as_str) {
         Some("count") if args.len() == 4 => count(&args),
         Some("fixed") if args.len() == 4 => fixed_envelope(&args),
         Some("prod") if args.len() == 9 => render_prod(&args),
+        Some("oracle") if args.len() == 7 => render_oracle(&args),
         _ => panic!(
-            "usage: measure count <cl100k|o200k> <file> | measure fixed <control-full.txt> <output> | measure prod <response.json> <source> <fidelity> <focus-csv-or-empty> <selection-tokenizer> <provide-fallback|renderer> <output>"
+            "usage: measure count <cl100k|o200k> <file> | measure fixed <control-full.txt> <output> | measure prod <response.json> <source> <fidelity> <focus-csv-or-empty> <selection-tokenizer> <provide-fallback|renderer> <output> | measure oracle <response.json> <source> <fidelity> <focus-csv-or-empty> <output>"
         ),
     }
 }

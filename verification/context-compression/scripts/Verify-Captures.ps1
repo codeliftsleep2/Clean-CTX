@@ -172,7 +172,7 @@ Require (@($high.semantic_edges | Where-Object { $_.subject.file -or $_.object.f
 foreach ($stage in @("baseline", "delta", "apply")) {
     Require (Test-Path (Join-Path $captures "delta-flow-$stage\control-full.txt")) "delta ${stage}: missing content"
 }
-Require ((Header "delta-flow-delta") -like "// CONTROL-FULL-DELTA v2*") "delta: wrong model-visible contract"
+Require ((Header "delta-flow-delta") -like "// FILE-CONTEXT-DELTA v1*") "delta: wrong model-visible contract"
 Require ((Header "restore-flow") -like "// CONTROL-FULL v2*") "restore: not regenerated CONTROL-FULL"
 Require ((Header "replay-flow") -like "// CONTROL-FULL v2*") "replay: not regenerated CONTROL-FULL"
 

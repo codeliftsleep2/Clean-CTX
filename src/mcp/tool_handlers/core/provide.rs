@@ -16,14 +16,12 @@ use std::collections::HashSet;
 pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &McpState) {
     use std::time::Instant;
     let overall_start = Instant::now();
-
     let focus_methods: Option<HashSet<String>> =
         params["arguments"]["focusMethods"].as_array().map(|arr| {
             arr.iter()
                 .filter_map(|s| s.as_str().map(String::from))
                 .collect()
         });
-
     let file_path_str = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
     if file_path_str.is_empty() {
         send_response(
@@ -31,7 +29,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         );
         return;
     }
-
     let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
     let resolved_path = match resolve_file_path_checked(
         file_path_str,
@@ -49,14 +46,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             return;
         }
     };
-
     if state.config.is_excluded(&resolved_path) {
         send_response(
             &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("File excluded by config: {}", file_path_str) } }),
         );
         return;
     }
-
     if let Err(error) = state.preflight_semantic_publication(&resolved_path) {
         send_response(&crate::mcp::tool_helpers::jsonrpc_error(
             id.clone(),
@@ -66,9 +61,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         ));
         return;
     }
-
     let limits = &state.config.resource_limits;
-
     if let Ok(metadata) = std::fs::metadata(&resolved_path) {
         if let Err(e) = limits.check_file_size(metadata.len()) {
             send_response(&serde_json::json!({
@@ -321,9 +314,10 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         d,
                         &semantic_edges,
                     );
-                    let economic = crate::mcp::content_economics::select_with_local_tokenizer(
+                    let economic = super::content::select_complete_content(
                         source,
                         delta_text,
+                        edit_focus.is_some(),
                         tokenizer_kind,
                         tokenizer_ref,
                     );
@@ -381,9 +375,10 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         )
                     });
                     let render_ms = render_start.elapsed().as_millis() as u64;
-                    let economic = crate::mcp::content_economics::select_with_local_tokenizer(
+                    let economic = super::content::select_complete_content(
                         source,
                         full,
+                        edit_focus.is_some(),
                         tokenizer_kind,
                         tokenizer_ref,
                     );
@@ -469,14 +464,18 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     None => return,
                 };
 
-                let economic = super::content::economical_compact_a_document(
+                let candidate = super::content::compact_a_document(
                     &ir,
                     &hir,
                     &semantic_edges,
                     effective_fidelity,
                     &resolved_path,
-                    source,
                     state,
+                );
+                let economic = super::content::select_complete_content(
+                    source,
+                    candidate,
+                    edit_focus.is_some(),
                     tokenizer_kind,
                     tokenizer_ref,
                 );

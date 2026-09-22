@@ -5,7 +5,7 @@ $captures = Join-Path $runtimeRoot "captures"
 $measure = Join-Path $runtimeRoot "scripts\measure.exe"
 if (-not (Test-Path $measure)) { throw "Run Build-MeasureHelper.ps1 first" }
 
-$schema = "S A1 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution] E[occurrence,relation,S(domain,type,name,file),O(domain,type,name,file),layer,call_evidence]. N.D[owner_id,ordered_core_injection_groups]; NO_CORE_INJECTION_OCCURRENCES is authoritative; constructor parameters are signatures and NEVER injection evidence; duplicates significant. N.V tagged rows: mod,cs,pf,lf,pt,cf,df,se,ec. N.E framework relation direction is subject -> object; subject_file and object_file are independent. B[method_id,start,end,utf8_bytes]"
+$schema = "S A2 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution]. Workspace graph edges are retrieved with workspace_query. N.D and N.V index existing local facts. B[method_id,start,end,utf8_bytes]"
 
 function Method-Row($method, [System.Collections.Generic.List[object]]$bodyFrames) {
     if ($null -ne $method.body) {
@@ -46,10 +46,6 @@ function Interface-Row($owner, [System.Collections.Generic.List[object]]$bodyFra
     )
 }
 
-function Entity-Row($entity) {
-    return ,@($entity.domain, $entity.entity_type, $entity.name, $entity.file)
-}
-
 function Call-Row($call) {
     return ,@(
         $call.occurrence, $call.caller_method_id, $call.callee_written_name,
@@ -57,22 +53,13 @@ function Call-Row($call) {
     )
 }
 
-function Edge-Row($edge) {
-    return ,@(
-        $edge.occurrence, $edge.relation, (Entity-Row $edge.subject),
-        (Entity-Row $edge.object), $edge.layer, $edge.call_evidence
-    )
-}
-
-function Encode-A1($semantic) {
+function Encode-A2($semantic) {
     $bodyFrames = [System.Collections.Generic.List[object]]::new()
     $classes = @($semantic.classes | ForEach-Object { Class-Row $_ $bodyFrames })
     $interfaces = @($semantic.interfaces | ForEach-Object { Interface-Row $_ $bodyFrames })
     $calls = @($semantic.calls | ForEach-Object { Call-Row $_ })
-    $edges = @($semantic.semantic_edges | ForEach-Object { Edge-Row $_ })
-    $di = @($semantic.classes | ForEach-Object {
-        ,@($_.id, $(if (@($_.injection_occurrences).Count) { @($_.injection_occurrences) } else { 'NO_CORE_INJECTION_OCCURRENCES' }))
-    })
+    $di = @($semantic.classes | Where-Object { @($_.injection_occurrences).Count } |
+        ForEach-Object { ,@($_.id, 'inj') })
     $behavior = [Collections.Generic.List[object]]::new()
     @(
         @($semantic.classes) + @($semantic.interfaces) |
@@ -86,19 +73,16 @@ function Encode-A1($semantic) {
                     @('df', @($method.data_flow)), @('se', @($method.side_effects)),
                     @('ec', @($method.execution_contexts))
                 )) {
-                    if (@($entry[1]).Count) { $behavior.Add(@($method.id, $entry[0], $entry[1])) }
+                    if (@($entry[1]).Count) { $behavior.Add(@($method.id, $entry[0])) }
                 }
             }
     ) | Out-Null
-    $edgeNavigation = @($semantic.semantic_edges | Where-Object { $_.layer -ne 'builtin' } | ForEach-Object {
-        [ordered]@{ occurrence=$_.occurrence; relation=$_.relation; subject_name=$_.subject.name; subject_file=$_.subject.file; object_name=$_.object.name; object_file=$_.object.file; layer=$_.layer }
-    })
     $envelope = [ordered]@{
-        A = 1
-        h = @($semantic.schema, $semantic.schema_version, $semantic.file, $semantic.mode)
+        A = 2
+        h = @('clean-ctx/file-context', 1, $semantic.file, $semantic.mode)
         d = [ordered]@{ A = 1; c = $classes; i = $interfaces }
-        g = [ordered]@{ K = $calls; E = $edges }
-        n = [ordered]@{ D = $di; V = @($behavior); E = $edgeNavigation }
+        g = [ordered]@{ K = $calls }
+        n = [ordered]@{ D = $di; V = @($behavior) }
         i = @($semantic.imports)
         t = @($semantic.type_aliases)
     }
@@ -119,7 +103,9 @@ function Body-Wire($frames) {
 $records = @()
 foreach ($directory in Get-ChildItem -LiteralPath $captures -Directory) {
     $fullPath = Join-Path $directory.FullName "control-full.txt"
+    $rawPath = Join-Path $directory.FullName "raw-source.txt"
     if (-not (Test-Path $fullPath)) { continue }
+    if (-not (Test-Path $rawPath)) { throw "$($directory.Name): missing capture-time raw-source.txt" }
     $fullText = Get-Content -Raw $fullPath
     if (-not $fullText.StartsWith("// CONTROL-FULL v2")) { continue }
     $remainder = $fullText -replace "^[^`r`n]*`r?`n", ""
@@ -127,33 +113,49 @@ foreach ($directory in Get-ChildItem -LiteralPath $captures -Directory) {
     if ($pathmap -lt 0) { throw "$($directory.Name): missing PATHMAP footer" }
     $semantic = $remainder.Substring(0, $pathmap) | ConvertFrom-Json -Depth 100
     $footer = $remainder.Substring($pathmap)
-    $encoded = Encode-A1 $semantic
-    $candidate = "// COMPACT-A A1; decodes to normalized CONTROL-FULL v2`n$schema`n" +
+    $encoded = Encode-A2 $semantic
+    $candidate = "// COMPACT-A A2; file-local; workspace graph via workspace_query`n$schema`n" +
         ($encoded.envelope | ConvertTo-Json -Depth 100 -Compress) +
         "`n§BODIES`n" + (Body-Wire $encoded.bodies) + $footer
-    $candidatePath = Join-Path $directory.FullName "compact-a1.txt"
+    $candidatePath = Join-Path $directory.FullName "compact-a2.txt"
     [IO.File]::WriteAllText($candidatePath, $candidate, [Text.UTF8Encoding]::new($false))
     foreach ($tokenizer in @("cl100k", "o200k")) {
         $fullTokens = [int](& $measure count $tokenizer $fullPath)
+        $rawTokens = [int](& $measure count $tokenizer $rawPath)
         $candidateTokens = [int](& $measure count $tokenizer $candidatePath)
         $records += [ordered]@{
             capture = $directory.Name
+            lane = if ($directory.Name.StartsWith("economics-")) { "tracked_economics" } else { "correctness_lifecycle" }
             tokenizer = $tokenizer
+            raw_source_tokens = $rawTokens
             control_full_v2_tokens = $fullTokens
-            compact_a1_tokens = $candidateTokens
-            saved_tokens = $fullTokens - $candidateTokens
-            reduction_percent = [Math]::Round((($fullTokens - $candidateTokens) * 100.0 / $fullTokens), 2)
+            compact_a2_tokens = $candidateTokens
+            production_saved_tokens = $rawTokens - $candidateTokens
+            production_reduction_percent = if ($rawTokens) { [Math]::Round((($rawTokens - $candidateTokens) * 100.0 / $rawTokens), 2) } else { 0 }
+            economical_vs_raw = $candidateTokens -lt $rawTokens
+            oracle_saved_tokens = $fullTokens - $candidateTokens
+            oracle_reduction_percent = [Math]::Round((($fullTokens - $candidateTokens) * 100.0 / $fullTokens), 2)
+            raw_source_payload = $rawPath
             candidate_payload = $candidatePath
         }
     }
 }
 if (-not $records.Count) { throw "No CONTROL-FULL v2 captures were measured" }
-$output = Join-Path $captures "compact-a1-token-records.json"
+$output = Join-Path $captures "compact-a2-token-records.json"
 $records | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8NoBOM $output
 foreach ($tokenizer in @("cl100k", "o200k")) {
     $lane = @($records | Where-Object tokenizer -eq $tokenizer)
-    $full = ($lane.control_full_v2_tokens | Measure-Object -Sum).Sum
-    $compact = ($lane.compact_a1_tokens | Measure-Object -Sum).Sum
-    Write-Host "${tokenizer}: $($lane.Count) captures, $full -> $compact tokens ($([Math]::Round((($full-$compact)*100.0/$full),2))% reduction)"
+    $raw = ($lane.raw_source_tokens | Measure-Object -Sum).Sum
+    $compact = ($lane.compact_a2_tokens | Measure-Object -Sum).Sum
+    $wins = @($lane | Where-Object economical_vs_raw).Count
+    Write-Host "${tokenizer}: $($lane.Count) captures, raw $raw -> A2 $compact tokens ($([Math]::Round((($raw-$compact)*100.0/$raw),2))% production reduction; $wins/$($lane.Count) economical)"
+    foreach ($laneName in @("correctness_lifecycle", "tracked_economics")) {
+        $subset = @($lane | Where-Object lane -eq $laneName)
+        if (-not $subset.Count) { continue }
+        $subsetRaw = ($subset.raw_source_tokens | Measure-Object -Sum).Sum
+        $subsetCompact = ($subset.compact_a2_tokens | Measure-Object -Sum).Sum
+        $subsetWins = @($subset | Where-Object economical_vs_raw).Count
+        Write-Host "  ${laneName}: $($subset.Count), raw $subsetRaw -> A2 $subsetCompact ($([Math]::Round((($subsetRaw-$subsetCompact)*100.0/$subsetRaw),2))%; $subsetWins/$($subset.Count) economical)"
+    }
 }
 Write-Host "Wrote $output ($($records.Count) records; zero model calls)"

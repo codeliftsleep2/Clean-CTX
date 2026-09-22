@@ -172,9 +172,11 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     "jsonrpc": "2.0", "id": id,
                     "result": {
                         "content": [{ "type": "text", "text": content }],
+                        "ir": crate::ir::hierarchical::hierarchy_to_wire(&compiled, &hierarchy),
+                        "semantic_edges": serde_json::to_value(&edges).unwrap_or_default(),
                         "version": prev_version,
                         "instruction_count": instruction_count,
-                        "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a1" },
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
                         "cached": true
                     }
                 });
@@ -361,8 +363,9 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": content }],
+                    "ir": crate::ir::hierarchical::hierarchy_to_wire(&compiled, &hierarchy),
                     "version": version, "instruction_count": compiled.instructions.len(),
-                    "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a1" },
+                    "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
                     "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                 }
             });

@@ -229,7 +229,7 @@ public class TestController : ControllerBase
         pcc_resp["result"]["content"][0]["text"]
             .as_str()
             .is_some_and(|text| {
-                text.starts_with("// COMPACT-A A1") || text.contains("TestController")
+                text.starts_with("// COMPACT-A A2") || text.contains("TestController")
             })
     );
 

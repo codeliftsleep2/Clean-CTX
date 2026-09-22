@@ -1,6 +1,12 @@
 # COMPACT-A research boundary
 
-**Status:** A1 production integration implemented; verification pending
+**Status:** A2 rejected by raw-source economics; A3 sparse positional repair approved
+
+The current implementation must not proceed to model smoke or production
+acceptance. A2's legend is only 146 cl100k / 147 o200k tokens; its inflation is
+caused by incomplete nested positional encoding, fixed empty columns, repeated
+call defaults, and fidelity-insensitive layouts. See `PHASED_A2_PLAN.md` for the
+closed finding and `PHASED_A3_PLAN.md` for the approved successor gates.
 
 ## Candidate lineage
 
@@ -10,7 +16,9 @@
 - **A1** is a correctness-complete successor to SCHEMA v5: typed scoped records,
   positional columns, occurrence markers, compact graph rows, and separately
   framed exact bodies. It must decode to normalized CONTROL-FULL v2 before token
-  measurement or reasoning evaluation.
+  measurement or reasoning evaluation. CONTROL-FULL is the semantic oracle,
+  not the production cost denominator. Capture-time byte-exact raw source is
+  the production cost control.
 
 ## A1 hard edit boundary
 
@@ -72,15 +80,28 @@ Equality therefore ignores object-key order and whitespace while preserving:
 The verified research decoder remains under `src/tests/ir/**`. The production
 encoder now lives in `src/ir/compact_a.rs` and is assembled through the shared
 MCP content boundary. Full provide/compress, delta baselines and post-apply
-snapshots, restore, replay, and durable regenerated presentation use A1.
-CONTROL-FULL-DELTA v2 remains the acknowledged-state delta contract.
+snapshots, restore, replay, and durable regenerated presentation historically
+used A1. A2 uses the file-local `FILE-CONTEXT-DELTA v1` acknowledged-state
+contract; workspace graph state is queried separately after apply when needed.
+
+That historical A1 boundary is under correction because it embedded the full
+workspace semantic-edge snapshot in every file response. The approved A2
+boundary limits file content to fidelity-appropriate file structure, canonical
+local calls/injections, and required exact bodies. Forward/reverse dependency,
+multi-hop, framework, and cross-file provenance facts remain authoritative in
+the workspace index and are requested through `workspace_query`. Persistence
+and auxiliary state may retain them; model-visible file content must not copy
+them automatically.
 
 Every complete candidate is compared locally with the byte-exact raw source.
 No model or remote token-count API is called. cl100k/o200k use bundled exact
 BPE counts; Claude uses the calibrated local cl100k approximation and must
 clear the documented uncertainty on both sides. A tie, an unsafe approximate
 margin, unsupported approximate tokenizer, or tokenizer initialization failure
-selects byte-exact raw source with no A1 wrapper/footer.
+selects byte-exact raw source with no A1 wrapper/footer. Focused Edit is the
+sole exception: a full raw document is not semantically equivalent because it
+exposes every method body. Focused Edit therefore returns the complete focused
+A1 projection with exact selected bodies and skeletons for all other methods.
 
 Production verification is owned by the repository Final Verification Gate in
 `docs/agent/verification.md`. The tracked suite now covers the production A1
@@ -110,9 +131,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scrip
 ```
 
 The script writes per-capture cl100k/o200k comparisons to
-`target/context-compression-verification/captures/compact-a1-token-records.json`.
-These screening counts decide whether any bounded model smoke is economically
-justified; they do not select the codec for production.
+`target/context-compression-verification/captures/compact-a2-token-records.json`.
+Its primary comparison is capture-time raw source versus A2. CONTROL-FULL-to-A2
+numbers are retained only as oracle-encoding diagnostics. These screening
+counts decide whether any bounded model smoke is economically justified.
 
 After measurement, validate every generated capture without model calls:
 
@@ -125,6 +147,18 @@ Only after that passes, run the six-case, twelve-invocation high-risk smoke:
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-CompactA1Smoke.ps1
 ```
+
+The production comparison is a three-task paired A1-versus-raw smoke (six
+cases, twelve model invocations including scoring). It refuses to spend model
+tokens unless A1 first clears the raw-source economic screen:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-CompactA1VsRawSmoke.ps1 -Restart
+```
+
+The paired questions deliberately avoid requiring canonical IDs that do not
+exist in raw source. They compare ownership/overloads, DI honesty, and ordered
+call/spread reasoning using equivalent semantic expectations.
 
 The smoke is resumable and intentionally excludes the remaining 30 baseline
 cases. Use `-Restart` only to discard and rerun its six saved results.

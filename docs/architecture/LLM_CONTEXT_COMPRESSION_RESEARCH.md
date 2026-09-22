@@ -1,8 +1,8 @@
 # LLM-context compression research
 
-**Status:** COMPACT-A1 production integration implemented; verification pending
+**Status:** file/workspace authority split approved; COMPACT-A2 rejected; sparse positional A3 planned
 **Date:** 2026-09-21  
-**Scope:** the representation delivered to an LLM. Canonical IR and tool input contracts are unchanged. Structured full snapshots now use COMPACT-A1 when its complete locally counted payload is safely cheaper than byte-exact raw source; otherwise raw source is returned without a wrapper. CONTROL-FULL v2 remains the normalized semantic oracle and delta contract. Sections 1–13 preserve the pre-repair research findings; Section 14 records the approved production-mode boundary and current checkpoint.
+**Scope:** the representation delivered to an LLM. Canonical IR and tool input contracts are unchanged. File-context content is being corrected to exclude unsolicited workspace graph snapshots; those facts remain available on demand through `workspace_query`. Structured file snapshots use a compact candidate only when it is safely cheaper than byte-exact raw source; otherwise raw is returned without a wrapper. Sections 1–13 preserve the pre-repair research findings; Section 14 records the approved production boundary and current checkpoint.
 
 ## Executive finding
 
@@ -13,7 +13,8 @@ That is a pre-existing production-presentation gap, not a compression result. Th
 ```text
 CONTROL-PROD = exact text models receive today in result.content
 CONTROL-FULL = correctness-complete, intent-sensitive semantic envelope
-candidate win = fewer model tokens than CONTROL-FULL AND no semantic/reasoning regression
+candidate correctness = exact normalized CONTROL-FULL recovery
+candidate production win = fewer model tokens than byte-exact raw source AND no reasoning regression versus raw
 ```
 
 The strongest near-term hypothesis is that the typed architecture does permit materially denser output through scoped positional ownership, schema elision, columnar facts, and short local handles. It does **not** permit omitting an identity or relationship just because the current renderer omits it. No production codec should be selected until a model-visible correctness-complete envelope and its benchmark are approved.
@@ -592,4 +593,4 @@ The benchmark corpus must exercise full provide/compress, selected and all-body 
 | Low–Edit | mapped/explicit | inherited | provide/delta/apply | exact delta plus complete post-apply edge snapshot; acknowledged prior state required | follows effective fidelity/focus | pending | pending | n/a | pending user run |
 | persisted fidelity | n/a | persisted | restore/replay | regenerate normalized CONTROL-FULL from durable checked IR + edges, render economical A1 or exact raw, never trust stale compact text | follows persisted body facts | pending | pending | pending | pending user run |
 
-Registered-path verification, token capture, and the corrected 36-case reasoning run completed. Follow-up diagnostics found that the required DI provenance and occurrence facts were present and deterministically correct, while their organization reduced model reasoning reliability. The approved CONTROL-FULL v2 repair added stable typed navigation descriptors without altering canonical facts. COMPACT-A1 subsequently passed deterministic roundtrip, token, bounded reasoning, and production edge-case research gates and was approved for production integration. Full snapshots now render A1 from normalized CONTROL-FULL and pass the complete payload through the local token-economics gate; exact raw source wins ties and every unsafe estimate. CONTROL-FULL-DELTA v2 remains the acknowledged-state delta representation. Production integration verification is pending the user-owned gate.
+Registered-path verification, token capture, and the corrected 36-case reasoning run completed. Follow-up diagnostics found that the required DI provenance and occurrence facts were present and deterministically correct, while their organization reduced model reasoning reliability. The approved CONTROL-FULL v2 repair added stable typed navigation descriptors without altering canonical facts. COMPACT-A1 passed deterministic roundtrip, bounded reasoning, and production edge-case gates, but its initial 77% token result used verbose CONTROL-FULL as the denominator rather than raw source. That result proves oracle-encoding reduction only and is not production savings evidence. The corrected harness preserves capture-time raw bytes, measures raw-to-A1 economics, and runs paired raw/A1 reasoning only after the candidate clears that screen. Full snapshots retain the local raw ceiling; focused Edit forbids full-document raw fallback because it violates the requested body-disclosure boundary. CONTROL-FULL-DELTA v2 remains the acknowledged-state delta representation.

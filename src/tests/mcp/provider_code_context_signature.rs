@@ -188,6 +188,10 @@ fn provide_code_context_edit_focus_methods_targets_corrected_identities() {
     );
     let kind = content_kind(&resp);
     let text = rendered(&resp);
+    assert_eq!(
+        kind, "skeleton_with_focused_verbatim_bodies",
+        "focused Edit must never degrade to full-document raw passthrough"
+    );
     assert!(
         text.contains("return (values[0], values[1]);"),
         "focusing `GetPair` must select its verbatim body: {text}"
@@ -196,10 +200,8 @@ fn provide_code_context_edit_focus_methods_targets_corrected_identities() {
         text.contains("return source.OrderByDescending(keySelector);"),
         "focusing the generic method must select its verbatim body: {text}"
     );
-    if kind != "raw_passthrough" {
-        assert!(
-            !text.contains("return (names[0], names.Length);"),
-            "an unfocused method's body must stay signature-only: {text}"
-        );
-    }
+    assert!(
+        !text.contains("return (names[0], names.Length);"),
+        "an unfocused method's body must stay signature-only: {text}"
+    );
 }
