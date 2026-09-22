@@ -212,10 +212,9 @@ fn provide_code_context_uses_meta_not_ad_hoc_fields() {
         .and_then(|m| m.get("content_kind"))
         .and_then(|k| k.as_str());
 
-    assert_eq!(content_kind, Some("skeleton"));
     assert!(
-        text.contains("// CONTROL-FULL v2"),
-        "content must be CONTROL-FULL v2: {text}"
+        text.contains("// COMPACT-A A1") || content_kind == Some("raw_passthrough"),
+        "content must be economical A1 or raw passthrough: {text}"
     );
 
     for banned in [

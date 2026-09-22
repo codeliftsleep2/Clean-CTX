@@ -1,6 +1,6 @@
 # COMPACT-A research boundary
 
-**Status:** A0 control gates green; scoped A1 investigation active; no production integration authorized
+**Status:** A1 production integration implemented; verification pending
 
 ## Candidate lineage
 
@@ -69,10 +69,26 @@ Equality therefore ignores object-key order and whitespace while preserving:
 - exact body strings byte-for-byte, including line endings and Unicode;
 - numeric body start/end spans exactly.
 
-The first tracked prototype lives under `src/tests/ir/compact_a.rs` and is
-compiled only for tests. It has no MCP registration, production renderer,
-persistence path, or runtime selection mechanism. Token measurement and model
-reasoning evaluation remain separate gates after exact semantic roundtrip.
+The verified research decoder remains under `src/tests/ir/**`. The production
+encoder now lives in `src/ir/compact_a.rs` and is assembled through the shared
+MCP content boundary. Full provide/compress, delta baselines and post-apply
+snapshots, restore, replay, and durable regenerated presentation use A1.
+CONTROL-FULL-DELTA v2 remains the acknowledged-state delta contract.
+
+Every complete candidate is compared locally with the byte-exact raw source.
+No model or remote token-count API is called. cl100k/o200k use bundled exact
+BPE counts; Claude uses the calibrated local cl100k approximation and must
+clear the documented uncertainty on both sides. A tie, an unsafe approximate
+margin, unsupported approximate tokenizer, or tokenizer initialization failure
+selects byte-exact raw source with no A1 wrapper/footer.
+
+Production verification is owned by the repository Final Verification Gate in
+`docs/agent/verification.md`. The tracked suite now covers the production A1
+renderer against the verified decoder, local exact/approximate economics,
+strictly cheaper selection, byte-exact CRLF/Unicode raw fallback, focused Edit
+bodies, full provide/compress, delta baseline/apply, and restore/replay. The
+older capture/measurement scripts below remain research evidence and do not
+replace the tracked gate.
 
 The focused user-run test passed. This establishes codec reversibility for the
 representative correctness-rich fixture and validates that normalization ignores

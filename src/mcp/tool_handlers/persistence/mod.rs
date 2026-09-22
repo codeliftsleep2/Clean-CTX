@@ -84,7 +84,7 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
         Some(edges) => edges,
         None => return send_persistence_error(id, "Missing authoritative semantic-edge state"),
     };
-    let compact = crate::mcp::tool_handlers::core::content::control_full_document(
+    let compact = crate::mcp::tool_handlers::core::content::compact_a_document(
         &session_ir,
         &hierarchy,
         &semantic_edges,
@@ -398,14 +398,46 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
             return;
         }
     };
-    let rendered = crate::mcp::tool_handlers::core::content::control_full_document(
-        &ir,
-        &hierarchy,
-        &restored.semantic_edges,
-        restored.fidelity,
-        file_path,
-        state,
-    );
+    let compact = || {
+        crate::mcp::tool_handlers::core::content::compact_a_document(
+            &ir,
+            &hierarchy,
+            &restored.semantic_edges,
+            restored.fidelity,
+            file_path,
+            state,
+        )
+    };
+    let (rendered, raw_passthrough) = match state.read_source(file_path) {
+        Ok(source) => {
+            let source_matches =
+                state.cache_read().compute_hash(source.as_bytes()) == restored.source_hash;
+            let tokenizer_kind = crate::mcp::tools::parse_tokenizer_arg(params, &state.config);
+            let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
+            let economic =
+                crate::mcp::tool_handlers::core::content::economical_compact_a_document(
+                    &ir,
+                    &hierarchy,
+                    &restored.semantic_edges,
+                    restored.fidelity,
+                    file_path,
+                    &source,
+                    state,
+                    tokenizer_kind,
+                    tokenizer_box.as_deref(),
+                );
+            let selected_raw = matches!(
+                economic.selected,
+                crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
+            );
+            if selected_raw && source_matches {
+                (economic.text, true)
+            } else {
+                (compact(), false)
+            }
+        }
+        Err(_) => (compact(), false),
+    };
     let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
     state
         .ir_context_lock()
@@ -426,7 +458,18 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         "result": {
             "content": [{ "type": "text", "text": rendered }],
             "ir": crate::ir::hierarchical::hierarchy_to_wire(&ir, &hierarchy),
-            "_meta": { "file": file_path, "version": ir.version, "instruction_count": ir.instructions.len() }
+            "_meta": {
+                "file": file_path, "version": ir.version,
+                "instruction_count": ir.instructions.len(),
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a1" },
+                "byte_exact": if raw_passthrough {
+                    serde_json::json!(["document"])
+                } else if restored.fidelity == crate::compression::Fidelity::Edit {
+                    serde_json::json!(["method_bodies"])
+                } else {
+                    serde_json::json!([])
+                }
+            }
         }
     }));
 }

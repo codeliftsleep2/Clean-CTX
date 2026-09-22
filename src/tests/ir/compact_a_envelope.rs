@@ -181,7 +181,7 @@ fn navigation(decoded: &Value) -> Value {
     })
 }
 
-pub(super) fn decode(envelope: &Value, body_wire: &[u8]) -> Result<Value, String> {
+pub(crate) fn decode(envelope: &Value, body_wire: &[u8]) -> Result<Value, String> {
     let declarations = decode_scoped_declarations(&envelope["d"]);
     let graph = decode_graph(&envelope["g"]);
     let expected_ids = envelope["h"][3]["exact_body_method_ids"]
@@ -293,4 +293,29 @@ fn scoped_a1_envelope_rejects_missing_duplicate_and_unexpected_bodies() {
         decode(&encoded, &unexpected).unwrap_err(),
         "body frames do not match exact body method IDs"
     );
+}
+
+#[test]
+fn production_renderer_matches_the_verified_a1_envelope_and_body_frames() {
+    let (ir, hierarchy, edges) = super::tests::fixture();
+    let oracle = normalize_control_full(
+        &ir.file_id,
+        "C:/repo/owner.ts",
+        ir.version,
+        Fidelity::Edit,
+        &hierarchy,
+        &edges,
+    );
+    let rendered = crate::ir::compact_a::render(&oracle);
+    let payload = rendered
+        .strip_prefix("// COMPACT-A A1; decodes to normalized CONTROL-FULL v2\n")
+        .expect("production A1 header");
+    let (_, encoded_and_bodies) = payload.split_once('\n').expect("A1 legend");
+    let (encoded, body_wire) = encoded_and_bodies
+        .split_once("\n§BODIES\n")
+        .expect("A1 body boundary");
+    let envelope: Value = serde_json::from_str(encoded).expect("A1 envelope JSON");
+    let decoded = decode(&envelope, body_wire.as_bytes()).expect("decode production A1");
+
+    assert_eq!(decoded, oracle);
 }

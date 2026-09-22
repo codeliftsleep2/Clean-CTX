@@ -12,8 +12,8 @@
 
 use super::*;
 
-// CONTROL-PROD token economics remains measurement input; CONTROL-FULL is the
-// correctness baseline and is never replaced by a semantically weaker payload.
+// COMPACT-A is selected only when the local counter proves it cheaper than the
+// exact raw document. Raw passthrough is the mandatory economic fallback.
 
 fn count_tokens(text: &str) -> usize {
     let kind = crate::tokenizer::TokenizerKind::default();
@@ -63,7 +63,7 @@ fn resp_text(resp: &serde_json::Value) -> String {
 }
 
 #[test]
-fn small_edit_uses_model_visible_control_full() {
+fn small_edit_uses_byte_exact_raw_when_a1_is_not_cheaper() {
     let dir = tempfile::TempDir::new().unwrap();
     let root_str = dir.path().to_string_lossy().into_owned();
     let path = dir.path().join("tiny.rs");
@@ -79,12 +79,12 @@ fn small_edit_uses_model_visible_control_full() {
         .pop()
         .expect("handler must send response");
     let kind = resp_kind(&resp);
-    assert_eq!(kind, "skeleton_with_verbatim_bodies");
-    assert!(resp_text(&resp).starts_with("// CONTROL-FULL v2"));
+    assert_eq!(kind, "raw_passthrough");
+    assert_eq!(resp_text(&resp), "fn small() { 42 }");
 }
 
 #[test]
-fn edit_mode_keeps_control_full_even_when_it_exceeds_raw() {
+fn edit_mode_never_returns_a_payload_more_expensive_than_raw() {
     let dir = tempfile::TempDir::new().unwrap();
     let root_str = dir.path().to_string_lossy().into_owned();
     let path_str = create_multi_method_fixture(&dir, "svc.rs", 35);
@@ -106,9 +106,7 @@ fn edit_mode_keeps_control_full_even_when_it_exceeds_raw() {
         .expect("handler must send response");
     let text = resp_text(&resp);
     let comp_tokens = count_tokens(&text);
-    assert_eq!(resp_kind(&resp), "skeleton_with_verbatim_bodies");
-    assert!(text.starts_with("// CONTROL-FULL v2"));
-    assert!(comp_tokens > 0 && raw_tokens > 0);
+    assert!(comp_tokens <= raw_tokens);
 }
 
 #[test]
@@ -130,14 +128,16 @@ fn structural_fidelities_keep_the_correctness_baseline() {
             .pop()
             .expect("handler must send resp");
         let text = resp_text(&resp);
-        assert_eq!(resp_kind(&resp), "skeleton");
-        assert!(text.starts_with("// CONTROL-FULL v2"), "{fidelity}");
-        assert!(count_tokens(&text) > 0 && raw_tokens > 0);
+        assert!(count_tokens(&text) <= raw_tokens, "{fidelity}");
+        assert!(
+            text.starts_with("// COMPACT-A A1") || text == source,
+            "{fidelity}"
+        );
     }
 }
 
 #[test]
-fn large_files_still_use_control_full() {
+fn large_files_never_exceed_raw_even_when_a1_does_not_win() {
     let dir = tempfile::TempDir::new().unwrap();
     let root_str = dir.path().to_string_lossy().into_owned();
     let path = dir.path().join("large.rs");
@@ -171,13 +171,9 @@ fn large_files_still_use_control_full() {
         let resp = crate::protocol::captured_responses()
             .pop()
             .expect("handler must send resp");
-        let kind = resp_kind(&resp);
         let text = resp_text(&resp);
-        assert_ne!(
-            kind, "raw_passthrough",
-            "{fidelity}: CONTROL-FULL must stay authoritative"
-        );
-        assert!(text.starts_with("// CONTROL-FULL v2"));
+        assert!(count_tokens(&text) <= raw_tokens, "{fidelity}");
+        assert!(text.starts_with("// COMPACT-A A1") || text == source);
         assert!(raw_tokens > 0);
     }
 }
@@ -200,7 +196,6 @@ fn intent_edit_selects_control_full_edit_mode() {
         .pop()
         .expect("handler must send resp");
     let text = resp_text(&resp);
-    assert_eq!(resp_kind(&resp), "skeleton_with_verbatim_bodies");
-    assert!(text.starts_with("// CONTROL-FULL v2"));
-    assert!(count_tokens(&text) > 0 && raw_tokens > 0);
+    assert!(count_tokens(&text) <= raw_tokens);
+    assert!(text.starts_with("// COMPACT-A A1") || text == source);
 }

@@ -1,7 +1,7 @@
 // Angular template specialization for provide_code_context.
 
 use crate::mcp::McpState;
-use crate::mcp::tool_helpers::{count_tokens_with_tokenizer, inject_baseline_breakpoint};
+use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::mcp::tools::parse_tokenizer_arg;
 use crate::protocol::send_response;
 use serde_json::Value;
@@ -67,8 +67,19 @@ pub(super) fn try_handle_angular_template(
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
-    let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
-    let comp_tokens = count_tokens_with_tokenizer(&body, tokenizer_ref);
+    let economic = crate::mcp::content_economics::select_with_local_tokenizer(
+        source,
+        body,
+        tokenizer_kind,
+        tokenizer_ref,
+    );
+    let raw_tokens = economic.raw_tokens;
+    let comp_tokens = economic.selected_tokens();
+    let raw_passthrough = matches!(
+        economic.selected,
+        crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
+    );
+    let body = economic.text;
     state.record_compression(
         resolved_path,
         raw_tokens,
@@ -77,7 +88,11 @@ pub(super) fn try_handle_angular_template(
         true,
         "full",
         None,
-        "angular_template",
+        if raw_passthrough {
+            "raw_passthrough"
+        } else {
+            "angular_template"
+        },
     );
 
     // Angular templates use a separate, non-canonical representation. They
@@ -96,8 +111,9 @@ pub(super) fn try_handle_angular_template(
             "content": [{ "type": "text", "text": body }],
             "_meta": {
                 "strategy": "full", "fidelity": format!("{:?}", fidelity).to_lowercase(),
-                "is_angular": true, "template_compressed": true,
-                "content_kind": content_kind, "byte_exact": byte_exact,
+                "is_angular": true, "template_compressed": !raw_passthrough,
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
+                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() },
                 "degradation": null
             }
         }

@@ -1,5 +1,5 @@
 use crate::mcp::tools::dispatch_tools_call;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
     let mut config = crate::tests::test_config();

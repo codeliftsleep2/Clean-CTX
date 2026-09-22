@@ -92,7 +92,7 @@ pub(super) fn ensure_persisted_baseline(
     Ok(())
 }
 
-pub(super) fn ensure_apply_baseline(
+pub(crate) fn ensure_apply_baseline(
     state: &McpState,
     alias: &str,
     file_path: &str,
@@ -123,7 +123,7 @@ pub(super) fn ensure_apply_baseline(
     )
 }
 
-pub(super) fn persisted_context_id(
+pub(crate) fn persisted_context_id(
     state: &McpState,
     file_path: &str,
 ) -> Result<Option<String>, String> {

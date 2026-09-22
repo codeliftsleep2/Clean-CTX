@@ -125,7 +125,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             None => return,
         };
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
-        let candidate_compact = crate::ir::render_control_full(
+        let normalized = crate::ir::normalize_control_full(
             &ir.file_id,
             &resolved_path,
             ir.version,
@@ -133,6 +133,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             &hir,
             &semantic_edges,
         );
+        let candidate_compact = crate::ir::compact_a::render(&normalized);
         let compressed_tokens = count_tokens_with_tokenizer(&candidate_compact, tokenizer_ref);
 
         // P9-14: durability is the publication boundary. Persist the checked
@@ -174,15 +175,23 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         let path_alias = state.get_or_create_alias(resolved_path.clone());
         ir.file_id.clone_from(&path_alias);
         let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
-        let llm_text_with_footer = super::content::control_full_document(
+        let economic = super::content::economical_compact_a_document(
             &ir,
             &hir,
             &semantic_edges,
             effective_fidelity,
             &resolved_path,
+            source_text,
             state,
+            tokenizer_kind,
+            tokenizer_ref,
         );
-        let compressed_tokens = count_tokens_with_tokenizer(&llm_text_with_footer, tokenizer_ref);
+        let llm_text_with_footer = economic.text.clone();
+        let compressed_tokens = economic.selected_tokens();
+        let raw_passthrough = matches!(
+            economic.selected,
+            crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
+        );
 
         state
             .ir_context_lock()
@@ -208,7 +217,11 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             false,
             "full",
             None,
-            "ir_compression",
+            if raw_passthrough {
+                "raw_passthrough"
+            } else {
+                "ir_compression"
+            },
         );
 
         let ir_value = match encoding {
@@ -239,7 +252,8 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 "content": [{ "type": "text", "text": llm_text_with_footer }],
                 "ir": crate::ir::hierarchical::hierarchy_to_wire(&ir, &hir),
                 "pretty": ir_value, "v": ir.version, "file": ir.file_id,
-                "content_kind": content_kind, "byte_exact": byte_exact,
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
+                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() },
                 "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
             }
         })

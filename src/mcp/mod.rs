@@ -13,6 +13,7 @@
 
 pub(crate) mod buffered_store;
 pub(crate) mod cache_hints;
+pub(crate) mod content_economics;
 pub(crate) mod context_store;
 pub(crate) mod discovery_cache;
 pub mod dispatcher;

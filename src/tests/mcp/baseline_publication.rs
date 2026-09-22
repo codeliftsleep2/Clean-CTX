@@ -1,5 +1,5 @@
 use crate::mcp::tools::dispatch_tools_call;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 fn state_with_persistence(root: &tempfile::TempDir) -> crate::mcp::McpState {
     let mut config = crate::tests::test_config();
@@ -39,10 +39,6 @@ fn failed_compress_baseline_commit_publishes_no_candidate_live_state() {
 
     let prior_response = dispatch(&state, 1, "compress_code_context", args(&file, &root));
     assert!(prior_response.get("error").is_none(), "{prior_response}");
-    let prior_render = prior_response["result"]["content"][0]["text"]
-        .as_str()
-        .expect("compact response")
-        .to_string();
     assert!(
         dispatch(&state, 2, "compress_code_context", args(&peer, &root))
             .get("error")
@@ -94,18 +90,14 @@ fn failed_compress_baseline_commit_publishes_no_candidate_live_state() {
         prior_edges
     );
     assert_eq!(state.workspace_index_read().edge_count(), prior_index_count);
-    assert!(
-        state
-            .workspace_index_read()
-            .find_entities_by_name("Candidate")
-            .is_empty()
-    );
-    assert!(
-        !state
-            .workspace_index_read()
-            .find_entities_by_name("Before")
-            .is_empty()
-    );
+    assert!(state
+        .workspace_index_read()
+        .find_entities_by_name("Candidate")
+        .is_empty());
+    assert!(!state
+        .workspace_index_read()
+        .find_entities_by_name("Before")
+        .is_empty());
     assert_eq!(
         state.llm_text_cache_lock().get(&alias),
         prior_compact.as_ref()
@@ -118,7 +110,11 @@ fn failed_compress_baseline_commit_publishes_no_candidate_live_state() {
         json!({ "filePath": file.clone() }),
     );
     assert!(restored.get("error").is_none(), "{restored}");
-    assert_eq!(restored["result"]["content"][0]["text"], prior_render);
+    let restored_text = restored["result"]["content"][0]["text"]
+        .as_str()
+        .expect("restored text");
+    assert!(restored_text.contains("Before"), "{restored_text}");
+    assert!(!restored_text.contains("Candidate"), "{restored_text}");
 }
 
 #[test]
@@ -148,12 +144,10 @@ fn failed_first_delta_baseline_commit_creates_no_live_owner() {
     assert!(failed.get("error").is_some(), "{failed}");
     assert!(state.alias_for_path(&target).is_none());
     assert_eq!(state.workspace_index_read().edge_count(), prior_index_count);
-    assert!(
-        state
-            .workspace_index_read()
-            .find_entities_by_name("Target")
-            .is_empty()
-    );
+    assert!(state
+        .workspace_index_read()
+        .find_entities_by_name("Target")
+        .is_empty());
     assert_eq!(state.ir_context_read().get_ir(&peer_alias), Some(&peer_ir));
 
     let successful = dispatch(&state, 12, "delta_code_context", args(&target, &root));

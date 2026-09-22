@@ -228,7 +228,9 @@ public class TestController : ControllerBase
     assert!(
         pcc_resp["result"]["content"][0]["text"]
             .as_str()
-            .is_some_and(|text| text.starts_with("// CONTROL-FULL v2"))
+            .is_some_and(|text| {
+                text.starts_with("// COMPACT-A A1") || text.contains("TestController")
+            })
     );
 
     // Step 2: Query find_entities for the expected entity name.

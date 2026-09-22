@@ -1,7 +1,7 @@
 //! Production-path contracts for durable semantic-edge restoration.
 
 use crate::mcp::tools::dispatch_tools_call;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
     let mut config = crate::tests::test_config();
@@ -139,15 +139,13 @@ fn generated_delta_persists_and_restores_complete_target_edges() {
     );
     assert!(applied.get("error").is_none(), "{applied}");
     let expected_edges = edge_json(&producer, &alias);
-    assert!(
-        producer
-            .pending_transition(
-                &alias,
-                &file,
-                &serde_json::from_value(delta.clone()).unwrap()
-            )
-            .is_err()
-    );
+    assert!(producer
+        .pending_transition(
+            &alias,
+            &file,
+            &serde_json::from_value(delta.clone()).unwrap()
+        )
+        .is_err());
 
     let restarted = state(&root);
     let restored = dispatch(

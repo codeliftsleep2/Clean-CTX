@@ -304,15 +304,15 @@ fn test_cache_dashboard_json() {
     );
 }
 
-/// Verify that generated vocabulary teaches the current CONTROL-FULL contract.
+/// Verify that generated vocabulary teaches the current COMPACT-A contract.
 #[test]
 fn test_generate_vocabulary_text() {
     let text = generate_vocabulary_text();
     assert!(
-        text.contains("CONTROL-FULL v2"),
-        "vocabulary prompt must teach CONTROL-FULL v2"
+        text.contains("COMPACT-A A1"),
+        "vocabulary prompt must teach COMPACT-A A1"
     );
-    assert!(text.contains("semantic_edges"));
+    assert!(text.contains("g.K/g.E"));
     assert!(text.contains("α"), "path aliases remain current");
     for banned in [
         "$c   → class",

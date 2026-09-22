@@ -4,28 +4,32 @@
 pub(crate) const SYSTEM_PROMPT: &str = r#"# Clean-CTX Context Guide
 
 `provide_code_context`, `compress_code_context`, `restore_context`, and replay
-responses use the versioned CONTROL-FULL JSON document in `content`. This is
-the portable semantic authority. `_meta` is application-facing state and may
-mirror facts, but never treat it as the only source of code meaning.
+responses use either the versioned COMPACT-A A1 presentation or byte-exact raw
+source in `content`. A1 decodes to normalized CONTROL-FULL v2 and is the compact
+portable semantic authority. `_meta` is application-facing state and may mirror
+facts, but never treat it as the only source of code meaning.
 
-## CONTROL-FULL v2
+## COMPACT-A A1
 
 The document begins with:
 
-`// CONTROL-FULL v2; canonical IDs are authoritative`
+`// COMPACT-A A1; decodes to normalized CONTROL-FULL v2`
 
-The JSON fields are named and preserve canonical order:
+The following schema legend declares positional rows. Identity rule: canonical IDs are authoritative;
+position is presentation, never identity:
 
-- `file`: session ID, canonical source path, and IR version.
-- `mode`: effective fidelity, exact-body method IDs, and source-escalation rule.
-- `classes` / `interfaces`: typed owners with explicit IDs, methods, fields,
-  inheritance, implements, injection occurrences, modifiers, flags, and facts.
-- `methods`: explicit IDs, parameters, return type, occurrence-grouped facts,
-  flow/effects/context, and optional exact body plus source spans.
-- `calls`: ordered call occurrences. `caller_method_id` is canonical;
+`S A1 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution] E[occurrence,relation,S(domain,type,name,file),O(domain,type,name,file),layer,call_evidence]`
+
+The envelope preserves:
+
+- `h`: CONTROL-FULL schema/version plus file and mode records.
+- `d.c` / `d.i`: typed class/interface rows and scoped members.
+- `g.K` / `g.E`: ordered call and semantic-edge rows.
+- `n.D` / `n.V` / `n.E`: DI, behavior, and endpoint-local navigation.
+- ordered call occurrences. `caller_method_id` is canonical;
   `callee_written_name` is spelling evidence only. When
   `callee_resolution` is `unresolved`, never invent a declaration target.
-- `semantic_edges`: complete generic/framework relationships with relation,
+- complete generic/framework relationships with relation,
   typed subject/object, layer, file provenance, and call evidence where present.
 
 Arrays preserve occurrence order, duplicates, and nested group boundaries.
@@ -35,7 +39,7 @@ Names are display data; explicit IDs and typed ownership determine identity.
 
 - Low/Medium/High contain the complete canonical envelope compiled at that
   fidelity. High is the structural reasoning baseline.
-- Edit adds byte-exact method bodies. With `focusMethods`, selectors resolve
+- Edit adds byte-exact `B[method_id,start,end,utf8_bytes]` frames. With `focusMethods`, selectors resolve
   through typed owner identity to canonical method IDs before other bodies are
   removed. Ambiguous selectors are errors, never guesses.
 - Verbatim is the explicit byte-exact whole-document mode. Request it for
@@ -50,7 +54,7 @@ Names are display data; explicit IDs and typed ownership determine identity.
 ## Editing
 
 Use `intent="edit"` before a body edit. Only regions identified by
-`byte_exact` and `mode.exact_body_method_ids` are safe exact-match inputs.
+`byte_exact` and the mode record's exact body IDs are safe exact-match inputs.
 Prefer `apply_edit` for a supported unit edit. On rejection, re-read and retry;
 never blind-retry. Use `fidelity="verbatim"` for whole-document edits.
 
@@ -61,6 +65,9 @@ source edits. `compress_workspace` manifests and the historical SCHEMA v5
 renderer are legacy/CONTROL-PROD measurement formats; use
 `decompress_code_context` where expansion is required. They are not the
 correctness authority for current file-context responses.
+
+If A1 is not safely cheaper under the selected local tokenizer estimate,
+`content` is the byte-exact raw source with no A1 wrapper or footer.
 "#;
 
 /// Return the list of available prompt definitions (for `prompts/list`).
@@ -68,7 +75,7 @@ pub(crate) fn prompt_list() -> Vec<serde_json::Value> {
     vec![
         serde_json::json!({
             "name": "cleanctx-notation",
-            "description": "System instructions for reading Clean-CTX CONTROL-FULL context",
+            "description": "System instructions for reading Clean-CTX COMPACT-A A1 context",
             "arguments": []
         }),
         serde_json::json!({
@@ -78,7 +85,7 @@ pub(crate) fn prompt_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "clean-ctx-vocabulary",
-            "description": "CONTROL-FULL v2 named semantic fields, stable typed navigation, canonical identity, exact-body, delta, and path-map rules.",
+            "description": "COMPACT-A A1 positional schema, canonical identity, exact-body, delta, raw-fallback, and path-map rules.",
             "arguments": []
         }),
     ]

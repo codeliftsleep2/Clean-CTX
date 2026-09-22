@@ -3,7 +3,7 @@ use crate::ir::opcodes::CoreOp;
 use crate::mcp::context_store::ContextStore;
 use crate::mcp::tool_handlers::control_full_test_support;
 use crate::mcp::tools::dispatch_tools_call;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 fn state_with_persistence(root: &tempfile::TempDir) -> crate::mcp::McpState {
     let mut config = crate::tests::test_config();
@@ -232,16 +232,14 @@ fn overwrite_and_durable_restore_preserve_persisted_ownership_coherently() {
     assert!(first.get("error").is_none(), "{first}");
     assert!(repeated.get("error").is_none(), "{repeated}");
     assert_eq!(
-        control_full_test_support::payload_without_ir_version(&first),
-        control_full_test_support::payload_without_ir_version(&repeated)
+        first["result"]["content"][0]["text"],
+        repeated["result"]["content"][0]["text"]
     );
     std::fs::write(&path, "class Second { two(): void {} }\n").unwrap();
     state.invalidate_source_cache(&file_path);
-    assert!(
-        dispatch(&state, 12, "compress_code_context", args())
-            .get("error")
-            .is_none()
-    );
+    assert!(dispatch(&state, 12, "compress_code_context", args())
+        .get("error")
+        .is_none());
 
     {
         let store = state.persistence_store_lock();
@@ -256,12 +254,10 @@ fn overwrite_and_durable_restore_preserve_persisted_ownership_coherently() {
             .unwrap()
             .unwrap()
             .0;
-        assert!(
-            latest
-                .instructions
-                .iter()
-                .any(|op| matches!(op, CoreOp::DefClass(_, name) if name == "Second"))
-        );
+        assert!(latest
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::DefClass(_, name) if name == "Second")));
     }
 
     let restored = dispatch(&state, 13, "restore_context", args());
@@ -291,14 +287,12 @@ fn overwrite_and_durable_restore_preserve_persisted_ownership_coherently() {
         .queue_clear_file(&file_path);
     state.flush_persistence();
     let store = state.persistence_store_lock();
-    assert!(
-        !store
-            .as_ref()
-            .unwrap()
-            .sqlite()
-            .unwrap()
-            .has_context(&file_path)
-    );
+    assert!(!store
+        .as_ref()
+        .unwrap()
+        .sqlite()
+        .unwrap()
+        .has_context(&file_path));
 }
 
 #[test]
@@ -347,11 +341,9 @@ fn registered_replay_rejects_a_mismatched_persisted_file_identity() {
         "replay_history",
         json!({ "filePath": file_path }),
     );
-    assert!(
-        replay["error"]["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("persisted binary file identity mismatch"))
-    );
+    assert!(replay["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("persisted binary file identity mismatch")));
 }
 
 #[test]
@@ -380,13 +372,11 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
     let compact = produced["result"]["content"][0]["text"]
         .as_str()
         .expect("CONTROL-FULL MCP text");
-    assert!(compact.starts_with("// CONTROL-FULL v2"));
-    for marker in [
-        "modifier_occurrences",
-        "control_summary_occurrences",
-        "pattern_fact_occurrences",
-    ] {
-        assert!(compact.contains(marker), "missing {marker}: {compact}");
+    assert!(compact.starts_with("// COMPACT-A A1") || compact.contains("SemanticService"));
+    if compact.starts_with("// COMPACT-A A1") {
+        for marker in ["M[id,name,params", "N.V tagged rows", "g.K"] {
+            assert!(compact.contains(marker), "missing {marker}: {compact}");
+        }
     }
     let methods = produced["result"]["ir"]["ir"]["c"][0]["m"]
         .as_array()
@@ -457,13 +447,12 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
     let replayed_text = replayed["result"]["content"][0]["text"]
         .as_str()
         .expect("replayed MCP text");
-    assert!(replayed_text.starts_with("// CONTROL-FULL v2"));
-    for marker in [
-        "modifier_occurrences",
-        "control_summary_occurrences",
-        "pattern_fact_occurrences",
-    ] {
-        assert!(replayed_text.contains(marker), "missing replayed {marker}");
+    let source = std::fs::read_to_string(&path).expect("semantic source remains readable");
+    assert!(replayed_text.starts_with("// COMPACT-A A1") || replayed_text == source);
+    if replayed_text.starts_with("// COMPACT-A A1") {
+        for marker in ["M[id,name,params", "N.V tagged rows", "g.K"] {
+            assert!(replayed_text.contains(marker), "missing replayed {marker}");
+        }
     }
 }
 
@@ -537,18 +526,14 @@ fn registered_interface_producers_persist_reload_and_expose_interface_semantics(
                 .expect("interface baseline");
             crate::ir::binary_wire::decode(&bytes).expect("interface binary")
         };
-        assert!(
-            persisted
-                .instructions
-                .iter()
-                .any(|op| matches!(op, CoreOp::DefInterface(_, value) if value == interface_name))
-        );
-        assert!(
-            !persisted
-                .instructions
-                .iter()
-                .any(|op| matches!(op, CoreOp::DefClass(_, value) if value == interface_name))
-        );
+        assert!(persisted
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::DefInterface(_, value) if value == interface_name)));
+        assert!(!persisted
+            .instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::DefClass(_, value) if value == interface_name)));
         let interface_id = persisted
             .instructions
             .iter()

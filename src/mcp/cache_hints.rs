@@ -274,26 +274,27 @@ pub fn render_cache_json(metrics: &CacheMetrics, enabled: bool) -> serde_json::V
 }
 
 /// Generate the response-vocabulary text for the `clean-ctx-vocabulary`
-/// prompt resource. Teaches the portable CONTROL-FULL model-visible contract.
+/// prompt resource. Teaches the portable COMPACT-A model-visible contract.
 ///
 /// This function is used by the `prompts/get` MCP handler.
 pub fn generate_vocabulary_text() -> String {
     let lines = vec![
-        "Clean-CTX Response Vocabulary (CONTROL-FULL v2)",
+        "Clean-CTX Response Vocabulary (COMPACT-A A1)",
         "================================================",
         "",
-        "// CONTROL-FULL v2; canonical IDs are authoritative",
-        "file: session ID, source path, IR version",
-        "mode: fidelity, exact_body_method_ids, source escalation rule",
-        "classes/interfaces: typed owners with explicit IDs and grouped facts",
-        "methods/fields: explicit IDs, ownership, types, bodies/spans when exact",
-        "calls: ordered occurrences; written callee names stay unresolved",
-        "semantic_edges: complete relation/layer/file provenance and evidence",
+        "// COMPACT-A A1; decodes to normalized CONTROL-FULL v2",
+        crate::ir::compact_a::LEGEND,
+        "h: CONTROL-FULL schema/version, file, and fidelity mode",
+        "d.c/d.i: typed owners and scoped declaration rows",
+        "g.K/g.E: ordered calls and typed semantic edges",
+        "n.D/n.V/n.E: DI, behavior, and endpoint-local navigation",
+        "B frames: canonical method ID, exact span, UTF-8 byte length and bytes",
         "",
         "Arrays preserve order, duplicates, and occurrence-group boundaries.",
         "Edit focus resolves typed ownership to canonical method IDs before filtering.",
         "navigation uses stable typed locators, never serialized array indices; endpoint file fields remain separate.",
         "CONTROL-FULL-DELTA v2 requires an acknowledged prior canonical state.",
+        "When A1 is not safely cheaper under local counting, content is byte-exact raw source.",
         "",
         "α/β/γ   path aliases — see §PATHMAP footer",
         "",

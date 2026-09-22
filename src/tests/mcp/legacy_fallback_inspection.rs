@@ -88,12 +88,10 @@ fn registered_inspection_reports_quarantine_without_mutation() {
         .map(|entry| entry.expect("fixture entry").path())
         .collect::<Vec<_>>();
     assert_eq!(before, after);
-    assert!(
-        state
-            .persistence_store_lock()
-            .as_ref()
-            .is_some_and(|store| { store.list_contexts(10).is_ok_and(|rows| rows.is_empty()) })
-    );
+    assert!(state
+        .persistence_store_lock()
+        .as_ref()
+        .is_some_and(|store| { store.list_contexts(10).is_ok_and(|rows| rows.is_empty()) }));
     assert!(state.ir_context_read().file_ids().is_empty());
     assert_eq!(state.workspace_index_read().edge_count(), 0);
 }

@@ -227,7 +227,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             let delta_start = Instant::now();
             let prev_version = state.file_version(&alias).unwrap_or(0);
             let initial_full = if prev_version == 0 {
-                let full = super::content::control_full_document(
+                let full = super::content::compact_a_document(
                     &compiled,
                     &checked_hir,
                     &semantic_edges,
@@ -321,8 +321,19 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         d,
                         &semantic_edges,
                     );
-                    raw_tokens = count_tokens_with_tokenizer(&delta_text, tokenizer_ref);
-                    comp_tokens = raw_tokens; // delta is the payload itself
+                    let economic = crate::mcp::content_economics::select_with_local_tokenizer(
+                        source,
+                        delta_text,
+                        tokenizer_kind,
+                        tokenizer_ref,
+                    );
+                    raw_tokens = economic.raw_tokens;
+                    comp_tokens = economic.selected_tokens();
+                    let raw_passthrough = matches!(
+                        economic.selected,
+                        crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
+                    );
+                    let delta_text = economic.text;
                     let prev_full_compressed = state
                         .session_stats_lock()
                         .file_stats(&resolved_path)
@@ -334,7 +345,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                                 "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                                 "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                                 "decision_summary": decision.summary(),
-                                "content_kind": content_kind, "byte_exact": byte_exact,
+                                "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
+                                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(&byte_exact).unwrap_or_default() },
                                 "degradation": null,
                                 "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                             }
@@ -359,7 +371,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 None => {
                     let render_start = Instant::now();
                     let full = initial_full.unwrap_or_else(|| {
-                        super::content::control_full_document(
+                        super::content::compact_a_document(
                             &compiled,
                             &checked_hir,
                             &semantic_edges,
@@ -369,8 +381,19 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         )
                     });
                     let render_ms = render_start.elapsed().as_millis() as u64;
-                    raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
-                    comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
+                    let economic = crate::mcp::content_economics::select_with_local_tokenizer(
+                        source,
+                        full,
+                        tokenizer_kind,
+                        tokenizer_ref,
+                    );
+                    raw_tokens = economic.raw_tokens;
+                    comp_tokens = economic.selected_tokens();
+                    let raw_passthrough = matches!(
+                        economic.selected,
+                        crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
+                    );
+                    let full = economic.text;
                     state.record_compression(
                         &resolved_path,
                         raw_tokens,
@@ -388,7 +411,8 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                                 "version": compiled.version,
                                 "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                                 "decision_summary": decision.summary(),
-                                "content_kind": content_kind, "byte_exact": byte_exact,
+                                "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
+                                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(&byte_exact).unwrap_or_default() },
                                 "degradation": null,
                                 "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                             }
@@ -440,22 +464,30 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
 
             if let Ok((mut ir, semantic_edges, source_hash)) = ir_result {
                 let render_start = Instant::now();
-                // Note: IR error is logged below in the else branch (4.4 audit fix)
                 let hir = match resolve_focus_or_respond(id, &mut ir, edit_focus) {
                     Some(hierarchy) => hierarchy,
                     None => return,
                 };
 
-                let full = super::content::control_full_document(
+                let economic = super::content::economical_compact_a_document(
                     &ir,
                     &hir,
                     &semantic_edges,
                     effective_fidelity,
                     &resolved_path,
+                    source,
                     state,
+                    tokenizer_kind,
+                    tokenizer_ref,
                 );
-                let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
-                let comp_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
+                let raw_tokens = economic.raw_tokens;
+                let candidate_tokens = economic.candidate_tokens;
+                let selected_tokens = economic.selected_tokens();
+                let saved_tokens = economic.saved_tokens();
+                let raw_passthrough = matches!(
+                    economic.selected,
+                    crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
+                );
                 if effective_fidelity == crate::compression::Fidelity::Edit {
                     if let Err(error) = super::provide_persistence::persist_edit_baseline(
                         state,
@@ -464,7 +496,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                         &semantic_edges,
                         &source_hash,
                         raw_tokens,
-                        comp_tokens,
+                        candidate_tokens,
                     ) {
                         send_response(&crate::mcp::tool_helpers::jsonrpc_error(
                             id.clone(),
@@ -476,14 +508,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     }
                 }
 
-                // Compute canonical file identity for WorkspaceIndex provenance
                 let canonical_path =
                     crate::dictionary::path::canonical_identity_key(&resolved_path);
                 state
                     .ir_context_lock()
                     .load_ir(ir.clone(), Some(source_hash));
                 state.remember_context_fidelity(&ir.file_id, effective_fidelity);
-                // Update workspace index: remove stale edges, insert fresh ones.
                 {
                     let mut idx = state.workspace_index_lock();
                     idx.remove_file(&canonical_path);
@@ -492,33 +522,47 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 state.remember_semantic_edges(&ir.file_id, semantic_edges.clone());
                 state
                     .llm_text_cache_lock()
-                    .insert(ir.file_id.clone(), full.clone());
+                    .insert(ir.file_id.clone(), economic.text.clone());
                 let render_ms = render_start.elapsed().as_millis() as u64;
                 state.record_compression(
                     &resolved_path,
                     raw_tokens,
-                    comp_tokens,
+                    selected_tokens,
                     &format!("{:?}", effective_fidelity).to_lowercase(),
                     is_angular,
                     "full",
                     None,
-                    "ir_compression",
+                    if raw_passthrough {
+                        "raw_passthrough"
+                    } else {
+                        "ir_compression"
+                    },
                 );
+                let visible_content_kind = if raw_passthrough {
+                    "raw_passthrough"
+                } else {
+                    content_kind
+                };
+                let visible_byte_exact = if raw_passthrough {
+                    serde_json::json!(["document"])
+                } else {
+                    serde_json::to_value(byte_exact).unwrap_or_default()
+                };
+                let visible_text = economic.text;
                 let mut response = serde_json::json!({
                     "jsonrpc": "2.0", "id": id, "result": {
-                        "content": [{ "type": "text", "text": full }],
+                        "content": [{ "type": "text", "text": visible_text.clone() }],
                         "_meta": {
                             "version": ir.version,
                             "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                             "is_angular": is_angular, "decision_summary": decision.summary(),
-                            "content_kind": content_kind, "byte_exact": byte_exact,
+                            "content_kind": visible_content_kind, "byte_exact": visible_byte_exact,
                             "degradation": null,
                             "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
                         }
                     }
                 });
-                // Inject baseline cache breakpoint for the stable full-compression output.
-                inject_baseline_breakpoint(&mut response, state, &full);
+                inject_baseline_breakpoint(&mut response, state, &visible_text);
                 send_response(&response);
                 let total_ms = overall_start.elapsed().as_millis() as u64;
                 tracing::info!(
@@ -527,10 +571,9 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     render_ms = render_ms,
                     total_ms = total_ms,
                     raw_tokens = raw_tokens,
-                    comp_tokens = comp_tokens,
+                    comp_tokens = selected_tokens,
                     savings_pct = if raw_tokens > 0 {
-                        (raw_tokens.saturating_sub(comp_tokens) as f64 / raw_tokens as f64 * 100.0)
-                            as u64
+                        (saved_tokens as f64 / raw_tokens as f64 * 100.0) as u64
                     } else {
                         0
                     },

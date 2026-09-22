@@ -2,24 +2,24 @@
 //
 // Contract tests for SYSTEM_PROMPT notation documentation.
 //
-// Guards the portable model-visible CONTROL-FULL contract.
+// Guards the portable model-visible COMPACT-A contract.
 
 use super::SYSTEM_PROMPT;
 
 #[test]
-fn teaches_control_full_as_primary_notation() {
+fn teaches_compact_a_as_primary_notation() {
     for frag in [
-        "// CONTROL-FULL v2",
+        "// COMPACT-A A1",
         "canonical IDs are authoritative",
-        "classes` / `interfaces`",
+        "d.c` / `d.i",
         "caller_method_id",
         "callee_written_name",
-        "semantic_edges",
+        "g.K` / `g.E",
         "typed ownership",
     ] {
         assert!(
             SYSTEM_PROMPT.contains(frag),
-            "SYSTEM_PROMPT must teach CONTROL-FULL fragment `{frag}`"
+            "SYSTEM_PROMPT must teach COMPACT-A fragment `{frag}`"
         );
     }
 }
@@ -28,8 +28,8 @@ fn teaches_control_full_as_primary_notation() {
 fn documents_high_and_edit_behaviors() {
     for frag in [
         "Low/Medium/High",
-        "Edit adds byte-exact method bodies",
-        "exact_body_method_ids",
+        "Edit adds byte-exact `B[method_id,start,end,utf8_bytes]` frames",
+        "exact body IDs",
         "fidelity=\"verbatim\"",
         "CONTROL-FULL-DELTA v2",
     ] {

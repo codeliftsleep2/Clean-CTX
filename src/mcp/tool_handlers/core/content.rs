@@ -6,7 +6,7 @@ use crate::layers::meta::semantic::SemanticEdge;
 use crate::mcp::McpState;
 use serde::Serialize;
 
-pub(crate) fn control_full_document(
+pub(crate) fn compact_a_document(
     ir: &CompiledIR,
     hierarchy: &HierarchicalIR,
     semantic_edges: &[SemanticEdge],
@@ -14,7 +14,7 @@ pub(crate) fn control_full_document(
     source_path: &str,
     state: &McpState,
 ) -> String {
-    let payload = crate::ir::render_control_full(
+    let normalized = crate::ir::normalize_control_full(
         &ir.file_id,
         source_path,
         ir.version,
@@ -22,8 +22,33 @@ pub(crate) fn control_full_document(
         hierarchy,
         semantic_edges,
     );
+    let payload = crate::ir::compact_a::render(&normalized);
     let footer = state.format_dict_footer_for_aliases(&[&ir.file_id]);
-    format!("{}\n{}", payload.trim(), footer.trim())
+    // Keep the body-frame terminator emitted by A1. The additional newline is
+    // the document/footer boundary; trimming the payload would corrupt the
+    // final exact body frame.
+    format!("{}\n{}", payload, footer.trim())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn economical_compact_a_document(
+    ir: &CompiledIR,
+    hierarchy: &HierarchicalIR,
+    semantic_edges: &[SemanticEdge],
+    fidelity: Fidelity,
+    source_path: &str,
+    raw_source: &str,
+    state: &McpState,
+    tokenizer_kind: crate::tokenizer::TokenizerKind,
+    tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
+) -> crate::mcp::content_economics::EconomicContent {
+    let candidate = compact_a_document(ir, hierarchy, semantic_edges, fidelity, source_path, state);
+    crate::mcp::content_economics::select_with_local_tokenizer(
+        raw_source,
+        candidate,
+        tokenizer_kind,
+        tokenizer,
+    )
 }
 
 pub(super) fn control_full_delta<T: Serialize>(

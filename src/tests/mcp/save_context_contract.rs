@@ -5,7 +5,7 @@ use crate::ir::delta::{SequenceDeltaComputer, SequenceEdit};
 use crate::ir::opcodes::CoreOp;
 use crate::mcp::context_store::ContextStore;
 use crate::mcp::tools::dispatch_tools_call;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
     let mut config = crate::tests::test_config();
@@ -58,16 +58,12 @@ fn save_context_checkpoints_only_the_requested_file_and_reloads_exactly() {
     )
     .expect("second source");
     let state = state(&root);
-    assert!(
-        compile(&state, &first, &workspace, 1)
-            .get("error")
-            .is_none()
-    );
-    assert!(
-        compile(&state, &second, &workspace, 2)
-            .get("error")
-            .is_none()
-    );
+    assert!(compile(&state, &first, &workspace, 1)
+        .get("error")
+        .is_none());
+    assert!(compile(&state, &second, &workspace, 2)
+        .get("error")
+        .is_none());
 
     let first_alias = state.alias_for_path(&first).expect("first alias");
     let compact_before = state
@@ -144,11 +140,9 @@ fn save_context_rejects_missing_session_and_mismatched_durable_identity() {
     let missing = dispatch(&state, 10, "save_context", json!({ "filePath": path }));
     assert!(missing.get("error").is_some(), "{missing}");
     std::fs::write(&path, "export interface Owned { run(): void; }\n").expect("source");
-    assert!(
-        compile(&state, &path, &workspace, 11)
-            .get("error")
-            .is_none()
-    );
+    assert!(compile(&state, &path, &workspace, 11)
+        .get("error")
+        .is_none());
     let alias = state.alias_for_path(&path).expect("session alias");
     state.remember_persisted_path(&alias, &other);
     let mismatch = dispatch(&state, 12, "save_context", json!({ "filePath": path }));
@@ -169,11 +163,9 @@ fn registered_apply_delta_rejects_malformed_canonical_tuple_transactionally() {
     let workspace = root.path().to_string_lossy().into_owned();
     std::fs::write(&path, "export class DeltaOwner { run(): void {} }\n").expect("source");
     let state = state(&root);
-    assert!(
-        compile(&state, &path, &workspace, 20)
-            .get("error")
-            .is_none()
-    );
+    assert!(compile(&state, &path, &workspace, 20)
+        .get("error")
+        .is_none());
     let alias = state.alias_for_path(&path).expect("session alias");
     let (version, tuples) = {
         let context = state.ir_context_read();
