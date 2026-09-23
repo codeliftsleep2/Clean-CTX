@@ -302,6 +302,7 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
     let mut current_owner: Option<(bool, usize)> = None;
     let mut current_method: Option<(bool, usize, usize)> = None;
     let mut ids = HashSet::new();
+    let mut param_ids = HashSet::new();
     let mut owner_count = 0;
     let mut method_count = 0;
     let mut terminal = false;
@@ -392,6 +393,7 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                 let methods = owners[owner]["methods"].as_array_mut().unwrap();
                 methods.push(value);
                 current_method = Some((interface, owner, methods.len() - 1));
+                param_ids.clear();
                 method_count += 1;
             }
             "p" => {
@@ -413,7 +415,7 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                 };
                 for entry in columns[2..].chunks_exact(3) {
                     let id = parse::parsed_scoped_handle(entry[0], 'P')?;
-                    if !ids.insert(id.as_str().unwrap().to_string()) {
+                    if !param_ids.insert(id.as_str().unwrap().to_string()) {
                         return Err("duplicate canonical ID".into());
                     }
                     owners[owner]["methods"][method]["parameters"]

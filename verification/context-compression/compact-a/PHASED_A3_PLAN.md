@@ -2,7 +2,8 @@
 
 **Status:** Phase 1 complete; Phase 2 green; initial Phase 3 economics failed;
 Phase 3A matrix measured: production-selected 19.30% o200k / 18.32% cl100k;
-Phase 3B complete: identity renumbering applied, token delta 0.00% (IDs ≤ 55)
+Phase 3B complete: identity renumbering applied, token delta 0.00% (IDs ≤ 55);
+Phase 3C negative: scoped type/callee table removed (see `A3_PHASE3C_TABLE.md`)
 **Predecessor:** A2 stopped after failing raw-source economics
 **Scope:** model-facing file-context representation only. Canonical IR,
 normalized semantic objects, persistence authority, workspace-query authority,
@@ -285,6 +286,13 @@ measured break-even threshold, emit no table.
 - The experiment reports complete-payload deltas under both tokenizers.
 - A negative result is documented and removed rather than forced to remain.
 
+**Result (negative, removed):** the table increased the complete payload on every
+measured row (per-row deltas +54 to +828 tokens across both tokenizers) because
+the repeated types/callees are already single BPE tokens, so `@n` references save
+nothing while the table rows and extended legend add cost. The table was removed
+and the tree restored to the Phase 3B checkpoint; the finding is recorded in
+`A3_PHASE3C_TABLE.md`.
+
 ### Phase 3D — corpus-backed defaults and final row merging
 
 Measure occurrence/value frequencies for `mo`, `cs`, `lf`, and `pf`. Introduce
@@ -372,11 +380,11 @@ Stop and do not spend model tokens if:
 
 ## Immediate next work
 
-Phase 3A is measured and recorded in `A3_PHASE3A_MATRIX.md`: the
-production-selected aggregate is 19.30% (o200k) / 18.32% (cl100k), far below the
-50% gate, and every per-fidelity/per-focus/per-language row is visible. The
-capture harness compiles each fidelity directly, and the high rows reproduce the
-frozen 25.03% cl100k / 26.99% o200k baseline exactly. Next: present the Phase 3B
-typed wire-local identity rule for explicit maintainer approval. Do not
-implement identity renumbering, spend model tokens, or modify production
-selection before that decision.
+Phase 3B (identity renumbering, 0.00% delta) and Phase 3C (scoped type/callee
+table, negative, removed) are complete; see `A3_PHASE3C_TABLE.md` for the Phase 3C
+finding. The next lever is Phase 3D — corpus-backed defaults and final row
+merging: measure occurrence/value frequencies for `mo`, `cs`, `lf`, and `pf`,
+introduce an implied default only where the primary corpus demonstrates a dominant
+value and the grammar can reconstruct it exactly, then audit always-adjacent
+records for final merging. Each default and merge needs an isolated before/after
+token delta and exact roundtrip evidence before it stays in the grammar.
