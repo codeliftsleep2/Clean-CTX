@@ -71,10 +71,8 @@ pub(super) fn parsed_optional(column: &str) -> Result<Value, String> {
 pub(super) fn empty_method(id: Value, name: Value, return_type: Value) -> Value {
     json!({
         "id": id, "name": name, "parameters": [], "return_type": return_type,
-        "modifier_occurrences": [], "control_summary_occurrences": [],
-        "pattern_fact_occurrences": [], "legacy_flag_occurrences": [], "patterns": [],
-        "body": null, "body_start": null, "body_end": null,
-        "control_flow": [], "data_flow": [], "side_effects": [], "execution_contexts": []
+        "modifier_occurrences": [],
+        "body": null, "body_start": null, "body_end": null
     })
 }
 
@@ -103,43 +101,4 @@ pub(super) fn occurrence(columns: &[&str]) -> Result<Value, String> {
         }
         Ok(Value::Array(vec![parsed_string(columns[1])?]))
     }
-}
-
-pub(super) fn pattern_fact_occurrence(columns: &[&str]) -> Result<Value, String> {
-    if columns.len() < 2 {
-        return Err("short pattern-fact record".into());
-    }
-    // A leading bare unsigned integer is the explicit fact count; any other
-    // first column is a single elided fact (count implied = 1).
-    let (start, expected) = if is_bare_unsigned(columns[1]) {
-        (
-            2,
-            columns[1]
-                .parse::<usize>()
-                .map_err(|_| "invalid fact count")?,
-        )
-    } else {
-        (1, 1)
-    };
-    let mut facts = Vec::new();
-    let mut column = start;
-    while column < columns.len() {
-        let kind = parsed_string(columns[column])?;
-        let kind_text = kind.as_str().unwrap();
-        column += 1;
-        let fact = match kind_text {
-            "CTOR" | "OBSERVABLE" | "OVERRIDE" => json!({"k":kind}),
-            "GETTER" | "SETTER" => {
-                let value = columns.get(column).ok_or("missing pattern-fact value")?;
-                column += 1;
-                json!({"k":kind,"v":parsed_string(value)?})
-            }
-            _ => return Err("unknown pattern-fact kind".into()),
-        };
-        facts.push(fact);
-    }
-    if facts.len() != expected {
-        return Err("pattern-fact count mismatch".into());
-    }
-    Ok(Value::Array(facts))
 }

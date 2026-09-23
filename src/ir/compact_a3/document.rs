@@ -5,7 +5,6 @@ use super::facts::{
 };
 use super::{decode_declarations, encode_declarations};
 use serde_json::{Value, json};
-use std::collections::HashSet;
 
 const SOURCE_REQUIREMENT: &str = "request edit or verbatim when exact source is required";
 
@@ -36,7 +35,7 @@ fn body_frames(value: &Value) -> Result<Vec<BodyFrame>, String> {
         .collect()
 }
 
-fn counts(value: &Value) -> Result<(usize, usize, usize), String> {
+fn counts(value: &Value) -> Result<(usize, usize), String> {
     let owners = value["classes"]
         .as_array()
         .ok_or("classes must be an array")?
@@ -46,11 +45,7 @@ fn counts(value: &Value) -> Result<(usize, usize, usize), String> {
             .ok_or("interfaces must be an array")?
             .len();
     let methods = all_methods(value).count();
-    let calls = value["calls"]
-        .as_array()
-        .ok_or("calls must be an array")?
-        .len();
-    Ok((owners, methods, calls))
+    Ok((owners, methods))
 }
 
 /// Encode one complete cold A3 document. No production caller uses it.
@@ -68,12 +63,12 @@ pub fn encode(normalized: &Value) -> Result<Vec<u8>, String> {
         .ok_or("declaration fragment lacks terminal")?;
     let facts = encode_facts(&normalized)?;
     let bodies = body_frames(&normalized)?;
-    let (owners, methods, calls) = counts(&normalized)?;
+    let (owners, methods) = counts(&normalized)?;
     let mut output = format!("{declarations}\n{facts}Y|{}\n", bodies.len()).into_bytes();
     for body in &bodies {
         output.extend(encode_body(body));
     }
-    output.extend(format!("Z|{owners}|{methods}|{calls}|{}\n", bodies.len()).into_bytes());
+    output.extend(format!("Z|{owners}|{methods}|{}\n", bodies.len()).into_bytes());
     Ok(output)
 }
 
@@ -152,57 +147,11 @@ fn method_mut<'a>(value: &'a mut Value, id: &str) -> Option<&'a mut Value> {
 fn declaration_tag(tag: &str) -> bool {
     matches!(
         tag,
-        "C" | "I"
-            | "X"
-            | "J"
-            | "cm"
-            | "cf"
-            | "D"
-            | "F"
-            | "M"
-            | "p"
-            | "mo"
-            | "cs"
-            | "pf"
-            | "lf"
-            | "pt"
+        "C" | "I" | "X" | "J" | "cm" | "cf" | "F" | "M" | "p" | "mo"
     )
 }
 
 fn merge_facts(mut target: Value, facts: Value, bodies: Vec<BodyFrame>) -> Result<Value, String> {
-    let method_ids = all_methods(&target)
-        .filter_map(|method| method["id"].as_str().map(str::to_string))
-        .collect::<HashSet<_>>();
-    for call in facts["calls"].as_array().ok_or("decoded calls missing")? {
-        let caller = call["caller_method_id"]
-            .as_str()
-            .ok_or("call caller missing")?;
-        if !method_ids.contains(caller) {
-            return Err("call references unknown method".into());
-        }
-    }
-    for fact in facts["behavior"]
-        .as_array()
-        .ok_or("decoded behavior missing")?
-    {
-        let id = fact["method_id"]
-            .as_str()
-            .ok_or("behavior method missing")?;
-        let method = method_mut(&mut target, id).ok_or("behavior references unknown method")?;
-        let (field, scalar) = match fact["family"].as_str() {
-            Some("fc") => ("control_flow", false),
-            Some("fd") => ("data_flow", false),
-            Some("se") => ("side_effects", true),
-            Some("ec") => ("execution_contexts", true),
-            _ => return Err("unknown behavior family".into()),
-        };
-        let value = if scalar {
-            fact["value"][0].clone()
-        } else {
-            fact["value"].clone()
-        };
-        method[field].as_array_mut().unwrap().push(value);
-    }
     let mut body_ids = Vec::new();
     for frame in bodies {
         if body_ids.iter().any(|id| id == &frame.method_id) {
@@ -215,7 +164,6 @@ fn merge_facts(mut target: Value, facts: Value, bodies: Vec<BodyFrame>) -> Resul
         method["body_end"] = json!(frame.end);
         body_ids.push(frame.method_id);
     }
-    target["calls"] = facts["calls"].clone();
     target["imports"] = facts["imports"].clone();
     target["type_aliases"] = facts["type_aliases"].clone();
     target["mode"]["exact_body_method_ids"] = json!(body_ids);
@@ -345,15 +293,10 @@ pub fn decode(input: &[u8]) -> Result<Value, String> {
         .trim_end_matches('\n')
         .split('|')
         .collect::<Vec<_>>();
-    if row.len() != 5 || row[0] != "Z" {
+    if row.len() != 4 || row[0] != "Z" {
         return Err("invalid terminal record".into());
     }
-    let expected = [
-        owner_count,
-        method_count,
-        facts["calls"].as_array().unwrap().len(),
-        body_count,
-    ];
+    let expected = [owner_count, method_count, body_count];
     for (column, expected) in row[1..].iter().zip(expected) {
         if column.parse::<usize>().ok() != Some(expected) {
             return Err("terminal count mismatch".into());
@@ -371,11 +314,11 @@ pub fn target(normalized: &Value) -> Result<Value, String> {
         .as_str()
         .ok_or("target fidelity missing")?;
     let mut target = json!({
-        "schema":"clean-ctx/file-context","schema_version":3,
+        "schema":"clean-ctx/file-context","schema_version":4,
         "file":normalized["file"],
         "mode":{"fidelity":normalized["mode"]["fidelity"],"exact_body_method_ids":[],"source_requirement":SOURCE_REQUIREMENT},
         "classes":normalized["classes"],"interfaces":normalized["interfaces"],
-        "imports":normalized["imports"],"type_aliases":normalized["type_aliases"],"calls":normalized["calls"]
+        "imports":normalized["imports"],"type_aliases":normalized["type_aliases"]
     });
     let body_ids = all_methods(&normalized)
         .filter(|method| normalized["mode"]["fidelity"] == "edit" && !method["body"].is_null())
@@ -387,6 +330,16 @@ pub fn target(normalized: &Value) -> Result<Value, String> {
             .as_array_mut()
             .ok_or("target owners missing")?
         {
+            {
+                let owner_obj = owner
+                    .as_object_mut()
+                    .ok_or("target owner must be an object")?;
+                owner_obj.remove("injection_occurrences");
+                owner_obj.remove("patterns");
+            }
+            let filtered =
+                super::declarations::filtered_modifiers(&owner["modifier_occurrences"], fidelity)?;
+            owner["modifier_occurrences"] = filtered;
             let mut names = std::collections::HashMap::new();
             for method in owner["methods"]
                 .as_array()
@@ -405,14 +358,26 @@ pub fn target(normalized: &Value) -> Result<Value, String> {
                 .as_array_mut()
                 .ok_or("target methods missing")?
             {
+                {
+                    let method_obj = method
+                        .as_object_mut()
+                        .ok_or("target method must be an object")?;
+                    method_obj.remove("control_summary_occurrences");
+                    method_obj.remove("pattern_fact_occurrences");
+                    method_obj.remove("legacy_flag_occurrences");
+                    method_obj.remove("patterns");
+                    method_obj.remove("control_flow");
+                    method_obj.remove("data_flow");
+                    method_obj.remove("side_effects");
+                    method_obj.remove("execution_contexts");
+                }
+                let filtered = super::declarations::filtered_modifiers(
+                    &method["modifier_occurrences"],
+                    fidelity,
+                )?;
+                method["modifier_occurrences"] = filtered;
                 if fidelity == "low" && names[method["name"].as_str().unwrap()] == 1 {
                     method["parameters"] = json!([]);
-                }
-                if matches!(fidelity, "low" | "medium") {
-                    method["control_flow"] = json!([]);
-                    method["data_flow"] = json!([]);
-                    method["side_effects"] = json!([]);
-                    method["execution_contexts"] = json!([]);
                 }
                 if fidelity != "edit" {
                     method["body"] = Value::Null;

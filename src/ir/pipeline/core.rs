@@ -115,7 +115,7 @@ impl IRPass for CoreIRPass {
             // only built on the skip path.
             if let Some(skip) = &skip_set
                 && !skip.is_empty()
-                && crate::compression::skip::should_skip_capture(&cap.to_entry(), skip)
+                && crate::compression::pipeline::should_skip_capture(&cap.to_entry(), skip)
             {
                 continue;
             }

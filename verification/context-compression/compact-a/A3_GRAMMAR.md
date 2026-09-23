@@ -17,8 +17,8 @@ Its decoder produces a fidelity-specific normalized semantic object. Missing
 families are declared unavailable for that fidelity; they are never decoded as
 authoritative empty arrays.
 
-Workspace graph edges are outside this grammar. File-local calls and core
-injection occurrences are inside it.
+Workspace graph edges, file-local calls, and core injection occurrences are
+outside this grammar; they are served on demand by `workspace_query`.
 
 ## Identity renumbering (Phase 3B)
 
@@ -45,11 +45,10 @@ document's IDs are the local ordinals, not the canonical handles; equality again
 the normalized oracle is modulo this bijective renumbering. Every other family
 (names, order, duplicates, occurrence groups, spans, bodies) remains literal-exact.
 
-**Name-vs-ID references.** `X`/`J` (extends/implements), `pt` pattern args, and
-`fd`/`fc` targets may carry either a canonical ID or a written name. The renumber
-rewrites a value only when it exactly equals a declared ID in the same family;
-other values are left opaque. Definitely-ID references (`K` caller, `B` body,
-behavior owner) fail closed on a dangling miss.
+**Name-vs-ID references.** `X`/`J` (extends/implements) may carry either a
+canonical ID or a written name. The renumber rewrites a value only when it
+exactly equals a declared ID in the same family; other values are left opaque.
+Definitely-ID references (`B` body) fail closed on a dangling miss.
 
 ## Lexical rules
 
@@ -63,11 +62,10 @@ behavior owner) fail closed on a dangling miss.
   the reserved absent marker `-`, strings beginning with `"`, and strings with
   delimiters use JSON string escaping and include their quotes.
 - Integers are unsigned base-10 without leading zeroes, except `0`.
-- Occurrence/fact group records (`cm`, `cf`, `mo`, `cs`, `lf`, `pf`) omit the
-  count column when the group holds exactly one value/fact whose leading column
-  is not a bare unsigned integer; the count is otherwise required and a bare
-  unsigned integer in the first column is always read as a count. Both spellings
-  decode identically.
+- Occurrence group records (`cm`, `cf`, `mo`) omit the count column when the
+  group holds exactly one value whose leading column is not a bare unsigned
+  integer; the count is otherwise required and a bare unsigned integer in the
+  first column is always read as a count. Both spellings decode identically.
 - `-` is the absent scalar. Empty arrays are represented by no record.
 - Record order is semantic wherever the normalized target uses an array.
 - Unknown tags, wrong column counts, invalid escapes, invalid handles, dangling
@@ -79,14 +77,14 @@ lexical rule for individual string columns.
 ## Document framing
 
 ```text
-A3|3|<L|M|H|E>|<file-id>|<ir-version>|<source-path-json-string>
+A3|4|<L|M|H|E>|<file-id>|<ir-version>|<source-path-json-string>
 ...
-Z|<owner-count>|<method-count>|<call-count>|<body-count>
+Z|<owner-count>|<method-count>|<body-count>
 ```
 
 The terminal `Z` record is mandatory. Counts cover decoded semantic records,
 not physical lines, and make truncation detectable. Content after `Z` is an
-error. A schema number other than `3` is an error rather than an attempted A2
+error. A schema number other than `4` is an error rather than an attempted A2
 decode.
 
 ## Owner scopes
@@ -98,15 +96,14 @@ X|<parent-reference>
 J|<interface-reference>
 cm|<value-count>|<value>...
 cf|<value-count>|<value>...
-D|<dependency-count>|<dependency-reference>...
 F|<field-count>|<field-id>|<name>|<type-or-->...
 ```
 
 `C` or `I` opens the current typed owner scope and closes any prior method and
 owner scope. `X` is class/interface extends. `J` is class implements. Repeated
 records retain source order. `cm` holds modifier occurrence groups; `cf` holds
-legacy class-flag occurrence groups. `D` is one ordered core-injection
-occurrence. Empty occurrence groups use a zero count and remain significant.
+legacy class-flag occurrence groups. Empty occurrence groups use a zero count
+and remain significant.
 
 Fields belong to the current owner. Their canonical field ID is explicit even
 when no other record currently refers to it.
@@ -117,10 +114,6 @@ when no other record currently refers to it.
 M|<method-id>|<name>|<declared-arity>|<return-type-or-->
 p|<parameter-count>|<parameter-id>|<name>|<type-or-->...
 mo|<value-count>|<value>...
-cs|<value-count>|<value>...
-pf|<fact-count>|<kind>|[<kind-value>]...
-lf|<value-count>|<value>...
-pt|<pattern-name>|<argument-count>|<argument>...
 ```
 
 `M` opens a method under the current owner and closes the prior method scope.
@@ -130,23 +123,8 @@ same-owner overload families so overload signatures remain distinguishable.
 Medium, High, and Edit include all parameter rows.
 
 Physical row order is the occurrence index. Empty and duplicate occurrence
-groups remain explicit rows and significant. Pattern-fact kinds are `CTOR`, `OBSERVABLE`, `OVERRIDE`,
-`GETTER`, and `SETTER`; only getter/setter consume the following value column.
-Values are positional strings, never copied named objects.
-
-## High/Edit behavior records
-
-```text
-fc|<kind>|<target>
-fd|<direction>|<target>
-se|<value>
-ec|<value>
-```
-
-These records are legal only in High and Edit. Physical order within each
-method and family reconstructs exact zero-based ordinals. Family records are
-contiguous, so a missing or reordered physical row changes the decoded ordered
-array rather than being silently normalized.
+groups remain explicit rows and significant. Values are positional strings,
+never copied named objects.
 
 ## File records
 
@@ -158,21 +136,6 @@ T|<alias>|<original-type>
 Import and alias occurrence order is physical record order; no redundant
 occurrence column is serialized. Values are
 positional JSON-string columns; named objects are forbidden.
-
-## Local call stream
-
-```text
-K|<caller-method-id>|<call-count>|<callee-written-name>|<explicit-argument-count>|[*]...
-```
-
-`K` contains one consecutive caller run. A later `K` may return to an earlier
-caller; physical entry order is the authoritative global occurrence order.
-Each entry is unresolved by definition. `*` follows only a spread call.
-Duplicates remain duplicate entries. The count makes truncation and trailing
-columns invalid.
-
-This removes repeated occurrence numbers, repeated caller IDs, repeated
-`false`, and repeated `"unresolved"` while retaining every canonical fact.
 
 ## Exact Edit bodies
 
@@ -201,19 +164,18 @@ other bodies.
 | Method identity/name/arity/return | yes | yes | yes | yes |
 | Parameter rows | overload families | all | all | all |
 | Extends/implements | yes | yes | yes | yes |
-| Class/interface/method occurrences | yes | yes | yes | yes |
-| Patterns and pattern facts | yes | yes | yes | yes |
-| Core injection occurrences | yes | yes | yes | yes |
-| File-local calls/arity/spread | yes | yes | yes | yes |
+| Class/interface/method modifiers | no | semantic only | yes | yes |
 | Imports/type aliases | yes | yes | yes | yes |
-| Control/data flow | no | no | yes | yes |
-| Side effects/execution contexts | no | no | yes | yes |
 | Exact bodies/spans | no | no | no | selected/all |
-| Workspace semantic edges | query | query | query | query |
+| Workspace edges, calls, injections | query | query | query | query |
 
-Medium differs from Low through complete signatures. High adds the detailed
-behavior families. Edit is High plus exact body frames. Verbatim is byte-exact
-raw source and does not use A3.
+Medium and High differ from Low through complete signatures. Modifiers are the
+remaining Medium-vs-High distinction: Low drops every `cm`/`mo` modifier;
+Medium drops access/visibility and declaration-kind modifiers (`EXPORT`,
+`STATIC`, `PRIVATE`, `PROTECTED`, `ABSTRACT`) and keeps the semantic ones
+(`ASYNC`, `GEN`, `UNSAFE`); High and Edit keep all. `cf` (legacy class-flag
+occurrences) is not fidelity-filtered. Edit adds exact body frames. Verbatim
+is byte-exact raw source and does not use A3.
 
 ## Navigation policy
 

@@ -2,29 +2,13 @@ use super::{BodyFrame, decode, decode_bodies, encode, encode_body};
 use serde_json::json;
 
 #[test]
-fn sparse_facts_roundtrip_calls_behavior_imports_and_aliases() {
+fn sparse_facts_roundtrip_imports_and_aliases() {
     let oracle = json!({
-        "mode":{"fidelity":"high"},
-        "classes":[{"methods":[{"id":"M1","control_flow":[["if","x|y"]],"data_flow":[],"side_effects":["io"],"execution_contexts":[]}]}],
-        "interfaces":[],
-        "calls":[
-            {"caller_method_id":"M1","callee_written_name":"find|one","explicit_argument_count":1,"has_spread":false,"callee_resolution":"unresolved"},
-            {"caller_method_id":"M1","callee_written_name":"audit","explicit_argument_count":1,"has_spread":true,"callee_resolution":"unresolved"}
-        ],
         "imports":[{"alias":"Api","module":"./api|v2","named_export":null}],
         "type_aliases":[{"alias":"Id","original_type":"string"}]
     });
     let wire = encode(&oracle).unwrap();
-    assert_eq!(wire.matches("K|1|2").count(), 1);
-    assert!(!wire.contains("unresolved"));
     let decoded = decode(&wire).unwrap();
-    assert_eq!(
-        decoded["calls"],
-        json!([
-            {"occurrence":0,"caller_method_id":"M1","callee_written_name":"find|one","explicit_argument_count":1,"has_spread":false,"callee_resolution":"unresolved"},
-            {"occurrence":1,"caller_method_id":"M1","callee_written_name":"audit","explicit_argument_count":1,"has_spread":true,"callee_resolution":"unresolved"}
-        ])
-    );
     assert_eq!(
         decoded["imports"],
         json!([{"occurrence":0,"alias":"Api","module":"./api|v2","named_export":null}])
@@ -33,8 +17,6 @@ fn sparse_facts_roundtrip_calls_behavior_imports_and_aliases() {
         decoded["type_aliases"],
         json!([{"occurrence":0,"alias":"Id","original_type":"string"}])
     );
-    assert_eq!(decoded["behavior"][0]["method_id"], "M1");
-    assert_eq!(decoded["behavior"][0]["value"], json!(["if", "x|y"]));
 }
 
 #[test]
@@ -51,10 +33,10 @@ fn exact_body_frames_preserve_bytes_and_reject_truncation() {
 }
 
 #[test]
-fn sparse_facts_reject_scope_and_resolution_corruption() {
+fn sparse_facts_reject_malformed_rows_and_dropped_families() {
+    assert!(decode("$|x\n").is_err());
+    assert!(decode("T|x\n").is_err());
     assert!(decode("K|1|2|call|1\n").is_err());
     assert!(decode("fc|\"if\"|\"x\"\n").is_err());
     assert!(decode("V|1\nfc|if\n").is_err());
-    let invalid = json!({"mode":{"fidelity":"high"},"classes":[],"interfaces":[],"calls":[{"caller_method_id":"M1","callee_written_name":"x","explicit_argument_count":0,"has_spread":false,"callee_resolution":"resolved"}],"imports":[],"type_aliases":[]});
-    assert!(encode(&invalid).is_err());
 }

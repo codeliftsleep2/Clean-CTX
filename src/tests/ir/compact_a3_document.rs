@@ -14,7 +14,7 @@ fn oracle() -> serde_json::Value {
             "patterns":[{"name":"SERVICE","args":["C1"]}],
             "methods":[{
                 "id":"M1","name":"run","parameters":[{"id":"P1","name":"value","type":"string"}],
-                "return_type":"Promise<Result>","modifier_occurrences":[["PUBLIC","ASYNC"]],
+                "return_type":"Promise<Result>","modifier_occurrences":[["PRIVATE","ASYNC"]],
                 "control_summary_occurrences":[["IF","RET"]],"pattern_fact_occurrences":[[{"k":"OBSERVABLE"}]],
                 "legacy_flag_occurrences":[],"patterns":[{"name":"OBSERVABLE","args":["M1"]}],
                 "body":"{\r\n  return this.repo.find(value); // 🦀 | Z\r\n}","body_start":40,"body_end":96,
@@ -43,13 +43,7 @@ fn phase1c_complete_edit_document_roundtrips_normalized_target() {
         decoded["classes"][0]["methods"][0]["body"],
         oracle["classes"][0]["methods"][0]["body"]
     );
-    assert_eq!(
-        wire.windows(b"K|1".len())
-            .filter(|window| *window == b"K|1")
-            .count(),
-        1
-    );
-    assert!(!String::from_utf8_lossy(&wire).contains("unresolved"));
+    assert!(!String::from_utf8_lossy(&wire).contains("K|"));
 }
 
 #[test]
@@ -68,14 +62,14 @@ fn cold_document_requires_the_exact_versioned_legend() {
 fn phase1c_document_rejects_terminal_body_and_reference_corruption() {
     let wire = encode(&oracle()).unwrap();
     let bad_count = String::from_utf8_lossy(&wire)
-        .replace("Z|2|1|2|1", "Z|2|1|3|1")
+        .replace("Z|2|1|1", "Z|2|2|1")
         .into_bytes();
     assert!(decode(&bad_count).is_err());
     assert!(decode(&wire[..wire.len() - 4]).is_err());
-    let bad_call = String::from_utf8_lossy(&wire)
-        .replace("K|1", "K|404")
+    let bad_body = String::from_utf8_lossy(&wire)
+        .replacen("M|1|", "M|404|", 1)
         .into_bytes();
-    assert!(decode(&bad_call).is_err());
+    assert!(decode(&bad_body).is_err());
 }
 
 #[test]
@@ -109,13 +103,31 @@ fn phase2_low_medium_high_have_distinct_declared_targets() {
             .len(),
         1
     );
+    // Low drops every modifier; Medium drops access modifiers and keeps
+    // semantic ones (ASYNC); High keeps all.
     assert_eq!(
-        medium_decoded["classes"][0]["methods"][0]["control_flow"],
-        json!([])
+        low_decoded["classes"][0]["modifier_occurrences"],
+        json!([[]])
     );
     assert_eq!(
-        high_decoded["classes"][0]["methods"][0]["control_flow"],
-        json!([["return", "Result"]])
+        low_decoded["classes"][0]["methods"][0]["modifier_occurrences"],
+        json!([[]])
+    );
+    assert_eq!(
+        medium_decoded["classes"][0]["modifier_occurrences"],
+        json!([[]])
+    );
+    assert_eq!(
+        medium_decoded["classes"][0]["methods"][0]["modifier_occurrences"],
+        json!([["ASYNC"]])
+    );
+    assert_eq!(
+        high_decoded["classes"][0]["modifier_occurrences"],
+        json!([["EXPORT"]])
+    );
+    assert_eq!(
+        high_decoded["classes"][0]["methods"][0]["modifier_occurrences"],
+        json!([["PRIVATE", "ASYNC"]])
     );
     assert!(low_wire.len() < medium_wire.len());
     assert!(medium_wire.len() < high_wire.len());
@@ -167,17 +179,6 @@ fn renumbering_compresses_sparse_canonical_ids_to_dense_local_ordinals() {
         decoded["classes"][0]["methods"][0]["parameters"][0]["id"],
         "P1"
     );
-    // Every reference is rewritten to the local ordinal.
-    assert_eq!(decoded["classes"][0]["patterns"][0]["args"], json!(["C1"]));
-    assert_eq!(
-        decoded["classes"][0]["methods"][0]["patterns"][0]["args"],
-        json!(["M1"])
-    );
-    assert_eq!(
-        decoded["classes"][0]["methods"][0]["data_flow"],
-        json!([["reads", "F1"]])
-    );
-    assert_eq!(decoded["calls"][0]["caller_method_id"], "M1");
     // The wire never leaks a sparse canonical id.
     let text = String::from_utf8_lossy(&wire);
     for sparse in ["C7", "M41", "M57", "F23", "P88"] {

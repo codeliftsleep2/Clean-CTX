@@ -34,18 +34,39 @@ fn oracle() -> Value {
 }
 
 fn declaration_target(value: &Value) -> Value {
-    json!({
-        "schema":"clean-ctx/file-context","schema_version":3,
+    let mut target = json!({
+        "schema":"clean-ctx/file-context","schema_version":4,
         "file":value["file"],"mode":{"fidelity":value["mode"]["fidelity"]},
         "classes":value["classes"],"interfaces":value["interfaces"]
-    })
+    });
+    for family in ["classes", "interfaces"] {
+        for owner in target[family].as_array_mut().unwrap() {
+            owner
+                .as_object_mut()
+                .unwrap()
+                .remove("injection_occurrences");
+            owner.as_object_mut().unwrap().remove("patterns");
+            for method in owner["methods"].as_array_mut().unwrap() {
+                let method_obj = method.as_object_mut().unwrap();
+                method_obj.remove("control_summary_occurrences");
+                method_obj.remove("pattern_fact_occurrences");
+                method_obj.remove("legacy_flag_occurrences");
+                method_obj.remove("patterns");
+                method_obj.remove("control_flow");
+                method_obj.remove("data_flow");
+                method_obj.remove("side_effects");
+                method_obj.remove("execution_contexts");
+            }
+        }
+    }
+    target
 }
 
 #[test]
 fn phase1a_declarations_roundtrip_typed_identity_groups_and_delimiters() {
     let oracle = oracle();
     let encoded = encode_declarations(&oracle).expect("encode A3 declarations");
-    assert!(encoded.starts_with("A3|3|H|"));
+    assert!(encoded.starts_with("A3|4|H|"));
     assert!(!encoded.contains("\"parameters\""));
     assert_eq!(
         decode_declarations(&encoded).expect("decode A3 declarations"),
@@ -57,7 +78,7 @@ fn phase1a_declarations_roundtrip_typed_identity_groups_and_delimiters() {
 fn phase1a_declarations_reject_truncation_scope_and_count_corruption() {
     let encoded = encode_declarations(&oracle()).unwrap();
     assert!(decode_declarations(encoded.trim_end_matches("Z|2|2|0|0\n")).is_err());
-    assert!(decode_declarations("A3|3|H|f|1|\"p\"\np|P1|\"x\"|\"t\"\nZ|0|0|0|0\n").is_err());
+    assert!(decode_declarations("A3|4|H|f|1|\"p\"\np|P1|\"x\"|\"t\"\nZ|0|0|0|0\n").is_err());
     assert!(decode_declarations(&encoded.replace("Z|2|2|0|0", "Z|2|3|0|0")).is_err());
     assert!(decode_declarations(&encoded.replacen("M|2|", "M|1|", 1)).is_err());
 }
@@ -79,14 +100,6 @@ fn phase3d_single_value_groups_elide_count_and_roundtrip() {
         "single method modifier elides count"
     );
     assert!(
-        encoded.contains("cs|2|IF|RET\n"),
-        "multi-value group keeps explicit count"
-    );
-    assert!(
-        encoded.contains("pf|OBSERVABLE\n"),
-        "single pattern fact elides count"
-    );
-    assert!(
         encoded.contains("mo|0\n"),
         "empty group keeps explicit zero count"
     );
@@ -98,8 +111,8 @@ fn phase3d_single_value_groups_elide_count_and_roundtrip() {
 
 #[test]
 fn phase3d_explicit_and_elided_counts_decode_identically() {
-    let explicit = "A3|3|H|f|1|p\nC|1|Owner|0\nM|1|run|0|void\nmo|1|PUBLIC\nZ|1|1|0|0\n";
-    let elided = "A3|3|H|f|1|p\nC|1|Owner|0\nM|1|run|0|void\nmo|PUBLIC\nZ|1|1|0|0\n";
+    let explicit = "A3|4|H|f|1|p\nC|1|Owner|0\nM|1|run|0|void\nmo|1|PUBLIC\nZ|1|1|0|0\n";
+    let elided = "A3|4|H|f|1|p\nC|1|Owner|0\nM|1|run|0|void\nmo|PUBLIC\nZ|1|1|0|0\n";
     assert_eq!(
         decode_declarations(explicit).unwrap()["classes"][0]["methods"][0]["modifier_occurrences"],
         json!([["PUBLIC"]])

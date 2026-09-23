@@ -9,7 +9,7 @@ use parse::{
     split_columns,
 };
 use values::{handle, optional_quoted, quoted, scoped_handle, string_values};
-pub const SCHEMA_VERSION: u64 = 3;
+pub const SCHEMA_VERSION: u64 = 4;
 
 fn occurrence_rows(
     output: &mut String,
@@ -36,73 +36,51 @@ fn occurrence_rows(
     Ok(())
 }
 
-fn pattern_rows(output: &mut String, patterns: &Value) -> Result<(), String> {
-    for pattern in patterns.as_array().ok_or("patterns must be an array")? {
-        let name = quoted(&pattern["name"], "pattern name")?;
-        let args = string_values(&pattern["args"], "pattern args")?;
-        write!(output, "pt|{name}|{}", args.len()).unwrap();
-        for argument in args {
-            write!(output, "|{argument}").unwrap();
-        }
-        output.push('\n');
-    }
-    Ok(())
-}
+/// Declaration modifiers dropped at Medium fidelity. This re-expresses the
+/// legacy `compaction::modifiers::MODIFIERS_MEDIUM` access/visibility and
+/// declaration-kind set in the IR's `DeclarationModifier` vocabulary. Low drops
+/// every modifier; High and Edit keep all.
+pub(crate) const ACCESS_MODIFIERS: [&str; 5] =
+    ["EXPORT", "STATIC", "PRIVATE", "PROTECTED", "ABSTRACT"];
 
-fn pattern_fact_rows(output: &mut String, groups: &Value) -> Result<(), String> {
-    for group in groups
+/// Filter `modifier_occurrences` (occurrence groups) for the declared fidelity.
+/// Order, duplicates, and empty groups are preserved; only modifier values are
+/// removed.
+pub(crate) fn filtered_modifiers(groups: &Value, fidelity: &str) -> Result<Value, String> {
+    let groups = groups
         .as_array()
-        .ok_or("pattern facts must be an array")?
+        .ok_or("modifier occurrences must be an array")?;
+    let filtered = groups
         .iter()
-    {
-        let facts = group
-            .as_array()
-            .ok_or("pattern fact group must be an array")?;
-        if facts.len() == 1
-            && !is_bare_unsigned(
-                facts[0]["k"]
-                    .as_str()
-                    .ok_or("pattern fact kind must be a string")?,
-            )
-        {
-            write!(output, "pf").unwrap();
-            write_pattern_fact(output, &facts[0])?;
-        } else {
-            write!(output, "pf|{}", facts.len()).unwrap();
-            for fact in facts {
-                write_pattern_fact(output, fact)?;
-            }
-        }
-        output.push('\n');
-    }
-    Ok(())
-}
-
-fn write_pattern_fact(output: &mut String, fact: &Value) -> Result<(), String> {
-    let kind = fact["k"]
-        .as_str()
-        .ok_or("pattern fact kind must be a string")?;
-    if !matches!(
-        kind,
-        "CTOR" | "OBSERVABLE" | "OVERRIDE" | "GETTER" | "SETTER"
-    ) {
-        return Err("unknown pattern fact kind".into());
-    }
-    write!(output, "|{kind}").unwrap();
-    if matches!(kind, "GETTER" | "SETTER") {
-        write!(output, "|{}", quoted(&fact["v"], "pattern fact value")?).unwrap();
-    } else if !fact["v"].is_null() {
-        return Err("unexpected pattern fact value".into());
-    }
-    Ok(())
+        .map(|group| {
+            let values = group
+                .as_array()
+                .ok_or("modifier occurrence group must be an array")?;
+            let kept = values
+                .iter()
+                .filter(|value| match fidelity {
+                    "low" => false,
+                    "medium" => match value.as_str() {
+                        Some(text) => !ACCESS_MODIFIERS.contains(&text),
+                        None => true,
+                    },
+                    _ => true,
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            Ok(Value::Array(kept))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok(Value::Array(filtered))
 }
 
 fn method_rows(
     output: &mut String,
     methods: &Value,
     count: &mut usize,
-    low: bool,
+    fidelity: &str,
 ) -> Result<(), String> {
+    let low = fidelity == "low";
     let methods = methods.as_array().ok_or("methods must be an array")?;
     let mut names = HashMap::new();
     for method in methods {
@@ -142,26 +120,8 @@ fn method_rows(
             }
             output.push('\n');
         }
-        occurrence_rows(
-            output,
-            "mo",
-            &method["modifier_occurrences"],
-            "method modifiers",
-        )?;
-        occurrence_rows(
-            output,
-            "cs",
-            &method["control_summary_occurrences"],
-            "control summaries",
-        )?;
-        pattern_fact_rows(output, &method["pattern_fact_occurrences"])?;
-        occurrence_rows(
-            output,
-            "lf",
-            &method["legacy_flag_occurrences"],
-            "legacy flags",
-        )?;
-        pattern_rows(output, &method["patterns"])?;
+        let modifiers = filtered_modifiers(&method["modifier_occurrences"], fidelity)?;
+        occurrence_rows(output, "mo", &modifiers, "method modifiers")?;
     }
     Ok(())
 }
@@ -172,7 +132,7 @@ fn owner_rows(
     interface: bool,
     owner_count: &mut usize,
     method_count: &mut usize,
-    low: bool,
+    fidelity: &str,
 ) -> Result<(), String> {
     for owner in owners.as_array().ok_or("owners must be an array")? {
         if interface {
@@ -215,28 +175,9 @@ fn owner_rows(
                 &owner["class_flag_occurrences"],
                 "class flags",
             )?;
-            for group in owner["injection_occurrences"]
-                .as_array()
-                .ok_or("injections must be an array")?
-                .iter()
-            {
-                let dependencies = string_values(group, "injection dependencies")?;
-                write!(output, "D|{}", dependencies.len()).unwrap();
-                for dependency in dependencies {
-                    write!(output, "|{dependency}").unwrap();
-                }
-                output.push('\n');
-            }
         }
-        occurrence_rows(
-            output,
-            "cm",
-            &owner["modifier_occurrences"],
-            "owner modifiers",
-        )?;
-        if !interface {
-            pattern_rows(output, &owner["patterns"])?;
-        }
+        let modifiers = filtered_modifiers(&owner["modifier_occurrences"], fidelity)?;
+        occurrence_rows(output, "cm", &modifiers, "owner modifiers")?;
         let fields = owner["fields"]
             .as_array()
             .ok_or("fields must be an array")?;
@@ -254,7 +195,7 @@ fn owner_rows(
             }
             output.push('\n');
         }
-        method_rows(output, &owner["methods"], method_count, low)?;
+        method_rows(output, &owner["methods"], method_count, fidelity)?;
     }
     Ok(())
 }
@@ -272,7 +213,7 @@ pub fn encode_declarations(normalized: &Value) -> Result<String, String> {
         _ => return Err(format!("unsupported A3 fidelity: {mode}")),
     };
     let mut output = format!(
-        "A3|3|{fidelity}|{}|{}|{}\n",
+        "A3|4|{fidelity}|{}|{}|{}\n",
         handle(&normalized["file"]["id"], "file id")?,
         normalized["file"]["ir_version"]
             .as_u64()
@@ -287,7 +228,7 @@ pub fn encode_declarations(normalized: &Value) -> Result<String, String> {
         false,
         &mut owner_count,
         &mut method_count,
-        fidelity == "L",
+        mode,
     )?;
     owner_rows(
         &mut output,
@@ -295,7 +236,7 @@ pub fn encode_declarations(normalized: &Value) -> Result<String, String> {
         true,
         &mut owner_count,
         &mut method_count,
-        fidelity == "L",
+        mode,
     )?;
     writeln!(output, "Z|{owner_count}|{method_count}|0|0").unwrap();
     Ok(output)
@@ -308,7 +249,7 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
         return Err("truncated A3 document".into());
     }
     let header = split_columns(lines[0])?;
-    if header.len() != 6 || header[0] != "A3" || header[1] != "3" {
+    if header.len() != 6 || header[0] != "A3" || header[1] != "4" {
         return Err("unsupported A3 header".into());
     }
     let fidelity = match header[2] {
@@ -352,7 +293,7 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                         "1" => true,
                         _ => return Err("invalid synthetic flag".into()),
                     };
-                    json!({"kind":"class","id":id,"name":parsed_string(columns[2])?,"synthetic":synthetic,"methods":[],"fields":[],"modifier_occurrences":[],"class_flag_occurrences":[],"extends":null,"implements":[],"injection_occurrences":[],"patterns":[]})
+                    json!({"kind":"class","id":id,"name":parsed_string(columns[2])?,"synthetic":synthetic,"methods":[],"fields":[],"modifier_occurrences":[],"class_flag_occurrences":[],"extends":null,"implements":[]})
                 };
                 let owners = if interface {
                     &mut interfaces
@@ -471,13 +412,13 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                 }
                 current_method = None;
             }
-            "cm" | "cf" | "D" => {
+            "cm" | "cf" => {
                 let (interface, owner) = current_owner.ok_or("owner fact outside owner")?;
                 let group = occurrence(&columns)?;
-                let field = match columns[0] {
-                    "cm" => "modifier_occurrences",
-                    "cf" => "class_flag_occurrences",
-                    _ => "injection_occurrences",
+                let field = if columns[0] == "cm" {
+                    "modifier_occurrences"
+                } else {
+                    "class_flag_occurrences"
                 };
                 if interface && field != "modifier_occurrences" {
                     return Err("class fact under interface".into());
@@ -491,76 +432,19 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                 groups.push(group);
                 current_method = None;
             }
-            "pf" => {
-                let (interface, owner, method) =
-                    current_method.ok_or("pattern fact outside method")?;
-                let group = parse::pattern_fact_occurrence(&columns)?;
-                let owners = if interface {
-                    &mut interfaces
-                } else {
-                    &mut classes
-                };
-                let groups = owners[owner]["methods"][method]["pattern_fact_occurrences"]
-                    .as_array_mut()
-                    .unwrap();
-                groups.push(group);
-            }
-            "mo" | "cs" | "lf" => {
+            "mo" => {
                 let (interface, owner, method) =
                     current_method.ok_or("method fact outside method")?;
                 let group = occurrence(&columns)?;
-                let field = match columns[0] {
-                    "mo" => "modifier_occurrences",
-                    "cs" => "control_summary_occurrences",
-                    "pf" => "pattern_fact_occurrences",
-                    _ => "legacy_flag_occurrences",
-                };
                 let owners = if interface {
                     &mut interfaces
                 } else {
                     &mut classes
                 };
-                let groups = owners[owner]["methods"][method][field]
+                let groups = owners[owner]["methods"][method]["modifier_occurrences"]
                     .as_array_mut()
                     .unwrap();
                 groups.push(group);
-            }
-            "pt" => {
-                if columns.len() < 3 {
-                    return Err("short pattern record".into());
-                }
-                let count = columns[2]
-                    .parse::<usize>()
-                    .map_err(|_| "invalid pattern count")?;
-                if columns.len() != count + 3 {
-                    return Err("pattern count mismatch".into());
-                }
-                let value = json!({"name":parsed_string(columns[1])?,"args":columns[3..].iter().map(|column|parsed_string(column)).collect::<Result<Vec<_>,_>>()?});
-                if let Some((interface, owner, method)) = current_method {
-                    let owners = if interface {
-                        &mut interfaces
-                    } else {
-                        &mut classes
-                    };
-                    owners[owner]["methods"][method]["patterns"]
-                        .as_array_mut()
-                        .unwrap()
-                        .push(value);
-                } else {
-                    let (interface, owner) = current_owner.ok_or("pattern outside scope")?;
-                    if interface {
-                        return Err("owner pattern under interface".into());
-                    }
-                    let owners = if interface {
-                        &mut interfaces
-                    } else {
-                        &mut classes
-                    };
-                    owners[owner]["patterns"]
-                        .as_array_mut()
-                        .unwrap()
-                        .push(value);
-                }
             }
             "Z" => {
                 if columns.len() != 5 || columns[3] != "0" || columns[4] != "0" {
@@ -601,7 +485,7 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
         }
     }
     Ok(json!({
-        "schema":"clean-ctx/file-context","schema_version":3,
+        "schema":"clean-ctx/file-context","schema_version":4,
         "file":{"id":parsed_handle(header[3],None)?,"ir_version":header[4].parse::<u64>().map_err(|_|"invalid IR version")?,"source_path":parsed_string(header[5])?},
         "mode":{"fidelity":fidelity},"classes":classes,"interfaces":interfaces
     }))
