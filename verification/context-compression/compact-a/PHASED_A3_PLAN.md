@@ -1,7 +1,8 @@
 # COMPACT-A3 sparse positional phase plan
 
 **Status:** Phase 1 complete; Phase 2 green; initial Phase 3 economics failed;
-lossless density iteration in progress
+Phase 3A matrix measured: production-selected 19.30% o200k / 18.32% cl100k;
+Phase 3B identity design gate next
 **Predecessor:** A2 stopped after failing raw-source economics
 **Scope:** model-facing file-context representation only. Canonical IR,
 normalized semantic objects, persistence authority, workspace-query authority,
@@ -171,19 +172,146 @@ remain in the roundtrip lane but do not determine aggregate economics.
 
 - Legend is at most 300 tokens, with a target of 200 or fewer.
 - The raw ceiling selects raw for every losing non-focused case.
-- Every representative large fixture saves at least 50% against byte-exact raw
-  source. Aggregate savings and raw fallback cannot hide an individual miss.
-- No aggregate hides an individual inflation case.
-- C# economics remain explicitly pending until a qualifying fixture exists.
+- Production-selected output across the qualifying representative large-file
+  corpus saves at least 50% in aggregate against byte-exact raw. There is no
+  maximum savings target.
+- Every invocation still applies the local economics gate and selects raw when
+  the candidate is not cheaper by the configured safety margin. Per-file,
+  fidelity, intent, language, and focus rows remain visible so the aggregate
+  cannot hide an inflation bug or unsupported mode; those rows are not
+  independent 50% requirements.
+- Qualifying large TypeScript, Angular, and C#/.NET fixtures are all required;
+  they are the primary production scope. Java/Spring remains secondary unless
+  existing coverage is inexpensive to retain.
 
-The first complete encoding failed this checkpoint. Under o200k,
-`LargeService.ts` saved 22.32% and `UserManagementService.ts` inflated 2.76%.
-The legend was only about 130 tokens; repeated local calls, fields, parameters,
-methods, imports, and types dominate. A byte-profitable repeated-string
-dictionary was tested and rejected because it increased o200k cost on both
-large fixtures. Phase 4 is blocked while A3 iterates on packed caller runs,
-implicit physical-order ordinals, dense owner/member layout, and reversible
-scoped handles. None of these may weaken the normalized decoded target.
+The first complete encoding failed this checkpoint. Subsequent lossless density
+iterations added packed caller runs, implicit physical-order ordinals, packed
+field/parameter rows, bare strings with JSON fallback, and removal of redundant
+typed-ID prefixes. The current tracked High-fidelity baseline is:
+
+| Tokenizer | Raw aggregate | A3 aggregate | Reduction |
+|---|---:|---:|---:|
+| cl100k | 6,869 | 5,150 | 25.03% |
+| o200k | 7,151 | 5,221 | 26.99% |
+
+The current individual o200k diagnostics are 38.20% for `LargeService.ts` and
+18.60% for `UserManagementService.ts`. These are diagnostic rows, not separate
+50% gates. The aggregate remains below the required 50%, so Phase 4 is blocked.
+The legend is about 120–130 tokens and is not the dominant problem. A generic,
+byte-profitable repeated-string dictionary was tested and rejected because it
+increased o200k cost. Remaining cost is concentrated in calls, fields, methods,
+parameters, imports, and types.
+
+### Phase 3A — complete the production-scope measurement matrix
+
+Before selecting another grammar lever, extend the zero-model-call harness so
+each qualifying large fixture is captured at Low, Medium, High, focused Edit,
+and all-body Edit. The corpus must include representative large TypeScript,
+Angular, and C#/.NET inputs. Record language, fidelity, intent/focus mode,
+source tokens, candidate tokens, selected representation, and semantic-family
+token anatomy. Java/Spring remains secondary.
+
+Compute the production-selected aggregate independently for every tokenizer:
+
+```text
+selected(i) = candidate(i) only when the local estimate plus safety buffer
+              beats raw(i); otherwise raw(i)
+aggregate reduction = 1 - sum(selected(i)) / sum(raw(i))
+```
+
+Small lifecycle/correctness fixtures remain mandatory roundtrip coverage but do
+not enter this aggregate. Focused Edit is reported separately because full raw
+source would expose unselected bodies and is not an acceptable fallback.
+All-body Edit may legitimately select raw and contribute zero savings.
+
+#### Checkpoint 3A
+
+- Every primary language has at least one qualifying large fixture.
+- Every fidelity/focus row is visible; no blended-only report is accepted.
+- Body-bearing rows verify exact UTF-8 bytes and numeric spans.
+- The harness makes zero model calls and does not modify production behavior.
+- Current baseline numbers and anatomy are recorded before the next grammar
+  experiment.
+
+### Phase 3B — typed wire-local identity design gate
+
+The next structural proposal is deterministic file-local alpha-renaming of
+wire identities. This is permitted only as a reversible presentation handle
+after canonical typed ownership has already been resolved. It must never turn
+display names or row position into canonical authority.
+
+Before implementation, document and obtain explicit maintainer approval for:
+
+- the typed local numbering rule and first-appearance scope;
+- which declarations retain explicit handles and which may derive them;
+- how every owner/caller/parameter/field/pattern reference is rewritten;
+- alpha-normalized equality between the canonical oracle and decoded A3;
+- the rule that local handles are payload-local, never persisted, never
+  accepted as selectors, and never returned as canonical workspace identity;
+- deterministic rejection of duplicate, missing, wrong-family, dangling, or
+  out-of-range references.
+
+Do not change the compiler's global `next_id`, canonical IR, focus resolution,
+persistence, delta/replay authority, or workspace-query identity. Focus still
+resolves documented selectors against canonical typed ownership first; only
+the already-resolved result is rendered with local handles.
+
+#### Checkpoint 3B
+
+- The identity spelling change is explicitly approved before code changes.
+- Alpha-normalized roundtrip equality covers every identity-bearing family.
+- Same-name owners, overloads, calls, DI, and focused Edit remain unambiguous.
+- The token delta is reported against the Phase 3A baseline.
+- Any reasoning-facing identity regression rejects the design regardless of
+  savings.
+
+### Phase 3C — scoped type/callee table experiment
+
+Only after Phase 3B measurement, test an optional table limited to repeated
+field/parameter/return types and callee-written names. This is not another
+generic dictionary. Keep an explicit on/off form and measure the complete cold
+payload, including table rows, references, and legend changes.
+
+Selection must use actual cl100k/o200k counts in research and the existing
+calibrated local estimate plus buffer in production; character or byte savings
+are not evidence. Keep the table only if it improves the production-selected
+aggregate without breaking any deterministic or reasoning invariant. Below the
+measured break-even threshold, emit no table.
+
+#### Checkpoint 3C
+
+- Referenced types and callees decode byte-for-byte to their original strings.
+- Empty-table fallback and invalid-index rejection have tracked tests.
+- The experiment reports complete-payload deltas under both tokenizers.
+- A negative result is documented and removed rather than forced to remain.
+
+### Phase 3D — corpus-backed defaults and final row merging
+
+Measure occurrence/value frequencies for `mo`, `cs`, `lf`, and `pf`. Introduce
+an implied default only where the primary corpus demonstrates a dominant value
+and the grammar can reconstruct it exactly. Empty groups, duplicate groups,
+group boundaries, and order remain explicit and significant.
+
+After identity and table shapes settle, audit always-adjacent records for final
+merging. Existing packed calls, fields, and parameters are the starting point;
+do not recreate completed work. Every merge needs an isolated before/after
+token delta and exact roundtrip evidence.
+
+#### Checkpoint 3D
+
+- Every default is justified by recorded primary-corpus frequency data.
+- No semantic value, empty group, duplicate, or boundary is discarded.
+- Only measured token wins remain in the grammar.
+- All modified/new files remain within the active-file ceiling.
+
+### Phase 3E — economics decision
+
+Rerun the complete Phase 3A matrix. The checkpoint passes when the sum of
+production-selected outputs is at least 50% smaller than the same qualifying
+raw corpus under the approved estimators/tokenizers. There is no maximum:
+continue improving when another lossless, reasoning-safe measured win remains.
+All diagnostic rows remain published, and the local raw gate must prevent every
+ordinary invocation from inflating model cost.
 
 ## Phase 4 — locality and reasoning screen
 
@@ -244,8 +372,11 @@ Stop and do not spend model tokens if:
 
 ## Immediate next work
 
-Begin Phase 1 with a research-only A3 encoder/decoder over normalized fixtures.
-Implement typed owner/member/signature rows first, followed by sparse behavior,
-local calls, imports/types, and exact body frames. Do not modify production
-selection until the research encoder/decoder clears deterministic roundtrip and
-economics.
+Phase 3A is measured and recorded in `A3_PHASE3A_MATRIX.md`: the
+production-selected aggregate is 19.30% (o200k) / 18.32% (cl100k), far below the
+50% gate, and every per-fidelity/per-focus/per-language row is visible. The
+capture harness compiles each fidelity directly, and the high rows reproduce the
+frozen 25.03% cl100k / 26.99% o200k baseline exactly. Next: present the Phase 3B
+typed wire-local identity rule for explicit maintainer approval. Do not
+implement identity renumbering, spend model tokens, or modify production
+selection before that decision.

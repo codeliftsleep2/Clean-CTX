@@ -3,9 +3,11 @@
 **Status:** Phase 0 specification; no production encoder is authorized yet
 
 **Economics status:** the first complete A3 encoding failed the Phase 3 gate.
-Both representative large-file cases must save at least 50% against raw; the
-initial results saved 22.32% and -2.76% under o200k. A raw fallback prevents
-production inflation but does not make a sub-50% codec successful.
+The production-selected outputs over the qualifying representative corpus must
+save at least 50% in aggregate against the same raw corpus. Each invocation is
+independently protected by the raw-economics gate, so a losing candidate emits
+raw and contributes zero savings rather than inflation. Fidelity/intent rows
+remain separately reported diagnostics, not individual 50% gates.
 
 ## Authority and decoded target
 

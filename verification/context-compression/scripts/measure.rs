@@ -84,6 +84,34 @@ fn render_a3(args: &[String]) {
     fs::write(&args[3], payload).expect("A3 output");
 }
 
+fn normalized_from_control_full(path: &str) -> Value {
+    let text = fs::read_to_string(path).expect("CONTROL-FULL payload");
+    let (_, remainder) = text.split_once('\n').expect("CONTROL-FULL header");
+    serde_json::Deserializer::from_str(remainder)
+        .into_iter::<Value>()
+        .next()
+        .expect("CONTROL-FULL JSON value")
+        .expect("CONTROL-FULL JSON")
+}
+
+fn render_a3_anatomy(args: &[String]) {
+    let normalized = normalized_from_control_full(&args[2]);
+    let anatomy = clean_ctx::ir::compact_a3::document::anatomy(&normalized).expect("A3 anatomy");
+    let counter = create_tokenizer(tokenizer(&args[3])).expect("tokenizer");
+    let count = |bytes: &[u8]| {
+        counter.count_tokens(std::str::from_utf8(bytes).expect("A3 fragment is UTF-8"))
+    };
+    println!(
+        "{}",
+        serde_json::json!({
+            "legend": count(&anatomy.legend),
+            "declarations": count(&anatomy.declarations),
+            "facts": count(&anatomy.facts),
+            "bodies": count(&anatomy.bodies),
+        })
+    );
+}
+
 fn write_a3_legend(args: &[String]) {
     fs::write(
         &args[2],
@@ -245,8 +273,9 @@ fn main() {
         Some("oracle") if args.len() == 7 => render_oracle(&args),
         Some("a3") if args.len() == 4 => render_a3(&args),
         Some("a3-legend") if args.len() == 3 => write_a3_legend(&args),
+        Some("a3-anatomy") if args.len() == 4 => render_a3_anatomy(&args),
         _ => panic!(
-            "usage: measure count <cl100k|o200k> <file> | measure fixed <control-full.txt> <output> | measure a3 <control-full.txt> <output> | measure a3-legend <output> | measure prod <response.json> <source> <fidelity> <focus-csv-or-empty> <selection-tokenizer> <provide-fallback|renderer> <output> | measure oracle <response.json> <source> <fidelity> <focus-csv-or-empty> <output>"
+            "usage: measure count <cl100k|o200k> <file> | measure fixed <control-full.txt> <output> | measure a3 <control-full.txt> <output> | measure a3-legend <output> | measure a3-anatomy <control-full.txt> <cl100k|o200k> | measure prod <response.json> <source> <fidelity> <focus-csv-or-empty> <selection-tokenizer> <provide-fallback|renderer> <output> | measure oracle <response.json> <source> <fidelity> <focus-csv-or-empty> <output>"
         ),
     }
 }

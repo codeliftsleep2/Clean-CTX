@@ -82,6 +82,36 @@ pub fn encode_cold(normalized: &Value) -> Result<Vec<u8>, String> {
     Ok(output)
 }
 
+/// Token-anatomy fragments for the zero-model economics harness. These are not
+/// independently decodable A3 documents; they exist so the harness can count the
+/// marginal token cost of each family without a model call.
+pub struct ColdAnatomy {
+    pub legend: Vec<u8>,
+    pub declarations: Vec<u8>,
+    pub facts: Vec<u8>,
+    pub bodies: Vec<u8>,
+}
+
+pub fn anatomy(normalized: &Value) -> Result<ColdAnatomy, String> {
+    let legend = format!("{}\n{}\n", super::COLD_PREAMBLE, super::COLD_LEGEND).into_bytes();
+    let declarations = encode_declarations(normalized)?;
+    let (declarations, _) = declarations
+        .rsplit_once("\nZ|")
+        .ok_or("declaration fragment lacks terminal")?;
+    let facts = encode_facts(normalized)?;
+    let bodies = body_frames(normalized)?;
+    let mut body_bytes = format!("Y|{}\n", bodies.len()).into_bytes();
+    for body in &bodies {
+        body_bytes.extend(encode_body(body));
+    }
+    Ok(ColdAnatomy {
+        legend,
+        declarations: declarations.as_bytes().to_vec(),
+        facts: facts.as_bytes().to_vec(),
+        bodies: body_bytes,
+    })
+}
+
 pub fn decode_cold(input: &[u8]) -> Result<Value, String> {
     let prefix = format!("{}\n{}\n", super::COLD_PREAMBLE, super::COLD_LEGEND);
     let document = input

@@ -19,21 +19,34 @@ try {
         & $measure a3 $full $candidate
         if ($LASTEXITCODE -ne 0) { throw "$($directory.Name): A3 render failed" }
         $fidelity = ((Get-Content -Raw $candidate) -split "`r?`n", 4)[2].Split('|')[2]
+        $metaPath = Join-Path $directory.FullName "capture-meta.json"
+        $meta = if (Test-Path -LiteralPath $metaPath) { Get-Content -Raw $metaPath | ConvertFrom-Json } else { $null }
+        $language = if ($meta -and $meta.language) { $meta.language } else { "" }
+        $focusMode = if ($meta -and $meta.focus_mode) { $meta.focus_mode } else { "none" }
         foreach ($tokenizer in @("cl100k", "o200k")) {
             $rawTokens = [int](& $measure count $tokenizer $raw)
             $a3Tokens = [int](& $measure count $tokenizer $candidate)
             $legendTokens = [int](& $measure count $tokenizer $legend)
+            $anatomy = (& $measure a3-anatomy $full $tokenizer) | ConvertFrom-Json
+            $economical = $a3Tokens -lt $rawTokens
             $records += [ordered]@{
                 capture = $directory.Name
                 lane = if ($directory.Name.StartsWith("economics-")) { "tracked_economics" } else { "correctness_lifecycle" }
+                language = $language
                 fidelity = @{ L="low"; M="medium"; H="high"; E="edit" }[$fidelity]
+                focus_mode = $focusMode
                 tokenizer = $tokenizer
                 raw_source_tokens = $rawTokens
                 compact_a3_tokens = $a3Tokens
                 legend_tokens = $legendTokens
+                anatomy_legend_tokens = $anatomy.legend
+                anatomy_declarations_tokens = $anatomy.declarations
+                anatomy_facts_tokens = $anatomy.facts
+                anatomy_bodies_tokens = $anatomy.bodies
                 saved_tokens = $rawTokens - $a3Tokens
                 reduction_percent = if ($rawTokens) { [Math]::Round((($rawTokens-$a3Tokens)*100.0/$rawTokens), 2) } else { 0 }
-                economical_vs_raw = $a3Tokens -lt $rawTokens
+                economical_vs_raw = $economical
+                selected_tokens = if ($economical) { $a3Tokens } else { $rawTokens }
                 candidate_payload = $candidate
             }
         }
@@ -59,6 +72,26 @@ foreach ($tokenizer in @("cl100k", "o200k")) {
             $modeRaw = ($mode.raw_source_tokens | Measure-Object -Sum).Sum
             $modeA3 = ($mode.compact_a3_tokens | Measure-Object -Sum).Sum
             Write-Host "  ${fidelity}: $($mode.Count), raw $modeRaw -> A3 $modeA3 ($([Math]::Round((($modeRaw-$modeA3)*100.0/$modeRaw),2))%)"
+        }
+    }
+    $econ = @($rows | Where-Object lane -eq "tracked_economics")
+    if ($econ.Count) {
+        $rawSum = ($econ.raw_source_tokens | Measure-Object -Sum).Sum
+        $selSum = ($econ.selected_tokens | Measure-Object -Sum).Sum
+        $winCount = @($econ | Where-Object economical_vs_raw).Count
+        $agg = if ($rawSum) { [Math]::Round((($rawSum - $selSum) * 100.0 / $rawSum), 2) } else { 0 }
+        Write-Host "$tokenizer PRODUCTION-SELECTED economics aggregate: $($econ.Count) rows, raw $rawSum -> selected $selSum ($agg%; $winCount/$($econ.Count) economical)"
+        foreach ($lang in @($econ.language | Sort-Object -Unique)) {
+            foreach ($fidelity in @("low", "medium", "high", "edit")) {
+                foreach ($focusMode in @("none", "all-bodies", "focused")) {
+                    $mode = @($econ | Where-Object { $_.language -eq $lang -and $_.fidelity -eq $fidelity -and $_.focus_mode -eq $focusMode })
+                    if (-not $mode.Count) { continue }
+                    $modeRaw = ($mode.raw_source_tokens | Measure-Object -Sum).Sum
+                    $modeA3 = ($mode.compact_a3_tokens | Measure-Object -Sum).Sum
+                    $modeRed = if ($modeRaw) { [Math]::Round((($modeRaw - $modeA3) * 100.0 / $modeRaw), 2) } else { 0 }
+                    Write-Host ("    {0,-10} {1,-6} {2,-11}: {3} row(s), raw {4} -> A3 {5} ({6}%)" -f $lang, $fidelity, $focusMode, $mode.Count, $modeRaw, $modeA3, $modeRed)
+                }
+            }
         }
     }
 }

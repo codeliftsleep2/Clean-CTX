@@ -65,9 +65,18 @@ $GeneratedDependencyLockfiles = @(
 #     Its single-document structure is intentionally retained for coherent
 #     navigation and retrieval. Exempted by explicit maintainer decision
 #     (2026-09-20).
+#   src/test_files/dotnet/OrderManagementService.cs — synthetic ASP.NET Core
+#     order-management economics fixture. It exists to be a genuinely large,
+#     representative production-scope input for the COMPACT-A3 token-economics
+#     measurement (see verification/context-compression/compact-a/), so its
+#     realistic length is the point of the fixture and decomposing it to meet a
+#     line ceiling would defeat its purpose. Exempted by explicit maintainer
+#     decision (2026-09-22); adding a path here requires the same explicit
+#     authorization as expanding an encoding allowlist.
 $ExemptPaths = @(
     'docs/agent/DISCOVERY_REGISTRY.md',
-    'docs/ARCHITECTURE_OVERVIEW.md'
+    'docs/ARCHITECTURE_OVERVIEW.md',
+    'src/test_files/dotnet/OrderManagementService.cs'
 )
 
 if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {

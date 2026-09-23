@@ -90,6 +90,27 @@ function Invoke-OracleRender($structuredResponse, $scenario, $dir, $path) {
     if ($LASTEXITCODE -ne 0) { throw "CONTROL-FULL oracle render failed for $($scenario.id)" }
 }
 
+function Get-EconomicsLanguage([string]$relative) {
+    switch -Regex ($relative.Replace('\', '/')) {
+        '^LargeService\.ts$' { return "typescript" }
+        '^UserManagementService\.ts$' { return "angular" }
+        '^dotnet/' { return "csharp" }
+        '^angular/' { return "angular" }
+        '^typescript/' { return "typescript" }
+        '^java/' { return "java" }
+        default { return "unknown" }
+    }
+}
+
+function Get-EconomicsFocus([string]$relative) {
+    switch -Regex ($relative.Replace('\', '/')) {
+        '^LargeService\.ts$' { return "UserService.createUser" }
+        '^UserManagementService\.ts$' { return "UserManagementService.createUser" }
+        '^dotnet/OrderManagementService\.cs$' { return "OrderService.CreateOrderAsync" }
+        default { return "" }
+    }
+}
+
 $scenarios = Get-Content -Raw (Join-Path $definitionRoot "expected\scenarios.json") | ConvertFrom-Json
 $session = Start-CleanCtxSession $BinaryPath $runtime
 $requestId = 10
@@ -170,27 +191,55 @@ try {
     if (-not $economicsFiles.Count) {
         throw "No tracked source file meets the 8 KiB production-economics minimum"
     }
+    Get-ChildItem -LiteralPath $captures -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "economics-*" } |
+        Remove-Item -Recurse -Force
     foreach ($economicsFile in $economicsFiles) {
         $relative = [IO.Path]::GetRelativePath($economicsWorkspace, $economicsFile.FullName)
-        $id = "economics-" + (($relative -replace '[^A-Za-z0-9]+', '-').Trim('-').ToLowerInvariant())
-        Write-Host "Capturing tracked economics scenario: $relative"
-        $scenario = [pscustomobject]@{
-            id = $id
-            fidelity = "high"
-            focus = $null
-            operation = "compress_code_context"
+        $language = Get-EconomicsLanguage $relative
+        $slug = ($relative -replace '[^A-Za-z0-9]+', '-').Trim('-').ToLowerInvariant()
+        $focusTarget = Get-EconomicsFocus $relative
+        Write-Host "Capturing tracked economics scenario: $relative ($language)"
+        $responses = @{}
+        foreach ($captureFidelity in @("low", "medium", "high", "edit")) {
+            $requestId++
+            $responses[$captureFidelity] = Invoke-CleanCtxTool $session $requestId "compress_code_context" @{
+                filePath = $economicsFile.FullName
+                workspaceRoot = $workspace
+                fidelity = $captureFidelity
+                tokenizer = "o200k"
+            }
+            Require-ToolSuccess $responses[$captureFidelity] "tracked economics capture $relative @ $captureFidelity"
         }
-        $requestId++
-        $response = Invoke-CleanCtxTool $session $requestId "compress_code_context" @{
-            filePath = $economicsFile.FullName
-            workspaceRoot = $workspace
-            fidelity = "high"
-            tokenizer = "o200k"
+        $matrix = @(
+            @{ fidelity = "low";    focusCsv = "";           focusMode = "none";       capture = "low" }
+            @{ fidelity = "medium"; focusCsv = "";           focusMode = "none";       capture = "medium" }
+            @{ fidelity = "high";   focusCsv = "";           focusMode = "none";       capture = "high" }
+            @{ fidelity = "edit";   focusCsv = "";           focusMode = "all-bodies"; capture = "edit" }
+            @{ fidelity = "edit";   focusCsv = $focusTarget; focusMode = "focused";    capture = "edit" }
+        )
+        foreach ($entry in $matrix) {
+            if ($entry.focusMode -eq "focused" -and -not $entry.focusCsv) {
+                Write-Host "  skipping focused Edit for $relative (no focus target defined)"
+                continue
+            }
+            $dirName = "economics-$language-$slug-$($entry.fidelity)-$($entry.focusMode)"
+            $dir = Join-Path $captures $dirName
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            $meta = @{
+                fixture = $relative
+                language = $language
+                fidelity = $entry.fidelity
+                focus_mode = $entry.focusMode
+                focus_target = $entry.focusCsv
+            } | ConvertTo-Json -Depth 10
+            [IO.File]::WriteAllText((Join-Path $dir "capture-meta.json"), $meta, [Text.UTF8Encoding]::new($false))
+            Copy-Item -LiteralPath $economicsFile.FullName -Destination (Join-Path $dir "raw-source.txt") -Force
+            $oracleResponsePath = Join-Path $dir "oracle-source-response.json"
+            $responses[$entry.capture] | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8NoBOM $oracleResponsePath
+            & $measure oracle $oracleResponsePath $economicsFile.FullName $entry.fidelity $entry.focusCsv (Join-Path $dir "control-full.txt")
+            if ($LASTEXITCODE -ne 0) { throw "CONTROL-FULL oracle render failed for $dirName" }
         }
-        Require-ToolSuccess $response "tracked economics capture $relative"
-        $dir = Save-Capture $scenario $response "" $economicsFile.FullName
-        Invoke-OracleRender $response $scenario $dir $economicsFile.FullName
-        Invoke-ProdRender $response $scenario $dir $economicsFile.FullName
     }
 } finally { Stop-CleanCtxSession $session }
 
