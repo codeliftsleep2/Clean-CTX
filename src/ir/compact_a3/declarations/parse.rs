@@ -1,5 +1,9 @@
 use serde_json::{json, Value};
 
+pub(super) fn is_bare_unsigned(column: &str) -> bool {
+    !column.is_empty() && column.bytes().all(|byte| byte.is_ascii_digit())
+}
+
 pub(super) fn split_columns(line: &str) -> Result<Vec<&str>, String> {
     let mut columns = Vec::new();
     let (mut start, mut quoted, mut escaped) = (0, false, false);
@@ -78,29 +82,47 @@ pub(super) fn occurrence(columns: &[&str]) -> Result<Value, String> {
     if columns.len() < 2 {
         return Err("short occurrence record".into());
     }
-    let count = columns[1]
-        .parse::<usize>()
-        .map_err(|_| "invalid value count")?;
-    if columns.len() != count + 2 {
-        return Err("occurrence value-count mismatch".into());
+    // A leading bare unsigned integer is the explicit count; any other first
+    // column is a single elided value (count implied = 1).
+    if is_bare_unsigned(columns[1]) {
+        let count = columns[1]
+            .parse::<usize>()
+            .map_err(|_| "invalid value count")?;
+        if columns.len() != count + 2 {
+            return Err("occurrence value-count mismatch".into());
+        }
+        Ok(Value::Array(
+            columns[2..]
+                .iter()
+                .map(|column| parsed_string(column))
+                .collect::<Result<_, _>>()?,
+        ))
+    } else {
+        if columns.len() != 2 {
+            return Err("occurrence value-count mismatch".into());
+        }
+        Ok(Value::Array(vec![parsed_string(columns[1])?]))
     }
-    Ok(Value::Array(
-        columns[2..]
-            .iter()
-            .map(|column| parsed_string(column))
-            .collect::<Result<_, _>>()?,
-    ))
 }
 
 pub(super) fn pattern_fact_occurrence(columns: &[&str]) -> Result<Value, String> {
     if columns.len() < 2 {
         return Err("short pattern-fact record".into());
     }
-    let expected = columns[1]
-        .parse::<usize>()
-        .map_err(|_| "invalid fact count")?;
+    // A leading bare unsigned integer is the explicit fact count; any other
+    // first column is a single elided fact (count implied = 1).
+    let (start, expected) = if is_bare_unsigned(columns[1]) {
+        (
+            2,
+            columns[1]
+                .parse::<usize>()
+                .map_err(|_| "invalid fact count")?,
+        )
+    } else {
+        (1, 1)
+    };
     let mut facts = Vec::new();
-    let mut column = 2;
+    let mut column = start;
     while column < columns.len() {
         let kind = parsed_string(columns[column])?;
         let kind_text = kind.as_str().unwrap();

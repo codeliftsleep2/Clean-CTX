@@ -5,7 +5,8 @@ use std::fmt::Write;
 mod parse;
 mod values;
 use parse::{
-    empty_method, occurrence, parsed_handle, parsed_optional, parsed_string, split_columns,
+    empty_method, is_bare_unsigned, occurrence, parsed_handle, parsed_optional, parsed_string,
+    split_columns,
 };
 use values::{handle, optional_quoted, quoted, scoped_handle, string_values};
 pub const SCHEMA_VERSION: u64 = 3;
@@ -22,9 +23,13 @@ fn occurrence_rows(
         .iter()
     {
         let values = string_values(group, field)?;
-        write!(output, "{tag}|{}", values.len()).unwrap();
-        for value in values {
-            write!(output, "|{value}").unwrap();
+        if values.len() == 1 && !is_bare_unsigned(&values[0]) {
+            write!(output, "{tag}|{}", values[0]).unwrap();
+        } else {
+            write!(output, "{tag}|{}", values.len()).unwrap();
+            for value in values {
+                write!(output, "|{value}").unwrap();
+            }
         }
         output.push('\n');
     }
@@ -53,25 +58,41 @@ fn pattern_fact_rows(output: &mut String, groups: &Value) -> Result<(), String> 
         let facts = group
             .as_array()
             .ok_or("pattern fact group must be an array")?;
-        write!(output, "pf|{}", facts.len()).unwrap();
-        for fact in facts {
-            let kind = fact["k"]
-                .as_str()
-                .ok_or("pattern fact kind must be a string")?;
-            if !matches!(
-                kind,
-                "CTOR" | "OBSERVABLE" | "OVERRIDE" | "GETTER" | "SETTER"
-            ) {
-                return Err("unknown pattern fact kind".into());
-            }
-            write!(output, "|{kind}").unwrap();
-            if matches!(kind, "GETTER" | "SETTER") {
-                write!(output, "|{}", quoted(&fact["v"], "pattern fact value")?).unwrap();
-            } else if !fact["v"].is_null() {
-                return Err("unexpected pattern fact value".into());
+        if facts.len() == 1
+            && !is_bare_unsigned(
+                facts[0]["k"]
+                    .as_str()
+                    .ok_or("pattern fact kind must be a string")?,
+            )
+        {
+            write!(output, "pf").unwrap();
+            write_pattern_fact(output, &facts[0])?;
+        } else {
+            write!(output, "pf|{}", facts.len()).unwrap();
+            for fact in facts {
+                write_pattern_fact(output, fact)?;
             }
         }
         output.push('\n');
+    }
+    Ok(())
+}
+
+fn write_pattern_fact(output: &mut String, fact: &Value) -> Result<(), String> {
+    let kind = fact["k"]
+        .as_str()
+        .ok_or("pattern fact kind must be a string")?;
+    if !matches!(
+        kind,
+        "CTOR" | "OBSERVABLE" | "OVERRIDE" | "GETTER" | "SETTER"
+    ) {
+        return Err("unknown pattern fact kind".into());
+    }
+    write!(output, "|{kind}").unwrap();
+    if matches!(kind, "GETTER" | "SETTER") {
+        write!(output, "|{}", quoted(&fact["v"], "pattern fact value")?).unwrap();
+    } else if !fact["v"].is_null() {
+        return Err("unexpected pattern fact value".into());
     }
     Ok(())
 }

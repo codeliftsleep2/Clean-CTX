@@ -3,7 +3,9 @@
 **Status:** Phase 1 complete; Phase 2 green; initial Phase 3 economics failed;
 Phase 3A matrix measured: production-selected 19.30% o200k / 18.32% cl100k;
 Phase 3B complete: identity renumbering applied, token delta 0.00% (IDs ≤ 55);
-Phase 3C negative: scoped type/callee table removed (see `A3_PHASE3C_TABLE.md`)
+Phase 3C negative: scoped type/callee table removed (see `A3_PHASE3C_TABLE.md`);
+Phase 3D complete: single-value count elision applied, +1.24% cl100k / +1.18% o200k
+(see `A3_PHASE3D_ROW_MERGING.md`)
 **Predecessor:** A2 stopped after failing raw-source economics
 **Scope:** model-facing file-context representation only. Canonical IR,
 normalized semantic objects, persistence authority, workspace-query authority,
@@ -312,6 +314,13 @@ token delta and exact roundtrip evidence.
 - Only measured token wins remain in the grammar.
 - All modified/new files remain within the active-file ceiling.
 
+**Result (measured):** no implied default was viable (`lf` is always empty and
+already free; `mo`/`cs`/`pf` have no single dominant, safely-defaultable value).
+The row-merge audit found one measured win — single-value count elision for
+occurrence/fact records (`mo|ASYNC` instead of `mo|1|ASYNC`, same for `pf`), which
+raised the production-selected aggregate from 18.32% to 19.56% cl100k and 19.30%
+to 20.48% o200k. Details in `A3_PHASE3D_ROW_MERGING.md`.
+
 ### Phase 3E — economics decision
 
 Rerun the complete Phase 3A matrix. The checkpoint passes when the sum of
@@ -380,11 +389,10 @@ Stop and do not spend model tokens if:
 
 ## Immediate next work
 
-Phase 3B (identity renumbering, 0.00% delta) and Phase 3C (scoped type/callee
-table, negative, removed) are complete; see `A3_PHASE3C_TABLE.md` for the Phase 3C
-finding. The next lever is Phase 3D — corpus-backed defaults and final row
-merging: measure occurrence/value frequencies for `mo`, `cs`, `lf`, and `pf`,
-introduce an implied default only where the primary corpus demonstrates a dominant
-value and the grammar can reconstruct it exactly, then audit always-adjacent
-records for final merging. Each default and merge needs an isolated before/after
-token delta and exact roundtrip evidence before it stays in the grammar.
+Phase 3B (0.00%), Phase 3C (negative, removed), and Phase 3D (single-value count
+elision, +1.2%) are complete. The next step is Phase 3E — the economics decision:
+re-run the complete Phase 3A matrix and check the production-selected aggregate
+against the 50% gate under both tokenizers. The aggregate now stands at 19.56%
+cl100k / 20.48% o200k, so the gate is expected to remain unmet; continue improving
+only while another lossless, reasoning-safe measured win remains. See
+`A3_PHASE3D_ROW_MERGING.md` for the Phase 3D record.

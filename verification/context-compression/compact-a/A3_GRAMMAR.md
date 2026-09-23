@@ -63,6 +63,11 @@ behavior owner) fail closed on a dangling miss.
   the reserved absent marker `-`, strings beginning with `"`, and strings with
   delimiters use JSON string escaping and include their quotes.
 - Integers are unsigned base-10 without leading zeroes, except `0`.
+- Occurrence/fact group records (`cm`, `cf`, `mo`, `cs`, `lf`, `pf`) omit the
+  count column when the group holds exactly one value/fact whose leading column
+  is not a bare unsigned integer; the count is otherwise required and a bare
+  unsigned integer in the first column is always read as a count. Both spellings
+  decode identically.
 - `-` is the absent scalar. Empty arrays are represented by no record.
 - Record order is semantic wherever the normalized target uses an array.
 - Unknown tags, wrong column counts, invalid escapes, invalid handles, dangling

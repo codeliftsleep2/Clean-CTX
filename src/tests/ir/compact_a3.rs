@@ -61,3 +61,61 @@ fn phase1a_declarations_reject_truncation_scope_and_count_corruption() {
     assert!(decode_declarations(&encoded.replace("Z|2|2|0|0", "Z|2|3|0|0")).is_err());
     assert!(decode_declarations(&encoded.replacen("M|2|", "M|1|", 1)).is_err());
 }
+
+#[test]
+fn phase3d_single_value_groups_elide_count_and_roundtrip() {
+    let oracle = oracle();
+    let encoded = encode_declarations(&oracle).unwrap();
+    assert!(encoded.contains("cm|EXPORT\n"), "single class modifier elides count");
+    assert!(encoded.contains("cf|ABSTRACT\n"), "single class flag elides count");
+    assert!(encoded.contains("mo|PUBLIC\n"), "single method modifier elides count");
+    assert!(encoded.contains("cs|2|IF|RET\n"), "multi-value group keeps explicit count");
+    assert!(encoded.contains("pf|OBSERVABLE\n"), "single pattern fact elides count");
+    assert!(encoded.contains("mo|0\n"), "empty group keeps explicit zero count");
+    assert_eq!(
+        decode_declarations(&encoded).expect("decode A3 declarations"),
+        declaration_target(&oracle)
+    );
+}
+
+#[test]
+fn phase3d_explicit_and_elided_counts_decode_identically() {
+    let explicit = "A3|3|H|f|1|p\nC|1|Owner|0\nM|1|run|0|void\nmo|1|PUBLIC\nZ|1|1|0|0\n";
+    let elided = "A3|3|H|f|1|p\nC|1|Owner|0\nM|1|run|0|void\nmo|PUBLIC\nZ|1|1|0|0\n";
+    assert_eq!(
+        decode_declarations(explicit).unwrap()["classes"][0]["methods"][0]
+            ["modifier_occurrences"],
+        json!([["PUBLIC"]])
+    );
+    assert_eq!(
+        decode_declarations(elided).unwrap(),
+        decode_declarations(explicit).unwrap()
+    );
+}
+
+#[test]
+fn phase3d_numeric_single_value_keeps_explicit_count() {
+    let numeric = json!({
+        "schema":"clean-ctx/control-full","schema_version":2,
+        "file":{"id":"f","source_path":"p","ir_version":1},
+        "mode":{"fidelity":"high"},
+        "classes":[{
+            "kind":"class","id":"C1","name":"N","synthetic":false,
+            "methods":[{"id":"M1","name":"run","parameters":[],"return_type":"void",
+                "modifier_occurrences":[["42"]],"control_summary_occurrences":[],
+                "pattern_fact_occurrences":[],"legacy_flag_occurrences":[],"patterns":[],
+                "body":null,"body_start":null,"body_end":null,
+                "control_flow":[],"data_flow":[],"side_effects":[],"execution_contexts":[]}],
+            "fields":[],"modifier_occurrences":[],"class_flag_occurrences":[],
+            "extends":null,"implements":[],"injection_occurrences":[],"patterns":[]
+        }],
+        "interfaces":[]
+    });
+    let encoded = encode_declarations(&numeric).unwrap();
+    assert!(encoded.contains("mo|1|42\n"), "numeric single value keeps explicit count");
+    let decoded = decode_declarations(&encoded).unwrap();
+    assert_eq!(
+        decoded["classes"][0]["methods"][0]["modifier_occurrences"],
+        json!([["42"]])
+    );
+}
