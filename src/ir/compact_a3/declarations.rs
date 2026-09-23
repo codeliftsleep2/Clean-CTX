@@ -1,5 +1,5 @@
 //! Research-only COMPACT-A3 declaration/signature codec.
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 mod parse;

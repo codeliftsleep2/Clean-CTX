@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub(super) fn is_bare_unsigned(column: &str) -> bool {
     !column.is_empty() && column.bytes().all(|byte| byte.is_ascii_digit())

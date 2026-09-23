@@ -1,4 +1,4 @@
-use super::{decode, decode_bodies, encode, encode_body, BodyFrame};
+use super::{BodyFrame, decode, decode_bodies, encode, encode_body};
 use serde_json::json;
 
 #[test]

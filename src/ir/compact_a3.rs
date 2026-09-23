@@ -5,7 +5,7 @@ pub mod document;
 pub mod facts;
 mod renumber;
 
-pub use declarations::{decode_declarations, encode_declarations, SCHEMA_VERSION};
+pub use declarations::{SCHEMA_VERSION, decode_declarations, encode_declarations};
 
 pub const COLD_PREAMBLE: &str =
     "// COMPACT-A A3; sparse file context; workspace graph via workspace_query";

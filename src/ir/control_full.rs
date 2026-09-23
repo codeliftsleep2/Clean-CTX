@@ -6,7 +6,7 @@
 use super::hierarchical::{FieldNode, HierarchicalIR, MethodNode, PatternEntry};
 use crate::compression::Fidelity;
 use crate::layers::meta::semantic::SemanticEdge;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub const CONTROL_FULL_SCHEMA: &str = "clean-ctx/control-full";
 pub const CONTROL_FULL_VERSION: u64 = 2;

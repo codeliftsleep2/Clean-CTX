@@ -163,11 +163,20 @@ fn renumbering_compresses_sparse_canonical_ids_to_dense_local_ordinals() {
     assert_eq!(decoded["classes"][0]["methods"][0]["id"], "M1");
     assert_eq!(decoded["classes"][0]["methods"][1]["id"], "M2");
     assert_eq!(decoded["classes"][0]["fields"][0]["id"], "F1");
-    assert_eq!(decoded["classes"][0]["methods"][0]["parameters"][0]["id"], "P1");
+    assert_eq!(
+        decoded["classes"][0]["methods"][0]["parameters"][0]["id"],
+        "P1"
+    );
     // Every reference is rewritten to the local ordinal.
     assert_eq!(decoded["classes"][0]["patterns"][0]["args"], json!(["C1"]));
-    assert_eq!(decoded["classes"][0]["methods"][0]["patterns"][0]["args"], json!(["M1"]));
-    assert_eq!(decoded["classes"][0]["methods"][0]["data_flow"], json!([["reads", "F1"]]));
+    assert_eq!(
+        decoded["classes"][0]["methods"][0]["patterns"][0]["args"],
+        json!(["M1"])
+    );
+    assert_eq!(
+        decoded["classes"][0]["methods"][0]["data_flow"],
+        json!([["reads", "F1"]])
+    );
     assert_eq!(decoded["calls"][0]["caller_method_id"], "M1");
     // The wire never leaks a sparse canonical id.
     let text = String::from_utf8_lossy(&wire);

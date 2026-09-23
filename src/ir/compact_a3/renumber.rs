@@ -5,12 +5,16 @@
 //! Presentation-only: applied before `encode` and before building the decode target
 //! so both sides carry the same local handles. Local handles never leave the payload.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 
 pub fn renumber(normalized: &Value) -> Result<Value, String> {
-    let classes = normalized["classes"].as_array().ok_or("classes must be an array")?;
-    let interfaces = normalized["interfaces"].as_array().ok_or("interfaces must be an array")?;
+    let classes = normalized["classes"]
+        .as_array()
+        .ok_or("classes must be an array")?;
+    let interfaces = normalized["interfaces"]
+        .as_array()
+        .ok_or("interfaces must be an array")?;
 
     let mut class_map = HashMap::new();
     let mut interface_map = HashMap::new();
@@ -28,7 +32,10 @@ pub fn renumber(normalized: &Value) -> Result<Value, String> {
 
     let mut field_ordinal = 0usize;
     for owner in classes.iter().chain(interfaces.iter()) {
-        for field in owner["fields"].as_array().ok_or("fields must be an array")? {
+        for field in owner["fields"]
+            .as_array()
+            .ok_or("fields must be an array")?
+        {
             let id = field["id"].as_str().ok_or("field id missing")?;
             field_ordinal += 1;
             field_map.insert(id.to_string(), format!("F{field_ordinal}"));
@@ -37,7 +44,10 @@ pub fn renumber(normalized: &Value) -> Result<Value, String> {
 
     let mut method_ordinal = 0usize;
     for owner in classes.iter().chain(interfaces.iter()) {
-        for method in owner["methods"].as_array().ok_or("methods must be an array")? {
+        for method in owner["methods"]
+            .as_array()
+            .ok_or("methods must be an array")?
+        {
             let id = method["id"].as_str().ok_or("method id missing")?;
             method_ordinal += 1;
             method_map.insert(id.to_string(), format!("M{method_ordinal}"));
@@ -66,9 +76,17 @@ pub fn renumber(normalized: &Value) -> Result<Value, String> {
 
     for family in ["classes", "interfaces"] {
         let is_class = family == "classes";
-        for owner in result[family].as_array_mut().ok_or("owners must be arrays")? {
+        for owner in result[family]
+            .as_array_mut()
+            .ok_or("owners must be arrays")?
+        {
             let oid = owner["id"].as_str().ok_or("owner id missing")?.to_string();
-            owner["id"] = json!(owner_map.get(&oid).ok_or_else(|| format!("owner {oid} not mapped"))?.clone());
+            owner["id"] = json!(
+                owner_map
+                    .get(&oid)
+                    .ok_or_else(|| format!("owner {oid} not mapped"))?
+                    .clone()
+            );
 
             // extends: class = single class id, interface = array of interface ids.
             if is_class {
@@ -97,16 +115,35 @@ pub fn renumber(normalized: &Value) -> Result<Value, String> {
                 }
             }
 
-            for field in owner["fields"].as_array_mut().ok_or("fields must be arrays")? {
+            for field in owner["fields"]
+                .as_array_mut()
+                .ok_or("fields must be arrays")?
+            {
                 let fid = field["id"].as_str().ok_or("field id missing")?.to_string();
-                field["id"] = json!(field_map.get(&fid).ok_or_else(|| format!("field {fid} not mapped"))?.clone());
+                field["id"] = json!(
+                    field_map
+                        .get(&fid)
+                        .ok_or_else(|| format!("field {fid} not mapped"))?
+                        .clone()
+                );
             }
 
             rewrite_patterns(owner, &owner_map, &method_map, &field_map)?;
 
-            for method in owner["methods"].as_array_mut().ok_or("methods must be arrays")? {
-                let mid = method["id"].as_str().ok_or("method id missing")?.to_string();
-                method["id"] = json!(method_map.get(&mid).ok_or_else(|| format!("method {mid} not mapped"))?.clone());
+            for method in owner["methods"]
+                .as_array_mut()
+                .ok_or("methods must be arrays")?
+            {
+                let mid = method["id"]
+                    .as_str()
+                    .ok_or("method id missing")?
+                    .to_string();
+                method["id"] = json!(
+                    method_map
+                        .get(&mid)
+                        .ok_or_else(|| format!("method {mid} not mapped"))?
+                        .clone()
+                );
 
                 if let Some(params) = method.get_mut("parameters").and_then(Value::as_array_mut) {
                     for (k, param) in params.iter_mut().enumerate() {
@@ -140,8 +177,13 @@ pub fn renumber(normalized: &Value) -> Result<Value, String> {
         }
     }
 
-    for call in result["calls"].as_array_mut().ok_or("calls must be an array")? {
-        let caller = call["caller_method_id"].as_str().ok_or("caller method id missing")?;
+    for call in result["calls"]
+        .as_array_mut()
+        .ok_or("calls must be an array")?
+    {
+        let caller = call["caller_method_id"]
+            .as_str()
+            .ok_or("caller method id missing")?;
         call["caller_method_id"] = json!(
             method_map
                 .get(caller)

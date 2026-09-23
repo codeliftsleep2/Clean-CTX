@@ -1,5 +1,5 @@
 use super::{decode_declarations, encode_declarations};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn method(id: &str, name: &str, parameters: Value) -> Value {
     json!({
@@ -66,12 +66,30 @@ fn phase1a_declarations_reject_truncation_scope_and_count_corruption() {
 fn phase3d_single_value_groups_elide_count_and_roundtrip() {
     let oracle = oracle();
     let encoded = encode_declarations(&oracle).unwrap();
-    assert!(encoded.contains("cm|EXPORT\n"), "single class modifier elides count");
-    assert!(encoded.contains("cf|ABSTRACT\n"), "single class flag elides count");
-    assert!(encoded.contains("mo|PUBLIC\n"), "single method modifier elides count");
-    assert!(encoded.contains("cs|2|IF|RET\n"), "multi-value group keeps explicit count");
-    assert!(encoded.contains("pf|OBSERVABLE\n"), "single pattern fact elides count");
-    assert!(encoded.contains("mo|0\n"), "empty group keeps explicit zero count");
+    assert!(
+        encoded.contains("cm|EXPORT\n"),
+        "single class modifier elides count"
+    );
+    assert!(
+        encoded.contains("cf|ABSTRACT\n"),
+        "single class flag elides count"
+    );
+    assert!(
+        encoded.contains("mo|PUBLIC\n"),
+        "single method modifier elides count"
+    );
+    assert!(
+        encoded.contains("cs|2|IF|RET\n"),
+        "multi-value group keeps explicit count"
+    );
+    assert!(
+        encoded.contains("pf|OBSERVABLE\n"),
+        "single pattern fact elides count"
+    );
+    assert!(
+        encoded.contains("mo|0\n"),
+        "empty group keeps explicit zero count"
+    );
     assert_eq!(
         decode_declarations(&encoded).expect("decode A3 declarations"),
         declaration_target(&oracle)
@@ -83,8 +101,7 @@ fn phase3d_explicit_and_elided_counts_decode_identically() {
     let explicit = "A3|3|H|f|1|p\nC|1|Owner|0\nM|1|run|0|void\nmo|1|PUBLIC\nZ|1|1|0|0\n";
     let elided = "A3|3|H|f|1|p\nC|1|Owner|0\nM|1|run|0|void\nmo|PUBLIC\nZ|1|1|0|0\n";
     assert_eq!(
-        decode_declarations(explicit).unwrap()["classes"][0]["methods"][0]
-            ["modifier_occurrences"],
+        decode_declarations(explicit).unwrap()["classes"][0]["methods"][0]["modifier_occurrences"],
         json!([["PUBLIC"]])
     );
     assert_eq!(
@@ -112,7 +129,10 @@ fn phase3d_numeric_single_value_keeps_explicit_count() {
         "interfaces":[]
     });
     let encoded = encode_declarations(&numeric).unwrap();
-    assert!(encoded.contains("mo|1|42\n"), "numeric single value keeps explicit count");
+    assert!(
+        encoded.contains("mo|1|42\n"),
+        "numeric single value keeps explicit count"
+    );
     let decoded = decode_declarations(&encoded).unwrap();
     assert_eq!(
         decoded["classes"][0]["methods"][0]["modifier_occurrences"],

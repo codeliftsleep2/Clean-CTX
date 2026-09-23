@@ -12,10 +12,10 @@ use crate::compaction::{
     compact_import, format_class_entry, format_java_type_entry, format_rust_type_entry,
     simple_compact,
 };
-use crate::compression::markers::build_marker;
-use crate::compression::skip::should_skip_capture;
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
+use crate::compression::markers::build_marker;
+use crate::compression::skip::should_skip_capture;
 
 /// Output of [`build_output_lines`]. F-04 (FAANG audit): previously
 /// the orchestrator counted classes/methods/imports by
@@ -256,4 +256,3 @@ pub fn assemble_body(output_lines: &[String], fidelity: Fidelity) -> String {
         Fidelity::Edit | Fidelity::Verbatim => output_lines.join("\n"),
     }
 }
-

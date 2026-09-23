@@ -115,15 +115,17 @@ export class EdgeComponent {
         .expect("spread call");
     assert_eq!(spread["has_spread"], true);
     assert_eq!(spread["callee_resolution"], "unresolved");
-    assert!(decoded["semantic_edges"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|edge| {
-            edge["relation"] == "Injects"
-                && edge["subject"]["name"] == "EdgeComponent"
-                && edge["object"]["name"] == "Repository"
-        }));
+    assert!(
+        decoded["semantic_edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|edge| {
+                edge["relation"] == "Injects"
+                    && edge["subject"]["name"] == "EdgeComponent"
+                    && edge["object"]["name"] == "Repository"
+            })
+    );
 }
 
 #[cfg(feature = "csharp")]
@@ -182,18 +184,23 @@ class EdgeController : ControllerBase {
             "missing C# lambda/nested call {callee}"
         );
     }
-    assert!(decoded["semantic_edges"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|edge| {
-            edge["relation"] == "HasRoute" && edge["subject"]["name"] == "EdgeController"
-        }));
-    assert!(decoded["semantic_edges"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|edge| {
-            edge["relation"] == "ControllerAction" && edge["subject"]["name"] == "EdgeController"
-        }));
+    assert!(
+        decoded["semantic_edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|edge| {
+                edge["relation"] == "HasRoute" && edge["subject"]["name"] == "EdgeController"
+            })
+    );
+    assert!(
+        decoded["semantic_edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|edge| {
+                edge["relation"] == "ControllerAction"
+                    && edge["subject"]["name"] == "EdgeController"
+            })
+    );
 }

@@ -1,6 +1,6 @@
 //! Research-only A3 sparse fact and exact-body records.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::fmt::Write;
 

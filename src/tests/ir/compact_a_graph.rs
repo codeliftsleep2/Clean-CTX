@@ -1,7 +1,7 @@
 use crate::compression::Fidelity;
 use crate::ir::normalize_control_full;
 use crate::layers::meta::semantic::{CallEvidence, EntityRef, SemanticEdge, SemanticRelation};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn entity_record(entity: &Value) -> Value {
     json!([

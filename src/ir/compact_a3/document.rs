@@ -1,10 +1,10 @@
 //! Integrated research-only A3 High/Edit document.
 
 use super::facts::{
-    decode as decode_facts, decode_body, encode as encode_facts, encode_body, BodyFrame,
+    BodyFrame, decode as decode_facts, decode_body, encode as encode_facts, encode_body,
 };
 use super::{decode_declarations, encode_declarations};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashSet;
 
 const SOURCE_REQUIREMENT: &str = "request edit or verbatim when exact source is required";
@@ -228,13 +228,19 @@ fn merge_facts(mut target: Value, facts: Value, bodies: Vec<BodyFrame>) -> Resul
 /// not exactly `1..N` in order is corrupted (duplicate, gap, or out-of-order).
 fn validate_dense_identities(value: &Value) -> Result<(), String> {
     let mut class_ords = Vec::new();
-    for owner in value["classes"].as_array().ok_or("decoded classes missing")? {
+    for owner in value["classes"]
+        .as_array()
+        .ok_or("decoded classes missing")?
+    {
         class_ords.push(parse_ordinal(&owner["id"], 'C')?);
     }
     validate_dense("class", &class_ords)?;
 
     let mut interface_ords = Vec::new();
-    for owner in value["interfaces"].as_array().ok_or("decoded interfaces missing")? {
+    for owner in value["interfaces"]
+        .as_array()
+        .ok_or("decoded interfaces missing")?
+    {
         interface_ords.push(parse_ordinal(&owner["id"], 'I')?);
     }
     validate_dense("interface", &interface_ords)?;
@@ -246,10 +252,16 @@ fn validate_dense_identities(value: &Value) -> Result<(), String> {
             for field in owner["fields"].as_array().ok_or("decoded fields missing")? {
                 field_ords.push(parse_ordinal(&field["id"], 'F')?);
             }
-            for method in owner["methods"].as_array().ok_or("decoded methods missing")? {
+            for method in owner["methods"]
+                .as_array()
+                .ok_or("decoded methods missing")?
+            {
                 method_ords.push(parse_ordinal(&method["id"], 'M')?);
                 let mut param_ords = Vec::new();
-                for param in method["parameters"].as_array().ok_or("decoded parameters missing")? {
+                for param in method["parameters"]
+                    .as_array()
+                    .ok_or("decoded parameters missing")?
+                {
                     param_ords.push(parse_ordinal(&param["id"], 'P')?);
                 }
                 validate_dense("parameter", &param_ords)?;
