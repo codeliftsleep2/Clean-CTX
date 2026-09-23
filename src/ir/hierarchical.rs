@@ -27,7 +27,9 @@ const HIERARCHICAL_SCHEMA_VERSION: u64 = 8;
 mod decode;
 mod encode;
 mod migrate;
+mod reduce;
 use migrate::upgrade_revision_5_pattern_facts;
+pub(crate) use reduce::hierarchy_to_wire_reduced;
 
 // Re-exported so the established public paths (`crate::ir::hierarchical::
 // ir_to_hierarchical`, `::hierarchical_to_ir`) are unchanged by the split

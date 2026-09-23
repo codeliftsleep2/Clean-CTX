@@ -172,8 +172,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     "jsonrpc": "2.0", "id": id,
                     "result": {
                         "content": [{ "type": "text", "text": content }],
-                        "ir": crate::ir::hierarchical::hierarchy_to_wire(&compiled, &hierarchy),
-                        "semantic_edges": serde_json::to_value(&edges).unwrap_or_default(),
+                        "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&compiled, &hierarchy),
                         "version": prev_version,
                         "instruction_count": instruction_count,
                 "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
@@ -294,8 +293,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     "strategy": "delta", "fidelity": format!("{:?}", fidelity).to_lowercase(),
                     "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
                     "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() },
-                    "degradation": null,
-                    "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
+                    "degradation": null
                 }
             });
             // Delta output is rolling dynamic content — mark as tail (ephemeral).
@@ -363,10 +361,9 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": content }],
-                    "ir": crate::ir::hierarchical::hierarchy_to_wire(&compiled, &hierarchy),
+                    "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&compiled, &hierarchy),
                     "version": version, "instruction_count": compiled.instructions.len(),
-                    "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
-                    "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
+                    "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" }
                 }
             });
             // Baseline stored — this is a stable snapshot, inject baseline breakpoint.

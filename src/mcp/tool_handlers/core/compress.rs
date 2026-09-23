@@ -250,11 +250,10 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             "jsonrpc": "2.0", "id": id,
             "result": {
                 "content": [{ "type": "text", "text": llm_text_with_footer }],
-                "ir": crate::ir::hierarchical::hierarchy_to_wire(&ir, &hir),
+                "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&ir, &hir),
                 "pretty": ir_value, "v": ir.version, "file": ir.file_id,
                 "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
-                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() },
-                "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
+                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() }
             }
         })
     } else {

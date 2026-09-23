@@ -341,8 +341,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                                 "decision_summary": decision.summary(),
                                 "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
                                 "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(&byte_exact).unwrap_or_default() },
-                                "degradation": null,
-                                "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
+                                "degradation": null
                             }
                         }
                     });
@@ -408,8 +407,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                                 "decision_summary": decision.summary(),
                                 "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
                                 "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(&byte_exact).unwrap_or_default() },
-                                "degradation": null,
-                                "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
+                                "degradation": null
                             }
                         }
                     });
@@ -556,8 +554,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                             "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                             "is_angular": is_angular, "decision_summary": decision.summary(),
                             "content_kind": visible_content_kind, "byte_exact": visible_byte_exact,
-                            "degradation": null,
-                            "semantic_edges": serde_json::to_value(&semantic_edges).unwrap_or_default()
+                            "degradation": null
                         }
                     }
                 });

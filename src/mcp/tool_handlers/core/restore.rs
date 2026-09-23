@@ -95,8 +95,6 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     };
     let canonical_path = crate::dictionary::path::canonical_identity_key(&durable_path);
     let edge_count = restored.semantic_edges.len();
-    let semantic_edges_wire =
-        serde_json::to_value(&restored.semantic_edges).unwrap_or_else(|_| serde_json::json!([]));
 
     state
         .ir_context_lock()
@@ -117,8 +115,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": full }],
-            "ir": crate::ir::hierarchical::hierarchy_to_wire(&session_ir, &hierarchy),
-            "semantic_edges": semantic_edges_wire,
+            "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&session_ir, &hierarchy),
             "_meta": {
                 "version": session_ir.version, "restored": true,
                 "file": durable_path,

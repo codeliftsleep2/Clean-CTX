@@ -282,14 +282,13 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             let rendered = economic.text;
             let (_, candidate_byte_exact) = contract_fields(fidelity);
             let hierarchical_wire =
-                crate::ir::hierarchical::hierarchy_to_wire(&target_ir, &hierarchy);
+                crate::ir::hierarchical::hierarchy_to_wire_reduced(&target_ir, &hierarchy);
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": rendered }],
                     "structuredContent": {
-                        "ir": hierarchical_wire,
-                        "semantic_edges": serde_json::to_value(&target_edges).unwrap_or_default()
+                        "ir": hierarchical_wire
                     },
                     "_meta": {
                         "version": new_version,

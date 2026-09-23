@@ -1,5 +1,6 @@
 #![cfg(feature = "typescript")]
 
+use crate::layers::meta::semantic::SemanticRelation;
 use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
 
@@ -124,17 +125,22 @@ export class Consumer {
     }));
 
     assert_eq!(payload["semantic_edges"], json!([]));
-    let edges = response["result"]["_meta"]["semantic_edges"]
-        .as_array()
-        .expect("authoritative auxiliary edge snapshot");
+    assert!(
+        response["result"]["_meta"]["semantic_edges"].is_null(),
+        "semantic edges no longer ride on the content response"
+    );
+    let index = state.workspace_index_lock();
+    let edges = index.forward_edges_by_identity("angular", "Service", "Consumer");
     let injection = edges
         .iter()
-        .find(|edge| edge["relation"] == "Injects")
+        .find(|edge| edge.relation == SemanticRelation::Injects)
         .expect("framework injection edge must remain available to the workspace index");
-    assert_eq!(injection["layer"], "angular");
+    assert_eq!(injection.layer, "angular");
     assert!(
-        injection["subject"]["file"]
-            .as_str()
+        injection
+            .subject
+            .file
+            .as_deref()
             .is_some_and(|file| file.ends_with("consumer.service.ts"))
     );
 }
@@ -236,7 +242,6 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
         baseline["result"]["ir"].is_object(),
         "delta baseline must expose its structured lifecycle snapshot"
     );
-    assert!(baseline["result"]["semantic_edges"].is_array());
     assert!(
         baseline["result"]["content"][0]["text"]
             .as_str()
@@ -246,7 +251,6 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     let cached = dispatch(&state, 2, "delta_code_context", args());
     assert_eq!(cached["result"]["cached"], true);
     assert!(cached["result"]["ir"].is_object());
-    assert!(cached["result"]["semantic_edges"].is_array());
 
     std::fs::write(
         &path,
@@ -284,10 +288,6 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     assert!(
         applied["result"]["structuredContent"]["ir"].is_object(),
         "applied delta must expose its structured lifecycle snapshot"
-    );
-    assert!(
-        applied["result"]["structuredContent"]["semantic_edges"].is_array(),
-        "applied delta must expose its semantic-edge snapshot"
     );
     let applied_payload = control_full_json(&applied);
     assert_eq!(applied_payload["schema_version"], 1);
@@ -335,10 +335,6 @@ fn registered_restore_and_replay_regenerate_control_full_from_durable_facts() {
         );
         assert!(response.get("error").is_none(), "{response}");
         assert!(response["result"]["ir"].is_object(), "{tool} hierarchy");
-        assert!(
-            response["result"]["semantic_edges"].is_array(),
-            "{tool} semantic edges"
-        );
         let payload = control_full_json(&response);
         assert_eq!(payload["schema"], "clean-ctx/file-context");
         assert!(payload.get("navigation").is_none());

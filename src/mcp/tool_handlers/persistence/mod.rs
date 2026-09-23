@@ -438,8 +438,6 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         Err(_) => (compact(), false),
     };
     let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
-    let semantic_edges_wire =
-        serde_json::to_value(&restored.semantic_edges).unwrap_or_else(|_| serde_json::json!([]));
     state
         .ir_context_lock()
         .load_ir(ir.clone(), Some(restored.source_hash));
@@ -458,8 +456,7 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         "jsonrpc": "2.0", "id": id,
         "result": {
             "content": [{ "type": "text", "text": rendered }],
-            "ir": crate::ir::hierarchical::hierarchy_to_wire(&ir, &hierarchy),
-            "semantic_edges": semantic_edges_wire,
+            "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&ir, &hierarchy),
             "_meta": {
                 "file": file_path, "version": ir.version,
                 "instruction_count": ir.instructions.len(),
