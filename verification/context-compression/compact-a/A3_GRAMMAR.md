@@ -20,6 +20,37 @@ authoritative empty arrays.
 Workspace graph edges are outside this grammar. File-local calls and core
 injection occurrences are inside it.
 
+## Identity renumbering (Phase 3B)
+
+Canonical identities are the compiler's global `next_id` handles (`C487`,
+`M1204`, `F82`, `P633`). The A3 wire spells them as **dense file-local ordinals**
+assigned by first appearance, per family:
+
+| Family | Local ordinal |
+|---|---|
+| class | `C1..CK` |
+| interface | `I1..II` |
+| method | `M1..MM` (file-local, across owners) |
+| field | `F1..FF` (file-local, across owners) |
+| parameter | `P1..PP` (method-local) |
+
+Ordinals are assigned in wire (decode) order: owners in `C`/`I` record order,
+fields then methods in their scoped order, parameters in `p`-row order. The wire
+keeps the bare ordinal exactly as before; only the number changes. Local handles
+are payload-local: never persisted, never accepted as selectors, never returned
+as workspace identity.
+
+**Decode equality is alpha-normalized for the identity family only.** A decoded
+document's IDs are the local ordinals, not the canonical handles; equality against
+the normalized oracle is modulo this bijective renumbering. Every other family
+(names, order, duplicates, occurrence groups, spans, bodies) remains literal-exact.
+
+**Name-vs-ID references.** `X`/`J` (extends/implements), `pt` pattern args, and
+`fd`/`fc` targets may carry either a canonical ID or a written name. The renumber
+rewrites a value only when it exactly equals a declared ID in the same family;
+other values are left opaque. Definitely-ID references (`K` caller, `B` body,
+behavior owner) fail closed on a dangling miss.
+
 ## Lexical rules
 
 - The stream is strict UTF-8 without a BOM.

@@ -2,7 +2,7 @@
 
 **Status:** Phase 1 complete; Phase 2 green; initial Phase 3 economics failed;
 Phase 3A matrix measured: production-selected 19.30% o200k / 18.32% cl100k;
-Phase 3B identity design gate next
+Phase 3B complete: identity renumbering applied, token delta 0.00% (IDs ≤ 55)
 **Predecessor:** A2 stopped after failing raw-source economics
 **Scope:** model-facing file-context representation only. Canonical IR,
 normalized semantic objects, persistence authority, workspace-query authority,

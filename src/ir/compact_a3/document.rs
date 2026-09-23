@@ -61,13 +61,14 @@ pub fn encode(normalized: &Value) -> Result<Vec<u8>, String> {
     ) {
         return Err("unsupported A3 fidelity".into());
     }
-    let declarations = encode_declarations(normalized)?;
+    let normalized = super::renumber::renumber(normalized)?;
+    let declarations = encode_declarations(&normalized)?;
     let (declarations, _) = declarations
         .rsplit_once("\nZ|")
         .ok_or("declaration fragment lacks terminal")?;
-    let facts = encode_facts(normalized)?;
-    let bodies = body_frames(normalized)?;
-    let (owners, methods, calls) = counts(normalized)?;
+    let facts = encode_facts(&normalized)?;
+    let bodies = body_frames(&normalized)?;
+    let (owners, methods, calls) = counts(&normalized)?;
     let mut output = format!("{declarations}\n{facts}Y|{}\n", bodies.len()).into_bytes();
     for body in &bodies {
         output.extend(encode_body(body));
@@ -93,13 +94,14 @@ pub struct ColdAnatomy {
 }
 
 pub fn anatomy(normalized: &Value) -> Result<ColdAnatomy, String> {
+    let normalized = super::renumber::renumber(normalized)?;
     let legend = format!("{}\n{}\n", super::COLD_PREAMBLE, super::COLD_LEGEND).into_bytes();
-    let declarations = encode_declarations(normalized)?;
+    let declarations = encode_declarations(&normalized)?;
     let (declarations, _) = declarations
         .rsplit_once("\nZ|")
         .ok_or("declaration fragment lacks terminal")?;
-    let facts = encode_facts(normalized)?;
-    let bodies = body_frames(normalized)?;
+    let facts = encode_facts(&normalized)?;
+    let bodies = body_frames(&normalized)?;
     let mut body_bytes = format!("Y|{}\n", bodies.len()).into_bytes();
     for body in &bodies {
         body_bytes.extend(encode_body(body));
@@ -221,6 +223,65 @@ fn merge_facts(mut target: Value, facts: Value, bodies: Vec<BodyFrame>) -> Resul
     Ok(target)
 }
 
+/// Reject non-dense local identities. The renumbering assigns ordinals
+/// `1..N` per family by first appearance, so a decoded document whose IDs are
+/// not exactly `1..N` in order is corrupted (duplicate, gap, or out-of-order).
+fn validate_dense_identities(value: &Value) -> Result<(), String> {
+    let mut class_ords = Vec::new();
+    for owner in value["classes"].as_array().ok_or("decoded classes missing")? {
+        class_ords.push(parse_ordinal(&owner["id"], 'C')?);
+    }
+    validate_dense("class", &class_ords)?;
+
+    let mut interface_ords = Vec::new();
+    for owner in value["interfaces"].as_array().ok_or("decoded interfaces missing")? {
+        interface_ords.push(parse_ordinal(&owner["id"], 'I')?);
+    }
+    validate_dense("interface", &interface_ords)?;
+
+    let mut method_ords = Vec::new();
+    let mut field_ords = Vec::new();
+    for family in ["classes", "interfaces"] {
+        for owner in value[family].as_array().ok_or("decoded owners missing")? {
+            for field in owner["fields"].as_array().ok_or("decoded fields missing")? {
+                field_ords.push(parse_ordinal(&field["id"], 'F')?);
+            }
+            for method in owner["methods"].as_array().ok_or("decoded methods missing")? {
+                method_ords.push(parse_ordinal(&method["id"], 'M')?);
+                let mut param_ords = Vec::new();
+                for param in method["parameters"].as_array().ok_or("decoded parameters missing")? {
+                    param_ords.push(parse_ordinal(&param["id"], 'P')?);
+                }
+                validate_dense("parameter", &param_ords)?;
+            }
+        }
+    }
+    validate_dense("method", &method_ords)?;
+    validate_dense("field", &field_ords)?;
+    Ok(())
+}
+
+fn parse_ordinal(value: &Value, prefix: char) -> Result<usize, String> {
+    let text = value.as_str().ok_or("identity must be a string")?;
+    let suffix = text.strip_prefix(prefix).ok_or("wrong identity family")?;
+    suffix
+        .parse::<usize>()
+        .map_err(|_| "invalid identity ordinal".into())
+}
+
+fn validate_dense(family: &str, ordinals: &[usize]) -> Result<(), String> {
+    for (position, ordinal) in ordinals.iter().enumerate() {
+        if *ordinal != position + 1 {
+            return Err(format!(
+                "non-dense {family} identity: position {} has ordinal {}",
+                position + 1,
+                ordinal
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Decode a complete A3 document and reject framing/count/reference corruption.
 pub fn decode(input: &[u8]) -> Result<Value, String> {
     let section = marker(input, b"\nY|").ok_or("missing body section")?;
@@ -286,11 +347,14 @@ pub fn decode(input: &[u8]) -> Result<Value, String> {
             return Err("terminal count mismatch".into());
         }
     }
-    merge_facts(declarations, facts, bodies)
+    let merged = merge_facts(declarations, facts, bodies)?;
+    validate_dense_identities(&merged)?;
+    Ok(merged)
 }
 
 /// Fidelity-specific normalized target used by deterministic A3 equality tests.
 pub fn target(normalized: &Value) -> Result<Value, String> {
+    let normalized = super::renumber::renumber(normalized)?;
     let fidelity = normalized["mode"]["fidelity"]
         .as_str()
         .ok_or("target fidelity missing")?;
@@ -301,7 +365,7 @@ pub fn target(normalized: &Value) -> Result<Value, String> {
         "classes":normalized["classes"],"interfaces":normalized["interfaces"],
         "imports":normalized["imports"],"type_aliases":normalized["type_aliases"],"calls":normalized["calls"]
     });
-    let body_ids = all_methods(normalized)
+    let body_ids = all_methods(&normalized)
         .filter(|method| normalized["mode"]["fidelity"] == "edit" && !method["body"].is_null())
         .map(|method| method["id"].clone())
         .collect::<Vec<_>>();

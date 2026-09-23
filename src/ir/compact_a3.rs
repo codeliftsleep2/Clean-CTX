@@ -3,6 +3,7 @@
 mod declarations;
 pub mod document;
 pub mod facts;
+mod renumber;
 
 pub use declarations::{decode_declarations, encode_declarations, SCHEMA_VERSION};
 
