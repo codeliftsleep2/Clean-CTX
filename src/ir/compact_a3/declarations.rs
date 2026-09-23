@@ -3,41 +3,12 @@ use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 mod parse;
+mod values;
 use parse::{
     empty_method, occurrence, parsed_handle, parsed_optional, parsed_string, split_columns,
 };
+use values::{handle, optional_quoted, quoted, scoped_handle, string_values};
 pub const SCHEMA_VERSION: u64 = 3;
-
-fn handle<'a>(value: &'a Value, field: &str) -> Result<&'a str, String> {
-    let value = value
-        .as_str()
-        .ok_or_else(|| format!("{field} must be a string"))?;
-    if value.is_empty() || value.contains(['|', '\r', '\n']) {
-        return Err(format!("invalid {field}"));
-    }
-    Ok(value)
-}
-fn quoted(value: &Value, field: &str) -> Result<String, String> {
-    let value = value
-        .as_str()
-        .ok_or_else(|| format!("{field} must be a string"))?;
-    serde_json::to_string(value).map_err(|error| error.to_string())
-}
-fn optional_quoted(value: &Value, field: &str) -> Result<String, String> {
-    if value.is_null() {
-        Ok("-".into())
-    } else {
-        quoted(value, field)
-    }
-}
-fn string_values(values: &Value, field: &str) -> Result<Vec<String>, String> {
-    values
-        .as_array()
-        .ok_or_else(|| format!("{field} must be an array"))?
-        .iter()
-        .map(|value| quoted(value, field))
-        .collect()
-}
 
 fn occurrence_rows(
     output: &mut String,
@@ -45,14 +16,13 @@ fn occurrence_rows(
     groups: &Value,
     field: &str,
 ) -> Result<(), String> {
-    for (occurrence, group) in groups
+    for group in groups
         .as_array()
         .ok_or_else(|| format!("{field} must be an array"))?
         .iter()
-        .enumerate()
     {
         let values = string_values(group, field)?;
-        write!(output, "{tag}|{occurrence}|{}", values.len()).unwrap();
+        write!(output, "{tag}|{}", values.len()).unwrap();
         for value in values {
             write!(output, "|{value}").unwrap();
         }
@@ -75,16 +45,15 @@ fn pattern_rows(output: &mut String, patterns: &Value) -> Result<(), String> {
 }
 
 fn pattern_fact_rows(output: &mut String, groups: &Value) -> Result<(), String> {
-    for (occurrence, group) in groups
+    for group in groups
         .as_array()
         .ok_or("pattern facts must be an array")?
         .iter()
-        .enumerate()
     {
         let facts = group
             .as_array()
             .ok_or("pattern fact group must be an array")?;
-        write!(output, "pf|{occurrence}|{}", facts.len()).unwrap();
+        write!(output, "pf|{}", facts.len()).unwrap();
         for fact in facts {
             let kind = fact["k"]
                 .as_str()
@@ -95,7 +64,7 @@ fn pattern_fact_rows(output: &mut String, groups: &Value) -> Result<(), String> 
             ) {
                 return Err("unknown pattern fact kind".into());
             }
-            write!(output, "|{}", serde_json::to_string(kind).unwrap()).unwrap();
+            write!(output, "|{kind}").unwrap();
             if matches!(kind, "GETTER" | "SETTER") {
                 write!(output, "|{}", quoted(&fact["v"], "pattern fact value")?).unwrap();
             } else if !fact["v"].is_null() {
@@ -131,24 +100,26 @@ fn method_rows(
         writeln!(
             output,
             "M|{}|{}|{}|{}",
-            handle(&method["id"], "method id")?,
+            scoped_handle(&method["id"], 'M', "method id")?,
             quoted(&method["name"], "method name")?,
             parameters.len(),
             optional_quoted(&method["return_type"], "return type")?
         )
         .unwrap();
         *count += 1;
-        if !low || names[method["name"].as_str().unwrap()] > 1 {
+        if !parameters.is_empty() && (!low || names[method["name"].as_str().unwrap()] > 1) {
+            write!(output, "p|{}", parameters.len()).unwrap();
             for parameter in parameters {
-                writeln!(
+                write!(
                     output,
-                    "p|{}|{}|{}",
-                    handle(&parameter["id"], "parameter id")?,
+                    "|{}|{}|{}",
+                    scoped_handle(&parameter["id"], 'P', "parameter id")?,
                     quoted(&parameter["name"], "parameter name")?,
                     optional_quoted(&parameter["type"], "parameter type")?
                 )
                 .unwrap();
             }
+            output.push('\n');
         }
         occurrence_rows(
             output,
@@ -187,7 +158,7 @@ fn owner_rows(
             writeln!(
                 output,
                 "I|{}|{}",
-                handle(&owner["id"], "interface id")?,
+                scoped_handle(&owner["id"], 'I', "interface id")?,
                 quoted(&owner["name"], "interface name")?
             )
             .unwrap();
@@ -195,7 +166,7 @@ fn owner_rows(
             writeln!(
                 output,
                 "C|{}|{}|{}",
-                handle(&owner["id"], "class id")?,
+                scoped_handle(&owner["id"], 'C', "class id")?,
                 quoted(&owner["name"], "class name")?,
                 u8::from(
                     owner["synthetic"]
@@ -223,14 +194,13 @@ fn owner_rows(
                 &owner["class_flag_occurrences"],
                 "class flags",
             )?;
-            for (occurrence, group) in owner["injection_occurrences"]
+            for group in owner["injection_occurrences"]
                 .as_array()
                 .ok_or("injections must be an array")?
                 .iter()
-                .enumerate()
             {
                 let dependencies = string_values(group, "injection dependencies")?;
-                write!(output, "D|{occurrence}|{}", dependencies.len()).unwrap();
+                write!(output, "D|{}", dependencies.len()).unwrap();
                 for dependency in dependencies {
                     write!(output, "|{dependency}").unwrap();
                 }
@@ -246,18 +216,22 @@ fn owner_rows(
         if !interface {
             pattern_rows(output, &owner["patterns"])?;
         }
-        for field in owner["fields"]
+        let fields = owner["fields"]
             .as_array()
-            .ok_or("fields must be an array")?
-        {
-            writeln!(
-                output,
-                "F|{}|{}|{}",
-                handle(&field["id"], "field id")?,
-                quoted(&field["name"], "field name")?,
-                optional_quoted(&field["type"], "field type")?
-            )
-            .unwrap();
+            .ok_or("fields must be an array")?;
+        if !fields.is_empty() {
+            write!(output, "F|{}", fields.len()).unwrap();
+            for field in fields {
+                write!(
+                    output,
+                    "|{}|{}|{}",
+                    scoped_handle(&field["id"], 'F', "field id")?,
+                    quoted(&field["name"], "field name")?,
+                    optional_quoted(&field["type"], "field type")?
+                )
+                .unwrap();
+            }
+            output.push('\n');
         }
         method_rows(output, &owner["methods"], method_count, low)?;
     }
@@ -343,7 +317,8 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                 if columns.len() != if interface { 3 } else { 4 } {
                     return Err("invalid owner record".into());
                 }
-                let id = parsed_handle(columns[1], Some(if interface { 'I' } else { 'C' }))?;
+                let id =
+                    parse::parsed_scoped_handle(columns[1], if interface { 'I' } else { 'C' })?;
                 if !ids.insert(id.as_str().unwrap().to_string()) {
                     return Err("duplicate canonical ID".into());
                 }
@@ -368,21 +343,30 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                 owner_count += 1;
             }
             "F" => {
-                if columns.len() != 4 {
+                if columns.len() < 2 {
                     return Err("invalid field record".into());
                 }
                 let (interface, owner) = current_owner.ok_or("field outside owner")?;
-                let id = parsed_handle(columns[1], Some('F'))?;
-                if !ids.insert(id.as_str().unwrap().to_string()) {
-                    return Err("duplicate canonical ID".into());
+                let count = columns[1]
+                    .parse::<usize>()
+                    .map_err(|_| "invalid field count")?;
+                if columns.len() != 2 + count * 3 {
+                    return Err("field count mismatch".into());
                 }
-                let value = json!({"id":id,"name":parsed_string(columns[2])?,"type":parsed_optional(columns[3])?});
                 let owners = if interface {
                     &mut interfaces
                 } else {
                     &mut classes
                 };
-                owners[owner]["fields"].as_array_mut().unwrap().push(value);
+                for entry in columns[2..].chunks_exact(3) {
+                    let id = parse::parsed_scoped_handle(entry[0], 'F')?;
+                    if !ids.insert(id.as_str().unwrap().to_string()) {
+                        return Err("duplicate canonical ID".into());
+                    }
+                    owners[owner]["fields"].as_array_mut().unwrap().push(
+                        json!({"id":id,"name":parsed_string(entry[1])?,"type":parsed_optional(entry[2])?}),
+                    );
+                }
                 current_method = None;
             }
             "M" => {
@@ -390,7 +374,7 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                     return Err("invalid method record".into());
                 }
                 let (interface, owner) = current_owner.ok_or("method outside owner")?;
-                let id = parsed_handle(columns[1], Some('M'))?;
+                let id = parse::parsed_scoped_handle(columns[1], 'M')?;
                 if !ids.insert(id.as_str().unwrap().to_string()) {
                     return Err("duplicate canonical ID".into());
                 }
@@ -411,25 +395,32 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                 method_count += 1;
             }
             "p" => {
-                if columns.len() != 4 {
+                if columns.len() < 2 {
                     return Err("invalid parameter record".into());
                 }
                 let (interface, owner, method) =
                     current_method.ok_or("parameter outside method")?;
-                let id = parsed_handle(columns[1], Some('P'))?;
-                if !ids.insert(id.as_str().unwrap().to_string()) {
-                    return Err("duplicate canonical ID".into());
+                let count = columns[1]
+                    .parse::<usize>()
+                    .map_err(|_| "invalid parameter count")?;
+                if columns.len() != 2 + count * 3 {
+                    return Err("parameter count mismatch".into());
                 }
-                let value = json!({"id":id,"name":parsed_string(columns[2])?,"type":parsed_optional(columns[3])?});
                 let owners = if interface {
                     &mut interfaces
                 } else {
                     &mut classes
                 };
-                owners[owner]["methods"][method]["parameters"]
-                    .as_array_mut()
-                    .unwrap()
-                    .push(value);
+                for entry in columns[2..].chunks_exact(3) {
+                    let id = parse::parsed_scoped_handle(entry[0], 'P')?;
+                    if !ids.insert(id.as_str().unwrap().to_string()) {
+                        return Err("duplicate canonical ID".into());
+                    }
+                    owners[owner]["methods"][method]["parameters"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(json!({"id":id,"name":parsed_string(entry[1])?,"type":parsed_optional(entry[2])?}));
+                }
             }
             "X" | "J" => {
                 if columns.len() != 2 {
@@ -459,7 +450,7 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
             }
             "cm" | "cf" | "D" => {
                 let (interface, owner) = current_owner.ok_or("owner fact outside owner")?;
-                let (index, group) = occurrence(&columns)?;
+                let group = occurrence(&columns)?;
                 let field = match columns[0] {
                     "cm" => "modifier_occurrences",
                     "cf" => "class_flag_occurrences",
@@ -474,16 +465,13 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                     &mut classes
                 };
                 let groups = owners[owner][field].as_array_mut().unwrap();
-                if index != groups.len() {
-                    return Err("non-contiguous occurrence".into());
-                }
                 groups.push(group);
                 current_method = None;
             }
             "pf" => {
                 let (interface, owner, method) =
                     current_method.ok_or("pattern fact outside method")?;
-                let (index, group) = parse::pattern_fact_occurrence(&columns)?;
+                let group = parse::pattern_fact_occurrence(&columns)?;
                 let owners = if interface {
                     &mut interfaces
                 } else {
@@ -492,15 +480,12 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                 let groups = owners[owner]["methods"][method]["pattern_fact_occurrences"]
                     .as_array_mut()
                     .unwrap();
-                if index != groups.len() {
-                    return Err("non-contiguous occurrence".into());
-                }
                 groups.push(group);
             }
             "mo" | "cs" | "lf" => {
                 let (interface, owner, method) =
                     current_method.ok_or("method fact outside method")?;
-                let (index, group) = occurrence(&columns)?;
+                let group = occurrence(&columns)?;
                 let field = match columns[0] {
                     "mo" => "modifier_occurrences",
                     "cs" => "control_summary_occurrences",
@@ -515,9 +500,6 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                 let groups = owners[owner]["methods"][method][field]
                     .as_array_mut()
                     .unwrap();
-                if index != groups.len() {
-                    return Err("non-contiguous occurrence".into());
-                }
                 groups.push(group);
             }
             "pt" => {

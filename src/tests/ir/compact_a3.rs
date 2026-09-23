@@ -59,5 +59,5 @@ fn phase1a_declarations_reject_truncation_scope_and_count_corruption() {
     assert!(decode_declarations(encoded.trim_end_matches("Z|2|2|0|0\n")).is_err());
     assert!(decode_declarations("A3|3|H|f|1|\"p\"\np|P1|\"x\"|\"t\"\nZ|0|0|0|0\n").is_err());
     assert!(decode_declarations(&encoded.replace("Z|2|2|0|0", "Z|2|3|0|0")).is_err());
-    assert!(decode_declarations(&encoded.replacen("M2|", "M1|", 1)).is_err());
+    assert!(decode_declarations(&encoded.replacen("M|2|", "M|1|", 1)).is_err());
 }

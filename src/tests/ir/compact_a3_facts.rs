@@ -15,7 +15,7 @@ fn sparse_facts_roundtrip_calls_behavior_imports_and_aliases() {
         "type_aliases":[{"alias":"Id","original_type":"string"}]
     });
     let wire = encode(&oracle).unwrap();
-    assert_eq!(wire.matches("K|M1").count(), 1);
+    assert_eq!(wire.matches("K|1|2").count(), 1);
     assert!(!wire.contains("unresolved"));
     let decoded = decode(&wire).unwrap();
     assert_eq!(
@@ -52,9 +52,9 @@ fn exact_body_frames_preserve_bytes_and_reject_truncation() {
 
 #[test]
 fn sparse_facts_reject_scope_and_resolution_corruption() {
-    assert!(decode("k|\"call\"|1\n").is_err());
-    assert!(decode("fc|0|\"if\"|\"x\"\n").is_err());
-    assert!(decode("V|M1\nfc|1|\"if\"|\"x\"\n").is_err());
+    assert!(decode("K|1|2|call|1\n").is_err());
+    assert!(decode("fc|\"if\"|\"x\"\n").is_err());
+    assert!(decode("V|1\nfc|if\n").is_err());
     let invalid = json!({"mode":{"fidelity":"high"},"classes":[],"interfaces":[],"calls":[{"caller_method_id":"M1","callee_written_name":"x","explicit_argument_count":0,"has_spread":false,"callee_resolution":"resolved"}],"imports":[],"type_aliases":[]});
     assert!(encode(&invalid).is_err());
 }

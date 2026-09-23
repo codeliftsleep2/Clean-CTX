@@ -44,8 +44,8 @@ fn phase1c_complete_edit_document_roundtrips_normalized_target() {
         oracle["classes"][0]["methods"][0]["body"]
     );
     assert_eq!(
-        wire.windows(b"K|M1".len())
-            .filter(|window| *window == b"K|M1")
+        wire.windows(b"K|1".len())
+            .filter(|window| *window == b"K|1")
             .count(),
         1
     );
@@ -73,7 +73,7 @@ fn phase1c_document_rejects_terminal_body_and_reference_corruption() {
     assert!(decode(&bad_count).is_err());
     assert!(decode(&wire[..wire.len() - 4]).is_err());
     let bad_call = String::from_utf8_lossy(&wire)
-        .replace("K|M1", "K|M404")
+        .replace("K|1", "K|404")
         .into_bytes();
     assert!(decode(&bad_call).is_err());
 }

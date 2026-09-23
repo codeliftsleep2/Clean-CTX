@@ -5,12 +5,18 @@ use std::collections::HashMap;
 use std::fmt::Write;
 
 fn quote(value: &Value, field: &str) -> Result<String, String> {
-    serde_json::to_string(
-        value
-            .as_str()
-            .ok_or_else(|| format!("{field} must be a string"))?,
-    )
-    .map_err(|error| error.to_string())
+    let value = value
+        .as_str()
+        .ok_or_else(|| format!("{field} must be a string"))?;
+    if !value.is_empty()
+        && value != "-"
+        && !value.starts_with('"')
+        && !value.contains(['|', '\r', '\n'])
+    {
+        Ok(value.into())
+    } else {
+        serde_json::to_string(value).map_err(|error| error.to_string())
+    }
 }
 
 fn optional(value: &Value, field: &str) -> Result<String, String> {
@@ -26,7 +32,11 @@ fn handle(value: &Value, family: char) -> Result<&str, String> {
     if !value.starts_with(family) || value.contains(['|', '\r', '\n']) {
         return Err("invalid typed handle".into());
     }
-    Ok(value)
+    let suffix = value.strip_prefix(family).ok_or("invalid typed handle")?;
+    if suffix.is_empty() || !suffix.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err("invalid typed handle".into());
+    }
+    Ok(suffix)
 }
 
 fn methods(normalized: &Value) -> Result<Vec<&Value>, String> {
@@ -47,11 +57,10 @@ fn methods(normalized: &Value) -> Result<Vec<&Value>, String> {
 }
 
 fn pair_rows(output: &mut String, tag: &str, values: &Value, field: &str) -> Result<(), String> {
-    for (ordinal, value) in values
+    for value in values
         .as_array()
         .ok_or_else(|| format!("{field} must be an array"))?
         .iter()
-        .enumerate()
     {
         let columns = value
             .as_array()
@@ -61,7 +70,7 @@ fn pair_rows(output: &mut String, tag: &str, values: &Value, field: &str) -> Res
         }
         writeln!(
             output,
-            "{tag}|{ordinal}|{}|{}",
+            "{tag}|{}|{}",
             quote(&columns[0], field)?,
             quote(&columns[1], field)?
         )
@@ -71,13 +80,12 @@ fn pair_rows(output: &mut String, tag: &str, values: &Value, field: &str) -> Res
 }
 
 fn scalar_rows(output: &mut String, tag: &str, values: &Value, field: &str) -> Result<(), String> {
-    for (ordinal, value) in values
+    for value in values
         .as_array()
         .ok_or_else(|| format!("{field} must be an array"))?
         .iter()
-        .enumerate()
     {
-        writeln!(output, "{tag}|{ordinal}|{}", quote(value, field)?).unwrap();
+        writeln!(output, "{tag}|{}", quote(value, field)?).unwrap();
     }
     Ok(())
 }
@@ -108,35 +116,42 @@ pub fn encode(normalized: &Value) -> Result<String, String> {
             }
         }
     }
-    let mut caller = None;
-    for call in normalized["calls"]
+    let calls = normalized["calls"]
         .as_array()
-        .ok_or("calls must be an array")?
-    {
-        if call["callee_resolution"] != "unresolved" {
-            return Err("A3 cannot fabricate resolved callees".into());
+        .ok_or("calls must be an array")?;
+    let mut start = 0;
+    while start < calls.len() {
+        let caller_id = calls[start]["caller_method_id"]
+            .as_str()
+            .ok_or("call caller must be a string")?;
+        let caller = handle(&calls[start]["caller_method_id"], 'M')?;
+        let mut end = start + 1;
+        while end < calls.len() && calls[end]["caller_method_id"] == caller_id {
+            end += 1;
         }
-        let next = handle(&call["caller_method_id"], 'M')?;
-        if caller != Some(next) {
-            writeln!(output, "K|{next}").unwrap();
-            caller = Some(next);
-        }
-        write!(
-            output,
-            "k|{}|{}",
-            quote(&call["callee_written_name"], "callee")?,
-            call["explicit_argument_count"]
-                .as_u64()
-                .ok_or("call arity must be unsigned")?
-        )
-        .unwrap();
-        if call["has_spread"]
-            .as_bool()
-            .ok_or("spread must be boolean")?
-        {
-            output.push_str("|*");
+        write!(output, "K|{caller}|{}", end - start).unwrap();
+        for call in &calls[start..end] {
+            if call["callee_resolution"] != "unresolved" {
+                return Err("A3 cannot fabricate resolved callees".into());
+            }
+            write!(
+                output,
+                "|{}|{}",
+                quote(&call["callee_written_name"], "callee")?,
+                call["explicit_argument_count"]
+                    .as_u64()
+                    .ok_or("call arity must be unsigned")?
+            )
+            .unwrap();
+            if call["has_spread"]
+                .as_bool()
+                .ok_or("spread must be boolean")?
+            {
+                output.push_str("|*");
+            }
         }
         output.push('\n');
+        start = end;
     }
     for import in normalized["imports"]
         .as_array()
@@ -196,9 +211,16 @@ fn string(column: &str) -> Result<Value, String> {
     if column == "-" {
         return Ok(Value::Null);
     }
-    serde_json::from_str::<String>(column)
-        .map(Value::String)
-        .map_err(|_| "invalid string column".into())
+    if column.starts_with('"') {
+        serde_json::from_str::<String>(column)
+            .map(Value::String)
+            .map_err(|_| "invalid string column".into())
+    } else {
+        if column.is_empty() || column.contains(['|', '\r', '\n']) {
+            return Err("invalid string column".into());
+        }
+        Ok(Value::String(column.into()))
+    }
 }
 
 /// Decode sparse fact records into merge-ready normalized families.
@@ -207,51 +229,56 @@ pub fn decode(input: &str) -> Result<Value, String> {
     let mut calls = Vec::new();
     let mut imports = Vec::new();
     let mut aliases = Vec::new();
-    let (mut method, mut caller) = (None::<String>, None::<String>);
+    let mut method = None::<String>;
     let mut ordinals = HashMap::<(String, String), u64>::new();
     for line in input.lines() {
         let row = columns(line)?;
         match row.first().copied().unwrap_or_default() {
-            "V" | "K" => {
-                if row.len() != 2 || !row[1].starts_with('M') {
+            "V" => {
+                if row.len() != 2 || !row[1].bytes().all(|byte| byte.is_ascii_digit()) {
                     return Err("invalid method scope".into());
                 }
-                if row[0] == "V" {
-                    method = Some(row[1].into());
-                } else {
-                    caller = Some(row[1].into());
-                }
+                method = Some(format!("M{}", row[1]));
             }
             "fc" | "fd" | "se" | "ec" => {
                 let owner = method.clone().ok_or("behavior outside method")?;
                 let pair = matches!(row[0], "fc" | "fd");
-                if row.len() != if pair { 4 } else { 3 } {
+                if row.len() != if pair { 3 } else { 2 } {
                     return Err("invalid behavior row".into());
                 }
-                let ordinal = row[1].parse::<u64>().map_err(|_| "invalid ordinal")?;
                 let next = ordinals.entry((owner.clone(), row[0].into())).or_default();
-                if ordinal != *next {
-                    return Err("non-contiguous behavior ordinal".into());
-                }
+                let ordinal = *next;
                 *next += 1;
-                let mut value = vec![string(row[2])?];
+                let mut value = vec![string(row[1])?];
                 if pair {
-                    value.push(string(row[3])?);
+                    value.push(string(row[2])?);
                 }
                 behavior.push(
                     json!({"method_id":owner,"family":row[0],"ordinal":ordinal,"value":value}),
                 );
             }
-            "k" => {
-                if !(row.len() == 3 || row.len() == 4 && row[3] == "*") {
-                    return Err("invalid call row".into());
+            "K" => {
+                if row.len() < 3 || !row[1].bytes().all(|byte| byte.is_ascii_digit()) {
+                    return Err("invalid call run".into());
                 }
-                calls.push(json!({
-                    "occurrence":calls.len(),"caller_method_id":caller.clone().ok_or("call outside caller")?,
-                    "callee_written_name":string(row[1])?,
-                    "explicit_argument_count":row[2].parse::<u64>().map_err(|_|"invalid call arity")?,
-                    "has_spread":row.len()==4,"callee_resolution":"unresolved"
-                }));
+                let count = row[2].parse::<usize>().map_err(|_| "invalid call count")?;
+                let mut column = 3;
+                for _ in 0..count {
+                    let callee = row.get(column).ok_or("truncated call run")?;
+                    let arity = row.get(column + 1).ok_or("truncated call run")?;
+                    column += 2;
+                    let spread = row.get(column) == Some(&"*");
+                    column += usize::from(spread);
+                    calls.push(json!({
+                        "occurrence":calls.len(),"caller_method_id":format!("M{}", row[1]),
+                        "callee_written_name":string(callee)?,
+                        "explicit_argument_count":arity.parse::<u64>().map_err(|_|"invalid call arity")?,
+                        "has_spread":spread,"callee_resolution":"unresolved"
+                    }));
+                }
+                if column != row.len() {
+                    return Err("call count mismatch".into());
+                }
             }
             "$" => {
                 if row.len() != 4 {

@@ -69,7 +69,7 @@ fn caller_run_encoding_preserves_global_switch_and_duplicate_order() {
     normalized["calls"].as_array_mut().unwrap().push(first);
     normalized["calls"][3]["occurrence"] = serde_json::json!(3);
     let wire = encode(&normalized).unwrap();
-    assert_eq!(String::from_utf8_lossy(&wire).matches("K|M1").count(), 2);
+    assert_eq!(String::from_utf8_lossy(&wire).matches("K|1").count(), 2);
     let decoded = decode(&wire).unwrap();
     assert_eq!(decoded["calls"], normalized["calls"]);
 }

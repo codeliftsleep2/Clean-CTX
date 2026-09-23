@@ -27,9 +27,16 @@ pub(super) fn split_columns(line: &str) -> Result<Vec<&str>, String> {
 }
 
 pub(super) fn parsed_string(column: &str) -> Result<Value, String> {
-    serde_json::from_str::<String>(column)
-        .map(Value::String)
-        .map_err(|_| "invalid JSON-string column".into())
+    if column.starts_with('"') {
+        serde_json::from_str::<String>(column)
+            .map(Value::String)
+            .map_err(|_| "invalid JSON-string column".into())
+    } else {
+        if column.is_empty() || column == "-" || column.contains(['|', '\r', '\n']) {
+            return Err("invalid bare-string column".into());
+        }
+        Ok(Value::String(column.into()))
+    }
 }
 
 pub(super) fn parsed_handle(column: &str, family: Option<char>) -> Result<Value, String> {
@@ -40,6 +47,13 @@ pub(super) fn parsed_handle(column: &str, family: Option<char>) -> Result<Value,
         return Err("invalid canonical handle".into());
     }
     Ok(Value::String(column.into()))
+}
+
+pub(super) fn parsed_scoped_handle(column: &str, family: char) -> Result<Value, String> {
+    if column.is_empty() || !column.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err("invalid scoped handle".into());
+    }
+    Ok(Value::String(format!("{family}{column}")))
 }
 
 pub(super) fn parsed_optional(column: &str) -> Result<Value, String> {
@@ -60,42 +74,33 @@ pub(super) fn empty_method(id: Value, name: Value, return_type: Value) -> Value 
     })
 }
 
-pub(super) fn occurrence(columns: &[&str]) -> Result<(usize, Value), String> {
-    if columns.len() < 3 {
+pub(super) fn occurrence(columns: &[&str]) -> Result<Value, String> {
+    if columns.len() < 2 {
         return Err("short occurrence record".into());
     }
-    let index = columns[1]
-        .parse::<usize>()
-        .map_err(|_| "invalid occurrence")?;
-    let count = columns[2]
+    let count = columns[1]
         .parse::<usize>()
         .map_err(|_| "invalid value count")?;
-    if columns.len() != count + 3 {
+    if columns.len() != count + 2 {
         return Err("occurrence value-count mismatch".into());
     }
-    Ok((
-        index,
-        Value::Array(
-            columns[3..]
-                .iter()
-                .map(|column| parsed_string(column))
-                .collect::<Result<_, _>>()?,
-        ),
+    Ok(Value::Array(
+        columns[2..]
+            .iter()
+            .map(|column| parsed_string(column))
+            .collect::<Result<_, _>>()?,
     ))
 }
 
-pub(super) fn pattern_fact_occurrence(columns: &[&str]) -> Result<(usize, Value), String> {
-    if columns.len() < 3 {
+pub(super) fn pattern_fact_occurrence(columns: &[&str]) -> Result<Value, String> {
+    if columns.len() < 2 {
         return Err("short pattern-fact record".into());
     }
-    let occurrence = columns[1]
-        .parse::<usize>()
-        .map_err(|_| "invalid occurrence")?;
-    let expected = columns[2]
+    let expected = columns[1]
         .parse::<usize>()
         .map_err(|_| "invalid fact count")?;
     let mut facts = Vec::new();
-    let mut column = 3;
+    let mut column = 2;
     while column < columns.len() {
         let kind = parsed_string(columns[column])?;
         let kind_text = kind.as_str().unwrap();
@@ -114,5 +119,5 @@ pub(super) fn pattern_fact_occurrence(columns: &[&str]) -> Result<(usize, Value)
     if facts.len() != expected {
         return Err("pattern-fact count mismatch".into());
     }
-    Ok((occurrence, Value::Array(facts)))
+    Ok(Value::Array(facts))
 }

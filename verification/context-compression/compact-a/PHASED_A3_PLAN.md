@@ -1,6 +1,7 @@
 # COMPACT-A3 sparse positional phase plan
 
-**Status:** Phase 1 complete; Phase 2 green; Phase 3 cold economics implemented, verification pending
+**Status:** Phase 1 complete; Phase 2 green; initial Phase 3 economics failed;
+lossless density iteration in progress
 **Predecessor:** A2 stopped after failing raw-source economics
 **Scope:** model-facing file-context representation only. Canonical IR,
 normalized semantic objects, persistence authority, workspace-query authority,
@@ -170,10 +171,19 @@ remain in the roundtrip lane but do not determine aggregate economics.
 
 - Legend is at most 300 tokens, with a target of 200 or fewer.
 - The raw ceiling selects raw for every losing non-focused case.
-- At least one representative large fixture is economically eligible before
-  reasoning evaluation begins.
+- Every representative large fixture saves at least 50% against byte-exact raw
+  source. Aggregate savings and raw fallback cannot hide an individual miss.
 - No aggregate hides an individual inflation case.
 - C# economics remain explicitly pending until a qualifying fixture exists.
+
+The first complete encoding failed this checkpoint. Under o200k,
+`LargeService.ts` saved 22.32% and `UserManagementService.ts` inflated 2.76%.
+The legend was only about 130 tokens; repeated local calls, fields, parameters,
+methods, imports, and types dominate. A byte-profitable repeated-string
+dictionary was tested and rejected because it increased o200k cost on both
+large fixtures. Phase 4 is blocked while A3 iterates on packed caller runs,
+implicit physical-order ordinals, dense owner/member layout, and reversible
+scoped handles. None of these may weaken the normalized decoded target.
 
 ## Phase 4 — locality and reasoning screen
 

@@ -2,6 +2,11 @@
 
 **Status:** Phase 0 specification; no production encoder is authorized yet
 
+**Economics status:** the first complete A3 encoding failed the Phase 3 gate.
+Both representative large-file cases must save at least 50% against raw; the
+initial results saved 22.32% and -2.76% under o200k. A raw fallback prevents
+production inflation but does not make a sub-50% codec successful.
+
 ## Authority and decoded target
 
 A3 is a presentation codec over checked file-local state. It does not alter
@@ -18,16 +23,20 @@ injection occurrences are inside it.
 - The stream is strict UTF-8 without a BOM.
 - Records are separated by LF. CR is forbidden outside a framed body.
 - `|` separates columns.
-- Canonical handles match their typed family (`C`, `I`, `F`, `M`, `P`).
-- Arbitrary strings use JSON string escaping and include their quotes.
+- Typed declaration/scope records omit the redundant family prefix from
+  canonical handles (`C`, `I`, `F`, `M`, `P`); decoding restores it from the
+  record type. Other string-valued references retain their exact spelling.
+- Strings without `|`, CR, or LF use their bare UTF-8 spelling. Empty strings,
+  the reserved absent marker `-`, strings beginning with `"`, and strings with
+  delimiters use JSON string escaping and include their quotes.
 - Integers are unsigned base-10 without leading zeroes, except `0`.
 - `-` is the absent scalar. Empty arrays are represented by no record.
 - Record order is semantic wherever the normalized target uses an array.
 - Unknown tags, wrong column counts, invalid escapes, invalid handles, dangling
   references, and records illegal for the declared fidelity are errors.
 
-JSON objects are forbidden in A3. JSON string escaping is only a lexical rule
-for individual arbitrary string columns.
+JSON objects are forbidden in A3. JSON string escaping is only a fallback
+lexical rule for individual string columns.
 
 ## Document framing
 
@@ -49,10 +58,10 @@ C|<class-id>|<name>|<synthetic-0-or-1>
 I|<interface-id>|<name>
 X|<parent-reference>
 J|<interface-reference>
-cm|<occurrence>|<value-count>|<value>...
-cf|<occurrence>|<value-count>|<value>...
-D|<occurrence>|<dependency-count>|<dependency-reference>...
-F|<field-id>|<name>|<type-or-->
+cm|<value-count>|<value>...
+cf|<value-count>|<value>...
+D|<dependency-count>|<dependency-reference>...
+F|<field-count>|<field-id>|<name>|<type-or-->...
 ```
 
 `C` or `I` opens the current typed owner scope and closes any prior method and
@@ -68,37 +77,38 @@ when no other record currently refers to it.
 
 ```text
 M|<method-id>|<name>|<declared-arity>|<return-type-or-->
-p|<parameter-id>|<name>|<type-or-->
-mo|<occurrence>|<value-count>|<value>...
-cs|<occurrence>|<value-count>|<value>...
-pf|<occurrence>|<fact-count>|<kind>|[<kind-value>]...
-lf|<occurrence>|<value-count>|<value>...
+p|<parameter-count>|<parameter-id>|<name>|<type-or-->...
+mo|<value-count>|<value>...
+cs|<value-count>|<value>...
+pf|<fact-count>|<kind>|[<kind-value>]...
+lf|<value-count>|<value>...
 pt|<pattern-name>|<argument-count>|<argument>...
 ```
 
 `M` opens a method under the current owner and closes the prior method scope.
-`p` records are ordered parameters. Low may omit `p` rows for a unique-name
+One `p` record contains all ordered parameters. Low may omit it for a unique-name
 method, but `declared-arity` remains exact; Low includes parameter rows for
 same-owner overload families so overload signatures remain distinguishable.
 Medium, High, and Edit include all parameter rows.
 
-The occurrence index is explicit because empty and duplicate occurrence groups
-are significant. Pattern-fact kinds are `CTOR`, `OBSERVABLE`, `OVERRIDE`,
+Physical row order is the occurrence index. Empty and duplicate occurrence
+groups remain explicit rows and significant. Pattern-fact kinds are `CTOR`, `OBSERVABLE`, `OVERRIDE`,
 `GETTER`, and `SETTER`; only getter/setter consume the following value column.
 Values are positional strings, never copied named objects.
 
 ## High/Edit behavior records
 
 ```text
-fc|<ordinal>|<kind>|<target>
-fd|<ordinal>|<direction>|<target>
-se|<ordinal>|<value>
-ec|<ordinal>|<value>
+fc|<kind>|<target>
+fd|<direction>|<target>
+se|<value>
+ec|<value>
 ```
 
-These records are legal only in High and Edit. Ordinals must start at zero and
-increase by one within each method and family. This preserves order and catches
-missing rows without serializing empty family columns.
+These records are legal only in High and Edit. Physical order within each
+method and family reconstructs exact zero-based ordinals. Family records are
+contiguous, so a missing or reordered physical row changes the decoded ordered
+array rather than being silently normalized.
 
 ## File records
 
@@ -114,16 +124,14 @@ positional JSON-string columns; named objects are forbidden.
 ## Local call stream
 
 ```text
-K|<caller-method-id>
-k|<callee-written-name>|<explicit-argument-count>
-k|<callee-written-name>|<explicit-argument-count>|*
+K|<caller-method-id>|<call-count>|<callee-written-name>|<explicit-argument-count>|[*]...
 ```
 
-`K` changes the current caller. It is emitted only when the caller changes, so
-consecutive calls do not repeat it. A later `K` may return to an earlier caller;
-physical `k` order is the authoritative global occurrence order. Each `k` is
-unresolved by definition. `*` is present only for spread calls. Duplicate rows
-remain duplicate occurrences. A `k` without a current `K` is invalid.
+`K` contains one consecutive caller run. A later `K` may return to an earlier
+caller; physical entry order is the authoritative global occurrence order.
+Each entry is unresolved by definition. `*` follows only a spread call.
+Duplicates remain duplicate entries. The count makes truncation and trailing
+columns invalid.
 
 This removes repeated occurrence numbers, repeated caller IDs, repeated
 `false`, and repeated `"unresolved"` while retaining every canonical fact.
@@ -186,7 +194,7 @@ The decoder rejects:
 - owner/member records outside their required scope;
 - duplicate canonical declarations;
 - wrong-family or dangling references;
-- non-contiguous required ordinals;
+- malformed counts or order-changing missing records;
 - illegal fidelity families;
 - malformed JSON-string columns;
 - missing, duplicate, truncated, or overlong body frames;
