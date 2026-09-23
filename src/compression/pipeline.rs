@@ -1,11 +1,11 @@
 // src/compression/pipeline.rs
 //
-// Non-streaming compression orchestrator (`compress_file`). It owns the
-// shared helper functions `build_output_lines` and `assemble_body` that
-// were historically private to `compressor.rs`. These are `pub(crate)` so
-// the streaming variant can also call them.
+// Non-streaming compression orchestrators (`compress_file`,
+// `compress_file_with_source`, `compress_text`, `compress_source`). Output
+// assembly (`build_output_lines`, `assemble_body`, `combine_footers`) lives in
+// `output.rs`; CBM filter-first capture skipping lives in `skip.rs`.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -42,44 +42,19 @@ use crate::compaction::java::{
 };
 use crate::compaction::{
     compact_expression, compact_import, extract_class_name, extract_field, extract_method_sig,
-    extract_rust_struct_name, format_class_entry, format_java_type_entry, format_rust_type_entry,
-    simple_compact,
+    extract_rust_struct_name,
 };
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::run_capture_pipeline;
 use crate::compression::language::language_for_extension;
-use crate::compression::markers::build_marker;
+pub(crate) use crate::compression::output::{assemble_body, build_output_lines, combine_footers};
+pub(crate) use crate::compression::skip::should_skip_capture;
 use crate::compression::micro_opcodes::apply_micro_opcodes;
 use crate::compression::report::{format_compacted_body, format_final_output};
 use crate::compression::symbol_compression::apply_symbol_compression;
 use crate::compression::type_aliases::apply_type_aliases;
 use crate::dictionary::PathDictionary;
-
-/// Output of [`build_output_lines`]. F-04 (FAANG audit): previously
-/// the orchestrator counted classes/methods/imports by
-/// `let class_count: usize = 0;` and bound it to `_`, then passed
-/// `0, 0, 0` to `format_final_output`. The header always lied.
-/// The struct now carries the real counts.
-#[derive(Debug, Clone)]
-pub struct BuildOutputResult {
-    /// The compacted body lines, in document order, with the import
-    /// block prepended.
-    pub output_lines: Vec<String>,
-    /// Number of `class.root` captures that emitted a class entry.
-    pub class_count: usize,
-    /// Number of `method.root` captures that emitted a method line.
-    pub method_count: usize,
-    /// Number of `import.root` captures that produced a non-empty
-    /// import line.
-    pub import_count: usize,
-    /// Angular Meta-Layer block (Phase 1: Tier 1 decorator extraction).
-    pub meta_block: Option<crate::angular_meta::MetaBlock>,
-    /// Spring Boot Meta-Layer block (Phase 1: Tier 1 annotation extraction).
-    pub spring_meta_block: Option<crate::spring_meta::MetaBlock>,
-    /// .NET / C# Meta-Layer block.
-    pub dotnet_meta_block: Option<crate::dotnet_meta::MetaBlock>,
-}
 
 /// Reads a target source file and compiles it down into a highly compacted,
 /// keyword-stripped structural signature stream with configurable fidelity.
@@ -330,202 +305,6 @@ pub fn compress_text(
     Ok((body_lines, full_output))
 }
 
-// ---------------------------------------------------------------------------
-// Shared pipeline helpers
-// ---------------------------------------------------------------------------
-
-/// Walk the captures in document order and build the output lines +
-/// the per-fidelity counts. Shared between the streaming and
-/// non-streaming variants.
-///
-/// F-04: the return type is now `BuildOutputResult` (with the real
-/// counts) instead of a `(Vec<String>, Vec<String>)` tuple.
-///
-/// `skip_set`: optional set of symbol names to exclude from the output.
-/// When a class, method, or field name matches an entry in this set,
-/// the capture is dropped entirely. Used by the CBM filter-first
-/// architecture to exclude low-importance symbols.
-///
-/// `config`: optional project config forwarded to the meta-layer registry
-/// so per-framework `enabled` flags and sub-layer settings are honored.
-pub fn build_output_lines(
-    all_captures: &[CapEntry],
-    source_code: &str,
-    fidelity: Fidelity,
-    skip_set: Option<&HashSet<String>>,
-    config: Option<&crate::config::CleanCtxConfig>,
-) -> BuildOutputResult {
-    let mut output_lines: Vec<String> = Vec::new();
-    let mut fields: Vec<String> = Vec::new();
-    let mut markers: Vec<String> = Vec::new();
-    let mut imports: Vec<String> = Vec::new();
-    let mut class_count: usize = 0;
-    let mut method_count: usize = 0;
-    let mut import_count: usize = 0;
-    let mut class_captures: Vec<String> = Vec::new();
-
-    for cap in all_captures {
-        if let Some(skip) = skip_set {
-            if !skip.is_empty() && should_skip_capture(cap, skip) {
-                continue;
-            }
-        }
-        match cap.name.as_str() {
-            "import.root" | "mod.root" | "package.root" => {
-                let compact = compact_import(&cap.text, fidelity);
-                if !compact.is_empty() {
-                    imports.push(compact);
-                    import_count += 1;
-                }
-            }
-            "class.root" => {
-                if !output_lines.is_empty()
-                    && (fidelity == Fidelity::High || fidelity == Fidelity::Medium)
-                {
-                    output_lines.push(String::new());
-                }
-                output_lines.push(format_class_entry(&cap.text, &fields, fidelity));
-                // The meta-layer contract requires the FULL class text
-                // (leading decorators + body), NOT the compacted name.
-                // Reconstruct the decorator-inclusive span via the CANONICAL
-                // shared helper (same one used by
-                // `mcp::workspace_util::extract_class_blocks`).
-                class_captures.push(
-                    crate::meta_util::class_source_from_capture(source_code, cap).to_string(),
-                );
-                class_count += 1;
-                fields.clear();
-                markers.clear();
-            }
-            "struct.root" | "trait.root" | "impl.root" => {
-                if !output_lines.is_empty()
-                    && (fidelity == Fidelity::High || fidelity == Fidelity::Medium)
-                {
-                    output_lines.push(String::new());
-                }
-                output_lines.push(format_rust_type_entry(&cap.text, &fields, fidelity));
-                class_captures.push(cap.text.clone());
-                class_count += 1;
-                fields.clear();
-                markers.clear();
-            }
-            "interface.root" | "enum.root" | "record.root" => {
-                if !output_lines.is_empty()
-                    && (fidelity == Fidelity::High || fidelity == Fidelity::Medium)
-                {
-                    output_lines.push(String::new());
-                }
-                output_lines.push(format_java_type_entry(
-                    &cap.text, &cap.name, &fields, fidelity,
-                ));
-                class_captures.push(cap.text.clone());
-                class_count += 1;
-                fields.clear();
-                markers.clear();
-            }
-            "method.root" | "constructor.root" => {
-                let sig = &cap.text;
-                if !markers.is_empty() {
-                    let marker_str = markers.join(" ");
-                    if fidelity == Fidelity::High {
-                        output_lines.push(format!("  {} {{ {} }}", sig, marker_str));
-                    } else if fidelity == Fidelity::Medium {
-                        output_lines.push(format!("{} {}", sig, marker_str));
-                    } else {
-                        output_lines.push(sig.clone());
-                    }
-                } else {
-                    if fidelity == Fidelity::High {
-                        output_lines.push(format!("  {}", sig));
-                    } else {
-                        output_lines.push(sig.clone());
-                    }
-                }
-                method_count += 1;
-                markers.clear();
-            }
-            "field.root" => {
-                if !cap.text.is_empty() {
-                    fields.push(cap.text.clone());
-                }
-            }
-            _ => {
-                if fidelity == Fidelity::Low {
-                    continue;
-                }
-                if let Some(marker) = build_marker(&cap.name, &cap.text)
-                    && markers.last().map(|m| m != &marker).unwrap_or(true)
-                {
-                    markers.push(marker);
-                }
-            }
-        }
-    }
-
-    if !fields.is_empty() && output_lines.is_empty() && fidelity != Fidelity::Low {
-        output_lines.push(format!("⊕fields {{ {} }}", fields.join("; ")));
-    }
-
-    if output_lines.is_empty()
-        && let Some(first_line) = source_code.lines().next()
-    {
-        let trimmed = first_line.trim().to_string();
-        if !trimmed.is_empty() {
-            // H-5: at Edit/Verbatim the raw fallback must be byte-exact
-            // (preserve internal whitespace), not re-compact via simple_compact.
-            if fidelity == Fidelity::Edit || fidelity == Fidelity::Verbatim {
-                output_lines.push(trimmed);
-            } else {
-                output_lines.push(simple_compact(&trimmed, fidelity));
-            }
-        }
-    }
-
-    let mut output = output_lines;
-    if !imports.is_empty() {
-        let import_block = match fidelity {
-            Fidelity::Low => imports.join("; "),
-            _ => imports.join("\n"),
-        };
-        output.insert(0, import_block);
-    }
-
-    // Phase 4: Dispatch meta-layers through the registry.
-    // The `config` is threaded through so per-framework `enabled` flags
-    // and sub-layer settings (min_pipe_operators, include_dispatch_sites,
-    // etc.) are honored.
-    let registry = crate::layers::LayerRegistry::global();
-    let meta_results =
-        registry.run_meta_layers_pipeline(source_code, &class_captures, fidelity, config);
-
-    // The registry now returns structured `MetaLayerOutput` values. Use the
-    // structured blocks directly — no render-then-reparse.
-    let meta_block = meta_results
-        .iter()
-        .find(|o| o.layer_name == "angular")
-        .and_then(|o| o.angular_block.clone());
-
-    let spring_meta_block = meta_results
-        .iter()
-        .find(|o| o.layer_name == "spring_boot")
-        .and_then(|o| o.spring_block.clone());
-
-    let dotnet_meta_block = meta_results
-        .iter()
-        .find(|o| o.layer_name == "dotnet")
-        .and_then(|o| o.dotnet_block.clone());
-
-    BuildOutputResult {
-        output_lines: output,
-        class_count,
-        method_count,
-        import_count,
-        meta_block,
-        spring_meta_block,
-        dotnet_meta_block,
-    }
-}
-
 /// Compress source code from a string (not from a file path).
 ///
 /// `config` is threaded through to the meta-layer registry so per-framework
@@ -698,94 +477,10 @@ pub fn compress_source(
     Ok(final_output)
 }
 
-/// Check if a capture should be skipped due to CBM filter-first rules.
-pub(crate) fn should_skip_capture(
-    cap: &crate::compression::CapEntry,
-    skip_set: &HashSet<String>,
-) -> bool {
-    if matches!(
-        cap.name.as_str(),
-        "class.root"
-            | "struct.root"
-            | "enum.root"
-            | "trait.root"
-            | "impl.root"
-            | "interface.root"
-            | "record.root"
-    ) {
-        return skip_set.contains(cap.text.trim());
-    }
-
-    // C-8 (FAANG audit): at Edit/Verbatim `cap.text` is the FULL method body
-    // (e.g. "public async getUser..."), so the first word is the access
-    // modifier, not the method name. Extract the actual method name by
-    // scanning for the identifier that precedes the first `(`.
-    if matches!(
-        cap.name.as_str(),
-        "method.root" | "constructor.root" | "func.root" | "arrow.root"
-    ) {
-        if let Some(name) = extract_method_name_for_skip(&cap.text) {
-            return skip_set.contains(name);
-        }
-        return skip_set.contains(cap.text.trim());
-    }
-
-    // C-8: at Edit/Verbatim `cap.text` is the full field text
-    // (e.g. "private readonly userId: string = '';"). The `:` split still
-    // yields the leading modifiers + name, so we take the LAST whitespace
-    // token before the `:` to get the actual field name.
-    if cap.name == "field.root" {
-        let before_colon = cap.text.split(':').next().unwrap_or(cap.text.as_str());
-        let field_name = before_colon
-            .split_whitespace()
-            .last()
-            .unwrap_or(before_colon);
-        return skip_set.contains(field_name.trim());
-    }
-
-    false
-}
-
-/// Extract the method name from a method capture's text for CBM skip-set
-/// matching. At Edit/Verbatim the text is the full method body, so we scan
-/// for the identifier immediately preceding the first `(` (the method name).
-/// At lower fidelities the text is already the compact signature, so the
-/// same scan works. Returns `None` if no `(` is found.
-fn extract_method_name_for_skip(text: &str) -> Option<&str> {
-    let open = text.find('(')?;
-    let before = &text[..open];
-    // Take the last whitespace-delimited token before the `(`.
-    // Handles "public async getUser" → "getUser", "getUser" → "getUser",
-    // "async getUser<T>" → "getUser<T>".
-    let name = before.split_whitespace().last()?;
-    // Strip generic parameters for matching (skip sets use bare names).
-    let bare = name.split('<').next().unwrap_or(name);
-    Some(bare.trim())
-}
-
-/// Combine the symbol-dictionary footer and the type-alias footer into
-/// a single string.
-fn combine_footers(sym_footer: &str, ta_footer: &str) -> String {
-    if ta_footer.is_empty() {
-        sym_footer.to_string()
-    } else if sym_footer.is_empty() {
-        ta_footer.to_string()
-    } else {
-        format!("{}\n{}", sym_footer, ta_footer)
-    }
-}
-
-/// Join the body lines using the per-fidelity separator.
-pub fn assemble_body(output_lines: &[String], fidelity: Fidelity) -> String {
-    match fidelity {
-        Fidelity::Low => output_lines.join(";"),
-        Fidelity::Medium => output_lines.join("\n"),
-        Fidelity::High => output_lines.join("\n"),
-        // Edit/Verbatim preserve structure — newline-joined.
-        Fidelity::Edit | Fidelity::Verbatim => output_lines.join("\n"),
-    }
-}
-
 #[cfg(test)]
 #[path = "../tests/compression/pipeline.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/compression/pipeline_anatomy.rs"]
+mod pipeline_anatomy_tests;

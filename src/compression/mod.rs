@@ -25,8 +25,10 @@ pub(crate) mod graph_utils;
 pub(crate) mod markers;
 pub(crate) mod micro_opcodes;
 pub(crate) mod opcodes;
+pub(crate) mod output;
 pub(crate) mod pipeline;
 pub(crate) mod report;
+pub(crate) mod skip;
 pub(crate) mod symbol_compression;
 // R-02: Type-aware compression — replaces configured type names with
 // short alias tokens (`UserId` → `$uid`) and emits a reversible `§TA`
