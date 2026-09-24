@@ -46,6 +46,30 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-020: Model-Visible Content Is Assembled from the Codec, Not a Presentation
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-24 |
+| **Environment** | Controlled laboratory (this repository): source audit + measurement harness |
+| **Repository/context** | Clean-CTX itself — `src/mcp/tool_handlers/core/content.rs` and its 17 caller sites |
+| **Symptom** | Every content-producing handler (`compress_code_context`, `provide_code_context`, `control_full_delta`, `apply_delta`, `restore_context`, `replay_history`, persistence) assembles the model-visible `content` from the CONTROL-FULL codec (`compact_a::render_file_context`, A2), shipping the codec's preamble, grammar legend, envelope schema id and `§BODIES` framing into the model's context. `render_hierarchical_for_llm` (SCHEMA v5), the LLM-facing presentation renderer, has zero production callers. |
+| **Root cause** | The feature branch replaced the presentation renderer with the codec, conflating the reversible wire (CTX-001) with the model-visible presentation (ARCH-003). The codec's decode side has no production caller (`decode_cold` / `decode_declarations` / `decode_facts` reference only one another), so its legend is required by nothing in the protocol while being paid in every prompt. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes — dispatch any content handler and read `result.content[0].text`. |
+| **Local regression** | `src/tests/mcp/presentation_boundary.rs` (content is not the codec document; carries no decoder legend / envelope schema id / body framing; typed owner + method identity survive). |
+| **Live scenario required?** | No — the defect is the production assembly path, not scale-dependent. |
+| **Architectural invariant** | ARCH-003 (presentation) vs CTX-001 (reversible codec), now mechanically enforced. |
+| **Status** | Open — decision recorded, fix in progress |
+
+**Decision (2026-09-24):** `content` becomes the presentation renderer
+(`render_hierarchical_for_llm`, SCHEMA v5) on every path; the codec stays
+code-side (`result.ir` + persistence). Option A now, Option C (a purpose-built
+presentation) follows; Option B (codec minus its legend) was rejected because a
+positional grammar without its interpretive key is undecodable, not presentable.
+See `verification/context-compression/compact-a/PRESENTATION_BOUNDARY_PLAN.md` §6.
+
+
 ## DIS-2026-019: `provide_code_context` Fabricated Method Identities for C# Generic and Tuple-Returning Declarations
 
 | Field | Value |

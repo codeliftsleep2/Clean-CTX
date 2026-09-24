@@ -1,6 +1,6 @@
 # File/workspace presentation boundary — re-partition plan
 
-**Status:** Approved plan (2026-09-23). No production code changes yet.
+**Status:** In execution (2026-09-24). §1-§3 done (invariants reconciled, reasoning suite re-partitioned, DeepSeek backend added); §6 records the content-boundary decision; the content fix (Option A) is in progress.
 
 **Scope:** Determine what a normal `provide_code_context` / `compress_code_context`
 call must put in front of the LLM (versus what belongs in `workspace_query` or in
@@ -206,6 +206,49 @@ respectively.
 
 ## 5. Open decisions
 
-- DeepSeek exact API model id + where the `DEEPSEEK_API_KEY` is provided.
+- ~~DeepSeek exact API model id + where the `DEEPSEEK_API_KEY` is provided.~~
+  Resolved: Cline's OpenAI-compatible API (`api.cline.bot`, `CLINE02_LOCAL_ENV_API_KEY`,
+  model `cline-pass/deepseek-v4-pro`).
+
+---
+
+## 6. Decision — model-visible content is the presentation, not the codec
+
+**Decided 2026-09-24. Approved: implement Option A now, then Option C.**
+
+**Decisive evidence (not inference):** the codec's decode side has no production
+caller. `compact_a3::decode_cold` / `decode_declarations` / `decode_facts` are
+referenced only by one another (`document.rs:270-271`); no MCP handler decodes a
+caller-supplied content document — `delta`, `apply_edit`, `restore_context`,
+`replay_history` operate from the server's persisted canonical IR and exchange
+`from_version`/`to_version`, never documents. The only caller-text parse in
+`src/mcp` is `buffered_store.rs:164`, unrelated. The codec is therefore
+encoder-only in production: its preamble, grammar legend, envelope schema id and
+`§BODIES` framing are paid in every prompt while required by nothing in the
+protocol.
+
+**Decision.** `content` is the model-facing presentation
+(`render_hierarchical_for_llm`, SCHEMA v5) on every path; the reversible codec
+stays code-side (`result.ir` + persistence). Option A is the minimal correct
+enforcement of ARCH-003 vs CTX-001; Option C (a purpose-built presentation
+authored against §2.2's SHOULD/SHOULDN'T table) follows.
+
+**Rejected — Option B** (keep the dense codec as content, drop the decoder
+contract): a positional grammar without its interpretive key is a codec the
+reader cannot decode, not a presentation. It optimizes tokens by removing the
+information the reader needs — the exact failure mode this plan corrects — and
+the reasoning runs already showed the dense form struggling.
+
+**Consequence owned.** The A2/A3 token-savings gate (42–43%) stops describing
+the model-visible wire; production savings become the presentation's density
+(v5's historical 56–65% on large files). A3's correct home is the code-side
+reversible wire, whose decoder has never been load-bearing in production.
+
+**Enforcement.** `src/tests/mcp/presentation_boundary.rs` — five RED tests
+pinning that content is not the codec document and does not carry its decoder
+legend, envelope schema id, or body framing, plus one guard that the typed
+owner and method identity survive. Written RED, frozen (stash), then the code
+is fixed and the tests restored byte-identically.
+
 - Whether the "whole-file local facts" `workspace_query` operation is worth building
   (deferred behind the step-3 measurement).

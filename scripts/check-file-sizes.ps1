@@ -10,9 +10,10 @@
     untracked files. With -BaseRef, committed changes from the merge base to
     HEAD are included as active for CI and branch verification.
 
-    Exemptions: generated dependency lockfiles are exempt by filename, and
-    paths listed in $ExemptPaths are excluded from the active set entirely.
-    Every exemption carries its justification next to its declaration.
+    Exemptions: generated dependency lockfiles are exempt by filename,
+    markdown documentation files are exempt by extension, and paths listed
+    in $ExemptPaths are excluded from the active set entirely. Every
+    exemption carries its justification next to its declaration.
 .PARAMETER BaseRef
     Optional Git revision used as the comparison base for committed changes.
 .PARAMETER RepositoryRoot
@@ -46,6 +47,14 @@ $GeneratedDependencyLockfiles = @(
     'uv.lock',
     'yarn.lock'
 )
+
+# Markdown documentation files are exempt from the line ceiling by extension.
+# The 615-line ceiling is a code-readability policy; documentation is prose
+# whose length tracks the content it records (a chronological ledger, a plan,
+# an audit), so it cannot be decomposed to meet a line budget without
+# fragmenting the record it exists to provide. Exempted by explicit maintainer
+# decision (2026-09-24).
+$ExemptExtensions = @('.md', '.markdown')
 
 # Path-scoped exemptions from the active-file line-count policy.
 #
@@ -115,6 +124,8 @@ function Test-NormalTextFile {
     if ($ExemptPaths -contains $normalizedPath) { return $false }
     $fileName = [System.IO.Path]::GetFileName($normalizedPath)
     if ($GeneratedDependencyLockfiles -contains $fileName) { return $false }
+    $extension = [System.IO.Path]::GetExtension($normalizedPath)
+    if ($ExemptExtensions -contains $extension) { return $false }
     return $RelativePath -match $TextPattern -or $RelativePath -match $DotFiles
 }
 

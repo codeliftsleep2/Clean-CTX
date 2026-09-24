@@ -245,6 +245,11 @@ file**.
   `package-lock.json`) are exempt because their structure is tool-owned and
   cannot be semantically decomposed. The exemption is filename-specific and
   does not apply to ordinary hand-maintained `*.lock` files.
+- Markdown documentation files (`*.md`, `*.markdown`) are exempt from the line
+  ceiling by extension. The ceiling is a code-readability policy; documentation
+  is prose whose length tracks the content it records, so it cannot be
+  decomposed to meet a line budget without fragmenting the record. Exempted by
+  explicit maintainer decision (2026-09-24).
 - One path is additionally exempt by explicit maintainer decision:
   `docs/agent/DISCOVERY_REGISTRY.md`, the live discovery registry — an
   append-only chronological ledger whose growth tracks how many discoveries are
