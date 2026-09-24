@@ -55,10 +55,9 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         None => return,
     };
     let compact = || {
-        super::content::compact_a_document(
+        super::content::presentation_document(
             &session_ir,
             &hierarchy,
-            &restored.semantic_edges,
             restored.fidelity,
             &durable_path,
             state,
@@ -70,10 +69,9 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
                 state.cache_read().compute_hash(source.as_bytes()) == restored.source_hash;
             let tokenizer_kind = crate::mcp::tools::parse_tokenizer_arg(params, &state.config);
             let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
-            let economic = super::content::economical_compact_a_document(
+            let economic = super::content::economical_presentation_document(
                 &session_ir,
                 &hierarchy,
-                &restored.semantic_edges,
                 restored.fidelity,
                 &durable_path,
                 &source,
@@ -121,7 +119,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
                 "file": durable_path,
                 "instruction_count": session_ir.instructions.len(),
                 "semantic_edge_count": edge_count,
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { "skeleton" },
                 "byte_exact": if raw_passthrough {
                     serde_json::json!(["document"])
                 } else if restored.fidelity == crate::compression::Fidelity::Edit {

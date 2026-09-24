@@ -252,3 +252,88 @@ is fixed and the tests restored byte-identically.
 
 - Whether the "whole-file local facts" `workspace_query` operation is worth building
   (deferred behind the step-3 measurement).
+
+---
+
+## 7. Category A triage — tests pinning codec/envelope-as-content
+
+After the content-boundary fix (A: `content` = SCHEMA-v5 presentation) and the
+delta-transport fix (A-2: delta `content` = full presentation, not the
+`// FILE-CONTEXT-DELTA v1` envelope), several existing tests that pinned the
+*old* codec/envelope-as-content behavior will fail. This is the tracked triage
+list. Every item is Category A — the test pinned the conflation, so its
+assertion must be corrected to the presentation — unless marked otherwise. No
+test here is edited to make a fix look green; each correction is deliberate,
+brought to the maintainer with `file:line` + evidence before a word changes.
+
+### Definite Category A (assert codec/envelope as model-visible content)
+
+1. **`src/tests/mcp/control_full_content.rs`** — the `control_full_json` helper
+   (lines 19–47) parses the codec envelope (`// COMPACT-A A1/A2` + `§BODIES`) or
+   the delta envelope; the delta test asserts the codec baseline
+   (`content.starts_with("// COMPACT-A A2")`, line 248), the delta envelope
+   (`content.starts_with("// FILE-CONTEXT-DELTA v1")`, line 268), and its schema
+   (`schema == "clean-ctx/file-context-delta"`, line 276). Rewrite the helper to
+   decode the SCHEMA-v5 presentation; update the three content assertions.
+
+2. **`src/tests/mcp/control_full_test_support.rs`** — the shared `payload()`
+   helper (lines 3–37) parses the codec envelope (`// COMPACT-A A1/A2` +
+   `§BODIES`, lines 8–29) or the legacy named CONTROL-FULL JSON (lines 31–36).
+   After A the content is neither, so `payload()` hits the fallback and panics on
+   `"valid CONTROL-FULL JSON"`. It needs a presentation branch. (Note: its
+   `has_interface`/`has_method_body` helpers already short-circuit on
+   `!starts_with("// COMPACT-A") && text.contains(name)` — the presentation's
+   names satisfy that, so those two are robust and do not reach `payload()`.)
+
+3. **`src/tests/mcp/tool_handlers_economics.rs:133,176,200`** —
+   `text.starts_with("// COMPACT-A A2") || text == source`. After A the candidate
+   is the presentation (neither A2 nor raw), so both clauses are false whenever
+   the economics gate selects the candidate. Update to assert the presentation is
+   selected when the tokenizer proves it cheaper than raw (and `text == source`
+   when raw wins).
+
+4. **`src/tests/mcp/phase3_contract.rs:216`** —
+   `text.contains("// COMPACT-A A2") || content_kind == Some("raw_passthrough")`.
+   After A: content is the presentation and `content_kind` is `"skeleton"` (not
+   `"raw_passthrough"`), so both clauses are false. Update to the presentation +
+   `"skeleton"` (or `"raw_passthrough"`).
+
+5. **`src/tests/mcp/prompts.rs:5-35`** — asserts the SYSTEM_PROMPT teaches the
+   `// COMPACT-A A2` and `FILE-CONTEXT-DELTA v1` fragments. The prompt must now
+   teach the SCHEMA-v5 presentation; update the taught fragments (and the prompt
+   source, not just the test).
+
+6. **`src/tests/mcp/cache_hints.rs:312`** — asserts the generated vocabulary
+   prompt teaches `COMPACT-A A2`. Update to the presentation vocabulary.
+
+### Robust (OR-with-name — likely still pass; verify, do not assume)
+
+- **`src/tests/mcp/persistence_lifecycle_semantics.rs:31-32, 117-118`** —
+  `starts_with("// COMPACT-A A2") || contains("SemanticService")`; the second
+  clause short-circuits on the presentation's type name, and the codec-decode
+  `if` branch is skipped when content is not the codec. Verify.
+- **`src/tests/mcp/phase_a_retirement.rs:154`** —
+  `contains("// COMPACT-A A2") || contains("class Greeter")`. Verify.
+- **`src/tests/mcp/workspace_query.rs:232`** —
+  `starts_with("// COMPACT-A A2") || contains("TestController")`. Verify.
+
+### Not triage (test the codec module itself, unchanged)
+
+- **`src/tests/ir/compact_a.rs`**, **`src/tests/ir/compact_a_envelope.rs`**,
+  **`src/tests/ir/compact_a_production_edges.rs`** — these exercise the
+  `compact_a` codec directly (encode/decode round-trip). A does not touch the
+  codec; it becomes code-side only (`result.ir` + persistence). They continue to
+  pass.
+
+### Category B guard (if these fail, the code is wrong — fix the code, not the test)
+
+- `presentation_boundary.rs` guard `guard_presentation_keeps_typed_owner_and_method_identity`.
+- `delta_presentation_boundary.rs` `red_delta_content_is_the_presentation`
+  (the delta presentation must still name the type + method).
+
+### Sequencing
+
+Run after A-2 is GREEN, as part of the full-suite pass. The two RED suites
+(`presentation_boundary`, `delta_presentation_boundary`) must be green first;
+then each Definite-Category-A item above is corrected individually with
+evidence, the Robust items are verified, and the Category B guards confirmed.

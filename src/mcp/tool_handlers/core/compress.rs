@@ -125,16 +125,10 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             None => return,
         };
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
-        let normalized = crate::ir::normalize_control_full(
-            &ir.file_id,
-            &resolved_path,
-            ir.version,
-            effective_fidelity,
-            &hir,
-            &semantic_edges,
-        );
-        let candidate_compact = crate::ir::compact_a::render_file_context(&normalized);
-        let compressed_tokens = count_tokens_with_tokenizer(&candidate_compact, tokenizer_ref);
+        let candidate_presentation =
+            crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
+        let compressed_tokens =
+            count_tokens_with_tokenizer(&candidate_presentation, tokenizer_ref);
 
         // P9-14: durability is the publication boundary. Persist the checked
         // candidate and its complete edge snapshot before creating aliases or
@@ -175,10 +169,9 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         let path_alias = state.get_or_create_alias(resolved_path.clone());
         ir.file_id.clone_from(&path_alias);
         let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
-        let economic = super::content::economical_compact_a_document(
+        let economic = super::content::economical_presentation_document(
             &ir,
             &hir,
-            &semantic_edges,
             effective_fidelity,
             &resolved_path,
             source_text,

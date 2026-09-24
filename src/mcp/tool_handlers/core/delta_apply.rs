@@ -264,10 +264,9 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             };
             let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
             let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
-            let economic = super::content::economical_compact_a_document(
+            let economic = super::content::economical_presentation_document(
                 &target_ir,
                 &hierarchy,
-                &target_edges,
                 fidelity,
                 &durable_file,
                 &source,
@@ -292,7 +291,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                     },
                     "_meta": {
                         "version": new_version,
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { "skeleton" },
                         "byte_exact": if raw_passthrough {
                             serde_json::json!(["document"])
                         } else {

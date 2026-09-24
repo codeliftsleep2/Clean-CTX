@@ -220,10 +220,9 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             let delta_start = Instant::now();
             let prev_version = state.file_version(&alias).unwrap_or(0);
             let initial_full = if prev_version == 0 {
-                let full = super::content::compact_a_document(
+                let full = super::content::presentation_document(
                     &compiled,
                     &checked_hir,
-                    &semantic_edges,
                     effective_fidelity,
                     &resolved_path,
                     state,
@@ -308,11 +307,14 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             match delta {
                 Some(ref d) => {
                     let wire_delta = serde_json::to_value(d).unwrap_or_default();
-                    let delta_text = super::content::control_full_delta(
-                        &compiled.file_id,
-                        effective_fidelity,
-                        d,
-                        &semantic_edges,
+                    let delta_text = format!(
+                        "Δ delta for {} (v{} → v{}): +{} ~{} -{} ops",
+                        compiled.file_id,
+                        d.from,
+                        d.to,
+                        d.ops.adds.len(),
+                        d.ops.mods.len(),
+                        d.ops.dels.len()
                     );
                     let economic = super::content::select_complete_content(
                         source,
@@ -364,10 +366,9 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 None => {
                     let render_start = Instant::now();
                     let full = initial_full.unwrap_or_else(|| {
-                        super::content::compact_a_document(
+                        super::content::presentation_document(
                             &compiled,
                             &checked_hir,
-                            &semantic_edges,
                             effective_fidelity,
                             &resolved_path,
                             state,
@@ -462,10 +463,9 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     None => return,
                 };
 
-                let candidate = super::content::compact_a_document(
+                let candidate = super::content::presentation_document(
                     &ir,
                     &hir,
-                    &semantic_edges,
                     effective_fidelity,
                     &resolved_path,
                     state,

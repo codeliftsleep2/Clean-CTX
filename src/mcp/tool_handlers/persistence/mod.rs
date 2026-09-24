@@ -84,10 +84,9 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
         Some(edges) => edges,
         None => return send_persistence_error(id, "Missing authoritative semantic-edge state"),
     };
-    let compact = crate::mcp::tool_handlers::core::content::compact_a_document(
+    let compact = crate::mcp::tool_handlers::core::content::presentation_document(
         &session_ir,
         &hierarchy,
-        &semantic_edges,
         fidelity,
         &durable_path,
         state,
@@ -399,10 +398,9 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         }
     };
     let compact = || {
-        crate::mcp::tool_handlers::core::content::compact_a_document(
+        crate::mcp::tool_handlers::core::content::presentation_document(
             &ir,
             &hierarchy,
-            &restored.semantic_edges,
             restored.fidelity,
             file_path,
             state,
@@ -414,17 +412,17 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
                 state.cache_read().compute_hash(source.as_bytes()) == restored.source_hash;
             let tokenizer_kind = crate::mcp::tools::parse_tokenizer_arg(params, &state.config);
             let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
-            let economic = crate::mcp::tool_handlers::core::content::economical_compact_a_document(
-                &ir,
-                &hierarchy,
-                &restored.semantic_edges,
-                restored.fidelity,
-                file_path,
-                &source,
-                state,
-                tokenizer_kind,
-                tokenizer_box.as_deref(),
-            );
+            let economic =
+                crate::mcp::tool_handlers::core::content::economical_presentation_document(
+                    &ir,
+                    &hierarchy,
+                    restored.fidelity,
+                    file_path,
+                    &source,
+                    state,
+                    tokenizer_kind,
+                    tokenizer_box.as_deref(),
+                );
             let selected_raw = matches!(
                 economic.selected,
                 crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
@@ -460,7 +458,7 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
             "_meta": {
                 "file": file_path, "version": ir.version,
                 "instruction_count": ir.instructions.len(),
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { "skeleton" },
                 "byte_exact": if raw_passthrough {
                     serde_json::json!(["document"])
                 } else if restored.fidelity == crate::compression::Fidelity::Edit {

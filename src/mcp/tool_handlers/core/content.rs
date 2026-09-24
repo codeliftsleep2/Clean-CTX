@@ -2,39 +2,37 @@
 
 use crate::compression::Fidelity;
 use crate::ir::{CompiledIR, HierarchicalIR};
-use crate::layers::meta::semantic::SemanticEdge;
 use crate::mcp::McpState;
-use serde::Serialize;
 
-pub(crate) fn compact_a_document(
+/// Render the model-visible presentation for a compiled file.
+///
+/// ARCH-003: `content` is a compact projection — class/interface/method names,
+/// typed ownership, signatures, collapsed modifiers, extends/implements,
+/// imports, type aliases, and (at Edit) exact bodies. The reversible codec
+/// (CTX-001, `compact_a`/`compact_a3`) is code-side and must never appear in
+/// the model-visible content.
+pub(crate) fn presentation_document(
     ir: &CompiledIR,
     hierarchy: &HierarchicalIR,
-    semantic_edges: &[SemanticEdge],
     fidelity: Fidelity,
     source_path: &str,
     state: &McpState,
 ) -> String {
-    let normalized = crate::ir::normalize_control_full(
-        &ir.file_id,
-        source_path,
-        ir.version,
-        fidelity,
-        hierarchy,
-        semantic_edges,
-    );
-    let payload = crate::ir::compact_a::render_file_context(&normalized);
+    let llm_text = crate::ir::render_hierarchical_for_llm(hierarchy, fidelity);
     let footer = state.format_dict_footer_for_aliases(&[&ir.file_id]);
-    // Keep the body-frame terminator emitted by A1. The additional newline is
-    // the document/footer boundary; trimming the payload would corrupt the
-    // final exact body frame.
-    format!("{}\n{}", payload, footer.trim())
+    format!(
+        "{}\n// ── {} ({}) ──\n{}",
+        llm_text.trim(),
+        ir.file_id,
+        source_path,
+        footer.trim()
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn economical_compact_a_document(
+pub(crate) fn economical_presentation_document(
     ir: &CompiledIR,
     hierarchy: &HierarchicalIR,
-    semantic_edges: &[SemanticEdge],
     fidelity: Fidelity,
     source_path: &str,
     raw_source: &str,
@@ -42,7 +40,7 @@ pub(crate) fn economical_compact_a_document(
     tokenizer_kind: crate::tokenizer::TokenizerKind,
     tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
 ) -> crate::mcp::content_economics::EconomicContent {
-    let candidate = compact_a_document(ir, hierarchy, semantic_edges, fidelity, source_path, state);
+    let candidate = presentation_document(ir, hierarchy, fidelity, source_path, state);
     crate::mcp::content_economics::select_with_local_tokenizer(
         raw_source,
         candidate,
@@ -90,22 +88,14 @@ pub(crate) fn select_complete_content(
     }
 }
 
-pub(super) fn control_full_delta<T: Serialize>(
-    file_id: &str,
-    fidelity: Fidelity,
-    delta: &T,
-    _semantic_edges: &[SemanticEdge],
-) -> String {
-    let value = serde_json::json!({
-        "schema": "clean-ctx/file-context-delta",
-        "schema_version": 1,
-        "file_id": file_id,
-        "fidelity": fidelity,
-        "delta": delta,
-        "workspace_graph": "query workspace_query after apply when graph facts are required",
-    });
-    format!(
-        "// FILE-CONTEXT-DELTA v1; apply to the acknowledged prior canonical state\n{}",
-        serde_json::to_string_pretty(&value).expect("CONTROL-FULL delta is serializable")
-    )
-}
+// (control_full_delta removed: delta content is the full presentation, and the
+// structured op list is returned code-side in `result.delta`.)
+
+// Presentation boundary guard: the model-visible `content` must be a compact
+// projection (SCHEMA v5 presentation), never the CONTROL-FULL codec — whose
+// decoder contract (preamble, grammar legend, envelope schema id, body
+// framing) is code-side machinery. These tests pin that boundary rather than
+// any particular presentation shape.
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/presentation_boundary.rs"]
+mod presentation_boundary_tests;

@@ -151,11 +151,9 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     Some(hierarchy) => hierarchy,
                     None => return,
                 };
-                let edges = state.semantic_edges(&path_alias).unwrap_or_default();
-                let economic = super::content::economical_compact_a_document(
+                let economic = super::content::economical_presentation_document(
                     &compiled,
                     &hierarchy,
-                    &edges,
                     fidelity,
                     &resolved_path,
                     &source,
@@ -175,7 +173,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                         "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&compiled, &hierarchy),
                         "version": prev_version,
                         "instruction_count": instruction_count,
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" },
+                "content_kind": if raw_passthrough { "raw_passthrough" } else { "skeleton" },
                         "cached": true
                     }
                 });
@@ -269,30 +267,25 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
         Some(d) => {
             let wire_delta = serde_json::to_value(&d).unwrap_or_default();
             let (content_kind, byte_exact) = contract_fields(fidelity);
-            let content = super::content::control_full_delta(
-                &compiled.file_id,
-                fidelity,
-                &d,
-                &semantic_edges,
+            // The delta is code-side only: the LLM is stateless and must never
+            // receive a delta (envelope OR presentation). Emit the same minimal
+            // summary main produces; the op list rides in `result.delta`.
+            let content = format!(
+                "Δ delta for {} (v{} → v{}): +{} ~{} -{} ops",
+                compiled.file_id,
+                d.from,
+                d.to,
+                d.ops.adds.len(),
+                d.ops.mods.len(),
+                d.ops.dels.len()
             );
-            let economic = crate::mcp::content_economics::select_with_local_tokenizer(
-                &source,
-                content,
-                tokenizer_kind,
-                tokenizer_ref,
-            );
-            let raw_passthrough = matches!(
-                economic.selected,
-                crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
-            );
-            let content = economic.text;
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id, "result": {
                     "content": [{ "type": "text", "text": content }],
                     "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                     "strategy": "delta", "fidelity": format!("{:?}", fidelity).to_lowercase(),
-                    "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
-                    "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() },
+                    "content_kind": content_kind,
+                    "byte_exact": serde_json::to_value(byte_exact).unwrap_or_default(),
                     "degradation": null
                 }
             });
@@ -341,10 +334,9 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 Some(hierarchy) => hierarchy,
                 None => return,
             };
-            let economic = super::content::economical_compact_a_document(
+            let economic = super::content::economical_presentation_document(
                 &compiled,
                 &hierarchy,
-                &semantic_edges,
                 fidelity,
                 &resolved_path,
                 &source,
@@ -363,7 +355,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     "content": [{ "type": "text", "text": content }],
                     "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&compiled, &hierarchy),
                     "version": version, "instruction_count": compiled.instructions.len(),
-                    "content_kind": if raw_passthrough { "raw_passthrough" } else { "compact_a2" }
+                    "content_kind": if raw_passthrough { "raw_passthrough" } else { "skeleton" }
                 }
             });
             // Baseline stored — this is a stable snapshot, inject baseline breakpoint.
@@ -383,3 +375,11 @@ mod sequence_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/delta_edit_recovery.rs"]
 mod edit_recovery_tests;
+
+// Presentation boundary: the delta is code-side only. Its model-visible
+// `content` is a minimal summary (adds/mods/dels counts), never a full
+// presentation and never a `// FILE-CONTEXT-DELTA v1` envelope. The structured
+// op list stays in `result.delta` for `apply_delta`.
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/delta_presentation_boundary.rs"]
+mod delta_presentation_boundary_tests;
