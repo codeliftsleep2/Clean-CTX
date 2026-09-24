@@ -29,6 +29,7 @@ try {
             $legendTokens = [int](& $measure count $tokenizer $legend)
             $anatomy = (& $measure a3-anatomy $full $tokenizer) | ConvertFrom-Json
             $economical = $a3Tokens -lt $rawTokens
+            $selectedTokens = if ($economical) { $a3Tokens } else { $rawTokens }
             $records += [ordered]@{
                 capture = $directory.Name
                 lane = if ($directory.Name.StartsWith("economics-")) { "tracked_economics" } else { "correctness_lifecycle" }
@@ -43,10 +44,10 @@ try {
                 anatomy_declarations_tokens = $anatomy.declarations
                 anatomy_facts_tokens = $anatomy.facts
                 anatomy_bodies_tokens = $anatomy.bodies
-                saved_tokens = $rawTokens - $a3Tokens
-                reduction_percent = if ($rawTokens) { [Math]::Round((($rawTokens-$a3Tokens)*100.0/$rawTokens), 2) } else { 0 }
+                saved_tokens = $rawTokens - $selectedTokens
+                reduction_percent = if ($rawTokens) { [Math]::Round((($rawTokens-$selectedTokens)*100.0/$rawTokens), 2) } else { 0 }
                 economical_vs_raw = $economical
-                selected_tokens = if ($economical) { $a3Tokens } else { $rawTokens }
+                selected_tokens = $selectedTokens
                 candidate_payload = $candidate
             }
         }
@@ -63,15 +64,15 @@ foreach ($tokenizer in @("cl100k", "o200k")) {
         $subset = @($rows | Where-Object lane -eq $lane)
         if (-not $subset.Count) { continue }
         $raw = ($subset.raw_source_tokens | Measure-Object -Sum).Sum
-        $a3 = ($subset.compact_a3_tokens | Measure-Object -Sum).Sum
+        $sel = ($subset.selected_tokens | Measure-Object -Sum).Sum
         $wins = @($subset | Where-Object economical_vs_raw).Count
-        Write-Host "$tokenizer ${lane}: $($subset.Count), raw $raw -> A3 $a3 ($([Math]::Round((($raw-$a3)*100.0/$raw),2))%; $wins/$($subset.Count) economical)"
+        Write-Host "$tokenizer ${lane}: $($subset.Count), raw $raw -> selected $sel ($([Math]::Round((($raw-$sel)*100.0/$raw),2))%; $wins/$($subset.Count) economical)"
         foreach ($fidelity in @("low", "medium", "high", "edit")) {
             $mode = @($subset | Where-Object fidelity -eq $fidelity)
             if (-not $mode.Count) { continue }
             $modeRaw = ($mode.raw_source_tokens | Measure-Object -Sum).Sum
-            $modeA3 = ($mode.compact_a3_tokens | Measure-Object -Sum).Sum
-            Write-Host "  ${fidelity}: $($mode.Count), raw $modeRaw -> A3 $modeA3 ($([Math]::Round((($modeRaw-$modeA3)*100.0/$modeRaw),2))%)"
+            $modeSel = ($mode.selected_tokens | Measure-Object -Sum).Sum
+            Write-Host "  ${fidelity}: $($mode.Count), raw $modeRaw -> selected $modeSel ($([Math]::Round((($modeRaw-$modeSel)*100.0/$modeRaw),2))%)"
         }
     }
     $econ = @($rows | Where-Object lane -eq "tracked_economics")
@@ -87,9 +88,9 @@ foreach ($tokenizer in @("cl100k", "o200k")) {
                     $mode = @($econ | Where-Object { $_.language -eq $lang -and $_.fidelity -eq $fidelity -and $_.focus_mode -eq $focusMode })
                     if (-not $mode.Count) { continue }
                     $modeRaw = ($mode.raw_source_tokens | Measure-Object -Sum).Sum
-                    $modeA3 = ($mode.compact_a3_tokens | Measure-Object -Sum).Sum
-                    $modeRed = if ($modeRaw) { [Math]::Round((($modeRaw - $modeA3) * 100.0 / $modeRaw), 2) } else { 0 }
-                    Write-Host ("    {0,-10} {1,-6} {2,-11}: {3} row(s), raw {4} -> A3 {5} ({6}%)" -f $lang, $fidelity, $focusMode, $mode.Count, $modeRaw, $modeA3, $modeRed)
+                    $modeSel = ($mode.selected_tokens | Measure-Object -Sum).Sum
+                    $modeRed = if ($modeRaw) { [Math]::Round((($modeRaw - $modeSel) * 100.0 / $modeRaw), 2) } else { 0 }
+                    Write-Host ("    {0,-10} {1,-6} {2,-11}: {3} row(s), raw {4} -> selected {5} ({6}%)" -f $lang, $fidelity, $focusMode, $mode.Count, $modeRaw, $modeSel, $modeRed)
                 }
             }
         }
