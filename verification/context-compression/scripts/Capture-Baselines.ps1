@@ -78,11 +78,9 @@ function Invoke-OracleRender($structuredResponse, $scenario, $dir, $path) {
         $null -eq $structuredResponse.result.structuredContent.ir) {
         throw "CONTROL-FULL oracle input for $($scenario.id) is missing result.ir"
     }
-    if ($null -eq $structuredResponse.result.semantic_edges -and
-        $null -eq $structuredResponse.result.structuredContent.semantic_edges -and
-        $null -eq $structuredResponse.result._meta.semantic_edges) {
-        throw "CONTROL-FULL oracle input for $($scenario.id) is missing semantic_edges"
-    }
+    # Semantic edges are served on demand by workspace_query and are no longer
+    # shipped on content responses, so the CONTROL-FULL oracle is rendered from
+    # the reduced result.ir with an empty edge snapshot.
     $responsePath = Join-Path $dir "oracle-source-response.json"
     $structuredResponse | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8NoBOM $responsePath
     $focus = if ($scenario.focus) { ($scenario.focus -join ",") } else { "" }
