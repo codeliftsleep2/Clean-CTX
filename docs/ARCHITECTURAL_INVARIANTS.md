@@ -103,7 +103,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | Property | Value |
 |----------|-------|
 | **Intent** | Internal correctness structure must not force a verbose model-facing representation, and token optimization must never weaken canonical guarantees. |
-| **Invariant** | Canonical IR is explicit, typed, ordered, identity-bearing, and occurrence-preserving. LLM text is a separate compact projection that may abbreviate presentation only while preserving complete meaning; it is not the canonical storage or validation model. |
+| **Invariant** | Canonical IR is explicit, typed, ordered, identity-bearing, and occurrence-preserving. LLM text is a separate compact projection that may abbreviate presentation only while preserving complete meaning; it is not the canonical storage or validation model. The model-visible `content` preserves names, typed ownership, signatures, collapsed modifiers, extends/implements, imports, type aliases, and exact bodies when requested, while omitting code-side machinery (canonical IDs, occurrence groups, navigation, legend, body framing) and workspace-served facts (semantic edges, calls, injections), which remain available through the reversible codec and `workspace_query` respectively. |
 | **Enforcement** | Distinct canonical types/wire paths and `render_hierarchical_for_llm`; semantic-family renderer contracts under `src/tests/ir/**`. |
 | **Authority** | `src/ir/opcodes.rs`, `src/ir/opcodes/semantic.rs`, `src/ir/hierarchical.rs`, `src/ir/render_llm.rs`, `src/tests/ir/control_summaries.rs`, `src/tests/ir/pattern_facts.rs`, `src/tests/ir/side_effects.rs`, `src/tests/mcp/tool_helpers.rs` |
 | **Type** | STRUCTURAL and ENFORCED |
@@ -422,12 +422,12 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### CTX-001 Model-Visible Context Is a Correctness-Complete Projection
+### CTX-001 Reversible Codec Is Correctness-Complete
 
 | Property | Value |
 |----------|-------|
-| **Intent** | Token savings cannot compensate for semantic facts being absent from the portable model-visible channel. |
-| **Invariant** | For every non-Verbatim context response, MCP `content` is a versioned CONTROL-FULL projection of checked hierarchical IR plus the complete semantic-edge snapshot. It preserves explicit canonical IDs, typed ownership, occurrence order/grouping/duplicates, unresolved written call names and written-arity/spread evidence, injection facts, edge relation/layer/file provenance, and exact bodies/spans when compiled. `_meta` and legacy result siblings may mirror these facts but are not their exclusive authority. Restore/replay regenerate the projection from durable canonical IR and edges instead of trusting historical compact text. `focusMethods` is resolved against typed owners into canonical method IDs before bodies are filtered: bare selectors spanning owners and duplicate qualified owners are errors; a same-owner overload family selects every canonical occurrence. Structured modes never fall back to a cheaper semantically incomplete raw payload; Verbatim remains the explicit whole-document source mode. |
+| **Intent** | Token savings must never remove a semantic fact from the reversible/persisted authority; the model-facing presentation is governed separately by ARCH-003. |
+| **Invariant** | `CONTROL-FULL` (the reversible oracle) preserves explicit canonical IDs, typed ownership, occurrence order/grouping/duplicates, unresolved written call names and written-arity/spread evidence, injection facts, edge relation/layer/file provenance, and exact bodies/spans when compiled. It is the round-trip/persistence authority, regenerated from durable canonical IR and edges instead of trusting historical compact text; it is not the model-visible presentation. `focusMethods` is resolved against typed owners into canonical method IDs before bodies are filtered: bare selectors spanning owners and duplicate qualified owners are errors; a same-owner overload family selects every canonical occurrence. Verbatim remains the explicit whole-document source mode. |
 | **Enforcement** | `src/ir/control_full.rs` and `src/ir/focus.rs`; exact-oracle and focus regressions under `src/tests/ir/control_full.rs` and `src/tests/ir/focus.rs`; registered MCP dispatch regressions under `src/tests/mcp/control_full_content.rs`; language call regressions under `src/tests/ir/calls_{typescript,java,csharp}.rs`; injection rendering regressions under `src/tests/ir/render_llm_meta.rs` and `src/tests/mcp/tool_handlers_render.rs`. |
 | **Authority** | `src/ir/control_full.rs`, `src/ir/focus.rs`, `src/mcp/tool_handlers/core/content.rs`, `docs/architecture/LLM_CONTEXT_COMPRESSION_RESEARCH.md` |
 | **Type** | ENFORCED (test) |

@@ -14,18 +14,18 @@ function Get-Scenario([string]$capture) {
 }
 
 $rows = foreach ($oracle in $oracles) {
-    foreach ($capture in $oracle.captures) {
-        $scenario = Get-Scenario $capture
+    if ($oracle.lane -eq "workspace") {
         [ordered]@{
-            case_id = "$($oracle.id)--$capture"
+            case_id = "$($oracle.id)--workspace-query"
             task_family = $oracle.id
-            fixture = $scenario.fixture
-            fidelity = $scenario.fidelity
-            intent = if ($scenario.intent) { $scenario.intent } else { $null }
-            focus_mode = $scenario.focusMode
-            production_operation = $scenario.operation
-            capture = $capture
-            control_full_capture = Join-Path $captures "$capture\control-full.txt"
+            lane = "workspace"
+            fixture = "cross-file"
+            fidelity = ""
+            intent = $null
+            focus_mode = "ignored"
+            production_operation = "workspace_query"
+            capture = "workspace-query"
+            control_full_capture = Join-Path $captures "workspace-query\$($oracle.id).txt"
             question = $oracle.question
             exact_expected_oracle = $oracle.expected
             zero_tolerance = @($oracle.zeroTolerance)
@@ -37,11 +37,38 @@ $rows = foreach ($oracle in $oracles) {
             failure_categories = @()
             notes = $null
         }
+    } else {
+        $payloadFile = if ($oracle.lane -eq "file") { "context-a3.txt" } else { "control-full.txt" }
+        foreach ($capture in $oracle.captures) {
+            $scenario = Get-Scenario $capture
+            [ordered]@{
+                case_id = "$($oracle.id)--$capture"
+                task_family = $oracle.id
+                lane = $oracle.lane
+                fixture = $scenario.fixture
+                fidelity = $scenario.fidelity
+                intent = if ($scenario.intent) { $scenario.intent } else { $null }
+                focus_mode = $scenario.focusMode
+                production_operation = $scenario.operation
+                capture = $capture
+                control_full_capture = Join-Path $captures "$capture\$payloadFile"
+                question = $oracle.question
+                exact_expected_oracle = $oracle.expected
+                zero_tolerance = @($oracle.zeroTolerance)
+                model = $null
+                model_version = $null
+                sampling_settings = $null
+                actual_model_answer = $null
+                pass = $null
+                failure_categories = @()
+                notes = $null
+            }
+        }
     }
 }
 
-if ($rows.Count -ne 36) { throw "Expected exactly 36 executable reasoning cases, found $($rows.Count)" }
-if (($rows.case_id | Sort-Object -Unique).Count -ne 36) { throw "Reasoning case IDs are not unique" }
+if ($rows.Count -ne 35) { throw "Expected exactly 35 executable reasoning cases, found $($rows.Count)" }
+if (($rows.case_id | Sort-Object -Unique).Count -ne 35) { throw "Reasoning case IDs are not unique" }
 
 $output = Join-Path $captures "reasoning-results.json"
 $rows | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8NoBOM $output

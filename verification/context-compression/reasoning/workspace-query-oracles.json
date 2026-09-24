@@ -1,0 +1,4 @@
+[
+  {"id":"provenance","type":"find_entities","arguments":{"name":"SharedName"}},
+  {"id":"framework-edge-provenance","type":"forward_edges","arguments":{"domain":"angular","entity_type":"Service","name":"Alpha"}}
+]

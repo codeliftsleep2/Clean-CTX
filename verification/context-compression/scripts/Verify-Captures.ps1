@@ -179,10 +179,9 @@ Require ((Header "replay-flow") -like "// CONTROL-FULL v2*") "replay: not regene
 $a = Payload "cross-a"; $b = Payload "cross-b"
 Require ($a.file.source_path -ne $b.file.source_path) "cross-file: provenance paths collapsed"
 Require ((@($a.classes | Where-Object name -eq "SharedName").Count -eq 1) -and (@($b.classes | Where-Object name -eq "SharedName").Count -eq 1)) "cross-file: fixture no longer exercises equal display names"
-$crossTarget = @($b.semantic_edges | Where-Object { $_.subject.file -eq $a.file.source_path -or $_.object.file -eq $a.file.source_path })
-if ($crossTarget.Count -eq 0) {
-    $unsupported.Add("Registered single-file context did not emit a cross-file-resolved relation for cross-b.ts; do not score cross-file target resolution.")
-}
+# Cross-file relations belong to workspace_query, not the single-file context. The
+# file context correctly omits them; the workspace reasoning lane scores cross-file
+# resolution and framework-edge provenance through workspace_query responses.
 
 $result = [ordered]@{ pass = ($failures.Count -eq 0); failure_count = $failures.Count; failures = @($failures); unsupported = @($unsupported) }
 $result | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8NoBOM (Join-Path $captures "verification-result.json")
