@@ -304,15 +304,15 @@ fn test_cache_dashboard_json() {
     );
 }
 
-/// Verify that generated vocabulary teaches the current COMPACT-A contract.
+/// Verify that generated vocabulary teaches the current SCHEMA-v5 presentation.
 #[test]
 fn test_generate_vocabulary_text() {
     let text = generate_vocabulary_text();
     assert!(
-        text.contains("COMPACT-A A2"),
-        "vocabulary prompt must teach COMPACT-A A2"
+        text.contains("SCHEMA v5"),
+        "vocabulary prompt must teach SCHEMA v5"
     );
-    assert!(text.contains("g.K:"));
+    assert!(text.contains("M: method"));
     assert!(text.contains("workspace_query:"));
     assert!(text.contains("α"), "path aliases remain current");
     for banned in [
@@ -321,6 +321,10 @@ fn test_generate_vocabulary_text() {
         "⊕Input",
         "Opcode/Marker Vocabulary",
         "compress_code_context and provide_code_context tools",
+        "COMPACT-A A2",
+        "FILE-CONTEXT-DELTA v1",
+        "g.K:",
+        "d.c/d.i",
     ] {
         assert!(
             !text.contains(banned),

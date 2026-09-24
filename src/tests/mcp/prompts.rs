@@ -2,41 +2,42 @@
 //
 // Contract tests for SYSTEM_PROMPT notation documentation.
 //
-// Guards the portable model-visible COMPACT-A contract.
+// Guards the portable model-visible SCHEMA-v5 contract.
 
 use super::SYSTEM_PROMPT;
 
 #[test]
-fn teaches_compact_a_as_primary_notation() {
+fn teaches_schema_v5_as_primary_notation() {
     for frag in [
-        "// COMPACT-A A2",
-        "canonical IDs are authoritative",
-        "d.c` / `d.i",
-        "caller_method_id",
-        "callee_written_name",
-        "`g.K`",
-        "workspace_query",
+        "// SCHEMA v5",
+        "X=extends",
+        "I=implements",
+        "F=field",
+        "M=method",
         "typed ownership",
+        "workspace_query",
+        "§PATHMAP",
     ] {
         assert!(
             SYSTEM_PROMPT.contains(frag),
-            "SYSTEM_PROMPT must teach COMPACT-A fragment `{frag}`"
+            "SYSTEM_PROMPT must teach SCHEMA-v5 fragment `{frag}`"
         );
     }
 }
 
 #[test]
-fn documents_high_and_edit_behaviors() {
+fn documents_fidelity_and_edit_behaviors() {
     for frag in [
         "Low/Medium/High",
-        "Edit adds byte-exact `B[method_id,start,end,utf8_bytes]` frames",
-        "exact body IDs",
+        "focusMethods",
+        "byte-exact",
+        "focused_method_bodies",
         "fidelity=\"verbatim\"",
-        "FILE-CONTEXT-DELTA v1",
+        "Δ delta for",
     ] {
         assert!(
             SYSTEM_PROMPT.contains(frag),
-            "SYSTEM_PROMPT must document High/Edit fragment `{frag}`"
+            "SYSTEM_PROMPT must document fidelity fragment `{frag}`"
         );
     }
 }
@@ -51,6 +52,8 @@ fn retired_vocabulary_is_not_taught_as_current_semantics() {
         "⊕",
         "§I=",
         "§SYM",
+        "COMPACT-A A2",
+        "FILE-CONTEXT-DELTA v1",
     ] {
         assert!(
             !SYSTEM_PROMPT.contains(tok),

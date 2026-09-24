@@ -274,32 +274,28 @@ pub fn render_cache_json(metrics: &CacheMetrics, enabled: bool) -> serde_json::V
 }
 
 /// Generate the response-vocabulary text for the `clean-ctx-vocabulary`
-/// prompt resource. Teaches the portable COMPACT-A model-visible contract.
+/// prompt resource. Teaches the portable SCHEMA-v5 presentation contract.
 ///
 /// This function is used by the `prompts/get` MCP handler.
 pub fn generate_vocabulary_text() -> String {
     let lines = vec![
-        "Clean-CTX Response Vocabulary (COMPACT-A A2)",
-        "================================================",
+        "Clean-CTX Response Vocabulary (SCHEMA v5)",
+        "==========================================",
         "",
-        "// COMPACT-A A2; file-local; workspace graph via workspace_query",
-        crate::ir::compact_a::FILE_CONTEXT_LEGEND,
-        "h: CONTROL-FULL schema/version, file, and fidelity mode",
-        "d.c/d.i: typed owners and scoped declaration rows",
-        "g.K: ordered canonical file-local calls",
-        "n.D/n.V: DI and behavior navigation over local facts",
+        "// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias",
+        "// ── ClassName ── opens a class; Q Name opens an interface",
+        "X: extends   I: implements   F: field",
+        "M: method; overloads disambiguated by parameter count as M name(+N)",
+        "$: import   T: type alias   P: pattern",
+        "→: scope; p:name:type params, → return, then mod:/ctl:/pf:/fl:/cf:/df:/se:/ec:",
         "workspace_query: forward/reverse/multi-hop/framework graph facts and provenance",
-        "B frames: canonical method ID, exact span, UTF-8 byte length and bytes",
         "",
-        "Arrays preserve order, duplicates, and occurrence-group boundaries.",
-        "Edit focus resolves typed ownership to canonical method IDs before filtering.",
-        "navigation uses stable typed locators, never serialized array indices.",
-        "FILE-CONTEXT-DELTA v1 requires an acknowledged prior canonical state.",
-        "When A2 is not safely cheaper under local counting, content is byte-exact raw source.",
+        "Member order, duplicates, and overload groups preserve source order.",
+        "Edit appends byte-exact bodies; focusMethods resolve typed ownership before filtering.",
+        "Delta content is the summary `Δ delta for …: +N ~N -N ops`; ops ride in result.delta.",
+        "When the presentation is not safely cheaper under local counting, content is raw source.",
         "",
         "α/β/γ   path aliases — see §PATHMAP footer",
-        "",
-        "SCHEMA v5 and compress_workspace text are CONTROL-PROD/legacy formats.",
     ];
     lines.join("\n")
 }
