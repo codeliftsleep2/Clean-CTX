@@ -1,7 +1,7 @@
 // Diff, delta, and apply-delta MCP handlers.
 
 use super::common::{
-    checked_hierarchy_or_respond, compiled_from_tuples, contract_fields,
+    checked_hierarchy_or_respond, compiled_from_tuples, contract_fields, ContentKind,
     invalid_session_ir_response,
 };
 use crate::error::to_jsonrpc_error;
@@ -173,7 +173,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                         "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&compiled, &hierarchy),
                         "version": prev_version,
                         "instruction_count": instruction_count,
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { "skeleton" },
+                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::Skeleton },
                         "cached": true
                     }
                 });
@@ -270,14 +270,15 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             // The delta is code-side only: the LLM is stateless and must never
             // receive a delta (envelope OR presentation). Emit the same minimal
             // summary main produces; the op list rides in `result.delta`.
+            let (adds, mods, dels) = d.summary_counts();
             let content = format!(
                 "Δ delta for {} (v{} → v{}): +{} ~{} -{} ops",
                 compiled.file_id,
                 d.from,
                 d.to,
-                d.ops.adds.len(),
-                d.ops.mods.len(),
-                d.ops.dels.len()
+                adds,
+                mods,
+                dels
             );
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id, "result": {
@@ -355,7 +356,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     "content": [{ "type": "text", "text": content }],
                     "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&compiled, &hierarchy),
                     "version": version, "instruction_count": compiled.instructions.len(),
-                    "content_kind": if raw_passthrough { "raw_passthrough" } else { "skeleton" }
+                    "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::Skeleton }
                 }
             });
             // Baseline stored — this is a stable snapshot, inject baseline breakpoint.

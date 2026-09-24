@@ -92,6 +92,42 @@ pub(crate) fn projection_error_response(
     response
 }
 
+/// The model-visible content category a response self-reports.
+///
+/// Serializes to the wire strings the LLM and verification drivers read;
+/// [`ContentKind::as_str`] is the single source of truth for those strings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ContentKind {
+    /// Structural-only: names, signatures, no byte-exact regions.
+    Skeleton,
+    /// Edit fidelity: every method body is byte-exact.
+    SkeletonWithVerbatimBodies,
+    /// Edit + `focusMethods`: only focused method bodies are byte-exact.
+    SkeletonWithFocusedVerbatimBodies,
+    /// Verbatim fidelity: the whole document is byte-exact.
+    VerbatimDocument,
+    /// The economics gate selected byte-exact raw source.
+    RawPassthrough,
+}
+
+impl ContentKind {
+    /// Wire string for tests — the same string the derived `Serialize` impl
+    /// emits. Test-only: production serializes via `Serialize`, not this method.
+    #[cfg(test)]
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            ContentKind::Skeleton => "skeleton",
+            ContentKind::SkeletonWithVerbatimBodies => "skeleton_with_verbatim_bodies",
+            ContentKind::SkeletonWithFocusedVerbatimBodies => {
+                "skeleton_with_focused_verbatim_bodies"
+            }
+            ContentKind::VerbatimDocument => "verbatim_document",
+            ContentKind::RawPassthrough => "raw_passthrough",
+        }
+    }
+}
+
 /// Self-reporting contract fields (Gap 5/3/6 fixes).
 ///
 /// Returns `(content_kind, byte_exact_regions)` describing what the
@@ -106,7 +142,7 @@ pub(crate) fn projection_error_response(
 ///   others → `[]`.
 pub(crate) fn contract_fields(
     fidelity: crate::compression::Fidelity,
-) -> (&'static str, Vec<&'static str>) {
+) -> (ContentKind, Vec<&'static str>) {
     contract_fields_focused(fidelity, None)
 }
 
@@ -124,26 +160,26 @@ pub(crate) fn contract_fields(
 pub(crate) fn contract_fields_focused(
     fidelity: crate::compression::Fidelity,
     focus: Option<&HashSet<String>>,
-) -> (&'static str, Vec<&'static str>) {
+) -> (ContentKind, Vec<&'static str>) {
     match fidelity {
-        crate::compression::Fidelity::Verbatim => ("verbatim_document", vec!["document"]),
+        crate::compression::Fidelity::Verbatim => (ContentKind::VerbatimDocument, vec!["document"]),
         // No focus set → every method body is byte-exact (legacy behavior).
         crate::compression::Fidelity::Edit if focus.is_none() => {
-            ("skeleton_with_verbatim_bodies", vec!["method_bodies"])
+            (ContentKind::SkeletonWithVerbatimBodies, vec!["method_bodies"])
         }
         // Focus set but EMPTY → ZERO method bodies are byte-exact. The
-        // output is effectively all-signatures, so report `"skeleton"`
+        // output is effectively all-signatures, so report `Skeleton`
         // with no byte-exact regions (otherwise the LLM would attempt
         // replace_in_file SEARCH on bodies that don't exist).
         crate::compression::Fidelity::Edit if focus.is_some_and(HashSet::is_empty) => {
-            ("skeleton", Vec::new())
+            (ContentKind::Skeleton, Vec::new())
         }
         // Focus set with names → only the focused method bodies are
         // byte-exact. The LLM must NOT attempt SEARCH on unfocused bodies.
         crate::compression::Fidelity::Edit => (
-            "skeleton_with_focused_verbatim_bodies",
+            ContentKind::SkeletonWithFocusedVerbatimBodies,
             vec!["focused_method_bodies"],
         ),
-        _ => ("skeleton", Vec::new()),
+        _ => (ContentKind::Skeleton, Vec::new()),
     }
 }

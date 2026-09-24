@@ -1,6 +1,6 @@
 use super::common::{
     compiled_from_tuples, contract_fields_focused, invalid_session_ir_response,
-    resolve_focus_or_respond,
+    resolve_focus_or_respond, ContentKind,
 };
 use crate::error::to_jsonrpc_error;
 use crate::ir::delta::SequenceDeltaComputer;
@@ -153,7 +153,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 "_meta": {
                     "strategy": "full", "fidelity": "verbatim",
                     "decision_summary": decision.summary(),
-                    "content_kind": "verbatim_document", "byte_exact": ["document"],
+                    "content_kind": ContentKind::VerbatimDocument, "byte_exact": ["document"],
                     "degradation": null, "verbatim": true
                 }
             }
@@ -307,14 +307,15 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             match delta {
                 Some(ref d) => {
                     let wire_delta = serde_json::to_value(d).unwrap_or_default();
+                    let (adds, mods, dels) = d.summary_counts();
                     let delta_text = format!(
                         "Δ delta for {} (v{} → v{}): +{} ~{} -{} ops",
                         compiled.file_id,
                         d.from,
                         d.to,
-                        d.ops.adds.len(),
-                        d.ops.mods.len(),
-                        d.ops.dels.len()
+                        adds,
+                        mods,
+                        dels
                     );
                     let economic = super::content::select_complete_content(
                         source,
@@ -341,7 +342,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                                 "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                                 "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                                 "decision_summary": decision.summary(),
-                                "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
+                                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
                                 "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(&byte_exact).unwrap_or_default() },
                                 "degradation": null
                             }
@@ -406,7 +407,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                                 "version": compiled.version,
                                 "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                                 "decision_summary": decision.summary(),
-                                "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
+                                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
                                 "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(&byte_exact).unwrap_or_default() },
                                 "degradation": null
                             }
@@ -536,7 +537,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     },
                 );
                 let visible_content_kind = if raw_passthrough {
-                    "raw_passthrough"
+                    ContentKind::RawPassthrough
                 } else {
                     content_kind
                 };

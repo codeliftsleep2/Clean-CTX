@@ -1,5 +1,6 @@
 // Angular template specialization for provide_code_context.
 
+use super::common::ContentKind;
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::mcp::tools::parse_tokenizer_arg;
@@ -52,7 +53,7 @@ pub(super) fn try_handle_angular_template(
                 "_meta": {
                     "strategy": "full", "fidelity": "verbatim",
                     "is_angular": true, "template_compressed": false,
-                    "content_kind": "verbatim_document", "byte_exact": ["document"],
+                    "content_kind": ContentKind::VerbatimDocument, "byte_exact": ["document"],
                     "degradation": null
                 }
             }
@@ -105,14 +106,14 @@ pub(super) fn try_handle_angular_template(
     // claim `["method_bodies"]` even at Edit fidelity (it would be a
     // Gap 5/3/6 contract leak: the LLM would attempt replace_in_file
     // SEARCH against bodies that don't exist in template output).
-    let (content_kind, byte_exact) = ("skeleton", Vec::<&'static str>::new());
+    let (content_kind, byte_exact) = (ContentKind::Skeleton, Vec::<&'static str>::new());
     let mut response = serde_json::json!({
         "jsonrpc": "2.0", "id": id, "result": {
             "content": [{ "type": "text", "text": body }],
             "_meta": {
                 "strategy": "full", "fidelity": format!("{:?}", fidelity).to_lowercase(),
                 "is_angular": true, "template_compressed": !raw_passthrough,
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
+                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
                 "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() },
                 "degradation": null
             }

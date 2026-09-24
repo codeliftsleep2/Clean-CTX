@@ -1,6 +1,6 @@
 //! Apply-delta handler, separated from delta production orchestration.
 
-use super::common::{compiled_from_tuples, contract_fields, invalid_session_ir_response};
+use super::common::{compiled_from_tuples, contract_fields, invalid_session_ir_response, ContentKind};
 use super::delta::persistence::{ensure_apply_baseline, persisted_context_id};
 use crate::ir::delta::{IRDelta, SequenceDelta};
 use crate::mcp::McpState;
@@ -291,7 +291,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                     },
                     "_meta": {
                         "version": new_version,
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { "skeleton" },
+                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::Skeleton },
                         "byte_exact": if raw_passthrough {
                             serde_json::json!(["document"])
                         } else {

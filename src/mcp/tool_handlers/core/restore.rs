@@ -1,6 +1,6 @@
 // Durable restore_context MCP handler.
 
-use super::common::checked_hierarchy_or_respond;
+use super::common::{checked_hierarchy_or_respond, ContentKind};
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::protocol::send_response;
@@ -119,7 +119,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
                 "file": durable_path,
                 "instruction_count": session_ir.instructions.len(),
                 "semantic_edge_count": edge_count,
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { "skeleton" },
+                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::Skeleton },
                 "byte_exact": if raw_passthrough {
                     serde_json::json!(["document"])
                 } else if restored.fidelity == crate::compression::Fidelity::Edit {

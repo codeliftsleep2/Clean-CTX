@@ -2,6 +2,7 @@
 
 use crate::layers::meta::semantic::SemanticRelation;
 use crate::mcp::tools::dispatch_tools_call;
+use crate::mcp::tool_handlers::core::ContentKind;
 use serde_json::{Value, json};
 
 fn dispatch(state: &crate::mcp::McpState, id: i64, tool: &str, arguments: Value) -> Value {
@@ -363,7 +364,7 @@ fn small_file_lifecycle_uses_byte_exact_raw_without_a_wrapper() {
 
     let compressed = dispatch(&state, 1, "compress_code_context", arguments);
     assert_eq!(compressed["result"]["content"][0]["text"], source);
-    assert_eq!(compressed["result"]["content_kind"], "raw_passthrough");
+    assert_eq!(compressed["result"]["content_kind"], ContentKind::RawPassthrough.as_str());
 
     for (id, tool) in [(2, "restore_context"), (3, "replay_history")] {
         let response = dispatch(
@@ -376,7 +377,7 @@ fn small_file_lifecycle_uses_byte_exact_raw_without_a_wrapper() {
         assert_eq!(response["result"]["content"][0]["text"], source);
         assert_eq!(
             response["result"]["_meta"]["content_kind"],
-            "raw_passthrough"
+            ContentKind::RawPassthrough.as_str()
         );
     }
 }
@@ -405,7 +406,7 @@ fn small_angular_template_also_obeys_the_raw_economics_ceiling() {
         .expect("template content");
     let tokenizer = crate::tokenizer::create_tokenizer(Default::default()).unwrap();
     assert!(tokenizer.count_tokens(visible) <= tokenizer.count_tokens(source));
-    if response["result"]["_meta"]["content_kind"] == "raw_passthrough" {
+    if response["result"]["_meta"]["content_kind"] == ContentKind::RawPassthrough.as_str() {
         assert_eq!(visible.as_bytes(), source.as_bytes());
         assert_eq!(response["result"]["_meta"]["template_compressed"], false);
     } else {

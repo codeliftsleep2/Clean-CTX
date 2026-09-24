@@ -23,6 +23,7 @@
 // serialized through `protocol::HANDLER_RESPONSE_SERIAL`.
 
 use crate::mcp::tools::dispatch_tools_call;
+use crate::mcp::tool_handlers::core::ContentKind;
 use serde_json::json;
 
 // Shared Phase 2-promoted envelope helper (crate::tests).
@@ -213,8 +214,8 @@ fn provide_code_context_uses_meta_not_ad_hoc_fields() {
         .and_then(|k| k.as_str());
 
     assert!(
-        text.contains("// COMPACT-A A2") || content_kind == Some("raw_passthrough"),
-        "content must be economical A1 or raw passthrough: {text}"
+        text.contains("// SCHEMA v5") || content_kind == Some(ContentKind::RawPassthrough.as_str()),
+        "content must be the SCHEMA-v5 presentation or raw passthrough: {text}"
     );
 
     for banned in [

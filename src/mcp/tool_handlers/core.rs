@@ -11,7 +11,7 @@ mod provide_angular;
 mod provide_persistence;
 mod restore;
 
-pub(crate) use common::projection_error_response;
+pub(crate) use common::{projection_error_response, ContentKind};
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use common::{contract_fields, contract_fields_focused};
 pub(crate) use compress::handle_compress_code_context;

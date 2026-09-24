@@ -4,6 +4,7 @@
 // and purge old deltas.
 
 use crate::mcp::McpState;
+use crate::mcp::tool_handlers::core::ContentKind;
 use crate::protocol::send_response;
 use serde_json::Value;
 
@@ -458,7 +459,7 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
             "_meta": {
                 "file": file_path, "version": ir.version,
                 "instruction_count": ir.instructions.len(),
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { "skeleton" },
+                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::Skeleton },
                 "byte_exact": if raw_passthrough {
                     serde_json::json!(["document"])
                 } else if restored.fidelity == crate::compression::Fidelity::Edit {

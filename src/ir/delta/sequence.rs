@@ -203,6 +203,24 @@ impl SequenceDelta {
             intent: None,
         }
     }
+
+    /// Count the edits by kind: (insertions, replacements, removals).
+    ///
+    /// These are the `+`/`~`/`-` counts surfaced in the model-visible delta
+    /// summary, so the mapping lives in one place.
+    pub fn summary_counts(&self) -> (usize, usize, usize) {
+        let mut adds = 0usize;
+        let mut mods = 0usize;
+        let mut dels = 0usize;
+        for edit in &self.edits {
+            match edit {
+                SequenceEdit::Insert { .. } => adds += 1,
+                SequenceEdit::Replace { .. } => mods += 1,
+                SequenceEdit::Remove { .. } => dels += 1,
+            }
+        }
+        (adds, mods, dels)
+    }
 }
 
 pub struct SequenceDeltaComputer;

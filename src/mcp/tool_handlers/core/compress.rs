@@ -1,6 +1,6 @@
 // compress_code_context MCP handler.
 
-use super::common::{checked_hierarchy_or_respond, contract_fields};
+use super::common::{checked_hierarchy_or_respond, contract_fields, ContentKind};
 use crate::ir::wire::ir_to_wire;
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::{
@@ -105,7 +105,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             "jsonrpc": "2.0", "id": id,
             "result": {
                 "content": [{ "type": "text", "text": source_text }],
-                "content_kind": "verbatim_document", "byte_exact": ["document"],
+                "content_kind": ContentKind::VerbatimDocument, "byte_exact": ["document"],
                 "verbatim": true
             }
         });
@@ -245,7 +245,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 "content": [{ "type": "text", "text": llm_text_with_footer }],
                 "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&ir, &hir),
                 "pretty": ir_value, "v": ir.version, "file": ir.file_id,
-                "content_kind": if raw_passthrough { "raw_passthrough" } else { content_kind },
+                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
                 "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() }
             }
         })

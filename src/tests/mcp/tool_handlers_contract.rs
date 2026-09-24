@@ -11,6 +11,7 @@
 // implementations.
 
 use super::*;
+use crate::mcp::tool_handlers::core::ContentKind;
 
 // ── Regression: relative path resolution ─────────────────────────
 // FAANG audit follow-up: ensure all handlers resolve relative paths
@@ -129,7 +130,7 @@ fn handle_provide_code_context_accepts_relative_path() {
 #[test]
 fn contract_fields_low_is_skeleton() {
     let (kind, byte_exact) = contract_fields(Fidelity::Low);
-    assert_eq!(kind, "skeleton");
+    assert_eq!(kind, ContentKind::Skeleton);
     assert!(
         byte_exact.is_empty(),
         "Low must not claim byte-exact regions"
@@ -139,14 +140,14 @@ fn contract_fields_low_is_skeleton() {
 #[test]
 fn contract_fields_medium_is_skeleton() {
     let (kind, byte_exact) = contract_fields(Fidelity::Medium);
-    assert_eq!(kind, "skeleton");
+    assert_eq!(kind, ContentKind::Skeleton);
     assert!(byte_exact.is_empty());
 }
 
 #[test]
 fn contract_fields_high_is_skeleton() {
     let (kind, byte_exact) = contract_fields(Fidelity::High);
-    assert_eq!(kind, "skeleton");
+    assert_eq!(kind, ContentKind::Skeleton);
     assert!(byte_exact.is_empty());
 }
 
@@ -155,7 +156,7 @@ fn contract_fields_high_is_skeleton() {
 #[test]
 fn contract_fields_edit_reports_method_bodies() {
     let (kind, byte_exact) = contract_fields(Fidelity::Edit);
-    assert_eq!(kind, "skeleton_with_verbatim_bodies");
+    assert_eq!(kind, ContentKind::SkeletonWithVerbatimBodies);
     assert_eq!(byte_exact, vec!["method_bodies"]);
 }
 
@@ -163,7 +164,7 @@ fn contract_fields_edit_reports_method_bodies() {
 #[test]
 fn contract_fields_verbatim_is_document() {
     let (kind, byte_exact) = contract_fields(Fidelity::Verbatim);
-    assert_eq!(kind, "verbatim_document");
+    assert_eq!(kind, ContentKind::VerbatimDocument);
     assert_eq!(byte_exact, vec!["document"]);
 }
 
@@ -173,7 +174,7 @@ fn contract_fields_verbatim_is_document() {
 #[test]
 fn contract_fields_focused_none_edit_is_all_bodies() {
     let (kind, byte_exact) = contract_fields_focused(Fidelity::Edit, None);
-    assert_eq!(kind, "skeleton_with_verbatim_bodies");
+    assert_eq!(kind, ContentKind::SkeletonWithVerbatimBodies);
     assert_eq!(byte_exact, vec!["method_bodies"]);
 }
 
@@ -184,7 +185,7 @@ fn contract_fields_focused_none_edit_is_all_bodies() {
 fn contract_fields_focused_empty_set_edit_is_skeleton() {
     let focus = std::collections::HashSet::new();
     let (kind, byte_exact) = contract_fields_focused(Fidelity::Edit, Some(&focus));
-    assert_eq!(kind, "skeleton");
+    assert_eq!(kind, ContentKind::Skeleton);
     assert!(byte_exact.is_empty());
 }
 
@@ -193,7 +194,7 @@ fn contract_fields_focused_empty_set_edit_is_skeleton() {
 fn contract_fields_focused_some_edit_is_focused_bodies() {
     let focus = std::collections::HashSet::from(["GetOrgUnitDic".to_string()]);
     let (kind, byte_exact) = contract_fields_focused(Fidelity::Edit, Some(&focus));
-    assert_eq!(kind, "skeleton_with_focused_verbatim_bodies");
+    assert_eq!(kind, ContentKind::SkeletonWithFocusedVerbatimBodies);
     assert_eq!(byte_exact, vec!["focused_method_bodies"]);
 }
 
@@ -203,7 +204,7 @@ fn contract_fields_focused_non_edit_ignores_focus() {
     let focus = std::collections::HashSet::from(["doWork".to_string()]);
     for fidelity in [Fidelity::Low, Fidelity::Medium, Fidelity::High] {
         let (kind, byte_exact) = contract_fields_focused(fidelity, Some(&focus));
-        assert_eq!(kind, "skeleton");
+        assert_eq!(kind, ContentKind::Skeleton);
         assert!(byte_exact.is_empty());
     }
 }
@@ -213,7 +214,7 @@ fn contract_fields_focused_non_edit_ignores_focus() {
 fn contract_fields_focused_verbatim_is_document() {
     let focus = std::collections::HashSet::from(["doWork".to_string()]);
     let (kind, byte_exact) = contract_fields_focused(Fidelity::Verbatim, Some(&focus));
-    assert_eq!(kind, "verbatim_document");
+    assert_eq!(kind, ContentKind::VerbatimDocument);
     assert_eq!(byte_exact, vec!["document"]);
 }
 
@@ -231,6 +232,30 @@ fn contract_fields_delegates_to_focused_none() {
             contract_fields(fidelity),
             contract_fields_focused(fidelity, None)
         );
+    }
+}
+
+/// The `content_kind` wire strings are the model-visible contract: the LLM and
+/// the `.mjs` verification drivers parse these exact strings. Pin that `as_str`
+/// and `Serialize` agree on every variant.
+#[test]
+fn content_kind_wire_strings_match_the_model_visible_contract() {
+    let cases = [
+        (ContentKind::Skeleton, "skeleton"),
+        (
+            ContentKind::SkeletonWithVerbatimBodies,
+            "skeleton_with_verbatim_bodies",
+        ),
+        (
+            ContentKind::SkeletonWithFocusedVerbatimBodies,
+            "skeleton_with_focused_verbatim_bodies",
+        ),
+        (ContentKind::VerbatimDocument, "verbatim_document"),
+        (ContentKind::RawPassthrough, "raw_passthrough"),
+    ];
+    for (kind, wire) in cases {
+        assert_eq!(kind.as_str(), wire);
+        assert_eq!(serde_json::to_value(kind).unwrap(), wire);
     }
 }
 
