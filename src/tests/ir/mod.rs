@@ -49,3 +49,9 @@ mod pattern_identity;
 // the real production pipeline; they are the reason F2's severity was real.
 #[path = "pattern_identity_downstream.rs"]
 mod pattern_identity_downstream;
+
+// RED regressions: Canonical identity defects where presentation compactors or
+// raw syntax leaked into canonical IR identities (DefField, DefClass, Import, TypeAlias).
+#[path = "regression_canonical_identity.rs"]
+mod regression_canonical_identity;
+

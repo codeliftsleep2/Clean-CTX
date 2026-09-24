@@ -455,6 +455,8 @@ impl PassContext {
             let named_part = trimmed[..from_pos].trim();
             let module_part = trimmed[from_pos + 6..]
                 .trim()
+                .trim_end_matches(';')
+                .trim()
                 .trim_matches('\'')
                 .trim_matches('"');
             let named = if let Some(start) = named_part.find('{') {

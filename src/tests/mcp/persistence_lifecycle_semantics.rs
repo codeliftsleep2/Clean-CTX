@@ -1,6 +1,5 @@
 use super::{dispatch, in_memory_ir, state_with_persistence};
 use crate::ir::opcodes::CoreOp;
-use crate::mcp::context_store::ContextStore;
 use crate::mcp::tool_handlers::control_full_test_support;
 use serde_json::json;
 

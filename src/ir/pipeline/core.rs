@@ -2,7 +2,8 @@
 
 use super::{IRPass, PassContext, PassError, locate_method_body};
 use crate::compaction::{
-    extract_class_name, extract_field, extract_method_sig, extract_rust_struct_name,
+    extract_bare_class_name, extract_bare_field_name, extract_field, extract_method_sig,
+    extract_rust_struct_name,
 };
 use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::{CapturedNode, run_capture_pipeline_nodes};
@@ -61,18 +62,12 @@ impl IRPass for CoreIRPass {
             &source,
             fidelity,
             |capture_name, raw, fidelity| match capture_name {
-                "class.root" => Some(extract_class_name(raw)),
-                "interface.root" => Some(
-                    extract_class_name(raw)
-                        .split(':')
-                        .next()
-                        .unwrap_or_default()
-                        .to_string(),
-                ),
+                "class.root" => Some(extract_bare_class_name(raw)),
+                "interface.root" => Some(extract_bare_class_name(raw)),
                 "struct.root" | "trait.root" | "impl.root" => Some(extract_rust_struct_name(raw)),
                 "enum.root" => {
                     if query_string == crate::queries::CS_QUERY {
-                        Some(extract_class_name(raw))
+                        Some(extract_bare_class_name(raw))
                     } else {
                         Some(extract_rust_struct_name(raw))
                     }
@@ -204,18 +199,22 @@ impl IRPass for CoreIRPass {
                 }
                 "field.root" => {
                     state.refresh_type_owner(cap.start_byte);
+                    let field_name = extract_bare_field_name(&cap.raw_text);
+                    if field_name.is_empty() {
+                        continue;
+                    }
                     let field_id = state.next_id("F");
                     if let Some(class_id) = state.current_class.clone() {
                         state.instructions.push(CoreOp::DefField(
                             class_id,
-                            field_id,
-                            cap.text.clone(),
+                            field_id.clone(),
+                            field_name.clone(),
                         ));
                     } else if let Some(interface_id) = state.current_interface.clone() {
                         state.instructions.push(CoreOp::DefInterfaceField(
                             interface_id,
-                            field_id,
-                            cap.text.clone(),
+                            field_id.clone(),
+                            field_name.clone(),
                         ));
                     } else {
                         continue;
@@ -229,7 +228,7 @@ impl IRPass for CoreIRPass {
                     }
                 }
                 "import.root" | "package.root" => {
-                    state.emit_import_ir(&cap.text);
+                    state.emit_import_ir(&cap.raw_text);
                     for layer in state.language_layers.iter_mut() {
                         state.instructions.extend(layer.process_capture(
                             &cap.name,
@@ -240,9 +239,10 @@ impl IRPass for CoreIRPass {
                 }
                 "type.root" => {
                     let alias_id = state.next_id("T");
-                    state
-                        .instructions
-                        .push(CoreOp::TypeAlias(alias_id, cap.text.clone()));
+                    state.instructions.push(CoreOp::TypeAlias(
+                        alias_id,
+                        canonical_type_alias_target(&cap.raw_text),
+                    ));
                     dispatch_capture(state, cap, false);
                 }
                 "mod.root" => dispatch_capture(state, cap, false),
@@ -399,6 +399,20 @@ fn register_arrow_capture(state: &mut PassContext, cap: &CapturedNode, file_id: 
         ),
     }
     state.push_callable_scope(method_id, cap.start_byte, cap.end_byte);
+}
+
+/// Extract a canonical TypeScript type-alias target (`Identifier = string`
+/// yields `string`) without trusting the presentation-normalized capture text.
+/// A root with no explicit assignment falls back to that capture text.
+fn canonical_type_alias_target(raw: &str) -> String {
+    let line = raw.lines().next().unwrap_or(raw).trim();
+    if let Some((_, target)) = line.split_once('=') {
+        let target = target.trim().trim_end_matches(';').trim();
+        if !target.is_empty() {
+            return target.to_string();
+        }
+    }
+    line.to_string()
 }
 
 fn dispatch_capture(state: &mut PassContext, cap: &CapturedNode, use_raw_text: bool) {
