@@ -28,6 +28,13 @@ pub(crate) fn payload(response: &Value) -> Value {
         }
         return decoded;
     }
+    // After the presentation-boundary fix, model-visible content is the
+    // SCHEMA-v5 presentation or raw source — never a structured codec JSON.
+    // Nothing below decodes to `interfaces`/`classes`; return the text as a
+    // plain string so callers' index access is safe (Null) instead of panicking.
+    if !text.starts_with("// CONTROL-FULL") {
+        return Value::String(text.to_string());
+    }
     let document = text
         .split("\n§PATHMAP")
         .next()

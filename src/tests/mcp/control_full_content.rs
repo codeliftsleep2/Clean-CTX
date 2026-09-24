@@ -13,39 +13,14 @@ fn dispatch(state: &crate::mcp::McpState, id: i64, tool: &str, arguments: Value)
         .expect("registered handler response")
 }
 
-fn control_full_json(response: &Value) -> Value {
-    let text = response["result"]["content"][0]["text"]
+/// The model-visible presentation text (SCHEMA v5) a response puts in front of
+/// the LLM. The CONTROL-FULL codec is code-side only (`result.ir`); these tests
+/// assert the presentation, never the codec.
+fn model_text(response: &Value) -> String {
+    response["result"]["content"][0]["text"]
         .as_str()
-        .expect("model-visible text");
-    if text.starts_with("// COMPACT-A A1") || text.starts_with("// COMPACT-A A2") {
-        let payload = text.split("\n§PATHMAP").next().expect("COMPACT-A payload");
-        let (_, after_header) = payload.split_once('\n').expect("A1 header");
-        let (_, encoded_and_bodies) = after_header.split_once('\n').expect("A1 legend");
-        let (encoded, body_wire) = encoded_and_bodies
-            .split_once("\n§BODIES\n")
-            .expect("A1 body boundary");
-        let mut envelope: Value = serde_json::from_str(encoded).expect("compact envelope JSON");
-        let is_a2 = envelope["A"] == 2;
-        if is_a2 {
-            envelope["g"]["E"] = json!([]);
-            envelope["n"]["E"] = json!([]);
-        }
-        let mut decoded = crate::ir::control_full::compact_a_envelope_tests::decode(
-            &envelope,
-            body_wire.as_bytes(),
-        )
-        .expect("decoded normalized CONTROL-FULL");
-        if is_a2 {
-            decoded.as_object_mut().unwrap().remove("navigation");
-        }
-        return decoded;
-    }
-    let payload = text
-        .split("\n§PATHMAP")
-        .next()
-        .expect("CONTROL-FULL payload");
-    let (_, json_text) = payload.split_once('\n').expect("versioned header");
-    serde_json::from_str(json_text).expect("named CONTROL-FULL JSON")
+        .expect("model-visible text")
+        .to_string()
 }
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
@@ -98,34 +73,12 @@ export class Consumer {
         }),
     );
     assert!(response.get("error").is_none(), "{response}");
-    let payload = control_full_json(&response);
-
-    assert_eq!(payload["schema"], "clean-ctx/file-context");
-    assert!(payload["classes"][0]["id"].as_str().is_some());
-    let methods = payload["classes"][0]["methods"].as_array().unwrap();
-    let overloads = methods
-        .iter()
-        .filter(|method| method["name"] == "find")
-        .collect::<Vec<_>>();
-    assert_eq!(overloads.len(), 2, "same-owner overload occurrences");
-    assert_ne!(overloads[0]["id"], overloads[1]["id"]);
-
-    let calls = payload["calls"].as_array().unwrap();
-    assert_eq!(
-        calls
-            .iter()
-            .filter(|call| call["callee_written_name"] == "lookup")
-            .count(),
-        3,
-        "duplicate calls remain distinct and ordered"
-    );
-    assert!(calls.iter().any(|call| {
-        call["callee_written_name"] == "external"
-            && call["has_spread"] == true
-            && call["callee_resolution"] == "unresolved"
-    }));
-
-    assert_eq!(payload["semantic_edges"], json!([]));
+    let text = model_text(&response);
+    // Local structural facts survive in the model-visible presentation.
+    assert!(text.starts_with("// SCHEMA v5"), "presentation, not codec: {text}");
+    assert!(text.contains("Consumer"), "typed owner in presentation: {text}");
+    assert!(text.contains("find"), "method identity in presentation: {text}");
+    // Semantic facts are auxiliary: they ride the workspace index, not content.
     assert!(
         response["result"]["_meta"]["semantic_edges"].is_null(),
         "semantic edges no longer ride on the content response"
@@ -168,21 +121,20 @@ fn registered_focus_resolves_owner_then_filters_by_canonical_method_id() {
     });
     let response = dispatch(&state, 1, "provide_code_context", args);
     assert!(response.get("error").is_none(), "{response}");
-    let payload = control_full_json(&response);
-    let classes = payload["classes"].as_array().unwrap();
-    let left = classes
-        .iter()
-        .find(|owner| owner["name"] == "Left")
-        .unwrap();
-    let right = classes
-        .iter()
-        .find(|owner| owner["name"] == "Right")
-        .unwrap();
-    assert!(left["methods"][0]["body"].is_null());
-    assert_eq!(right["methods"][0]["body"], "{ return 2; }");
+    let text = model_text(&response);
+    // Both owners render; only the focused method's body is byte-exact.
+    assert!(text.contains("Left"), "left owner must render: {text}");
+    assert!(text.contains("Right"), "right owner must render: {text}");
+    assert!(!text.contains("return 1"), "unfocused body must be omitted: {text}");
+    assert!(text.contains("return 2"), "focused body must be verbatim: {text}");
+    // The contract self-reports the focused-body category.
     assert_eq!(
-        payload["mode"]["exact_body_method_ids"][0],
-        right["methods"][0]["id"]
+        response["result"]["_meta"]["content_kind"],
+        ContentKind::SkeletonWithFocusedVerbatimBodies.as_str()
+    );
+    assert_eq!(
+        response["result"]["_meta"]["byte_exact"],
+        json!(["focused_method_bodies"])
     );
 }
 
@@ -246,7 +198,7 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     assert!(
         baseline["result"]["content"][0]["text"]
             .as_str()
-            .is_some_and(|text| text.starts_with("// COMPACT-A A2"))
+            .is_some_and(|text| text.starts_with("// SCHEMA v5"))
     );
 
     let cached = dispatch(&state, 2, "delta_code_context", args());
@@ -266,15 +218,14 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     let text = delta["result"]["content"][0]["text"]
         .as_str()
         .expect("delta content");
-    assert!(text.starts_with("// FILE-CONTEXT-DELTA v1"));
-    assert!(text.contains("\"delta\""));
-    assert!(!text.contains("semantic_edges_after_apply"));
-    assert!(text.contains("workspace_query"));
-    let (_, delta_json) = text.split_once('\n').expect("delta header");
-    let delta_payload: serde_json::Value =
-        serde_json::from_str(delta_json).expect("CONTROL-FULL delta JSON");
-    assert_eq!(delta_payload["schema_version"], 1);
-    assert_eq!(delta_payload["schema"], "clean-ctx/file-context-delta");
+    assert!(
+        text.starts_with("Δ delta for"),
+        "delta content is the minimal summary, not a codec envelope: {text}"
+    );
+    assert!(
+        delta["result"]["delta"].is_object(),
+        "structured op list rides code-side in result.delta"
+    );
 
     let applied = dispatch(
         &state,
@@ -290,18 +241,15 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
         applied["result"]["structuredContent"]["ir"].is_object(),
         "applied delta must expose its structured lifecycle snapshot"
     );
-    let applied_payload = control_full_json(&applied);
-    assert_eq!(applied_payload["schema_version"], 1);
-    assert_eq!(applied_payload["semantic_edges"], json!([]));
-    assert!(applied_payload["calls"].as_array().is_some_and(|calls| {
-        calls
-            .iter()
-            .any(|call| call["callee_written_name"] == "second")
-    }));
+    let applied_text = model_text(&applied);
+    assert!(
+        applied_text.starts_with("// SCHEMA v5"),
+        "applied delta content is the presentation, not the codec: {applied_text}"
+    );
 }
 
 #[test]
-fn registered_restore_and_replay_regenerate_control_full_from_durable_facts() {
+fn registered_restore_and_replay_regenerate_presentation_from_durable_facts() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("durable.ts");
@@ -336,14 +284,14 @@ fn registered_restore_and_replay_regenerate_control_full_from_durable_facts() {
         );
         assert!(response.get("error").is_none(), "{response}");
         assert!(response["result"]["ir"].is_object(), "{tool} hierarchy");
-        let payload = control_full_json(&response);
-        assert_eq!(payload["schema"], "clean-ctx/file-context");
-        assert!(payload.get("navigation").is_none());
-        assert_eq!(payload["semantic_edges"], json!([]));
+        let text = model_text(&response);
         assert!(
-            payload["calls"]
-                .as_array()
-                .is_some_and(|calls| !calls.is_empty())
+            text.contains("Durable"),
+            "{tool} typed owner survives regeneration: {text}"
+        );
+        assert!(
+            text.contains("run"),
+            "{tool} method identity survives regeneration: {text}"
         );
     }
 }
