@@ -129,11 +129,13 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
 
     for op in slice.iter().skip(1).take(5) {
         match op {
-            CoreOp::Return(_, ty) => {
+            CoreOp::DefMethod(..) => break,
+            CoreOp::Return(tid, ty) if *tid == method_id => {
                 if ty == "$P" || ty.contains("Promise") || ty.contains("Observable") {
                     has_observable_return = true;
                 }
             }
+            CoreOp::Return(..) => {}
             CoreOp::MethodModifiers(tid, modifiers)
                 if *tid == method_id && modifiers.contains(&DeclarationModifier::Async) =>
             {
@@ -144,7 +146,7 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
         }
     }
 
-    if has_observable_return || has_async_flag {
+    if has_observable_return && has_async_flag {
         Some((
             CoreOp::PatternFacts(method_id, vec![PatternFact::Observable]),
             0, // additive — do not consume any instructions

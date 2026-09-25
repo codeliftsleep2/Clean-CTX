@@ -39,3 +39,7 @@ mod auto_save_contract_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../tests/mcp/content_kind_lifecycle.rs"]
 mod content_kind_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/mcp/pattern_fact_ownership.rs"]
+mod pattern_fact_ownership_tests;

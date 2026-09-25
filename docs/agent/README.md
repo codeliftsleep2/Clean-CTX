@@ -35,7 +35,7 @@ architectural facts and is NOT duplicated here.
 | File | Purpose | Read it when ... |
 |-----------|------------------------------------------------------|------------------------------|
 | `verification.md` | Single authoritative final verification gate | declaring any task complete |
-| `architecture.md` | Architectural audit checklist, invariant hierarchy, test-file convention | ending a multi-step architectural task |
+| `architecture.md` | RED/GREEN regression procedure, architectural audit checklist, invariant hierarchy, test-file convention | fixing a reproducible bug or ending a multi-step architectural task |
 | `incremental-migration.md` | Incremental architectural migration procedure | performing a designated migration |
 | `releases.md` | Gated release, changelog & versioning accounting | a behavior-affecting build ships |
 | `tooling.md` | Comprehensive MCP/code-context tool selection, workflow, and antipatterns guide | choosing how to read, understand, edit, or verify code |

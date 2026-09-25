@@ -49,6 +49,30 @@ simplest enforcement mechanism that provides reliable protection.
   has moved. When relocating functionality, preserve its existing test
   coverage.
 
+### Required RED/GREEN regression procedure
+
+For a reproducible bug or behavioral regression, preserve direct evidence that
+the regression test detects the unfixed defect:
+
+1. Add the narrowest appropriate tracked regression under `src/tests/**` and
+   register it through the normal `#[path = "..."]` convention. Do not modify
+   production code yet.
+2. Run the focused regression against the unfixed implementation and observe
+   RED for the intended behavioral assertion. A compile error, unrelated test
+   failure, or untracked harness result is not valid RED evidence.
+3. Stash only the regression and any test-module registration needed to compile
+   it. Do not include unrelated working-tree changes in that stash.
+4. Implement the production fix while the regression is absent from the
+   working tree.
+5. Restore the exact regression from the stash without modifying it.
+6. Run the same focused command and observe GREEN. The unchanged tracked test,
+   failing before the fix and passing after it, is the RED/GREEN evidence.
+
+If the RED test itself is invalid, correct it and restart the procedure from
+step 1. Never weaken or rewrite an observed RED assertion merely to obtain
+GREEN. Repository policy may require the operator rather than the agent to run
+the Cargo commands; that execution boundary does not change this sequence.
+
 ## Test-file convention
 
 Clean-CTX uses Rust's `#[path = "..."]` attribute to keep test files in the

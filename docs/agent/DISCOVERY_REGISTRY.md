@@ -46,6 +46,30 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-021: Observable Pattern Fact Borrowed Evidence from Neighboring Methods
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-25 |
+| **Environment** | Claude + Clean-CTX on `(feat)Architectural-Hardening`, followed by controlled local reproduction |
+| **Repository/context** | TypeScript/Angular service code; reproduced deterministically with adjacent plain and async Promise-returning methods and observed on a real approximately 700-line service. |
+| **Symptom** | SCHEMA-v5 rendered `pf:OBSERVABLE` on plain methods with no Observable or RxJS usage, including a `void` method whose body only performed ordinary work. The false compiler-derived fact was exposed by both `provide_code_context` and the full-response path of `delta_code_context`. |
+| **Root cause** | The additive `CodePatternRecognizer` inspected up to five following operations but accepted a qualifying `Return` without checking its owning method ID. A plain method could therefore borrow a neighboring method's Promise/Observable return. The recognizer also used `has_observable_return || has_async_flag`, although its established contract requires both pieces of evidence on the same method. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/ir/layers/patterns.rs` (foreign-owner evidence and incomplete-evidence regressions); `src/tests/mcp/pattern_fact_ownership.rs` (registered `provide_code_context` and initial-full `delta_code_context` production paths). The tracked tests were observed RED before the implementation change, stashed, restored byte-identically, and then reported GREEN with the same focused commands. |
+| **Live scenario required?** | Yes — re-run the original real Angular service through `provide_code_context` and confirm plain methods no longer carry `pf:OBSERVABLE` while legitimately classified methods retain it. |
+| **Architectural invariant** | Compiler-derived presentation facts must be supported by evidence owned by the declaration receiving the fact; neighboring declarations are never evidence sources. |
+| **Status** | Fixed locally; live re-verification pending |
+
+**Fix (2026-09-25):** `try_observable_pattern` now stops at the next method
+declaration, accepts return evidence only when its method ID matches the method
+being classified, and emits `PatternFact::Observable` only when both the
+qualifying return and owner-matched async modifier are present. The renderer was
+unchanged because it correctly projected the false canonical input it received.
+
+---
+
 ## DIS-2026-020: Model-Visible Content Is Assembled from the Codec, Not a Presentation
 
 | Field | Value |

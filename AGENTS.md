@@ -165,7 +165,8 @@ task type applies:
 
 - Final verification / gates -> `docs/agent/verification.md`
 - Incremental architectural migration -> `docs/agent/incremental-migration.md`
-- Architectural audit / invariant / test-file details -> `docs/agent/architecture.md`
+- Bug fixes / RED-GREEN regressions / architectural audit / invariant /
+  test-file details -> `docs/agent/architecture.md`
 - Gated release / changelog / versioning -> `docs/agent/releases.md`
 - MCP / code-context tooling -> `docs/agent/tooling.md` (local sessions; MCP
   tools are unavailable in the GitHub Actions runner)

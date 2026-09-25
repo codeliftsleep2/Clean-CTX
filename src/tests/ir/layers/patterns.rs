@@ -79,6 +79,56 @@ fn recognize_observable_return() {
     );
 }
 
+#[test]
+fn observable_fact_never_borrows_evidence_from_another_method() {
+    let instructions = vec![
+        make_defmethod("C1", "M1", "methodB"),
+        make_ret("M1", "$v"),
+        make_defmethod("C1", "M2", "methodA"),
+        make_ret("M2", "$P"),
+        make_modifiers("M2", vec![DeclarationModifier::Async]),
+    ];
+
+    let result = CodePatternRecognizer::new().recognize(&instructions);
+
+    assert!(
+        !result.iter().any(|op| {
+            matches!(op, CoreOp::PatternFacts(m, facts) if m == "M1" && facts.contains(&PatternFact::Observable))
+        }),
+        "a plain method must not borrow Observable evidence from a neighboring method: {result:?}"
+    );
+    assert!(
+        result.iter().any(|op| {
+            matches!(op, CoreOp::PatternFacts(m, facts) if m == "M2" && facts.contains(&PatternFact::Observable))
+        }),
+        "the method that owns both pieces of evidence should retain its Observable fact: {result:?}"
+    );
+}
+
+#[test]
+fn observable_fact_requires_return_and_async_evidence_on_the_same_method() {
+    let promise_only = vec![
+        make_defmethod("C1", "M1", "promiseOnly"),
+        make_ret("M1", "$P"),
+    ];
+    let async_only = vec![
+        make_defmethod("C1", "M2", "asyncOnly"),
+        make_ret("M2", "$v"),
+        make_modifiers("M2", vec![DeclarationModifier::Async]),
+    ];
+    let recognizer = CodePatternRecognizer::new();
+
+    for instructions in [&promise_only, &async_only] {
+        let result = recognizer.recognize(instructions);
+        assert!(
+            !result
+                .iter()
+                .any(|op| matches!(op, CoreOp::PatternFacts(_, facts) if facts.contains(&PatternFact::Observable))),
+            "partial evidence must not produce a compiler-derived Observable fact: {result:?}"
+        );
+    }
+}
+
 // ── Getter/Setter Pattern Tests ───────────────────────
 
 #[test]
