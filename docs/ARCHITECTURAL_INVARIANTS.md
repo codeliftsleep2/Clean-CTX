@@ -435,6 +435,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### PERSIST-001 Automatic Checkpoints Are Policy; Accepted Mutations Are Durable Authority
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Operators must be able to keep ordinary context reads session-only without weakening crash recovery, edit safety, or explicitly requested persistence. |
+| **Invariant** | `persistence.enabled = false` creates no durable store. With persistence enabled, `auto_save = true` checkpoints canonical read-produced baselines before publishing their live owners; `auto_save = false` leaves ordinary `provide_code_context`, `compress_code_context`, and read-only delta-generation results session-only until `save_context`. Edit-fidelity baselines remain durable because they establish safe edit authority. Accepted `apply_edit` and `apply_delta` transitions, explicit saves, and explicit deletions remain durable regardless of `auto_save`. Verbatim and Angular-template presentations are never checkpointed because they own no canonical IR. Every required checkpoint atomically aligns canonical IR, semantic edges, source hash, version, and fidelity before live publication. |
+| **Enforcement** | `src/mcp/tool_handlers/core/provide_persistence.rs` owns read-checkpoint policy; canonical producers consult it before live publication. Mutation handlers retain their independent transactional persistence boundaries. `src/tests/mcp/auto_save_contract.rs` covers disabled persistence, manual session-only reads, every canonical automatic producer, explicit save/restart/restore, and mandatory Edit authority. `src/tests/mcp/delta_fidelity_persistence.rs` covers accepted delta durability with auto-save disabled. Existing baseline-publication and edit-transaction regressions enforce failure atomicity. |
+| **Authority** | `src/config.rs` (`PersistenceConfig`), `src/mcp/tool_handlers/core/{provide_persistence,provide,compress,delta,delta_apply}.rs`, `src/mcp/tool_handlers/edit.rs`, `src/mcp/tool_handlers/persistence/mod.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test --all-features` |
+
+---
+
 ## Architectural Debt
 
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)

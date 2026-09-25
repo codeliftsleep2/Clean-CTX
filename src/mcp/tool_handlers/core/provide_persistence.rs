@@ -4,16 +4,27 @@ use crate::ir::compiler::CompiledIR;
 use crate::layers::meta::semantic::SemanticEdge;
 use crate::mcp::McpState;
 
+pub(super) fn read_checkpoint_required(
+    state: &McpState,
+    fidelity: crate::compression::Fidelity,
+) -> bool {
+    state.config.persistence.auto_save || fidelity == crate::compression::Fidelity::Edit
+}
+
 #[allow(clippy::too_many_arguments)]
-pub(super) fn persist_edit_baseline(
+pub(super) fn persist_read_baseline(
     state: &McpState,
     resolved_path: &str,
+    fidelity: crate::compression::Fidelity,
     compiled: &CompiledIR,
     semantic_edges: &[SemanticEdge],
     source_hash: &str,
     raw_tokens: usize,
     compressed_tokens: usize,
 ) -> Result<(), &'static str> {
+    if !read_checkpoint_required(state, fidelity) {
+        return Ok(());
+    }
     let guard = state.persistence_store_lock();
     let Some(store) = guard.as_ref() else {
         return Ok(());
@@ -24,7 +35,7 @@ pub(super) fn persist_edit_baseline(
         sqlite
             .save_context_with_semantics(
                 resolved_path,
-                crate::compression::Fidelity::Edit,
+                fidelity,
                 "",
                 &binary,
                 source_hash,

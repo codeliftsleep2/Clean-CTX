@@ -129,40 +129,27 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
         let compressed_tokens = count_tokens_with_tokenizer(&candidate_presentation, tokenizer_ref);
 
-        // P9-14: durability is the publication boundary. Persist the checked
-        // candidate and its complete edge snapshot before creating aliases or
-        // changing any live owner. Compact output is rendered after the
-        // committed candidate receives its session-local alias.
-        {
-            if let Some(ref store) = *state.persistence_store_lock() {
-                let mut durable_ir = ir.clone();
-                durable_ir.file_id.clone_from(&resolved_path);
-                let ir_binary = crate::ir::binary_wire::encode(&durable_ir);
-                let persisted = store.sqlite().is_some_and(|mut sqlite| {
-                    sqlite
-                        .save_context_with_semantics(
-                            &resolved_path,
-                            effective_fidelity,
-                            "",
-                            &ir_binary,
-                            &source_hash,
-                            ir.version,
-                            &semantic_edges,
-                            raw_tokens as u64,
-                            compressed_tokens as u64,
-                        )
-                        .is_ok()
-                });
-                if !persisted {
-                    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                        id.clone(),
-                        -32603,
-                        "Canonical IR and semantic edges could not be persisted atomically",
-                        None,
-                    ));
-                    return;
-                }
-            }
+        // Automatic checkpoints are an optional read-side policy. Edit
+        // baselines remain mandatory because they establish safe edit
+        // authority. Any required checkpoint still commits before live
+        // publication.
+        if let Err(error) = super::provide_persistence::persist_read_baseline(
+            state,
+            &resolved_path,
+            effective_fidelity,
+            &ir,
+            &semantic_edges,
+            &source_hash,
+            raw_tokens,
+            compressed_tokens,
+        ) {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                error,
+                None,
+            ));
+            return;
         }
 
         let path_alias = state.get_or_create_alias(resolved_path.clone());

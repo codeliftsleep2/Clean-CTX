@@ -151,7 +151,7 @@ fn default_tool_version() -> String {
     "v1".to_string()
 }
 
-// ── Persistence configuration (placeholder) ────────────────────────
+// ── Persistence configuration ──────────────────────────────────────
 
 /// Persistence configuration for SQLite-backed cross-session storage.
 ///
@@ -163,7 +163,9 @@ pub struct PersistenceConfig {
     /// are purely in-memory (current behaviour).
     #[serde(default)]
     pub enabled: bool,
-    /// Automatically save context after each compression/delta operation.
+    /// Automatically checkpoint canonical context produced by read-only
+    /// compression and delta-generation operations. Required edit/delta
+    /// transactions and explicit persistence tools are unaffected.
     #[serde(default = "default_true")]
     pub auto_save: bool,
     /// Maximum days to retain history before pruning.

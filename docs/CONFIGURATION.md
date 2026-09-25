@@ -196,14 +196,36 @@ Controls SQLite-backed cross-session storage:
 {
   "persistence": {
     "enabled": true,            // Master switch (default: true)
-    "auto_save": true,          // Auto-save after each operation
+    "auto_save": true,          // Auto-checkpoint canonical read results
     "max_history_days": 30,     // Prune history older than this
     "db_path": ".clean-ctx/persistence.db"
   }
 }
 ```
 
-**Note**: Persistence is **enabled by default** — cross-session compression history is a core feature. It is automatically disabled in CI environments (A-14) to prevent stale `persistence.db` from leaking between builds and to avoid SQLite file lock contention in parallel test runs. Set `"enabled": false` to opt out.
+**Lifecycle contract:**
+
+- `enabled: false` creates no durable store; all context remains session-only.
+- `enabled: true, auto_save: true` automatically checkpoints canonical IR and
+  its aligned semantic edges after `provide_code_context`,
+  `compress_code_context`, and read-only delta baseline generation.
+- `enabled: true, auto_save: false` keeps those ordinary read results
+  session-only until `save_context` is called explicitly.
+- Edit-fidelity baselines remain durable because they establish safe edit
+  authority. Accepted `apply_edit` and `apply_delta` transactions, explicit
+  saves, and explicit deletions also remain durable regardless of
+  `auto_save`.
+- Verbatim responses and Angular template compression do not produce
+  canonical IR and therefore are not automatic-checkpoint candidates.
+
+Required checkpoints commit before the corresponding live state is
+published. A failed durable write therefore cannot publish a partial live
+candidate.
+
+Persistence is **enabled by default** — cross-session compression history is
+a core feature. It is automatically disabled in CI environments (A-14) to
+prevent stale `persistence.db` from leaking between builds and to avoid SQLite
+file lock contention in parallel test runs. Set `"enabled": false` to opt out.
 
 ## Smart Defaults
 

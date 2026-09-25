@@ -227,16 +227,18 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             .get_source_hash(&path_alias)
             .cloned()
             .unwrap_or_else(|| source_hash.clone());
-        if let Err(error) = ensure_persisted_baseline(
-            state,
-            &resolved_path,
-            fidelity,
-            &prev_compiled,
-            &previous_hash,
-        ) {
-            drop(ir_ctx);
-            send_response(&invalid_session_ir_response(id, &error));
-            return;
+        if super::provide_persistence::read_checkpoint_required(state, fidelity) {
+            if let Err(error) = ensure_persisted_baseline(
+                state,
+                &resolved_path,
+                fidelity,
+                &prev_compiled,
+                &previous_hash,
+            ) {
+                drop(ir_ctx);
+                send_response(&invalid_session_ir_response(id, &error));
+                return;
+            }
         }
         SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
     } else {
@@ -291,20 +293,25 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
         }
         None => {
             if prev_version == 0 {
-                if let Err(error) = persist_baseline(
-                    state,
-                    &resolved_path,
-                    fidelity,
-                    &compiled,
-                    &source_hash,
-                    &semantic_edges,
-                ) {
-                    send_response(&invalid_session_ir_response(id, &error));
-                    return;
+                let checkpoint_required =
+                    super::provide_persistence::read_checkpoint_required(state, fidelity);
+                if checkpoint_required {
+                    if let Err(error) = persist_baseline(
+                        state,
+                        &resolved_path,
+                        fidelity,
+                        &compiled,
+                        &source_hash,
+                        &semantic_edges,
+                    ) {
+                        send_response(&invalid_session_ir_response(id, &error));
+                        return;
+                    }
                 }
 
-                // P9-14: the durable baseline commit precedes publication of
-                // every corresponding live owner.
+                // When policy requires a read-side checkpoint, its durable
+                // commit precedes publication of the corresponding live
+                // owner. Manual-checkpoint mode publishes session state only.
                 let committed_alias = state.get_or_create_alias(resolved_path.clone());
                 compiled.file_id.clone_from(&committed_alias);
                 state

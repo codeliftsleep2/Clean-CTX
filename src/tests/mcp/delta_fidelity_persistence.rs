@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 fn config(root: &tempfile::TempDir) -> crate::config::CleanCtxConfig {
     let mut config = crate::tests::test_config();
     config.persistence.enabled = true;
+    config.persistence.auto_save = false;
     config.persistence.db_path = root
         .path()
         .join("delta-fidelity.db")

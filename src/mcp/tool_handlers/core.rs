@@ -31,3 +31,7 @@ mod control_full_content_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../tests/mcp/meta_layer_config.rs"]
 mod meta_layer_config_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/mcp/auto_save_contract.rs"]
+mod auto_save_contract_tests;

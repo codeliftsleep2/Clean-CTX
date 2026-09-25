@@ -230,24 +230,23 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 );
                 let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
                 let compressed_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
-                if effective_fidelity == crate::compression::Fidelity::Edit {
-                    if let Err(error) = super::provide_persistence::persist_edit_baseline(
-                        state,
-                        &resolved_path,
-                        &compiled,
-                        &semantic_edges,
-                        &source_hash,
-                        raw_tokens,
-                        compressed_tokens,
-                    ) {
-                        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                            id.clone(),
-                            -32603,
-                            error,
-                            None,
-                        ));
-                        return;
-                    }
+                if let Err(error) = super::provide_persistence::persist_read_baseline(
+                    state,
+                    &resolved_path,
+                    effective_fidelity,
+                    &compiled,
+                    &semantic_edges,
+                    &source_hash,
+                    raw_tokens,
+                    compressed_tokens,
+                ) {
+                    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                        id.clone(),
+                        -32603,
+                        error,
+                        None,
+                    ));
+                    return;
                 }
                 Some(full)
             } else {
@@ -482,24 +481,23 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     economic.selected,
                     crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
                 );
-                if effective_fidelity == crate::compression::Fidelity::Edit {
-                    if let Err(error) = super::provide_persistence::persist_edit_baseline(
-                        state,
-                        &resolved_path,
-                        &ir,
-                        &semantic_edges,
-                        &source_hash,
-                        raw_tokens,
-                        candidate_tokens,
-                    ) {
-                        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                            id.clone(),
-                            -32603,
-                            error,
-                            None,
-                        ));
-                        return;
-                    }
+                if let Err(error) = super::provide_persistence::persist_read_baseline(
+                    state,
+                    &resolved_path,
+                    effective_fidelity,
+                    &ir,
+                    &semantic_edges,
+                    &source_hash,
+                    raw_tokens,
+                    candidate_tokens,
+                ) {
+                    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                        id.clone(),
+                        -32603,
+                        error,
+                        None,
+                    ));
+                    return;
                 }
 
                 let canonical_path =
