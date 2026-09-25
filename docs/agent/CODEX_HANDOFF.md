@@ -4,22 +4,32 @@ You are resuming work on Clean-CTX (a token-waste reducer / context compiler for
 LLM tooling). This note corrects an earlier architectural mistake and brings you
 current.
 
-## The architectural fact (do not re-litigate — ARCH-003)
+## The architectural fact (ARCH-003 / CTX-001)
 
-Clean-CTX has two **separate** contracts:
+Clean-CTX has four distinct representation roles:
 
-1. **Canonical IR / codec** — `CoreOp[]`, CONTROL-FULL, COMPACT-A2/A3. This is
-   the **reversible wire**: its only job is lossless round-trip (encode IR ↔
-   decode IR) for deltas, persistence, and replay. It is a *reversibility*
-   mechanism, **not a compressor**.
-2. **LLM projection / presentation** — SCHEMA-v5, produced by
+1. **Canonical semantics and correctness oracle** — `CompiledIR`/`CoreOp[]`
+   plus `SemanticEdge` state are canonical. Normalized CONTROL-FULL is the
+   correctness oracle used to prove that every required fact survives; it is
+   regenerated, not decoded as the durable baseline.
+2. **Physical durable authority** — binary `0x04` IR plus the aligned
+   semantic-edge snapshot, with checked `dv:2` deltas for incremental history.
+3. **Application-facing auxiliary view** — reduced `result.ir` is useful
+   structured output but is intentionally non-reversible and is not a
+   correctness or persistence authority.
+4. **LLM projection / presentation** — SCHEMA-v5, produced by
    `render_hierarchical_for_llm`. This is the **model-visible `content`**; its
    job is maximum information per token for the model.
 
-**Invariant:** `content` is always the SCHEMA-v5 presentation. The codec stays
-code-side (`result.ir` + persistence). Workspace facts (semantic
-edges/calls/injections) are served separately via `workspace_query`. This is
-mechanically enforced (ARCH-003) and tested.
+COMPACT-A1/A3 are research codecs. A2 remains a non-authoritative
+compatibility/diagnostic `pretty_text` snapshot on the delta persistence path;
+restore and replay never trust or decode it.
+
+**Invariant:** structural model content uses SCHEMA-v5. Explicitly classified
+raw-source fallbacks, Angular-template content, and delta acknowledgements are
+the only alternate visible representations. Delta operations remain code-side.
+Workspace facts (semantic edges/calls/injections) are served separately via
+`workspace_query`. These boundaries are mechanically enforced and tested.
 
 ## Why the earlier "compact-full duplication on the LLM side" was 100% wrong
 
@@ -43,10 +53,10 @@ The branch wired the CONTROL-FULL codec as the model-visible `content` across
 Net effect: the model received a *larger, lower-signal* document, while the
 genuinely compressed presentation was never emitted.
 
-## What has been fixed (committed baseline: `5021889`, `a2899cd`)
+## What has been fixed
 
-- `content` is the SCHEMA-v5 presentation on every path; the codec is code-side
-  only.
+- Structural `content` is the SCHEMA-v5 presentation; raw, template, and delta
+  acknowledgement alternatives are explicitly classified.
 - Delta presentation is the minimal summary
   `Δ delta for … (v{from} → v{to}): +N ~N -N ops`, with the op list in
   `result.delta` — never a full presentation or a `FILE-CONTEXT-DELTA v1`
@@ -57,7 +67,7 @@ genuinely compressed presentation was never emitted.
   `schema-v5/` (presentation), plus measurement and a task-based edit eval
   (**3/3 green**, deterministic grading + `apply_edit` round-trip).
 
-## Current work: annotation-redundancy collapse (A/B)
+## Completed work: annotation-redundancy collapse (A/B)
 
 **Finding:** the `async` fact was reported up to three times in the High
 presentation — `mod:ASYNC` + `se:async` + `ec:async` — densest in C# (async
@@ -85,13 +95,16 @@ expected (densest async population + interface mirror). The remaining C# gap is
 the verbose `CancellationToken`/`Task<ActionResult<T>>` signatures, not
 annotation redundancy.
 
-## What to do next
+## Current remediation status
 
-1. Commit the annotation-redundancy collapse (source + tests + doc updates).
-2. If pursuing further C# density, the next lever is collapsing the verbose
-   async signature boilerplate in the presentation (e.g. eliding repeated
-   `CancellationToken cancellationToken = default`), which is a separate,
-   presentation-only A/B with its own density + reasoning gate.
+Production configuration, persistence/fidelity, visible-content metadata, and
+explicit code-side delta acknowledgement have been repaired and verified. The
+remaining work in the current remediation is terminology alignment plus the
+final architectural audit and user-owned verification gate.
+
+R-46 is deliberately separate: migrating legacy result-level MCP fields into
+`structuredContent`/`_meta` is a versioned 0.6.0 wire-contract change and must
+not be folded into documentation cleanup.
 
 ## Non-negotiable constraints
 

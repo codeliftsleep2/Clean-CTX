@@ -140,10 +140,10 @@ When you explicitly specify `fidelity` instead of `intent`, these are the values
 
 | Fidelity | What the Agent Sees | Method Bodies | Verbatim? |
 |----------|---------------------|:-------------:|:---------:|
-| `low` | CONTROL-FULL of the compiled Low semantic envelope | ❌ | ❌ |
-| `medium` | CONTROL-FULL of the compiled Medium semantic envelope | ❌ | ❌ |
-| `high` | CONTROL-FULL complete reasoning envelope + control/data-flow metadata | ❌ | ❌ |
-| `edit` | CONTROL-FULL + exact method bodies and spans | ✅ (all or resolved focus) | ✅ (bodies) |
+| `low` | SCHEMA-v5 structural presentation of the compiled Low hierarchy | ❌ | ❌ |
+| `medium` | SCHEMA-v5 structural presentation with Medium semantic detail | ❌ | ❌ |
+| `high` | SCHEMA-v5 reasoning presentation with control/data-flow metadata | ❌ | ❌ |
+| `edit` | SCHEMA-v5 structure plus exact bodies for all or the resolved focus | ✅ (all or resolved focus) | ✅ (bodies) |
 | `verbatim` | Full raw source, entire document | ✅ | ✅ (all) |
 
 ---

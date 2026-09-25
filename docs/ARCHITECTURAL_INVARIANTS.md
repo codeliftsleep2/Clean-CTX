@@ -447,14 +447,14 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-### CTX-001 Reversible Codec Is Correctness-Complete
+### CTX-001 Canonical Semantics and Representation Authorities Stay Distinct
 
 | Property | Value |
 |----------|-------|
-| **Intent** | Token savings must never remove a semantic fact from the reversible/persisted authority; the model-facing presentation is governed separately by ARCH-003. |
-| **Invariant** | `CONTROL-FULL` (the reversible oracle) preserves explicit canonical IDs, typed ownership, occurrence order/grouping/duplicates, unresolved written call names and written-arity/spread evidence, injection facts, edge relation/layer/file provenance, and exact bodies/spans when compiled. It is the round-trip/persistence authority, regenerated from durable canonical IR and edges instead of trusting historical compact text; it is not the model-visible presentation. `focusMethods` is resolved against typed owners into canonical method IDs before bodies are filtered: bare selectors spanning owners and duplicate qualified owners are errors; a same-owner overload family selects every canonical occurrence. Verbatim remains the explicit whole-document source mode. |
+| **Intent** | Token savings and representation changes must never blur semantic correctness, physical persistence, auxiliary wire views, and model-facing presentation. |
+| **Invariant** | Canonical `CompiledIR` plus semantic-edge state preserves explicit typed identity, ownership, occurrence order/grouping/duplicates, unresolved written call names and written-arity/spread evidence, injection facts, edge relation/layer/file provenance, and exact bodies/spans when compiled. Normalized `CONTROL-FULL` is the regenerated semantic correctness oracle, not stored text and not the model-visible presentation. Physical binary `0x04` plus the aligned semantic-edge snapshot is the durable baseline authority; checked `dv:2` history is incremental canonical transport. Reduced `result.ir` is non-reversible auxiliary output. COMPACT-A1/A3 are research codecs; A2 `pretty_text` is non-authoritative compatibility/diagnostic data and is never used to restore canonical state. `focusMethods` resolves typed owners into canonical method IDs before bodies are filtered: bare selectors spanning owners and duplicate qualified owners are errors; a same-owner overload family selects every canonical occurrence. Verbatim remains the explicit whole-document source mode. |
 | **Enforcement** | `src/ir/control_full.rs` and `src/ir/focus.rs`; exact-oracle and focus regressions under `src/tests/ir/control_full.rs` and `src/tests/ir/focus.rs`; registered MCP dispatch regressions under `src/tests/mcp/control_full_content.rs`; language call regressions under `src/tests/ir/calls_{typescript,java,csharp}.rs`; injection rendering regressions under `src/tests/ir/render_llm_meta.rs` and `src/tests/mcp/tool_handlers_render.rs`. |
-| **Authority** | `src/ir/control_full.rs`, `src/ir/focus.rs`, `src/mcp/tool_handlers/core/content.rs`, `docs/architecture/LLM_CONTEXT_COMPRESSION_RESEARCH.md` |
+| **Authority** | `src/ir/{compiler,control_full,binary_wire}.rs`, `src/ir/focus.rs`, `src/mcp/sqlite_store/{replay,semantic_state}.rs`, `src/mcp/tool_handlers/core/content.rs`, `docs/architecture/{BINARY_V04_CONTRACT,LLM_CONTEXT_COMPRESSION_RESEARCH}.md` |
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test --all-features` |
 

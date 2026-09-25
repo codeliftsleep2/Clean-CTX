@@ -62,3 +62,23 @@ fn retired_vocabulary_is_not_taught_as_current_semantics() {
         );
     }
 }
+
+#[test]
+fn vocabulary_prompt_description_names_the_production_presentation_boundary() {
+    let _serial = crate::protocol::handler_response_serial();
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    crate::protocol::captured_responses().clear();
+
+    crate::mcp::handlers::handle_prompts_get(&serde_json::json!(1), "clean-ctx-vocabulary", &state);
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("vocabulary response");
+    let description = response["result"]["description"]
+        .as_str()
+        .expect("vocabulary description");
+
+    assert!(description.contains("SCHEMA-v5"), "{description}");
+    assert!(description.contains("code-side delta"), "{description}");
+    assert!(!description.contains("COMPACT-A"), "{description}");
+    assert!(!description.contains("CONTROL-FULL"), "{description}");
+}

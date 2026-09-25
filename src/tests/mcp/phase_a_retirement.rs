@@ -96,6 +96,11 @@ fn phase_a_fallbacks_return_structured_ir_unavailable_not_legacy_text() {
             "[{tool}] message must name ir_unavailable: {message}"
         );
         assert!(
+            message.contains("SCHEMA-v5 structural output"),
+            "[{tool}] message must name the current presentation boundary: {message}"
+        );
+        assert!(!message.contains("CONTROL-FULL"), "[{tool}] {message}");
+        assert!(
             message.contains(fx.path.as_str()),
             "[{tool}] message must identify the file: {message}"
         );
@@ -123,7 +128,7 @@ fn phase_a_fallbacks_return_structured_ir_unavailable_not_legacy_text() {
 }
 
 #[test]
-fn phase_a_success_paths_render_schema_v3() {
+fn phase_a_success_paths_use_current_content_boundary() {
     let _serial = crate::protocol::handler_response_serial();
     let fx = phase_a_temp_fixture();
     let id = json!(78);
@@ -151,8 +156,8 @@ fn phase_a_success_paths_render_schema_v3() {
             .and_then(|t| t.as_str())
             .unwrap_or_else(|| panic!("[{tool}] missing result.content[0].text: {resp}"));
         assert!(
-            text.contains("// COMPACT-A A2") || text.contains("class Greeter"),
-            "[{tool}] output must be A1 or exact raw source"
+            text.starts_with("// SCHEMA v5") || text == TS_FIXTURE,
+            "[{tool}] output must be SCHEMA-v5 or exact raw source"
         );
         assert!(
             text.contains("Greeter"),

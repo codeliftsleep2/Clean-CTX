@@ -591,17 +591,21 @@ The benchmark corpus must exercise full provide/compress, selected and all-body 
 | Edit | edit | one/many typed selectors | provide full | same envelope; focus resolves to canonical method IDs | only resolved target set exact; overload family retained | pending | pending | n/a | pending user run; rejection cases are transport-only |
 | Verbatim | any/explicit | ignored | provide/compress raw | exact source document; no compressed semantic claim | entire document exact | pending | n/a | n/a | excluded from semantic reasoning baseline |
 | Low–Edit | mapped/explicit | inherited | provide/delta/apply | exact delta plus complete post-apply edge snapshot; acknowledged prior state required | follows effective fidelity/focus | pending | pending | n/a | pending user run |
-| persisted fidelity | n/a | persisted | restore/replay | regenerate normalized CONTROL-FULL from durable checked IR + edges, render economical A1 or exact raw, never trust stale compact text | follows persisted body facts | pending | pending | pending | pending user run |
+| persisted fidelity | n/a | persisted | restore/replay | decode checked binary-v04 IR, replay checked delta-v2 history, validate the aligned edge snapshot, then regenerate SCHEMA-v5 or exact raw; never trust stored `pretty_text` | follows persisted body facts | pending | pending | pending | pending user run |
 
-Registered-path verification, token capture, and the corrected 36-case reasoning run completed. Follow-up diagnostics found that the required DI provenance and occurrence facts were present and deterministically correct, while their organization reduced model reasoning reliability. The approved CONTROL-FULL v2 repair added stable typed navigation descriptors without altering canonical facts. COMPACT-A1 passed deterministic roundtrip, bounded reasoning, and production edge-case gates, but its initial 77% token result used verbose CONTROL-FULL as the denominator rather than raw source. That result proves oracle-encoding reduction only and is not production savings evidence. The corrected harness preserves capture-time raw bytes, measures raw-to-A1 economics, and runs paired raw/A1 reasoning only after the candidate clears that screen. Full snapshots retain the local raw ceiling; focused Edit forbids full-document raw fallback because it violates the requested body-disclosure boundary. CONTROL-FULL-DELTA v2 remains the acknowledged-state delta representation.
+Registered-path verification, token capture, and the corrected 36-case reasoning run completed. Follow-up diagnostics found that the required DI provenance and occurrence facts were present and deterministically correct, while their organization reduced model reasoning reliability. The approved CONTROL-FULL v2 repair added stable typed navigation descriptors without altering canonical facts. COMPACT-A1 passed deterministic roundtrip, bounded reasoning, and production edge-case gates, but its initial 77% token result used verbose CONTROL-FULL as the denominator rather than raw source. That result proves oracle-encoding reduction only and is not production savings evidence. The corrected harness preserves capture-time raw bytes, measures raw-to-A1 economics, and runs paired raw/A1 reasoning only after the candidate clears that screen. Full snapshots retain the local raw ceiling; focused Edit forbids full-document raw fallback because it violates the requested body-disclosure boundary. Occurrence-aware `dv:2` remains the acknowledged-state incremental canonical transport; CONTROL-FULL remains the regenerated semantic oracle, not the delta wire format.
 
 ## 15. Current measurement checkpoint (2026-09-24)
 
 The presentation boundary (ARCH-003) is implemented and mechanically enforced:
-`content` is the SCHEMA-v5 presentation on every path, the reversible codec is
-code-side (`result.ir` + persistence), and `content` falls back to byte-exact
-raw source when the presentation is not safely cheaper under the local tokenizer
-estimate — i.e. for small files at structural fidelity and for Edit all-bodies.
+structural `content` is SCHEMA-v5, while explicitly classified raw-source,
+Angular-template, and delta-acknowledgement responses retain their dedicated
+visible forms. Canonical semantics remain `CompiledIR` plus semantic edges;
+binary `0x04` plus the aligned edge snapshot is the physical durable authority,
+`dv:2` is incremental transport, and reduced `result.ir` is non-reversible
+auxiliary output. `content` falls back to byte-exact raw source when the
+presentation is not safely cheaper under the local tokenizer estimate — i.e.
+for small files at structural fidelity and for Edit all-bodies.
 The measurement harness now splits into `codec/` (reversible wire) and
 `schema-v5/` (model-visible presentation) under `verification/context-compression/`.
 

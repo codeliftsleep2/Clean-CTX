@@ -261,7 +261,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             "error": {
                 "code": -32603,
                 "message": format!(
-                    "IR compilation unavailable for {}: {}. CONTROL-FULL output \
+                    "IR compilation unavailable for {}: {}. SCHEMA-v5 structural output \
                      cannot be produced for this input; retry with fidelity \
                      \"verbatim\" or read the source directly.",
                     resolved_path, reason

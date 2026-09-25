@@ -1,8 +1,11 @@
-//! Correctness-complete COMPACT-A1 model presentation.
+//! Experimental CONTROL-FULL text codecs and the non-authoritative A2 snapshot.
 //!
 //! This codec is derived only from normalized CONTROL-FULL. Positional rows
-//! shorten presentation; canonical typed IDs remain the identity authority.
-//! Exact bodies are emitted as UTF-8 byte-length frames.
+//! retain canonical typed identities and exact UTF-8 body frames. A1 remains a
+//! research codec. A2 is written as compatibility/diagnostic `pretty_text` by
+//! the delta persistence path, but restore and replay never decode or trust it:
+//! physical binary `0x04`, `dv:2` history, and aligned semantic-edge snapshots
+//! are the durable authority. Neither format is model-visible content.
 
 use serde_json::{Value, json};
 use std::fmt::Write;

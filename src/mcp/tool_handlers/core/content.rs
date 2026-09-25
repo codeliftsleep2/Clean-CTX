@@ -88,8 +88,9 @@ pub(crate) fn select_complete_content(
     }
 }
 
-// (control_full_delta removed: delta content is the full presentation, and the
-// structured op list is returned code-side in `result.delta`.)
+// `control_full_delta` was removed. Delta operations are returned only in the
+// code-side `result.delta`; model-visible content is a minimal acknowledgement
+// (or the explicitly classified raw-source economics fallback).
 
 // Presentation boundary guard: the model-visible `content` must be a compact
 // projection (SCHEMA v5 presentation), never the CONTROL-FULL codec — whose

@@ -268,7 +268,7 @@ force conservative pattern-compression decline where required by IRPAT-001.
 
 Phase 6D types side effects as `SideEffectKind` without changing their named
 wire spelling, binary opcode, hierarchical `se` strings, compact LLM `se:`
-projection, hierarchical revision 6, LLM schema v5, or physical binary `0x03`.
+projection, hierarchical revision 6, LLM schema v5, or physical binary `0x04`.
 Every occurrence, order, and duplicate remains authoritative. `SideEffect`
 continues to block unsafe consumptive pattern compression. Phase 9 confirmed
 the default compiler, checked projection, persistence, reload, and registered

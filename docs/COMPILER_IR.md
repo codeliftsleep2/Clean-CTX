@@ -28,11 +28,15 @@
 
 ## 1. Overview
 
-The Compiler IR subsystem translates source code (TypeScript, C#, Rust, Java) into a structured intermediate representation — a stream of `CoreOp` instructions. This IR serves as the canonical source of truth for all subsequent operations:
+The Compiler IR subsystem translates source code (TypeScript, C#, Rust, Java)
+into a structured intermediate representation—a stream of `CoreOp`
+instructions. `CompiledIR` together with the extracted semantic-edge state is
+the canonical semantic source for subsequent operations:
 
-- **Rendering**: IR → human-readable compressed text (3 fidelity levels)
-- **Delta transport**: IR → instruction-level diffs → state machine application
-- **Wire encoding**: 6 formats (named, positional, tagged, string_table, hierarchical, binary)
+- **Rendering**: checked hierarchy → SCHEMA-v5 model presentation
+- **Delta transport**: IR → occurrence-aware `dv:2` sequence edits → explicit application
+- **Persistence**: binary `0x04` IR + aligned semantic-edge snapshot + checked delta history
+- **Auxiliary wire views**: reduced hierarchy and legacy named/positional debug representations
 - **Language layers**: Pluggable passes for TS, C#, Rust, Java
 - **Meta layers**: Pluggable passes for Angular, Spring Boot
 
@@ -40,11 +44,10 @@ The IR subsystem replaces the earlier text-only compression pipeline with a stru
 
 ### Key Design Decisions
 
-- **IR-first output**: `provide_code_context` renders hierarchical IR text as primary output; text pipeline is fallback
-- **Backward compatible**: `ir_to_text()` can produce byte-identical output to the legacy text pipeline
-- **Render-time fidelity**: The same IR compiles once and renders at Low/Medium/High (no re-parse)
-- **Deterministic**: BTreeMap-based indexing for delta comparison ensures stable ordering
-- **Cross-file symbol tracking**: GlobalSymbolTable registers classes/methods across files with monotonic versioning
+- **IR-first output**: structural responses render checked SCHEMA-v5; raw source is an explicit economics fallback, not a legacy text fallback
+- **Fidelity-aware compilation**: each canonical baseline records the fidelity used to compile it
+- **Deterministic deltas**: positional sequence edits preserve semantic identity, occurrence multiplicity, and order
+- **Cross-file semantics**: complete semantic edges are owned separately and published through `WorkspaceIndex`
 
 ---
 
@@ -114,25 +117,17 @@ The IR subsystem introduces a layered approach:
           │
      ┌────┴────────────────────────────┐
      ▼                                 ▼
-┌──────────────┐              ┌──────────────────┐
-│ IR → Wire    │              │ IR → LLM Text    │
-│ (6 formats)  │              │ (SCHEMA v2)      │
-│ (delta,      │              └────────┬─────────┘
-│  transport,  │                       ▼
-│  positional) │              ┌──────────────────┐
-└──────┬───────┘              │ HierarchicalIR   │
-       │                      │ → compact        │
-       ▼                      │   LLM output     │
-┌──────────────┐              └──────────────────┘
-│ Delta        │
-│ Transport    │
-│ (IRDelta)    │
-└──────┬───────┘
-       │
-       ▼
+┌──────────────────┐          ┌──────────────────┐
+│ Canonical        │          │ Checked hierarchy│
+│ code-side forms  │          │ → SCHEMA-v5      │
+│ binary v04       │          │ model output     │
+│ dv:2 delta       │          └──────────────────┘
+└────────┬─────────┘
+         │ explicit acknowledgement
+         ▼
 ┌─────────────────────┐
-│   State Replay      │  Apply delta ops to ContextState
-│   (Apply + Render)  │
+│ State replay        │  Transactional sequence apply plus aligned edges
+│ and durable commit  │
 └─────────────────────┘
 ```
 
@@ -176,28 +171,29 @@ Methods/fields outside a class are skipped (F-29). Standalone functions (`func.r
 
 ### 3.2 Delta Computation (IR → Delta)
 
-The delta engine (`DeltaComputer` in `src/ir/delta.rs`) computes instruction-level deltas between two `CompiledIR` states:
+Production uses `SequenceDeltaComputer` to compute occurrence-aware positional
+edits between two ordered `CompiledIR` streams:
 
 ```
-1. Index both IRs by primary key (opcode + IDs) via BTreeMap
-2. Diff the indices:
-   - In current but not baseline → additions
-   - In baseline but not current → deletions
-   - In both but different tuples → modifications
-3. Emit IRDelta envelope
+1. Derive typed semantic identity and a stable occurrence ordinal per tuple.
+2. Compare the ordered baseline and target streams.
+3. Emit validated insert/remove/replace edits with exact positions and expected tuples.
+4. Attach the target source hash; the server separately retains the complete target edge snapshot.
 ```
+
+Legacy key-based `IRDelta` remains decode-only compatibility input.
 
 ### 3.3 State Replay (Delta → Updated State)
 
-The state machine (`ContextState` in `src/ir/replay.rs`) applies delta ops:
+The state machine applies the sequence transactionally:
 
 ```
 1. Validate version chain (file.version must match delta.from)
 2. Validate monotonic version (delta.to > delta.from)
-3. Apply deletions (swap_remove + index update)
-4. Apply modifications (full replacement or field-patch)
-5. Apply additions (append + index update, reject duplicates)
-6. Bump version
+3. Validate every position, semantic identity, occurrence ordinal, and expected tuple
+4. Apply edits to a candidate state
+5. Commit the candidate only after the complete stream succeeds
+6. Persist/install aligned semantic edges at the acknowledgement boundary
 ```
 
 ---
@@ -212,11 +208,11 @@ src/ir/
 ├── compiler_methods.rs   # MethodSig, parse_method_sig, emit_method_ir, emit_import_ir,
 │                         # resolve_forward_aliases
 ├── render.rs             # ir_to_text(), ir_to_text_ops() — fidelity-aware text rendering
-├── render_llm.rs         # render_hierarchical_for_llm() — SCHEMA v2 LLM-optimized output
+├── render_llm.rs         # render_hierarchical_for_llm() — SCHEMA-v5 model presentation
 ├── wire.rs               # op_to_tuple(), tuple_to_op(), ir_to_wire(), wire_to_ir()
-├── delta.rs              # IRDelta, DeltaOps, ModOp, FieldPatch, DeltaComputer,
-│                         # compact_encode, compact_decode, primary_key_from_tuple
-├── replay.rs             # ContextState, FileState, DeltaError
+├── delta.rs              # SequenceDelta + legacy IRDelta compatibility
+├── delta/sequence.rs     # occurrence-aware dv:2 computation and compact transport
+├── replay.rs             # ContextState and transactional replay
 ├── symbol_table.rs       # GlobalSymbolTable, SymbolEntry, SymbolKind
 ├── string_table.rs       # StringTable, ir_to_string_table_wire (integer-indexed IR)
 ├── hierarchical.rs       # HierarchicalIR, ClassNode, MethodNode, FieldNode,
@@ -295,18 +291,21 @@ pub enum CompileError {
 
 ---
 
-## 6. Wire Formats
+## 6. Representation Formats
 
-The IR supports 6 wire formats, selected via the `encoding` parameter:
+These formats do not have equal authority. Binary `0x04` is the physical
+durable representation. The reduced hierarchical `result.ir` is
+non-reversible auxiliary output. The `encoding` argument selects only the
+legacy `pretty` response field where that field is still exposed pending R-46.
 
-| Format | Encoding Key | Description | Savings |
-|--------|-------------|-------------|---------|
-| Named | `"named"` | JSON arrays with opcode strings | Baseline |
-| Positional | `"positional"` | Stripped opcode, schema-aware | ~30% vs named |
-| Tagged | `"tagged"` | Positional + opcode preserved | Debug/mixed |
-| String Table | `"string_table"` | Integer-indexed string interning | ~40% vs named |
-| Hierarchical | `"hierarchical"` | Class→method→param tree, no parent IDs | ~40-60% vs named |
-| Binary | `"binary"` | Compact binary encoding with varints | ~50% vs named |
+| Format | Current surface | Description | Authority |
+|--------|-----------------|-------------|-----------|
+| Named | default legacy `pretty` | JSON arrays with opcode strings | auxiliary/debug |
+| Positional | `encoding: "positional"` legacy `pretty` | Schema-aware positional tuples | auxiliary/debug |
+| Tagged | `encoding: "tagged"` legacy `pretty` | Positional tuples with opcode tags | auxiliary/debug |
+| String Table | internal/research helper | Integer-indexed string interning | none |
+| Reduced Hierarchical | fixed `result.ir` | Class→method→parameter auxiliary tree | non-reversible auxiliary |
+| Binary v04 | internal persistence | Lossless canonical `CompiledIR` encoding with varints | physical durable authority |
 
 ### Named Format (Default)
 
@@ -324,9 +323,12 @@ The IR supports 6 wire formats, selected via the `encoding` parameter:
 }
 ```
 
-### Hierarchical Format (Primary LLM Output)
+### Reduced Hierarchical Format (Auxiliary Output)
 
-The hierarchical format is the primary output of `provide_code_context`. It reorganizes the flat CoreOp stream into a class→method→param tree, eliminating all opcode strings and parent ID repetitions:
+The hierarchy reorganizes the flat CoreOp stream into a
+class→method→parameter tree. A deliberately reduced form is exposed as
+`result.ir`; SCHEMA-v5 text rendered from the checked full hierarchy is the
+model-visible structural presentation.
 
 ```json
 {
@@ -349,58 +351,63 @@ The hierarchical format is the primary output of `provide_code_context`. It reor
 }
 ```
 
-### LLM-Optimized Text (SCHEMA v2)
+### LLM-Optimized Text (SCHEMA v5)
 
 The hierarchical IR is rendered to compact LLM-friendly text via `render_hierarchical_for_llm()`:
 
 ```
-// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias
+// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
 // ── UserService ──
 X BaseService
 F userRepo:UserRepository
-M processData(payload:$s):$b  fl:IF RET
+M processData(payload:$s):$b  ctl:IF,RET
 ```
 
 ---
 
 ## 7. Delta Transport
 
-### IRDelta Envelope
+### Corrected Sequence Delta Envelope (`dv:2`)
 
 ```json
 {
+  "dv": 2,
   "file": "α1",
   "from": 1,
   "to": 2,
-  "ops": {
-    "+": [["DEF_M", "C1", "M3", "newMethod"], ["RET", "M3", "$s"]],
-    "~": [{"k": ["DEF_M","C1","M1"], "r": ["DEF_M","C1","M1","renamedMethod"]}],
-    "-": [["DEF_M", "C1", "M2"]]
-  }
+  "target_hash": "…",
+  "edits": [
+    {
+      "op": "insert",
+      "at": 2,
+      "value": {
+        "identity": {"opcode": "DEF_METHOD", "key": ["DEF_M", "C1", "M3"]},
+        "occurrence": 0
+      },
+      "instruction": ["DEF_M", "C1", "M3", "newMethod"]
+    }
+  ],
+  "intent": null
 }
 ```
 
-### ModOp Formats
-
-| Format | Description | Best For |
-|--------|-------------|----------|
-| Full replacement (`r`) | Complete instruction tuple | Major signature changes |
-| Field patches (`d`) | Changed fields only (index:value pairs) | Minor edits (rename, type change) |
+Legacy `+` / `~` / `-` envelopes are decode-only compatibility input.
+Production generation emits only occurrence-aware `dv:2` sequence edits.
 
 ### Compact Delta Format
 
-The `CompactDelta` struct provides an abbreviated wire format:
-- `f` instead of `file`
-- `"5→6"` version range instead of separate `from`/`to` fields
-- Single-character opcode abbreviations (C=DEF_C, M=DEF_M, etc.)
-- Field-patch encoding for all modifications
+`CompactSequenceDelta` abbreviates only the outer `dv:2` envelope (`d`, `f`,
+`v`, `e`, `h`, `i`). The occurrence-aware edits themselves retain their typed
+identity and validation evidence. Durable MCP history stores normalized
+sequence deltas with the physical file identity.
 
 ### Delta Application
 
 `ContextState` in `src/ir/replay.rs` manages per-file IR state:
 - `FileState`: ordered instruction tuples + primary-key index (HashMap)
 - `ContextState`: per-file HashMap + global monotonic version
-- `apply()`: validates → deletions → modifications → additions (order ensures correctness)
+- `apply_sequence()`: validates and applies occurrence-aware edits transactionally
+- `apply()`: legacy compatibility application
 - `load_ir()`: bootstraps state from full CompiledIR
 - `render_pretty()`: re-renders current state to text
 
@@ -488,29 +495,28 @@ The state machine supports:
 |------|---------|-------------|
 | `compress_code_context` | `handle_compress_code_context` | IR-first compression with encoding selection |
 | `delta_code_context` | `handle_delta_code_context` | IR-level delta computation |
-| `apply_delta` | `handle_apply_delta` | Client-side state update |
-| `provide_code_context` | `handle_provide_code_context` | Zero-touch entry point (auto-detect + delta) |
-| `restore_context` | `handle_restore_context` | Force full re-compression |
+| `apply_delta` | `handle_apply_delta` | Explicit code-side acknowledgement of an exact pending delta |
+| `provide_code_context` | `handle_provide_code_context` | Heuristic entry point; may return a code-side pending delta |
+| `restore_context` | `handle_restore_context` | Restore checked binary-v04 IR, delta-v2 history, and aligned edges without recompiling source |
 | `context_history` | `handle_context_history` | Per-file delta history |
 | `context_stats` | `handle_context_stats` | Session dashboard |
 
-### Response Format (Phase 6 IR-first)
+### Current Legacy Result-Level Response Shape
+
+Until the separately versioned R-46 migration, context tools retain legacy
+result-level fields. `content` is the model-visible SCHEMA-v5 presentation (or
+an explicitly classified alternative), while `ir` is a reduced,
+non-reversible auxiliary hierarchy. It is not the persistence authority.
 
 ```json
 {
-  "content": [{ "type": "text", "text": "// SCHEMA v2 ..." }],
+  "content": [{ "type": "text", "text": "// SCHEMA v5 ..." }],
   "ir": { "encoding": "hierarchical", "file": "α1", "v": 1, "ir": { ... } },
   "pretty": { "encoding": "named", "file": "α1", "v": 1, "ir": [...] },
   "v": 1,
   "file": "α1",
-  "_meta": {
-    "fidelity": "low",
-    "strategy": "full_compress",
-    "angular_detected": false,
-    "line_count": 32,
-    "version": 1,
-    "decision_summary": "fidelity=Low, strategy=full_compress, class=general, angular=none, lines=32"
-  }
+  "content_kind": "skeleton",
+  "byte_exact": []
 }
 ```
 
@@ -546,7 +552,7 @@ The state machine supports:
 | compiler | `tests/ir/compiler.rs` | ~20 | DefClass/DefMethod emission, fidelity, determinism |
 | wire | `tests/ir/wire.rs` | ~40 | op_to_tuple all variants, round-trip, decode errors |
 | render | `tests/ir/render.rs` | ~20 | fidelity comparison, round-trip |
-| render_llm | `tests/ir/render_llm.rs` | ~20 | SCHEMA v2, overloaded methods, fidelity layout |
+| render_llm | `tests/ir/render_llm.rs` | ~20 | SCHEMA v5, overloaded methods, fidelity layout |
 | delta | `tests/ir/delta.rs` | ~30 | add/modify/remove, version chain, compact encode |
 | replay | `tests/ir/replay.rs` | ~30 | apply, remove/replace/append, error cases, sequential |
 | symbol_table | `tests/ir/symbol_table.rs` | ~30 | registration, lookup, versioning, unregister |

@@ -236,9 +236,9 @@ Returns the component entity that exposes the `app-user-card` selector. Other qu
 }
 ```
 
-**Output (SCHEMA v2):**
+**Structural output (SCHEMA v5):**
 ```
-// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias
+// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
 // ── SampleService ──
 M doWork(payload:$s[]):$b
 ```
@@ -265,31 +265,40 @@ M doWork(payload:$s[]):$b
 
 ---
 
-## Response Notation (SCHEMA v2)
+## Response Notation (SCHEMA v5)
 
-Every `provide_code_context` / `compress_code_context` / `restore_context` response starts with this legend and uses the structural grammar below:
+Structural `provide_code_context`, `compress_code_context`, and
+`restore_context` presentations start with this legend. Byte-exact raw
+fallbacks, Angular-template output, and delta acknowledgements use their own
+explicit content kinds instead.
 
 ```
-// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias
+// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
 ```
 
 | Symbol | Meaning |
 |--------|---------|
 | `// ── Name ──` | opens a class scope |
-| `cl:` | class-level flags |
+| `cmod:` | class modifiers |
+| `cl:` | additional class metadata |
 | `X <Parent>` | extends |
 | `I <Iface...>` | implements |
 | `F name:type` | field |
 | `M name(+N)` | method (`+N` = overload by param count) |
 | `→ p:name:type ...` / `→ type` | parameters / return type |
-| `fl:` | method flags: `IF LOOP RET THROW ASYNC GEN EXPORT STATIC PRIVATE PROTECTED ABSTRACT UNSAFE` |
+| `mod:` | method modifiers such as `ASYNC`, `STATIC`, or visibility |
+| `ctl:` / `pf:` | control summary and typed pattern facts |
+| `fl:` | compatibility-only legacy flags when present |
 | `$ alias module [names]` | import |
 | `T alias = Type` | type alias |
 | `P NAME [args]` | structural pattern (CTOR, OBSERVABLE, GETTER, SETTER...) |
 
-**High fidelity** adds `cf:` (control flow), `df:` (reads/writes), `se:` (side effect), `ec:` (execution context). **Edit fidelity appends each focused method verbatim source body** - byte-exact. Types render exactly as captured.
+**High fidelity** adds `cf:` (control flow), `df:` (reads/writes), `se:` (side
+effect), and `ec:` (execution context). **Edit fidelity appends the selected
+method bodies as byte-exact source.** Types render exactly as captured.
 
-The full SCHEMA v2 notation reference is in [`docs/COMPILER_IR.md`](docs/COMPILER_IR.md).
+The full SCHEMA-v5 notation reference is in
+[`docs/COMPILER_IR.md`](docs/COMPILER_IR.md).
 
 ---
 
