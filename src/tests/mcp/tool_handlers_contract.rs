@@ -252,6 +252,7 @@ fn content_kind_wire_strings_match_the_model_visible_contract() {
         ),
         (ContentKind::VerbatimDocument, "verbatim_document"),
         (ContentKind::RawPassthrough, "raw_passthrough"),
+        (ContentKind::DeltaSummary, "delta_summary"),
     ];
     for (kind, wire) in cases {
         assert_eq!(kind.as_str(), wire);

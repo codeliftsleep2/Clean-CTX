@@ -1,7 +1,7 @@
 // Diff, delta, and apply-delta MCP handlers.
 
 use super::common::{
-    ContentKind, checked_hierarchy_or_respond, compiled_from_tuples, contract_fields,
+    ContentKind, checked_hierarchy_or_respond, compiled_from_tuples, contract_fields_for_hierarchy,
     invalid_session_ir_response,
 };
 use crate::error::to_jsonrpc_error;
@@ -166,6 +166,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
                 );
                 let content = economic.text;
+                let (content_kind, byte_exact) =
+                    contract_fields_for_hierarchy(fidelity, &hierarchy);
                 let mut response = serde_json::json!({
                     "jsonrpc": "2.0", "id": id,
                     "result": {
@@ -173,7 +175,12 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                         "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&compiled, &hierarchy),
                         "version": prev_version,
                         "instruction_count": instruction_count,
-                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::Skeleton },
+                        "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
+                        "byte_exact": if raw_passthrough {
+                            serde_json::json!(["document"])
+                        } else {
+                            serde_json::to_value(byte_exact).unwrap_or_default()
+                        },
                         "cached": true
                     }
                 });
@@ -268,10 +275,10 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     match delta {
         Some(d) => {
             let wire_delta = serde_json::to_value(&d).unwrap_or_default();
-            let (content_kind, byte_exact) = contract_fields(fidelity);
             // The delta is code-side only: the LLM is stateless and must never
             // receive a delta (envelope OR presentation). Emit the same minimal
-            // summary main produces; the op list rides in `result.delta`.
+            // acknowledgement main produces; the op list rides only in
+            // `result.delta` for code-side consumption.
             let (adds, mods, dels) = d.summary_counts();
             let content = format!(
                 "Δ delta for {} (v{} → v{}): +{} ~{} -{} ops",
@@ -282,8 +289,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     "content": [{ "type": "text", "text": content }],
                     "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                     "strategy": "delta", "fidelity": format!("{:?}", fidelity).to_lowercase(),
-                    "content_kind": content_kind,
-                    "byte_exact": serde_json::to_value(byte_exact).unwrap_or_default(),
+                    "content_kind": ContentKind::DeltaSummary,
+                    "byte_exact": [],
                     "degradation": null
                 }
             });
@@ -352,13 +359,19 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
             );
             let content = economic.text;
+            let (content_kind, byte_exact) = contract_fields_for_hierarchy(fidelity, &hierarchy);
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "result": {
                     "content": [{ "type": "text", "text": content }],
                     "ir": crate::ir::hierarchical::hierarchy_to_wire_reduced(&compiled, &hierarchy),
                     "version": version, "instruction_count": compiled.instructions.len(),
-                    "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::Skeleton }
+                    "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
+                    "byte_exact": if raw_passthrough {
+                        serde_json::json!(["document"])
+                    } else {
+                        serde_json::to_value(byte_exact).unwrap_or_default()
+                    }
                 }
             });
             // Baseline stored — this is a stable snapshot, inject baseline breakpoint.

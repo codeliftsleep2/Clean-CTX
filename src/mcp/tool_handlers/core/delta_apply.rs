@@ -1,7 +1,7 @@
 //! Apply-delta handler, separated from delta production orchestration.
 
 use super::common::{
-    ContentKind, compiled_from_tuples, contract_fields, invalid_session_ir_response,
+    ContentKind, compiled_from_tuples, contract_fields_for_hierarchy, invalid_session_ir_response,
 };
 use super::delta::persistence::{ensure_apply_baseline, persisted_context_id};
 use crate::ir::delta::{IRDelta, SequenceDelta};
@@ -288,7 +288,8 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                 crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
             );
             let rendered = economic.text;
-            let (_, candidate_byte_exact) = contract_fields(fidelity);
+            let (content_kind, candidate_byte_exact) =
+                contract_fields_for_hierarchy(fidelity, &hierarchy);
             let hierarchical_wire =
                 crate::ir::hierarchical::hierarchy_to_wire_reduced(&target_ir, &hierarchy);
             let mut response = serde_json::json!({
@@ -300,7 +301,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                     },
                     "_meta": {
                         "version": new_version,
-                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::Skeleton },
+                        "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
                         "byte_exact": if raw_passthrough {
                             serde_json::json!(["document"])
                         } else {

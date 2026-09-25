@@ -337,8 +337,11 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                                 "delta": wire_delta, "from_version": d.from, "to_version": d.to,
                                 "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
                                 "decision_summary": decision.summary(),
-                                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
-                                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(&byte_exact).unwrap_or_default() },
+                                // The structured delta is code-side only. This
+                                // metadata describes only the visible summary
+                                // (or the economics-selected raw document).
+                                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::DeltaSummary },
+                                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::json!([]) },
                                 "degradation": null
                             }
                         }

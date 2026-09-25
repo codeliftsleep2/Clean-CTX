@@ -113,6 +113,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### CONTENT-001 Visible Content Metadata Describes Only the Visible Text
+
+| Property | Value |
+|----------|-------|
+| **Intent** | A consumer must never infer byte-exact source regions from fidelity or from an auxiliary code-side payload when those regions are absent from the visible `content`. |
+| **Invariant** | `content_kind` and `byte_exact` describe the text in `content`, not the requested fidelity, canonical IR, or delta payload. Structural SCHEMA-v5 reports `skeleton`/`[]`; complete Edit bodies report `skeleton_with_verbatim_bodies`/`["method_bodies"]`; partial focused coverage reports `skeleton_with_focused_verbatim_bodies`/`["focused_method_bodies"]`; Edit with no bodies reports `skeleton`/`[]`; whole-document source reports `verbatim_document` or `raw_passthrough` with `["document"]`; a visible delta acknowledgement reports `delta_summary`/`[]`. Delta operations remain exclusively code-side auxiliary data and never become an LLM responsibility: `result.delta` or `_meta.delta` carries the structured payload while `content` contains only the acknowledgement, unless the economics gate deliberately selects byte-exact raw source. |
+| **Enforcement** | The typed `ContentKind` enum is the wire-value authority. `contract_fields_for_hierarchy` derives regenerated Edit coverage from the actual hierarchy instead of fidelity alone. `src/tests/mcp/tool_handlers_contract.rs` pins every wire string; `src/tests/mcp/content_kind_lifecycle.rs` crosses dedicated and automatic delta generation, baseline/cache, apply, restart, restore, replay, full/focused/empty Edit coverage, and raw fallback while asserting that structured delta data remains auxiliary. |
+| **Authority** | `src/mcp/tool_handlers/core/common.rs`, `src/mcp/tool_handlers/core/{delta,provide,delta_apply,restore}.rs`, `src/mcp/tool_handlers/persistence/mod.rs`, `src/mcp/prompts.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test --all-features` |
+
+---
+
 ### ARCH-004 Production Integration Is the Completion Boundary
 
 | Property | Value |

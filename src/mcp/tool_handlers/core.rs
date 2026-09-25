@@ -11,7 +11,7 @@ mod provide_angular;
 mod provide_persistence;
 mod restore;
 
-pub(crate) use common::{ContentKind, projection_error_response};
+pub(crate) use common::{ContentKind, contract_fields_for_hierarchy, projection_error_response};
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use common::{contract_fields, contract_fields_focused};
 pub(crate) use compress::handle_compress_code_context;
@@ -35,3 +35,7 @@ mod meta_layer_config_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../tests/mcp/auto_save_contract.rs"]
 mod auto_save_contract_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/mcp/content_kind_lifecycle.rs"]
+mod content_kind_lifecycle_tests;

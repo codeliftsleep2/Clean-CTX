@@ -109,6 +109,8 @@ pub(crate) enum ContentKind {
     VerbatimDocument,
     /// The economics gate selected byte-exact raw source.
     RawPassthrough,
+    /// Human-readable acknowledgement of a code-side delta payload.
+    DeltaSummary,
 }
 
 impl ContentKind {
@@ -124,7 +126,47 @@ impl ContentKind {
             }
             ContentKind::VerbatimDocument => "verbatim_document",
             ContentKind::RawPassthrough => "raw_passthrough",
+            ContentKind::DeltaSummary => "delta_summary",
         }
+    }
+}
+
+/// Derive the contract from the body coverage that is actually visible in a
+/// regenerated hierarchy. This is intentionally independent of delta
+/// transport: deltas remain code-side, while this helper describes only the
+/// rendered SCHEMA-v5 text returned after a lifecycle operation.
+pub(crate) fn contract_fields_for_hierarchy(
+    fidelity: crate::compression::Fidelity,
+    hierarchy: &crate::ir::hierarchical::HierarchicalIR,
+) -> (ContentKind, Vec<&'static str>) {
+    if fidelity != crate::compression::Fidelity::Edit {
+        return contract_fields(fidelity);
+    }
+
+    let (method_count, body_count) = hierarchy
+        .classes
+        .iter()
+        .flat_map(|class| class.methods.iter())
+        .filter(|method| {
+            !method
+                .modifiers
+                .iter()
+                .flatten()
+                .any(|modifier| *modifier == crate::ir::opcodes::DeclarationModifier::Abstract)
+        })
+        .fold((0usize, 0usize), |(methods, bodies), method| {
+            (methods + 1, bodies + usize::from(method.body.is_some()))
+        });
+    match (body_count, method_count) {
+        (0, _) => (ContentKind::Skeleton, Vec::new()),
+        (bodies, methods) if bodies == methods => (
+            ContentKind::SkeletonWithVerbatimBodies,
+            vec!["method_bodies"],
+        ),
+        _ => (
+            ContentKind::SkeletonWithFocusedVerbatimBodies,
+            vec!["focused_method_bodies"],
+        ),
     }
 }
 

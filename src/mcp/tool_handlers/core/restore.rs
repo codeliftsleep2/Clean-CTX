@@ -1,6 +1,6 @@
 // Durable restore_context MCP handler.
 
-use super::common::{ContentKind, checked_hierarchy_or_respond};
+use super::common::{ContentKind, checked_hierarchy_or_respond, contract_fields_for_hierarchy};
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::protocol::send_response;
@@ -108,6 +108,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     state
         .llm_text_cache_lock()
         .insert(alias.clone(), full.clone());
+    let (content_kind, byte_exact) = contract_fields_for_hierarchy(restored.fidelity, &hierarchy);
 
     let mut response = serde_json::json!({
         "jsonrpc": "2.0", "id": id,
@@ -119,13 +120,11 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
                 "file": durable_path,
                 "instruction_count": session_ir.instructions.len(),
                 "semantic_edge_count": edge_count,
-                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::Skeleton },
+                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
                 "byte_exact": if raw_passthrough {
                     serde_json::json!(["document"])
-                } else if restored.fidelity == crate::compression::Fidelity::Edit {
-                    serde_json::json!(["method_bodies"])
                 } else {
-                    serde_json::json!([])
+                    serde_json::to_value(byte_exact).unwrap_or_default()
                 }
             }
         }

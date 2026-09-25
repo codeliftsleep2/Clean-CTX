@@ -4,7 +4,7 @@
 // and purge old deltas.
 
 use crate::mcp::McpState;
-use crate::mcp::tool_handlers::core::ContentKind;
+use crate::mcp::tool_handlers::core::{ContentKind, contract_fields_for_hierarchy};
 use crate::protocol::send_response;
 use serde_json::Value;
 
@@ -451,6 +451,7 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
     state
         .llm_text_cache_lock()
         .insert(path_alias, rendered.clone());
+    let (content_kind, byte_exact) = contract_fields_for_hierarchy(restored.fidelity, &hierarchy);
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
@@ -459,13 +460,11 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
             "_meta": {
                 "file": file_path, "version": ir.version,
                 "instruction_count": ir.instructions.len(),
-                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::Skeleton },
+                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
                 "byte_exact": if raw_passthrough {
                     serde_json::json!(["document"])
-                } else if restored.fidelity == crate::compression::Fidelity::Edit {
-                    serde_json::json!(["method_bodies"])
                 } else {
-                    serde_json::json!([])
+                    serde_json::to_value(byte_exact).unwrap_or_default()
                 }
             }
         }
