@@ -1,5 +1,10 @@
 # Clean-CTX hand-off: SCHEMA-v5 presentation boundary + annotation-redundancy A/B
 
+> For the comprehensive code-grounded branch history, current production
+> architecture, SCHEMA-v2 comparison, and live-use expectations, start with
+> `docs/agent/LIVE_HANDOFF.md`. This file remains the focused record of the
+> presentation-boundary correction.
+
 You are resuming work on Clean-CTX (a token-waste reducer / context compiler for
 LLM tooling). This note corrects an earlier architectural mistake and brings you
 current.
