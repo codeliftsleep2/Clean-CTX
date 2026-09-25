@@ -7,20 +7,52 @@ written beneath `target/context-compression-verification/`.
 
 **Operator PASS is not tracked-test PASS.** Files under `target/` are ignored, are not CI regression tests, and cannot satisfy an architectural test requirement. The tracked tests under `src/tests/**` remain the enforcement authority.
 
+## Harness layout
+
+This directory is split into two independent evaluation harnesses plus shared
+infrastructure:
+
+- `codec/` — the A2/A3 reversible file-local wire harness: CONTROL-FULL oracle
+  reconstruction, codec token measurement, and codec-preservation reasoning.
+- `schema-v5/` — the model-visible SCHEMA-v5 presentation harness: the
+  `content` payload plus `workspace_query` responses, scored for understanding
+  and edit-readiness (see `schema-v5/README.md`).
+- `scripts/` — shared PowerShell (`McpSession.ps1`, `measure.rs`, fixture and
+  capture builders). `McpSession.ps1` and `measure.rs` stay here because the
+  `edge-cases/` and `verification/workspace-query/` harnesses and
+  `measure-helper/Cargo.toml` reference these exact paths.
+- `score.schema.json` — shared scoring schema at the harness root.
+
 ## Prerequisites and exact command order
 
-Run from the repository root in PowerShell:
+Run from the repository root in PowerShell.
+
+Codec harness:
 
 ```powershell
 cargo build --all-features
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Reset.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Prepare-Fixtures.ps1
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Validate-ReasoningDefinitions.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Validate-ReasoningDefinitions.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Build-MeasureHelper.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Capture-Baselines.ps1
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Verify-Captures.ps1
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Measure-Baselines.ps1
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Prepare-ReasoningWorksheet.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Verify-Captures.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Measure-Baselines.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Prepare-ReasoningWorksheet.ps1
+```
+
+Schema-v5 harness:
+
+```powershell
+cargo build --all-features
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Reset.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Prepare-Fixtures.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Validate-ReasoningDefinitions.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Build-MeasureHelper.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Capture-Baselines.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Capture-WorkspaceQuery.ps1 -WorkspaceQueryOracles schema-v5\workspace-query-oracles.json
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Verify-Captures.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Prepare-ReasoningWorksheet.ps1
 ```
 
 The agent did not run these commands. `cargo build` is the user-owned prerequisite. The capture script launches `target/debug/clean-ctx.exe`; this is also user-owned live execution.
@@ -120,7 +152,7 @@ After captures and the worksheet exist, run the complete local Codex baseline
 with one command:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-CodexReasoning.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Run-CodexReasoning.ps1
 ```
 
 Pass `-Model '<model-id>'` only when a specific installed Codex model must be
@@ -139,8 +171,8 @@ The first completed Codex run is preserved as invalid historical evidence in
 22 cleared cases while carrying forward the 14 unchanged valid results:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Prepare-CorrectedReasoningRun.ps1
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-CodexReasoning.ps1 -ResultsPath ./target/context-compression-verification/captures/reasoning-results-codex-corrected.json
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Prepare-CorrectedReasoningRun.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Run-CodexReasoning.ps1 -ResultsPath ./target/context-compression-verification/captures/reasoning-results-codex-corrected.json
 ```
 
 ### Production Claude lane
@@ -158,7 +190,7 @@ The investigation dossier and controlled matrix are under `investigation/`.
 Run five independent trials for each of the twelve failed cases with one command:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-FailureTriageTrials.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Run-FailureTriageTrials.ps1
 ```
 
 This preserves the other 24 results in every trial. Outputs are written as
@@ -175,14 +207,14 @@ the original CONTROL-FULL semantic object remains otherwise exactly equal.
 Generate and deterministically validate the variants with:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Prepare-OrganizationExperiments.ps1
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Validate-ControlFullExperiments.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Prepare-OrganizationExperiments.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Validate-ControlFullExperiments.ps1
 ```
 
 After that validation passes, the complete bounded model experiment is:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-OrganizationExperiments.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Run-OrganizationExperiments.ps1
 ```
 
 It runs three trials for one representative DI case and one representative
@@ -193,7 +225,7 @@ After the approved production presentation repair, run the two affected cases
 against a fresh production CONTROL-FULL v2 capture with:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Run-PresentationRepairSmoke.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Run-PresentationRepairSmoke.ps1
 ```
 
 The script creates a timestamped result lane, rejects stale/non-v2 captures,
@@ -220,7 +252,7 @@ edit-target, source-escalation, or byte-fidelity failure.
 Example recording command:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Record-ReasoningResult.ps1 `
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/codec/scripts/Record-ReasoningResult.ps1 `
   -CaseId ownership--low-overview `
   -AnswerPath .\target\context-compression-verification\answers\ownership--low-overview.txt `
   -Result pass -Model '<model>' -ModelVersion '<version>' -SamplingSettings '<settings>'

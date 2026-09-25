@@ -48,7 +48,12 @@ function Save-Capture($scenario, $response, [string]$suffix = "", [string]$sourc
     $response | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8NoBOM (Join-Path $dir "response.json")
     $content = @($response.result.content)
     if ($content.Count -gt 0 -and $null -ne $content[0].text) {
-        [IO.File]::WriteAllText((Join-Path $dir "control-full.txt"), [string]$content[0].text, [Text.UTF8Encoding]::new($false))
+        $text = [string]$content[0].text
+        # control-full.txt is overwritten with the codec CONTROL-FULL oracle for
+        # non-verbatim, non-error scenarios; content.txt preserves the actual
+        # model-visible SCHEMA-v5 presentation for the schema-v5 harness.
+        [IO.File]::WriteAllText((Join-Path $dir "control-full.txt"), $text, [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $dir "content.txt"), $text, [Text.UTF8Encoding]::new($false))
     }
     if ($sourcePath -and (Test-Path -LiteralPath $sourcePath)) {
         Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $dir "raw-source.txt") -Force

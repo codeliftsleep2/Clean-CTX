@@ -1,6 +1,7 @@
 param(
     [string]$BinaryPath = "",
-    [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
+    [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path,
+    [string]$WorkspaceQueryOracles = "codec\workspace-query-oracles.json"
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,7 +27,7 @@ $config = @{
 } | ConvertTo-Json -Depth 10
 [IO.File]::WriteAllText((Join-Path $runtime ".clean-ctx.json"), $config, [Text.UTF8Encoding]::new($false))
 
-$mapping = Get-Content -Raw (Join-Path $definitionRoot "reasoning\workspace-query-oracles.json") | ConvertFrom-Json
+$mapping = Get-Content -Raw (Join-Path $definitionRoot $WorkspaceQueryOracles) | ConvertFrom-Json
 
 $session = Start-CleanCtxSession $BinaryPath $runtime
 try {

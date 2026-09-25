@@ -1,0 +1,5 @@
+[
+  {"id":"edit-largeservice-createuser","fixture":"LargeService.ts","language":"typescript","operation":"provide_code_context","explicitFidelity":"edit","fidelity":"edit","focus":["UserService.createUser"],"focusMode":"one qualified","bodyPolicy":"resolved IDs exact","expect":"success","matrixRow":"Edit / focused bodies"},
+  {"id":"edit-largeservice-getuserstats","fixture":"LargeService.ts","language":"typescript","operation":"provide_code_context","explicitFidelity":"edit","fidelity":"edit","focus":["UserService.getUserStats"],"focusMode":"one qualified","bodyPolicy":"resolved IDs exact","expect":"success","matrixRow":"Edit / focused bodies"},
+  {"id":"edit-usermanagement-isvalidemail","fixture":"UserManagementService.ts","language":"typescript","operation":"provide_code_context","explicitFidelity":"edit","fidelity":"edit","focus":["UserManagementService.isValidEmail"],"focusMode":"one qualified","bodyPolicy":"resolved IDs exact","expect":"success","matrixRow":"Edit / focused bodies"}
+]
