@@ -261,33 +261,41 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                 state.remember_semantic_edges(&file, transition.semantic_edges);
                 state.consume_pending_transition(&file, from, new_version);
             }
-            let source = match state.read_source(&durable_file) {
-                Ok(source) => source,
-                Err(error) => {
-                    send_response(&invalid_session_ir_response(
-                        id,
-                        &format!("Cannot read source for economics gate: {error}"),
-                    ));
-                    return;
-                }
+            // The acknowledgement is already committed at this point. Source
+            // availability must therefore never turn a successful mutation
+            // into an error response, and raw source is valid only when it is
+            // the exact source snapshot represented by the committed target.
+            let compact = || {
+                super::content::presentation_document(
+                    &target_ir,
+                    &hierarchy,
+                    fidelity,
+                    &durable_file,
+                    state,
+                )
             };
-            let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
-            let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
-            let economic = super::content::economical_presentation_document(
-                &target_ir,
-                &hierarchy,
-                fidelity,
-                &durable_file,
-                &source,
-                state,
-                tokenizer_kind,
-                tokenizer_box.as_deref(),
-            );
-            let raw_passthrough = matches!(
-                economic.selected,
-                crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
-            );
-            let rendered = economic.text;
+            let (rendered, raw_passthrough) = match state.read_source(&durable_file) {
+                Ok(source) if state.cache_read().compute_hash(source.as_bytes()) == source_hash => {
+                    let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
+                    let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
+                    let economic = super::content::economical_presentation_document(
+                        &target_ir,
+                        &hierarchy,
+                        fidelity,
+                        &durable_file,
+                        &source,
+                        state,
+                        tokenizer_kind,
+                        tokenizer_box.as_deref(),
+                    );
+                    let selected_raw = matches!(
+                        economic.selected,
+                        crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
+                    );
+                    (economic.text, selected_raw)
+                }
+                Ok(_) | Err(_) => (compact(), false),
+            };
             let (content_kind, candidate_byte_exact) =
                 contract_fields_for_hierarchy(fidelity, &hierarchy);
             let hierarchical_wire =

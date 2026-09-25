@@ -46,6 +46,46 @@ fn source(return_value: u8) -> String {
     )
 }
 
+fn pending_tiny_delta(
+    state: &crate::mcp::McpState,
+    root: &tempfile::TempDir,
+    path: &std::path::Path,
+) -> (String, Value, Value) {
+    let file = path.to_string_lossy().into_owned();
+    let workspace_root = root.path().to_string_lossy().into_owned();
+    std::fs::write(path, "export class Race { first(): void {} }\n").expect("baseline source");
+    let baseline = dispatch(
+        state,
+        20,
+        "provide_code_context",
+        json!({
+            "filePath": file.clone(),
+            "workspaceRoot": workspace_root.clone(),
+            "fidelity": "high"
+        }),
+    );
+    assert!(baseline.get("error").is_none(), "{baseline}");
+
+    std::fs::write(path, "export class Race { second(): void {} }\n").expect("target source");
+    state.invalidate_source_cache(&file);
+    let generated = dispatch(
+        state,
+        21,
+        "provide_code_context",
+        json!({
+            "filePath": file.clone(),
+            "workspaceRoot": workspace_root
+        }),
+    );
+    assert_eq!(generated["result"]["_meta"]["strategy"], "delta");
+    assert!(generated["result"]["_meta"]["delta"].is_object());
+    (
+        file,
+        generated["result"]["_meta"]["delta"].clone(),
+        generated["result"]["_meta"]["from_version"].clone(),
+    )
+}
+
 #[test]
 fn apply_delta_rejects_missing_authoritative_fidelity_before_mutation() {
     let _serial = crate::protocol::handler_response_serial();
@@ -191,4 +231,88 @@ fn auto_delta_missing_baseline_preserves_high_fidelity_across_restart_restore() 
         .alias_for_path(&file)
         .expect("restore recreates session alias");
     assert_eq!(restarted.context_fidelity(&alias), Some(Fidelity::High));
+}
+
+#[test]
+fn committed_delta_acknowledgement_survives_missing_source() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("missing-after-generation.ts");
+    let state = crate::mcp::McpState::new(config(&root));
+    let (file, delta, from) = pending_tiny_delta(&state, &root, &path);
+    let alias = state.alias_for_path(&file).expect("session alias");
+    let target_version = delta["to"].as_u64().expect("target version");
+
+    std::fs::remove_file(&path).expect("remove source before acknowledgement");
+    state.invalidate_source_cache(&file);
+    let applied = dispatch(
+        &state,
+        22,
+        "apply_delta",
+        json!({ "delta": delta, "currentVersion": from }),
+    );
+
+    assert!(applied.get("error").is_none(), "{applied}");
+    assert_eq!(applied["result"]["_meta"]["content_kind"], "skeleton");
+    let text = applied["result"]["content"][0]["text"]
+        .as_str()
+        .expect("SCHEMA-v5 acknowledgement");
+    assert!(text.starts_with("// SCHEMA v5"), "{text}");
+    assert!(text.contains("second"), "{text}");
+    assert_eq!(state.file_version(&alias), Some(target_version));
+    assert_eq!(state.pending_transition_count(&alias), 0);
+}
+
+#[test]
+fn committed_delta_acknowledgement_rejects_newer_raw_source() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("changed-after-generation.ts");
+    let state = crate::mcp::McpState::new(config(&root));
+    let (file, delta, from) = pending_tiny_delta(&state, &root, &path);
+
+    std::fs::write(&path, "export class Race { third(): void {} }\n")
+        .expect("newer source before acknowledgement");
+    state.invalidate_source_cache(&file);
+    let applied = dispatch(
+        &state,
+        23,
+        "apply_delta",
+        json!({ "delta": delta, "currentVersion": from }),
+    );
+
+    assert!(applied.get("error").is_none(), "{applied}");
+    assert_eq!(applied["result"]["_meta"]["content_kind"], "skeleton");
+    let text = applied["result"]["content"][0]["text"]
+        .as_str()
+        .expect("SCHEMA-v5 acknowledgement");
+    assert!(text.starts_with("// SCHEMA v5"), "{text}");
+    assert!(text.contains("second"), "{text}");
+    assert!(!text.contains("third"), "{text}");
+}
+
+#[test]
+fn committed_delta_acknowledgement_keeps_matching_raw_economics_fallback() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("matching-after-generation.ts");
+    let state = crate::mcp::McpState::new(config(&root));
+    let (_file, delta, from) = pending_tiny_delta(&state, &root, &path);
+
+    let applied = dispatch(
+        &state,
+        24,
+        "apply_delta",
+        json!({ "delta": delta, "currentVersion": from }),
+    );
+
+    assert!(applied.get("error").is_none(), "{applied}");
+    assert_eq!(
+        applied["result"]["_meta"]["content_kind"],
+        "raw_passthrough"
+    );
+    assert_eq!(
+        applied["result"]["content"][0]["text"],
+        "export class Race { second(): void {} }\n"
+    );
 }
