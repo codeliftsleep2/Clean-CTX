@@ -1,6 +1,6 @@
 use super::common::{
-    compiled_from_tuples, contract_fields_focused, invalid_session_ir_response,
-    resolve_focus_or_respond, ContentKind,
+    ContentKind, compiled_from_tuples, contract_fields_focused, invalid_session_ir_response,
+    resolve_focus_or_respond,
 };
 use crate::error::to_jsonrpc_error;
 use crate::ir::delta::SequenceDeltaComputer;
@@ -310,12 +310,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                     let (adds, mods, dels) = d.summary_counts();
                     let delta_text = format!(
                         "Δ delta for {} (v{} → v{}): +{} ~{} -{} ops",
-                        compiled.file_id,
-                        d.from,
-                        d.to,
-                        adds,
-                        mods,
-                        dels
+                        compiled.file_id, d.from, d.to, adds, mods, dels
                     );
                     let economic = super::content::select_complete_content(
                         source,

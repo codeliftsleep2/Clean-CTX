@@ -54,4 +54,3 @@ mod pattern_identity_downstream;
 // raw syntax leaked into canonical IR identities (DefField, DefClass, Import, TypeAlias).
 #[path = "regression_canonical_identity.rs"]
 mod regression_canonical_identity;
-

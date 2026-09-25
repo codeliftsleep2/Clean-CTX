@@ -22,8 +22,8 @@
 // so responses are observed via cfg(test)-only `protocol::CAPTURED_RESPONSES`,
 // serialized through `protocol::HANDLER_RESPONSE_SERIAL`.
 
-use crate::mcp::tools::dispatch_tools_call;
 use crate::mcp::tool_handlers::core::ContentKind;
+use crate::mcp::tools::dispatch_tools_call;
 use serde_json::json;
 
 // Shared Phase 2-promoted envelope helper (crate::tests).

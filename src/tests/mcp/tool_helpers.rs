@@ -254,8 +254,11 @@ fn production_compile_path_carries_typed_execution_semantics_to_llm_projection()
     let hierarchy = crate::ir::hierarchical::try_ir_to_hierarchical(&compiled)
         .expect("checked production projection");
     let rendered = crate::ir::render_hierarchical_for_llm(&hierarchy, Fidelity::High);
-    assert!(rendered.contains(" se:async"), "{rendered}");
-    assert!(rendered.contains(" ec:async"), "{rendered}");
+    // Annotation-redundancy collapse: `async` renders once as mod:ASYNC, not
+    // triplicate as mod:ASYNC + se:async + ec:async.
+    assert!(rendered.contains("mod:ASYNC"), "{rendered}");
+    assert!(!rendered.contains("se:async"), "{rendered}");
+    assert!(!rendered.contains("ec:async"), "{rendered}");
 
     let _ = std::fs::remove_file(&file);
     let _ = std::fs::remove_dir(&root);

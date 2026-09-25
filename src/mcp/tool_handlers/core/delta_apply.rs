@@ -1,6 +1,8 @@
 //! Apply-delta handler, separated from delta production orchestration.
 
-use super::common::{compiled_from_tuples, contract_fields, invalid_session_ir_response, ContentKind};
+use super::common::{
+    ContentKind, compiled_from_tuples, contract_fields, invalid_session_ir_response,
+};
 use super::delta::persistence::{ensure_apply_baseline, persisted_context_id};
 use crate::ir::delta::{IRDelta, SequenceDelta};
 use crate::mcp::McpState;

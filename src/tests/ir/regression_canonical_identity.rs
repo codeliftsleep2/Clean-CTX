@@ -100,10 +100,7 @@ fn red_field_name_ts_is_fidelity_invariant_and_not_empty_at_low() {
     let name_med = get_field_name(&ir_med);
     let name_high = get_field_name(&ir_high);
 
-    assert_ne!(
-        name_low, "",
-        "Field name must not be empty at Low fidelity"
-    );
+    assert_ne!(name_low, "", "Field name must not be empty at Low fidelity");
     assert_eq!(
         name_low, "label",
         "Field name at Low fidelity must be 'label'"
@@ -211,4 +208,3 @@ fn red_type_alias_original_type_has_no_declaration_wrapper() {
         "Type alias target must be 'string', not 'type Identifier = string;'"
     );
 }
-

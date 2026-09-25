@@ -23,6 +23,7 @@
 use super::hierarchical::{
     ClassNode, FieldNode, HierarchicalIR, InterfaceNode, MethodNode, PatternEntry,
 };
+use super::{DeclarationModifier, ExecutionContextKind, SideEffectKind};
 use crate::compression::Fidelity;
 use std::collections::{HashMap, HashSet};
 
@@ -380,28 +381,52 @@ fn render_methods(
             output.push_str(&format!(" df:{}", df_strs.join(",")));
         }
 
+        // Annotation-redundancy collapse: the `async` fact (co-derived from
+        // the `async` keyword) was reported up to three times — mod:ASYNC +
+        // se:async + ec:async. Report it once, at the most structural level
+        // available: mod:ASYNC (declaration modifier) is authoritative and
+        // drops se:async/ec:async; otherwise se:async (side effect) is
+        // authoritative and drops ec:async. Presentation-only — the codec
+        // still stores all three. se:async/ec:async still render when no
+        // more-structural async fact exists.
+        let is_async_declared = method
+            .modifiers
+            .iter()
+            .flatten()
+            .any(|m| *m == DeclarationModifier::Async);
+        let has_async_side_effect = method.side_effect.contains(&SideEffectKind::Async);
+
         // Side-effect annotation at High fidelity (Gap 1 fix).
         // e.g. `se:mutation` — quickly tells the LLM whether a method is
         // pure, performs I/O, mutates state, is async, or is transactional.
         if fidelity == Fidelity::High && !method.side_effect.is_empty() {
-            let effects = method
+            let effects: Vec<String> = method
                 .side_effect
                 .iter()
+                .filter(|&&e| !(is_async_declared && e == SideEffectKind::Async))
                 .map(ToString::to_string)
-                .collect::<Vec<_>>();
-            output.push_str(&format!(" se:{}", effects.join(",")));
+                .collect();
+            if !effects.is_empty() {
+                output.push_str(&format!(" se:{}", effects.join(",")));
+            }
         }
 
         // Execution-context annotation at High fidelity (Gap 1 fix).
         // e.g. `ec:async` — tells the agent the runtime context without
         // a full body read.
         if fidelity == Fidelity::High && !method.execution_context.is_empty() {
-            let contexts = method
+            let contexts: Vec<String> = method
                 .execution_context
                 .iter()
+                .filter(|&&c| {
+                    !((is_async_declared || has_async_side_effect)
+                        && c == ExecutionContextKind::Async)
+                })
                 .map(ToString::to_string)
-                .collect::<Vec<_>>();
-            output.push_str(&format!(" ec:{}", contexts.join(",")));
+                .collect();
+            if !contexts.is_empty() {
+                output.push_str(&format!(" ec:{}", contexts.join(",")));
+            }
         }
 
         // Verbatim method body at Edit fidelity (byte-exact for replace_in_file).

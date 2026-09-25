@@ -609,9 +609,9 @@ The measurement harness now splits into `codec/` (reversible wire) and
 
 | Fixture (language) | Low | Medium | High |
 |---|---:|---:|---:|
-| LargeService.ts (typescript) | 76.3% | 70.1% | 65.5% |
-| UserManagementService.ts (angular) | 73.9% | 64.6% | 60.4% |
-| OrderManagementService.cs (csharp) | 64.2% | 48.4% | 41.3% |
+| LargeService.ts (typescript) | 76.3% | 70.1% | 67.1% |
+| UserManagementService.ts (angular) | 73.9% | 64.6% | 61.8% |
+| OrderManagementService.cs (csharp) | 64.2% | 48.4% | 43.9% |
 
 Density is **language-dependent**, and it is the high-fidelity annotation load,
 not the schema, that drives the gap. C# is lowest because its idiom is
@@ -619,7 +619,7 @@ structurally verbose: every async method carries a
 `CancellationToken cancellationToken = default` parameter and a
 `Task<ActionResult<T>>` return plus `[FromBody]`/`[FromQuery]` attributes; at
 High fidelity each async method is annotated
-`mod:ASYNC ctl:… pf:OBSERVABLE cf:await… se:async,io ec:async`; and an
+`mod:ASYNC ctl:… pf:OBSERVABLE cf:await… se:io`; and an
 `IOrderService` interface mirrors the concrete service. This is a faithful
 encoding of real facts, not a renderer defect — the gap is narrow at Low and
 widens at High precisely where those per-method annotations land.
@@ -628,11 +628,16 @@ widens at High precisely where those per-method annotations land.
 
 The High-fidelity annotations are the **reasoning payload**: they replace the
 body. Cutting them to close the C# gap would remove the facts the model reasons
-with, trading accuracy for size. The legitimate lever is collapsing *redundancy*
-in the encoding — e.g. `async` is currently signalled three times as `mod:ASYNC`,
-`se:async`, and `ec:async` — not dropping facts. Whether a compressed encoding
-still preserves reasoning is an empirical question, answered by measuring size
-and task accuracy together, never size alone.
+with, trading accuracy for size. The legitimate lever is collapsing *redundancy*,
+not dropping facts. The first such collapse — the `async` triplicate
+(`mod:ASYNC` + `se:async` + `ec:async`, all co-derived from the `async` keyword)
+— is implemented and measured: it lifted High-fidelity density by **+1.6pp
+(typescript), +1.3pp (angular), +2.6pp (csharp)** while preserving every fact —
+the codec still stores all three, and the presentation reports `async` once at
+the most structural level available (`mod:ASYNC`, else `se:async`). Whether a
+further compressed encoding still preserves reasoning remains an empirical
+question, answered by measuring size and task accuracy together, never size
+alone.
 
 ### Task-based reasoning evaluation
 

@@ -1,8 +1,8 @@
 #![cfg(feature = "typescript")]
 
 use crate::layers::meta::semantic::SemanticRelation;
-use crate::mcp::tools::dispatch_tools_call;
 use crate::mcp::tool_handlers::core::ContentKind;
+use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
 
 fn dispatch(state: &crate::mcp::McpState, id: i64, tool: &str, arguments: Value) -> Value {
@@ -75,9 +75,18 @@ export class Consumer {
     assert!(response.get("error").is_none(), "{response}");
     let text = model_text(&response);
     // Local structural facts survive in the model-visible presentation.
-    assert!(text.starts_with("// SCHEMA v5"), "presentation, not codec: {text}");
-    assert!(text.contains("Consumer"), "typed owner in presentation: {text}");
-    assert!(text.contains("find"), "method identity in presentation: {text}");
+    assert!(
+        text.starts_with("// SCHEMA v5"),
+        "presentation, not codec: {text}"
+    );
+    assert!(
+        text.contains("Consumer"),
+        "typed owner in presentation: {text}"
+    );
+    assert!(
+        text.contains("find"),
+        "method identity in presentation: {text}"
+    );
     // Semantic facts are auxiliary: they ride the workspace index, not content.
     assert!(
         response["result"]["_meta"]["semantic_edges"].is_null(),
@@ -125,8 +134,14 @@ fn registered_focus_resolves_owner_then_filters_by_canonical_method_id() {
     // Both owners render; only the focused method's body is byte-exact.
     assert!(text.contains("Left"), "left owner must render: {text}");
     assert!(text.contains("Right"), "right owner must render: {text}");
-    assert!(!text.contains("return 1"), "unfocused body must be omitted: {text}");
-    assert!(text.contains("return 2"), "focused body must be verbatim: {text}");
+    assert!(
+        !text.contains("return 1"),
+        "unfocused body must be omitted: {text}"
+    );
+    assert!(
+        text.contains("return 2"),
+        "focused body must be verbatim: {text}"
+    );
     // The contract self-reports the focused-body category.
     assert_eq!(
         response["result"]["_meta"]["content_kind"],
@@ -312,7 +327,10 @@ fn small_file_lifecycle_uses_byte_exact_raw_without_a_wrapper() {
 
     let compressed = dispatch(&state, 1, "compress_code_context", arguments);
     assert_eq!(compressed["result"]["content"][0]["text"], source);
-    assert_eq!(compressed["result"]["content_kind"], ContentKind::RawPassthrough.as_str());
+    assert_eq!(
+        compressed["result"]["content_kind"],
+        ContentKind::RawPassthrough.as_str()
+    );
 
     for (id, tool) in [(2, "restore_context"), (3, "replay_history")] {
         let response = dispatch(

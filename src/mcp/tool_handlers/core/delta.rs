@@ -1,7 +1,7 @@
 // Diff, delta, and apply-delta MCP handlers.
 
 use super::common::{
-    checked_hierarchy_or_respond, compiled_from_tuples, contract_fields, ContentKind,
+    ContentKind, checked_hierarchy_or_respond, compiled_from_tuples, contract_fields,
     invalid_session_ir_response,
 };
 use crate::error::to_jsonrpc_error;
@@ -273,12 +273,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             let (adds, mods, dels) = d.summary_counts();
             let content = format!(
                 "Δ delta for {} (v{} → v{}): +{} ~{} -{} ops",
-                compiled.file_id,
-                d.from,
-                d.to,
-                adds,
-                mods,
-                dels
+                compiled.file_id, d.from, d.to, adds, mods, dels
             );
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id, "result": {

@@ -147,6 +147,45 @@ fn test_high_fidelity_renders_execution_context() {
     );
 }
 
+/// High Fidelity: the `async` fact is reported once (mod:ASYNC), not three
+/// times. When a method declares `mod:ASYNC`, the redundant `se:async` and
+/// `ec:async` values are suppressed; non-async side effects are preserved.
+#[test]
+fn test_high_fidelity_collapses_redundant_async() {
+    let mut hir = empty_hir();
+    let mut class = make_class("MyService");
+    let mut method = make_method("poll");
+    method.modifiers = vec![vec![DeclarationModifier::Async]];
+    method.side_effect = vec![SideEffectKind::Async, SideEffectKind::Io];
+    method.execution_context = vec![ExecutionContextKind::Async];
+    class.methods.push(method);
+    hir.classes.push(class);
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::High);
+    assert!(result.contains("mod:ASYNC"), "{result}");
+    assert!(result.contains("se:io"), "{result}");
+    assert!(!result.contains("se:async"), "{result}");
+    assert!(!result.contains("ec:async"), "{result}");
+}
+
+/// High Fidelity: with no mod:ASYNC, se:async is the async authority and the
+/// redundant ec:async is suppressed (annotation-redundancy collapse #2).
+#[test]
+fn test_high_fidelity_se_async_authoritative_without_modifier() {
+    let mut hir = empty_hir();
+    let mut class = make_class("MyService");
+    let mut method = make_method("poll");
+    method.side_effect = vec![SideEffectKind::Async];
+    method.execution_context = vec![ExecutionContextKind::Async];
+    class.methods.push(method);
+    hir.classes.push(class);
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::High);
+    assert!(result.contains("se:async"), "{result}");
+    assert!(!result.contains("ec:async"), "{result}");
+    assert!(!result.contains("mod:ASYNC"), "{result}");
+}
+
 /// Low fidelity: data-flow / side-effect / execution-context must not render.
 #[test]
 fn test_low_fidelity_no_execution_metadata() {

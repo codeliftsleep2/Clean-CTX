@@ -1,6 +1,6 @@
 // Durable restore_context MCP handler.
 
-use super::common::{checked_hierarchy_or_respond, ContentKind};
+use super::common::{ContentKind, checked_hierarchy_or_respond};
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::protocol::send_response;

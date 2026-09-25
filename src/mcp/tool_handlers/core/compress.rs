@@ -1,6 +1,6 @@
 // compress_code_context MCP handler.
 
-use super::common::{checked_hierarchy_or_respond, contract_fields, ContentKind};
+use super::common::{ContentKind, checked_hierarchy_or_respond, contract_fields};
 use crate::ir::wire::ir_to_wire;
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::{
@@ -127,8 +127,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
         let candidate_presentation =
             crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
-        let compressed_tokens =
-            count_tokens_with_tokenizer(&candidate_presentation, tokenizer_ref);
+        let compressed_tokens = count_tokens_with_tokenizer(&candidate_presentation, tokenizer_ref);
 
         // P9-14: durability is the publication boundary. Persist the checked
         // candidate and its complete edge snapshot before creating aliases or

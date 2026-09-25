@@ -164,9 +164,10 @@ pub(crate) fn contract_fields_focused(
     match fidelity {
         crate::compression::Fidelity::Verbatim => (ContentKind::VerbatimDocument, vec!["document"]),
         // No focus set → every method body is byte-exact (legacy behavior).
-        crate::compression::Fidelity::Edit if focus.is_none() => {
-            (ContentKind::SkeletonWithVerbatimBodies, vec!["method_bodies"])
-        }
+        crate::compression::Fidelity::Edit if focus.is_none() => (
+            ContentKind::SkeletonWithVerbatimBodies,
+            vec!["method_bodies"],
+        ),
         // Focus set but EMPTY → ZERO method bodies are byte-exact. The
         // output is effectively all-signatures, so report `Skeleton`
         // with no byte-exact regions (otherwise the LLM would attempt
