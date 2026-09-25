@@ -304,6 +304,18 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Gate** | `cargo test` |
 
 ---
+### IRDELTA-002 Explicit Code-Side Delta Acknowledgement
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Delta generation must never silently mutate the canonical baseline, and acknowledgement must install exactly the server-authorized target state or install nothing. |
+| **Invariant** | `delta_code_context` leaves live canonical IR and indexed semantics at the acknowledged baseline while retaining one server-owned pending transition for the exact file, version pair, target hash, delta identity, and complete target edge set. Repeating generation against the same source is deterministic and replaces that same pending key rather than accumulating transitions. `apply_delta` requires the expected live version and exact pending authority; when persistence is enabled, it durably commits the canonical delta plus semantic snapshot before replacing live IR and indexed edges, then consumes only the matching transition. A rejected delta is never partially installed: state and pending authority remain coherent, while preflight may first complete a separately durable edit intent. Delta operations remain code-side auxiliary data; the repository ships the explicit server tools but no automatic production host consumer. |
+| **Enforcement** | `src/tests/mcp/durable_semantic_restore.rs` crosses dispatched generation, deterministic repeat generation, forged-transition rejection, mutation coherence, exact acknowledgement, durable restart/restore, index replacement, pending consumption, and replay rejection. `src/tests/mcp/delta_edit_recovery.rs` covers recovery ordering and recovery-failure atomicity. `src/tests/mcp/content_kind_lifecycle.rs` enforces the model-visible boundary. |
+| **Authority** | `src/mcp/durable_semantics.rs`, `src/mcp/tool_handlers/core/delta.rs`, `src/mcp/tool_handlers/core/delta_apply.rs`, `src/mcp/tool_handlers/core/delta/persistence.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test --all-features` |
+
+---
 ### IRPAT-001 IR Identity Preservation During Consumptive Pattern Transformations
 
 | Property | Value |

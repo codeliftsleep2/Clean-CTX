@@ -42,6 +42,12 @@ fn edge_json(state: &crate::mcp::McpState, alias: &str) -> Value {
     .expect("serializable semantic edges")
 }
 
+fn indexed_component_edges(state: &crate::mcp::McpState, component: &str) -> Value {
+    let index = state.workspace_index_read();
+    serde_json::to_value(index.forward_edges_by_identity("angular", "Component", component))
+        .expect("serializable indexed component edges")
+}
+
 #[test]
 fn generated_delta_persists_and_restores_complete_target_edges() {
     let _serial = crate::protocol::handler_response_serial();
@@ -70,6 +76,25 @@ fn generated_delta_persists_and_restores_complete_target_edges() {
     let from = generated["result"]["from_version"].clone();
     assert_eq!(delta["dv"], 2, "{generated}");
     assert!(delta["target_hash"].as_str().is_some(), "{generated}");
+    let baseline_ir = producer.ir_context_read().get_ir(&alias).cloned();
+    let baseline_edges = edge_json(&producer, &alias);
+    let baseline_index = indexed_component_edges(&producer, "AppComponent");
+    assert!(baseline_index.to_string().contains("app-old"));
+    assert_eq!(producer.pending_transition_count(&alias), 1);
+
+    let repeated = dispatch(&producer, 25, "delta_code_context", args(&file, &root));
+    assert_eq!(repeated["result"]["delta"], delta, "{repeated}");
+    assert_eq!(repeated["result"]["from_version"], from, "{repeated}");
+    assert_eq!(producer.pending_transition_count(&alias), 1);
+    assert_eq!(
+        producer.ir_context_read().get_ir(&alias).cloned(),
+        baseline_ir
+    );
+    assert_eq!(edge_json(&producer, &alias), baseline_edges);
+    assert_eq!(
+        indexed_component_edges(&producer, "AppComponent"),
+        baseline_index
+    );
 
     for (id, mismatched) in [
         (20, {
@@ -106,6 +131,16 @@ fn generated_delta_persists_and_restores_complete_target_edges() {
         );
         assert!(rejected.get("error").is_some(), "{rejected}");
     }
+    assert_eq!(
+        producer.ir_context_read().get_ir(&alias).cloned(),
+        baseline_ir
+    );
+    assert_eq!(edge_json(&producer, &alias), baseline_edges);
+    assert_eq!(
+        indexed_component_edges(&producer, "AppComponent"),
+        baseline_index
+    );
+    assert_eq!(producer.pending_transition_count(&alias), 1);
 
     let restarted_without_pending = state(&root);
     let restored_baseline = dispatch(
@@ -139,6 +174,12 @@ fn generated_delta_persists_and_restores_complete_target_edges() {
     );
     assert!(applied.get("error").is_none(), "{applied}");
     let expected_edges = edge_json(&producer, &alias);
+    let applied_index = indexed_component_edges(&producer, "AppComponent");
+    assert_ne!(expected_edges, baseline_edges);
+    assert_ne!(applied_index, baseline_index);
+    assert!(applied_index.to_string().contains("app-new"));
+    assert!(!applied_index.to_string().contains("app-old"));
+    assert_eq!(producer.pending_transition_count(&alias), 0);
     assert!(
         producer
             .pending_transition(

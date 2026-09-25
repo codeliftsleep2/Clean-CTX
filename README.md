@@ -53,7 +53,7 @@ Task-relevant context rather than indiscriminate source dumping:
 
 * **Compiles source into LLM-optimized representations** - three fidelity levels (Low/Medium/High) plus Edit and Verbatim, each preserving the semantics appropriate to the task.
 * **Semantic compression** - reduces representation size while preserving the relationships downstream consumers depend on.
-* **IR-level delta transport** - compile once, send instruction-level deltas thereafter (up to 53% CPU/latency savings on repeat calls; the LLM receives the same full output).
+* **IR-level delta transport** - compile once, return instruction-level deltas through code-side response fields thereafter (up to 53% CPU/latency savings on repeat calls). Delta operations are never model-visible content.
 * **Structural edits** - `apply_edit` performs byte-exact edits on previously-seen files using the semantic model.
 
 ### MCP integration
@@ -64,7 +64,7 @@ Exposes code intelligence and context capabilities to AI coding agents through t
 * **`workspace_query`** - cross-file semantic queries: entity lookup, forward/reverse edges, selector resolution, injection targets, transitive dependencies, cycle detection.
 * **`compress_code_context` / `restore_context`** - direct compression control with history and stats.
 * **`diff_code_context` / `diff_commits`** - AST-level change-sets, single-file and git ref-range.
-* **`delta_code_context` / `apply_delta`** - IR-level delta compression and client-side state updates.
+* **`delta_code_context` / `apply_delta`** - explicit, code-side IR delta generation and acknowledgement. Clean-CTX exposes both server tools; the repository does not ship an automatic host consumer.
 * **`apply_edit`** - structural edits on previously-seen files.
 * **Structured responses** - canonical `CallToolResult` envelope (`content` + `structuredContent` + `_meta`) with declared `outputSchema`.
 

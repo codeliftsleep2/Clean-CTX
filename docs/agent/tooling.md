@@ -49,7 +49,7 @@ as `filePath`.
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
 | `diff_code_context` | `filePath` | `workspaceRoot`, `fidelity` | AST-level diff: compares in-session baseline against current on-disk state for a **single file**. |
-| `delta_code_context` | `filePath` | `workspaceRoot`, `fidelity` | IR-level delta compression. Uses opcode-level differences between two compiled IRs. |
+| `delta_code_context` | `filePath` | `workspaceRoot`, `fidelity` | Generate an IR-level delta from opcode differences and retain its server-owned pending semantic transition. The structured payload is code-side only; generation does not apply it. |
 | `delta_text_context` | `filePath` | `workspaceRoot`, `fidelity` | Text-level line-oriented delta. Source-code files only (not markdown/json/yaml). |
 | `diff_commits` | `fromRef` | `toRef`, `workspaceRoot`, `fidelity` | **Multi-file git-ref diff.** Compares an entire workspace between two Git refs and emits per-file AST-level change-sets. Most token-efficient way to understand PR/commit-level changes. |
 
@@ -58,7 +58,7 @@ as `filePath`.
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
 | `apply_edit` | `filePath`, `operations` | `verify` | Byte-exact structural edit (`replace_body`, `delete`, `insert_after`, `insert_before`) over tracked units. Requires matching disk/live/durable source identity and commits source plus semantic state through the staged durable transaction. Full-body fidelity remains available when safe editing requires it. |
-| `apply_delta` | `delta`, `currentVersion` | — | Apply an IR delta envelope to the in-session state machine. Low-level; typically not called directly by agents. |
+| `apply_delta` | `delta`, `currentVersion` | — | Explicitly acknowledge and apply an exact pending IR delta, committing durable and live semantic state before consuming the pending transition. This is a code-side protocol, not an LLM workflow. Clean-CTX does not ship an automatic host consumer, so repository-local use is manual or verification-driven. |
 ### 1.5 Admin/Persistence Tools
 
 | Tool | Required | Optional | Semantics |
