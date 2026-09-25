@@ -1,6 +1,6 @@
 # LLM-context compression research
 
-**Status:** file/workspace authority split approved; COMPACT-A2 rejected; sparse positional A3 planned
+**Status:** presentation boundary (ARCH-003) implemented; SCHEMA-v5 density measured and language-dependent; task-based edit evaluation green (3/3)
 **Date:** 2026-09-21  
 **Scope:** the representation delivered to an LLM. Canonical IR and tool input contracts are unchanged. File-context content is being corrected to exclude unsolicited workspace graph snapshots; those facts remain available on demand through `workspace_query`. Structured file snapshots use a compact candidate only when it is safely cheaper than byte-exact raw source; otherwise raw is returned without a wrapper. Sections 1–13 preserve the pre-repair research findings; Section 14 records the approved production boundary and current checkpoint.
 
@@ -594,3 +594,54 @@ The benchmark corpus must exercise full provide/compress, selected and all-body 
 | persisted fidelity | n/a | persisted | restore/replay | regenerate normalized CONTROL-FULL from durable checked IR + edges, render economical A1 or exact raw, never trust stale compact text | follows persisted body facts | pending | pending | pending | pending user run |
 
 Registered-path verification, token capture, and the corrected 36-case reasoning run completed. Follow-up diagnostics found that the required DI provenance and occurrence facts were present and deterministically correct, while their organization reduced model reasoning reliability. The approved CONTROL-FULL v2 repair added stable typed navigation descriptors without altering canonical facts. COMPACT-A1 passed deterministic roundtrip, bounded reasoning, and production edge-case gates, but its initial 77% token result used verbose CONTROL-FULL as the denominator rather than raw source. That result proves oracle-encoding reduction only and is not production savings evidence. The corrected harness preserves capture-time raw bytes, measures raw-to-A1 economics, and runs paired raw/A1 reasoning only after the candidate clears that screen. Full snapshots retain the local raw ceiling; focused Edit forbids full-document raw fallback because it violates the requested body-disclosure boundary. CONTROL-FULL-DELTA v2 remains the acknowledged-state delta representation.
+
+## 15. Current measurement checkpoint (2026-09-24)
+
+The presentation boundary (ARCH-003) is implemented and mechanically enforced:
+`content` is the SCHEMA-v5 presentation on every path, the reversible codec is
+code-side (`result.ir` + persistence), and `content` falls back to byte-exact
+raw source when the presentation is not safely cheaper under the local tokenizer
+estimate — i.e. for small files at structural fidelity and for Edit all-bodies.
+The measurement harness now splits into `codec/` (reversible wire) and
+`schema-v5/` (model-visible presentation) under `verification/context-compression/`.
+
+### Measured SCHEMA-v5 density (raw → presentation, o200k; cl100k is within ~1%)
+
+| Fixture (language) | Low | Medium | High |
+|---|---:|---:|---:|
+| LargeService.ts (typescript) | 76.3% | 70.1% | 65.5% |
+| UserManagementService.ts (angular) | 73.9% | 64.6% | 60.4% |
+| OrderManagementService.cs (csharp) | 64.2% | 48.4% | 41.3% |
+
+Density is **language-dependent**, and it is the high-fidelity annotation load,
+not the schema, that drives the gap. C# is lowest because its idiom is
+structurally verbose: every async method carries a
+`CancellationToken cancellationToken = default` parameter and a
+`Task<ActionResult<T>>` return plus `[FromBody]`/`[FromQuery]` attributes; at
+High fidelity each async method is annotated
+`mod:ASYNC ctl:… pf:OBSERVABLE cf:await… se:async,io ec:async`; and an
+`IOrderService` interface mirrors the concrete service. This is a faithful
+encoding of real facts, not a renderer defect — the gap is narrow at Low and
+widens at High precisely where those per-method annotations land.
+
+### Compression vs. accuracy
+
+The High-fidelity annotations are the **reasoning payload**: they replace the
+body. Cutting them to close the C# gap would remove the facts the model reasons
+with, trading accuracy for size. The legitimate lever is collapsing *redundancy*
+in the encoding — e.g. `async` is currently signalled three times as `mod:ASYNC`,
+`se:async`, and `ec:async` — not dropping facts. Whether a compressed encoding
+still preserves reasoning is an empirical question, answered by measuring size
+and task accuracy together, never size alone.
+
+### Task-based reasoning evaluation
+
+A task-based edit evaluation replaces the comprehension quiz (which, on small
+fixtures, measured raw-source reading rather than SCHEMA-v5): 3 edit tasks on
+the large fixtures, graded deterministically (no LLM judge) by target resolution
+plus find/replace checks, with an `apply_edit` round-trip as the byte-exact gate.
+Initial result: **3/3 tasks** — the model targeted the correct method, reproduced
+the focused body byte-exactly (modulo CRLF→LF line endings), and produced the
+correct edit. This harness is the accuracy guardrail for any future
+encoding-compression experiment: change the annotation set, then re-measure size
+*and* task pass rate together.

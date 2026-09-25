@@ -60,7 +60,7 @@ behavior is superseded.
 | **Local regression** | `src/tests/mcp/presentation_boundary.rs` (content is not the codec document; carries no decoder legend / envelope schema id / body framing; typed owner + method identity survive). |
 | **Live scenario required?** | No — the defect is the production assembly path, not scale-dependent. |
 | **Architectural invariant** | ARCH-003 (presentation) vs CTX-001 (reversible codec), now mechanically enforced. |
-| **Status** | Open — decision recorded, fix in progress |
+| **Status** | Fixed — `content` is the SCHEMA-v5 presentation on all paths; the reversible codec stays code-side (`result.ir` + persistence) |
 
 **Decision (2026-09-24):** `content` becomes the presentation renderer
 (`render_hierarchical_for_llm`, SCHEMA v5) on every path; the codec stays
