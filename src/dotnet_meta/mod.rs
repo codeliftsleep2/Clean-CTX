@@ -193,9 +193,13 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         &self,
         source: &str,
         _path: &std::path::Path,
-        _config: Option<&crate::config::CleanCtxConfig>,
+        config: Option<&crate::config::CleanCtxConfig>,
     ) -> bool {
-        detect::is_dotnet_file(source)
+        let enabled = config
+            .and_then(|value| value.meta_layers.get("dotnet"))
+            .map(|value| value.enabled)
+            .unwrap_or(true);
+        enabled && detect::is_dotnet_file(source)
     }
 
     fn enrich(

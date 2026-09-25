@@ -44,7 +44,7 @@ impl IRPass for MetaLayerPass {
             path,
             &class_captures,
             state.fidelity,
-            None,
+            state.config.as_ref(),
         );
         append_marker_aliases(state, &meta_results);
 
@@ -53,7 +53,7 @@ impl IRPass for MetaLayerPass {
             path,
             &class_entries,
             state.fidelity,
-            None,
+            state.config.as_ref(),
         );
         for edge in &mut semantic_edges {
             if edge.subject.file.is_none() {

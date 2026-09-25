@@ -80,6 +80,8 @@ pub struct IRCompiler {
     language_layers: Vec<Box<dyn LanguageLayer>>,
     /// Pattern recognizers (Layer 4)
     pattern_recognizers: Vec<Box<dyn PatternRecognizer>>,
+    /// Active runtime configuration for framework meta-layer opt-outs.
+    config: Option<crate::config::CleanCtxConfig>,
     /// Semantic edges captured from the most recent compile_inner() call.
     /// Populated by draining PassContext.semantic_edges after pipeline.run().
     /// Reset to empty at the start of each new compilation.
@@ -94,8 +96,14 @@ impl IRCompiler {
             id_counter: 0,
             language_layers: Vec::new(),
             pattern_recognizers: Vec::new(),
+            config: None,
             semantic_edges: Vec::new(),
         }
+    }
+
+    /// Set the runtime configuration used by framework meta-layers.
+    pub fn set_config(&mut self, config: crate::config::CleanCtxConfig) {
+        self.config = Some(config);
     }
 
     /// Add a language layer (Layer 2).
@@ -211,6 +219,7 @@ impl IRCompiler {
     ) -> Result<CompiledIR, CompileError> {
         // Construct PassContext with per-compilation state
         let mut ctx = PassContext::new(source.to_string(), file_id.to_string(), fidelity);
+        ctx.config = self.config.clone();
         ctx.canonical_path = canonical_path.map(|p| p.to_string());
         ctx.language = Some(language);
         ctx.query_string = query_string.to_string();

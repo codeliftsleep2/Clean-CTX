@@ -27,3 +27,7 @@ mod projection_contract_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../tests/mcp/control_full_content.rs"]
 mod control_full_content_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/mcp/meta_layer_config.rs"]
+mod meta_layer_config_tests;

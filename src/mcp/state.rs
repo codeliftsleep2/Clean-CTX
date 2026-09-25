@@ -22,7 +22,6 @@ use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
 use crate::ir::replay::ContextState;
-use crate::layers::LayerRegistry;
 use crate::mcp::buffered_store::BufferedStore;
 use crate::mcp::cache_hints::CacheMetrics;
 use crate::mcp::context_store::InMemoryContextStore;
@@ -203,10 +202,6 @@ pub struct McpState {
     /// Defaults to 8787 (the proxy's default port).
     pub proxy_port: u16,
 
-    /// Layer registry for language/meta-layer dispatch.
-    /// Initialized once at startup from the enabled Cargo features.
-    pub registry: LayerRegistry,
-
     /// A-04: Metrics registry for operational signals.
     /// Provides counters, histograms, and gauges for key metrics.
     /// Thread-safe; can be shared across the server via `&MetricsRegistry`.
@@ -297,7 +292,6 @@ impl McpState {
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,
             proxy_port,
-            registry: LayerRegistry::new(),
             metrics_registry: std::sync::Arc::new(crate::observability::MetricsRegistry::new()),
             proxy_child: Mutex::new(None),
             proxy_cache: None,

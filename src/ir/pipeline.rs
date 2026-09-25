@@ -119,6 +119,8 @@ pub struct PassContext {
     /// Set by compile_inner; distinct from file_id (which is αN alias).
     pub canonical_path: Option<String>,
     pub fidelity: Fidelity,
+    /// Runtime configuration consulted by framework meta-layers.
+    pub config: Option<crate::config::CleanCtxConfig>,
     /// Monotonic instruction ID counter.
     pub id_counter: u64,
     /// Language layers (Layer 2) — mutable per-compilation state.
@@ -171,6 +173,7 @@ impl PassContext {
             file_id,
             canonical_path: None,
             fidelity,
+            config: None,
             id_counter: 0,
             language_layers: Vec::new(),
             pattern_recognizers: Vec::new(),

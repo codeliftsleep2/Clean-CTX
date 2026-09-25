@@ -416,6 +416,7 @@ fn compile_source_ir_focused_with_identity(
     };
 
     let mut compiler = IRCompiler::new();
+    compiler.set_config(state.config.clone());
 
     // Add language-specific layers (Layer 2)
     match extension {
@@ -434,9 +435,9 @@ fn compile_source_ir_focused_with_identity(
         _ => {}
     }
 
-    // P0-4: Framework meta-layers (Layer 3) are now handled by LayerRegistry::global()
-    // inside IRCompiler::compile(). Meta-layers are registered in src/layers/meta/
-    // and wired via McpState -> LayerRegistry. No manual add_meta_layer() needed.
+    // P0-4: Framework meta-layers (Layer 3) are handled by LayerRegistry::global()
+    // inside IRCompiler::compile(). The active McpState configuration is passed
+    // through the compiler so framework and sub-layer opt-outs are honored.
 
     // F-07 (FAANG audit): Wire the additive CodePatternRecognizer into
     // the compile path. This is the Layer 4 additive recognizer that
