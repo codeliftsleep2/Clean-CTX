@@ -18,8 +18,8 @@
 
 ## ADR-001 — Owner-aware file-local call inspection for Option C
 
-**Status:** Accepted architectural direction; implementation and final public
-request schema remain a separate approved work item.
+**Status:** Implemented on the production `workspace_query` path; final Cargo
+verification and Option-C task-based evaluation remain pending.
 
 **Decision date:** 2026-09-25
 
@@ -67,11 +67,10 @@ Do not attempt to recover typed ownership by adding a filter after projection;
 the information has already been discarded at that boundary.
 
 For the narrow case, introduce a focused, logically read-only file-local call
-inspection operation backed directly by canonical IR. The provisional public
-operation name is `calls_in_file` (also described conceptually as
-**WithinFile**). Whether it is exposed as a new `workspace_query` operation or
-a dedicated tool is finalized with its wire design; the semantic boundary is
-settled here.
+inspection operation backed directly by canonical IR. It is exposed as the
+`calls_in_file` operation of `workspace_query` (also described conceptually as
+**WithinFile**). This keeps trusted workspace scoping and the existing query
+answer envelope while giving the operation a distinct canonical-IR authority.
 
 The operation is keyed by:
 
@@ -99,15 +98,27 @@ Illustrative request:
 }
 ```
 
+`method.parameters`, when present, is an exact ordered selector over the
+visible parameter-signature strings returned by the canonical projection.
+This deliberately uses `parameters`, not a claimed `parameter_types` field:
+some language frontends currently preserve the complete written parameter
+(for example `string value`) where no separately normalized type exists.
+`method.return_type` is an optional exact selector. Omitting both selectors
+returns the complete same-name overload family in declaration order.
+
 Illustrative semantic result:
 
 ```json
 {
+  "file": ".../src/example.ts",
   "owner": { "kind": "class", "name": "Alpha" },
   "method": "run",
+  "overload_count": 1,
   "overloads": [
     {
+      "overload_occurrence": 0,
       "parameters": ["string"],
+      "return_type": "void",
       "calls": [
         {
           "occurrence": 0,
@@ -117,14 +128,23 @@ Illustrative semantic result:
         }
       ]
     }
-  ]
+  ],
+  "count": 1
 }
 ```
 
-The example is a design sketch, not an approved wire schema. Implementation
-must reuse trusted-root resolution and existing typed-owner/signature
-resolution, remain source-read-only, and must not acknowledge deltas, mutate
-source, or invent overload/callee resolution.
+This is the implemented wire contract. `count` is the total number of returned
+call occurrences; `overload_count` counts matching declarations. A missing
+typed owner or signature returns an empty result. More than one owner with the
+same requested kind and name is an invalid/ambiguous request (`-32602`), never
+a guessed match.
+
+The handler reuses trusted-root resolution and the shared optional
+`withinPath` narrowing, compiles a High-fidelity canonical candidate through
+the normal source-read boundary, and does not run WorkspaceIndex hydration.
+The candidate is not published as alias, version, IR baseline, semantic edge,
+or WorkspaceIndex state. The operation does not acknowledge deltas, mutate
+source, expose canonical IDs, or invent overload/callee resolution.
 
 ### Alternatives considered
 
@@ -181,10 +201,9 @@ file-local fact family appears.
 **Costs and limitations:**
 
 - tasks needing detailed calls require an additional tool invocation;
-- the operation must define source freshness and canonical compilation reuse;
+- each request performs canonical candidate compilation through the normal
+  metadata-invalidated source-read boundary rather than reading WorkspaceIndex;
 - the written callee remains unresolved unless a separate resolver proves it;
-- public tool placement and response schema still require their own review and
-  tracked contract tests;
 - Option C needs task evaluation proving that models discover and use the
   operation when call detail is required.
 
@@ -207,9 +226,11 @@ evidence.
 ### Relationship to Option C and R-46
 
 Option C may defer detailed local call facts only after `calls_in_file` exists
-on the real production path and passes task-based evaluation. Until then, its
-presentation contract must state the limitation rather than claim that current
-`workspace_query` is owner-complete.
+on the real production path and passes task-based evaluation. The production
+path now exists; task-based evaluation is still required before Option C may
+remove detailed calls from its default presentation. The generic cross-file
+operations remain intentionally owner-incomplete; `calls_in_file` is the
+owner-aware authority for this narrow file-local question.
 
 This decision is independent of R-46. It neither migrates legacy result-level
 fields nor changes delta transport. Delta remains entirely code-side.
@@ -273,8 +294,9 @@ regenerate positionally (code-side); occurrence groups + duplicates → code-sid
 (round-trip); navigation index → code-side; grammar legend → code-side; body
 byte-length framing → code-side.
 
-Until WithinFile is implemented and reasoning-tested, Option C must not claim
-that current `workspace_query` is an equivalent owner-aware call authority.
+WithinFile is now implemented as `workspace_query.calls_in_file`. Until it is
+reasoning-tested, Option C must not rely on tool discoverability as justification
+for removing detailed calls from the default presentation.
 
 §2.2's own framing: *"This is structurally main's SCHEMA v2 (names-only) plus
 explicit ownership clarity."*

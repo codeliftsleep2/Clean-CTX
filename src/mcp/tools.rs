@@ -50,6 +50,49 @@ fn inject_supported_languages(mut tools: Vec<serde_json::Value>) -> Vec<serde_js
     tools
 }
 
+/// Build the nested discovery contract separately so the broad
+/// `workspace_query` definition remains a shallow macro expansion.
+fn workspace_query_discovery_schema() -> Value {
+    serde_json::json!({
+        "type": "object",
+        "description": "Optional. Present ONLY when discovery deviated from its expected path (healthy CBM, completed across every configured root, ready projects, no candidates); absent when nothing noteworthy happened. Every field is omitted while it holds its expected value, and no field restates another.",
+        "properties": {
+            "provider": {
+                "type": "string",
+                "enum": ["filesystem", "cbm_and_filesystem", "none"],
+                "description": "Present only when a provider other than CBM supplied this query's coverage."
+            },
+            "status": {
+                "type": "string",
+                "enum": ["partial", "unavailable"],
+                "description": "Present only when discovery was not complete: 'partial' = it ran but did not cover every configured root; 'unavailable' = nothing could run, so the answer rests only on what the index already held."
+            },
+            "fallback_reason": {
+                "type": "string",
+                "enum": ["cbm_unavailable", "cbm_discovery_failed", "cbm_partial_failure", "cbm_scope_unavailable", "filesystem_unavailable"],
+                "description": "Present only when filesystem fallback was engaged for at least one root; its presence IS that fact."
+            },
+            "discovered": { "type": "integer", "description": "Present only when > 0 - candidate file paths discovered by this query." },
+            "compiled": { "type": "integer", "description": "Present only when > 0 - unique, previously-unindexed candidate files compiled into the WorkspaceIndex by this query." },
+            "projects": {
+                "type": "array",
+                "description": "Present only when a configured project's coverage was exceptional; healthy searched/ready projects are omitted and do not consume the diagnostic bound.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "project": { "type": "string" },
+                        "status": { "type": "string", "enum": ["searched", "search_failed", "skipped"] },
+                        "readiness": { "type": "string", "enum": ["still_indexing", "failed"], "description": "Only for an exceptional 'searched' entry: the project was not ready, so its contribution may be incomplete." },
+                        "reason": { "type": "string", "enum": ["cbm_unavailable", "additional_root_not_registered"], "description": "Only when it adds a distinction the status does not already carry." }
+                    },
+                    "required": ["project", "status"]
+                }
+            },
+            "projects_truncated": { "type": "integer", "description": "Present only when > 0 - exceptional project entries dropped by the diagnostic bound." }
+        }
+    })
+}
+
 pub(crate) fn tool_list() -> Vec<serde_json::Value> {
     let tools = vec![
         serde_json::json!({
@@ -287,16 +330,19 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "workspace_query",
-            "description": "Query cross-file semantic relationships accumulated from compiled files. Supports: find_entities (by name), forward_edges (outgoing semantic edges from entity), reverse_edges (incoming semantic edges to entity), entities_in_file (entity occurrences by file), transitive_dependencies (BFS dependency traversal), has_cycle (cycle detection). Candidate discovery is query-semantic aware: healthy CBM is preferred, while unavailable or failed CBM discovery falls back to literal source occurrence scanning. Both providers contribute paths only; Clean-CTX compilation determines authoritative semantic edges. Occurrence-bearing results are scoped to the declared workspaceRoot plus configured additional roots, and optionally narrowed to one file/directory subtree with withinPath (a narrowing can only ever shrink an authorized workspace; task-level workspace scope must be resolved first).",
+            "description": "Query cross-file semantic relationships or inspect owner-qualified calls in one trusted source file. Cross-file operations use WorkspaceIndex plus registered hydration. calls_in_file compiles a read-only canonical candidate and preserves owner, overload, call order, duplicates, written argument count, and spread evidence without claiming resolved callees. Results respect workspaceRoot plus configured additional roots and optional withinPath narrowing.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "transitive_dependencies", "has_cycle"], "description": "Type of workspace query." },
+                    "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "transitive_dependencies", "has_cycle", "calls_in_file"], "description": "Type of workspace query." },
                     "domain": { "type": "string", "description": "Framework domain for entity queries (e.g. 'angular', 'spring', 'ngrx'). Required for: forward_edges, reverse_edges, transitive_dependencies." },
                     "entity_type": { "type": "string", "description": "Entity type for entity queries (e.g. 'Component', 'Service', 'Controller'). Required for: forward_edges, reverse_edges, transitive_dependencies." },
                     "name": { "type": "string", "description": "Entity name for entity queries. Required for: find_entities, forward_edges, reverse_edges, transitive_dependencies." },
                     "file_path": { "type": "string", "description": "File path for entities_in_file query." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Primary trusted workspace root for path resolution and filesystem hydration discovery. Defaults to the detected project root." },
+                    "filePath": { "type": "string", "description": "Trusted source file for calls_in_file." },
+                    "owner": { "type": "object", "description": "Typed caller owner for calls_in_file.", "properties": { "kind": { "type": "string", "enum": ["class", "interface"] }, "name": { "type": "string" } }, "required": ["kind", "name"] },
+                    "method": { "type": "object", "description": "Caller method for calls_in_file. Omit signature fields for the complete overload family.", "properties": { "name": { "type": "string" }, "parameters": { "type": "array", "items": { "type": "string" }, "description": "Optional exact visible parameter-signature selector." }, "return_type": { "type": "string" } }, "required": ["name"] },
+                    "workspaceRoot": { "type": "string", "description": "Primary trusted workspace root for path resolution and filesystem hydration discovery. Required for calls_in_file; optional for existing cross-file operations, where it defaults to the detected project root." },
                     "withinPath": { "type": "string", "description": "Optional. Narrows an ALREADY authorized workspace to one file or directory subtree: occurrences whose ASSERTING file lies under it, and traversal/cycle evidence likewise. Relative paths resolve against workspaceRoot; absolute paths are used as declared. Rejected (-32602) when the path lies outside workspaceRoot plus configured additional roots, or when no workspaceRoot is given — it never widens a workspace and never becomes a root of its own. Omit to query the whole authorized workspace." },
                     "depth": { "type": "integer", "description": "Traversal depth for transitive_dependencies: 0 = unlimited, 1 = direct, 2 = transitive. Default: 1." }
                 },
@@ -332,64 +378,12 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                         "type": "integer",
                         "description": "Actual traversal depth used (transitive_dependencies)."
                     },
-                    "discovery": {
-                        "type": "object",
-                        "description": "Optional. Present ONLY when discovery deviated from its expected path (healthy CBM, completed across every configured root, ready projects, no candidates); absent when nothing noteworthy happened. Every field is omitted while it holds its expected value, and no field restates another.",
-                        "properties": {
-                            "provider": {
-                                "type": "string",
-                                "enum": ["filesystem", "cbm_and_filesystem", "none"],
-                                "description": "Present only when a provider other than CBM supplied this query's coverage."
-                            },
-                            "status": {
-                                "type": "string",
-                                "enum": ["partial", "unavailable"],
-                                "description": "Present only when discovery was not complete: 'partial' = it ran but did not cover every configured root; 'unavailable' = nothing could run, so the answer rests only on what the index already held."
-                            },
-                            "fallback_reason": {
-                                "type": "string",
-                                "enum": ["cbm_unavailable", "cbm_discovery_failed", "cbm_partial_failure", "cbm_scope_unavailable", "filesystem_unavailable"],
-                                "description": "Present only when filesystem fallback was engaged for at least one root; its presence IS that fact."
-                            },
-                            "discovered": {
-                                "type": "integer",
-                                "description": "Present only when > 0 - candidate file paths discovered by this query."
-                            },
-                            "compiled": {
-                                "type": "integer",
-                                "description": "Present only when > 0 - unique, previously-unindexed candidate files compiled into the WorkspaceIndex by this query."
-                            },
-                            "projects": {
-                                "type": "array",
-                                "description": "Present only when a configured project's coverage was exceptional; healthy searched/ready projects are omitted and do not consume the diagnostic bound.",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "project": { "type": "string" },
-                                        "status": {
-                                            "type": "string",
-                                            "enum": ["searched", "search_failed", "skipped"]
-                                        },
-                                        "readiness": {
-                                            "type": "string",
-                                            "enum": ["still_indexing", "failed"],
-                                            "description": "Only for an exceptional 'searched' entry: the project was not ready, so its contribution may be incomplete."
-                                        },
-                                        "reason": {
-                                            "type": "string",
-                                            "enum": ["cbm_unavailable", "additional_root_not_registered"],
-                                            "description": "Only when it adds a distinction the status does not already carry."
-                                        }
-                                    },
-                                    "required": ["project", "status"]
-                                }
-                            },
-                            "projects_truncated": {
-                                "type": "integer",
-                                "description": "Present only when > 0 - exceptional project entries dropped by the diagnostic bound."
-                            }
-                        }
-                    }
+                    "file": { "type": "string", "description": "Resolved source file for calls_in_file." },
+                    "owner": { "type": "object", "description": "Resolved typed owner for calls_in_file." },
+                    "method": { "type": "string", "description": "Caller method name for calls_in_file." },
+                    "overloads": { "type": "array", "description": "Matching overload declarations with ordered call occurrences.", "items": { "type": "object" } },
+                    "overload_count": { "type": "integer", "description": "Number of matching overload declarations." },
+                    "discovery": workspace_query_discovery_schema()
                 }
             }
         }),

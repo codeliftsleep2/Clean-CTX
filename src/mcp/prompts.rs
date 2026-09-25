@@ -7,8 +7,10 @@ pub(crate) const SYSTEM_PROMPT: &str = r#"# Clean-CTX Context Guide
 responses use the SCHEMA-v5 presentation in `content`, or byte-exact raw source
 when the presentation is not safely cheaper under the local tokenizer estimate.
 Workspace graph facts are retrieved on demand with `workspace_query`; they are
-not repeated in file context. `_meta` is application-facing state, not model
-context.
+not repeated in file context. Use its `calls_in_file` operation when detailed
+owner-qualified local calls, overload separation, occurrence order, written
+argument count, or spread evidence is needed. `_meta` is application-facing
+state, not model context.
 
 ## SCHEMA v5
 

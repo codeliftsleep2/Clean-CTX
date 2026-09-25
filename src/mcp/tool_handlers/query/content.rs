@@ -53,23 +53,42 @@ pub(super) fn render(
     additional_roots: &[String],
 ) -> String {
     let count = structured.get("count").and_then(Value::as_u64);
+    let file_local_calls = query_type == "calls_in_file";
     let direction = match query_type {
         "forward_edges" => Some("outgoing"),
         "reverse_edges" => Some("incoming"),
         _ => None,
     };
+    let mut query = json!({
+        "type": query_type,
+        "direction": direction,
+        "domain": args.get("domain"),
+        "entity_type": args.get("entity_type"),
+        "name": args.get("name"),
+        "file_path": args.get("file_path"),
+        "depth": args.get("depth"),
+    });
+    if file_local_calls {
+        let query = query
+            .as_object_mut()
+            .expect("workspace query descriptor is an object");
+        query.insert(
+            "file".into(),
+            args.get("filePath").cloned().unwrap_or(Value::Null),
+        );
+        query.insert(
+            "owner".into(),
+            args.get("owner").cloned().unwrap_or(Value::Null),
+        );
+        query.insert(
+            "method".into(),
+            args.get("method").cloned().unwrap_or(Value::Null),
+        );
+    }
     let envelope = json!({
         "schema": "clean-ctx/workspace-query-answer",
         "schema_version": WORKSPACE_QUERY_CONTENT_VERSION,
-        "query": {
-            "type": query_type,
-            "direction": direction,
-            "domain": args.get("domain"),
-            "entity_type": args.get("entity_type"),
-            "name": args.get("name"),
-            "file_path": args.get("file_path"),
-            "depth": args.get("depth"),
-        },
+        "query": query,
         "scope": {
             "mode": if args.get("workspaceRoot").and_then(Value::as_str).is_some() { "workspace" } else { "session" },
             "workspace_root": args.get("workspaceRoot"),
@@ -77,8 +96,8 @@ pub(super) fn render(
             "within_path": args.get("withinPath"),
         },
         "completeness": {
-            "authority": "workspace_index_after_registered_hydration",
-            "status": "authoritative_index_snapshot_for_effective_scope",
+            "authority": if file_local_calls { "fresh_canonical_file_ir" } else { "workspace_index_after_registered_hydration" },
+            "status": if file_local_calls { "authoritative_file_snapshot" } else { "authoritative_index_snapshot_for_effective_scope" },
             "zero_result": count == Some(0),
             "discovery": structured.get("discovery"),
         },

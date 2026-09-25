@@ -97,10 +97,20 @@ annotation redundancy.
 
 ## Current remediation status
 
-Production configuration, persistence/fidelity, visible-content metadata, and
-explicit code-side delta acknowledgement have been repaired and verified. The
-remaining work in the current remediation is terminology alignment plus the
-final architectural audit and user-owned verification gate.
+Production configuration, persistence/fidelity, visible-content metadata,
+explicit code-side delta acknowledgement, terminology alignment, and the final
+architectural audit have been repaired and user-verified.
+
+The next approved presentation prerequisite is now implemented pending the
+user-owned verification gate: `workspace_query(type="calls_in_file")` performs
+owner-aware, overload-preserving local call inspection from an unpublished
+High-fidelity canonical file candidate. It deliberately leaves Model C global
+identity, WorkspaceIndex hydration, persistence, and delta transport unchanged.
+The exact decision and wire contract are recorded in
+`docs/architecture/FORWARD_THINKING_OPTION_C.md` ADR-001 and WSC-005 in
+`docs/ARCHITECTURAL_INVARIANTS.md`. Option C itself must still wait for
+task-based evaluation showing that models discover and use the operation when
+detailed calls are needed.
 
 R-46 is deliberately separate: migrating legacy result-level MCP fields into
 `structuredContent`/`_meta` is a versioned 0.6.0 wire-contract change and must

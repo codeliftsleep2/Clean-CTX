@@ -1,10 +1,11 @@
 // src/mcp/tool_handlers/query.rs
 //
-// workspace_query handler — read-only MCP API over WorkspaceIndex.
+// workspace_query handler — read-only MCP query API.
 //
-// This handler exposes the existing WorkspaceIndex query methods as an MCP
-// tool. It is a thin read boundary over the already-wired write lifecycle
-// established in Phases A/B.
+// Cross-file operations expose the existing WorkspaceIndex query methods over
+// the already-wired write lifecycle established in Phases A/B. The narrow
+// `calls_in_file` operation instead inspects a fresh, unpublished canonical IR
+// candidate so typed owner and overload identity survive the query boundary.
 //
 // Semantic hydration: for eligible query types, after the initial WorkspaceIndex
 // query, one exhaustive candidate-file discovery pass runs across the primary
@@ -37,6 +38,7 @@
 // Module layout (handler groups are separate files, mirroring how the index
 // splits its query families):
 //   query.rs             — dispatch, the hydration cycle, the shared scope rule.
+//   query/calls.rs       — owner-aware calls from one canonical file candidate.
 //   query/diagnostics.rs — the sparse LLM-facing discovery-diagnostic projection.
 //   query/entities.rs    — find_entities, entities_in_file.
 //   query/edges.rs       — forward_edges, reverse_edges.
@@ -52,6 +54,7 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+mod calls;
 mod content;
 mod diagnostics;
 mod edges;
@@ -60,7 +63,7 @@ mod graph;
 
 pub(super) use diagnostics::discovery_field;
 
-/// Handle `workspace_query` — read-only cross-file semantic queries.
+/// Handle `workspace_query` — read-only cross-file and file-local queries.
 pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpState) {
     let args = &params["arguments"];
     let query_type = match args["type"].as_str() {
@@ -72,7 +75,7 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
                     "code": -32602,
                     "message": "Missing required argument: 'type'. Supported values: \
                      find_entities, forward_edges, reverse_edges, entities_in_file, \
-                     transitive_dependencies, has_cycle.".to_string()
+                     transitive_dependencies, has_cycle, calls_in_file.".to_string()
                 }
             }));
             return;
@@ -86,6 +89,7 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
         "entities_in_file" => entities::handle_entities_in_file(id, args, state),
         "transitive_dependencies" => graph::handle_transitive_dependencies(id, args, state),
         "has_cycle" => graph::handle_has_cycle(id, args, state),
+        "calls_in_file" => calls::handle_calls_in_file(id, args, state),
         _ => {
             // ... error handling unchanged
             send_response(&serde_json::json!({
@@ -95,7 +99,7 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
                     "message": format!(
                         "Unknown query type: '{}'. Supported values: find_entities, \
                          forward_edges, reverse_edges, entities_in_file, \
-                         transitive_dependencies, has_cycle.",
+                         transitive_dependencies, has_cycle, calls_in_file.",
                         query_type
                     )
                 }
@@ -279,3 +283,10 @@ mod tests_native_calls_languages;
 #[cfg(all(test, feature = "rust", feature = "typescript"))]
 #[path = "../../tests/mcp/workspace_query_calls_arrows.rs"]
 mod tests_native_calls_arrows;
+
+// Owner-aware file-local call inspection: canonical IR remains the authority,
+// while global WorkspaceIndex identity and cross-file query behavior stay
+// unchanged.
+#[cfg(all(test, feature = "rust", feature = "csharp", feature = "typescript"))]
+#[path = "../../tests/mcp/workspace_query_calls_in_file.rs"]
+mod tests_calls_in_file;

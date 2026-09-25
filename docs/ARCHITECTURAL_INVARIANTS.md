@@ -274,7 +274,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 |----------|-------|
 | **Intent** | Every externally exposed Clean-CTX MCP tool result MUST conform to the canonical MCP `CallToolResult` envelope so schema-validating MCP clients receive a renderable `content` channel. Domain-specific fields MUST NOT be emitted directly at the MCP result level. |
 | **Invariant** | The JSON-RPC `result` object of any successful tool call carries a non-empty `content` array (`[{type:"text", text:"..."}]`) as the human/model-readable representation. Machine-readable payloads, when applicable, live in `structuredContent` and are described by a declared `outputSchema` in `tools/list`. Metadata, when applicable, lives in `_meta`. No ad-hoc domain fields are permitted directly under `result`. `structuredContent`/`outputSchema`/`_meta` remain optional — the invariant is about valid canonical result structure, not about forcing every tool into structured output. Result-level failures use `isError: true` (errors that use the JSON-RPC `error` object are outside this envelope). |
-| **Enforcement** | Shared `crate::tests::assert_valid_mcp_envelope` applied at the dispatched-handler/wire boundary: CBM graph tools (`src/tests/cbm/handlers.rs`), `apply_edit` (`src/tests/mcp/apply_edit.rs`), `workspace_query` all six operations (`src/tests/mcp/workspace_query.rs`), comprehensive `outputSchema`↔`structuredContent` consistency (`src/tests/cbm/handlers.rs`, `src/tests/mcp/apply_edit.rs`, `src/tests/mcp/workspace_query.rs`), Phase-3 migrated tools (`src/tests/mcp/phase3_contract.rs`), and the complete dispatched-handler coverage suite for remaining result-producing tools (`src/tests/mcp/envelope_contract.rs`). `compress_code_context`/`delta_code_context` remain the sole documented exceptions (R-46, deferred to 0.6.0). |
+| **Enforcement** | Shared `crate::tests::assert_valid_mcp_envelope` applied at the dispatched-handler/wire boundary: CBM graph tools (`src/tests/cbm/handlers.rs`), `apply_edit` (`src/tests/mcp/apply_edit.rs`), all seven `workspace_query` operations (`src/tests/mcp/workspace_query.rs`, `src/tests/mcp/workspace_query_calls_in_file.rs`), comprehensive `outputSchema`↔`structuredContent` consistency (`src/tests/cbm/handlers.rs`, `src/tests/mcp/apply_edit.rs`, `src/tests/mcp/workspace_query.rs`, `src/tests/mcp/workspace_query_calls_in_file.rs`), Phase-3 migrated tools (`src/tests/mcp/phase3_contract.rs`), and the complete dispatched-handler coverage suite for remaining result-producing tools (`src/tests/mcp/envelope_contract.rs`). `compress_code_context`/`delta_code_context` remain the sole documented exceptions (R-46, deferred to 0.6.0). |
 | **Authority** | Reference implementation: `src/cbm/handlers.rs` (`handle_graph_search` — `content` + `structuredContent` + declared `outputSchema`). Shared helper: `src/tests/mod.rs::assert_valid_mcp_envelope`. |
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
@@ -431,6 +431,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Authority** | `src/workspace/scope.rs`, `src/workspace/index.rs`, `src/workspace/index/traversal.rs`, `src/mcp/tool_handlers/query.rs` |
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
+
+---
+
+### WSC-005 File-Local Call Inspection Retains Canonical Owner and Occurrence Evidence
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Model C WorkspaceIndex identity is intentionally global and owner-agnostic for methods, so cross-file graph queries cannot distinguish same-named methods owned by different types in one file or isolate overload declarations. Precise file-local inspection must answer from the richer canonical representation without changing global identity or pretending that a post-projection filter can recover discarded evidence. |
+| **Invariant** | `workspace_query(type="calls_in_file")` MUST resolve one trusted source file under `workspaceRoot` plus configured `additional_roots`, honor the shared optional `withinPath` narrowing, and compile a read-only High-fidelity canonical candidate for that request. It MUST NOT hydrate, read answers from, or publish facts into `WorkspaceIndex`; install alias/version/IR-baseline state; mutate source; acknowledge delta transport; expose canonical IDs; or claim resolved callee identity. Selection MUST use typed owner kind+name and method name. An omitted signature selector returns the complete same-name overload family in declaration order; supplied `parameters` and `return_type` selectors match exactly; a missing match returns zero; duplicate matching typed owners are ambiguous (`-32602`) and MUST NOT be guessed. Results MUST preserve overload occurrence, call order, duplicates, callee spelling, written argument-node count, and spread evidence. Existing cross-file operations and Model C identity remain unchanged. |
+| **Enforcement** | `src/mcp/tool_handlers/query/calls.rs` (trusted path, shared scope, canonical candidate compilation, exact typed-owner/signature selection, occurrence projection); `src/mcp/tool_handlers/query.rs` (production dispatch without hydration); `src/mcp/tools.rs` (public schema); `src/tests/mcp/workspace_query_calls_in_file.rs` (same-file owner isolation, overload-family and exact-selector behavior, duplicate/order/spread preservation, fresh source observation without state publication, ambiguity rejection, and registered schema contract). |
+| **Authority** | `src/mcp/tool_handlers/query/calls.rs`, `src/ir/hierarchical.rs`, `src/mcp/tool_helpers.rs::compile_file_ir_candidate` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test --all-features mcp::tool_handlers::query::tests_calls_in_file` |
 
 ---
 
