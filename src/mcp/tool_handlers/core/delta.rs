@@ -372,6 +372,10 @@ mod sequence_tests;
 #[path = "../../../tests/mcp/delta_edit_recovery.rs"]
 mod edit_recovery_tests;
 
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/delta_fidelity_persistence.rs"]
+mod fidelity_persistence_tests;
+
 // Presentation boundary: the delta is code-side only. Its model-visible
 // `content` is a minimal summary (adds/mods/dels counts), never a full
 // presentation and never a `// FILE-CONTEXT-DELTA v1` envelope. The structured

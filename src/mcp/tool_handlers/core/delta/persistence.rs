@@ -96,6 +96,7 @@ pub(crate) fn ensure_apply_baseline(
     state: &McpState,
     alias: &str,
     file_path: &str,
+    fidelity: crate::compression::Fidelity,
 ) -> Result<(), String> {
     if state.persistence_store_lock().is_none() {
         return Ok(());
@@ -114,13 +115,7 @@ pub(crate) fn ensure_apply_baseline(
         .ok_or_else(|| "missing canonical baseline source hash".to_string())?;
     drop(ir_ctx);
     let compiled = compiled_from_tuples(alias.to_string(), version, instructions)?;
-    ensure_persisted_baseline(
-        state,
-        file_path,
-        crate::compression::Fidelity::Low,
-        &compiled,
-        &source_hash,
-    )
+    ensure_persisted_baseline(state, file_path, fidelity, &compiled, &source_hash)
 }
 
 pub(crate) fn persisted_context_id(

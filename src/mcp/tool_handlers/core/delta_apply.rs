@@ -58,6 +58,16 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         .persisted_path(&file)
         .or_else(|| state.path_for_alias(&file))
         .unwrap_or_else(|| file.clone());
+    let fidelity = match state.context_fidelity(&file) {
+        Some(fidelity) => fidelity,
+        None => {
+            send_response(&invalid_session_ir_response(
+                id,
+                "missing authoritative fidelity for delta application",
+            ));
+            return;
+        }
+    };
     if let Err(error) = state.preflight_semantic_publication(&durable_file) {
         send_response(&invalid_session_ir_response(id, &error));
         return;
@@ -106,7 +116,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             return;
         }
     };
-    if let Err(error) = ensure_apply_baseline(state, &file, &durable_file) {
+    if let Err(error) = ensure_apply_baseline(state, &file, &durable_file, fidelity) {
         send_response(&invalid_session_ir_response(id, &error));
         return;
     }
@@ -165,9 +175,6 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                     return;
                 }
             };
-            let fidelity = state
-                .context_fidelity(&file)
-                .unwrap_or(crate::compression::Fidelity::Low);
             let target_edges = pending_transition
                 .as_ref()
                 .map(|transition| transition.semantic_edges.clone())

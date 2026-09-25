@@ -99,6 +99,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     let explicit_intent = params["arguments"]["intent"].as_str();
 
     let heuristics_start = Instant::now();
+    let stored_fidelity = state.context_fidelity(&alias);
     let ir_read = state.ir_context_read();
     let decision = match crate::mcp::heuristics::decide(
         &resolved_path,
@@ -108,7 +109,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         &ir_read,
         source,
         Some(&alias),
-        None,
+        stored_fidelity,
     ) {
         Ok(d) => d,
         Err(e) => {

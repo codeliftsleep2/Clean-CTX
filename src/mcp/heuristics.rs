@@ -541,7 +541,10 @@ pub fn decide(
     // Auto-edit mode: when enabled and no explicit intent/fidelity was
     // provided, Service and Implementation files get Fidelity::Edit so
     // method bodies are carried verbatim for safe edits.
-    if config.heuristics.auto_edit_mode && explicit_fidelity.is_none() && explicit_intent.is_none()
+    if config.heuristics.auto_edit_mode
+        && explicit_fidelity.is_none()
+        && explicit_intent.is_none()
+        && !(config.heuristics.session_aware_fidelity && stored_fidelity.is_some())
     {
         // M-4 (Gap 2.1 fix): the class → Edit mapping is now configurable
         // via `edit_auto_classifications` instead of being hardcoded.
@@ -604,3 +607,7 @@ pub fn decide(
 #[cfg(test)]
 #[path = "../tests/mcp/heuristics.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/mcp/heuristics_fidelity_precedence.rs"]
+mod fidelity_precedence_tests;
