@@ -1,7 +1,9 @@
 # Task-based SCHEMA-v5 evaluation — design
 
-**Status:** proposed, not implemented. Supersedes the comprehension-quiz oracles
-in `oracles.json`.
+**Status:** edit tasks (1–3) implemented and green — 3/3 on both the v1
+deterministic grader and the v2 `apply_edit` round-trip. Debug/Implement tasks
+(4–7) remain proposed, not implemented. Supersedes the comprehension-quiz
+oracles in `oracles.json`.
 
 ## Principle
 
@@ -105,5 +107,7 @@ separate from the codec harness's `expected/scenarios.json` — captured by
 - `schema-v5/scripts/run-tasks.ps1` — feeds `content.txt` + instruction to the
   model and emits a structured `apply_edit` JSON.
 - `schema-v5/scripts/grade-tasks.ps1` — the deterministic grader (no model).
+- `schema-v5/scripts/grade-tasks-v2.ps1` — the `apply_edit` round-trip grader
+  (feeds each answer's operation to the real tool; the byte-exact/EOL gate).
 - Reuses `scripts/McpSession.ps1`; `run-tasks.ps1` carries the Codex/DeepSeek
   model invocation.

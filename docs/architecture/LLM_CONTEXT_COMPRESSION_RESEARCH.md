@@ -642,6 +642,9 @@ the large fixtures, graded deterministically (no LLM judge) by target resolution
 plus find/replace checks, with an `apply_edit` round-trip as the byte-exact gate.
 Initial result: **3/3 tasks** — the model targeted the correct method, reproduced
 the focused body byte-exactly (modulo CRLF→LF line endings), and produced the
-correct edit. This harness is the accuracy guardrail for any future
+correct edit; the `apply_edit` round-trip (v2 grader) also passed **3/3**,
+confirming the line-ending normalization is immaterial (`apply_edit` is
+EOL-preserving and accepts the LF-normalized bodies against CRLF source). This
+harness is the accuracy guardrail for any future
 encoding-compression experiment: change the annotation set, then re-measure size
 *and* task pass rate together.
