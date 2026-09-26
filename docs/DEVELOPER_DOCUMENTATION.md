@@ -88,7 +88,7 @@ The core workflow is:
 4. **Encode** repeated tokens as short opcodes (`$c` = `class`, `$s` = `string`, etc.)
 5. **Report** token savings using the cl100k BPE estimator
 
-The **recommended entry point** is `provide_code_context` — a single tool that automatically handles compression, delta transport, Angular detection, and fidelity selection via a heuristics engine.
+The **recommended model-facing entry point** is `provide_code_context` — a single tool that handles compression, Angular detection, and fidelity selection while always returning complete current context. Structured delta generation and acknowledgement are explicit through `delta_code_context` and `apply_delta`.
 
 ---
 
@@ -97,7 +97,7 @@ The **recommended entry point** is `provide_code_context` — a single tool that
 The system architecture is documented in detail in [`docs/ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md). The key subsystems are:
 
 - **MCP stdio Interface** — JSON-RPC 2.0 request/response loop over stdin/stdout
-- **Heuristics Engine** — selects fidelity and strategy per file based on intent, size, language, and Angular detection
+- **Heuristics Engine** — selects fidelity and classification per file based on intent, size, language, and Angular detection
 - **Compressor Engine** — AST extraction → fidelity filter → opcode encoding → text delta snapshots
 - **IR Subsystem** — structured intermediate representation with delta-based state transport (see [Compiler IR Subsystem](#compiler-ir-subsystem))
 - **Decompressor** — opcode → readable expansion (precomputed sorted opcodes for O(L×N) performance)
@@ -231,20 +231,21 @@ src/
 
 ## Zero-Touch Workflow
 
-The zero-touch workflow is the **recommended entry point** for any file-related coding task. It orchestrates all subsystems automatically via `provide_code_context`.
+The zero-touch workflow is the **recommended model-facing entry point** for file-related coding tasks. `provide_code_context` always returns complete current context.
 
 ### How It Works
 
-1. **Heuristics Engine** (`src/mcp/heuristics.rs`) decides the optimal fidelity and strategy based on:
+1. **Heuristics Engine** (`src/mcp/heuristics.rs`) decides the optimal fidelity and classification based on:
    - Explicit intent parameter (`"edit"`, `"debug"`, `"overview"`, `"refactor"`, `"implement"`)
    - Explicit fidelity override
    - File characteristics (size, language, Angular detection)
-   - Existing baselines (text delta state, IR delta state)
+   - Persisted/session fidelity evidence
    - Project config overrides
 
-2. **Strategy Dispatch**:
-   - `FullCompress` — runs full compression pipeline + IR compilation + persistence save
-   - `DeltaTransport` — computes text-level and IR-level deltas + persistence save + delta append
+2. **Complete Provider**:
+   - Runs IR compilation and selects complete SCHEMA-v5 or raw-source content
+   - Publishes the canonical session baseline and applies persistence policy
+   - Never substitutes a code-side delta acknowledgement for model context
 
 3. **Session Stats** (`src/mcp/session_stats.rs`) records compression metrics for the dashboard
 
@@ -252,19 +253,15 @@ The zero-touch workflow is the **recommended entry point** for any file-related 
 
 | Tool | Purpose |
 |------|---------|
-| `provide_code_context` | **Single entry point** — auto-detects, selects fidelity, uses delta transport on subsequent calls |
+| `provide_code_context` | **Model-facing entry point** — auto-detects, selects fidelity, and returns complete current context |
+| `delta_code_context` / `apply_delta` | Explicit code-side delta generation and acknowledgement |
 | `restore_context` | Force full re-compression, clearing all baselines and DB entries |
 | `context_history` | View compression history and delta savings for tracked files |
 | `context_stats` | Dashboard: token savings, compression stats, session metrics |
 
-### Adding a New Strategy
-
-To add a new strategy to the heuristics engine:
-
-1. Add a variant to `ContextStrategy` in `src/mcp/heuristics.rs`
-2. Add selection logic in `decide()` function
-3. Add a dispatch arm in `handle_provide_code_context()` in `src/mcp/tools.rs`
-4. Add tests in `src/tests/mcp/heuristics.rs`
+Structured transport strategies belong behind explicit tools or a future
+negotiated host capability. They must not be inferred inside the model-facing
+provider from the mere existence of a server baseline.
 
 ---
 
@@ -327,9 +324,9 @@ The `SqliteStore` implementation (`src/mcp/sqlite_store.rs`) provides:
 ### Persistence Hooks
 
 Persistence hooks fire automatically in:
-- `provide_code_context` → `FullCompress` path (baseline save)
-- `provide_code_context` → `DeltaTransport` path (baseline + delta save)
-- `restore_context` → DB clear on file reset
+- `provide_code_context` → complete baseline publication
+- `delta_code_context` / `apply_delta` → explicit delta lifecycle
+- `restore_context` → checked durable restoration
 
 ### Adding a New ContextStore Implementation
 

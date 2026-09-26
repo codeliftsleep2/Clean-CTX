@@ -57,8 +57,8 @@ behavior is superseded.
 | **Root cause** | The missing post-edit delta was not a transport failure: explicit `fidelity`/`intent` deliberately selects full `provide_code_context`, while `apply_edit` atomically installs its edited IR as the new canonical baseline, leaving no unapplied transition for a reread. Two independent observability defects were real. `delta_code_context` never called `record_compression` on its initial-full, cached-full, or generated-delta paths. Separately, the automatic-delta `None` fallback correctly recorded a full response inside its match arm and then executed a second trailing statistics write mislabeled `delta`. |
 | **Classification** | Emergent lifecycle diagnosis + observability correctness |
 | **Reproducible locally?** | Yes |
-| **Local regression** | `src/tests/mcp/delta_stats_lifecycle.rs` covers the dedicated full-baseline → external-change → generated-delta statistics lifecycle and the unchanged auto-delta full fallback. Both tracked regressions were observed RED, stashed without production changes, restored byte-identically, and reported GREEN with the identical focused command. |
-| **Live scenario required?** | Yes — after rebuilding, repeat the original dedicated `delta_code_context` workflow and confirm `context_stats` reports the full baseline and later delta truthfully. Auto-delta selection and host-consumer policy remain a separate architectural discussion. |
+| **Local regression** | `src/tests/mcp/delta_stats_lifecycle.rs` covers the dedicated full-baseline → external-change → generated-delta statistics lifecycle and repeated complete provider reads. `src/tests/mcp/provide_complete_context.rs` proves a changed implicit follow-up remains complete even when the compatibility `auto_delta` field is true. The statistics regressions were observed RED/GREEN first; the provider-boundary regression was separately observed RED before the architectural correction. |
+| **Live scenario required?** | Yes — after rebuilding, confirm dedicated `delta_code_context` statistics and verify repeated changed `provide_code_context` calls always return complete current context. |
 | **Architectural invariant** | IRDELTA-003 (delta statistics mirror the successful response lifecycle) |
 | **Status** | Fixed locally; live re-verification pending |
 
@@ -69,12 +69,16 @@ preceding full-compression token baseline for efficiency accounting. The stale
 trailing write in `provide_code_context` was removed, so an unchanged delta
 attempt that falls back to complete content remains a single full event.
 
-**Boundary retained:** `apply_edit` still publishes its verified target as the
-canonical live baseline and clears obsolete pending transitions. An unchanged
-reread does not fabricate an empty delta. The existing rule that explicit
-fidelity or intent disables automatic delta was not changed; whether automatic
-delta belongs in the LLM-facing provider without a negotiated host consumer is
-deferred to a separate architectural decision.
+**Boundary decision (2026-09-25):** `apply_edit` still publishes its verified
+target as the canonical live baseline and clears obsolete pending transitions.
+An unchanged reread does not fabricate an empty delta. Automatic delta was
+removed from `provide_code_context`: a stateless model cannot consume the
+structured operation list, prompt caching does not apply code-side state, and
+the repository ships no host consumer that reconstructs a complete context.
+`delta_code_context` / `apply_delta` remain the explicit code-side protocol.
+The `auto_delta` configuration field remains parseable but inactive for
+compatibility; future automation requires explicit host capability plus proof
+of the exact retained baseline.
 
 ---
 

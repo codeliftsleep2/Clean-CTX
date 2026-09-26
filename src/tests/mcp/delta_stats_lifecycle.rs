@@ -80,10 +80,10 @@ fn dedicated_delta_records_full_baseline_and_generated_delta_stats() {
 }
 
 #[test]
-fn unchanged_auto_delta_fallback_remains_a_full_stats_event() {
+fn unchanged_follow_up_provide_remains_a_full_stats_event() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
-    let path = root.path().join("unchanged-auto-delta.ts");
+    let path = root.path().join("unchanged-provider.ts");
     let file = path.to_string_lossy().into_owned();
     std::fs::write(&path, source("unchanged();")).expect("source");
     let state = state(&root);

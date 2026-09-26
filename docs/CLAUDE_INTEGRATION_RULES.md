@@ -8,7 +8,7 @@ These rules are **mandatory**. They prevent Claude from bypassing Clean-CTX's co
 
 **NEVER use your native `Read` tool on code files** (`.ts`, `.js`, `.cs`, `.rs`, `.java`).
 
-**ALWAYS use `provide_code_context` FIRST** — it compresses code, uses delta transport on repeat calls, and records savings.
+**ALWAYS use `provide_code_context` FIRST** — it returns complete current compressed context and records savings. Code-side delta transport is explicitly requested with `delta_code_context`.
 
 `Read` is allowed ONLY for:
 - Non-code files (markdown, JSON, TOML, config)

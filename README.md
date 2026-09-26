@@ -60,7 +60,7 @@ Task-relevant context rather than indiscriminate source dumping:
 
 Exposes code intelligence and context capabilities to AI coding agents through the Model Context Protocol:
 
-* **`provide_code_context`** - single entry point: auto-detects file type, selects fidelity, applies delta transport, filters low-importance symbols.
+* **`provide_code_context`** - complete model-facing context: auto-detects file type, selects fidelity, and filters low-importance symbols. Structured delta transport remains explicit through `delta_code_context` / `apply_delta`.
 * **`workspace_query`** - cross-file semantic queries: entity lookup, forward/reverse edges, selector resolution, injection targets, transitive dependencies, cycle detection.
 * **`compress_code_context` / `restore_context`** - direct compression control with history and stats.
 * **`diff_code_context` / `diff_commits`** - AST-level change-sets, single-file and git ref-range.

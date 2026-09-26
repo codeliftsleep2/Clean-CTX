@@ -150,7 +150,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "provide_code_context",
-            "description": "Automatically provides the best possible compressed context for a file.",
+            "description": "Provides complete current model-facing context for a file, with automatic fidelity selection and framework-aware enrichment. Structured delta transport is available separately through delta_code_context.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

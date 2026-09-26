@@ -37,7 +37,7 @@ integration evidence.
 | Compact LLM projection | `provide_code_context`, `compress_code_context`, and restore paths render the checked hierarchy through the separate LLM renderer. | Confirmed |
 | Session owner | `McpState` owns canonical instruction tuples, versions, source hashes, aliases, and durable-path mappings. | Confirmed |
 | Persistent owner | Production save paths encode canonical physical binary `0x04` and queue it through `BufferedStore` into SQLite. | Confirmed; Phase 8C user-verified |
-| Delta history | `delta_code_context` and incremental `provide_code_context` produce `SequenceDeltaComputer` output; `apply_delta` persists normalized `dv:2` payloads. | Confirmed |
+| Delta history | Explicit `delta_code_context` produces `SequenceDeltaComputer` output; `apply_delta` persists normalized `dv:2` payloads. `provide_code_context` remains a complete model-facing read. | Confirmed |
 | Reload | `replay_history` loads the `0x04` baseline, checks file identity, replays version-discriminated history, and restores session ownership. | Confirmed |
 | Edit preservation | The registered lifecycle regression reloads/replays before exercising byte-exact `apply_edit`. | Confirmed |
 

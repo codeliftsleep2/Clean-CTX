@@ -117,8 +117,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref = tokenizer_box.as_deref();
     let fidelity_name = format!("{:?}", fidelity).to_lowercase();
-    let is_angular = state.config.auto_angular
-        && crate::angular_meta::detect::is_angular_file(source.as_str());
+    let is_angular =
+        state.config.auto_angular && crate::angular_meta::detect::is_angular_file(source.as_str());
 
     // A-08: Check if source has changed before compiling
     let path_alias = state

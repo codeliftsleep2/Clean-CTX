@@ -156,10 +156,10 @@ The delta overhead vs full recompression is fidelity-dependent:
 | **Medium** | ~747 tokens | **−51% cheaper** | Delta lines < re-compressed lines |
 | **High** | ~971 tokens | **−52.7% cheaper** | Delta lines < re-compressed lines |
 
-**Practical guidance:**
-- If you use **Low fidelity** and the compressed output is already tiny, full recompression's overhead is negligible — delta doesn't hurt but doesn't help much either
-- If you use **Medium or High fidelity**, delta transport provides a significant additional savings on top of the base compression
-- For maximum edit-session efficiency, the pipeline could auto-detect fidelity and choose the optimal transport strategy
+**Practical guidance:** These measurements apply to the explicit code-side
+`delta_code_context` / `apply_delta` protocol. `provide_code_context` always
+returns complete current model-facing content; prompt caching can reuse its
+stable prefix without requiring the model to consume a structured IR delta.
 
 ---
 

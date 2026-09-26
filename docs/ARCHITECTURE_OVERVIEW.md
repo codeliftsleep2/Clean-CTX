@@ -166,7 +166,10 @@ stdin reader thread           Dispatcher thread pool (N workers)
 └─────────────────────────┘
 ```
 
-The **IR Subsystem** provides an alternative transport path. Instead of sending compressed text, the source is compiled to an instruction-level Intermediate Representation (IR), and deltas are computed between successive IR states. This enables:
+The **IR Subsystem** provides canonical structured state plus an explicit
+code-side transport path. Source is compiled to an instruction-level
+Intermediate Representation (IR); `delta_code_context` computes transitions
+between acknowledged states and `apply_delta` installs them. This enables:
 
 - **Named format**: JSON arrays with opcode strings (human-readable IR)
 - **String table format**: Integer-indexed arrays for ~30% additional savings
@@ -176,25 +179,24 @@ The **IR Subsystem** provides an alternative transport path. Instead of sending 
 
 ## Zero-Touch Workflow
 
-The zero-touch workflow is the **recommended entry point** for any file-related coding task. It orchestrates all subsystems automatically:
+The zero-touch workflow is the **recommended model-facing entry point** for
+file-related coding tasks. It selects a presentation but always returns a
+complete current representation:
 
 ```
      provide_code_context(file)
           │
           ▼
 ┌─────────────────────┐
-│   Heuristics Engine │  Decide fidelity + strategy based on:
+│   Heuristics Engine │  Decide fidelity + classification based on:
 │   (heuristics.rs)   │  - file characteristics (size, language)
 └─────────┬───────────┘  - explicit intent ("edit", "debug", etc.)
-          │              - existing baselines (text delta, IR delta)
+          │              - persisted/session fidelity evidence
           ▼              - Angular detection
 ┌─────────────────────┐
-│ Strategy Dispatch   │
-│                     │
-│  FullCompress ──────┤──→ Full compression + IR compilation
-│                     │    + persistence save
-│  DeltaTransport ────┤──→ Delta computation (text + IR)
-│                     │    + persistence save + delta append
+│ Complete Provider   │──→ Full SCHEMA-v5 presentation
+│                     │    or economics-selected raw source
+│                     │    + canonical IR publication/persistence
 └─────────┬───────────┘
           │
           ▼
@@ -214,7 +216,8 @@ The zero-touch workflow is the **recommended entry point** for any file-related 
 
 | Tool | Purpose |
 |------|---------|
-| `provide_code_context` | **Single entry point** — auto-detects, selects fidelity, uses delta transport on subsequent calls |
+| `provide_code_context` | **Model-facing entry point** — auto-detects, selects fidelity, and returns complete current context |
+| `delta_code_context` / `apply_delta` | Explicit code-side IR transition generation and acknowledgement |
 | `restore_context` | Transactionally restore persisted canonical IR, delta history, and semantic-edge ownership without source recompilation |
 | `context_history` | View compression history and delta savings for tracked files |
 | `context_stats` | Dashboard: token savings, compression stats, session metrics |

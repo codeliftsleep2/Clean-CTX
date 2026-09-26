@@ -48,7 +48,7 @@ The registry exposes four direct context-producing paths plus two lifecycle re-r
 
 | Operation | Primary purpose | Model-readable `content` on the relevant success path | Auxiliary wire fields |
 |---|---|---|---|
-| `provide_code_context` | preferred contextual read | full renderer text, raw source fallback, or a delta summary | full path: `_meta.semantic_edges`; delta path: delta and edges in `_meta` |
+| `provide_code_context` | preferred contextual read | complete current renderer text or raw source fallback | application metadata in `_meta`; never a structured delta |
 | `compress_code_context` | direct compilation/encoding | full renderer text | `ir`, `pretty`, `semantic_edges` as non-standard result siblings |
 | `delta_code_context` | create/store IR baseline or delta | only “Baseline stored…” / “Cached IR…” / delta summary | baseline/edge/delta data as non-standard result siblings |
 | `restore_context` | restore durable context | persisted compact output or fresh renderer text | hierarchical `ir`; edge **count**, not edge values, in `_meta` |

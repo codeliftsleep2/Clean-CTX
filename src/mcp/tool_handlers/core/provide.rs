@@ -1,13 +1,8 @@
-use super::common::{
-    ContentKind, compiled_from_tuples, contract_fields_focused, invalid_session_ir_response,
-    resolve_focus_or_respond,
-};
-use crate::error::to_jsonrpc_error;
-use crate::ir::delta::SequenceDeltaComputer;
+use super::common::{ContentKind, contract_fields_focused, resolve_focus_or_respond};
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::{
     compile_file_ir_focused, count_tokens_with_tokenizer, inject_baseline_breakpoint,
-    inject_tail_breakpoint, resolve_file_path_checked,
+    resolve_file_path_checked,
 };
 use crate::mcp::tools::parse_tokenizer_arg;
 use crate::protocol::send_response;
@@ -129,7 +124,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         .flatten();
     let (content_kind, byte_exact) =
         contract_fields_focused(effective_fidelity, focus_methods.as_ref());
-    let strategy = decision.strategy;
     let is_angular = decision.is_angular;
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
@@ -191,7 +185,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         "provide_code_context",
         file_path = %resolved_path,
         fidelity = %format!("{:?}", effective_fidelity),
-        strategy = %format!("{:?}", strategy),
+        strategy = "full",
         cbm_status = %state.cbm_status.summary(),
         is_angular = %is_angular,
         prediction = %te_prediction,
@@ -199,395 +193,156 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     )
     .entered();
 
-    match strategy {
-        crate::mcp::heuristics::ContextStrategy::DeltaTransport => {
-            let compile_start = Instant::now();
-            let (mut compiled, semantic_edges, source_hash) =
-                match compile_file_ir_focused(&resolved_path, effective_fidelity, state, None) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        send_response(&to_jsonrpc_error(id, &e));
-                        return;
-                    }
-                };
-            let compile_ms = compile_start.elapsed().as_millis() as u64;
-            let checked_hir = match resolve_focus_or_respond(id, &mut compiled, edit_focus) {
-                Some(hierarchy) => hierarchy,
-                None => return,
-            };
+    let compile_start = Instant::now();
+    let ir_result = compile_file_ir_focused(&resolved_path, effective_fidelity, state, None);
+    let compile_ms = compile_start.elapsed().as_millis() as u64;
 
-            let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+    if let Ok((mut ir, semantic_edges, source_hash)) = ir_result {
+        let render_start = Instant::now();
+        let hir = match resolve_focus_or_respond(id, &mut ir, edit_focus) {
+            Some(hierarchy) => hierarchy,
+            None => return,
+        };
 
-            let delta_start = Instant::now();
-            let prev_version = state.file_version(&alias).unwrap_or(0);
-            let initial_full = if prev_version == 0 {
-                let full = super::content::presentation_document(
-                    &compiled,
-                    &checked_hir,
-                    effective_fidelity,
-                    &resolved_path,
-                    state,
-                );
-                let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
-                let compressed_tokens = count_tokens_with_tokenizer(&full, tokenizer_ref);
-                if let Err(error) = super::provide_persistence::persist_read_baseline(
-                    state,
-                    &resolved_path,
-                    effective_fidelity,
-                    &compiled,
-                    &semantic_edges,
-                    &source_hash,
-                    raw_tokens,
-                    compressed_tokens,
-                ) {
-                    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                        id.clone(),
-                        -32603,
-                        error,
-                        None,
-                    ));
-                    return;
-                }
-                Some(full)
-            } else {
-                None
-            };
-            let mut ir_ctx = state.ir_context_lock();
-            let mut delta = if prev_version > 0 && ir_ctx.has_file(&alias) {
-                let Some(prev_instructions) = ir_ctx.get_ir(&alias).cloned() else {
-                    drop(ir_ctx);
-                    send_response(&invalid_session_ir_response(
-                        id,
-                        "missing prior instruction stream",
-                    ));
-                    return;
-                };
-                let prev_compiled =
-                    match compiled_from_tuples(alias.clone(), prev_version, prev_instructions) {
-                        Ok(compiled) => compiled,
-                        Err(error) => {
-                            drop(ir_ctx);
-                            send_response(&invalid_session_ir_response(id, &error));
-                            return;
-                        }
-                    };
-                SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
-            } else {
-                ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
-                let mut idx = state.workspace_index_lock();
-                idx.remove_file(&canonical_path);
-                idx.add_edges(&canonical_path, semantic_edges.clone());
-                drop(idx);
-                state.remember_semantic_edges(&alias, semantic_edges.clone());
-                None
-            };
-            if let Some(delta) = &mut delta {
-                delta.target_hash = Some(source_hash.clone());
-            }
-            state.remember_context_fidelity(&alias, effective_fidelity);
-            if let Some(delta) = &delta {
-                if let Err(error) = state.remember_pending_transition(
-                    &alias,
-                    &resolved_path,
-                    delta,
-                    source_hash,
-                    semantic_edges.clone(),
-                ) {
-                    drop(ir_ctx);
-                    send_response(&invalid_session_ir_response(id, &error));
-                    return;
-                }
-            }
-            drop(ir_ctx);
-            let _delta_ms = delta_start.elapsed().as_millis() as u64;
-
-            let raw_tokens;
-            let comp_tokens;
-
-            match delta {
-                Some(ref d) => {
-                    let wire_delta = serde_json::to_value(d).unwrap_or_default();
-                    let (adds, mods, dels) = d.summary_counts();
-                    let delta_text = format!(
-                        "Δ delta for {} (v{} → v{}): +{} ~{} -{} ops",
-                        compiled.file_id, d.from, d.to, adds, mods, dels
-                    );
-                    let economic = super::content::select_complete_content(
-                        source,
-                        delta_text,
-                        edit_focus.is_some(),
-                        tokenizer_kind,
-                        tokenizer_ref,
-                    );
-                    raw_tokens = economic.raw_tokens;
-                    comp_tokens = economic.selected_tokens();
-                    let raw_passthrough = matches!(
-                        economic.selected,
-                        crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
-                    );
-                    let delta_text = economic.text;
-                    let prev_full_compressed = state
-                        .session_stats_lock()
-                        .file_stats(&resolved_path)
-                        .map(|f| f.compressed_tokens);
-                    let mut response = serde_json::json!({
-                        "jsonrpc": "2.0", "id": id, "result": {
-                            "content": [{ "type": "text", "text": delta_text }],
-                            "_meta": {
-                                "delta": wire_delta, "from_version": d.from, "to_version": d.to,
-                                "strategy": "delta", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                                "decision_summary": decision.summary(),
-                                // The structured delta is code-side only. This
-                                // metadata describes only the visible summary
-                                // (or the economics-selected raw document).
-                                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { ContentKind::DeltaSummary },
-                                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::json!([]) },
-                                "degradation": null
-                            }
-                        }
-                    });
-                    // Delta output is rolling dynamic content — mark as tail (ephemeral).
-                    inject_tail_breakpoint(&mut response, state);
-                    send_response(&response);
-                    // Record the delta with the previous full compressed token
-                    // count for delta efficiency computation.
-                    state.record_compression(
-                        &resolved_path,
-                        raw_tokens,
-                        comp_tokens,
-                        &format!("{:?}", effective_fidelity).to_lowercase(),
-                        is_angular,
-                        "delta",
-                        prev_full_compressed,
-                        "ir_compression",
-                    );
-                }
-                None => {
-                    let render_start = Instant::now();
-                    let full = initial_full.unwrap_or_else(|| {
-                        super::content::presentation_document(
-                            &compiled,
-                            &checked_hir,
-                            effective_fidelity,
-                            &resolved_path,
-                            state,
-                        )
-                    });
-                    let render_ms = render_start.elapsed().as_millis() as u64;
-                    let economic = super::content::select_complete_content(
-                        source,
-                        full,
-                        edit_focus.is_some(),
-                        tokenizer_kind,
-                        tokenizer_ref,
-                    );
-                    raw_tokens = economic.raw_tokens;
-                    comp_tokens = economic.selected_tokens();
-                    let raw_passthrough = matches!(
-                        economic.selected,
-                        crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
-                    );
-                    let full = economic.text;
-                    state.record_compression(
-                        &resolved_path,
-                        raw_tokens,
-                        comp_tokens,
-                        &format!("{:?}", effective_fidelity).to_lowercase(),
-                        is_angular,
-                        "full",
-                        None,
-                        "ir_compression",
-                    );
-                    let mut response = serde_json::json!({
-                        "jsonrpc": "2.0", "id": id, "result": {
-                            "content": [{ "type": "text", "text": full }],
-                            "_meta": {
-                                "version": compiled.version,
-                                "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                                "decision_summary": decision.summary(),
-                                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
-                                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(&byte_exact).unwrap_or_default() },
-                                "degradation": null
-                            }
-                        }
-                    });
-                    // Inject baseline cache breakpoint for the stable full-compression output.
-                    inject_baseline_breakpoint(&mut response, state, &full);
-                    send_response(&response);
-                    tracing::info!(
-                        heuristics_ms = heuristics_ms,
-                        compile_ms = compile_ms,
-                        delta_ms = _delta_ms,
-                        render_ms = render_ms,
-                        raw_tokens = raw_tokens,
-                        comp_tokens = comp_tokens,
-                        savings_pct = if raw_tokens > 0 {
-                            (raw_tokens.saturating_sub(comp_tokens) as f64 / raw_tokens as f64
-                                * 100.0) as u64
-                        } else {
-                            0
-                        },
-                        "provide_code_context delta full complete"
-                    );
-                }
-            }
-            let _total_ms = overall_start.elapsed().as_millis() as u64;
+        let candidate = super::content::presentation_document(
+            &ir,
+            &hir,
+            effective_fidelity,
+            &resolved_path,
+            state,
+        );
+        let economic = super::content::select_complete_content(
+            source,
+            candidate,
+            edit_focus.is_some(),
+            tokenizer_kind,
+            tokenizer_ref,
+        );
+        let raw_tokens = economic.raw_tokens;
+        let candidate_tokens = economic.candidate_tokens;
+        let selected_tokens = economic.selected_tokens();
+        let saved_tokens = economic.saved_tokens();
+        let raw_passthrough = matches!(
+            economic.selected,
+            crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
+        );
+        if let Err(error) = super::provide_persistence::persist_read_baseline(
+            state,
+            &resolved_path,
+            effective_fidelity,
+            &ir,
+            &semantic_edges,
+            &source_hash,
+            raw_tokens,
+            candidate_tokens,
+        ) {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                error,
+                None,
+            ));
+            return;
         }
-        crate::mcp::heuristics::ContextStrategy::FullCompress => {
-            let compile_start = Instant::now();
-            let ir_result =
-                compile_file_ir_focused(&resolved_path, effective_fidelity, state, None);
-            let compile_ms = compile_start.elapsed().as_millis() as u64;
 
-            if let Ok((mut ir, semantic_edges, source_hash)) = ir_result {
-                let render_start = Instant::now();
-                let hir = match resolve_focus_or_respond(id, &mut ir, edit_focus) {
-                    Some(hierarchy) => hierarchy,
-                    None => return,
-                };
-
-                let candidate = super::content::presentation_document(
-                    &ir,
-                    &hir,
-                    effective_fidelity,
-                    &resolved_path,
-                    state,
-                );
-                let economic = super::content::select_complete_content(
-                    source,
-                    candidate,
-                    edit_focus.is_some(),
-                    tokenizer_kind,
-                    tokenizer_ref,
-                );
-                let raw_tokens = economic.raw_tokens;
-                let candidate_tokens = economic.candidate_tokens;
-                let selected_tokens = economic.selected_tokens();
-                let saved_tokens = economic.saved_tokens();
-                let raw_passthrough = matches!(
-                    economic.selected,
-                    crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
-                );
-                if let Err(error) = super::provide_persistence::persist_read_baseline(
-                    state,
-                    &resolved_path,
-                    effective_fidelity,
-                    &ir,
-                    &semantic_edges,
-                    &source_hash,
-                    raw_tokens,
-                    candidate_tokens,
-                ) {
-                    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                        id.clone(),
-                        -32603,
-                        error,
-                        None,
-                    ));
-                    return;
-                }
-
-                let canonical_path =
-                    crate::dictionary::path::canonical_identity_key(&resolved_path);
-                state
-                    .ir_context_lock()
-                    .load_ir(ir.clone(), Some(source_hash));
-                state.remember_context_fidelity(&ir.file_id, effective_fidelity);
-                {
-                    let mut idx = state.workspace_index_lock();
-                    idx.remove_file(&canonical_path);
-                    idx.add_edges(&canonical_path, semantic_edges.clone());
-                }
-                state.remember_semantic_edges(&ir.file_id, semantic_edges.clone());
-                state
-                    .llm_text_cache_lock()
-                    .insert(ir.file_id.clone(), economic.text.clone());
-                let render_ms = render_start.elapsed().as_millis() as u64;
-                state.record_compression(
-                    &resolved_path,
-                    raw_tokens,
-                    selected_tokens,
-                    &format!("{:?}", effective_fidelity).to_lowercase(),
-                    is_angular,
-                    "full",
-                    None,
-                    if raw_passthrough {
-                        "raw_passthrough"
-                    } else {
-                        "ir_compression"
-                    },
-                );
-                let visible_content_kind = if raw_passthrough {
-                    ContentKind::RawPassthrough
-                } else {
-                    content_kind
-                };
-                let visible_byte_exact = if raw_passthrough {
-                    serde_json::json!(["document"])
-                } else {
-                    serde_json::to_value(byte_exact).unwrap_or_default()
-                };
-                let visible_text = economic.text;
-                let mut response = serde_json::json!({
-                    "jsonrpc": "2.0", "id": id, "result": {
-                        "content": [{ "type": "text", "text": visible_text.clone() }],
-                        "_meta": {
-                            "version": ir.version,
-                            "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
-                            "is_angular": is_angular, "decision_summary": decision.summary(),
-                            "content_kind": visible_content_kind, "byte_exact": visible_byte_exact,
-                            "degradation": null
-                        }
-                    }
-                });
-                inject_baseline_breakpoint(&mut response, state, &visible_text);
-                send_response(&response);
-                let total_ms = overall_start.elapsed().as_millis() as u64;
-                tracing::info!(
-                    heuristics_ms = heuristics_ms,
-                    compile_ms = compile_ms,
-                    render_ms = render_ms,
-                    total_ms = total_ms,
-                    raw_tokens = raw_tokens,
-                    comp_tokens = selected_tokens,
-                    savings_pct = if raw_tokens > 0 {
-                        (saved_tokens as f64 / raw_tokens as f64 * 100.0) as u64
-                    } else {
-                        0
-                    },
-                    "provide_code_context full complete"
-                );
-            } else {
-                // Phase A retirement (2026-08-25): legacy `$`/`⊕`/`§`
-                // fallback removed (see compress_code_context site — its
-                // removal also eliminates a latent dict-lock self-deadlock).
-                let reason = ir_result
-                    .err()
-                    .map(|e| e.to_string())
-                    .unwrap_or_else(|| "unknown".to_string());
-                tracing::warn!(
-                    error = %reason,
-                    path = %resolved_path,
-                    "IR compilation failed in provide_code_context; returning structured ir_unavailable error"
-                );
-                send_response(&serde_json::json!({
-                    "jsonrpc": "2.0", "id": id,
-                    "error": {
-                        "code": -32603,
-                        "message": format!(
-                            "IR compilation unavailable for {}: {}. SCHEMA-v5 structural output \
-                             cannot be produced for this input; retry with fidelity \
-                             \"verbatim\" or read the source directly.",
-                            resolved_path, reason
-                        ),
-                        "data": {
-                            "reason": "ir_unavailable",
-                            "path": resolved_path,
-                            "ir_compiler": reason,
-                        }
-                    }
-                }));
-            }
+        let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+        state
+            .ir_context_lock()
+            .load_ir(ir.clone(), Some(source_hash));
+        state.remember_context_fidelity(&ir.file_id, effective_fidelity);
+        {
+            let mut idx = state.workspace_index_lock();
+            idx.remove_file(&canonical_path);
+            idx.add_edges(&canonical_path, semantic_edges.clone());
         }
+        state.remember_semantic_edges(&ir.file_id, semantic_edges.clone());
+        state
+            .llm_text_cache_lock()
+            .insert(ir.file_id.clone(), economic.text.clone());
+        let render_ms = render_start.elapsed().as_millis() as u64;
+        state.record_compression(
+            &resolved_path,
+            raw_tokens,
+            selected_tokens,
+            &format!("{:?}", effective_fidelity).to_lowercase(),
+            is_angular,
+            "full",
+            None,
+            if raw_passthrough {
+                "raw_passthrough"
+            } else {
+                "ir_compression"
+            },
+        );
+        let visible_content_kind = if raw_passthrough {
+            ContentKind::RawPassthrough
+        } else {
+            content_kind
+        };
+        let visible_byte_exact = if raw_passthrough {
+            serde_json::json!(["document"])
+        } else {
+            serde_json::to_value(byte_exact).unwrap_or_default()
+        };
+        let visible_text = economic.text;
+        let mut response = serde_json::json!({
+            "jsonrpc": "2.0", "id": id, "result": {
+                "content": [{ "type": "text", "text": visible_text.clone() }],
+                "_meta": {
+                    "version": ir.version,
+                    "strategy": "full", "fidelity": format!("{:?}", effective_fidelity).to_lowercase(),
+                    "is_angular": is_angular, "decision_summary": decision.summary(),
+                    "content_kind": visible_content_kind, "byte_exact": visible_byte_exact,
+                    "degradation": null
+                }
+            }
+        });
+        inject_baseline_breakpoint(&mut response, state, &visible_text);
+        send_response(&response);
+        let total_ms = overall_start.elapsed().as_millis() as u64;
+        tracing::info!(
+            heuristics_ms = heuristics_ms,
+            compile_ms = compile_ms,
+            render_ms = render_ms,
+            total_ms = total_ms,
+            raw_tokens = raw_tokens,
+            comp_tokens = selected_tokens,
+            savings_pct = if raw_tokens > 0 {
+                (saved_tokens as f64 / raw_tokens as f64 * 100.0) as u64
+            } else {
+                0
+            },
+            "provide_code_context full complete"
+        );
+    } else {
+        // Phase A retirement (2026-08-25): legacy `$`/`⊕`/`§`
+        // fallback removed (see compress_code_context site — its
+        // removal also eliminates a latent dict-lock self-deadlock).
+        let reason = ir_result
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        tracing::warn!(
+            error = %reason,
+            path = %resolved_path,
+            "IR compilation failed in provide_code_context; returning structured ir_unavailable error"
+        );
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": {
+                "code": -32603,
+                "message": format!(
+                    "IR compilation unavailable for {}: {}. SCHEMA-v5 structural output \
+                     cannot be produced for this input; retry with fidelity \
+                     \"verbatim\" or read the source directly.",
+                    resolved_path, reason
+                ),
+                "data": {
+                    "reason": "ir_unavailable",
+                    "path": resolved_path,
+                    "ir_compiler": reason,
+                }
+            }
+        }));
     }
 }

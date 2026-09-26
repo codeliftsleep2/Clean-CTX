@@ -496,7 +496,7 @@ The state machine supports:
 | `compress_code_context` | `handle_compress_code_context` | IR-first compression with encoding selection |
 | `delta_code_context` | `handle_delta_code_context` | IR-level delta computation |
 | `apply_delta` | `handle_apply_delta` | Explicit code-side acknowledgement of an exact pending delta |
-| `provide_code_context` | `handle_provide_code_context` | Heuristic entry point; may return a code-side pending delta |
+| `provide_code_context` | `handle_provide_code_context` | Heuristic model-facing entry point; always returns complete current context |
 | `restore_context` | `handle_restore_context` | Restore checked binary-v04 IR, delta-v2 history, and aligned edges without recompiling source |
 | `context_history` | `handle_context_history` | Per-file delta history |
 | `context_stats` | `handle_context_stats` | Session dashboard |

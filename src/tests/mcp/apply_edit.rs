@@ -218,9 +218,9 @@ fn round_trip_fixture(dir: &std::path::Path) -> std::path::PathBuf {
     path
 }
 
-/// Full round trip: provide → apply_edit → provide(delta).
+/// Full round trip: provide → apply_edit → provide(complete context).
 /// Asserts the write lands, the response is minimal, and the follow-up
-/// provide_code_context reports a delta (state refreshed).
+/// provider exposes the updated source rather than a delta receipt.
 #[ignore]
 #[test]
 fn e2e_apply_edit_round_trip_then_delta() {
@@ -276,15 +276,21 @@ fn e2e_apply_edit_round_trip_then_delta() {
     assert!(on_disk.contains("toLowerCase"));
     assert!(!on_disk.contains("return order.trim();"));
 
-    // 4) Follow-up provide_code_context should now be a DELTA (baseline
-    //    refreshed by apply_edit, not a full recompress).
+    // 4) Follow-up provide_code_context remains complete. `apply_edit`
+    //    already installed the edited source as the canonical baseline.
     let prov2 = session.call(
         3,
         "provide_code_context",
         json!({ "filePath": file_path, "fidelity": "edit" }),
     );
     assert!(prov2.get("error").is_none(), "provide2 failed: {prov2:?}");
-    assert_eq!(prov2["result"]["strategy"], "delta");
+    assert_eq!(prov2["result"]["_meta"]["strategy"], "full");
+    assert!(
+        prov2["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap_or("")
+            .contains("toLowerCase")
+    );
 }
 
 /// Adversarial: two edits to the SAME unit — the second is rejected with a

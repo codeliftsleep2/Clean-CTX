@@ -71,18 +71,19 @@ fn pending_tiny_delta(
     let generated = dispatch(
         state,
         21,
-        "provide_code_context",
+        "delta_code_context",
         json!({
             "filePath": file.clone(),
-            "workspaceRoot": workspace_root
+            "workspaceRoot": workspace_root,
+            "fidelity": "high"
         }),
     );
-    assert_eq!(generated["result"]["_meta"]["strategy"], "delta");
-    assert!(generated["result"]["_meta"]["delta"].is_object());
+    assert_eq!(generated["result"]["strategy"], "delta");
+    assert!(generated["result"]["delta"].is_object());
     (
         file,
-        generated["result"]["_meta"]["delta"].clone(),
-        generated["result"]["_meta"]["from_version"].clone(),
+        generated["result"]["delta"].clone(),
+        generated["result"]["from_version"].clone(),
     )
 }
 
@@ -128,7 +129,7 @@ fn apply_delta_rejects_missing_authoritative_fidelity_before_mutation() {
 }
 
 #[test]
-fn auto_delta_missing_baseline_preserves_high_fidelity_across_restart_restore() {
+fn explicit_delta_missing_baseline_preserves_high_fidelity_across_restart_restore() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("temp workspace");
     let path = root.path().join("worker.ts");
@@ -155,18 +156,19 @@ fn auto_delta_missing_baseline_preserves_high_fidelity_across_restart_restore() 
     let generated = dispatch(
         &state,
         2,
-        "provide_code_context",
+        "delta_code_context",
         json!({
             "filePath": file.clone(),
-            "workspaceRoot": workspace_root
+            "workspaceRoot": workspace_root,
+            "fidelity": "high"
         }),
     );
     assert!(generated.get("error").is_none(), "{generated}");
-    assert_eq!(generated["result"]["_meta"]["strategy"], "delta");
-    assert_eq!(generated["result"]["_meta"]["fidelity"], "high");
-    let delta = generated["result"]["_meta"]["delta"].clone();
-    let from = generated["result"]["_meta"]["from_version"].clone();
-    assert!(delta.is_object(), "automatic delta payload: {generated}");
+    assert_eq!(generated["result"]["strategy"], "delta");
+    assert_eq!(generated["result"]["fidelity"], "high");
+    let delta = generated["result"]["delta"].clone();
+    let from = generated["result"]["from_version"].clone();
+    assert!(delta.is_object(), "explicit delta payload: {generated}");
 
     {
         let store = state.persistence_store_lock();

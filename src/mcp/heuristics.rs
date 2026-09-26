@@ -2,9 +2,10 @@
 //
 // Heuristics engine V2 for `provide_code_context`.
 //
-// Decides the compression strategy (full vs delta) and fidelity level
-// based on config, file characteristics, content-based classification,
-// evidence from the persistence DB, and explicit intent.
+// Decides fidelity and file classification for `provide_code_context`
+// based on config, file characteristics, evidence from the persistence DB,
+// and explicit intent. The provider always returns complete model-facing
+// content; structured delta transport is an explicit tool boundary.
 //
 // V2 (auto-inferred intent): files are classified by cheap content
 // signals (test, config, model/types, service/complex, implementation)
@@ -25,15 +26,6 @@ use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::ir::replay::ContextState;
 use std::path::Path;
-
-/// What compression strategy should `provide_code_context` use?
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ContextStrategy {
-    /// First time seeing this file — do full compression.
-    FullCompress,
-    /// File seen before in this session — use delta transport.
-    DeltaTransport,
-}
 
 /// Content-based file classification (V2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,8 +49,6 @@ pub enum FileClass {
 pub struct ContextDecision {
     /// The resolved fidelity level.
     pub fidelity: Fidelity,
-    /// The compression strategy to use.
-    pub strategy: ContextStrategy,
     /// Whether Angular Meta-Layer markers should be emitted.
     pub is_angular: bool,
     /// Source line count (used for large-file heuristics).
@@ -72,10 +62,6 @@ pub struct ContextDecision {
 impl ContextDecision {
     /// Human-readable summary of the decision.
     pub fn summary(&self) -> String {
-        let strategy_str = match self.strategy {
-            ContextStrategy::FullCompress => "full_compress",
-            ContextStrategy::DeltaTransport => "delta",
-        };
         let angular_str = if self.is_angular { "angular" } else { "none" };
         let class_str = match self.file_class {
             FileClass::Test => "test",
@@ -92,7 +78,7 @@ impl ContextDecision {
         };
         format!(
             "fidelity={:?}, strategy={}, class={}, angular={}, lines={}, cbm={}",
-            self.fidelity, strategy_str, class_str, angular_str, self.source_line_count, cbm_str
+            self.fidelity, "full_compress", class_str, angular_str, self.source_line_count, cbm_str
         )
     }
 }
@@ -506,11 +492,12 @@ pub fn decide(
     explicit_fidelity: Option<&str>,
     explicit_intent: Option<&str>,
     config: &CleanCtxConfig,
-    ir_context: &ContextState,
+    _ir_context: &ContextState,
     source: &str,
-    // The dict alias (e.g. "α1") for this file — used to look up
-    // delta baselines that were stored under the alias.
-    path_alias: Option<&str>,
+    // Retained call-site inputs while the heuristics API is narrowed in a
+    // later compatibility cleanup. Model-facing strategy selection no longer
+    // depends on an IR baseline or its alias.
+    _path_alias: Option<&str>,
     // C-1: Previously persisted fidelity from the DB, if available.
     stored_fidelity: Option<Fidelity>,
 ) -> Result<ContextDecision, String> {
@@ -568,25 +555,6 @@ pub fn decide(
         }
     }
 
-    // Determine strategy: check for baselines using the dict alias
-    // (where they're actually stored), falling back to raw path.
-    let check_key = path_alias.unwrap_or(file_path);
-    let has_ir_baseline = ir_context.has_file(check_key);
-
-    // Delta transport only makes sense when the prior baseline was
-    // compiled at the SAME fidelity. When the caller explicitly changes
-    // `fidelity` (or `intent`, which maps to a fidelity), the prior
-    // baseline's wire format is incompatible with `apply_delta` — the
-    // delta would reference ops that never existed at the new fidelity,
-    // producing a bare summary line with no structured payload. Force a
-    // full compress in that case so the response is always consumable.
-    let explicit_fidelity_or_intent = explicit_fidelity.is_some() || explicit_intent.is_some();
-    let strategy = if config.auto_delta && !explicit_fidelity_or_intent && has_ir_baseline {
-        ContextStrategy::DeltaTransport
-    } else {
-        ContextStrategy::FullCompress
-    };
-
     // Angular detection
     let is_angular = if config.auto_angular {
         detect_angular(file_path, source)
@@ -596,7 +564,6 @@ pub fn decide(
 
     Ok(ContextDecision {
         fidelity,
-        strategy,
         is_angular,
         source_line_count: line_count,
         file_class,

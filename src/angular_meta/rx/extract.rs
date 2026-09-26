@@ -422,5 +422,3 @@ fn extract_subjects(source: &str, shape: &mut RxShape) {
         line_start += line.len() + 1;
     }
 }
-
-

@@ -111,7 +111,7 @@ fn delta_baseline_and_cache_report_their_visible_edit_bodies() {
 }
 
 #[test]
-fn focused_edit_metadata_survives_summary_apply_restart_restore_and_replay() {
+fn edit_metadata_survives_explicit_delta_apply_restart_restore_and_replay() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
     let path = root.path().join("focused.ts");
@@ -120,44 +120,40 @@ fn focused_edit_metadata_survives_summary_apply_restart_restore_and_replay() {
     std::fs::write(&path, edit_source(2)).expect("baseline source");
     let config = config(&root, "focused.db");
     let state = crate::mcp::McpState::new(config.clone());
-    let baseline_args = || {
-        json!({
-            "filePath": file.clone(),
-            "workspaceRoot": workspace_root.clone(),
-            "fidelity": "edit",
-            "focusMethods": ["Right.run"]
-        })
-    };
     let delta_args = || {
         json!({
             "filePath": file.clone(),
             "workspaceRoot": workspace_root.clone(),
-            "focusMethods": ["Right.run"]
+            "fidelity": "edit"
         })
     };
 
-    let baseline = dispatch(&state, 10, "provide_code_context", baseline_args());
+    let baseline = dispatch(&state, 10, "delta_code_context", delta_args());
     assert!(baseline.get("error").is_none(), "{baseline}");
-    assert_meta_contract(
-        &baseline,
-        ContentKind::SkeletonWithFocusedVerbatimBodies,
-        json!(["focused_method_bodies"]),
+    assert_eq!(
+        baseline["result"]["content_kind"],
+        ContentKind::SkeletonWithVerbatimBodies.as_str()
     );
+    assert_eq!(baseline["result"]["byte_exact"], json!(["method_bodies"]));
 
     std::fs::write(&path, edit_source(3)).expect("target source");
     state.invalidate_source_cache(&file);
-    let generated = dispatch(&state, 11, "provide_code_context", delta_args());
-    assert_eq!(generated["result"]["_meta"]["strategy"], "delta");
-    assert!(generated["result"]["_meta"]["delta"].is_object());
-    assert_meta_contract(&generated, ContentKind::DeltaSummary, json!([]));
+    let generated = dispatch(&state, 11, "delta_code_context", delta_args());
+    assert_eq!(generated["result"]["strategy"], "delta");
+    assert!(generated["result"]["delta"].is_object());
+    assert_eq!(
+        generated["result"]["content_kind"],
+        ContentKind::DeltaSummary.as_str()
+    );
+    assert_eq!(generated["result"]["byte_exact"], json!([]));
 
     let applied = dispatch(
         &state,
         12,
         "apply_delta",
         json!({
-            "delta": generated["result"]["_meta"]["delta"].clone(),
-            "currentVersion": generated["result"]["_meta"]["from_version"].clone()
+            "delta": generated["result"]["delta"].clone(),
+            "currentVersion": generated["result"]["from_version"].clone()
         }),
     );
     assert!(applied.get("error").is_none(), "{applied}");
@@ -174,8 +170,8 @@ fn focused_edit_metadata_survives_summary_apply_restart_restore_and_replay() {
         assert!(response.get("error").is_none(), "{tool}: {response}");
         assert_meta_contract(
             &response,
-            ContentKind::SkeletonWithFocusedVerbatimBodies,
-            json!(["focused_method_bodies"]),
+            ContentKind::SkeletonWithVerbatimBodies,
+            json!(["method_bodies"]),
         );
         let visible = response["result"]["content"][0]["text"]
             .as_str()
@@ -245,7 +241,7 @@ fn regenerated_edit_contract_distinguishes_all_bodies_from_no_bodies() {
 }
 
 #[test]
-fn tiny_automatic_delta_keeps_raw_visible_and_delta_code_side() {
+fn tiny_follow_up_provider_keeps_complete_raw_content() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
     let path = root.path().join("tiny.ts");
@@ -258,7 +254,7 @@ fn tiny_automatic_delta_keeps_raw_visible_and_delta_code_side() {
             "fidelity": "high"
         })
     };
-    let delta_args = || {
+    let follow_up_args = || {
         json!({
             "filePath": file.clone(),
             "workspaceRoot": workspace(&root)
@@ -271,8 +267,9 @@ fn tiny_automatic_delta_keeps_raw_visible_and_delta_code_side() {
     let target = "class Tiny { two() {} }\n";
     std::fs::write(&path, target).expect("target source");
     state.invalidate_source_cache(&file);
-    let generated = dispatch(&state, 31, "provide_code_context", delta_args());
-    assert!(generated["result"]["_meta"]["delta"].is_object());
-    assert_meta_contract(&generated, ContentKind::RawPassthrough, json!(["document"]));
-    assert_eq!(generated["result"]["content"][0]["text"], target);
+    let follow_up = dispatch(&state, 31, "provide_code_context", follow_up_args());
+    assert_eq!(follow_up["result"]["_meta"]["strategy"], "full");
+    assert!(follow_up["result"]["_meta"].get("delta").is_none());
+    assert_meta_contract(&follow_up, ContentKind::RawPassthrough, json!(["document"]));
+    assert_eq!(follow_up["result"]["content"][0]["text"], target);
 }

@@ -37,7 +37,7 @@ fn empty_source() -> &'static str {
     ""
 }
 
-// ── V1 Strategy Tests (unchanged) ──────────────────────────────────
+// ── Complete-provider boundary ─────────────────────────────────────
 
 #[test]
 fn test_first_call_full_compress() {
@@ -53,11 +53,11 @@ fn test_first_call_full_compress() {
         None,
         None,
     );
-    assert_eq!(decision.strategy, heuristics::ContextStrategy::FullCompress);
+    assert!(decision.summary().contains("strategy=full_compress"));
 }
 
 #[test]
-fn test_delta_after_ir_baseline() {
+fn test_ir_baseline_does_not_change_provider_strategy() {
     let config = CleanCtxConfig::default();
     let mut ir_ctx = ContextState::new();
 
@@ -81,21 +81,13 @@ fn test_delta_after_ir_baseline() {
         Some("alpha1"),
         None,
     );
-    assert_eq!(
-        decision.strategy,
-        heuristics::ContextStrategy::DeltaTransport
-    );
+    assert!(decision.summary().contains("strategy=full_compress"));
 }
 
-// ── F-32: Delta fidelity-change guard ──────────────────────────────
+// ── Explicit fidelity and intent ───────────────────────────────────
 
-/// Delta transport must NOT be selected when the caller explicitly
-/// changes `fidelity` between calls on the same file. The prior
-/// baseline was compiled at a different fidelity; its wire format is
-/// incompatible with `apply_delta`, which would produce a bare summary
-/// line with no structured delta payload. Force a full compress.
 #[test]
-fn test_explicit_fidelity_change_forces_full_compress() {
+fn test_explicit_fidelity_is_honored_with_an_existing_baseline() {
     let config = CleanCtxConfig::default();
     let mut ir_ctx = ContextState::new();
 
@@ -109,7 +101,6 @@ fn test_explicit_fidelity_change_forces_full_compress() {
         None,
     );
 
-    // Explicit fidelity change → delta would be incompatible.
     let decision = decide_ok(
         "alpha1",
         Some("edit"),
@@ -120,13 +111,12 @@ fn test_explicit_fidelity_change_forces_full_compress() {
         Some("alpha1"),
         None,
     );
-    assert_eq!(decision.strategy, heuristics::ContextStrategy::FullCompress);
+    assert_eq!(decision.fidelity, Fidelity::Edit);
+    assert!(decision.summary().contains("strategy=full_compress"));
 }
 
-/// Same guard for an explicit `intent` change (which maps to a
-/// fidelity via `config.smart_defaults`).
 #[test]
-fn test_explicit_intent_change_forces_full_compress() {
+fn test_explicit_intent_is_honored_with_an_existing_baseline() {
     let config = CleanCtxConfig::default();
     let mut ir_ctx = ContextState::new();
 
@@ -150,7 +140,8 @@ fn test_explicit_intent_change_forces_full_compress() {
         Some("alpha1"),
         None,
     );
-    assert_eq!(decision.strategy, heuristics::ContextStrategy::FullCompress);
+    assert_eq!(decision.fidelity, Fidelity::Edit);
+    assert!(decision.summary().contains("strategy=full_compress"));
 }
 
 // ── V1 Fidelity Tests (unchanged) ──────────────────────────────────

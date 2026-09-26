@@ -284,7 +284,11 @@ pub struct CleanCtxConfig {
     #[serde(default = "default_true")]
     pub auto_angular: bool,
 
-    /// Automatically use deltas for follow-up edits in `provide_code_context`.
+    /// Compatibility setting retained for existing configuration files.
+    ///
+    /// `provide_code_context` always returns complete model-facing content.
+    /// Structured delta transport is explicitly requested through
+    /// `delta_code_context`; this field is currently inactive.
     #[serde(default = "default_true")]
     pub auto_delta: bool,
 

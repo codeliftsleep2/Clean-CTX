@@ -68,7 +68,7 @@ pub(super) fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
 fn pipe_owner(source: &str, pipe_start: usize) -> String {
     let before = &source[..pipe_start];
     let statement_start = before
-        .rfind(|ch| matches!(ch, ';' | '{' | '}'))
+        .rfind([';', '{', '}'])
         .map_or(0, |index| index + 1);
     let statement = before[statement_start..].trim();
 
@@ -87,16 +87,21 @@ fn assignment_owner(lhs: &str) -> Option<String> {
     let name_part = lhs.split(':').next().unwrap_or(lhs).trim();
     let candidate = name_part
         .split_whitespace()
-        .filter(|word| {
+        .rfind(|word| {
             !matches!(
                 *word,
-                "private" | "public" | "protected" | "readonly" | "static" | "const" | "let" | "var"
+                "private"
+                    | "public"
+                    | "protected"
+                    | "readonly"
+                    | "static"
+                    | "const"
+                    | "let"
+                    | "var"
             )
-        })
-        .next_back()?;
+        })?;
     let candidate = candidate.trim();
-    (!candidate.is_empty() && candidate != "=" && candidate != ":")
-        .then(|| candidate.to_string())
+    (!candidate.is_empty() && candidate != "=" && candidate != ":").then(|| candidate.to_string())
 }
 
 fn expression_owner(statement: &str) -> Option<String> {
@@ -104,9 +109,7 @@ fn expression_owner(statement: &str) -> Option<String> {
         .split_whitespace()
         .next_back()
         .map(str::trim)
-        .filter(|value| {
-            !value.is_empty() && *value != "return" && *value != ")" && *value != "}"
-        })
+        .filter(|value| !value.is_empty() && *value != "return" && *value != ")" && *value != "}")
         .map(str::to_string)
 }
 
@@ -137,7 +140,7 @@ fn enclosing_method_name(source: &str, position: usize) -> Option<String> {
 fn method_name_before_brace(source: &str, brace: usize) -> Option<String> {
     let prefix = &source[..brace];
     let head_start = prefix
-        .rfind(|ch| matches!(ch, ';' | '{' | '}'))
+        .rfind([';', '{', '}'])
         .map_or(0, |index| index + 1);
     let head = prefix[head_start..].trim();
     let (params_open, _) = crate::compaction::method::find_method_params(head)?;
@@ -289,5 +292,3 @@ pub(super) fn extract_combinators(source: &str, shape: &mut RxShape) {
         }
     }
 }
-
-

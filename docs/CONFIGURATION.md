@@ -104,6 +104,11 @@ Location: Project root (walks up from current directory to find it)
 }
 ```
 
+`auto_delta` is retained as an inactive compatibility field so existing
+configuration files continue to parse. `provide_code_context` always returns
+complete model-facing content. Code-side delta transport is explicitly invoked
+through `delta_code_context` and acknowledged through `apply_delta`.
+
 ## Environment Variables
 
 ### Proxy Configuration
@@ -415,8 +420,7 @@ into JSON-RPC responses. This is the **consumer contract** for LLM clients
 | `prompts/get` (cleanctx-notation) | `system_prompt` | `vocab-<version>` | `system_prompt_ttl` |
 | `prompts/get` (clean-ctx-vocabulary) | `system_prompt` | `vocab-<version>` | `system_prompt_ttl` |
 | `compress_code_context` | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |
-| `provide_code_context` (full) | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |
-| `provide_code_context` (delta) | `tail` | `rolling` | `tail_ttl` |
+| `provide_code_context` | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |
 | `delta_code_context` | `tail` | `rolling` | `tail_ttl` |
 | `apply_delta` | `tail` | `rolling` | `tail_ttl` |
 | `diff_code_context` | `tail` | `rolling` | `tail_ttl` |

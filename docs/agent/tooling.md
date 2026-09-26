@@ -38,7 +38,7 @@ as `filePath`.
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
-| `provide_code_context` | `filePath` | `intent`, `fidelity`, `focusMethods`, `workspaceRoot`, `tokenizer` | **Primary entry point.** Heuristics engine selects fidelity, classifies file, and auto-detects delta transport. Prefer over `compress_code_context`. |
+| `provide_code_context` | `filePath` | `intent`, `fidelity`, `focusMethods`, `workspaceRoot`, `tokenizer` | **Primary model-facing entry point.** Heuristics select fidelity and classify the file; every success returns complete current context. Prefer over `compress_code_context`. |
 | `compress_code_context` | `filePath` | `fidelity`, `encoding`, `tokenizer`, `workspaceRoot` | Direct AST compilation without heuristics. Lower-level tool; prefer `provide_code_context`. |
 | `restore_context` | `filePath` | `fidelity`, `workspaceRoot` | Transactionally restore physical `0x04`, checked `dv:2` history, and the aligned semantic-edge snapshot. Never recompiles source as fallback. |
 | `decompress_code_context` | `compressedText` | — | Expand compressed IR back to human-readable format. |
@@ -106,7 +106,7 @@ expose canonical IDs, or claim that a written callee is resolved.
 
 | Situation | Preferred Tool | Why | Avoid |
 |-----------|---------------|-----|-------|
-| Understand a code file | `provide_code_context` | Compressed IR with signatures, fields, flags; delta transport on repeat calls; heuristics select appropriate fidelity | `read_files` (wasteful — full raw content), `compress_code_context` (no heuristics) |
+| Understand a code file | `provide_code_context` | Complete current SCHEMA-v5 context with signatures, fields, and flags; heuristics select appropriate fidelity | `read_files` (wasteful — full raw content), `compress_code_context` (no heuristics) |
 | Understand a non-code file | `read_files` | `provide_code_context` only supports `.ts`/`.cs`/`.rs`/`.java` | `provide_code_context` (will fail or produce no useful output) |
 | Exact line/byte inspection | `read_files` | Line-range reads, byte-level exactness | `provide_code_context` (IR is structural, not byte-exact at non-verbatim fidelities) |
 | Discover a symbol, file, class, method, or concept | `graph_search` or `cbm_proxy(cbm_tool: "search_graph")` | Graph-aware semantic search across CBM-indexed symbols and files | Regex-only `search_codebase` (text search, misses graph relationships) |
