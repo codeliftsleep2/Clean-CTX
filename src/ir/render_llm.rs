@@ -23,7 +23,8 @@
 use super::hierarchical::{
     ClassNode, FieldNode, HierarchicalIR, InterfaceNode, MethodNode, PatternEntry,
 };
-use super::{DeclarationModifier, ExecutionContextKind, SideEffectKind};
+use super::patterns::is_observable_return_type;
+use super::{DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind};
 use crate::compression::Fidelity;
 use std::collections::{HashMap, HashSet};
 
@@ -252,12 +253,20 @@ fn render_methods(
     // Second pass: emit methods
     let mut name_indices: HashMap<&str, usize> = HashMap::new();
     for method in methods {
+        let return_declares_observable = method
+            .return_type
+            .as_deref()
+            .is_some_and(is_observable_return_type);
+
         let count = name_counts[&method.name.as_str()];
         let idx = name_indices.entry(&method.name).or_insert(0);
         *idx += 1;
 
         // Method-level patterns first
         for pat in &method.patterns {
+            if return_declares_observable && pat.name == "OBSERVABLE" {
+                continue;
+            }
             render_pattern(output, pat);
         }
 
@@ -275,7 +284,15 @@ fn render_methods(
         let has_return = method.return_type.is_some();
         let has_modifiers = !method.modifiers.is_empty();
         let has_control_summaries = !method.control_summaries.is_empty();
-        let has_pattern_facts = !method.pattern_facts.is_empty();
+        let visible_pattern_facts = method
+            .pattern_facts
+            .iter()
+            .flatten()
+            .filter(|fact| {
+                !(return_declares_observable && fact.kind() == PatternFact::Observable.kind())
+            })
+            .collect::<Vec<_>>();
+        let has_pattern_facts = !visible_pattern_facts.is_empty();
         let has_flags = !method.flags.is_empty();
 
         if has_params
@@ -331,10 +348,8 @@ fn render_methods(
             }
 
             if has_pattern_facts {
-                let facts = method
-                    .pattern_facts
+                let facts = visible_pattern_facts
                     .iter()
-                    .flatten()
                     .map(ToString::to_string)
                     .collect::<Vec<_>>();
                 output.push_str(&format!(" pf:{}", facts.join(",")));

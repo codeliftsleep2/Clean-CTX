@@ -64,16 +64,15 @@ export class DataService {
 }
 "#;
 
-/// An `async` Promise-returning, zero-parameter method: the shape the
-/// OBSERVABLE classification recognizes (`DEF_M + Return + MethodModifiers(ASYNC)`).
+/// An Observable-returning, zero-parameter method: the shape the OBSERVABLE
+/// classification recognizes (`DEF_M + Return(Observable-like)`).
 ///
 /// Requires `Fidelity::Medium` or above for the same reason as `TS_PROMISE`,
-/// plus a typed ASYNC modifier adjacent to the `Return` — which is why at
-/// `Fidelity::Edit` (where the `Body` op sits between them) this shape is
-/// classified PROMISE instead.
+/// while Edit fidelity may conservatively decline classification when a body
+/// operation makes the pattern span non-adjacent.
 const TS_OBSERVABLE: &str = r#"
 export class StreamService {
-    async load(): Promise<string> {}
+    load(): Observable<string> {}
 }
 "#;
 
@@ -279,8 +278,7 @@ fn promise_method_keeps_its_declaration_and_gains_the_promise_classification() {
 
 #[test]
 fn observable_method_keeps_its_declaration_and_gains_the_observable_classification() {
-    // `Fidelity::Medium` again: OBSERVABLE needs the promise-like `Return`
-    // *and* the adjacent typed modifier the TypeScript layer emits for `async`.
+    // `Fidelity::Medium` again: OBSERVABLE derives from the declared return.
     let pre = compile_ts(TS_OBSERVABLE, "observable.ts", Fidelity::Medium, false);
     let load_id = sole_method_id(&pre, "load");
 
@@ -293,7 +291,7 @@ fn observable_method_keeps_its_declaration_and_gains_the_observable_classificati
     assert_eq!(
         declarations_of(&post, &load_id),
         1,
-        "the async method must survive pattern recognition: {post:?}"
+        "the Observable-returning method must survive pattern recognition: {post:?}"
     );
 }
 
@@ -310,7 +308,7 @@ fn identity_survives_where_a_classification_cannot_fire() {
     // classification being produced. The real pipeline reports that at
     // `Fidelity::Low` the TypeScript method label is compacted to `load()`, so
     // the emitted `Return` is the void alias and the Promise/Observable
-    // recognizers have nothing promise-like to match. The declaration must
+    // recognizers have no qualifying return contract to match. The declaration must
     // still survive intact and no classification may be orphaned.
     for (file_id, source) in [
         ("DataService.ts", TS_PROMISE),

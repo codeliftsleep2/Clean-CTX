@@ -26,15 +26,35 @@
 //
 // Recognised patterns:
 //   - **PAT_CTOR**   — `DEF_M(constructor) + SIG*(P:ServiceType) + RET + INJECTS`
-//   - **PAT_OBSERVABLE** — `DEF_M + RET($P) + MethodModifiers(ASYNC)`
+//   - **PAT_OBSERVABLE** — `DEF_M + RET(Observable/IObservable)`
 //   - **PAT_GETTER** / **PAT_SETTER** — `DEF_M(get X)` / `DEF_M(set X)`
 //   - **PAT_OVERRIDE** — `DEF_M + PatternFacts(OVERRIDE)`
-//   - **PAT_PROMISE** — `DEF_M + RET($P)` (without ASYNC)
+//   - **PAT_PROMISE** — `DEF_M + RET($P/Promise)`
 //
 // A pattern that doesn't match falls through unchanged (zero regression).
 
 use super::layers::PatternRecognizer;
 use super::opcodes::CoreOp;
+
+fn has_type_identifier(return_type: &str, expected: &str) -> bool {
+    return_type
+        .split(|ch: char| !(ch.is_alphanumeric() || matches!(ch, '_' | '$')))
+        .any(|identifier| identifier == expected)
+}
+
+/// Return whether a declared return type denotes an Observable contract.
+///
+/// Identifier matching deliberately avoids substring classifications such as
+/// `NonObservableResult`, while supporting qualified and generic spellings.
+pub(crate) fn is_observable_return_type(return_type: &str) -> bool {
+    has_type_identifier(return_type, "Observable")
+        || has_type_identifier(return_type, "IObservable")
+}
+
+/// Return whether a declared return type denotes a Promise contract.
+pub(crate) fn is_promise_return_type(return_type: &str) -> bool {
+    has_type_identifier(return_type, "$P") || has_type_identifier(return_type, "Promise")
+}
 
 /// A compressed pattern op.
 ///
@@ -57,14 +77,14 @@ pub enum PatternOp {
         method_id: String,
         deps: Vec<String>,
     },
-    /// `DEF_M + RET($P/$O) + FLAGS(ASYNC)` → single op.
+    /// `DEF_M + RET(Observable/IObservable)` → single op.
     /// Wire: `["PAT", "OBSERVABLE", class_id, method_id, return_type]`
     Observable {
         class_id: String,
         method_id: String,
         return_type: String,
     },
-    /// `DEF_M + RET($P)` (no ASYNC flag) → single op.
+    /// `DEF_M + RET($P/Promise)` → single op.
     /// Wire: `["PAT", "PROMISE", class_id, method_id, return_type]`
     Promise {
         class_id: String,
@@ -284,8 +304,9 @@ impl PatternOp {
             // Conservative: assume at least 3 (DEF_M + SIG + RET) + optional INJECTS
             PatternOp::Constructor { deps, .. } => 3 + deps.len().min(1),
             PatternOp::EmptyConstructor { .. } => 2, // DEF_M + RET
-            // Observable: DEF_M + RET + FLAGS
-            PatternOp::Observable { .. } | PatternOp::Override { .. } => 3,
+            // Observable: DEF_M + RET
+            PatternOp::Observable { .. } => 2,
+            PatternOp::Override { .. } => 3,
             // Promise: DEF_M + RET
             PatternOp::Promise { .. } => 2,
             // Accessor: DEF_M + RET (or just DEF_M)
@@ -474,6 +495,10 @@ pub use recognize::is_constructor_name;
 #[cfg(test)]
 #[path = "../tests/ir/patterns.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/observable_pattern_semantics.rs"]
+mod observable_pattern_semantics_tests;
 
 // IRPAT-001 for native call facts (RED-CALL21): a consumptive pattern must not
 // orphan a surviving `CoreOp::Call`.

@@ -5,13 +5,13 @@
 //
 // Patterns detected:
 //   - Constructor injection (DEF_M + SIG for injectable params + INJECTS)
-//   - Observable stream (DEF_M + RET(Promise) + MethodModifiers(ASYNC))
+//   - Observable stream (DEF_M + RET(Observable/IObservable))
 //   - Getter/Setter pattern (DEF_M("get/set X"))
 //   - Override pattern (DEF_M + PatternFacts(OVERRIDE))
 
 use super::PatternRecognizer;
-use crate::ir::opcodes::{CoreOp, DeclarationModifier, PatternFact};
-use crate::ir::patterns::is_constructor_name;
+use crate::ir::opcodes::{CoreOp, PatternFact};
+use crate::ir::patterns::{is_constructor_name, is_observable_return_type};
 
 /// Pattern recognizer (Layer 4).
 /// Analyzes the instruction stream and compresses recognized patterns.
@@ -70,8 +70,7 @@ fn try_recognize_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
         return Some(result);
     }
 
-    // Pattern: Observable/async method
-    // DEF_M + RET($P|$s) + FLAGS(ASYNC)
+    // Pattern: Observable-returning method
     if let Some(result) = try_observable_pattern(slice) {
         return Some(result);
     }
@@ -110,8 +109,8 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
     ))
 }
 
-/// Pattern: Observable/async method
-/// Matches: DEF_M + RET(Promise/Observable) + MethodModifiers(ASYNC)
+/// Pattern: Observable-returning method
+/// Matches: DEF_M + owner-matched RET(Observable/IObservable)
 /// Emits an OBSERVABLE fact but does NOT consume instructions.
 fn try_observable_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
     if slice.is_empty() {
@@ -123,37 +122,21 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
         _ => return None,
     };
 
-    // Look ahead for RET with Promise/Observable type
-    let mut has_observable_return = false;
-    let mut has_async_flag = false;
-
-    for op in slice.iter().skip(1).take(5) {
+    for op in slice.iter().skip(1) {
         match op {
             CoreOp::DefMethod(..) => break,
-            CoreOp::Return(tid, ty) if *tid == method_id => {
-                if ty == "$P" || ty.contains("Promise") || ty.contains("Observable") {
-                    has_observable_return = true;
-                }
+            CoreOp::Return(tid, ty) if *tid == method_id && is_observable_return_type(ty) => {
+                return Some((
+                    CoreOp::PatternFacts(method_id, vec![PatternFact::Observable]),
+                    0, // additive — do not consume any instructions
+                ));
             }
             CoreOp::Return(..) => {}
-            CoreOp::MethodModifiers(tid, modifiers)
-                if *tid == method_id && modifiers.contains(&DeclarationModifier::Async) =>
-            {
-                has_async_flag = true;
-            }
-            CoreOp::Flags(..) | CoreOp::MethodModifiers(..) => {}
             _ => {}
         }
     }
 
-    if has_observable_return && has_async_flag {
-        Some((
-            CoreOp::PatternFacts(method_id, vec![PatternFact::Observable]),
-            0, // additive — do not consume any instructions
-        ))
-    } else {
-        None
-    }
+    None
 }
 
 /// Pattern: Getter/Setter accessor

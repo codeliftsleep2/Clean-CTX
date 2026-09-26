@@ -21,15 +21,15 @@
 // matched are the declaration's identity-bearing facts (`DefMethod`, its
 // `Param*`, its `Return`) so the caller re-emits them unchanged before the
 // classification op. Only genuinely redundant, non-identity ops — `Injects`
-// for CTOR and `Flags(OVERRIDE)` for OVERRIDE. OBSERVABLE reads the typed
-// `MethodModifiers(ASYNC)` fact without consuming it. The wrapper's
-// leading/trailing `Flags(M)` runs are still summarized away.
+// for CTOR and `Flags(OVERRIDE)` for OVERRIDE — are summarized. Observable
+// and Promise classification derive only from the retained return contract.
+// The wrapper's leading/trailing annotation runs are still summarized away.
 // A method must never vanish from the hierarchical projection, the rendered
 // `M` line, the `UnitTable`, the semantic registration, or a caller-side
 // `Calls` subject merely because a pattern recognized it.
 
-use super::PatternOp;
-use crate::ir::opcodes::{CoreOp, DeclarationModifier};
+use super::{PatternOp, is_observable_return_type, is_promise_return_type};
+use crate::ir::opcodes::CoreOp;
 
 mod guards;
 use guards::{
@@ -296,12 +296,12 @@ fn try_empty_ctor_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     None
 }
 
-/// Observable pattern: `DEF_M + Return($P|$O) + MethodModifiers(ASYNC)`.
+/// Observable pattern: `DEF_M + Return(Observable/IObservable)`.
 ///
-/// `DefMethod`, `Return`, and the authoritative modifier fact are retained;
-/// the pattern is additive classification.
+/// `DefMethod` and `Return` are retained; the pattern is additive
+/// classification.
 fn try_observable_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
-    if slice.len() < 3 {
+    if slice.len() < 2 {
         return None;
     }
     let (class_id, method_id) = match &slice[0] {
@@ -312,32 +312,21 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
         CoreOp::Return(mid, ty) if mid == &method_id => ty.clone(),
         _ => return None,
     };
-    // Must be Promise-like and have an ASYNC declaration modifier.
-    let is_promise_like = return_type == "$P"
-        || return_type.contains("Promise")
-        || return_type.contains("Observable");
-    if !is_promise_like {
+    if !is_observable_return_type(&return_type) {
         return None;
     }
-    match &slice[2] {
-        CoreOp::MethodModifiers(mid, modifiers)
-            if mid == &method_id && modifiers.contains(&DeclarationModifier::Async) =>
-        {
-            Some((
-                PatternOp::Observable {
-                    class_id,
-                    method_id,
-                    return_type,
-                },
-                2,
-                2,
-            ))
-        }
-        _ => None,
-    }
+    Some((
+        PatternOp::Observable {
+            class_id,
+            method_id,
+            return_type,
+        },
+        2,
+        2,
+    ))
 }
 
-/// Promise pattern: `DEF_M + Return($P)` (no ASYNC) → 1 op.
+/// Promise pattern: `DEF_M + Return($P/Promise)` → 1 op.
 /// Only triggers if the observable pattern did not match
 ///
 /// F2: both matched ops are identity-bearing, so this classification is purely
@@ -352,8 +341,7 @@ fn try_promise_pattern(slice: &[CoreOp]) -> Option<MatcherResult> {
     };
     match &slice[1] {
         CoreOp::Return(mid, ty) if mid == &method_id => {
-            let is_promise_like = ty == "$P" || ty.contains("Promise") || ty.contains("Observable");
-            if is_promise_like {
+            if is_promise_return_type(ty) {
                 Some((
                     PatternOp::Promise {
                         class_id,

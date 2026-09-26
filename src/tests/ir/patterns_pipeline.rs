@@ -298,12 +298,11 @@ fn observable_two_pass_no_orphan_e003() {
     use crate::ir::validator::DefaultValidator;
     use crate::ir::validator::IRValidator;
 
-    // Input: DEF_M + RET($P) + MOD_M(ASYNC) + MOD_M(PRIVATE)
+    // Input: DEF_M + RET(Observable) + MOD_M(PRIVATE)
     let input = vec![
         defclass("C2", "TestComponent"),
         defmethod("C2", "M6", "fetchData"),
-        ret("M6", "$P"),
-        modifiers("M6", &[DeclarationModifier::Async]),
+        ret("M6", "Observable<User>"),
         modifiers("M6", &[DeclarationModifier::Private]),
         defmethod("C2", "M7", "ngOnInit"),
         ret("M7", "$v"),
@@ -345,8 +344,8 @@ fn observable_two_pass_no_orphan_e003() {
         .filter(|op| matches!(op, CoreOp::MethodModifiers(mid, _) if mid == "M6"))
         .count();
     assert_eq!(
-        preserved_modifiers, 2,
-        "both authoritative modifier occurrences survive"
+        preserved_modifiers, 1,
+        "the authoritative modifier occurrence survives"
     );
 
     // Verify observable is compressed to PAT(OBSERVABLE, ...)
@@ -379,7 +378,7 @@ fn promise_two_pass_no_orphan_e003() {
     use crate::ir::validator::DefaultValidator;
     use crate::ir::validator::IRValidator;
 
-    // Input: DEF_M + RET($P) + MOD_M(PRIVATE) — no ASYNC modifier, so it is a Promise.
+    // Input: DEF_M + RET($P) + MOD_M(PRIVATE).
     let input = vec![
         defclass("C2", "TestComponent"),
         defmethod("C2", "M6", "fetchData"),

@@ -71,10 +71,10 @@ fn pattern_op_observable_round_trip() {
     let pat = PatternOp::Observable {
         class_id: "C1".into(),
         method_id: "M1".into(),
-        return_type: "$P".into(),
+        return_type: "Observable<User>".into(),
     };
     let t = pat.to_tuple();
-    assert_eq!(t, vec!["PAT", "OBSERVABLE", "C1", "M1", "$P"]);
+    assert_eq!(t, vec!["PAT", "OBSERVABLE", "C1", "M1", "Observable<User>"]);
     let back = PatternOp::from_tuple(&t).unwrap();
     assert_eq!(back, pat);
 }
@@ -168,7 +168,7 @@ fn pattern_op_name() {
     let o = PatternOp::Observable {
         class_id: "C1".into(),
         method_id: "M1".into(),
-        return_type: "$P".into(),
+        return_type: "Observable<User>".into(),
     };
     assert_eq!(o.name(), "OBSERVABLE");
     let p = PatternOp::Promise {
@@ -343,11 +343,10 @@ fn compress_empty_constructor() {
 // ── Observable ────────────────────────────────────────────────
 
 #[test]
-fn compress_observable_with_async() {
+fn compress_observable_return() {
     let ops = vec![
         defmethod("C1", "M1", "fetchData"),
-        ret("M1", "$P"),
-        modifiers("M1", &[DeclarationModifier::Async]),
+        ret("M1", "Observable<User>"),
     ];
     let rec = CompressingPatternRecognizer::new();
     let (pats, _) = rec.compress(&ops);
@@ -355,17 +354,13 @@ fn compress_observable_with_async() {
     let obs = &pats[0];
     assert!(matches!(obs, PatternOp::Observable { .. }));
     if let PatternOp::Observable { return_type, .. } = obs {
-        assert_eq!(return_type, "$P");
+        assert_eq!(return_type, "Observable<User>");
     }
 }
 
 #[test]
 fn compress_observable_with_observable_type() {
-    let ops = vec![
-        defmethod("C1", "M1", "stream"),
-        ret("M1", "Observable"),
-        modifiers("M1", &[DeclarationModifier::Async]),
-    ];
+    let ops = vec![defmethod("C1", "M1", "stream"), ret("M1", "Observable")];
     let rec = CompressingPatternRecognizer::new();
     let (pats, _) = rec.compress(&ops);
     assert_eq!(pats.len(), 1);
@@ -373,7 +368,7 @@ fn compress_observable_with_observable_type() {
 }
 
 #[test]
-fn compress_observable_requires_async_flag() {
+fn compress_promise_does_not_require_async_flag() {
     let ops = vec![defmethod("C1", "M1", "fetchData"), ret("M1", "$P")];
     let rec = CompressingPatternRecognizer::new();
     let (pats, _) = rec.compress(&ops);

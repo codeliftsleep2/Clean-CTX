@@ -59,11 +59,10 @@ fn recognize_constructor_injection() {
 // ── Observable Pattern Tests ──────────────────────────
 
 #[test]
-fn recognize_observable_return() {
+fn observable_semantics_additive_recognizes_declared_observable() {
     let instructions = vec![
         make_defmethod("C1", "M1", "fetchData"),
-        make_ret("M1", "$P"),
-        make_modifiers("M1", vec![DeclarationModifier::Async]),
+        make_ret("M1", "Observable<User>"),
     ];
 
     let recognizer = CodePatternRecognizer::new();
@@ -80,13 +79,12 @@ fn recognize_observable_return() {
 }
 
 #[test]
-fn observable_fact_never_borrows_evidence_from_another_method() {
+fn observable_semantics_additive_never_borrows_evidence_from_another_method() {
     let instructions = vec![
         make_defmethod("C1", "M1", "methodB"),
         make_ret("M1", "$v"),
         make_defmethod("C1", "M2", "methodA"),
-        make_ret("M2", "$P"),
-        make_modifiers("M2", vec![DeclarationModifier::Async]),
+        make_ret("M2", "Observable<number>"),
     ];
 
     let result = CodePatternRecognizer::new().recognize(&instructions);
@@ -106,10 +104,11 @@ fn observable_fact_never_borrows_evidence_from_another_method() {
 }
 
 #[test]
-fn observable_fact_requires_return_and_async_evidence_on_the_same_method() {
-    let promise_only = vec![
-        make_defmethod("C1", "M1", "promiseOnly"),
+fn observable_semantics_additive_rejects_non_observable_evidence() {
+    let async_promise = vec![
+        make_defmethod("C1", "M1", "asyncPromise"),
         make_ret("M1", "$P"),
+        make_modifiers("M1", vec![DeclarationModifier::Async]),
     ];
     let async_only = vec![
         make_defmethod("C1", "M2", "asyncOnly"),
@@ -118,13 +117,13 @@ fn observable_fact_requires_return_and_async_evidence_on_the_same_method() {
     ];
     let recognizer = CodePatternRecognizer::new();
 
-    for instructions in [&promise_only, &async_only] {
+    for instructions in [&async_promise, &async_only] {
         let result = recognizer.recognize(instructions);
         assert!(
             !result
                 .iter()
                 .any(|op| matches!(op, CoreOp::PatternFacts(_, facts) if facts.contains(&PatternFact::Observable))),
-            "partial evidence must not produce a compiler-derived Observable fact: {result:?}"
+            "Promise or async evidence must not produce an Observable fact: {result:?}"
         );
     }
 }

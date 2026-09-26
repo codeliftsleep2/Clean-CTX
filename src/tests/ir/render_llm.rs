@@ -82,6 +82,35 @@ fn make_type_alias(alias: &str, original: &str) -> Vec<String> {
     vec![alias.to_string(), original.to_string()]
 }
 
+#[test]
+fn observable_semantics_llm_text_does_not_repeat_return_classification() {
+    let mut method = make_method("stream");
+    method.return_type = Some("Observable<User>".to_string());
+    method.pattern_facts = vec![vec![PatternFact::Observable]];
+    method.patterns = vec![make_pattern(
+        "OBSERVABLE",
+        vec!["C1", "M1", "Observable<User>"],
+    )];
+
+    let mut class = make_class("Service");
+    class.methods.push(method);
+    let mut hir = empty_hir();
+    hir.classes.push(class);
+
+    let rendered = render_hierarchical_for_llm(&hir, Fidelity::High);
+    assert!(rendered.contains("→ Observable<User>"), "{rendered}");
+    assert!(
+        !rendered.contains("pf:OBSERVABLE"),
+        "the declared return already carries the fact: {rendered}"
+    );
+    assert!(
+        !rendered
+            .lines()
+            .any(|line| line.starts_with("P OBSERVABLE")),
+        "the declared return already carries the classification: {rendered}"
+    );
+}
+
 // ── Tests ──
 
 #[test]
