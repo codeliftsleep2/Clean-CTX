@@ -383,15 +383,43 @@ fn test_method_level_patterns() {
 }
 
 #[test]
-fn test_imports() {
+fn imports_omit_generated_handles_but_preserve_module_and_named_symbols() {
     let mut hir = empty_hir();
     hir.imports.push(make_import("IM1", "./module", "Foo"));
     hir.imports
         .push(make_import("IM2", "std::collections", "HashMap"));
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("$ IM1 ./module [Foo]\n"));
-    assert!(result.contains("$ IM2 std::collections [HashMap]\n"));
+    assert!(result.contains("$ ./module [Foo]\n"));
+    assert!(result.contains("$ std::collections [HashMap]\n"));
+    assert!(!result.contains("IM1"));
+    assert!(!result.contains("IM2"));
+}
+
+#[test]
+fn imports_with_empty_modules_do_not_leave_a_phantom_column() {
+    let mut hir = empty_hir();
+    hir.imports
+        .push(make_import("IM1", "", "using System.Threading.Tasks;"));
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
+    assert!(result.contains("$ [using System.Threading.Tasks;]\n"));
+    assert!(!result.contains("$  ["));
+    assert!(!result.contains("IM1"));
+}
+
+#[test]
+fn imports_preserve_source_written_aliases_inside_the_named_payload() {
+    let mut hir = empty_hir();
+    hir.imports.push(make_import(
+        "IM1",
+        "./cross-a",
+        "SharedName as ImportedShared",
+    ));
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
+    assert!(result.contains("$ ./cross-a [SharedName as ImportedShared]\n"));
+    assert!(!result.contains("IM1"));
 }
 
 #[test]
@@ -400,7 +428,8 @@ fn test_import_wildcard() {
     hir.imports.push(make_import("IM1", "react", "*"));
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("$ IM1 react\n"));
+    assert!(result.contains("$ react\n"));
+    assert!(!result.contains("IM1"));
     assert!(!result.contains("[*]"));
 }
 
@@ -458,7 +487,7 @@ fn test_full_typescript_class() {
     assert!(result.contains("p:index:$n user:$s"));
     assert!(result.contains("ctl:IF"));
     assert!(result.contains("ctl:RET"));
-    assert!(result.contains("$ IM1 ./core [OnInit, OnDestroy]"));
+    assert!(result.contains("$ ./core [OnInit, OnDestroy]"));
 }
 
 #[test]

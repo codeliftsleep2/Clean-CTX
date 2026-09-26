@@ -89,14 +89,15 @@ pub fn render_hierarchical_for_llm_focused(
     // ── Imports ──
     for imp in &hir.imports {
         if imp.len() >= 3 {
-            // Format: $ alias module [named]
-            let alias = &imp[0];
+            // The generated import identity remains canonical code-side but is
+            // presentation-only noise: no visible record references it.
             let module = &imp[1];
             let named = &imp[2];
-            if named == "*" || named.is_empty() {
-                output.push_str(&format!("$ {} {}\n", alias, module));
-            } else {
-                output.push_str(&format!("$ {} {} [{}]\n", alias, module, named));
+            match (module.is_empty(), named == "*" || named.is_empty()) {
+                (true, true) => output.push_str("$\n"),
+                (false, true) => output.push_str(&format!("$ {module}\n")),
+                (true, false) => output.push_str(&format!("$ [{named}]\n")),
+                (false, false) => output.push_str(&format!("$ {module} [{named}]\n")),
             }
         }
     }

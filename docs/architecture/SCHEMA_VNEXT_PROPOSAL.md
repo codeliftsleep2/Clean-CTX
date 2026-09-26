@@ -177,14 +177,14 @@ meaning rather than globally deleted.
 
 ### 4.4 Unreferenced visible handles
 
-Imports currently render an internal alias:
+Before A3, imports rendered an internal alias:
 
 ```text
 $ IM1 rxjs [Observable, of]
 ```
 
-No other SCHEMA-v5 record refers to `IM1`. If corpus verification confirms that
-the value is never a source-written import alias, the presentation can render:
+No other SCHEMA-v5 record refers to `IM1`. Corpus verification confirmed that
+the value is never a source-written import alias, so production now renders:
 
 ```text
 $ rxjs [Observable, of]
@@ -552,7 +552,7 @@ focused edit. Laboratory token wins do not replace this gate.
 |---|---|---|---|---|
 | A1 single path | Measured 40–45 tokens/response; 0.99–6.14% | Very low | content assembly + contracts | Production and refreshed baseline verified; live gate pending |
 | A2 Promise collapse | No opportunity in the current economics corpus | Very low | fixture evidence, then renderer + tests | Defer until a qualifying `P PROMISE` cost exists |
-| A3 import handle removal | Measured 6/24/40 tokens for Angular/C#/TypeScript; 0.14–6.40% | Low; code/corpus and 8/8 paired reasoning gates passed | renderer/prompt/tests | Request production approval; then tracked contracts, refreshed baseline, and live gate |
+| A3 import handle removal | Measured 6/24/40 tokens for Angular/C#/TypeScript; 0.14–6.40% | Low; code/corpus, 8/8 paired reasoning, and focused RED/GREEN gates passed | renderer/prompt/tests | Production implemented; broader verification, refreshed baseline, and live gate pending |
 | A4a class-owner ID elision | No opportunity in the current economics corpus | Low | pattern-rich fixture + adversarial reasoning tests | Defer until visible `P` rows establish a cost |
 | A4b method-owner elision/replacement | No current corpus opportunity | Medium-to-high ambiguity risk | grammar + pattern-rich adversarial reasoning tests | Retain/replace discriminator unless all ownership gates pass |
 | B1 one method arrow | Medium recurring | Low | versioned grammar/prompt/tests | Highest-priority vNext experiment |
@@ -589,7 +589,9 @@ focused edit. Laboratory token wins do not replace this gate.
 4. Run deterministic and model reasoning gates for candidates that win. A3
    passed its code/corpus audit, isolated economics gate, and all eight paired
    import-meaning and source-alias cases using fresh isolated invocations of
-   the configured default Codex model.
+   the configured default Codex model. Its approved presentation-only renderer
+   change is implemented, and the unchanged three-case tracked regression was
+   reported GREEN after demonstrating RED against the old renderer.
 5. Approve and implement only the individually proven subset.
 
 ### Phase 2 — versioned grammar experiment

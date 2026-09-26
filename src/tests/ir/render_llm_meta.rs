@@ -67,7 +67,7 @@ fn test_spring_boot_class_with_meta() {
     assert!(result.contains("ctl:RET,IF"));
     assert!(result.contains("T @rest = UserController"));
     assert!(result.contains("T @map = GET /users POST /users"));
-    assert!(result.contains("$ IM1 org.springframework.web.bind.annotation"));
+    assert!(result.contains("$ org.springframework.web.bind.annotation"));
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn test_multiple_classes_with_imports_and_type_aliases() {
     // Order should be: classes first, then imports, then type aliases
     let alpha_pos = result.find("// ── Alpha ──").unwrap();
     let beta_pos = result.find("// ── Beta ──").unwrap();
-    let import_pos = result.find("$ IM1").unwrap();
+    let import_pos = result.find("$ lib [A, B]").unwrap();
     let alias_pos = result.find("T TypeA").unwrap();
 
     assert!(alpha_pos < beta_pos, "Alpha should appear before Beta");

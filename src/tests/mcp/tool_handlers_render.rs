@@ -68,7 +68,7 @@ fn render_hierarchical_for_llm_typescript_class() {
     assert!(result.contains("F users:$s[]"));
     assert!(result.contains("M ngOnInit"));
     assert!(result.contains("ctl:IF"));
-    assert!(result.contains("$ IM1 ./core [OnInit]"));
+    assert!(result.contains("$ ./core [OnInit]"));
 }
 
 #[test]

@@ -1,19 +1,19 @@
 # SCHEMA-vNext Phase 1 — A3 import-handle audit
 
-**Status:** Pre-production audit, economics, and paired reasoning gates passed; production approval pending
+**Status:** Production implemented; focused RED/GREEN passed; broader verification, refreshed baseline, and live gate pending
 **Audited:** 2026-09-26
-**Production renderer:** Unchanged
+**Production renderer:** A3 implemented in the model-facing import projection
 **Model calls:** Eight paired Codex cases
 
 ## Decision under investigation
 
-SCHEMA-v5 currently renders generated import identities such as:
+Before A3, SCHEMA-v5 rendered generated import identities such as:
 
 ```text
 $ IM1 rxjs [Observable, of]
 ```
 
-A3 tests whether the model-visible projection can omit only `IM1`:
+A3 changes the model-visible projection to omit only `IM1`:
 
 ```text
 $ rxjs [Observable, of]
@@ -38,7 +38,8 @@ delta identity, persistence, and replay remain unchanged.
   example `Foo as Bar`) and is not represented by the generated `IMn` value.
 - Hierarchical encode/decode, named/binary wire formats, identity validation,
   delta keys, persistence, and replay retain the generated handle code-side.
-- The SCHEMA-v5 renderer emits `IMn` but no other visible record consumes it.
+- The pre-A3 SCHEMA-v5 renderer emitted `IMn`, but no other visible record
+  consumed it. The production renderer now omits that field only.
 
 ## Corpus assertion
 
@@ -85,10 +86,25 @@ Generated answers and scoring remain under
 `target/context-compression-verification/captures/`; they are experiment
 evidence, not tracked-test evidence.
 
+## Production implementation and RED/GREEN result
+
+The approved implementation changes only `render_hierarchical_for_llm` import
+formatting. Canonical `CoreOp::Import` operands and every code-side consumer
+remain unchanged.
+
+Three tracked contracts were observed RED against the old renderer, stashed,
+restored unchanged after implementation, and reported GREEN:
+
+- generated handles are omitted while modules and named symbols remain;
+- an empty module renders without a phantom whitespace column; and
+- `SharedName as ImportedShared` remains intact in the named payload.
+
+Existing wildcard, full-class, meta-layer, ordering, and MCP renderer
+expectations were updated only where they encoded the superseded visible
+spelling.
+
 ## Next gate
 
-Obtain explicit approval for the externally visible SCHEMA-v5 grammar change.
-If approved, implement A3 only in the presentation renderer, add tracked
-contracts for generated-handle omission, empty-module spacing, and
-source-written alias preservation, then refresh the production baseline and
-complete the live Claude gate.
+Run the broader renderer and MCP presentation suites, then refresh the complete
+production capture and compression baseline. Completion still requires the
+live Claude pilot gate.
