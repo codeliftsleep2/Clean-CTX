@@ -1,7 +1,7 @@
 use clean_ctx::compression::Fidelity;
 use clean_ctx::ir::hierarchical::try_ir_to_hierarchical;
 use clean_ctx::ir::{
-    hierarchical_wire_to_ir, render_control_full, render_hierarchical_for_llm,
+    CompiledIR, hierarchical_wire_to_ir, render_control_full, render_hierarchical_for_llm,
     render_hierarchical_for_llm_focused,
 };
 use clean_ctx::layers::meta::semantic::{CallEvidence, EntityRef, SemanticEdge, SemanticRelation};
@@ -124,16 +124,28 @@ fn write_a3_legend(args: &[String]) {
     .expect("A3 legend output");
 }
 
+fn complete_ir_from_response(response: &Value) -> CompiledIR {
+    if let Some(wire) = response
+        .pointer("/result/pretty")
+        .or_else(|| response.pointer("/result/structuredContent/pretty"))
+    {
+        return clean_ctx::ir::wire::wire_to_ir_detect(wire)
+            .expect("decode complete named result.pretty IR");
+    }
+
+    let wire = response
+        .pointer("/result/ir")
+        .or_else(|| response.pointer("/result/structuredContent/ir"))
+        .expect("complete result.pretty or reduced hierarchical result.ir");
+    hierarchical_wire_to_ir(wire).expect("decode reduced hierarchical IR fallback")
+}
+
 fn render_prod(args: &[String]) {
     let response: Value = serde_json::from_str(
         &fs::read_to_string(&args[2]).expect("compress/restore/replay response"),
     )
     .expect("response JSON");
-    let wire = response
-        .pointer("/result/ir")
-        .or_else(|| response.pointer("/result/structuredContent/ir"))
-        .expect("hierarchical result.ir");
-    let ir = hierarchical_wire_to_ir(wire).expect("decode hierarchical IR");
+    let ir = complete_ir_from_response(&response);
     let hierarchy = try_ir_to_hierarchical(&ir).expect("checked hierarchy");
     let fidelity = fidelity(&args[4]);
     let focus = args
@@ -181,11 +193,7 @@ fn render_oracle(args: &[String]) {
     let response: Value =
         serde_json::from_str(&fs::read_to_string(&args[2]).expect("structured response"))
             .expect("response JSON");
-    let wire = response
-        .pointer("/result/ir")
-        .or_else(|| response.pointer("/result/structuredContent/ir"))
-        .expect("hierarchical result.ir or result.structuredContent.ir");
-    let mut ir = hierarchical_wire_to_ir(wire).expect("decode hierarchical IR");
+    let mut ir = complete_ir_from_response(&response);
     let focus = args[5]
         .split(',')
         .filter(|value| !value.is_empty())

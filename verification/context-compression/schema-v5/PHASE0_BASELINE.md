@@ -2,7 +2,7 @@
 
 **Status:** Complete  
 **Captured:** 2026-09-26  
-**Capture commit:** `e669ffd76042525170064768b60b893320f76e86`  
+**Capture commit:** `2f13a7536f4b88e169a2c7638d6e7e1b49c87dd1`
 **Tokenizer implementation:** `tiktoken-rs 0.12.0`  
 **Model calls:** Zero
 
@@ -13,6 +13,12 @@ Low, Medium, High, unfocused Edit, and focused Edit. The focused lane uses a
 real `provide_code_context` request with a qualified `focusMethods` selector;
 its model-visible response remains separate from the IR-bearing response used
 to regenerate the code-side CONTROL-FULL oracle.
+
+Candidate and oracle regeneration prefer the captured complete named IR in
+`result.pretty`, decoded through the production wire-format detector. The
+reduced hierarchical `result.ir` remains a compatibility fallback only; using
+it as the primary source undercounted facts in the initial Phase 0 Edit
+measurements.
 
 `Measure-SchemaV5Anatomy.ps1` measures:
 
@@ -50,17 +56,17 @@ records and capture metadata.
 
 | Language | Fidelity/focus | Complete | Legend | Path | Declarations | Facts | Imports | Bodies | Selected |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---|
-| Angular | Edit/all | 3890 | 65 | 84 | 763 | 146 | 164 | 2687 | raw: 3912 |
+| Angular | Edit/all | 4054 | 65 | 84 | 763 | 313 | 164 | 2687 | raw: 3912 |
 | Angular | Edit/focused | 1570 | 65 | 84 | 758 | 313 | 164 | 203 | SCHEMA-v5: 1570 |
 | Angular | High | 1465 | 65 | 84 | 743 | 409 | 181 | 0 | SCHEMA-v5: 1465 |
 | Angular | Low | 980 | 65 | 84 | 413 | 313 | 131 | 0 | SCHEMA-v5: 980 |
 | Angular | Medium | 1349 | 65 | 84 | 740 | 313 | 164 | 0 | SCHEMA-v5: 1349 |
-| C# | Edit/all | 3847 | 65 | 90 | 1255 | 128 | 209 | 2134 | raw: 3590 |
+| C# | Edit/all | 4006 | 65 | 90 | 1255 | 287 | 209 | 2134 | raw: 3590 |
 | C# | Edit/focused | 2115 | 65 | 90 | 1250 | 287 | 209 | 243 | SCHEMA-v5: 2115 |
 | C# | High | 2001 | 65 | 90 | 1250 | 393 | 232 | 0 | SCHEMA-v5: 2001 |
 | C# | Low | 1301 | 65 | 90 | 749 | 287 | 152 | 0 | SCHEMA-v5: 1301 |
 | C# | Medium | 1841 | 65 | 90 | 1232 | 287 | 209 | 0 | SCHEMA-v5: 1841 |
-| TypeScript | Edit/all | 3123 | 65 | 84 | 299 | 49 | 267 | 2368 | raw: 2957 |
+| TypeScript | Edit/all | 3223 | 65 | 84 | 299 | 149 | 267 | 2368 | raw: 2957 |
 | TypeScript | Edit/focused | 1220 | 65 | 84 | 295 | 149 | 267 | 365 | SCHEMA-v5: 1220 |
 | TypeScript | High | 947 | 65 | 84 | 295 | 209 | 299 | 0 | SCHEMA-v5: 947 |
 | TypeScript | Low | 665 | 65 | 84 | 108 | 149 | 267 | 0 | SCHEMA-v5: 665 |
@@ -70,17 +76,17 @@ records and capture metadata.
 
 | Language | Fidelity/focus | Complete | Legend | Path | Declarations | Facts | Imports | Bodies | Selected |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---|
-| Angular | Edit/all | 4061 | 66 | 88 | 809 | 146 | 167 | 2805 | raw: 4091 |
+| Angular | Edit/all | 4226 | 66 | 88 | 809 | 314 | 167 | 2805 | raw: 4091 |
 | Angular | Edit/focused | 1636 | 66 | 88 | 803 | 314 | 167 | 214 | SCHEMA-v5: 1636 |
 | Angular | High | 1520 | 66 | 88 | 787 | 410 | 185 | 0 | SCHEMA-v5: 1520 |
 | Angular | Low | 1025 | 66 | 88 | 449 | 314 | 134 | 0 | SCHEMA-v5: 1025 |
 | Angular | Medium | 1403 | 66 | 88 | 784 | 314 | 167 | 0 | SCHEMA-v5: 1403 |
-| C# | Edit/all | 4075 | 66 | 94 | 1317 | 128 | 222 | 2287 | raw: 3826 |
+| C# | Edit/all | 4234 | 66 | 94 | 1317 | 287 | 222 | 2287 | raw: 3826 |
 | C# | Edit/focused | 2208 | 66 | 94 | 1311 | 287 | 222 | 257 | SCHEMA-v5: 2208 |
 | C# | High | 2087 | 66 | 94 | 1311 | 400 | 245 | 0 | SCHEMA-v5: 2087 |
 | C# | Low | 1309 | 66 | 94 | 748 | 287 | 157 | 0 | SCHEMA-v5: 1309 |
 | C# | Medium | 1913 | 66 | 94 | 1287 | 287 | 222 | 0 | SCHEMA-v5: 1913 |
-| TypeScript | Edit/all | 3229 | 66 | 88 | 308 | 49 | 273 | 2454 | raw: 3060 |
+| TypeScript | Edit/all | 3330 | 66 | 88 | 308 | 150 | 273 | 2454 | raw: 3060 |
 | TypeScript | Edit/focused | 1249 | 66 | 88 | 305 | 150 | 273 | 373 | SCHEMA-v5: 1249 |
 | TypeScript | High | 968 | 66 | 88 | 305 | 210 | 306 | 0 | SCHEMA-v5: 968 |
 | TypeScript | Low | 684 | 66 | 88 | 115 | 150 | 273 | 0 | SCHEMA-v5: 684 |
@@ -91,9 +97,9 @@ records and capture metadata.
 1. **Focused Edit is economically and contractually distinct.** Production
    selected SCHEMA-v5 for every focused fixture, reducing o200k tokens versus
    raw by 60.01% (Angular), 42.29% (C#), and 59.18% (TypeScript). Unfocused
-   Edit selected raw source. C# and TypeScript candidates were larger than raw;
-   Angular's 0.73% candidate reduction was too small to clear the safe
-   economics boundary.
+   Edit selected raw source because every complete candidate was larger than
+   raw: 3.30% for Angular, 10.66% for C#, and 8.82% for TypeScript. This is the
+   expected strict economics decision, not a separate safety-margin policy.
 2. **Declarations/signatures are the dominant C# cost.** Independent o200k
    declaration/signature measurements are 57.1% of Low, 67.3% of Medium, and
    62.8% of High candidate tokens. This supports testing recurring method and

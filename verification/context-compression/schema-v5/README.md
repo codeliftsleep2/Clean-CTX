@@ -58,6 +58,11 @@ Shared `McpSession.ps1` and `measure.rs` remain in `scripts/` because the
 
 The SCHEMA-vNext Phase 0 production economics and independent token anatomy are
 recorded in [`PHASE0_BASELINE.md`](PHASE0_BASELINE.md).
+The first isolated Tier A experiment is measured with
+`scripts/Measure-A1SinglePath.ps1`; it writes generated evidence beneath
+`target/context-compression-verification/captures/` without changing the
+production renderer. Its result and gate status are recorded in
+[`PHASE1_A1_SINGLE_PATH.md`](PHASE1_A1_SINGLE_PATH.md).
 
 ## 3. Oracle catalog
 
