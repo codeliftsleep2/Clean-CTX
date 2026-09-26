@@ -76,6 +76,20 @@ The independent B2 experiment measures typed `C` class records with
 `scripts/Measure-B2ClassRecord.ps1`; its shape audit and gate status are
 recorded in [`PHASE2_B2_CLASS_RECORD.md`](PHASE2_B2_CLASS_RECORD.md).
 
+The independent B3 experiment measures grouped fields at body-free fidelities
+with `scripts/Measure-B3GroupedFields.ps1`; its field-run audit and gate status
+are recorded in [`PHASE2_B3_GROUPED_FIELDS.md`](PHASE2_B3_GROUPED_FIELDS.md).
+
+Prepare and run the paired B3 field-reasoning gate with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Prepare-B3ReasoningWorksheet.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Run-CodexReasoning.ps1 `
+  -TemplatePath ./target/context-compression-verification/captures/schema-vnext-b3-reasoning-template.json `
+  -ResultsPath ./target/context-compression-verification/captures/schema-vnext-b3-reasoning-results-codex.json `
+  -ExpectedCaseCount 16
+```
+
 Prepare and run the paired B2 class-reasoning gate with:
 
 ```powershell
