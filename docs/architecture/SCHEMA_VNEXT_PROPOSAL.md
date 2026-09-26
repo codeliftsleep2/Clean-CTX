@@ -69,21 +69,37 @@ an edit protocol, a delta protocol, or a substitute for `workspace_query`.
 
 ### Current measured checkpoint
 
-The last recorded raw-to-presentation densities were:
+Phase 0 was recaptured on 2026-09-26 after the corrected Observable/Promise
+classification and the presentation collapse for return-derived Observable
+facts. Percentages are token reduction from raw source.
+
+#### cl100k
 
 | Fixture | Low | Medium | High |
 |---|---:|---:|---:|
-| TypeScript | 76.3% | 70.1% | 67.1% |
-| Angular | 73.9% | 64.6% | 61.8% |
-| C# | 64.2% | 48.4% | 43.9% |
+| TypeScript | 77.51% | 71.09% | 67.97% |
+| Angular | 74.95% | 65.52% | 62.55% |
+| C# | 63.76% | 48.72% | 44.26% |
 
-These values predate the corrected Observable/Promise classification and the
-new presentation collapse for return-derived Observable facts. They are no
-longer an acceptable baseline for a vNext decision. A fresh capture is Phase 0.
+#### o200k
 
-The accompanying research prose that attributes `pf:OBSERVABLE` to ordinary
-C# async methods is likewise stale after `IRFACT-002` and must be corrected when
-the new baseline is recorded.
+| Fixture | Low | Medium | High |
+|---|---:|---:|---:|
+| TypeScript | 77.65% | 71.37% | 68.37% |
+| Angular | 74.95% | 65.71% | 62.85% |
+| C# | 65.79% | 50.00% | 45.45% |
+
+This is the comparison baseline for every vNext candidate. The detailed
+capture record is generated at
+`target/context-compression-verification/captures/schema-v5-token-records.json`.
+Because C# varies by 1.19–2.03pp between cl100k and o200k, evaluations must
+retain both tokenizer results rather than summarize them as interchangeable.
+
+Ordinary C# async methods are not Observable solely because they are async or
+return a Promise-like type. Declared Observable returns carry their
+classification in the signature; a redundant `pf:OBSERVABLE` is not rendered.
+The baseline therefore measures the corrected semantics rather than the former
+false/redundant annotation behavior.
 
 ---
 
@@ -403,7 +419,10 @@ Record by fixture, language, fidelity, and tokenizer:
 - imports/type-alias tokens;
 - exact-body tokens for Edit.
 
-The old density table remains historical evidence, not the comparison baseline.
+The prior density table remains available in repository history as historical
+evidence. The 2026-09-26 table above is the comparison baseline. Aggregate
+raw-to-presentation capture is complete; the per-family anatomy items in this
+list remain to be recorded before candidate implementation.
 
 ### Candidate isolation
 
@@ -480,10 +499,11 @@ focused edit. Laboratory token wins do not replace this gate.
 
 ### Phase 0 — refresh truth
 
-1. Capture the current production presentation after all recent correctness
-   fixes.
-2. Update stale measurement prose and retain the prior numbers as historical.
-3. Record per-family token anatomy.
+1. **Complete:** capture the current production presentation after all recent
+   correctness fixes.
+2. **Complete:** update stale measurement prose; the prior numbers remain in
+   repository history as historical evidence.
+3. **Pending:** record per-family token anatomy.
 
 ### Phase 1 — Tier A experiments
 

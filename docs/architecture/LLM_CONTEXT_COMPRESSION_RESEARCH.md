@@ -211,9 +211,14 @@ Bodies and spans are not present in this sample because they are intent-gated. E
 
 ## 5. Concrete representations
 
-### CONTROL-PROD — exact current renderer family
+### CONTROL-PROD — historical renderer family used by the original experiment
 
-This is the exact **shape** assembled by the current High renderer and file footer for the sample. Calls, injections, stable declaration IDs (apart from untyped pattern args), spans, and the framework edge do not appear.
+This is the exact **shape** that the High renderer and file footer assembled for
+the original experiment. It is retained as historical evidence for the token
+comparison below; it predates the async redundancy collapse and corrected
+Observable/Promise semantics, so it is not the current production
+presentation. Calls, injections, stable declaration IDs (apart from untyped
+pattern args), spans, and the framework edge do not appear.
 
 <!-- TOKEN-SAMPLE:CONTROL-PROD -->
 ```text
@@ -595,7 +600,7 @@ The benchmark corpus must exercise full provide/compress, selected and all-body 
 
 Registered-path verification, token capture, and the corrected 36-case reasoning run completed. Follow-up diagnostics found that the required DI provenance and occurrence facts were present and deterministically correct, while their organization reduced model reasoning reliability. The approved CONTROL-FULL v2 repair added stable typed navigation descriptors without altering canonical facts. COMPACT-A1 passed deterministic roundtrip, bounded reasoning, and production edge-case gates, but its initial 77% token result used verbose CONTROL-FULL as the denominator rather than raw source. That result proves oracle-encoding reduction only and is not production savings evidence. The corrected harness preserves capture-time raw bytes, measures raw-to-A1 economics, and runs paired raw/A1 reasoning only after the candidate clears that screen. Full snapshots retain the local raw ceiling; focused Edit forbids full-document raw fallback because it violates the requested body-disclosure boundary. Occurrence-aware `dv:2` remains the acknowledged-state incremental canonical transport; CONTROL-FULL remains the regenerated semantic oracle, not the delta wire format.
 
-## 15. Current measurement checkpoint (2026-09-24)
+## 15. Current measurement checkpoint (2026-09-26)
 
 The presentation boundary (ARCH-003) is implemented and mechanically enforced:
 structural `content` is SCHEMA-v5, while explicitly classified raw-source,
@@ -609,24 +614,53 @@ for small files at structural fidelity and for Edit all-bodies.
 The measurement harness now splits into `codec/` (reversible wire) and
 `schema-v5/` (model-visible presentation) under `verification/context-compression/`.
 
-### Measured SCHEMA-v5 density (raw → presentation, o200k; cl100k is within ~1%)
+### Measured SCHEMA-v5 density (raw → presentation)
+
+The production captures were regenerated after the corrected
+Observable/Promise classification and the presentation collapse for
+return-derived Observable facts. Percentages are token reduction from raw
+source; token counts are shown as `raw → SCHEMA-v5`.
+
+#### cl100k
 
 | Fixture (language) | Low | Medium | High |
 |---|---:|---:|---:|
-| LargeService.ts (typescript) | 76.3% | 70.1% | 67.1% |
-| UserManagementService.ts (angular) | 73.9% | 64.6% | 61.8% |
-| OrderManagementService.cs (csharp) | 64.2% | 48.4% | 43.9% |
+| LargeService.ts (typescript) | 77.51% (`2957 → 665`) | 71.09% (`2957 → 855`) | 67.97% (`2957 → 947`) |
+| UserManagementService.ts (angular) | 74.95% (`3912 → 980`) | 65.52% (`3912 → 1349`) | 62.55% (`3912 → 1465`) |
+| OrderManagementService.cs (csharp) | 63.76% (`3590 → 1301`) | 48.72% (`3590 → 1841`) | 44.26% (`3590 → 2001`) |
+
+#### o200k
+
+| Fixture (language) | Low | Medium | High |
+|---|---:|---:|---:|
+| LargeService.ts (typescript) | 77.65% (`3060 → 684`) | 71.37% (`3060 → 876`) | 68.37% (`3060 → 968`) |
+| UserManagementService.ts (angular) | 74.95% (`4091 → 1025`) | 65.71% (`4091 → 1403`) | 62.85% (`4091 → 1520`) |
+| OrderManagementService.cs (csharp) | 65.79% (`3826 → 1309`) | 50.00% (`3826 → 1913`) | 45.45% (`3826 → 2087`) |
+
+Against the prior recorded o200k checkpoint, the new presentation improves by
+1.27–1.35pp for TypeScript, 1.05–1.11pp for Angular, and 1.55–1.60pp for
+C#. cl100k and o200k track closely for TypeScript and Angular, but C# differs
+by 1.19–2.03pp. Tokenizer sensitivity must therefore be reported explicitly;
+the former blanket claim that cl100k was within approximately 1% is no longer
+valid for every fixture and fidelity.
 
 Density is **language-dependent**, and it is the high-fidelity annotation load,
 not the schema, that drives the gap. C# is lowest because its idiom is
 structurally verbose: every async method carries a
 `CancellationToken cancellationToken = default` parameter and a
 `Task<ActionResult<T>>` return plus `[FromBody]`/`[FromQuery]` attributes; at
-High fidelity each async method is annotated
-`mod:ASYNC ctl:… pf:OBSERVABLE cf:await… se:io`; and an
+High fidelity each async method can carry non-redundant annotations such as
+`mod:ASYNC ctl:… cf:await… se:io`; and an
 `IOrderService` interface mirrors the concrete service. This is a faithful
 encoding of real facts, not a renderer defect — the gap is narrow at Low and
 widens at High precisely where those per-method annotations land.
+
+`pf:OBSERVABLE` is not inferred from `async` or Promise evidence. Declared
+Observable return types remain represented by the return signature, while
+Observable behavior that is not already explicit in the return can be exposed
+through non-redundant data-flow/side-effect facts. This prevents false
+Observable classification and avoids restating a fact already carried by the
+signature.
 
 ### Compression vs. accuracy
 

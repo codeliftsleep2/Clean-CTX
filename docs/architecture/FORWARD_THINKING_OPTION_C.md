@@ -256,14 +256,34 @@ fields nor changes delta transport. Delta remains entirely code-side.
   `Capture-Baselines.ps1` → `measure-schema-v5.ps1`; accuracy is measured via
   the task-based edit eval (deterministic grading + `apply_edit` round-trip,
   currently 3/3 green).
+- **Observable semantics and presentation are corrected.** Observable facts
+  require method-local Observable evidence; async/Promise evidence cannot
+  manufacture `pf:OBSERVABLE`. A declared Observable return already carries
+  that classification, so the presentation no longer repeats it as a pattern
+  fact. The fresh baseline below includes these corrections.
 
-Current High-fidelity SCHEMA-v5 density (o200k):
+Current SCHEMA-v5 density, measured 2026-09-26. Percentages are reduction from
+raw source.
+
+### cl100k
 
 | Fixture (language) | Low | Medium | High |
 |---|---:|---:|---:|
-| typescript | 76.3% | 70.1% | 67.1% |
-| angular | 73.9% | 64.6% | 61.8% |
-| csharp | 64.2% | 48.4% | 43.9% |
+| typescript | 77.51% | 71.09% | 67.97% |
+| angular | 74.95% | 65.52% | 62.55% |
+| csharp | 63.76% | 48.72% | 44.26% |
+
+### o200k
+
+| Fixture (language) | Low | Medium | High |
+|---|---:|---:|---:|
+| typescript | 77.65% | 71.37% | 68.37% |
+| angular | 74.95% | 65.71% | 62.85% |
+| csharp | 65.79% | 50.00% | 45.45% |
+
+C# varies by 1.19–2.03pp between these tokenizers, so future Option C results
+must retain per-tokenizer reporting rather than treating cl100k and o200k as
+interchangeable.
 
 ## 2. The documented next extension — Option C
 
@@ -303,9 +323,10 @@ explicit ownership clarity."*
 
 ## 3. What we've learned that should shape Option C
 
-1. **Density is language-dependent, and the ceiling is structural.** After the
-   async collapse, C# High is 43.9% vs TS 67.1%. The remaining C# gap is *not*
-   annotation redundancy — it is verbose signatures
+1. **Density is language-dependent, and the ceiling is structural.** In the
+   fresh o200k baseline, C# High is 45.45% vs TS 68.37%. The remaining C# gap
+   is not explained by the removed false/redundant Observable facts; it is
+   dominated by verbose signatures
    (`CancellationToken cancellationToken = default`, `Task<ActionResult<T>>`
    returns, `[FromBody]`/`[FromQuery]` attributes) plus the `IOrderService`
    interface mirror.
