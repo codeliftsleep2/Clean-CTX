@@ -1,6 +1,6 @@
 # SCHEMA-vNext Phase 1 — A3 import-handle audit
 
-**Status:** Production implemented; focused RED/GREEN passed; broader verification, refreshed baseline, and live gate pending
+**Status:** Laboratory production gate complete; live gate pending
 **Audited:** 2026-09-26
 **Production renderer:** A3 implemented in the model-facing import projection
 **Model calls:** Eight paired Codex cases
@@ -103,8 +103,23 @@ Existing wildcard, full-class, meta-layer, ordering, and MCP renderer
 expectations were updated only where they encoded the superseded visible
 spelling.
 
+The broader `ir::render_llm::tests` and MCP `tool_handlers_render` suites were
+reported GREEN.
+
+## Production baseline result
+
+The clean production capture at commit `17e49bd2` matches the isolated A3
+prediction exactly for all 30 anatomy rows:
+
+- Angular: 6 tokens removed from every complete candidate;
+- C#: 24 tokens removed from every complete candidate; and
+- TypeScript: 40 tokens removed from every complete candidate.
+
+Legend, path, declaration, fact, and body families are unchanged. Only the
+imports/type-alias family moved. The current totals and family anatomy are
+recorded in `PHASE0_BASELINE.md`. The schema-v5 production and workspace
+capture verifier passed.
+
 ## Next gate
 
-Run the broader renderer and MCP presentation suites, then refresh the complete
-production capture and compression baseline. Completion still requires the
-live Claude pilot gate.
+Complete the live Claude pilot gate.

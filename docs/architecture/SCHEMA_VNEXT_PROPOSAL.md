@@ -70,29 +70,29 @@ an edit protocol, a delta protocol, or a substitute for `workspace_query`.
 ### Current measured checkpoint
 
 Phase 0 was recaptured on 2026-09-26 after the corrected Observable/Promise
-classification and the presentation collapse for return-derived Observable
-facts. Percentages are token reduction from raw source.
+classification, the A1 path collapse, and the A3 generated import-handle
+collapse. Percentages are token reduction from raw source.
 
 #### cl100k
 
 | Fixture | Low | Medium | High |
 |---|---:|---:|---:|
-| TypeScript | 77.51% | 71.09% | 67.97% |
-| Angular | 74.95% | 65.52% | 62.55% |
-| C# | 63.76% | 48.72% | 44.26% |
+| TypeScript | 80.22% | 73.79% | 70.68% |
+| Angular | 76.12% | 66.69% | 63.73% |
+| C# | 65.63% | 50.58% | 46.13% |
 
 #### o200k
 
 | Fixture | Low | Medium | High |
 |---|---:|---:|---:|
-| TypeScript | 77.65% | 71.37% | 68.37% |
-| Angular | 74.95% | 65.71% | 62.85% |
-| C# | 65.79% | 50.00% | 45.45% |
+| TypeScript | 80.33% | 74.05% | 71.05% |
+| Angular | 76.12% | 66.88% | 64.02% |
+| C# | 67.59% | 51.80% | 47.26% |
 
 This is the comparison baseline for every vNext candidate. The detailed
 capture record is generated at
 `target/context-compression-verification/captures/schema-v5-token-records.json`.
-Because C# varies by 1.19–2.03pp between cl100k and o200k, evaluations must
+Because C# varies by 1.13–1.96pp between cl100k and o200k, evaluations must
 retain both tokenizer results rather than summarize them as interchangeable.
 
 Ordinary C# async methods are not Observable solely because they are async or
@@ -394,8 +394,8 @@ grammar.
 cmod: EXPORT
 F repo:OrderRepository
 M load  → p:id:string → Promise<Order> mod:ASYNC ctl:RET cf:await:await se:io
-$ IM1 rxjs [Observable, of]
-// ── α1 (C:\workspace\src\order.service.ts) ──
+$ rxjs [Observable, of]
+// α1
 §PATHMAP
   α1 = C:\workspace\src\order.service.ts
 ```
@@ -552,7 +552,7 @@ focused edit. Laboratory token wins do not replace this gate.
 |---|---|---|---|---|
 | A1 single path | Measured 40–45 tokens/response; 0.99–6.14% | Very low | content assembly + contracts | Production and refreshed baseline verified; live gate pending |
 | A2 Promise collapse | No opportunity in the current economics corpus | Very low | fixture evidence, then renderer + tests | Defer until a qualifying `P PROMISE` cost exists |
-| A3 import handle removal | Measured 6/24/40 tokens for Angular/C#/TypeScript; 0.14–6.40% | Low; code/corpus, 8/8 paired reasoning, and focused RED/GREEN gates passed | renderer/prompt/tests | Production implemented; broader verification, refreshed baseline, and live gate pending |
+| A3 import handle removal | Measured 6/24/40 tokens for Angular/C#/TypeScript; 0.14–6.40% | Low; code/corpus, 8/8 paired reasoning, and focused RED/GREEN gates passed | renderer/prompt/tests | Laboratory production gate complete; live gate pending |
 | A4a class-owner ID elision | No opportunity in the current economics corpus | Low | pattern-rich fixture + adversarial reasoning tests | Defer until visible `P` rows establish a cost |
 | A4b method-owner elision/replacement | No current corpus opportunity | Medium-to-high ambiguity risk | grammar + pattern-rich adversarial reasoning tests | Retain/replace discriminator unless all ownership gates pass |
 | B1 one method arrow | Medium recurring | Low | versioned grammar/prompt/tests | Highest-priority vNext experiment |
@@ -591,7 +591,10 @@ focused edit. Laboratory token wins do not replace this gate.
    import-meaning and source-alias cases using fresh isolated invocations of
    the configured default Codex model. Its approved presentation-only renderer
    change is implemented, and the unchanged three-case tracked regression was
-   reported GREEN after demonstrating RED against the old renderer.
+   reported GREEN after demonstrating RED against the old renderer. Broader
+   renderer/MCP suites were reported GREEN, and the clean production recapture
+   matched all isolated A3 token predictions exactly. The schema-v5 production
+   and workspace capture verifier passed.
 5. Approve and implement only the individually proven subset.
 
 ### Phase 2 — versioned grammar experiment
