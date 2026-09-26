@@ -61,3 +61,9 @@ mod e2e_server;
 #[cfg(test)]
 #[path = "../tests/mcp/apply_edit.rs"]
 mod apply_edit_tests;
+
+// Persistent-process scenarios are isolated from the in-process/schema
+// contract suite and remain ignored unless the binary has been built first.
+#[cfg(test)]
+#[path = "../tests/mcp/apply_edit_e2e.rs"]
+mod apply_edit_e2e_tests;

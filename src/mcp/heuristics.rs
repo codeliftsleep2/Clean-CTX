@@ -576,5 +576,13 @@ pub fn decide(
 mod tests;
 
 #[cfg(test)]
+#[path = "../tests/mcp/heuristics_classification.rs"]
+mod classification_tests;
+
+#[cfg(test)]
+#[path = "../tests/mcp/heuristics_edit_mode.rs"]
+mod edit_mode_tests;
+
+#[cfg(test)]
 #[path = "../tests/mcp/heuristics_fidelity_precedence.rs"]
 mod fidelity_precedence_tests;
