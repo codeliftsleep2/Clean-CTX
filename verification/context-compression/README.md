@@ -52,6 +52,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scrip
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Capture-Baselines.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/scripts/Capture-WorkspaceQuery.ps1 -WorkspaceQueryOracles schema-v5\workspace-query-oracles.json
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Verify-Captures.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/measure-schema-v5.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Measure-SchemaV5Anatomy.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Prepare-ReasoningWorksheet.ps1
 ```
 
@@ -114,6 +116,8 @@ Generated data appears under
 - `verification-result.json` — operator semantic checks;
 - `baseline-records.json` — one record per capture/tokenizer with bytes, characters, family counts, CONTROL-PROD tokens, CONTROL-FULL tokens, null candidate tokens, and reasoning-oracle path.
 - `marginal-costs.json` — paired CONTROL-PROD/CONTROL-FULL token deltas for each added semantic family under both real local tokenizers.
+- `schema-v5-token-records.json` — raw-to-selected SCHEMA-v5 economics by language, fidelity, and tokenizer.
+- `schema-v5-anatomy-records.json` — independent SCHEMA-v5 legend, path, declaration/signature, behavior-fact, import/type-alias, and exact-body token measurements. Family counts are diagnostic and non-additive because BPE merges can cross family boundaries.
 - `reasoning-results.json` — unscored per-task/per-capture worksheet with exact oracle and zero-tolerance fields; it deliberately has no aggregate score.
 
 The per-family `*_value_tokens` and `*_json_tokens` fields isolate selected values for cost diagnosis. They are not an additive partition of the payload because the enclosing CONTROL-FULL JSON syntax is intentionally excluded.

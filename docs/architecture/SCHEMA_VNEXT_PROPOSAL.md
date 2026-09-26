@@ -459,8 +459,9 @@ Record by fixture, language, fidelity, and tokenizer:
 
 The prior density table remains available in repository history as historical
 evidence. The 2026-09-26 table above is the comparison baseline. Aggregate
-raw-to-presentation capture is complete; the per-family anatomy items in this
-list remain to be recorded before candidate implementation.
+raw-to-presentation capture and per-family anatomy are complete. The complete
+record and findings are in
+`verification/context-compression/schema-v5/PHASE0_BASELINE.md`.
 
 ### Baseline invalidation rule
 
@@ -550,10 +551,10 @@ focused edit. Laboratory token wins do not replace this gate.
 | Candidate | Expected impact | Correctness risk | Implementation scope | Initial recommendation |
 |---|---|---|---|---|
 | A1 single path | Small fixed | Very low | content assembly + contracts | Measure first |
-| A2 Promise collapse | Small-to-medium on async-heavy TS | Very low | renderer + tests | Measure first |
+| A2 Promise collapse | No opportunity in the current economics corpus | Very low | fixture evidence, then renderer + tests | Defer until a qualifying `P PROMISE` cost exists |
 | A3 import handle removal | Small recurring | Low pending meaning audit | renderer/prompt/tests | Audit then measure |
-| A4a class-owner ID elision | Small-to-medium on pattern-dense files | Low | renderer + adversarial reasoning tests | Measure independently |
-| A4b method-owner elision/replacement | Medium on pattern-dense files | Medium-to-high ambiguity risk | grammar + adversarial reasoning tests | Retain/replace discriminator unless all ownership gates pass |
+| A4a class-owner ID elision | No opportunity in the current economics corpus | Low | pattern-rich fixture + adversarial reasoning tests | Defer until visible `P` rows establish a cost |
+| A4b method-owner elision/replacement | No current corpus opportunity | Medium-to-high ambiguity risk | grammar + pattern-rich adversarial reasoning tests | Retain/replace discriminator unless all ownership gates pass |
 | B1 one method arrow | Medium recurring | Low | versioned grammar/prompt/tests | Highest-priority vNext experiment |
 | B2 `C` class record | Small-to-medium | Low | versioned grammar/prompt/tests | Pair with B1 only after isolation |
 | B3 grouped fields | Workload-dependent | Medium reasoning risk | renderer/reasoning tests | A/B test |
@@ -570,7 +571,8 @@ focused edit. Laboratory token wins do not replace this gate.
    correctness fixes.
 2. **Complete:** update stale measurement prose; the prior numbers remain in
    repository history as historical evidence.
-3. **Pending:** record per-family token anatomy.
+3. **Complete:** record per-family token anatomy and candidate opportunity in
+   `verification/context-compression/schema-v5/PHASE0_BASELINE.md`.
 
 ### Phase 1 — Tier A experiments
 

@@ -1,7 +1,7 @@
 # SCHEMA-v5 presentation reasoning harness — scoping
 
-**Status:** scoped, not yet implemented. This document records the boundary,
-structure, and oracle catalog for a *separate* evaluation harness that scores
+**Status:** implemented. This document records the boundary, structure, and
+oracle catalog for a *separate* evaluation harness that scores
 the model against the **model-visible interface** (SCHEMA-v5 presentation +
 `workspace_query`) — distinct from the existing codec harness.
 
@@ -55,6 +55,9 @@ verification/context-compression/
 Shared `McpSession.ps1` and `measure.rs` remain in `scripts/` because the
 `edge-cases/` and `verification/workspace-query/` harnesses and
 `measure-helper/Cargo.toml` reference those exact paths.
+
+The SCHEMA-vNext Phase 0 production economics and independent token anatomy are
+recorded in [`PHASE0_BASELINE.md`](PHASE0_BASELINE.md).
 
 ## 3. Oracle catalog
 

@@ -18,6 +18,11 @@ $measure = Join-Path $runtimeRoot "scripts\measure.exe"
 if (-not $BinaryPath) { $BinaryPath = Join-Path $RepositoryRoot "target\debug\clean-ctx.exe" }
 if (-not (Test-Path -LiteralPath $BinaryPath)) { throw "Missing binary. Run: cargo build --all-features" }
 if (-not (Test-Path -LiteralPath $measure)) { throw "Missing measure.exe. Run scripts/Build-MeasureHelper.ps1" }
+$captureGitCommit = (& git -C $RepositoryRoot rev-parse HEAD | Out-String).Trim()
+$captureWorktreeDirty = [bool]((& git -C $RepositoryRoot status --porcelain --untracked-files=no | Out-String).Trim())
+$captureStartedAtUtc = [DateTime]::UtcNow.ToString("o")
+$binaryHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $BinaryPath).Hash.ToLowerInvariant()
+$measureHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $measure).Hash.ToLowerInvariant()
 
 New-Item -ItemType Directory -Force $runtime, $workspace, $captures | Out-Null
 Get-ChildItem -LiteralPath $fixtureSource -File | Copy-Item -Destination $workspace -Force
@@ -214,12 +219,23 @@ try {
             }
             Require-ToolSuccess $responses[$captureFidelity] "tracked economics capture $relative @ $captureFidelity"
         }
+        if ($focusTarget) {
+            $requestId++
+            $responses["edit-focused"] = Invoke-CleanCtxTool $session $requestId "provide_code_context" @{
+                filePath = $economicsFile.FullName
+                workspaceRoot = $workspace
+                fidelity = "edit"
+                focusMethods = @($focusTarget)
+                tokenizer = "o200k"
+            }
+            Require-ToolSuccess $responses["edit-focused"] "tracked focused Edit economics capture $relative"
+        }
         $matrix = @(
             @{ fidelity = "low";    focusCsv = "";           focusMode = "none";       capture = "low" }
             @{ fidelity = "medium"; focusCsv = "";           focusMode = "none";       capture = "medium" }
             @{ fidelity = "high";   focusCsv = "";           focusMode = "none";       capture = "high" }
             @{ fidelity = "edit";   focusCsv = "";           focusMode = "all-bodies"; capture = "edit" }
-            @{ fidelity = "edit";   focusCsv = $focusTarget; focusMode = "focused";    capture = "edit" }
+            @{ fidelity = "edit";   focusCsv = $focusTarget; focusMode = "focused";    capture = "edit-focused" }
         )
         foreach ($entry in $matrix) {
             if ($entry.focusMode -eq "focused" -and -not $entry.focusCsv) {
@@ -235,12 +251,29 @@ try {
                 fidelity = $entry.fidelity
                 focus_mode = $entry.focusMode
                 focus_target = $entry.focusCsv
+                captured_at_utc = $captureStartedAtUtc
+                git_commit = $captureGitCommit
+                worktree_dirty = $captureWorktreeDirty
+                source_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $economicsFile.FullName).Hash.ToLowerInvariant()
+                binary_sha256 = $binaryHash
+                measure_helper_sha256 = $measureHash
             } | ConvertTo-Json -Depth 10
             [IO.File]::WriteAllText((Join-Path $dir "capture-meta.json"), $meta, [Text.UTF8Encoding]::new($false))
             Copy-Item -LiteralPath $economicsFile.FullName -Destination (Join-Path $dir "raw-source.txt") -Force
             $oracleResponsePath = Join-Path $dir "oracle-source-response.json"
             $responses[$entry.capture] | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8NoBOM $oracleResponsePath
-            & $measure oracle $oracleResponsePath $economicsFile.FullName $entry.fidelity $entry.focusCsv (Join-Path $dir "control-full.txt")
+            $oracleRenderResponsePath = $oracleResponsePath
+            if ($entry.focusMode -eq "focused") {
+                # provide_code_context is the real model-visible focused path,
+                # but intentionally does not expose canonical result.ir. Keep
+                # that response above for selected-content measurement and use
+                # the unfocused Edit IR only as the code-side oracle source;
+                # the qualified focus is applied by the oracle renderer below.
+                $oracleRenderResponsePath = Join-Path $dir "oracle-ir-response.json"
+                $responses["edit"] | ConvertTo-Json -Depth 100 |
+                    Set-Content -Encoding utf8NoBOM $oracleRenderResponsePath
+            }
+            & $measure oracle $oracleRenderResponsePath $economicsFile.FullName $entry.fidelity $entry.focusCsv (Join-Path $dir "control-full.txt")
             if ($LASTEXITCODE -ne 0) { throw "CONTROL-FULL oracle render failed for $dirName" }
         }
     }

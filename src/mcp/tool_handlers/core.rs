@@ -24,6 +24,10 @@ pub(crate) use restore::handle_restore_context;
 #[path = "../../tests/mcp/projection_contract.rs"]
 mod projection_contract_tests;
 
+#[cfg(test)]
+#[path = "../../tests/mcp/context_compression_harness.rs"]
+mod context_compression_harness_tests;
+
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../tests/mcp/control_full_content.rs"]
 mod control_full_content_tests;
